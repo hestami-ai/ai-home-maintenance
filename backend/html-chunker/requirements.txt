@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+beautifulsoup4
+requests
+tiktoken
+langchain
+lxml

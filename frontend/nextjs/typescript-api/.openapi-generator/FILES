@@ -1,0 +1,13 @@
+.openapi-generator-ignore
+apis/MediaApi.ts
+apis/PropertiesApi.ts
+apis/ServicesApi.ts
+apis/UsersApi.ts
+apis/index.ts
+index.ts
+models/TokenRefresh.ts
+models/User.ts
+models/UserLogin.ts
+models/UserRoleEnum.ts
+models/index.ts
+runtime.ts

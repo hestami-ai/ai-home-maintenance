@@ -1,0 +1,91 @@
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log debug;
+pid /var/run/nginx.pid;
+
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include mime.types;
+    default_type application/octet-stream;
+    client_max_body_size 100M;
+
+    log_format debug_format '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for" '
+                        'Host: "$http_host" Scheme: "$scheme" '
+                        'Server_Port: "$server_port" '
+                        'URI: "$uri" Args: "$args" '
+                        'secure_link: "$secure_link" '
+                        'secure_link_expires: "$secure_link_expires" '
+                        'arg_md5: "$arg_md5" '
+                        'arg_expires: "$arg_expires"';
+
+    access_log /var/log/nginx/access.log debug_format;
+    error_log /var/log/nginx/error.log debug;
+
+    sendfile on;
+    keepalive_timeout 65;
+
+    server {
+        listen 80;
+        server_name localhost;
+        root /usr/share/nginx/html;
+
+        set $secret_key '$NGINX_SECURE_LINK_SECRET';
+
+        location /media-secure/ {
+            alias /usr/share/nginx/html/media/;
+            
+            # Capture everything after /media-secure
+            if ($uri ~ "^/media-secure(.*)") {
+                set $clean_uri $1;
+            }
+
+            # Use base64 format for secure_link_md5
+            secure_link $arg_md5;
+            secure_link_md5 "$arg_expires|$uri|$secret_key";
+
+            # Add debug headers before any return statements
+            # add_header X-Debug-URI $uri always;
+            # add_header X-Debug-SecureLink $secure_link always;
+            # add_header X-Debug-Expires $arg_expires always;
+            # add_header X-Debug-Time $time_local always;
+            # add_header X-Debug-MD5-String "$arg_expires|$uri|$secret_key" always;
+            # add_header X-Debug-Clean-URI $clean_uri always;
+            # add_header X-Debug-Provided-MD5 $arg_md5 always;
+            # add_header X-Debug-Calculated-MD5 "$secure_link" always;
+            # add_header X-Debug-Secret-Key "$secret_key" always;
+
+            # Log the calculated MD5 hash
+            #error_log /var/log/nginx/error.log debug;
+            #set $debug_info "MD5 String: $arg_expires|$uri|$secret_key";
+            #error_log /var/log/nginx/error.log debug;
+
+            if ($arg_md5 = "") { return 403; }
+            if ($arg_expires = "") { return 403; }
+            if ($secure_link = "") { return 403; }
+            if ($secure_link = "0") { return 403; }
+
+            try_files $uri =404;
+        }
+
+        location /static/ {
+            alias /usr/share/nginx/html/static/;
+            try_files $uri $uri/ =404;
+        }
+
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+        }
+
+        location / {
+            try_files $uri $uri/ =404;
+            add_header Access-Control-Allow-Origin * always;
+        }
+    }
+}

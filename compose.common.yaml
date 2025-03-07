@@ -1,0 +1,109 @@
+name: hestami-ai
+
+networks:
+  traefik-public:
+    name: traefik-public
+    driver: bridge
+  backend-dev:
+    name: backend-dev
+    driver: bridge
+  backend-prod:
+    name: backend-prod
+    driver: bridge
+
+volumes:
+  traefik:
+  alpha-deliveries:
+  joomla:
+  mariadb:
+
+services:
+  traefik:
+    image: traefik:v3.2.1
+    container_name: traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.websecure.http.tls.certResolver=default"
+      - "--providers.file.directory=/etc/traefik/certs"
+      - "--providers.file.watch=true"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "443:443"
+    volumes:
+      - "./volumes/common/traefik/certs:/etc/traefik/certs:ro"
+      - "//var/run/docker.sock://var/run/docker.sock"
+      - "./volumes/common/traefik/logs:/var/log/traefik"
+    networks:
+      - traefik-public
+    restart: "unless-stopped"
+
+
+  joomla:
+    image: joomla:latest
+    container_name: joomla
+    hostname: 767098da0624
+    environment:
+      JOOMLA_DB_HOST: mariadb
+      JOOMLA_DB_USER: joomla_rw
+      JOOMLA_DB_PASSWORD: J00mla!!
+      JOOMLA_DB_NAME: joomla
+      PHPIZE_DEPS: "autoconf dpkg-dev file g++ gcc libc-dev make pkg-config re2c"
+      PHP_INI_DIR: /usr/local/etc/php
+      APACHE_CONFDIR: /etc/apache2
+      APACHE_ENVVARS: /etc/apache2/envvars
+      PHP_CFLAGS: "-fstack-protector-strong -fpic -fpie -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
+      PHP_CPPFLAGS: "-fstack-protector-strong -fpic -fpie -O2 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64"
+      PHP_LDFLAGS: "-Wl,-O1 -pie"
+      GPG_KEYS: "39B641343D8C104B2B146DC3F9C39DC0B9698544 E60913E4DF209907D8E30D96659A97C9CF2A795A 1198C0117593497A5EC5C199286AF1F9897469DC"
+      PHP_VERSION: 8.2.22
+      PHP_URL: https://www.php.net/distributions/php-8.2.22.tar.xz
+      PHP_ASC_URL: https://www.php.net/distributions/php-8.2.22.tar.xz.asc
+      PHP_SHA256: 8566229bc88ad1f4aadc10700ab5fbcec81587c748999d985f11cf3b745462df
+      JOOMLA_INSTALLATION_DISABLE_LOCALHOST_CHECK: "1"
+      JOOMLA_VERSION: 5.1.2
+      JOOMLA_SHA512: d344506443b403fa662aa4e626e11a76d8666c938f52e497030d4b422205a1cdf21d4457d5943f68eea47e904067f8005b49a6d95432255e772809a3a471d1b0
+    volumes:
+      - /home/mhendricks/projects/hestami-ai/volumes/common/joomla:/var/www/html
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hestamijoomla.rule=Host(`www.hestami-ai.com`)"
+      - "traefik.http.routers.hestamijoomla.tls=true"
+      - "traefik.http.services.hestamijoomla.loadbalancer.server.port=80"
+    networks:
+      - traefik-public
+    restart: "unless-stopped"
+    runtime: runc
+    depends_on:
+      - mariadb
+      - traefik
+
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    hostname: 6b86de4abab2
+    environment:
+      MYSQL_PASSWORD: J00mla!!
+      MYSQL_DATABASE: joomla
+      MYSQL_ROOT_PASSWORD: r00tp@404097
+      MYSQL_USER: joomla_rw
+      GOSU_VERSION: 1.17
+      LANG: C.UTF-8
+      MARIADB_VERSION: "1:11.5.2+maria~ubu2404"
+    volumes:
+      - /home/mhendricks/projects/hestami-ai/volumes/common/mariadb:/var/lib/mysql
+    networks:
+      - traefik-public
+    restart: "unless-stopped"
+    runtime: runc
+    depends_on:
+      - traefik
+

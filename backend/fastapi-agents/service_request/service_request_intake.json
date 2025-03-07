@@ -1,0 +1,42 @@
+{
+  "questions": [
+    {
+      "question": "Can you provide a rough estimate of when the water stains appeared after the heavy rain?",
+      "context": "To understand the timeline of the issue and assess the urgency of the roof repair.",
+      "required": true
+    },
+    {
+      "question": "Do you have any other damage besides water stains on the ceiling?",
+      "context": "To determine if the problem is isolated to one area or if there's further internal damage due to the leak.",
+      "required": true
+    },
+    {
+      "question": "Have you noticed any issues with the shingles or any visible damage on the roof before the heavy rain?",
+      "context": "To identify possible causes of the leak or to confirm if the issue is recent.",
+      "required": true
+    },
+    {
+      "question": "Are you available to provide roof access to the service provider for inspection?",
+      "context": "For the service provider to assess the roof's condition accurately.",
+      "required": true
+    },
+    {
+      "question": "Do you have a preferred brand or specific type of shingles you'd like to be used for repairs?",
+      "context": "To meet the client's specific roofing preferences, if any.",
+      "required": false
+    },
+    {
+      "question": "Are you willing to consider service providers offering partial emergency repairs followed by a more comprehensive evaluation?",
+      "context": "To accommodate potential rush work schedules while meeting the client's emergency requirements.",
+      "required": false
+    }
+  ],
+  "answers": {
+    "timeline": "Water stains appeared within 24 hours after the heavy rain last weekend",
+    "additional_damage": "Yes, there's some bubbling in the drywall around the water stains",
+    "prior_issues": "No visible damage noticed before, but haven't inspected the roof closely",
+    "access": "Yes, available for inspection during business hours",
+    "shingle_preference": "No specific preference, but would like durable, weather-resistant options",
+    "emergency_repairs": "Yes, willing to consider emergency repairs if needed"
+  }
+}

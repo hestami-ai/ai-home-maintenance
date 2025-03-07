@@ -1,0 +1,51 @@
+## Good Example ##
+
+[
+    {
+      "args": {
+        "query": null,
+        "zipCode": null
+      },
+      "next": "question",
+      "response": "What kind of home repair person are you looking for?",
+      "tool": null
+    }
+  ]
+
+## Bad Example ##
+
+[
+    {
+      "args": {
+        "query": null,
+        "zipCode": null
+      },
+      "next": "question",
+      "response": "What kind of home repair person are you looking for?",
+      "tool": null
+    }
+  ]
+
+## Error Patterns ##
+
+{
+  "error_patterns": [
+    {
+      "id": "json_parse_error_1",
+      "type": "json_parsing",
+      "description": "LLM response JSON format validation error",
+      "example": {
+        "response": "What kind of home repair service person are you looking for?",
+        "next": "question",
+        "tool": null,
+        "args": {
+          "query": null,
+          "zipCode": null
+        }
+      },
+      "error_message": "Response does not contain a properly formatted JSON block",
+      "resolution": "Updated prompt_llm activity to handle both raw JSON and JSON within code block markers",
+      "date_added": "2025-01-24"
+    }
+  ]
+}

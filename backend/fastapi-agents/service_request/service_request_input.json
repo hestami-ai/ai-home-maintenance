@@ -1,0 +1,11 @@
+{
+  "location": "123 Oak Street, Charlotte, NC 28202",
+  "service_type": "roof_repair",
+  "description": "Noticed water stains on ceiling in master bedroom after recent heavy rain. Suspect roof is leaking.",
+  "client_criteria": [
+    "licensed and insured",
+    "available for emergency repairs",
+    "experience with shingle roofs",
+    "local business"
+  ]
+}
