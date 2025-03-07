@@ -1,0 +1,106 @@
+name: hestami-ai-prod
+
+networks:
+  traefik-public:
+    name: traefik-public
+    driver: bridge
+  backend-dev:
+    name: backend-dev
+    driver: bridge
+  backend-prod:
+    name: backend-prod
+    driver: bridge
+
+volumes:
+  hestami_media_data_prod:
+  postgres_data_prod:
+
+services:
+
+  app:
+    build: 
+      context: ./frontend/nextjs
+      dockerfile: ../../docker/fronted/nextjs/Dockerfile
+    container_name: app-prod
+    env_file:
+      - ./.env.prod
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`app.hestami-ai.com`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    networks:
+      - traefik-public
+      - backend-prod
+    depends_on:
+      - api
+      - static
+
+  api:
+    build: 
+      context: ./backend/django
+      dockerfile: ../../docker/django/Dockerfile
+    command: python manage.py runserver --insecure 0.0.0.0:8050 --nostatic
+    container_name: api-prod
+    volumes:
+      - "hestami_media_data_prod:/mnt/hestami-static:rw"
+    ports:
+      - 8050:8050
+    env_file:
+      - ./.env.prod
+    depends_on:
+      - db
+    networks:
+      - backend-prod
+
+
+  db:
+    image: postgres:17
+    container_name: db-prod
+    env_file:
+      - ./.env.prod
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - backend-prod
+
+  static:
+    build: 
+      context: ./backend/static
+      dockerfile: ../../docker/static/Dockerfile
+    container_name: static-prod
+    restart: unless-stopped
+    volumes:
+      - "./volumes/prod/static/templates/etc/nginx:/templates/etc/nginx:ro"
+      - "hestami_media_data_prod:/usr/share/nginx/html/:ro"
+    env_file:
+      - ./.env.prod
+    command: >
+      /bin/sh -c "envsubst '$$NGINX_SECURE_LINK_SECRET' < /templates/etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf 
+      && exec nginx -g 'daemon off;'"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hestamistatic.rule=Host(`static.hestami-ai.com`)"
+      - "traefik.http.routers.hestamistatic.tls=true"
+      - "traefik.http.services.hestamistatic.loadbalancer.server.port=80"
+    networks:
+      - traefik-public
+
+
+  redis:
+    image: redis:8.0-M02-alpine3.20
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - backend-prod
+
+  clamav:
+    image: clamav/clamav:latest
+    container_name: clamav
+    ports:
+      - "3310:3310"
+    environment:
+      - CLAMAV_NO_MILTERD=true
+    networks:
+      - backend-prod

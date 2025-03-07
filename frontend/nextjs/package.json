@@ -1,0 +1,46 @@
+{
+  "name": "nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "dotenv -e ../../.env.local next dev",
+    "build": "dotenv -e ../../.env.prod next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@auth/core": "0.18.1",
+    "@headlessui/react": "^2.2.0",
+    "@heroicons/react": "^2.2.0",
+    "@marsidev/react-turnstile": "^1.1.0",
+    "@photo-sphere-viewer/core": "^5.12.0",
+    "@photo-sphere-viewer/gallery-plugin": "^5.12.0",
+    "@tinymce/tinymce-react": "^6.0.0",
+    "@types/uuid": "^10.0.0",
+    "date-fns": "^4.1.0",
+    "dotenv-cli": "^7.4.4",
+    "next": "^14.2.18",
+    "next-auth": "^5.0.0-beta.25",
+    "next-image-gallery": "^0.0.26",
+    "next-turnstile": "^1.0.2",
+    "postcss": "^8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.3.5",
+    "react-photo-sphere-viewer": "^6.0.0",
+    "sharp": "^0.33.5",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5",
+    "uuid": "^11.1.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@typescript-eslint/eslint-plugin": "^8.24.1",
+    "@typescript-eslint/parser": "^8.24.1",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^15.0.3"
+  }
+}

@@ -1,0 +1,418 @@
+{
+    "summary": {
+        "query": "roof leak repair",
+        "queryType": "NON_NEAR",
+        "queryTime": 132,
+        "numResults": 5,
+        "offset": 0,
+        "totalResults": 5,
+        "fuzzyLevel": 2,
+        "geoBias": {
+            "lat": 38.8861993,
+            "lon": -77.4387572
+        }
+    },
+    "results": [
+        {
+            "type": "POI",
+            "id": "RXcOynDkCIoSyDh0x9x-dA",
+            "score": 0.2739419639,
+            "dist": 9562.622048,
+            "info": "search:ta:840517000032714-US",
+            "matchConfidence": {
+                "score": 0.6193995086227541
+            },
+            "poi": {
+                "name": "Rooftop Agency Roof Repair Roofing Contractors",
+                "phone": "+1 571-459-7699",
+                "categorySet": [
+                    {
+                        "id": 9352032
+                    }
+                ],
+                "categories": [
+                    "company",
+                    "construction"
+                ],
+                "classifications": [
+                    {
+                        "code": "COMPANY",
+                        "names": [
+                            {
+                                "nameLocale": "en-US",
+                                "name": "company"
+                            },
+                            {
+                                "nameLocale": "en-US",
+                                "name": "construction"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "address": {
+                "streetNumber": "11230",
+                "streetName": "Waples Mill Road",
+                "municipality": "Providence",
+                "countrySecondarySubdivision": "Fairfax County",
+                "countrySubdivision": "VA",
+                "countrySubdivisionName": "Virginia",
+                "countrySubdivisionCode": "VA",
+                "postalCode": "22030",
+                "countryCode": "US",
+                "country": "United States",
+                "countryCodeISO3": "USA",
+                "freeformAddress": "11230 Waples Mill Road, Fairfax, VA 22030",
+                "localName": "Fairfax"
+            },
+            "position": {
+                "lat": 38.857772,
+                "lon": -77.334506
+            },
+            "viewport": {
+                "topLeftPoint": {
+                    "lat": 38.85867,
+                    "lon": -77.33566
+                },
+                "btmRightPoint": {
+                    "lat": 38.85687,
+                    "lon": -77.33335
+                }
+            },
+            "entryPoints": [
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.8582,
+                        "lon": -77.33524
+                    }
+                },
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.85851,
+                        "lon": -77.33523
+                    }
+                }
+            ]
+        },
+        {
+            "type": "POI",
+            "id": "BQ_vNy_BQKO60FgEDDw-9Q",
+            "score": 0.2597823143,
+            "dist": 20117.22357,
+            "info": "search:ta:840519001146032-US",
+            "matchConfidence": {
+                "score": 0.6937325041746731
+            },
+            "poi": {
+                "name": "Reliable Roof Repair",
+                "phone": "+1 202-701-7011",
+                "categorySet": [
+                    {
+                        "id": 9352002
+                    }
+                ],
+                "categories": [
+                    "company",
+                    "service"
+                ],
+                "classifications": [
+                    {
+                        "code": "COMPANY",
+                        "names": [
+                            {
+                                "nameLocale": "en-US",
+                                "name": "company"
+                            },
+                            {
+                                "nameLocale": "en-US",
+                                "name": "service"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "address": {
+                "streetNumber": "2123",
+                "streetName": "Dominion Heights Court",
+                "municipality": "Providence",
+                "countrySecondarySubdivision": "Fairfax County",
+                "countrySubdivision": "VA",
+                "countrySubdivisionName": "Virginia",
+                "countrySubdivisionCode": "VA",
+                "postalCode": "22043",
+                "extendedPostalCode": "22043-2559",
+                "countryCode": "US",
+                "country": "United States",
+                "countryCodeISO3": "USA",
+                "freeformAddress": "2123 Dominion Heights Court, Falls Church, VA 22043",
+                "localName": "Falls Church"
+            },
+            "position": {
+                "lat": 38.9053,
+                "lon": -77.2076
+            },
+            "viewport": {
+                "topLeftPoint": {
+                    "lat": 38.9062,
+                    "lon": -77.20876
+                },
+                "btmRightPoint": {
+                    "lat": 38.9044,
+                    "lon": -77.20644
+                }
+            },
+            "entryPoints": [
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.90542,
+                        "lon": -77.20774
+                    }
+                }
+            ]
+        },
+        {
+            "type": "POI",
+            "id": "0VHu2VQkz26xKIZZ5oqJcg",
+            "score": 0.1736015975,
+            "dist": 31073.244701,
+            "info": "search:ta:840516000195960-US",
+            "matchConfidence": {
+                "score": 0.6698748026613435
+            },
+            "poi": {
+                "name": "Va Roof Repair Company",
+                "phone": "+1 571-517-8099",
+                "categorySet": [
+                    {
+                        "id": 9352002
+                    }
+                ],
+                "categories": [
+                    "company",
+                    "service"
+                ],
+                "classifications": [
+                    {
+                        "code": "COMPANY",
+                        "names": [
+                            {
+                                "nameLocale": "en-US",
+                                "name": "company"
+                            },
+                            {
+                                "nameLocale": "en-US",
+                                "name": "service"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "address": {
+                "streetNumber": "1229",
+                "streetName": "North Quaker Lane",
+                "municipality": "Alexandria",
+                "neighbourhood": "Taylor Run-Duke Street",
+                "countrySecondarySubdivision": "Alexandria",
+                "countrySubdivision": "VA",
+                "countrySubdivisionName": "Virginia",
+                "countrySubdivisionCode": "VA",
+                "postalCode": "22302",
+                "extendedPostalCode": "22302-3006",
+                "countryCode": "US",
+                "country": "United States",
+                "countryCodeISO3": "USA",
+                "freeformAddress": "1229 North Quaker Lane, Alexandria, VA 22302",
+                "localName": "Alexandria"
+            },
+            "position": {
+                "lat": 38.825922,
+                "lon": -77.088351
+            },
+            "viewport": {
+                "topLeftPoint": {
+                    "lat": 38.82682,
+                    "lon": -77.08951
+                },
+                "btmRightPoint": {
+                    "lat": 38.82502,
+                    "lon": -77.0872
+                }
+            },
+            "entryPoints": [
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.82619,
+                        "lon": -77.08853
+                    }
+                }
+            ]
+        },
+        {
+            "type": "POI",
+            "id": "tKJsSy97aJqVrwCBf1gfDw",
+            "score": 0.1339050233,
+            "dist": 31883.852907,
+            "info": "search:ta:840517000037060-US",
+            "matchConfidence": {
+                "score": 0.6445981588754802
+            },
+            "poi": {
+                "name": "Roof Proof - Roofs Repair",
+                "phone": "+1 571-977-4467",
+                "categorySet": [
+                    {
+                        "id": 9352032
+                    }
+                ],
+                "categories": [
+                    "company",
+                    "construction"
+                ],
+                "classifications": [
+                    {
+                        "code": "COMPANY",
+                        "names": [
+                            {
+                                "nameLocale": "en-US",
+                                "name": "company"
+                            },
+                            {
+                                "nameLocale": "en-US",
+                                "name": "construction"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "address": {
+                "streetNumber": "1735",
+                "streetName": "North Lynn Street",
+                "municipality": "Arlington",
+                "neighbourhood": "North Rosslyn",
+                "countrySecondarySubdivision": "Arlington",
+                "countrySubdivision": "VA",
+                "countrySubdivisionName": "Virginia",
+                "countrySubdivisionCode": "VA",
+                "postalCode": "22209",
+                "extendedPostalCode": "22209-2005",
+                "countryCode": "US",
+                "country": "United States",
+                "countryCodeISO3": "USA",
+                "freeformAddress": "1735 North Lynn Street, Arlington, VA 22209",
+                "localName": "Arlington"
+            },
+            "position": {
+                "lat": 38.895791,
+                "lon": -77.070567
+            },
+            "viewport": {
+                "topLeftPoint": {
+                    "lat": 38.89669,
+                    "lon": -77.07172
+                },
+                "btmRightPoint": {
+                    "lat": 38.89489,
+                    "lon": -77.06941
+                }
+            },
+            "entryPoints": [
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.89579,
+                        "lon": -77.07083
+                    }
+                },
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.89564,
+                        "lon": -77.07083
+                    }
+                }
+            ]
+        },
+        {
+            "type": "POI",
+            "id": "mkpfY6NLvTki56IzJvzavQ",
+            "score": 0.1063743606,
+            "dist": 36285.090521,
+            "info": "search:ta:840116000011086-US",
+            "matchConfidence": {
+                "score": 0.6622190490409285
+            },
+            "poi": {
+                "name": "A1 Roof Repairs Washington",
+                "phone": "+1 202-979-4273",
+                "categorySet": [
+                    {
+                        "id": 9352002
+                    }
+                ],
+                "categories": [
+                    "company",
+                    "service"
+                ],
+                "classifications": [
+                    {
+                        "code": "COMPANY",
+                        "names": [
+                            {
+                                "nameLocale": "en-US",
+                                "name": "company"
+                            },
+                            {
+                                "nameLocale": "en-US",
+                                "name": "service"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "address": {
+                "streetNumber": "1400",
+                "streetName": "Whittier Place Northwest",
+                "municipality": "Washington",
+                "neighbourhood": "Brightwood",
+                "countrySecondarySubdivision": "District of Columbia",
+                "countrySubdivision": "DC",
+                "countrySubdivisionName": "District of Columbia",
+                "countrySubdivisionCode": "DC",
+                "postalCode": "20012",
+                "extendedPostalCode": "20012-2817",
+                "countryCode": "US",
+                "country": "United States",
+                "countryCodeISO3": "USA",
+                "freeformAddress": "1400 Whittier Place Northwest, Washington, DC 20012",
+                "localName": "Washington"
+            },
+            "position": {
+                "lat": 38.9713,
+                "lon": -77.0338
+            },
+            "viewport": {
+                "topLeftPoint": {
+                    "lat": 38.9722,
+                    "lon": -77.03496
+                },
+                "btmRightPoint": {
+                    "lat": 38.9704,
+                    "lon": -77.03264
+                }
+            },
+            "entryPoints": [
+                {
+                    "type": "main",
+                    "position": {
+                        "lat": 38.97148,
+                        "lon": -77.0338
+                    }
+                }
+            ]
+        }
+    ]
+}

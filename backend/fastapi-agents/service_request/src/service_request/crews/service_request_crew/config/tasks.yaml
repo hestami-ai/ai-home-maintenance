@@ -1,0 +1,65 @@
+determine_service_questions:
+  description: >
+    Using the provided service request context, analyze the property maintenance request and determine what specific information needs to be gathered from the property owner. Consider the initial request details, type of issue,
+    urgency, property details, and any specific requirements or preferences already provided. It is very important to NOT ask questions about asking the property owner for providing access to the property because our service provides high definition photos and videos for service providers to review before making their decision on whether and how much to charge.
+
+    Service Request: 
+    {service_request}
+  expected_output: >
+    Generate a list of relevant questions needed to fully understand the service request. Each question should include
+    its purpose/context and whether it's required or optional. Consider what information is already available in the
+    service request and what additional details would be helpful for service providers. 
+    Intake Questions Schema:
+    {intake_questions_schema}
+  agent: research_specialist
+
+gather_service_details:
+  description: >
+    Based on the initial service request and determined questions, interview the property owner to gather all
+    necessary details about the maintenance needs. Reference the service request context to avoid asking for
+    information that has already been provided. Document all responses clearly and note any additional
+    important information shared during the conversation.
+  expected_output: >
+    Provide a comprehensive record of the property owner's responses to the intake questions. Include the
+    specific details about the maintenance issue, any relevant property information, and additional observations
+    or notes from the conversation. The response should be structured according to the IntakeDetails schema,
+    with clear question-answer pairs and supplementary notes.
+  agent: client_liaison
+
+search_providers:
+  description: >
+    Using the service request details and gathered information from the previous tasks, search for qualified maintenance 
+    contractors in the specified service area. Follow these steps:
+    1. Review the service details and requirements from gather_service_details task
+    2. Generate appropriate search queries combining:
+       - The type of service needed
+       - The client's location from service_request
+       - Any specific requirements or qualifications needed
+    3. Use the Bing Search Tool to find service providers in the area
+    4. For each search result, evaluate if the provider matches the service requirements
+    
+    Tools available:
+    - Bing Search Tool: Use this to search for service providers. You can specify location and number of results.
+    
+    Context:
+    Service Request: {service_request}
+    Gathered Details: {intake_details}
+  expected_output: >
+    Provide a list of service providers that match the search criteria. Each provider must be formatted according 
+    to the provided ServiceProvider schema:
+    {service_provider_schema}
+    
+    The response should be a valid JSON array where each object follows this schema exactly.
+  agent: research_specialist
+
+contact_providers:
+  description: >
+    Contact identified service providers to present the maintenance request details from the service request context
+    and gathered information. Clearly communicate the specific requirements, urgency, and any special considerations
+    noted in the service request. Document their responses and any additional information they provide about their
+    services or timeline.
+  expected_output: >
+    Document each provider contact attempt with detailed information about when and how they were contacted,
+    their response, and any relevant information they provided about their services, availability, or estimated
+    timeline. The documentation should follow the ContactAttempt schema to maintain consistent record-keeping.
+  agent: business_contact

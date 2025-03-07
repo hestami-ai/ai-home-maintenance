@@ -1,0 +1,76 @@
+{
+    "_type": "SearchResponse",
+    "queryContext": {
+      "originalQuery": "roof leak repair contractors near 20151"
+    },
+    "places": {
+      "value": [
+        {
+          "_type": "LocalBusiness",
+          "id": "https://www.bingapis.com/api/v7/#Places.0",
+          "webSearchUrl": "https://www.bing.com/entityexplore?q=My+Home+Pro%2c+Inc.&filters=local_ypid:%22YN873x18367013198303911551%22&elv=AXXfrEiqqD9r3GuelwApuloMbwenx5y7elAvF2zv8IxlQCxM5s9s!5wsa70dsT6U5MrYmV8vlK0id4guQW!iqO8aSnmaGHcx8EsBayxsSTJ1",
+          "name": "My Home Pro, Inc.",
+          "url": "https://www.homepronova.com/",
+          "entityPresentationInfo": {
+            "entityScenario": "ListItem",
+            "entityTypeHints": ["Place", "LocalBusiness"]
+          },
+          "address": {
+            "addressLocality": "Clifton",
+            "addressRegion": "VA",
+            "postalCode": "20124",
+            "addressCountry": "US",
+            "neighborhood": ""
+          },
+          "telephone": "(703) 828-5325"
+        },
+        {
+          "_type": "LocalBusiness",
+          "id": "https://www.bingapis.com/api/v7/#Places.1",
+          "webSearchUrl": "https://www.bing.com/entityexplore?q=Commonwealth+Roofing+%26+Siding&filters=local_ypid:%22YN873x124294294%22&elv=AXXfrEiqqD9r3GuelwApuloMbwenx5y7elAvF2zv8IxlQCxM5s9s!5wsa70dsT6U5MrYmV8vlK0id4guQW!iqO8aSnmaGHcx8EsBayxsSTJ1",
+          "name": "Commonwealth Roofing & Siding",
+          "entityPresentationInfo": {
+            "entityScenario": "ListItem",
+            "entityTypeHints": ["Place", "LocalBusiness"]
+          },
+          "address": {
+            "addressLocality": "Chantilly",
+            "addressRegion": "VA",
+            "postalCode": "20151",
+            "addressCountry": "US",
+            "neighborhood": ""
+          },
+          "telephone": "(703) 261-6656"
+        },
+        {
+          "_type": "LocalBusiness",
+          "id": "https://www.bingapis.com/api/v7/#Places.2",
+          "webSearchUrl": "https://www.bing.com/entityexplore?q=Beyond+Exteriors&filters=local_ypid:%22YN873x132072543%22&elv=AXXfrEiqqD9r3GuelwApuloMbwenx5y7elAvF2zv8IxlQCxM5s9s!5wsa70dsT6U5MrYmV8vlK0id4guQW!iqO8aSnmaGHcx8EsBayxsSTJ1",
+          "name": "Beyond Exteriors",
+          "url": "https://www.beyondexteriors.com/",
+          "entityPresentationInfo": {
+            "entityScenario": "ListItem",
+            "entityTypeHints": ["Place", "LocalBusiness"]
+          },
+          "address": {
+            "addressLocality": "Chantilly",
+            "addressRegion": "VA",
+            "postalCode": "20151",
+            "addressCountry": "US",
+            "neighborhood": ""
+          },
+          "telephone": "(703) 830-0863"
+        }
+      ]
+    },
+    "rankingResponse": {
+      "mainline": {
+        "items": [
+          { "answerType": "Places" },
+          { "answerType": "Places", "resultIndex": 0, "value": { "id": "https://www.bingapis.com/api/v7/#Places.0" } },
+          { "answerType": "Places", "resultIndex": 1, "value": { "id": "https://www.bingapis.com/api/v7/#Places.1" } }
+        ]
+      }
+    }
+  }
+  

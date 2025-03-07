@@ -1,0 +1,214 @@
+name: hestami-ai-dev
+
+networks:
+  backend-dev:
+    name: backend-dev
+    driver: bridge
+  temporal-network:
+    name: temporal-network
+    external: true
+    driver: bridge
+
+volumes:
+  hestami_media_data_dev:
+  postgres_data_dev:
+  elasticsearch_data_dev:
+  ollama_models_dev:
+    driver: local
+
+services:
+  init-volumes:
+    image: busybox
+    container_name: init-volumes-dev
+    volumes:
+      - "./volumes/dev/static/hestami_media_data_dev:/mnt/hestami-static:rw"
+    command: >
+      /bin/sh -c "mkdir -p /mnt/hestami-static/media /mnt/hestami-static/static &&
+      chown -R 999:999 /mnt/hestami-static &&
+      chmod -R 775 /mnt/hestami-static"
+
+  frontend:
+    build: 
+      context: .
+      dockerfile: ./docker/frontend/nextjs/Dockerfile
+      args:
+        ENV_NPM_BUILD_FILE: ./.env.local
+    container_name: frontend-dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./.env.local
+    networks:
+      - backend-dev
+    depends_on:
+      - api
+      - static
+
+  api:
+    build: 
+      context: .
+      dockerfile: ./docker/backend/django/Dockerfile
+    container_name: api-dev
+    command: python manage.py runserver 0.0.0.0:8050
+    volumes:
+      - ./backend/django/hestami_ai_project:/app:rw
+      - "./volumes/dev/static/hestami_media_data_dev:/mnt/hestami-static:rw"
+    depends_on:
+      - db
+      - redis
+      - clamav
+      - static
+      - init-volumes
+    ports:
+      - "8050:8050"
+    env_file:
+      - ./.env.local
+    networks:
+      - backend-dev
+      - temporal-network
+
+  db:
+    image: postgres:17
+    container_name: db-dev
+    env_file:
+      - ./.env.local
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - backend-dev
+
+  static:
+    build: 
+      context: ./backend/static
+      dockerfile: ../../docker/backend/static/Dockerfile
+    container_name: static-dev
+    restart: unless-stopped
+    ports:
+      - "8090:80"
+    volumes:
+      - "./volumes/dev/static/hestami_media_data_dev/templates/etc/nginx:/templates/etc/nginx:ro"
+      - "./volumes/dev/static/hestami_media_data_dev:/usr/share/nginx/html/:ro"
+    env_file:
+      - ./.env.local
+    command: >
+      /bin/sh -c "envsubst '$$NGINX_SECURE_LINK_SECRET' < /templates/etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf 
+      && exec nginx -g 'daemon off;'"
+    networks:
+      - backend-dev
+    depends_on:
+      - init-volumes
+
+  ai-agents:
+    build:
+      context: .
+      dockerfile: ./docker/backend/fastapi/Dockerfile
+    volumes:
+      - ./backend/fastapi:/app
+    environment:
+      - PYTHONPATH=/app
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env.local
+    depends_on:
+      - redis
+      - elasticsearch
+      - ollama
+    networks:
+      - backend-dev
+
+  redis:
+    image: redis:8.0-M02-alpine3.20
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - backend-dev
+
+  clamav:
+    image: clamav/clamav:latest
+    container_name: clamav
+    ports:
+      - "3310:3310"
+    environment:
+      - CLAMAV_NO_MILTERD=true
+    networks:
+      - backend-dev
+
+  elasticsearch:
+    image: elasticsearch:8.11.1
+    container_name: elasticsearch-dev
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    volumes:
+      - elasticsearch_data_dev:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - backend-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+
+  vllm_container:
+    image: vllm/vllm-openai:latest
+    container_name: vllm_container
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./volumes/dev/vllm/.cache/huggingface:/root/.cache/huggingface:rw"
+    ipc: "host"
+    command: >
+      --model Qwen/Qwen2.5-14B-Instruct-GPTQ-Int4
+
+  ollama:
+    build:
+      context: ./docker/backend/ollama
+      dockerfile: Dockerfile
+    container_name: ollama-dev
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models_dev:/root/.ollama
+      - "./volumes/dev/ollama/models/config:/root/ollama/models/config:rw"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - backend-dev
+
+  temporal-workers:
+    build:
+      context: .
+      dockerfile: ./docker/backend/temporal-workers/Dockerfile
+    container_name: temporal-workers-dev
+    volumes:
+      - ./backend/temporal-workers/src:/app/src:rw
+    env_file:
+      - ./.env.local
+    networks:
+      - backend-dev
+      - temporal-network
+    depends_on:
+      - api
