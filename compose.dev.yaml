@@ -168,8 +168,8 @@ services:
         reservations:
           devices:
             - capabilities: ["gpu"]
-    environment:
-      - HUGGING_FACE_HUB_TOKEN=
+    env_file:
+      - ./.env.local
     ports:
       - "8000:8000"
     volumes:
