@@ -9,7 +9,8 @@ from .models import (
     ServiceRequestClarification,
     ServiceRequestView,
     ServiceRequestInterest,
-    ServiceResearch
+    ServiceResearch,
+    ServiceProviderScrapedData
 )
 
 admin.site.register(ServiceProvider)
@@ -22,3 +23,4 @@ admin.site.register(ServiceRequestClarification)
 admin.site.register(ServiceRequestView)
 admin.site.register(ServiceRequestInterest)
 admin.site.register(ServiceResearch)
+admin.site.register(ServiceProviderScrapedData)

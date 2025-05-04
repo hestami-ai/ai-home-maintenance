@@ -37,6 +37,7 @@ interface ResearchEntry {
   id: string;
   research_data: any;
   research_content: string;
+  research_content_raw_text: string;
   notes: string;
   created_at: string;
   updated_at: string;

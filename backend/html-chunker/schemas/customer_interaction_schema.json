@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "customer_interaction": {
+      "type": "object",
+      "properties": {
+        "onboarding_process": { "type": "string" },
+        "pricing_strategy": { "type": "string" },
+        "estimate_process": { "type": "string" },
+        "communication_style": { "type": "string" }
+      }
+    }
+  }
+}

@@ -26,11 +26,6 @@ class ServiceResearchSources(models.TextChoices):
 
 class ServiceProvider(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='service_provider_profile'
-    )
     company_name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     service_area = models.JSONField(default=dict)  # Store service area as GeoJSON
@@ -45,13 +40,73 @@ class ServiceProvider(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.company_name} ({self.user.email})"
+        return f"{self.company_name}"
 
     @property
     def average_rating(self):
         if self.total_reviews > 0:
             return self.rating / self.total_reviews
         return 0.0
+
+
+class ServiceProviderScrapedData(models.Model):
+    """
+    Model to store raw and processed data from web scraping for service providers.
+    Multiple websites can be scraped for a single service provider.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service_provider = models.ForeignKey(
+        ServiceProvider,
+        on_delete=models.CASCADE,
+        related_name='scraped_data'
+    )
+    source_name = models.CharField(
+        max_length=255,
+        help_text="Name of the source website (e.g., 'Yelp', 'Angi', 'HomeAdvisor')"
+    )
+    source_url = models.URLField(
+        help_text="URL of the scraped page"
+    )
+    raw_html = models.TextField(
+        help_text="Raw HTML content from web scraping"
+    )
+    processed_data = models.JSONField(
+        default=dict,
+        help_text="Processed structured data extracted from raw HTML"
+    )
+    scrape_status = models.CharField(
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('failed', 'Failed'),
+        ],
+        default='pending',
+        help_text="Status of the scraping process"
+    )
+    error_message = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Error message if scraping failed"
+    )
+    last_scraped_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp of when the data was last scraped"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-last_scraped_at']
+        indexes = [
+            models.Index(fields=['service_provider', '-last_scraped_at']),
+            models.Index(fields=['source_name']),
+            models.Index(fields=['scrape_status']),
+        ]
+        unique_together = ['service_provider', 'source_url']
+    
+    def __str__(self):
+        return f"{self.source_name} data for {self.service_provider.company_name}"
 
 class ProviderCategory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -454,6 +509,10 @@ class ServiceResearch(models.Model):
         blank=True,
         help_text="Rich text content with base64-encoded embedded images"
     )
+    research_content_raw_text = models.TextField(
+        blank=True,
+        help_text="Raw text content extracted from HTML (basically just copy-paste from browser)"
+    )
     data_sources = models.JSONField(
         default=list,
         help_text="List of data sources used for the research (e.g., 'Angi's List', 'Thumbtack', 'Bing Search', 'Yelp')"
@@ -467,6 +526,10 @@ class ServiceResearch(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         related_name='conducted_research'
+    )
+    service_provider_created = models.BooleanField(
+        default=False,
+        help_text="Indicates if a service provider was created from this research"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

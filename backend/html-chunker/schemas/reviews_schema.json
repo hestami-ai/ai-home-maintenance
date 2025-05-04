@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "reviews": {
+      "type": "object",
+      "properties": {
+        "overall_rating": { "type": "number", "minimum": 0, "maximum": 5 },
+        "total_reviews": { "type": "integer" },
+        "rating_distribution": {
+          "type": "object",
+          "properties": {
+            "5_star": { "type": "number", "minimum": 0, "maximum": 100 },
+            "4_star": { "type": "number", "minimum": 0, "maximum": 100 },
+            "3_star": { "type": "number", "minimum": 0, "maximum": 100 },
+            "2_star": { "type": "number", "minimum": 0, "maximum": 100 },
+            "1_star": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "review_keywords": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "individual_reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reviewer": { "type": "string" },
+              "rating": { "type": "number", "minimum": 0, "maximum": 5 },
+              "date": { "type": "string", "format": "date" },
+              "platform": { "type": "string" },
+              "review_text": { "type": "string" },
+              "service_performed": { "type": "string" },
+              "details": {
+                "type": "object",
+                "properties": {
+                  "building_type": { "type": "string" },
+                  "insurance_covered": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

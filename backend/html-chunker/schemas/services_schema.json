@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "services": {
+      "type": "object",
+      "properties": {
+        "offered": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "specialties": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "not_offered": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "business_info": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "years_in_business": { "type": "integer" },
+        "employees": { "type": "integer" },
+        "service_areas": { "type": "array", "items": { "type": "string" } },
+        "business_hours": {
+          "type": "object",
+          "properties": {
+            "Sunday": { "type": "string" },
+            "Monday": { "type": "string" },
+            "Tuesday": { "type": "string" },
+            "Wednesday": { "type": "string" },
+            "Thursday": { "type": "string" },
+            "Friday": { "type": "string" },
+            "Saturday": { "type": "string" }
+          }
+        },
+        "contact_information": {
+          "type": "object",
+          "properties": {
+            "website": { "type": "string" },
+            "phone": { "type": "string" },
+            "address": { "type": "string" }
+          }
+        },
+        "payment_methods": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "social_media": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "license": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "number": { "type": "string" },
+            "holder": { "type": "string" },
+            "verified_on": { "type": "string", "format": "date" },
+            "valid_until": { "type": "string", "format": "date" }
+          }
+        },
+        "background_check": { "type": "boolean" },
+        "awards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "year": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

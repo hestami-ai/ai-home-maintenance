@@ -254,17 +254,42 @@ class UserLoginView(APIView):
             )
 
 class UserLogoutView(APIView):
+    authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            refresh_token = request.data.get('refresh_token')
+            # Log authentication details for debugging
+            auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+            logger.info(f'Auth header in logout: {auth_header}')
+            logger.info(f'User authenticated: {request.user.is_authenticated}')
+            
+            # Try to get refresh token from cookie first (preferred method)
+            refresh_token = request.COOKIES.get('refresh_token')
+            
+            # Fallback to request body if cookie not present
+            if not refresh_token:
+                refresh_token = request.data.get('refresh_token')
+                logger.info('Using refresh token from request body')
+            else:
+                logger.info('Using refresh token from cookie')
+            
             if refresh_token:
                 token = RefreshToken(refresh_token)
                 token.blacklist()
-            return Response({'detail': 'Successfully logged out.'}, status=status.HTTP_200_OK)
+                logger.info('Token blacklisted successfully')
+            else:
+                logger.warning('No refresh token found in request')
+            
+            # Create response and clear auth cookies
+            response = Response({'detail': 'Successfully logged out.'}, status=status.HTTP_200_OK)
+            response.delete_cookie('access_token')
+            response.delete_cookie('refresh_token')
+            
+            return response
         except Exception as e:
-            return Response({'detail': 'Invalid token.'}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f'Logout error: {str(e)}')
+            return Response({'detail': 'Invalid token or logout failed.'}, status=status.HTTP_400_BAD_REQUEST)
 
 class CustomTokenRefreshView(APIView):
     """

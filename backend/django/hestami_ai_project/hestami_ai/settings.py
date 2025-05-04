@@ -359,6 +359,9 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=15),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=7),
+    # Grace period for token reuse during simultaneous refresh requests
+    # This allows recently blacklisted tokens to still be used for a short period
+    'SLIDING_TOKEN_REFRESH_LIFETIME_GRACE': timedelta(seconds=30),    
 }
 
 SPECTACULAR_SETTINGS = {

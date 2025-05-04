@@ -1,7 +1,7 @@
-fastapi
-uvicorn
-beautifulsoup4
-requests
-tiktoken
-langchain
-lxml
+beautifulsoup4==4.13.3
+requests==2.32.3
+fastapi==0.115.11
+uvicorn==0.34.0
+python-multipart==0.0.20
+tiktoken==0.9.0 
+html2text==2024.2.26
