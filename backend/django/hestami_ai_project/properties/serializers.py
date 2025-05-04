@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Property, PropertyAccess
+from .models import Property, PropertyAccess, PropertyScrapedData
 from users.serializers import UserSerializer
 
 class PropertySerializer(serializers.ModelSerializer):
@@ -54,3 +54,33 @@ class PropertyAccessUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = PropertyAccess
         fields = ['can_view', 'can_edit', 'can_manage_media', 'expires_at', 'is_active']
+
+
+class PropertyScrapedDataSerializer(serializers.ModelSerializer):
+    property_details = PropertySerializer(source='property', read_only=True)
+    
+    class Meta:
+        model = PropertyScrapedData
+        fields = [
+            'id', 'property', 'property_details', 'source_name', 'source_url',
+            'raw_html', 'processed_data', 'scrape_status', 'error_message',
+            'last_scraped_at', 'created_at'
+        ]
+        read_only_fields = ['id', 'last_scraped_at', 'created_at']
+    
+    def validate(self, data):
+        # Check if property exists
+        if 'property' in data and not Property.objects.filter(id=data['property'].id).exists():
+            raise serializers.ValidationError({'property': 'Property does not exist'})
+        
+        # Check for duplicate source_url for the same property
+        if self.instance is None:  # Only for creation
+            if PropertyScrapedData.objects.filter(
+                property=data['property'],
+                source_url=data['source_url']
+            ).exists():
+                raise serializers.ValidationError({
+                    'source_url': 'Data for this URL has already been scraped for this property'
+                })
+        
+        return data

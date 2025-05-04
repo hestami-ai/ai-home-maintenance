@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Information Discovery Schema",
+  "description": "Schema for discovering what types of information are present in HTML content",
+  "type": "object",
+  "properties": {
+    "information_types": {
+      "type": "object",
+      "description": "Types of information found in the HTML content",
+      "properties": {
+        "business_name": {
+          "type": "boolean",
+          "description": "Whether business name information is present"
+        },
+        "business_description": {
+          "type": "boolean",
+          "description": "Whether business description information is present"
+        },
+        "business_contact_info": {
+          "type": "boolean",
+          "description": "Whether business contact information is present"
+        },
+        "business_hours": {
+          "type": "boolean",
+          "description": "Whether business hours information is present"
+        },
+        "years_in_business": {
+          "type": "boolean",
+          "description": "Whether years in business information is present"
+        },
+        "employees_count": {
+          "type": "boolean",
+          "description": "Whether employee count information is present"
+        },
+        "service_areas": {
+          "type": "boolean",
+          "description": "Whether service area information is present"
+        },
+        "timezone": {
+          "type": "boolean",
+          "description": "Whether timezone information is present"
+        },
+        "payment_methods": {
+          "type": "boolean",
+          "description": "Whether payment method information is present"
+        },
+        "social_media": {
+          "type": "boolean",
+          "description": "Whether social media information is present"
+        },
+        "license_information": {
+          "type": "boolean",
+          "description": "Whether license information is present"
+        },
+        "background_check": {
+          "type": "boolean",
+          "description": "Whether background check information is present"
+        },
+        "awards": {
+          "type": "boolean",
+          "description": "Whether award information is present. Look for any mentions of awards, badges, recognitions, or special statuses such as 'Top Pro', 'Best of', 'Certified', etc."
+        },
+        "services_offered": {
+          "type": "boolean",
+          "description": "Whether information about services offered is present"
+        },
+        "services_not_offered": {
+          "type": "boolean",
+          "description": "Whether information about services not offered is present"
+        },
+        "reviews": {
+          "type": "boolean",
+          "description": "Whether review information is present"
+        },
+        "customer_interaction": {
+          "type": "boolean",
+          "description": "Whether customer interaction information is present"
+        }
+      }
+    }
+  },
+  "required": ["information_types"]
+}

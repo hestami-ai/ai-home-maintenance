@@ -1,0 +1,145 @@
+Extract information from the HTML section based on the requirements from the JSON schema section. NOTA BENE: The value for the review rating is data-star attribute of the div element associated with the review.
+
+===== HTML section =====
+
+
+
+
+===== JSON Schema section =====
+
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "business_info": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "years_in_business": { "type": "integer" },
+          "employees": { "type": "integer" },
+          "service_areas": { "type": "array", "items": { "type": "string" } },
+          "business_hours": {
+            "type": "object",
+            "properties": {
+              "Sunday": { "type": "string" },
+              "Monday": { "type": "string" },
+              "Tuesday": { "type": "string" },
+              "Wednesday": { "type": "string" },
+              "Thursday": { "type": "string" },
+              "Friday": { "type": "string" },
+              "Saturday": { "type": "string" }
+            }
+          },
+          "timezone": { "type": "string" },
+          "payment_methods": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "social_media": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "license": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "number": { "type": "string" },
+              "holder": { "type": "string" },
+              "verified_on": { "type": "string", "format": "date" },
+              "valid_until": { "type": "string", "format": "date" }
+            }
+          },
+          "background_check": { "type": "boolean" },
+          "awards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "year": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "services": {
+        "type": "object",
+        "properties": {
+          "offered": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "specialties": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "not_offered": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "reviews": {
+        "type": "object",
+        "properties": {
+          "overall_rating": { "type": "number", "minimum": 0, "maximum": 5 },
+          "total_reviews": { "type": "integer" },
+          "rating_distribution": {
+            "type": "object",
+            "properties": {
+              "5_star": { "type": "number", "minimum": 0, "maximum": 100 },
+              "4_star": { "type": "number", "minimum": 0, "maximum": 100 },
+              "3_star": { "type": "number", "minimum": 0, "maximum": 100 },
+              "2_star": { "type": "number", "minimum": 0, "maximum": 100 },
+              "1_star": { "type": "number", "minimum": 0, "maximum": 100 }
+            }
+          },
+          "review_keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "individual_reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reviewer": { "type": "string" },
+                "date": { "type": "string", "format": "date" },
+                "platform": { "type": "string" },
+                "review_text": { "type": "string" },
+                "service_performed": { "type": "string" },
+                "details": {
+                  "type": "object",
+                  "properties": {
+                    "building_type": { "type": "string" },
+                    "insurance_covered": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "customer_interaction": {
+        "type": "object",
+        "properties": {
+          "onboarding_process": { "type": "string" },
+          "pricing_strategy": { "type": "string" },
+          "estimate_process": { "type": "string" },
+          "communication_style": { "type": "string" }
+        }
+      },
+      "media": {
+        "type": "object",
+        "properties": {
+          "total_photos": { "type": "integer" },
+          "gallery_links": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+  

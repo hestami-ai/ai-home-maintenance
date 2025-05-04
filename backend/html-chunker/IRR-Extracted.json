@@ -1,0 +1,322 @@
+{
+  "media": {
+    "total_photos": 1855,
+    "gallery_links": [
+      "/photos/roof-replacement",
+      "/photos/gutter-services",
+      "/photos/siding-projects",
+      "/photo/metal-roofing",
+      "/photo/residential-roofing-2023",
+      "/photo/certainteed-landmark-2023",
+      "/photo/tpo-flat-roof-projects"
+    ]
+  },
+  "reviews": {
+    "total_reviews": 40,
+    "overall_rating": 4.7,
+    "review_keywords": [
+      "roof inspection",
+      "leak detection",
+      "flat roof replacement",
+      "siding installation",
+      "sunroom porch",
+      "rooftop extension"
+    ],
+    "individual_reviews": [
+      {
+        "date": "2024-09-10",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": null
+        },
+        "platform": null,
+        "reviewer": "Anjani V.",
+        "review_text": "I requested a quote for a leaking window and Daniel from Impact Roofing was incredible! He came by and spent the time and energy to fully diagnose the problem. This was amazing and made me feel confident in the solution he proposed and was a stark contrast to other companies who just suggested broad solutions without even testing anything. He also found causes to the issue that no one else found and suggested a cost efficient solution.",
+        "service_performed": "roof inspection"
+      },
+      {
+        "date": "2024-03-15",
+        "rating": 4,
+        "details": {
+          "building_type": null,
+          "insurance_covered": null
+        },
+        "platform": null,
+        "reviewer": "Rod N.",
+        "review_text": "Impact Roofing, was one of the first companies to respond back to my Yelp Request, when many didn't. They came back with a Precise and through quote. And then they came out in one day after scheduling and did the repair.",
+        "service_performed": "roof repair"
+      },
+      {
+        "date": "2023-12-15",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": true
+        },
+        "platform": null,
+        "reviewer": "Patrick H.",
+        "review_text": "Upon recommendation of my neighborhood, I reached out to Michael and Impact Roofing for assessment of my roof. Michael was responsive, walked me through what he found and next steps to work with my insurance company. A full replacement of roof, gutters etc. was approved by my insurer.",
+        "service_performed": "roof installation"
+      },
+      {
+        "date": "2024-10-09",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": null
+        },
+        "platform": null,
+        "reviewer": "Juliana C.",
+        "review_text": "We hired impact roofing and renovations to build a sunroom porch off the back of our home. We met with Mason and Ben from the design team initially. Out of all the quotes we received, we appreciated their educational approach.",
+        "service_performed": "siding installation"
+      },
+      {
+        "date": "2024-11-22",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": null,
+        "reviewer": "Va L.",
+        "review_text": "I put out a request for bids on an improvement/extension to my roof. This was the third time I'd done this. Impact Roofing was the only contractor who called back and explained to me why the request could create issues in the roof.",
+        "service_performed": "roof inspection"
+      },
+      {
+        "date": "2024-04-24",
+        "rating": 1,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": null,
+        "reviewer": "Calvin D.",
+        "review_text": "Impact Roofing came out to review my roof, but when I had follow up questions they did not respond. I emailed and called the technician and the office manager as was told they would get back to me but they never answered my questions.",
+        "service_performed": "roof inspection"
+      },
+      {
+        "date": "2024-11-14",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": null,
+        "reviewer": "Jawanna C.",
+        "review_text": "This company helped me solve my issues with my roof and siding replacement. Thank you impact roofing!",
+        "service_performed": "roof installation"
+      },
+      {
+        "date": "2024-04-30",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": null,
+        "reviewer": "Leonard G.",
+        "review_text": "Great job on my roof. One day service 8am to 8 pm. They brought a crew of 10+ people and were all in synch.",
+        "service_performed": "roof installation"
+      },
+      {
+        "date": "Sep 10, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Anjani V.",
+        "review_text": "I requested a quote for a leaking window and Daniel from Impact Roofing was incredible! He came by and spent the time and energy to fully diagnose the problem. This was amazing and made me feel confident in the solution he proposed.",
+        "service_performed": "Leaking Window Diagnosis"
+      },
+      {
+        "date": "Mar 15, 2024",
+        "rating": 4.5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Rod N.",
+        "review_text": "Impact Roofing, was one of the first companies to respond back to my Yelp Request... They came out in one day after scheduling and did the repair.",
+        "service_performed": "Roof Repair"
+      },
+      {
+        "date": "Dec 15, 2023",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": true
+        },
+        "platform": "Yelp",
+        "reviewer": "Patrick H.",
+        "review_text": "Michael and Impact Roofing for assessment of my roof. Matt has done a very good job of keeping me appraised throughout the process. ...The house looks great with the new roof, gutters etc.",
+        "service_performed": "Roof Replacement"
+      },
+      {
+        "date": "Oct 9, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Juliana C.",
+        "review_text": "We hired impact roofing and renovations to build a sunroom porch off the back of our home. ...The porch itself is more beautiful than we expected.",
+        "service_performed": "Sunroom Porch Construction"
+      },
+      {
+        "date": "Jun 26, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": true
+        },
+        "platform": "Yelp",
+        "reviewer": "Danielle M.",
+        "review_text": "The Impact Roofing team is incredible. ...Since their work on our home, we have not had any further issues with leaks. We could not be happier.",
+        "service_performed": "Roof Replacement and Flat Roof Deck Repair"
+      },
+      {
+        "date": "Nov 22, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Va L.",
+        "review_text": "I put out a request for bids on an improvement/extension to my roof. Impact Roofing was the only contractor who called back and explained to me why the request could create issues in the roof and advised me not to pursue it.",
+        "service_performed": "Roof Improvement Consultation"
+      },
+      {
+        "date": "Apr 24, 2024",
+        "rating": 2.5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Calvin D.",
+        "review_text": "Impact Roofing came out to review my roof, but when I had follow up questions they did not respond...They could have just told me that rather than ignoring me.",
+        "service_performed": "Roof Review and Follow-Up"
+      },
+      {
+        "date": "Jul 14, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Maya F.",
+        "review_text": "Impact (specifically Mason) went above and beyond my expectations for a roofing company. ...Their pricing was competitive, and I believe I received the best value for my money.",
+        "service_performed": "Roof Replacement Consultation"
+      },
+      {
+        "date": "Nov 14, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Jawanna C.",
+        "review_text": "This company helped me solve my issues with my roof and siding replacement. Thank you impact roofing!",
+        "service_performed": "Roof and Siding Replacement"
+      },
+      {
+        "date": "Apr 30, 2024",
+        "rating": 5,
+        "details": {
+          "building_type": null,
+          "insurance_covered": false
+        },
+        "platform": "Yelp",
+        "reviewer": "Leonard G.",
+        "review_text": "Great job on my roof. One day service from 8am to 8 pm... They brought a crew of 10+ people and were all in synch.",
+        "service_performed": "Roof Replacement"
+      }
+    ],
+    "rating_distribution": {
+      "1_star": 5,
+      "4_star": 20,
+      "5_star": 75
+    }
+  },
+  "services": {
+    "offered": [
+      "Gutter addition",
+      "Gutter replacement",
+      "New roof installation",
+      "Reroofing",
+      "Gutter installation",
+      "Restuccoing",
+      "Roof replacement",
+      "Siding installation",
+      "Roofing",
+      "Gutter Services",
+      "Siding"
+    ],
+    "not_offered": [],
+    "specialties": [
+      "Commercial Roofing",
+      "TPO Full Replacement",
+      "Flat Roof Projects",
+      "Residential Roofing"
+    ]
+  },
+  "business_info": {
+    "name": "Impact Roofing & Renovations",
+    "awards": [
+      {
+        "name": "Nextdoor Neighborhood Fave",
+        "year": 2023,
+        "description": "Voted as the favorite neighborhood business."
+      }
+    ],
+    "license": {
+      "type": "Certified License",
+      "holder": "Impact Roofing & Renovations"
+    },
+    "description": "Locally owned roofing contractor with expertise in traditional shingle roofs, as well as TPO, metal, slate and cedar. We have a goal to help reduce the 10 million tons of shingles that end up in landfills every year by educating homeowners on natural products and on the importance of a quality installation.",
+    "social_media": [],
+    "service_areas": [
+      "Alexandria",
+      "Washington, DC",
+      "Fairfax",
+      "Baltimore",
+      "Springfield"
+    ],
+    "business_hours": {
+      "Friday": "8:00 AM - 5:00 PM",
+      "Monday": "8:00 AM - 5:00 PM",
+      "Sunday": "Closed",
+      "Tuesday": "8:00 AM - 5:00 PM",
+      "Saturday": "Closed",
+      "Thursday": "8:00 AM - 5:00 PM",
+      "Wednesday": "8:00 AM - 5:00 PM"
+    },
+    "payment_methods": [
+      "Accepts Credit Cards",
+      "Accepts Zelle",
+      "Credit card processing fee",
+      "Credit Cards",
+      "Zelle"
+    ],
+    "background_check": true,
+    "years_in_business": 15,
+    "contact_information": {
+      "phone": "(703) 329-2959",
+      "website": "impactroofing.solutions"
+    }
+  },
+  "customer_interaction": {
+    "estimate_process": "Free estimates are offered for roofing services including replacement consultations and repairs.",
+    "pricing_strategy": "Competitive pricing, transparent billing practices.",
+    "onboarding_process": "Responsive with detailed consultation on roof issues and solutions provided.",
+    "communication_style": "Highly responsive to customer inquiries and concerns."
+  }
+}

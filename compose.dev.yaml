@@ -158,7 +158,6 @@ services:
       timeout: 10s
       retries: 5
 
-
   vllm_container:
     image: vllm/vllm-openai:latest
     container_name: vllm_container
@@ -177,12 +176,16 @@ services:
     ipc: "host"
     command: >
       --model Qwen/Qwen2.5-14B-Instruct-GPTQ-Int4
+    # "Qwen/Qwen2.5-3B-Instruct"
+    # "Qwen/Qwen2.5-14B-Instruct-GPTQ-Int4"
 
   ollama:
     build:
       context: ./docker/backend/ollama
       dockerfile: Dockerfile
     container_name: ollama-dev
+    environment:
+      - OLLAMA_CONTEXT_LENGTH=42768
     ports:
       - "11434:11434"
     volumes:
@@ -212,3 +215,18 @@ services:
       - temporal-network
     depends_on:
       - api
+
+  html-chunker:
+    build:
+      context: .
+      dockerfile: ./docker/backend/html-chunker/Dockerfile
+    container_name: html-chunker-dev
+    env_file:
+      - ./.env.local
+    ports:
+      - "8070:8000"
+    volumes:
+      - "./volumes/dev/html-chunker:/root/html-chunker:rw"
+    networks:
+      - backend-dev
+

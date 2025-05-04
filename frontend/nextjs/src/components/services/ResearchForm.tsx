@@ -30,6 +30,9 @@ export default function ResearchForm({ serviceRequestId, onSubmit, submitting }:
   const [editorContent, setEditorContent] = useState('');
   const [editorKey, setEditorKey] = useState(Date.now());
   
+  // State to store raw text content
+  const [rawTextContent, setRawTextContent] = useState('');
+  
   // Load saved content on initial render
   useEffect(() => {
     const savedContent = localStorage.getItem(`research-editor-${serviceRequestId}`);
@@ -72,6 +75,7 @@ export default function ResearchForm({ serviceRequestId, onSubmit, submitting }:
     const formData = {
       research_data: researchData,
       research_content: currentContent,
+      research_content_raw_text: rawTextContent,
       notes: notes,
       update_status: updateStatus
     };
@@ -227,6 +231,26 @@ export default function ResearchForm({ serviceRequestId, onSubmit, submitting }:
             init={getEditorConfig()}
           />
         </div>
+      </div>
+      
+      <div>
+        <label htmlFor="research-content-raw" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          Raw Text Content
+        </label>
+        <div className="mt-1">
+          <textarea
+            id="research-content-raw"
+            name="research-content-raw"
+            rows={5}
+            className="shadow-sm focus:ring-primary-main focus:border-primary-main block w-full sm:text-sm border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            placeholder="Paste raw text content here (e.g., text copied directly from websites)"
+            value={rawTextContent}
+            onChange={(e) => setRawTextContent(e.target.value)}
+          />
+        </div>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          This field is for pasting raw text content that will be processed by the system.
+        </p>
       </div>
       
       <div>

@@ -57,6 +57,65 @@ class Property(models.Model):
         self.status = PropertyStatus.ARCHIVED
         self.save()
 
+class PropertyScrapedData(models.Model):
+    """
+    Model to store raw and processed data from web scraping for properties.
+    Multiple websites can be scraped for a single property.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name='scraped_data'
+    )
+    source_name = models.CharField(
+        max_length=255,
+        help_text="Name of the source website (e.g., 'Yelp', 'Angi', 'HomeAdvisor')"
+    )
+    source_url = models.URLField(
+        help_text="URL of the scraped page"
+    )
+    raw_html = models.TextField(
+        help_text="Raw HTML content from web scraping"
+    )
+    processed_data = models.JSONField(
+        default=dict,
+        help_text="Processed structured data extracted from raw HTML"
+    )
+    scrape_status = models.CharField(
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('failed', 'Failed'),
+        ],
+        default='pending',
+        help_text="Status of the scraping process"
+    )
+    error_message = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Error message if scraping failed"
+    )
+    last_scraped_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp of when the data was last scraped"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-last_scraped_at']
+        indexes = [
+            models.Index(fields=['property', '-last_scraped_at']),
+            models.Index(fields=['source_name']),
+            models.Index(fields=['scrape_status']),
+        ]
+        unique_together = ['property', 'source_url']
+    
+    def __str__(self):
+        return f"{self.source_name} data for {self.property.title}"
+
 class PropertyAccess(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     property = models.ForeignKey(

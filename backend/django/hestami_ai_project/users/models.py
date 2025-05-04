@@ -59,6 +59,13 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)  # Can login
     is_staff = models.BooleanField(default=False)  # Can access admin site
     service_token = models.CharField(max_length=255, blank=True, null=True)  # For service accounts
+    service_provider = models.ForeignKey(
+        'services.ServiceProvider',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users'
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['user_role']

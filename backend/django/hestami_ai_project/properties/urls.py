@@ -11,4 +11,5 @@ urlpatterns = [
     path('<uuid:property_id>/delete/', views.delete_property, name='delete_property'),
     path('<uuid:property_id>/access/', views.grant_property_access, name='grant_property_access'),
     path('<uuid:property_id>/access/<uuid:access_id>/', views.update_property_access, name='update_property_access'),
+    path('<uuid:property_id>/scraped-data/', views.create_property_scraped_data, name='create_property_scraped_data'),
 ]

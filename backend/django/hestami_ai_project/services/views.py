@@ -59,7 +59,8 @@ def list_service_categories(request):
 def provider_profile(request):
     """Get or update service provider profile"""
     try:
-        provider = get_object_or_404(ServiceProvider, user=request.user)
+        # Get the service provider associated with the current user
+        provider = get_object_or_404(ServiceProvider, id=request.user.service_provider.id)
         
         if request.method == 'GET':
             serializer = ServiceProviderSerializer(provider)
@@ -176,7 +177,7 @@ def list_service_requests(request):
             )
         # Service providers see requests assigned to them
         else:  # Service Provider
-            provider = get_object_or_404(ServiceProvider, user=request.user)
+            provider = request.user.service_provider
             requests = ServiceRequest.objects.filter(provider=provider)
         
         # Apply filters
@@ -402,14 +403,14 @@ def submit_bid(request, request_id):
         # Check if provider has an existing bid
         existing_bid = ServiceBid.objects.filter(
             service_request=service_request,
-            provider__user=request.user
+            provider=request.user.service_provider
         ).first()
         
         # Prepare data for serializer
         data = {
             **request.data,
             'service_request': service_request.id,
-            'provider': request.user.service_provider_profile.id,
+            'provider': request.user.service_provider.id,
             'status': ServiceBid.Status.SUBMITTED
         }
         
@@ -517,7 +518,7 @@ def submit_clarification(request, request_id):
         data = {
             **request.data,
             'service_request': service_request.id,
-            'question_by': request.user.service_provider_profile.id
+            'question_by': request.user.service_provider.id
         }
         
         serializer = ServiceRequestClarificationSerializer(data=data)
@@ -620,7 +621,7 @@ def track_view(request, request_id):
         # Create view record
         ServiceRequestView.objects.create(
             service_request=service_request,
-            provider=request.user.service_provider_profile
+            provider=request.user.service_provider
         )
         
         return Response({"status": "view tracked"})
@@ -645,6 +646,7 @@ def add_research_data(request, request_id):
             'service_request': service_request.id,
             'research_data': request.data.get('research_data', {}),
             'research_content': request.data.get('research_content', ''),
+            'research_content_raw_text': request.data.get('research_content_raw_text', ''),
             'data_sources': request.data.get('data_sources', []),
             'notes': request.data.get('notes', '')
         }
@@ -666,6 +668,14 @@ def add_research_data(request, request_id):
         if update_status:
             service_request.status = ServiceRequest.Status.IN_RESEARCH
             service_request.save()
+        
+        # Log that we have research content and the status is IN_RESEARCH
+        has_research_content = bool(research_entry.research_content)
+        is_in_research = service_request.status == ServiceRequest.Status.IN_RESEARCH
+        
+        if has_research_content and is_in_research:
+            logger.info(f"Research entry {research_entry.id} created with content. It will be automatically processed by the background task.")
+            # No need to trigger a specific task as our background processor will pick it up
         
         logger.info(f"Added research data for service request: {service_request.id} by {request.user.email}")
         return Response(
@@ -690,7 +700,7 @@ def has_request_access(user, service_request):
         return service_request.property.owner == user
     else:  # Service Provider
         try:
-            provider = ServiceProvider.objects.get(user=user)
+            provider = user.service_provider
             return service_request.provider == provider
         except ServiceProvider.DoesNotExist:
             return False
@@ -698,7 +708,6 @@ def has_request_access(user, service_request):
 def is_assigned_provider(user, service_request):
     """Check if user is the assigned provider for the service request"""
     try:
-        provider = ServiceProvider.objects.get(user=user)
-        return service_request.provider == provider
-    except ServiceProvider.DoesNotExist:
+        return service_request.provider == user.service_provider
+    except (ServiceProvider.DoesNotExist, AttributeError):
         return False

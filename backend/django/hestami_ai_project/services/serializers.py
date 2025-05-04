@@ -21,7 +21,7 @@ class ProviderCategorySerializer(serializers.ModelSerializer):
         ]
 
 class ServiceProviderSerializer(serializers.ModelSerializer):
-    user_details = UserSerializer(source='user', read_only=True)
+    users_details = UserSerializer(source='users', many=True, read_only=True)
     categories_info = ProviderCategorySerializer(
         source='providercategory_set',
         many=True,
@@ -36,12 +36,12 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceProvider
         fields = [
-            'id', 'user', 'user_details', 'company_name',
+            'id', 'users_details', 'company_name',
             'description', 'service_area', 'is_available',
             'rating', 'total_reviews', 'average_rating',
             'categories_info', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['user', 'rating', 'total_reviews', 'created_at', 'updated_at']
+        read_only_fields = ['rating', 'total_reviews', 'created_at', 'updated_at']
 
 class ServiceBidSerializer(serializers.ModelSerializer):
     provider_details = ServiceProviderSerializer(source='provider', read_only=True)
@@ -304,8 +304,8 @@ class ServiceResearchSerializer(serializers.ModelSerializer):
         model = ServiceResearch
         fields = [
             'id', 'service_request', 'research_data', 'research_content',
-            'data_sources', 'notes', 'researched_by', 'researched_by_details', 
-            'created_at', 'updated_at'
+            'research_content_raw_text', 'data_sources', 'notes', 'researched_by', 
+            'researched_by_details', 'service_provider_created', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'researched_by']
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="#3b82f6" opacity="0.1"/>
+  <circle cx="256" cy="256" r="220" stroke="#3b82f6" stroke-width="8"/>
+  
+  <!-- H letter stylized -->
+  <path d="M160 140V372" stroke="#3b82f6" stroke-width="24" stroke-linecap="round"/>
+  <path d="M352 140V372" stroke="#3b82f6" stroke-width="24" stroke-linecap="round"/>
+  <path d="M160 256H352" stroke="#3b82f6" stroke-width="24" stroke-linecap="round"/>
+  
+  <!-- AI accent -->
+  <path d="M256 140L296 190" stroke="#3b82f6" stroke-width="12" stroke-linecap="round"/>
+  <path d="M256 140L216 190" stroke="#3b82f6" stroke-width="12" stroke-linecap="round"/>
+  
+  <!-- Smart home elements -->
+  <rect x="216" y="300" width="80" height="50" rx="8" stroke="#3b82f6" stroke-width="8" fill="none"/>
+  <path d="M246 300V350" stroke="#3b82f6" stroke-width="8"/>
+  <path d="M266 300V350" stroke="#3b82f6" stroke-width="8"/>
+</svg>
