@@ -1,20 +1,60 @@
 import { apiGet, apiPost } from '$lib/server/api';
-import type { Property, ServiceRequest } from '$lib/types';
+import type { Property, ServiceRequest, User } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ cookies, depends, url }) => {
+export const load: PageServerLoad = async ({ cookies, depends, url, locals }) => {
     // Create a dependency tag for this load function
     depends('app:requests');
     
     try {
-        // Let the API utility handle authentication
-        // It will automatically redirect if not authenticated
-        // No need to manually check for session cookie
-        const resp = await apiGet<Property[]>(cookies, '/api/properties/', {}, '/requests');
+        // Get user data from locals
+        const user = locals.auth?.user as User | undefined;
+        if (!user) {
+            throw redirect(302, `/login?returnUrl=${encodeURIComponent(url.pathname)}`);
+        }
+        
+        // Fetch data based on user role
+        let properties: Property[] = [];
+        let serviceRequests: ServiceRequest[] = [];
+        let error = null;
+        
+        // For property owners, fetch their properties and service requests
+        if (user.user_role === 'PROPERTY_OWNER') {
+            // Fetch properties
+            const propertiesResp = await apiGet<Property[]>(cookies, '/api/properties/', {}, '/requests');
+            properties = propertiesResp.data || [];
+            
+            // Service requests are included in the properties response
+            serviceRequests = properties.flatMap(property => property.service_requests || []);
+        } 
+        // For staff, fetch all service requests
+        else if (user.user_role === 'STAFF') {
+            const serviceRequestsResp = await apiGet<ServiceRequest[]>(
+                cookies, 
+                '/api/services/requests/', 
+                {}, 
+                '/requests'
+            );
+            serviceRequests = serviceRequestsResp.data || [];
+        } 
+        // For service providers, fetch their assigned requests and available requests
+        else if (user.user_role === 'SERVICE_PROVIDER') {
+            // Fetch service requests assigned to this provider
+            const serviceRequestsResp = await apiGet<ServiceRequest[]>(
+                cookies, 
+                '/api/services/requests/', 
+                {}, 
+                '/requests'
+            );
+            serviceRequests = serviceRequestsResp.data || [];
+        }
+        
         return {
-            properties: resp.data || [],
-            error: null
+            properties,
+            serviceRequests,
+            user,
+            error
         };
     } catch (e: any) {
         // Check if this is an authentication error
@@ -26,9 +66,11 @@ export const load: PageServerLoad = async ({ cookies, depends, url }) => {
             throw redirect(302, `/login?returnUrl=${encodeURIComponent(url.pathname)}`);
         }
         
-        // For other errors, return empty properties with error message
+        // For other errors, return empty data with error message
         return {
             properties: [],
+            serviceRequests: [],
+            user: null,
             error: e?.message || 'Failed to load data'
         };
     }

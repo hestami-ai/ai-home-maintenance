@@ -2,24 +2,18 @@
 	// Import necessary components
 	import { format } from 'date-fns';
 	import { Home, ClipboardList, Clock, Plus, Calendar } from 'lucide-svelte';
+	import type { ServiceRequest as ServiceRequestType } from '$lib/types';
 	
-	// Define types
-	type ServiceRequestStatus = 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-	
-	interface ServiceRequest {
-		id: string;
-		title: string;
-		status: ServiceRequestStatus;
-		created_at: string;
-		property: string;
-	}
-	
-	interface DashboardStats {
-		totalProperties: number;
-		activeRequests: number;
-		completedServices: number;
-		scheduledServices: number;
-	}
+	// Define props using runes syntax
+	const { ownerStats, recentRequests } = $props<{
+		ownerStats: {
+			totalProperties: number;
+			activeRequests: number;
+			completedServices: number;
+			scheduledServices: number;
+		};
+		recentRequests: (ServiceRequestType & { propertyTitle: string })[];
+	}>();
 	
 	interface QuickAction {
 		title: string;
@@ -29,12 +23,12 @@
 		color: string;
 	}
 	
-	// Stats data
-	let stats = $state<DashboardStats>({
-		totalProperties: 0,
-		activeRequests: 0,
-		completedServices: 0,
-		scheduledServices: 0
+	// Stats data - use the data passed from the parent
+	let stats = $state(ownerStats);
+	
+	// Update stats when props change
+	$effect(() => {
+		stats = ownerStats;
 	});
 	
 	// Quick action cards
@@ -57,67 +51,16 @@
 			title: 'Upcoming Services',
 			description: 'View your scheduled services',
 			iconType: 'calendar',
-			href: '/schedule',
+			href: '/requests',
 			color: 'variant-soft-tertiary'
 		}
 	]);
 	
-	// Recent requests
-	let recentRequests = $state<ServiceRequest[]>([]);
-	
-	// Loading state
-	let isLoading = $state(true);
-	
-	// Fetch dashboard data
-	async function fetchDashboardData() {
-		try {
-			// Simulate API call
-			setTimeout(() => {
-				stats = {
-					totalProperties: 3,
-					activeRequests: 2,
-					completedServices: 8,
-					scheduledServices: 1
-				};
-				
-				recentRequests = [
-					{
-						id: '1',
-						title: 'HVAC Repair',
-						status: 'PENDING',
-						created_at: new Date().toISOString(),
-						property: '123 Main St, Boston, MA'
-					},
-					{
-						id: '2',
-						title: 'Plumbing Issue',
-						status: 'SCHEDULED',
-						created_at: new Date(Date.now() - 86400000).toISOString(),
-						property: '456 Oak Ave, Cambridge, MA'
-					}
-				];
-				
-				isLoading = false;
-			}, 1000);
-			
-			// In a real implementation, you would fetch data from an API
-			// const response = await fetch('/api/dashboard/owner-stats');
-			// const data = await response.json();
-			// stats = data;
-		} catch (error) {
-			console.error('Failed to fetch dashboard data:', error);
-		} finally {
-			isLoading = false;
-		}
-	}
-	
-	// Initialize data on component mount
-	$effect(() => {
-		fetchDashboardData();
-	});
+	// Loading state - we'll consider it loaded since data is provided by the parent
+	let isLoading = $state(false);
 	
 	// Status badge helper
-	function getStatusBadgeClass(status: ServiceRequestStatus): string {
+	function getStatusBadgeClass(status: string): string {
 		switch (status) {
 			case 'PENDING':
 				return 'variant-soft-warning';
@@ -256,13 +199,13 @@
 										<span class="badge {getStatusBadgeClass(request.status)}">{request.status.replace(/_/g, ' ')}</span>
 									</td>
 									<td>
-										<div class="text-sm">{request.property}</div>
+										<div class="text-sm">{request.propertyTitle}</div>
 									</td>
 									<td>
 										<div class="text-sm">{format(new Date(request.created_at), 'MMM d, yyyy')}</div>
 									</td>
 									<td class="text-right">
-										<a href={`/dashboard/requests/${request.id}`} class="btn btn-sm variant-ghost-primary">
+										<a href={`/requests/${request.id}`} class="btn btn-sm variant-ghost-primary">
 											View
 										</a>
 									</td>

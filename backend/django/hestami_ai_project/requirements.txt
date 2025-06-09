@@ -20,7 +20,7 @@ python-magic==0.4.27
 numpy<2.0.0
 opencv-python-headless==4.8.0.74
 drf-spectacular==0.28.0
-clamd==1.0.2
+clamav-client==0.7.1
 squareup==40.0.0.220250123
 django-money==3.5.3
 temporalio==1.9.0

@@ -258,7 +258,9 @@ export async function apiRequest(
     const headers = new Headers(options.headers);
     headers.set('Authorization', `Bearer ${tokens.accessToken}`);
     
-    if (!headers.has('Content-Type') && options.body) {
+    // Only set Content-Type to application/json if the body is not FormData
+    // For FormData, browser will set the correct multipart/form-data Content-Type with boundary
+    if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json');
     }
     

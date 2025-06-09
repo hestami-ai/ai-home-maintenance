@@ -24,6 +24,13 @@ def start_research_queue_on_worker_ready(**kwargs):
     """
     # Import here to avoid circular imports
     from services.tasks import start_research_queue_processor
+    from properties.tasks import start_property_county_processor, start_permit_retrieval_processor
     
     # Start the research queue processor
     start_research_queue_processor()
+    
+    # Start the property county processor
+    start_property_county_processor()
+    
+    # Start the permit retrieval processor
+    start_permit_retrieval_processor()

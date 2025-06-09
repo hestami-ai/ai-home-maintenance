@@ -1,4 +1,4 @@
-import clamd
+from clamav_client.clamd import ClamdNetworkSocket
 from django.conf import settings
 import tempfile
 import os
@@ -15,7 +15,7 @@ def scan_file(file):
     """
     try:
         # Initialize ClamAV client
-        cd = clamd.ClamdNetworkSocket(
+        cd = ClamdNetworkSocket(
             host=settings.CLAMD_HOST,  # This is the service name in docker-compose
             port=int(settings.CLAMD_PORT)
         )

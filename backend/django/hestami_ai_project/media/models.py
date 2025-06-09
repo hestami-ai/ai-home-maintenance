@@ -202,9 +202,24 @@ def get_upload_path(instance, filename):
     """
     ext = os.path.splitext(filename)[1].lower()
     date = timezone.now()
+    
+    # Determine the property ID from the appropriate relationship
+    if instance.property_ref:
+        # Direct property media
+        property_id = str(instance.property_ref.id)
+    elif instance.service_request and instance.service_request.property:
+        # Service request media - get property from service request
+        property_id = str(instance.service_request.property.id)
+    elif instance.service_report and instance.service_report.service_request and instance.service_report.service_request.property:
+        # Service report media - get property from service request via service report
+        property_id = str(instance.service_report.service_request.property.id)
+    else:
+        # Fallback if no property reference can be found
+        property_id = 'unknown'
+    
     return os.path.join(
         settings.PROPERTY_MEDIA_PATH.format(
-            property_id=str(instance.property_ref.id) if instance.property_ref else 'unknown',
+            property_id=property_id,
             year=date.strftime('%Y'),
             month=date.strftime('%m'),
             day=date.strftime('%d')

@@ -15,7 +15,7 @@ import logging
 import os
 from django.conf import settings
 from django.core.cache import cache
-from .utils import scan_file
+from .tasks import scan_file
 
 logger = logging.getLogger('security')
 
@@ -400,6 +400,76 @@ def upload_service_request_media(request, request_id):
             {"error": "Failed to upload media"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def list_service_request_media(request, request_id):
+    """
+    List all media files for a specific service request.
+    Requires authentication and service request access verification.
+    """
+    try:
+        # Get the service request
+        service_request = get_object_or_404(ServiceRequest, id=request_id)
+        
+        # Check if user has access to the service request
+        if not (service_request.property.owner == request.user or 
+                service_request.provider == request.user or 
+                request.user.is_staff or
+                request.user.has_perm('services.view_servicerequest')):
+            logger.warning(f"User {request.user.id} denied access to view media for service request {request_id}")
+            return Response(
+                {"error": "You don't have permission to view media for this service request"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all non-deleted media files for this service request
+        media_files = Media.objects.filter(service_request_id=request_id, is_deleted=False)
+        serializer = MediaSerializer(media_files, many=True)
+        return Response(serializer.data)
+    
+    except ServiceRequest.DoesNotExist:
+        return Response({"error": "Service request not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error listing service request media: {str(e)}")
+        return Response({"error": "Failed to list media"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def list_service_report_media(request, report_id):
+    """
+    List all media files for a specific service report.
+    Requires authentication and service report access verification.
+    """
+    try:
+        # Get the service report
+        service_report = get_object_or_404(ServiceReport, id=report_id)
+        
+        # Check if user has access to the service report
+        if not (service_report.service_request.property.owner == request.user or 
+                service_report.service_request.provider == request.user or 
+                request.user.is_staff or
+                request.user.has_perm('services.view_servicereport')):
+            logger.warning(f"User {request.user.id} denied access to view media for service report {report_id}")
+            return Response(
+                {"error": "You don't have permission to view media for this service report"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get all non-deleted media files for this service report
+        media_files = Media.objects.filter(service_report_id=report_id, is_deleted=False)
+        serializer = MediaSerializer(media_files, many=True)
+        return Response(serializer.data)
+    
+    except ServiceReport.DoesNotExist:
+        return Response({"error": "Service report not found"}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        logger.error(f"Error listing service report media: {str(e)}")
+        return Response({"error": "Failed to list media"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])
