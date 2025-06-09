@@ -336,7 +336,7 @@
 	
 	<!-- Tabs for different sections -->
 	<div class="card p-4">
-		<nav class="flex flex-wrap gap-1 mb-4">
+		<nav class="btn-group preset-outlined-surface-200-800 flex-col p-2 md:flex-row flex flex-wrap gap-1 mb-4">
 			<button 
 				class="btn px-4 py-2 rounded-lg font-medium border-2 {activeTab === 'details' ? 'variant-filled-primary border-primary-500' : 'variant-soft-surface border-transparent hover:variant-soft-primary'}" 
 				onclick={() => activeTab = 'details'}

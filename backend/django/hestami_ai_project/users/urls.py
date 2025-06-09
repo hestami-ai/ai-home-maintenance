@@ -11,6 +11,8 @@ from .views.auth_views import (
     CustomTokenRefreshView,
     CustomTokenVerifyView
 )
+from .views.dashboard_views import staff_dashboard_stats
+from .views.user_views import list_users
 
 app_name = 'users'
 
@@ -27,4 +29,10 @@ urlpatterns = [
     path('password/change/', PasswordChangeView.as_view(), name='password_change'),
     path('password/reset/', PasswordResetRequestView.as_view(), name='password_reset'),
     path('password/reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    
+    # Dashboard endpoints
+    path('dashboard/stats/', staff_dashboard_stats, name='staff_dashboard_stats'),
+    
+    # User management endpoints
+    path('list/', list_users, name='list_users'),  # This becomes /api/users/list/
 ]

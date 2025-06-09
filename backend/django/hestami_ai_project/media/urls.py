@@ -11,7 +11,9 @@ urlpatterns = [
     
     # Service request and report media endpoints
     path('services/requests/<uuid:request_id>/upload/', views.upload_service_request_media, name='upload_service_request_media'),
+    path('services/requests/<uuid:request_id>/', views.list_service_request_media, name='list_service_request_media'),
     path('services/reports/<uuid:report_id>/upload/', views.upload_service_report_media, name='upload_service_report_media'),
+    path('services/reports/<uuid:report_id>/', views.list_service_report_media, name='list_service_report_media'),
     
     # Common media endpoints
     path('<uuid:media_id>/', views.delete_media, name='delete_media'),

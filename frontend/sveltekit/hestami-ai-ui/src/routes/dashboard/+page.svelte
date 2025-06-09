@@ -7,8 +7,50 @@
 	import OwnerDashboard from '$lib/components/dashboards/OwnerDashboard.svelte';
 	import ProviderDashboard from '$lib/components/dashboards/ProviderDashboard.svelte';
 	
-	// Get user data from page store
+	// Import ServiceRequest type
+	import type { ServiceRequest } from '$lib/types';
+	
+	// Get data from page store
 	const user = $page.data.user;
+	const properties = $page.data.properties || [];
+	const serviceRequests = $page.data.serviceRequests || [];
+	
+	// Define interfaces for dashboard component props
+	interface OwnerStats {
+		totalProperties: number;
+		activeRequests: number;
+		completedServices: number;
+		scheduledServices: number;
+	}
+	
+	interface StaffDashboardStats {
+		total_users: number;
+		active_providers: number;
+		pending_requests: number;
+	}
+	
+	// Initialize props with proper typing
+	const ownerStats: OwnerStats = $page.data.ownerStats || { 
+		totalProperties: 0, 
+		activeRequests: 0, 
+		completedServices: 0, 
+		scheduledServices: 0 
+	};
+	
+	const recentRequests: (ServiceRequest & { propertyTitle: string })[] = $page.data.recentRequests || [];
+	
+	// Initialize staffStats with proper typing
+	// Log the raw data from the API for debugging
+	console.log('Raw staffStats from API:', $page.data.staffStats);
+	
+	const staffStats: StaffDashboardStats = $page.data.staffStats || {
+		total_users: 0,
+		active_providers: 0,
+		pending_requests: 0
+	};
+	
+	// Log the processed staffStats for debugging
+	console.log('Processed staffStats:', staffStats);
 	
 	// For debugging
 	let userDebugInfo = $state('');
@@ -77,49 +119,14 @@
 		<p class="text-surface-600-300-token">Welcome to your Hestami AI dashboard.</p>
 	</header>
 	
-	<!-- Development Mode Toggle (only visible in development) -->
-	{#if import.meta.env.DEV}
-		<div class="card p-4 variant-soft-warning">
-			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-				<div>
-					<h3 class="font-semibold">Development Mode</h3>
-					<p class="text-sm">Current role: <span class="badge variant-filled">{userRole}</span></p>
-					<details class="mt-2">
-						<summary class="cursor-pointer text-sm font-medium">Debug Info</summary>
-						<pre class="p-2 mt-2 bg-surface-900 text-white rounded-container-token text-xs whitespace-pre-wrap">{userDebugInfo}</pre>
-					</details>
-				</div>
-				<div class="flex gap-2">
-					<button 
-						class="btn btn-sm {userRole === 'staff' ? 'variant-filled-primary' : 'variant-ghost-primary'}" 
-						onclick={() => switchRole('staff')}
-					>
-						Staff
-					</button>
-					<button 
-						class="btn btn-sm {userRole === 'owner' ? 'variant-filled-secondary' : 'variant-ghost-secondary'}" 
-						onclick={() => switchRole('owner')}
-					>
-						Owner
-					</button>
-					<button 
-						class="btn btn-sm {userRole === 'provider' ? 'variant-filled-tertiary' : 'variant-ghost-tertiary'}" 
-						onclick={() => switchRole('provider')}
-					>
-						Provider
-					</button>
-				</div>
-			</div>
-		</div>
-	{/if}
 	
 	<!-- Role-Specific Dashboard Content -->
 	{#if userRole === 'staff'}
-		<StaffDashboard />
+		<StaffDashboard {staffStats} />
 	{:else if userRole === 'owner'}
-		<OwnerDashboard />
+		<OwnerDashboard {ownerStats} {recentRequests} />
 	{:else if userRole === 'provider'}
-		<ProviderDashboard />
+		<ProviderDashboard /><!-- ProviderDashboard handles its own data fetching internally -->
 	{:else}
 		<!-- Fallback for unknown roles -->
 		<div class="card p-6 text-center">

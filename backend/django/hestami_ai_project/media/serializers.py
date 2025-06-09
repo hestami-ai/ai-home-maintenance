@@ -15,6 +15,8 @@ class MediaSerializer(serializers.ModelSerializer):
     location_type = serializers.ChoiceField(choices=LocationType.choices, required=False, allow_blank=True)
     location_sub_type = serializers.ChoiceField(choices=LocationSubType.choices, required=False, allow_blank=True)
     parent_type = serializers.SerializerMethodField()
+    processing_status = serializers.SerializerMethodField()
+    is_ready = serializers.SerializerMethodField()
     
     class Meta:
         model = Media
@@ -25,12 +27,13 @@ class MediaSerializer(serializers.ModelSerializer):
             'file_url', 'thumbnail_small_url', 'thumbnail_medium_url', 
             'thumbnail_large_url', 'is_image', 'is_video', 'media_type',
             'media_sub_type', 'location_type', 'location_sub_type', 
-            'location_display', 'parent_type', 'original_filename', 'mime_type'
+            'location_display', 'parent_type', 'original_filename', 'mime_type',
+            'processing_status', 'is_ready'
         ]
         read_only_fields = ['id', 'upload_date', 'file_url', 'thumbnail_small_url', 
                            'thumbnail_medium_url', 'thumbnail_large_url', 
                            'is_image', 'is_video', 'location_display',
-                           'parent_type']
+                           'parent_type', 'processing_status', 'is_ready']
 
     def get_parent_type(self, obj):
         if obj.property_ref:
@@ -113,6 +116,49 @@ class MediaSerializer(serializers.ModelSerializer):
         if obj.location_sub_type:
             return LocationSubType(obj.location_sub_type).label
         return None
+        
+    def get_processing_status(self, obj):
+        """Return the processing status of the media."""
+        if not obj.metadata:
+            return 'PENDING'
+            
+        # Check for scan status
+        scan_status = obj.metadata.get('scan_status')
+        if scan_status == 'SCANNING':
+            return 'SCANNING'
+        elif scan_status == 'FAILED':
+            return 'FAILED'
+            
+        # If scan is complete but not safe, return REJECTED
+        if scan_status == 'COMPLETED' and not obj.metadata.get('is_safe', True):
+            return 'REJECTED'
+            
+        # Check for processing status
+        processing_key = f'media_processing_{obj.id}'
+        processing_status = obj.metadata.get('processing_status')
+        
+        if processing_status == 'processing':
+            return 'PROCESSING'
+        elif processing_status == 'failed':
+            return 'PROCESSING_FAILED'
+        elif processing_status == 'completed':
+            return 'READY'
+            
+        # If we have thumbnails, it's probably ready
+        if obj.metadata.get('thumbnails') or obj.metadata.get('video_info'):
+            return 'READY'
+            
+        # Default status if we can't determine
+        return 'PENDING'
+    
+    def get_is_ready(self, obj):
+        """Return whether the media is ready for display."""
+        # Media is ready if it's not deleted and processing status is READY
+        if obj.is_deleted:
+            return False
+            
+        status = self.get_processing_status(obj)
+        return status == 'READY'
 
     def validate_file(self, value):
         # Get file size

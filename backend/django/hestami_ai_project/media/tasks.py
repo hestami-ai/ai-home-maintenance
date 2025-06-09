@@ -1,8 +1,10 @@
 from celery import shared_task
 from django.core.cache import cache
+from django.utils import timezone
 import logging
 from .services import MediaProcessor
 from .models import Media
+from .utils import scan_file as scan_file_util
 
 logger = logging.getLogger('security')
 
@@ -33,6 +35,13 @@ def process_media_task(self, media_id):
             'current_retry': self.request.retries
         }, timeout=3600)
         
+        # Update metadata with processing status
+        if not media.metadata:
+            media.metadata = {}
+        media.metadata['processing_status'] = 'processing'
+        media.metadata['processing_started_at'] = timezone.now().isoformat()
+        media.save(update_fields=['metadata'])
+        
         # Log file details
         logger.info(f"Media file details - size: {media.file_size}, type: {media.file_type}")
         logger.info(f"Media file path: {media.file.path}")
@@ -49,6 +58,11 @@ def process_media_task(self, media_id):
             'exif': media.metadata.get('exif', {}) if media.is_image else None
         }, timeout=3600)
         
+        # Update metadata with completion status
+        media.metadata['processing_status'] = 'completed'
+        media.metadata['processing_completed_at'] = timezone.now().isoformat()
+        media.save(update_fields=['metadata'])
+        
         logger.info(f"Successfully processed media {media_id}")
         return {'status': 'success', 'media_id': media_id}
     
@@ -62,10 +76,104 @@ def process_media_task(self, media_id):
     
     except Exception as exc:
         logger.error(f"Error processing media {media_id}: {str(exc)}", exc_info=True)
+        
+        # Update cache with error status
         cache.set(cache_key, {
-            'status': 'processing',
+            'status': 'failed',
             'task_id': self.request.id,
             'current_retry': self.request.retries,
             'error': str(exc)
         }, timeout=3600)
+        
+        try:
+            # Update metadata with failure status
+            media = Media.objects.get(id=media_id)
+            if not media.metadata:
+                media.metadata = {}
+            media.metadata['processing_status'] = 'failed'
+            media.metadata['processing_error'] = str(exc)
+            media.metadata['processing_failed_at'] = timezone.now().isoformat()
+            media.save(update_fields=['metadata'])
+        except Exception as inner_exc:
+            logger.error(f"Error updating metadata for failed media {media_id}: {str(inner_exc)}")
+            
+        raise self.retry(exc=exc)
+
+
+@shared_task(
+    bind=True,
+    name='media.scan_file',
+    max_retries=3,
+    default_retry_delay=30,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,  # Maximum retry delay of 5 minutes
+    acks_late=True  # Task messages will be acknowledged after the task has been executed
+)
+def scan_file(self, media_id):
+    """
+    Scan a media file for viruses asynchronously
+    """
+    try:
+        # Get media instance
+        media = Media.objects.get(id=media_id)
+        logger.info(f"Starting to scan media {media_id}, file: {media.file.name}")
+        
+        # Store scan status in metadata
+        if not media.metadata:
+            media.metadata = {}
+        media.metadata['scan_status'] = 'SCANNING'
+        media.save(update_fields=['metadata'])
+        
+        # Scan the file
+        try:
+            is_clean, message = scan_file_util(media.file)
+            
+            # Update media with scan results in metadata
+            if not media.metadata:
+                media.metadata = {}
+            media.metadata['is_safe'] = is_clean
+            media.metadata['scan_message'] = message
+            media.metadata['scan_status'] = 'COMPLETED'
+            media.metadata['scan_date'] = timezone.now().isoformat()
+            
+            # If the file is not clean, mark it as deleted for security
+            if not is_clean:
+                media.is_deleted = True
+                media.deleted_at = timezone.now()
+                logger.warning(f"Unsafe file detected: {message} for media {media_id}. Marking as deleted.")
+                media.save(update_fields=['metadata', 'is_deleted', 'deleted_at'])
+            else:
+                media.save(update_fields=['metadata'])
+                
+            logger.info(f"Scan completed for media {media_id}: {message}")
+            
+            # If the file is clean, trigger media processing
+            if is_clean:
+                logger.info(f"File is clean, triggering media processing for {media_id}")
+                process_media_task.delay(media_id)
+            else:
+                logger.warning(f"File is not safe, skipping media processing for {media_id}")
+                
+            return {'status': 'success', 'media_id': media_id, 'is_clean': is_clean}
+            
+        except Exception as scan_error:
+            logger.error(f"Error scanning file {media_id}: {str(scan_error)}", exc_info=True)
+            # Update metadata with error information
+            if not media.metadata:
+                media.metadata = {}
+            media.metadata['scan_status'] = 'FAILED'
+            media.metadata['scan_message'] = f"Error scanning file: {str(scan_error)}"
+            media.metadata['scan_date'] = timezone.now().isoformat()
+            media.is_deleted = True
+            media.deleted_at = timezone.now()
+            media.save(update_fields=['metadata', 'is_deleted', 'deleted_at'])
+            raise
+    
+    except Media.DoesNotExist:
+        logger.error(f"Media {media_id} not found for scanning")
+        raise
+    
+    except Exception as exc:
+        logger.error(f"Error in scan_file task for media {media_id}: {str(exc)}", exc_info=True)
         raise self.retry(exc=exc)

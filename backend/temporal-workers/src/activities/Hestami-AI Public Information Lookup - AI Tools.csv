@@ -1,0 +1,162 @@
+Tool Status,Tool Name,State,County / City / Locality,Password Protected,URL,Underlying Software,Page Load Times,Description,Prompt Template,Address Formatting Requirements
+Active,Property_History_Retrieval_Tool,VA,Fairfax County,No,https://ldip.fairfaxcounty.gov/,,,Property History for Fairfax County Virginia addresses,"You need to retrieve the property permit history for the following address in Fairfax County, Virginia.
+
+This website has particular form data entry that is described next.
+
+The search field for addresses is the address field. The full street number and street name go into the text field. 
+
+NOTA BENE: If you are given an address like ""904 Timber Lane Southwest"" - with specific reference to the directionality in the street name -  then there can be a follow on search output (i.e., ""Did you mean:"")  return which will ask you to select between, e.g.,  ""000904 TIMBER S W LA (2)"" or ""000904 TIMBER LA (9)"" then in this case you would choose the former value ""000904 TIMBER S W LA (2)"".
+
+Below are detailed instructions.
+
+Navigate to {URL}
+
+Target Property Address: {TARGET_PROPERTY_ADDRESS}
+
+Enter the full address.
+
+Press the submit or search button.
+
+Retrieve search results from the table. (NOTA BENE: 1 -  If no search results are returned or the table is empty simply return ""No permits found.""; 2 - The cell contents are complex and need all content returned as JSON.)",306 Tapawingo Rd SW
+Active,Permit_and_License_History_Retrieval_Tool,VA,Fairfax County,No,https://plus.fairfaxcounty.gov/CitizenAccess/Cap/CapHome.aspx?module=Building&TabName=Building&TabList=Home%7C0%7CBuilding%7C1%7CEnforcement%7C2%7CEnvHealth%7C3%7CFire%7C4%7CPlanning%7C5%7CSite%7C6%7CZoning%7C7%7CProffer%7C8%7CCurrentTabIndex%7C1,"<html ng-app=""appAca""",,Fairfax County Virginia permit history for contractors and license holders,,
+Active,State_Professional_Licenses_Retrieval_Tool,VA,ALL,No,https://www.dpor.virginia.gov/LicenseLookup,,,Virginia Department of Professional and Occupational Regulation; used to lookup professional license information for contractors,,
+Active,Google_Maps_Search_Browser_Use_Tool,ALL,ALL,No,https://maps.google.com,,,Google Maps Search for locating initial contractor candidates,,
+Active,Bing_Maps_Search_Browser_Use_Tool,ALL,ALL,No,https://www.bing.com/maps,,,Bing Maps Search for locating initial contractor candidates,"You need to search for candidate contractors / service providers who provide ""plumbing"" services near ""20151""",
+Active,Property_History_Retrieval_Tool,VA,Loudon County,No,https://loudouncountyvaeg.tylerhost.net/prod/selfservice#/search,"href=""https://cdn.forge.tylertech.com/v1/images/branding/tyler/talking-t-logo.svg""",,Property History for Loudon County Virginia addresses,"You need to retrieve the property permit history for the following address in Loudon County, Virginia.
+
+This website has particular form data entry that is described next.
+
+The search field for addresses is an all-in-one text field. The full street number and street name go into the text field. However, addresses need to be in U.S. Postal Service Addressing Standard Publication 28 format. 
+
+E.g., if you are given the address ""1308 White Feldspar Terrace Southeast"", that needs to be converted to ""1308 White Fieldspar Terr SE"". Or if you are given the address ""20638 Crescent Pointe Place"" that needs to be converted to ""20638 Crescent Pointe Pl"".
+
+Below are detailed instructions.
+
+Navigate to https://loudouncountyvaeg.tylerhost.net/prod/selfservice#/search
+
+Page loads slowly. Wait 10 seconds for the page to load fully.
+
+Target Property Address: 853 MacAlister Drive Southeast
+
+Enter the full address.
+
+Press the submit or search button.
+
+Page loads slowly. Wait 20 seconds for the page to load fully.
+
+Retrieve search results from the table. (NOTA BENE: If no search results are returned or the table is empty simply return ""No permits found."")","Postal Addressing Standards Publication 28 format:
+
+1308 WHITE FELDSPAR TER SE LEESBURG VA
+
+(Use ""Exact Phrase"" checkbox)"
+Active,Permit_and_License_History_Retrieval_Tool,VA,Loudon County,<TBD>,"Call county at: 
+Request from service provider on registration",,,,,
+Active,Geocode_Address_Formatting_Tool,ALL,ALL,Yes,"https://atlas.microsoft.com/search/address/json?&subscription-key={Your-Azure-Maps-Subscription-key}&api-version=1.0&language=en-US&query=400 Broad St, Seattle, WA 98109",,,Geocode and format U.S. based addresses,,
+Active,Azure_Maps_Search_API_Tool,ALL,ALL,Yes,https://atlas.microsoft.com/search/address/json?api-version=1.0&query=roof+leak+repair+contractors&subscription-key=YOUR_AZURE_MAPS_KEY&lat=38.8942&lon=-77.4311&radius=16093&category=repair&include=rating,,,"Find contractors using the Azure Maps API.
+
+NOTA BENE: This method does not provide ratings at all the way Browser Use version do.",,
+Active,US_Postal_Addressing_Tool,ALL,ALL,<TBD>,Internal + ChatGPT + [TBD],,,"https://github.com/google/libaddressinput
+
+https://developers.google.com/maps/documentation/address-validation/requests-validate-address
+
+https://jsjungle.dev/blog/address-formatting-in-javascript",,
+Active,Property_History_Retrieval_Tool,VA,Prince William County,No,https://egcss.pwcgov.org/SelfService#/search,"href=""https://cdn.forge.tylertech.com/v1/images/branding/tyler/talking-t-logo.svg""","Load Time: Very Slow
+Page Wait: 20 seconds",Property History for Prince William County Virginia addresses,"You need to retrieve the property permit history for the following address in Prince William County, Virginia.
+
+This website has particular form data entry that is described next.
+
+The search field for addresses is an all-in-one text field. The full street number and street name go into the text field. However, addresses need to be in U.S. Postal Service Addressing Standard Publication 28 format. 
+
+E.g., if you are given the address ""10103 Trinity Lane"", that needs to be converted to ""10103 Trinity Ln"". Or if you are given the address ""10239 Bethany Court"" that needs to be converted to ""10239 Bethany Ct"".
+
+Below are detailed instructions.
+
+Navigate to https://egcss.pwcgov.org/SelfService#/search
+
+Page loads slowly. Wait 10 seconds for the page to load fully.
+
+Target Property Address: 10037 Spindle Foot Court
+
+Enter the full address.
+
+Press the submit or search button.
+
+Page loads slowly. Wait 20 seconds for the page to load fully.
+
+Retrieve search results from the table. (NOTA BENE: If no search results are returned or the table is empty simply return ""No permits found."")","Postal Addressing Standards Publication 28 format:
+
+1308 WHITE FELDSPAR TER SE LEESBURG VA
+
+(Use ""Exact Phrase"" checkbox)"
+Active,Permit_and_License_History_Retrieval_Tool,VA,Prince William County,No,"Call county at: 
+Request from service provider on registration",,,,,
+Active,Property_History_Retrieval_Tool,VA,Chesterfield County,No,https://aca-prod.accela.com/CHESTERFIELD/Cap/CapHome.aspx?module=Building&TabName=Building&TabList=Home%7C0%7CBuilding%7C1%7CEnforcement%7C2%7CEnvEngineering%7C3%7CPlanning%7C4%7CUtilities%7C5%7CeReview%7C6%7CCurrentTabIndex%7C1,"<html ng-app=""appAca""","Load Time: Very Slow
+Page Wait: 30 seconds","Property History for Chesterfield County Virginia addresses.
+
+NOTA BENE: In the address field, adding in specifics like ""Terrace"" / ""Ter"" / ""TR"" will not result in the desired search results. E.g., 12911 Sir Scott Terrace will have to be searched as 12911 Sir Scott. And ""12921 Sir Scott Drive"" will have to be searched as ""12921 Sir Scott"" sans ""Drive"" / ""Dr"" / ""DR"". The house number will provide the correct distinction for the search parameters.
+
+TBD on the Geocoding of these addresses.","You need to retrieve the property permit history for the following address in Chesterfield County, Virginia.
+
+This website has particular form data entry that is described next.
+
+Address is in street name input edit box. Street number is supported by two street number edit boxes to support a range of addresses on the street. You will be retrieving specific property information and use one of the edit boxes to enter in the specific property number address.
+
+E.g., if you are given the address ""13009 SIR SCOTT DR"", then you will enter that as street number ""13009"" and street name ""Sir Scott"". Or if you are given ""12911 Sir Scott Terrace"" then you will enter that as street number ""12911"" and street name ""Sir Scott"".
+
+Once the fields are entered you will press the submit or search button to retrieve results.
+
+Below are detailed instructions.
+
+Target Property Address: 13001 Sir Scott Drive
+
+Navigate to https://aca-prod.accela.com/CHESTERFIELD/Cap/CapHome.aspx?module=Building&TabName=Building&TabList=Home%7C0%7CBuilding%7C1%7CEnforcement%7C2%7CEnvEngineering%7C3%7CPlanning%7C4%7CUtilities%7C5%7CeReview%7C6%7CCurrentTabIndex%7C1
+
+Enter the correct street number.
+
+Enter the correct street name.
+
+Press the submit or search button.
+
+Retrieve the search results from the table. (NOTA BENE: If no search results are returned or the table is empty simply return ""No permits found."")",
+Active,Permit_and_License_History_Retrieval_Tool,VA,Chesterfield County,No,,,,,,
+Deprecated,Property_History_Retrieval_Tool,VA,Arlington County,No,https://permits.arlingtonva.us/Query_by_address.aspx,https://granicus.com/product/opencities,,"Property history for Arlington County Virginia addresses.
+
+Address is street name dropdown box. Here are some examples:
+
+10TH PL S --> 10th Place South
+10TH RD N --> 10th Road North
+10TH ST N --> 10th Street North
+10TH ST S --> 10th Street South
+
+Once the street name is selected, then the street number dropdown will populate. E.g., for the address ""5128 10TH RD N"" then the street number dropdown will populate with ""5128"" (and other street numbers for properties on that street.","You need to retrieve the property permit history for the following address in Arlington County, Viriginia. 
+
+This website has particular form data entry that described next.
+
+Address is street name dropdown box.
+
+Here are some examples of address street names and their interpretation:
+
+""10TH PL S"" means ""10th Place South""
+""10TH RD N"" means ""10th Road North""
+""10TH ST N"" means ""10th Street North""
+""10TH ST S"" means ""10th Street South""
+
+Once the street name is selected, then the street number dropdown will populate. E.g., for the address ""5128 10TH RD N"", select the ""10TH RD N"" option in the street name dropdown and then the street number dropdown will populate with ""5128"" (and other street numbers for properties on that street - select the relevant street number.
+
+Below are detailed instructions.
+
+Target Property Address: {TARGET_PROPERTY_ADDRESS}
+
+Navigate to https://permits.arlingtonva.us/Query_by_address.aspx
+
+Select the correct street name.  (NOTE: The street name may not be found in which case return ""Address not found"".)
+
+Select the correct street number. (NOTE: The street number may not be found in which case return ""Address not found"".)
+
+Return the table of permits (if any). (NOTE: There may be no permits or the table may be empty or return no results in which case return ""No permits found"".)",
+Active,Property_History_Retrieval_Tool,VA,Arlington County,Yes,https://aca-prod.accela.com/ARLINGTONCO/Login.aspx,"<html ng-app=""appAca""",,,,
+Active,Permit_and_License_History_Retrieval_Tool,VA,Arlington County,,,,,,,
+Active,Property_History_Retrieval_Tool,VA,Fairfax City,No,https://aca-prod.accela.com/FAIRFAX/Cap/CapHome.aspx?module=Building&TabName=Building,"<html ng-app=""appAca""",,,,
+Active,Permit_and_License_History_Retrieval_Tool,VA,Fairfax City,No,https://aca-prod.accela.com/FAIRFAX/Cap/CapHome.aspx?module=Building&TabName=Building,"<html ng-app=""appAca""",,,,
+Active,Property_History_Retrieval_Tool,DC,Washington,Yes,https://govservices.dcra.dc.gov/oplaportalPPLICATION,,,,,
+Active,Permit_and_License_History_Retrieval_Tool,DC,Washington,,,,,,,

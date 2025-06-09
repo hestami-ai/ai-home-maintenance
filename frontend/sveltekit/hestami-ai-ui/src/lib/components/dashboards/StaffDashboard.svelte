@@ -5,10 +5,9 @@
 	
 	// Define types
 	interface StaffDashboardStats {
-		totalUsers: number;
-		activeProviders: number;
-		pendingRequests: number;
-		totalRevenue: number;
+		total_users: number;
+		active_providers: number;
+		pending_requests: number;
 	}
 	
 	interface QuickAction {
@@ -19,13 +18,8 @@
 		color: string;
 	}
 	
-	// Stats data
-	let stats = $state<StaffDashboardStats>({
-		totalUsers: 0,
-		activeProviders: 0,
-		pendingRequests: 0,
-		totalRevenue: 0
-	});
+	// Import data from page props
+	const { staffStats = null } = $props<{ staffStats: StaffDashboardStats | null }>();
 	
 	// Quick action cards
 	const quickActions = $derived<QuickAction[]>([
@@ -33,57 +27,20 @@
 			title: 'Manage Users',
 			description: 'View and manage user accounts',
 			iconType: 'users',
-			href: '/dashboard/users',
+			href: '/users',
 			color: 'variant-soft-primary'
 		},
 		{
 			title: 'Service Requests',
 			description: 'Review and manage service requests',
 			iconType: 'clipboard',
-			href: '/dashboard/requests',
+			href: '/requests',
 			color: 'variant-soft-secondary'
-		},
-		{
-			title: 'Analytics',
-			description: 'View platform analytics and reports',
-			iconType: 'chart',
-			href: '/dashboard/analytics',
-			color: 'variant-soft-tertiary'
 		}
 	]);
 	
 	// Loading state
-	let isLoading = $state(true);
-	
-	// Fetch dashboard data
-	async function fetchDashboardData(): Promise<void> {
-		try {
-			// Simulate API call
-			setTimeout(() => {
-				stats = {
-					totalUsers: 1254,
-					activeProviders: 87,
-					pendingRequests: 32,
-					totalRevenue: 125000
-				};
-				isLoading = false;
-			}, 1000);
-			
-			// In a real implementation, you would fetch data from an API
-			// const response = await fetch('/api/dashboard/stats');
-			// const data = await response.json();
-			// stats = data;
-		} catch (error) {
-			console.error('Failed to fetch dashboard data:', error);
-		} finally {
-			isLoading = false;
-		}
-	}
-	
-	// Initialize data on component mount
-	$effect(() => {
-		fetchDashboardData();
-	});
+	let isLoading = $derived(!staffStats);
 </script>
 
 <div class="space-y-8">
@@ -102,7 +59,7 @@
 					</div>
 					<div class="ml-4 flex-1">
 						<h3 class="text-sm font-medium text-surface-600-300-token">Total Users</h3>
-						<p class="text-2xl font-semibold">{stats.totalUsers}</p>
+						<p class="text-2xl font-semibold">{staffStats?.total_users || 0}</p>
 					</div>
 				</div>
 			</div>
@@ -115,7 +72,7 @@
 					</div>
 					<div class="ml-4 flex-1">
 						<h3 class="text-sm font-medium text-surface-600-300-token">Active Providers</h3>
-						<p class="text-2xl font-semibold">{stats.activeProviders}</p>
+						<p class="text-2xl font-semibold">{staffStats?.active_providers || 0}</p>
 					</div>
 				</div>
 			</div>
@@ -128,7 +85,7 @@
 					</div>
 					<div class="ml-4 flex-1">
 						<h3 class="text-sm font-medium text-surface-600-300-token">Pending Requests</h3>
-						<p class="text-2xl font-semibold">{stats.pendingRequests}</p>
+						<p class="text-2xl font-semibold">{staffStats?.pending_requests || 0}</p>
 					</div>
 				</div>
 			</div>
@@ -141,7 +98,7 @@
 					</div>
 					<div class="ml-4 flex-1">
 						<h3 class="text-sm font-medium text-surface-600-300-token">Total Revenue</h3>
-						<p class="text-2xl font-semibold">${(stats.totalRevenue / 1000).toFixed(1)}k</p>
+						<p class="text-2xl font-semibold">N/A</p>
 					</div>
 				</div>
 			</div>

@@ -1,0 +1,16 @@
+{'summary': {'query': '6083 wicker ln #154 centerville va 20121 us', 'queryType': 'NON_NEAR', 'queryTime': 113, 'numResults': 1, 'offset': 0, 'totalResults': 1547, 'fuzzyLevel': 2
+    }, 'results': [
+        {'type': 'Point Address', 'id': 'e-1o_wCqDxiVdVerm_GjDw', 'score': 0.915719530591523, 'matchConfidence': {'score': 0.915719530591523
+            }, 'address': {'streetNumber': '6083', 'streetName': 'Wicker Lane', 'municipality': 'Sully', 'countrySecondarySubdivision': 'Fairfax County', 'countrySubdivision': 'VA', 'countrySubdivisionName': 'Virginia', 'countrySubdivisionCode': 'VA', 'postalCode': '20121', 'extendedPostalCode': '20121-2214', 'countryCode': 'US', 'country': 'United States', 'countryCodeISO3': 'USA', 'freeformAddress': '6083 Wicker Lane, Centreville, VA 20121', 'localName': 'Centreville'
+            }, 'position': {'lat': 38.8359337, 'lon': -77.4427501
+            }, 'viewport': {'topLeftPoint': {'lat': 38.83683, 'lon': -77.4439
+                }, 'btmRightPoint': {'lat': 38.83503, 'lon': -77.4416
+                }
+            }, 'entryPoints': [
+                {'type': 'main', 'position': {'lat': 38.83581, 'lon': -77.44278
+                    }
+                }
+            ]
+        }
+    ]
+}

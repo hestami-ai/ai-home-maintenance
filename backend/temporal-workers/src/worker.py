@@ -10,11 +10,23 @@ from workflows.subscription_workflow import (
     UpdateSubscriptionWorkflow,
     CancelSubscriptionWorkflow
 )
+from workflows.property_workflow import (
+    PropertyCountyWorkflow,
+    PropertyPermitRetrievalWorkflow
+)
 from activities.subscription_activities import (
     create_square_subscription,
     update_square_subscription,
     cancel_square_subscription,
     update_user_subscription_status
+)
+from activities.property_activities import (
+    get_property_details,
+    find_property_county,
+    update_property_county,
+    get_property_permit_history,
+    update_property_permit_status,
+    create_permit_history_record
 )
 
 # Load environment variables
@@ -31,10 +43,14 @@ async def main():
         namespace=os.getenv("TEMPORAL_NAMESPACE", "default")
     )
 
-    # Run worker
-    worker = Worker(
+    # Task queue names
+    subscription_task_queue = os.getenv("SUBSCRIPTION_TASK_QUEUE", "subscription-tasks")
+    property_task_queue = os.getenv("PROPERTY_TASK_QUEUE", "property-tasks")
+    
+    # Create subscription worker
+    subscription_worker = Worker(
         client,
-        task_queue=os.getenv("TEMPORAL_TASK_QUEUE", "subscription-tasks"),
+        task_queue=subscription_task_queue,
         workflows=[
             CreateSubscriptionWorkflow,
             UpdateSubscriptionWorkflow,
@@ -47,14 +63,42 @@ async def main():
             update_user_subscription_status
         ]
     )
+    
+    # Create property worker
+    property_worker = Worker(
+        client,
+        task_queue=property_task_queue,
+        workflows=[
+            PropertyCountyWorkflow,
+            PropertyPermitRetrievalWorkflow
+        ],
+        activities=[
+            get_property_details,
+            find_property_county,
+            update_property_county,
+            get_property_permit_history,
+            update_property_permit_status,
+            create_permit_history_record
+        ]
+    )
 
     logger.info(
-        "Starting worker on task queue %s in namespace %s", 
-        os.getenv("TEMPORAL_TASK_QUEUE", "subscription-tasks"),
+        "Starting subscription worker on task queue %s in namespace %s", 
+        subscription_task_queue,
         os.getenv("TEMPORAL_NAMESPACE", "default")
     )
     
-    await worker.run()
+    logger.info(
+        "Starting property worker on task queue %s in namespace %s", 
+        property_task_queue,
+        os.getenv("TEMPORAL_NAMESPACE", "default")
+    )
+    
+    # Run both workers
+    await asyncio.gather(
+        subscription_worker.run(),
+        property_worker.run()
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
