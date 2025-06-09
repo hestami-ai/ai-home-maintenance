@@ -135,6 +135,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.env.local
+.env.prod
 
 # Spyder project settings
 .spyderproject
@@ -214,10 +216,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# env files (can opt-in for committing if needed)
-.env.local
-.env.prod
-
 # vercel
 .vercel
 
@@ -230,3 +228,5 @@ volumes
 
 # Others
 set_env_vars.bat
+.archive
+chrome_data
