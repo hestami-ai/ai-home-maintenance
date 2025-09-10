@@ -10,14 +10,28 @@ class ServiceTokenAuthentication(TokenAuthentication):
     """
     Custom authentication for service accounts using service tokens.
     This is used for service-to-service API endpoints only.
+    Accepts both 'Token' and 'Bearer' prefixes for compatibility.
     """
     keyword = 'Token'
+    allowed_keywords = ['Token', 'Bearer']
 
     def authenticate(self, request):
         auth = get_authorization_header(request).split()
-        logger.info(f"Auth header: {auth}")
-
-        if not auth or auth[0].lower() != self.keyword.lower().encode():
+        logger.error(f"Auth header: {auth}")
+        
+        if not auth:
+            logger.warning("No auth header provided")
+            return None
+            
+        try:
+            auth_type = auth[0].lower().decode()
+            logger.error(f"Auth type: {auth_type}")
+            
+            if auth_type not in [k.lower() for k in self.allowed_keywords]:
+                logger.warning(f"Auth type '{auth_type}' not in allowed keywords: {self.allowed_keywords}")
+                return None
+        except Exception as e:
+            logger.error(f"Error processing auth header: {str(e)}")
             return None
 
         if len(auth) == 1:
@@ -31,7 +45,6 @@ class ServiceTokenAuthentication(TokenAuthentication):
 
         try:
             token = auth[1].decode()
-            logger.info(f"Attempting to authenticate with token: {token[:8]}...")
         except UnicodeError:
             msg = 'Invalid token header. Token string should not contain invalid characters.'
             logger.warning(msg)
@@ -44,8 +57,18 @@ class ServiceTokenAuthentication(TokenAuthentication):
         User = get_user_model()
         
         try:
+            # First try to find any user with this token
+            try:
+                any_user = User.objects.filter(service_token=key).first()
+                if any_user:
+                    logger.error(f"Found user with matching token: {any_user.email}, active: {any_user.is_active}, service_account: {any_user.is_service_account}")
+                else:
+                    logger.warning(f"No user found with token starting with {key[:8]}...")
+            except Exception as e:
+                logger.error(f"Error checking for any user: {str(e)}")
+            
+            # Now try the actual authentication
             user = User.objects.get(service_token=key, is_active=True)
-            logger.info(f"Found user: {user.email}, is_service_account: {user.is_service_account}")
             
             if not user.is_service_account:
                 msg = 'User is not a service account'

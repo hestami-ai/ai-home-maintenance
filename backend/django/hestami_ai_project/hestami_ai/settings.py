@@ -470,6 +470,22 @@ CELERY_TIMEZONE = 'UTC'
 # Broker settings
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True  # Explicitly enable connection retry on startup
 
+# Celery Beat schedule settings
+CELERY_BEAT_SCHEDULE = {
+    'check-permit-retrieval-queue': {
+        'task': 'properties.check_permit_retrieval_queue',
+        'schedule': float(os.environ.get('PERMIT_PROCESSOR_INTERVAL', '5')),  # Run every 5 seconds by default
+    },
+    'check-property-county-queue': {
+        'task': 'properties.check_property_county_queue',
+        'schedule': float(os.environ.get('PROPERTY_COUNTY_PROCESSOR_INTERVAL', '5')),  # Run every 5 seconds by default
+    },
+    'process-pending-service-requests': {
+        'task': 'services.tasks.process_pending_service_requests',
+        'schedule': float(os.environ.get('SERVICE_REQUEST_PROCESSOR_INTERVAL', '5')),  # Run every 5 seconds by default
+    },
+}
+
 # Task-specific settings
 CELERY_TASK_TIME_LIMIT = 300  # 5 minutes
 CELERY_TASK_SOFT_TIME_LIMIT = 240  # 4 minutes

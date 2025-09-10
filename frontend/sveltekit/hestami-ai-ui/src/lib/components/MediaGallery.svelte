@@ -22,17 +22,44 @@
   let currentIndex = 0;
   let currentLightboxImage: PropertyImage | null = null;
   
-  // Filter out deleted items for the lightbox
-  $: readyMediaItems = mediaItems.filter(item => item.is_ready && !item.is_deleted);
+  // Filter out deleted items, non-image/video files, and timeline comment attachments for the lightbox
+  $: readyMediaItems = mediaItems.filter(item => {
+    // Check if item is ready and not deleted
+    const isReadyAndNotDeleted = item.is_ready && !item.is_deleted;
+    
+    // Check if item is an image or video
+    const isImageOrVideo = item.is_image || item.is_video;
+    
+    // Check if item is not part of a timeline comment
+    // Items attached to timeline comments will have metadata that indicates they're attachments
+    const isNotTimelineAttachment = !item.metadata || 
+                                  (typeof item.metadata === 'string' ? 
+                                    !item.metadata.includes('timeline') : 
+                                    !item.metadata.timeline_comment_id);
+    
+    return isReadyAndNotDeleted && isImageOrVideo && isNotTimelineAttachment;
+  });
   
   // Determine if we have any media to show
-  $: hasMedia = mediaItems && mediaItems.length > 0;
+  $: hasMedia = readyMediaItems && readyMediaItems.length > 0;
   
-  // Determine if any media is still processing
-  $: hasProcessingMedia = mediaItems.some(item => 
-    !item.is_ready && 
-    ['PENDING', 'SCANNING', 'PROCESSING'].includes(item.processing_status)
-  );
+  // Determine if any media is still processing (only for image/video files that aren't timeline attachments)
+  $: hasProcessingMedia = mediaItems.some(item => {
+    // Only check processing status for images and videos
+    const isImageOrVideo = item.is_image || item.is_video;
+    
+    // Skip timeline comment attachments
+    const isNotTimelineAttachment = !item.metadata || 
+                                  (typeof item.metadata === 'string' ? 
+                                    !item.metadata.includes('timeline') : 
+                                    !item.metadata.timeline_comment_id);
+    
+    // Check if it's still processing
+    const isProcessing = !item.is_ready && 
+                        ['PENDING', 'SCANNING', 'PROCESSING'].includes(item.processing_status);
+    
+    return isImageOrVideo && isNotTimelineAttachment && isProcessing;
+  });
   
   // Auto-refresh gallery if media is still processing
   let refreshInterval: number;
@@ -94,7 +121,7 @@
 
 {#if hasMedia}
   <div class="grid gap-4" style="grid-template-columns: repeat({columns}, minmax(0, 1fr));" role="list">
-    {#each mediaItems as item, i}
+    {#each readyMediaItems as item, i}
       <div 
         class="media-container flex items-center justify-center"
         role="listitem"

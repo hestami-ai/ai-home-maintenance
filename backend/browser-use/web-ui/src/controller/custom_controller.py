@@ -1,5 +1,6 @@
 import pdb
 import os
+import json
 import pyperclip
 from typing import Optional, Type
 from pydantic import BaseModel
@@ -19,7 +20,7 @@ from browser_use.controller.views import (
     SendKeysAction,
     SwitchTabAction,
 )
-from .custom_views import ClickElementByXpathAction, ClickIframeElementByXpathAction, CopyIframeHtmlAction, InputIframeTextByXpathAction
+from .custom_views import ClickElementByXpathAction, ClickIframeElementByXpathAction, CopyIframeHtmlAction, InputIframeTextByXpathAction, ClickNextPageButtonAction, SaveScrapedHtmlAction, ScrapeAllPagesAction
 import logging
 import requests
 
@@ -102,6 +103,85 @@ class CustomController(Controller):
                     error=f"Failed to extract and post HTML: {str(e)}",
                     extracted_content="HTML extraction failed"
                 )
+                
+        @self.registry.action("Jump to bottom of page")
+        async def jump_to_bottom_of_page(browser: BrowserContext):
+            """
+            Jumps to the bottom of the current page using JavaScript.
+            Useful for loading lazy-loaded content or triggering events that happen on scroll.
+            """
+            try:
+                page = await browser.get_current_page()
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                return ActionResult(
+                    extracted_content="Successfully jumped to the bottom of the page",
+                    include_in_memory=True
+                )
+            except Exception as e:
+                logger.warning(f"Error jumping to bottom of page: {str(e)}")
+                return ActionResult(error=f"Failed to jump to bottom: {str(e)}")
+                
+        @self.registry.action("Click next page button", param_model=ClickNextPageButtonAction)
+        async def click_next_page_button(params: ClickNextPageButtonAction, browser: BrowserContext):
+            """
+            Finds and clicks the next page button with id "link-NextPage".
+            Useful for navigating through paginated content.
+            Checks if the parent li element has a 'disabled' class and returns appropriate message.
+            """
+            try:
+                page = await browser.get_current_page()
+                # Try to find the next page button by its ID
+                next_button = await page.query_selector('#link-NextPage')
+                
+                if not next_button:
+                    logger.warning("Next page button not found with id 'link-NextPage'")
+                    return ActionResult(
+                        error="Next page button not found",
+                        extracted_content="Could not find next page button with id 'link-NextPage'"
+                    )
+                
+                # Check if the parent li element has the 'disabled' class
+                is_disabled = await page.evaluate("""
+                    () => {
+                        const button = document.getElementById('link-NextPage');
+                        if (!button) return true; // Consider not found as disabled
+                        
+                        // Check if the parent li has the 'disabled' class
+                        const parentLi = button.closest('li');
+                        return parentLi && parentLi.classList.contains('disabled');
+                    }
+                """)
+                
+                if is_disabled:
+                    logger.info("Next page button is disabled (no more pages)")
+                    return ActionResult(
+                        extracted_content="Reached the last page - next button is disabled",
+                        include_in_memory=True
+                    )
+                
+                # First try to scroll it into view
+                await next_button.scroll_into_view_if_needed()
+                
+                # Try to click the button
+                try:
+                    await next_button.click(timeout=2000)
+                    logger.info("Successfully clicked next page button")
+                except Exception as click_error:
+                    # If direct click fails, try JavaScript click
+                    logger.warning(f"Direct click failed, trying JavaScript click: {str(click_error)}")
+                    await page.evaluate("document.getElementById('link-NextPage').click()")
+                    
+                # Wait a moment for page to load
+                await page.wait_for_timeout(1000)
+                
+                return ActionResult(
+                    extracted_content="Successfully clicked next page button",
+                    include_in_memory=True
+                )
+            except Exception as e:
+                logger.warning(f"Error clicking next page button: {str(e)}")
+                return ActionResult(error=f"Failed to click next page button: {str(e)}")
+                
 
         """
         Implementation for the click_element_by_xpath method.
@@ -351,9 +431,54 @@ class CustomController(Controller):
                 logger.warning(f"Error inputting text in element inside iframe: {e}")
                 return ActionResult(error=str(e))
 
+        @self.registry.action("Scrape all pages until last page", param_model=ScrapeAllPagesAction)
+        async def scrape_all_pages(params: ScrapeAllPagesAction, browser: BrowserContext):
+            """
+            Combined action that scrapes HTML from all pages by dispatching to the appropriate
+            scraping implementation based on the state and source_name parameters.
             
-        @self.registry.action("Save scraped HTML to API endpoint")
-        async def save_scraped_html(browser: BrowserContext, property_id: str, source_name: str, scrape_type: str = "RAW_CONTENT"):
+            The function name is generated using the pattern: {STATE}_{COUNTY}_Scrape_All_Pages
+            where spaces in county name are replaced with underscores.
+            
+            This eliminates the need for the LLM to coordinate multiple actions and allows for
+            county/state-specific scraping implementations.
+            """
+            try:
+                # Generate the scrape function name based on state and source_name
+                # Replace spaces with underscores in the county name
+                county_name = params.source_name.replace(' ', '_')
+                scrape_function_name = f"{params.source_state}_{county_name}_Scrape_All_Pages"
+                
+                # Access the controller instance through the closure
+                controller = self  # This captures self from the enclosing scope
+                
+                # Check if the function exists in this class
+                if hasattr(controller, scrape_function_name) and callable(getattr(controller, scrape_function_name)):
+                    # Call the appropriate implementation
+                    scrape_function = getattr(controller, scrape_function_name)
+                    return await scrape_function(params, browser)
+                else:
+                    # If the function doesn't exist, log an error and return a helpful message
+                    logger.error(f"Scrape function '{scrape_function_name}' not found")
+                    
+                    # List available scrape functions for debugging
+                    available_functions = [name for name in dir(controller) if name.endswith('_Scrape_All_Pages') and callable(getattr(controller, name))]
+                    logger.info(f"Available scrape functions: {available_functions}")
+                    
+                    return ActionResult(
+                        error=f"Scrape function '{scrape_function_name}' not found for {params.source_state}, {params.source_name}. Available functions: {available_functions}",
+                        extracted_content=f"Failed to find scraping implementation for {params.source_state}, {params.source_name}"
+                    )
+                
+            except Exception as e:
+                logger.error(f"Error in scrape_all_pages dispatcher: {str(e)}")
+                return ActionResult(
+                    error=f"Failed to dispatch scrape function: {str(e)}",
+                    extracted_content="Page scraping failed"
+                )
+            
+        #@self.registry.action("Save scraped HTML to API endpoint", param_model=SaveScrapedHtmlAction)
+        async def save_scraped_html(params: SaveScrapedHtmlAction, browser: BrowserContext):
             """
             Save HTML from the current page to the specified API endpoint.
             """
@@ -365,7 +490,7 @@ class CustomController(Controller):
 
                 # Determine endpoint
                 base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://api:8050/api/properties/")
-                endpoint = f"{base_url}{property_id}/scraped-data/"
+                endpoint = f"{base_url}{params.property_id}/scraped-data/create"
 
                 if not endpoint:
                     logger.warning("No API endpoint provided for HTML extraction")
@@ -378,8 +503,12 @@ class CustomController(Controller):
                 payload = {
                     "raw_html": html_content,
                     "source_url": url,
-                    "source_name": source_name,
-                    "scrape_type": scrape_type,
+                    "source_name": params.source_name,
+                    "scrape_type": params.scrape_type,
+                    # Include tracking_id if provided
+                    **({
+                        "tracking_id": params.tracking_id
+                    } if params.tracking_id else {}),
                     # 'scrape_status' will default to 'pending' in the model if not provided
                     # 'processed_data' will default to {} in the model if not provided
                 }
@@ -412,3 +541,278 @@ class CustomController(Controller):
                     error=f"Failed to extract and post HTML: {str(e)}",
                     extracted_content="HTML extraction failed"
                 )
+
+    # County-specific scraping methods - these are proper class methods that can be found by the dispatcher
+    
+    async def VA_Prince_William_County_Scrape_All_Pages(self, params: ScrapeAllPagesAction, browser: BrowserContext):
+        """
+        Implementation for Prince William County, VA permit history scraping.
+        Scrapes HTML from all pages by:
+        1. Saving the HTML from the current page
+        2. Clicking the next page button identified by id 'link-NextPage'
+        3. Repeating until the last page is reached (button is disabled)
+        """
+        try:
+            page = await browser.get_current_page()
+            page_count = 0
+            results = []
+            last_page_reached = False
+            
+            while page_count < params.max_pages and not last_page_reached:
+                # Save the current page's HTML
+                try:
+                    # Extract HTML content
+                    url = page.url
+                    html_content = await page.evaluate("() => document.documentElement.outerHTML")
+
+                    # Determine endpoint
+                    base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://api:8050/api/properties/")
+                    endpoint = f"{base_url}{params.property_id}/scraped-data/create"
+
+                    # Prepare payload and headers
+                    payload = {
+                        "raw_html": html_content,
+                        "source_url": url,
+                        "source_name": params.source_name,
+                        "scrape_type": params.scrape_type,
+                        "tracking_id": params.tracking_id,
+                        # 'scrape_status' will default to 'pending' in the model if not provided
+                        # 'processed_data' will default to {} in the model if not provided
+                    }
+                    headers = {"Content-Type": "application/json"}
+                    auth_token = os.getenv("BROWSER_USE_ACCOUNT_TOKEN")
+                    if auth_token:
+                        headers["Authorization"] = f"Token {auth_token}"
+
+                    # Post to API
+                    logger.info(f"Posting HTML from page {page_count + 1} to API endpoint: {endpoint}")
+                    response = requests.post(endpoint, json=payload, headers=headers)
+                    
+                    if response.status_code >= 400:
+                        logger.error(f"API error on page {page_count + 1}: {response.status_code} - {response.text}")
+                        results.append(f"Error saving page {page_count + 1}: HTTP {response.status_code}")
+                    else:
+                        logger.info(f"HTML from page {page_count + 1} successfully posted to API: {response.status_code}")
+                        results.append(f"Successfully saved page {page_count + 1}")
+                
+                except Exception as e:
+                    logger.error(f"Error extracting and posting HTML from page {page_count + 1}: {str(e)}")
+                    results.append(f"Error saving page {page_count + 1}: {str(e)}")
+                
+                # Increment page counter
+                page_count += 1
+                
+                # Check if we've reached the last page
+                try:
+                    # Check if the next button is disabled
+                    is_disabled = await page.evaluate("""
+                        () => {
+                            const button = document.getElementById('link-NextPage');
+                            if (!button) return true;
+                            
+                            // Check if the parent li has class 'disabled'
+                            const parentLi = button.closest('li');
+                            if (parentLi && parentLi.classList.contains('disabled')) {
+                                return true;
+                            }
+                            
+                            // Check if the button itself has disabled attribute or class
+                            if (button.hasAttribute('disabled') || button.classList.contains('disabled')) {
+                                return true;
+                            }
+                            
+                            return false;
+                        }
+                    """)
+                    
+                    if is_disabled:
+                        logger.info("Next page button is disabled - reached the last page")
+                        last_page_reached = True
+                        results.append("Reached the last page - next button is disabled")
+                        break
+                    
+                    # Find and click the next page button
+                    next_button = await page.query_selector('#link-NextPage')
+                    if next_button:
+                        await next_button.click()
+                        logger.info(f"Clicked next page button, moving to page {page_count + 1}")
+                        
+                        # Wait for page to load
+                        await page.wait_for_timeout(params.wait_time * 1000)  # Convert to milliseconds
+                        
+                        results.append(f"Navigated to page {page_count + 1}")
+                    else:
+                        logger.info("Next page button not found - reached the last page")
+                        last_page_reached = True
+                        results.append("Reached the last page - next button not found")
+                        break
+                
+                except Exception as e:
+                    logger.error(f"Error navigating to next page: {str(e)}")
+                    results.append(f"Error navigating to page {page_count + 1}: {str(e)}")
+                    break
+            
+            # If we hit the max pages limit without reaching the last page
+            if page_count >= params.max_pages and not last_page_reached:
+                results.append(f"Reached maximum page limit of {params.max_pages} pages")
+            
+            return ActionResult(
+                extracted_content=f"Scraped {page_count} pages. " + " | ".join(results),
+                include_in_memory=True,
+                metadata={
+                    "pages_scraped": page_count,
+                    "property_id": params.property_id,
+                    "source_name": params.source_name,
+                    "last_page_reached": last_page_reached
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in VA_Prince_William_County_Scrape_All_Pages action: {str(e)}")
+            return ActionResult(
+                error=f"Failed to scrape all pages: {str(e)}",
+                extracted_content="Page scraping failed"
+            )
+
+    async def VA_Fairfax_County_Scrape_All_Pages(self, params: ScrapeAllPagesAction, browser: BrowserContext):
+        """
+        Implementation for Fairfax County, VA permit history scraping.
+        Scrapes HTML from all pages by:
+        1. Saving the HTML from the current page
+        2. Clicking the next page button with '>' text that contains a page parameter
+        3. Repeating until the last page is reached (no more next links)
+        """
+        try:
+            page = await browser.get_current_page()
+            page_count = 0
+            results = []
+            last_page_reached = False
+            
+            while page_count < params.max_pages and not last_page_reached:
+                # Save the current page's HTML
+                try:
+                    # Extract HTML content
+                    url = page.url
+                    html_content = await page.evaluate("() => document.documentElement.outerHTML")
+
+                    # Determine endpoint
+                    base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://api:8050/api/properties/")
+                    endpoint = f"{base_url}{params.property_id}/scraped-data/create"
+
+                    # Prepare payload and headers
+                    payload = {
+                        "raw_html": html_content,
+                        "source_url": url,
+                        "source_name": params.source_name,
+                        "scrape_type": params.scrape_type,
+                        "tracking_id": params.tracking_id,
+                        # 'scrape_status' will default to 'pending' in the model if not provided
+                        # 'processed_data' will default to {} in the model if not provided
+                    }
+                    
+                    headers = {"Content-Type": "application/json"}
+                    auth_token = os.getenv("BROWSER_USE_ACCOUNT_TOKEN")
+                    if auth_token:
+                        headers["Authorization"] = f"Token {auth_token}"
+
+                    # Post to API
+                    logger.info(f"Posting HTML from page {page_count + 1} to API endpoint: {endpoint}")
+                    response = requests.post(endpoint, json=payload, headers=headers)
+                    
+                    if response.status_code >= 400:
+                        logger.error(f"API error on page {page_count + 1}: {response.status_code} - {response.text}")
+                        results.append(f"Error saving page {page_count + 1}: HTTP {response.status_code}")
+                    else:
+                        logger.info(f"HTML from page {page_count + 1} successfully posted to API: {response.status_code}")
+                        results.append(f"Successfully saved page {page_count + 1}")
+                
+                except Exception as e:
+                    logger.error(f"Error extracting and posting HTML from page {page_count + 1}: {str(e)}")
+                    results.append(f"Error saving page {page_count + 1}: {str(e)}")
+                
+                # Increment page counter
+                page_count += 1
+                
+                # Check if we've reached the last page
+                try:
+                    # For Fairfax County, look for an anchor with '>' text that contains a page parameter
+                    # Example: <a href="/page/search?searchaddress=13511%20Granite%20Rock%20Dr&amp;src=%2Fpage%2Fsearch&amp;pg=2">&gt;</a>
+                    has_next_page = await page.evaluate("""
+                        () => {
+                            // Find all anchor elements
+                            const anchors = Array.from(document.querySelectorAll('a'));
+                            
+                            // Find the one with '>' text that contains 'pg=' in the href
+                            const nextPageLink = anchors.find(a => {
+                                return a.textContent === '>' && 
+                                       a.href && 
+                                       a.href.includes('pg=');
+                            });
+                            
+                            return nextPageLink ? true : false;
+                        }
+                    """)
+                    
+                    if not has_next_page:
+                        logger.info("No next page link found - reached the last page")
+                        last_page_reached = True
+                        results.append("Reached the last page - no next page link found")
+                        break
+                    
+                    # Find and click the next page link
+                    next_button = await page.evaluate("""
+                        () => {
+                            const anchors = Array.from(document.querySelectorAll('a'));
+                            const nextPageLink = anchors.find(a => {
+                                return a.textContent === '>' && 
+                                       a.href && 
+                                       a.href.includes('pg=');
+                            });
+                            
+                            if (nextPageLink) {
+                                nextPageLink.click();
+                                return true;
+                            }
+                            return false;
+                        }
+                    """)
+                    
+                    if next_button:
+                        logger.info(f"Clicked next page link, moving to page {page_count + 1}")
+                        
+                        # Wait for page to load
+                        await page.wait_for_timeout(params.wait_time * 1000)  # Convert to milliseconds
+                        
+                        results.append(f"Navigated to page {page_count + 1}")
+                    else:
+                        logger.info("Failed to click next page link - reached the last page")
+                        last_page_reached = True
+                        results.append("Reached the last page - failed to click next page link")
+                        break
+                
+                except Exception as e:
+                    logger.error(f"Error navigating to next page: {str(e)}")
+                    results.append(f"Error navigating to page {page_count + 1}: {str(e)}")
+                    break
+            
+            # If we hit the max pages limit without reaching the last page
+            if page_count >= params.max_pages and not last_page_reached:
+                results.append(f"Reached maximum page limit of {params.max_pages} pages")
+            
+            return ActionResult(
+                extracted_content=f"Scraped {page_count} pages. " + " | ".join(results),
+                include_in_memory=True,
+                metadata={
+                    "pages_scraped": page_count,
+                    "property_id": params.property_id,
+                    "source_name": params.source_name,
+                    "last_page_reached": last_page_reached
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Error in VA_Fairfax_County_Scrape_All_Pages action: {str(e)}")
+            return ActionResult(
+                error=f"Failed to scrape all pages: {str(e)}",
+                extracted_content="Page scraping failed"
+            )

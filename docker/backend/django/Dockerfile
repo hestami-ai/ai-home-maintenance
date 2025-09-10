@@ -8,7 +8,9 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     python3-dev \
     libmagic1 \
-    libgl1-mesa-glx \
+    #libgl1-mesa-glx \
+    libgl1 \
+    libglx-mesa0 \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -33,12 +35,12 @@ COPY ./backend/django/hestami_ai_project/ .
 RUN chmod +x /app/entrypoint.sh
 
 # Create necessary directories and set permissions
-RUN mkdir -p /mnt/hestami-static/media /app/logs && \
+RUN mkdir -p /mnt/hestami-static/media /mnt/hestami-static/static /app/logs && \
     chown -R django:django /app /mnt/hestami-static && \
     chmod -R 755 /app && \
-    chmod -R 775 /app/logs /mnt/hestami-static/media
+    chmod -R 775 /mnt/hestami-static/media /mnt/hestami-static/static
 
 # Switch to django user
-USER django
+#USER django
 
 ENTRYPOINT ["/app/entrypoint.sh"]

@@ -71,6 +71,11 @@ while ! nc -z redis 6379; do
 done
 echo "Redis started"
 
+echo ""
+
+#echo "Sleep 60 seconds..."
+#sleep 60
+
 # Collect static files
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
@@ -90,6 +95,10 @@ python manage.py migrate
 # Start Celery worker
 echo "Starting Celery worker..."
 celery -A hestami_ai worker --loglevel=info &
+
+# Start Celery Beat scheduler
+echo "Starting Celery Beat scheduler..."
+celery -A hestami_ai beat --loglevel=info &
 
 # Start server
 echo "Starting server..."

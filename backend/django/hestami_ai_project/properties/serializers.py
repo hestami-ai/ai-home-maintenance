@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Property, PropertyAccess, PropertyScrapedData, PermitHistory, PermitAttachment
 from users.serializers import UserSerializer
+from services.serializers.base_serializers import ServiceRequestSerializer
 
 class PropertySerializer(serializers.ModelSerializer):
     owner_details = UserSerializer(source='owner', read_only=True)
@@ -25,7 +26,6 @@ class PropertySerializer(serializers.ModelSerializer):
         return obj.media.filter(is_deleted=False).count()
 
     def get_service_requests(self, obj):
-        from services.serializers import ServiceRequestSerializer
         # Only serialize essential fields to avoid deep nesting
         return ServiceRequestSerializer(
             obj.service_requests.all(),
@@ -66,8 +66,8 @@ class PropertyScrapedDataSerializer(serializers.ModelSerializer):
         model = PropertyScrapedData
         fields = [
             'id', 'property', 'property_details', 'source_name', 'source_url',
-            'raw_html', 'processed_data', 'scrape_type', 'scrape_status', 'error_message',
-            'last_scraped_at', 'created_at'
+            'raw_html', 'processed_data', 'scrape_type', 'scrape_status', 'processed_status', 'error_message',
+            'last_scraped_at', 'created_at', 'tracking_id'
         ]
         read_only_fields = ['id', 'last_scraped_at', 'created_at']
     

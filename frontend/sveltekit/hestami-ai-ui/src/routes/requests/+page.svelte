@@ -15,8 +15,18 @@ export let data: {
 // Determine user role
 $: userRole = data.user?.user_role || 'PROPERTY_OWNER';
 
-
+// Get page title based on user role
+$: pageTitle = userRole === 'PROPERTY_OWNER' 
+	? 'My Service Requests' 
+	: userRole === 'STAFF' 
+		? 'All Service Requests' 
+		: 'Available Service Requests';
 </script>
+
+<svelte:head>
+	<title>{pageTitle} - Hestami AI</title>
+	<meta name="description" content="View and manage service requests" />
+</svelte:head>
 
 <div class="container mx-auto p-4 space-y-6">
 	{#if userRole === 'PROPERTY_OWNER'}

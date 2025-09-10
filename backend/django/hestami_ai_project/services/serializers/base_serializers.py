@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import (
+from services.models.base_models import (
     ServiceProvider, ProviderCategory,
     ServiceRequest, ServiceReport, ServiceReview,
     ServiceBid, ServiceRequestClarification, ServiceRequestInterest,
@@ -41,7 +41,7 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
             'rating', 'total_reviews', 'average_rating',
             'categories_info', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['rating', 'total_reviews', 'created_at', 'updated_at']
+        read_only_fields = ['created_at']
 
 class ServiceBidSerializer(serializers.ModelSerializer):
     provider_details = ServiceProviderSerializer(source='provider', read_only=True)
@@ -54,7 +54,7 @@ class ServiceBidSerializer(serializers.ModelSerializer):
             'proposed_start_date', 'status', 'created_at',
             'updated_at'
         ]
-        read_only_fields = ['status', 'created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at']
     
     def validate(self, data):
         if data.get('proposed_start_date') and data['proposed_start_date'] < timezone.now():
@@ -83,8 +83,7 @@ class ServiceRequestClarificationSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = [
-            'response', 'response_at', 'created_at',
-            'updated_at'
+            'created_at'
         ]
 
 class ServiceRequestCreateSerializer(serializers.ModelSerializer):
@@ -162,9 +161,7 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             'research_entries'
         ]
         read_only_fields = [
-            'status', 'actual_start', 'actual_end',
-            'final_cost', 'created_at', 'updated_at',
-            'created_by', 'selected_provider', 'runner_up_provider'
+            'created_at', 'created_by', 
         ]
 
     def get_provider_details(self, obj):
@@ -216,7 +213,7 @@ class ServiceReportSerializer(serializers.ModelSerializer):
             'after_photos', 'media_details', 'created_at',
             'updated_at', 'created_by', 'created_by_details'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'created_by']
+        read_only_fields = ['created_at', 'created_by']
 
     def get_media_details(self, obj):
         before_photos = obj.media.filter(report_photo_type='BEFORE', is_deleted=False)
@@ -267,7 +264,7 @@ class ServiceReviewSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'created_by',
             'created_by_details'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'created_by']
+        read_only_fields = ['created_at', 'created_by']
     
     def validate_rating(self, value):
         if not (1 <= value <= 5):
@@ -291,7 +288,7 @@ class ServiceRequestInterestSerializer(serializers.ModelSerializer):
             'provider_details', 'interest_status',
             'notes', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at']
 
 class ServiceResearchSerializer(serializers.ModelSerializer):
     """
@@ -307,7 +304,7 @@ class ServiceResearchSerializer(serializers.ModelSerializer):
             'research_content_raw_text', 'data_sources', 'notes', 'researched_by', 
             'researched_by_details', 'service_provider_created', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'researched_by']
+        read_only_fields = ['created_at']
 
 class ServiceRequestDetailSerializer(serializers.ModelSerializer):
     report = ServiceReportSerializer(read_only=True)

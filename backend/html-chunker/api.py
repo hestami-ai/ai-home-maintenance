@@ -4,12 +4,13 @@ FastAPI endpoint for HTML chunking and extraction using remote LLMs.
 import os
 import json
 import tempfile
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Body
 from fastapi.responses import JSONResponse
 import uvicorn
 from extractor import process_html, LLM_PROVIDERS, DEFAULT_LLM, DEFAULT_MODEL, DEFAULT_MODELS
 import logging
+import importlib
 from pydantic import BaseModel
 
 # Create a module-level logger
@@ -22,6 +23,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# TODO: This should be loaded from a CSV or database so that redeploying is not required for new extractors
+EXTRACTOR_REGISTRY = {
+    ("VA", "Fairfax County", "LDIP"): {
+        "module_name": "VA_Fairfax_County_Extractors", # Module name (filename without .py)
+        "function_name": "extract_LDIP_fairfax_county_data_from_html"
+    }
+    # Add more extractors here as they are developed
+}
+
 # Define a model for the request body
 class HTMLExtractionRequest(BaseModel):
     html_content: str
@@ -31,6 +41,13 @@ class HTMLExtractionRequest(BaseModel):
     max_tokens: int = 24048
     overlap_percent: float = 0.1
     log_level: str = "INFO"
+
+# Define a model for the new county extractor request body
+class CountyExtractorRequest(BaseModel):
+    state: str
+    county: str
+    site_name: str
+    html_text: str
 
 @app.post("/extract", response_model=Dict[str, Any])
 async def extract_from_html(
@@ -158,6 +175,47 @@ async def extract_from_html_string(request: HTMLExtractionRequest):
     except Exception as e:
         logger.error(f"Error during extraction: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/county_extractor/", response_model=List[Dict[str, Any]])
+async def county_extractor(request: CountyExtractorRequest):
+    logger.info(f"County extractor request received for State: {request.state}, County: {request.county}, Site: {request.site_name}")
+    
+    extractor_key = (request.state, request.county, request.site_name)
+    
+    if extractor_key not in EXTRACTOR_REGISTRY:
+        logger.error(f"No extractor found for key: {extractor_key}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Extractor not found for State '{request.state}', County '{request.county}', Site '{request.site_name}'"
+        )
+    
+    extractor_config = EXTRACTOR_REGISTRY[extractor_key]
+    module_name = extractor_config["module_name"]
+    function_name = extractor_config["function_name"]
+    
+    try:
+        # Dynamically import the module. Assumes modules are in the same directory or accessible via PYTHONPATH.
+        # If api.py and VA_Fairfax_County_Extractors.py are in 'html-chunker' and uvicorn runs from there,
+        # module_name 'VA_Fairfax_County_Extractors' should be directly importable.
+        target_module = importlib.import_module(module_name)
+        extractor_function = getattr(target_module, function_name)
+        
+        logger.info(f"Attempting to call {function_name} from {module_name}...")
+        # The extractor function is expected to take html_content as a string
+        extracted_data = extractor_function(request.html_text)
+        logger.info(f"Successfully extracted data using {function_name}.")
+        return extracted_data
+        
+    except ModuleNotFoundError:
+        logger.error(f"Module '{module_name}' not found. Ensure it is in the Python path.", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Extractor module '{module_name}' not found.")
+    except AttributeError:
+        logger.error(f"Function '{function_name}' not found in module '{module_name}'.", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Extractor function '{function_name}' not found in module '{module_name}'.")
+    except Exception as e:
+        logger.error(f"Error during county-specific extraction with {module_name}.{function_name}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Extraction error: {str(e)}")
+
 
 @app.get("/providers")
 async def get_providers():

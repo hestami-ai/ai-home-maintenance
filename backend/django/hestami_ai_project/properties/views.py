@@ -308,100 +308,7 @@ def has_property_access(user, property, access_type='view'):
     return False
 
 
-@api_view(['POST'])
-@authentication_classes([ServiceTokenAuthentication])
-def create_property_scraped_data(request, property_id):
-    """
-    Create a new property scraped data entry.
-    This endpoint allows remote services to post scraped data for properties.
-    
-    Authentication: Requires a service token in the Authorization header.
-    Format: Authorization: Token <service_token>
-    
-    Required fields:
-    - source_name: Name of the source website
-    - source_url: URL of the scraped page
-    - raw_html: Raw HTML content from web scraping
-    
-    Optional fields:
-    - processed_data: JSON data extracted from the raw HTML
-    - scrape_status: Status of the scraping process (default: 'completed')
-    - error_message: Error message if scraping failed
-    """
-    try:
-        # Verify this is a service account
-        if not request.user.is_service_account:
-            logger.warning(f"Non-service account {request.user.email} attempted to access service-only endpoint")
-            return Response(
-                {"error": "This endpoint is only available to service accounts"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-            
-        # Set scrape_status to 'completed' by default if not provided
-        if 'scrape_status' not in request.data:
-            request.data['scrape_status'] = 'completed'
-        
-        # Get the property from the URL path parameter
-        property_obj = get_object_or_404(Property, id=property_id)
-        
-        # Check for required fields
-        required_fields = ['source_name', 'source_url', 'raw_html']
-        for field in required_fields:
-            if field not in request.data:
-                return Response(
-                    {"error": f"{field} is required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-                
-        # Initialize processed_data if not provided
-        if 'processed_data' not in request.data:
-            request.data['processed_data'] = {}
-        
-        # Create or update the scraped data
-        try:
-            # Check if entry already exists for this property and source_url
-            existing_data = PropertyScrapedData.objects.filter(
-                property=property_obj,
-                source_url=request.data['source_url']
-            ).first()
-            
-            if existing_data:
-                # Update existing entry
-                serializer = PropertyScrapedDataSerializer(
-                    existing_data,
-                    data=request.data,
-                    partial=True
-                )
-                status_code = status.HTTP_200_OK
-                log_message = f"Updated scraped data for property {property_id} from {request.data['source_name']}"
-            else:
-                # Create new entry
-                # Add property to the data
-                request.data['property'] = property_id
-                serializer = PropertyScrapedDataSerializer(data=request.data)
-                status_code = status.HTTP_201_CREATED
-                log_message = f"Created new scraped data for property {property_id} from {request.data['source_name']}"
-            
-            if serializer.is_valid():
-                scraped_data = serializer.save()
-                logger.info(log_message)
-                return Response(serializer.data, status=status_code)
-            
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-        except Exception as e:
-            logger.error(f"Error processing scraped data: {str(e)}")
-            return Response(
-                {"error": f"Failed to process scraped data: {str(e)}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
-    except Exception as e:
-        logger.error(f"Error creating property scraped data: {str(e)}")
-        return Response(
-            {"error": "Failed to create property scraped data"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+
 
 
 # ============================================================================
@@ -906,3 +813,216 @@ def update_property_permit_status(request, property_id):
             {"error": "Failed to update property permit status"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['POST'])
+@authentication_classes([ServiceTokenAuthentication])
+def create_property_scraped_data(request, property_id):
+    """
+    Create a new property scraped data entry.
+    This endpoint allows remote services to post scraped data for properties.
+    
+    Authentication: Requires a service token in the Authorization header.
+    Format: Authorization: Token <service_token>
+    
+    Required fields:
+    - source_name: Name of the source website
+    - source_url: URL of the scraped page
+    - raw_html: Raw HTML content from web scraping
+    
+    Optional fields:
+    - processed_data: JSON data extracted from the raw HTML
+    - scrape_status: Status of the scraping process (default: 'completed')
+    - error_message: Error message if scraping failed
+    """
+    try:
+        # Verify this is a service account
+        if not request.user.is_service_account:
+            logger.warning(f"Non-service account {request.user.email} attempted to access service-only endpoint")
+            return Response(
+                {"error": "This endpoint is only available to service accounts"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        # Set scrape_status to 'completed' by default if not provided
+        if 'scrape_status' not in request.data:
+            request.data['scrape_status'] = 'completed'
+        
+        # Get the property from the URL path parameter
+        property_obj = get_object_or_404(Property, id=property_id)
+        
+        # Check for required fields
+        required_fields = ['source_name', 'source_url', 'raw_html']
+        for field in required_fields:
+            if field not in request.data:
+                return Response(
+                    {"error": f"{field} is required"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        # Initialize processed_data if not provided
+        if 'processed_data' not in request.data:
+            request.data['processed_data'] = {}
+        
+        # Create or update the scraped data
+        try:
+            # Check if entry already exists for this property and source_url
+            existing_data = PropertyScrapedData.objects.filter(
+                property=property_obj,
+                source_url=request.data['source_url']
+            ).first()
+            
+            if existing_data:
+                # Update existing entry
+                serializer = PropertyScrapedDataSerializer(
+                    existing_data,
+                    data=request.data,
+                    partial=True
+                )
+                status_code = status.HTTP_200_OK
+                log_message = f"Updated scraped data for property {property_id} from {request.data['source_name']}"
+            else:
+                # Create new entry
+                # Add property to the data
+                request.data['property'] = property_id
+                serializer = PropertyScrapedDataSerializer(data=request.data)
+                status_code = status.HTTP_201_CREATED
+                log_message = f"Created new scraped data for property {property_id} from {request.data['source_name']}"
+            
+            if serializer.is_valid():
+                scraped_data = serializer.save()
+                logger.info(log_message)
+                return Response(serializer.data, status=status_code)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Error processing scraped data: {str(e)}")
+            return Response(
+                {"error": f"Failed to process scraped data: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    except Exception as e:
+        logger.error(f"Error creating property scraped data: {str(e)}")
+        return Response(
+            {"error": "Failed to create property scraped data"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@authentication_classes([ServiceTokenAuthentication])
+@permission_classes([IsAuthenticated])
+def list_property_scraped_data(request, property_id):
+    """
+    Retrieve a list of PropertyScrapedData records based on query parameters.
+    
+    Query Parameters:
+    - input_tracking_id: Filter by the tracking ID from the source system.
+    - processed_status: Filter by the processing status (e.g., 'pending', 'completed').
+    
+    Authentication: Requires a service token or staff user session.
+    """
+    # Ensure user is either a service account or a staff member
+    if not (request.user.is_service_account or request.user.is_staff):
+        logger.warning(f"User {request.user.email} without sufficient permissions tried to access scraped data.")
+        return Response(
+            {"error": "You do not have permission to access this resource."},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Ensure the property exists before filtering
+    property_obj = get_object_or_404(Property, id=property_id)
+
+    # Check if property is active
+    if property_obj.status != PropertyStatus.ACTIVE:
+        return Response(
+            {"error": "Property is not active"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    queryset = PropertyScrapedData.objects.filter(property=property_obj)
+
+    # Apply filters based on query parameters
+    tracking_id = request.query_params.get('tracking_id', None)
+    if tracking_id:
+        queryset = queryset.filter(tracking_id=tracking_id)
+
+    processed_status = request.query_params.get('processed_status', None)
+    if processed_status:
+        queryset = queryset.filter(processed_status=processed_status)
+
+    serializer = PropertyScrapedDataSerializer(queryset, many=True)
+    return Response(serializer.data)
+
+@api_view(['PUT', 'PATCH'])
+@authentication_classes([ServiceTokenAuthentication])
+@permission_classes([IsAuthenticated])
+def update_property_scraped_data(request, property_id, scraped_data_id):
+    """
+    Update property scraped data record.
+    User must have edit access to the associated property.
+    """
+    try:
+        property_scraped_data = get_object_or_404(PropertyScrapedData, id=scraped_data_id)
+        
+        # Ensure user is either a service account or a staff member
+        if not (request.user.is_service_account or request.user.is_staff):
+            logger.warning(f"User {request.user.email} without sufficient permissions tried to access scraped data.")
+            return Response(
+                {"error": "You do not have permission to access this resource."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        partial = request.method == 'PATCH'
+        serializer = PropertyScrapedDataSerializer(property_scraped_data, data=request.data, partial=partial)
+        
+        if serializer.is_valid():
+            property_scraped_data = serializer.save()
+            logger.info(f"Property scraped data updated: {property_scraped_data.id} by user {request.user.id}")
+            
+            # Return full details
+            response_serializer = PropertyScrapedDataSerializer(property_scraped_data)
+            return Response(response_serializer.data)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"Error updating property scraped data: {str(e)}")
+        return Response(
+            {"error": "Failed to update property scraped data"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+@api_view(['DELETE'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def delete_property_scraped_data(request, scraped_data_id):
+    """
+    Soft delete a property scraped data. Only available to property owner or staff.
+    """
+    try:
+        property_scraped_data = get_object_or_404(PropertyScrapedData, id=scraped_data_id)
+        
+        # Ensure user is either a service account or a staff member
+        if not (request.user.is_service_account or request.user.is_staff):
+            logger.warning(f"User {request.user.email} without sufficient permissions tried to access scraped data.")
+            return Response(
+                {"error": "You do not have permission to access this resource."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        property_scraped_data.is_deleted = True
+        property_scraped_data.save()
+        logger.info(f"Property scraped data deleted: {property_scraped_data.id} by user {request.user.id}")
+        
+        return Response({"message": "Property scraped data deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+    
+    except Exception as e:
+        logger.error(f"Error deleting property scraped data: {str(e)}")
+        return Response(
+            {"error": "Failed to delete property scraped data"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    

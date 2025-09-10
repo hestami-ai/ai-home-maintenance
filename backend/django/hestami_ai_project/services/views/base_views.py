@@ -3,25 +3,26 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from users.authentication import ServiceTokenAuthentication
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
 import logging
 
-from .models import (
+from services.models.base_models import (
     ServiceProvider, ServiceRequest,
     ServiceBid, ServiceReport, ServiceReview,
     ServiceRequestClarification, ServiceRequestView,
     ServiceRequestInterest, ServiceCategory
 )
-from .serializers import (
+from services.serializers.base_serializers import (
     ServiceProviderSerializer, ServiceRequestSerializer,
     ServiceBidSerializer, ServiceReportSerializer,
     ServiceReviewSerializer, ServiceRequestClarificationSerializer,
     ServiceRequestInterestSerializer, ServiceRequestCreateSerializer,
     ServiceResearchSerializer
 )
-from .permissions import (
+from services.permissions import (
     IsServiceProvider, IsPropertyOwner,
     CanViewServiceRequest, CanBidOnServiceRequest,
     IsHestamaiStaff
@@ -31,7 +32,7 @@ logger = logging.getLogger('security')
 
 # Service Category Views
 @api_view(['GET'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def list_service_categories(request):
     """List all service categories"""
@@ -54,7 +55,7 @@ def list_service_categories(request):
 
 # Service Provider Views
 @api_view(['GET', 'PUT'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def provider_profile(request):
     """Get or update service provider profile"""
@@ -86,7 +87,7 @@ def provider_profile(request):
         )
 
 @api_view(['GET'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def list_providers(request):
     """List service providers filtered by category and location"""
@@ -118,7 +119,7 @@ def list_providers(request):
 
 # Service Request Views
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def create_service_request(request):
     """Create a new service request"""
@@ -162,7 +163,7 @@ def create_service_request(request):
         )
 
 @api_view(['GET'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def list_service_requests(request):
     """List service requests based on user role"""
@@ -223,7 +224,7 @@ def list_service_requests(request):
         )
 
 @api_view(['GET', 'PUT'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def service_request_detail(request, request_id):
     """Get or update service request details"""
@@ -245,6 +246,7 @@ def service_request_detail(request, request_id):
             return Response(serializer.data)
         
         elif request.method == 'PUT':
+            logger.info(f"Service Request PUT data: {request.data}")
             serializer = ServiceRequestSerializer(
                 service_request,
                 data=request.data,
@@ -265,7 +267,7 @@ def service_request_detail(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def start_service(request, request_id):
     """Start a scheduled service"""
@@ -296,7 +298,7 @@ def start_service(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def complete_service(request, request_id):
     """Complete a service and create service report"""
@@ -343,7 +345,7 @@ def complete_service(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def create_review(request, request_id):
     """Create a review for a completed service"""
@@ -393,7 +395,7 @@ def create_review(request, request_id):
 
 # Bidding System Views
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def submit_bid(request, request_id):
     """Submit or update a bid for a service request"""
@@ -436,7 +438,7 @@ def submit_bid(request, request_id):
         )
 
 @api_view(['GET'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def list_bids(request, request_id):
     """List all bids for a service request"""
@@ -462,7 +464,7 @@ def list_bids(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def select_bid(request, request_id, bid_id):
     """Select a winning bid for a service request"""
@@ -507,7 +509,7 @@ def select_bid(request, request_id, bid_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def submit_clarification(request, request_id):
     """Submit a clarification question for a service request"""
@@ -535,7 +537,7 @@ def submit_clarification(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def respond_to_clarification(request, request_id, clarification_id):
     """Respond to a clarification question"""
@@ -569,7 +571,7 @@ def respond_to_clarification(request, request_id, clarification_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def set_interest(request, request_id):
     """Set interest status for a service request"""
@@ -611,7 +613,7 @@ def set_interest(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def track_view(request, request_id):
     """Track when a provider views a service request"""
@@ -634,7 +636,7 @@ def track_view(request, request_id):
         )
 
 @api_view(['POST'])
-@authentication_classes([JWTAuthentication])
+@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated, IsHestamaiStaff])
 def add_research_data(request, request_id):
     """Add research data to a service request and update its status"""
@@ -692,6 +694,9 @@ def add_research_data(request, request_id):
 # Helper Functions
 def has_request_access(user, service_request):
     """Check if user has access to the service request"""
+    # Service accounts have full access
+    if hasattr(user, 'is_service_account') and user.is_service_account:
+        return True
     # Staff users have access to all service requests
     if user.is_staff and user.user_role == 'STAFF':
         return True

@@ -89,6 +89,11 @@
 	];
 </script>
 
+<svelte:head>
+	<title>New Service Request - Hestami AI</title>
+	<meta name="description" content="Create a new maintenance or service request" />
+</svelte:head>
+
 <div class="container mx-auto p-4 space-y-6">
 	<header class="flex items-center gap-2 mb-6">
 		<a href="/requests" class="btn-icon variant-soft-surface">

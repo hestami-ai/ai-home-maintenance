@@ -121,8 +121,15 @@ class PropertyScrapedData(models.Model):
         max_length=255,
         help_text="Name of the source website (e.g., 'Yelp', 'Angi', 'HomeAdvisor')"
     )
-    source_url = models.URLField(
-        help_text="URL of the scraped page"
+    source_url = models.TextField(
+        help_text="URL of the scraped page - stored as TextField to handle longer URLs"
+    )
+    tracking_id = models.CharField(
+        max_length=255,  # Enough for two UUID strings plus separator
+        blank=True,
+        null=True,
+        help_text="Tracking ID for linking related scrapes, can contain two UUID-length values",
+        db_index=True  # Add index for faster lookups
     )
     raw_html = models.TextField(
         help_text="Raw HTML content from web scraping"
@@ -144,6 +151,17 @@ class PropertyScrapedData(models.Model):
         help_text="Type of data scraped, indicating how it should be processed."
     )
     scrape_status = models.CharField(
+        max_length=50,
+        choices=[
+            ('pending', 'Pending'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('failed', 'Failed'),
+        ],
+        default='pending',
+        help_text="Status of the scraping process"
+    )
+    processed_status = models.CharField(
         max_length=50,
         choices=[
             ('pending', 'Pending'),

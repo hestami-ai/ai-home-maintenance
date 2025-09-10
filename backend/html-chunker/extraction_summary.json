@@ -1,0 +1,202 @@
+[
+  {
+    "id": "1",
+    "date": "Issued: 2011-03-11",
+    "record": "FIDO - RUP - 110660123",
+    "status": "APPLICATION CLOSED",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1551931.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "2",
+    "date": "Issued: 2011-03-11",
+    "record": "FIDO - RUP - 110660124",
+    "status": "APPLICATION CLOSED",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1551932.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "3",
+    "date": "Issued: 2010-12-03",
+    "record": "FIDO - MECH/GAS R - 103370098",
+    "status": "Finalized",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1533453.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "4",
+    "date": "Issued: 2010-12-03",
+    "record": "FIDO - MECH/GAS R - 103370112",
+    "status": "Finalized",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1533467.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "5",
+    "date": "Issued: 2010-11-19",
+    "record": "FIDO - F RESIDNTL - 102990050",
+    "status": "Finalized",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1525303.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "6",
+    "date": "Issued: 2010-11-19",
+    "record": "FIDO - F RESIDNTL - 102990051",
+    "status": "Finalized",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1525304.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "7",
+    "date": "Issued: 2010-10-27",
+    "record": "FIDO - ELECTRIC R - 103000240",
+    "status": "Finalized",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1525904.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "8",
+    "date": "Issued: 2010-10-27",
+    "record": "FIDO - ELECTRIC R - 103000241",
+    "status": "Finalized",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1525905.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "9",
+    "date": "Issued: 2010-10-27",
+    "record": "FIDO - PLUMBING R - 103000197",
+    "status": "Final",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1525860.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  },
+  {
+    "id": "10",
+    "date": "Issued: 2010-10-27",
+    "record": "FIDO - PLUMBING R - 103000217",
+    "status": "Final",
+    "address": "006083 WICKER LA",
+    "tax_map": "054-3 ((32)) 0012",
+    "record_url": "/page/detail?uri=%2Fdocs%2Ffido%2Fpermit-1525881.xml&searchaddress=006083%20WICKER%20LA&src=%2Fpage%2Fsearch",
+    "snippet_raw_text": "Tax Map: 054-3 ((32)) 0012\nAddress: 006083 WICKER LA",
+    "_extraction_metadata": {
+      "id": "beautifulsoup",
+      "date": "beautifulsoup",
+      "record": "beautifulsoup",
+      "status": "beautifulsoup",
+      "address": "beautifulsoup",
+      "tax_map": "beautifulsoup",
+      "record_url": "beautifulsoup",
+      "snippet_raw_text": "beautifulsoup"
+    }
+  }
+]

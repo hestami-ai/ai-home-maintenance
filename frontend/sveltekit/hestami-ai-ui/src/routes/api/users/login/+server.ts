@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         
         // Get credentials from request
         const credentials = await request.json();
-        
+
         // Forward the request to the Django backend
         const response = await fetch(`${API_BASE_URL}/api/users/login/`, {
             method: 'POST',

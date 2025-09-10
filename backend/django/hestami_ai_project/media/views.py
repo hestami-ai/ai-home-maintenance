@@ -9,7 +9,7 @@ from django.db.models import Count, Sum
 from django.utils import timezone
 from .models import Media, MediaType, MediaSubType, LocationType, LocationSubType
 from properties.models import Property, PropertyAccess
-from services.models import ServiceRequest, ServiceReport
+from services.models.base_models import ServiceRequest, ServiceReport
 from .serializers import MediaSerializer
 import logging
 import os

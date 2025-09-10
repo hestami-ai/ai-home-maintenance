@@ -15,6 +15,7 @@
 		Check,
 		Image
 	} from 'lucide-svelte';
+	import Timeline from '$lib/components/timeline/Timeline.svelte';
 	import MediaGallery from '$lib/components/MediaGallery.svelte';
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
@@ -125,6 +126,11 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Service Request: {serviceRequest.title} - Hestami AI</title>
+	<meta name="description" content="Service request details for {serviceRequest.title}" />
+</svelte:head>
+
 <div class="container mx-auto space-y-6 p-4">
 	<!-- Header with back button -->
 	<header class="mb-6 flex items-center gap-2">
@@ -150,7 +156,7 @@
 			{#if $page.data.user?.user_role === 'STAFF'}
 				<button type="button" class="btn preset-filled-primary-500">Update Status</button>
 			{/if}
-			<button type="button" class="btn preset-filled-primary-500">Add Comment</button>
+			<a href="#timeline-comment-form" class="btn preset-filled-primary-500">Add Comment</a>
 			<button type="button" class="btn preset-filled-primary-500">Cancel Request</button>
 		</nav>
 	</section>
@@ -224,78 +230,10 @@
 
 		<!-- Timeline/Activity -->
 		<section class="card space-y-4 p-4">
-			<h2 class="h3">Activity Timeline</h2>
-			<div class="relative pl-6">
-				<!-- Request Created -->
-				<div class="relative mb-6">
-					<!-- Timeline line -->
-					<div class="bg-surface-300-600-token absolute top-2 left-0 h-full w-0.5"></div>
-					<!-- Timeline dot -->
-					<div class="bg-primary-500 absolute top-1 left-[-0.3125rem] h-3 w-3 rounded-full"></div>
-					<!-- Content -->
-					<div>
-						<p class="font-semibold">Request Created</p>
-						<p class="text-surface-600-300-token text-sm">
-							{formatDate(serviceRequest.created_at)} at {formatTime(serviceRequest.created_at)}
-						</p>
-					</div>
-				</div>
-
-				<!-- Status Updated -->
-				{#if serviceRequest.status !== 'PENDING'}
-					<div class="relative mb-6">
-						<!-- Timeline line -->
-						<div class="bg-surface-300-600-token absolute top-2 left-0 h-full w-0.5"></div>
-						<!-- Timeline dot -->
-						<div class="bg-primary-500 absolute top-1 left-[-0.3125rem] h-3 w-3 rounded-full"></div>
-						<!-- Content -->
-						<div>
-							<p class="font-semibold">Request Created</p>
-							<p class="text-surface-600-300-token text-sm">
-								{formatDate(serviceRequest.created_at)} at {formatTime(serviceRequest.created_at)}
-							</p>
-						</div>
-					</div>
-
-					<!-- Status Updated -->
-					{#if serviceRequest.status !== 'PENDING'}
-						<div class="relative mb-6">
-							<!-- Timeline line -->
-							<div class="bg-surface-300-600-token absolute top-2 left-0 h-full w-0.5"></div>
-							<!-- Timeline dot -->
-							<div
-								class="bg-secondary-500 absolute top-1 left-[-0.3125rem] h-3 w-3 rounded-full"
-							></div>
-							<!-- Content -->
-							<div>
-								<p class="font-semibold">Status Updated</p>
-								<p class="text-surface-600-300-token text-sm">
-									Status changed to {formatStatus(serviceRequest.status)}
-								</p>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Service Scheduled -->
-					{#if serviceRequest.scheduled_start}
-						<div class="relative mb-6 last:mb-0">
-							<!-- Timeline dot -->
-							<div
-								class="bg-tertiary-500 absolute top-1 left-[-0.3125rem] h-3 w-3 rounded-full"
-							></div>
-							<!-- Content -->
-							<div>
-								<p class="font-semibold">Service Scheduled</p>
-								<p class="text-surface-600-300-token text-sm">
-									Scheduled for {formatDate(serviceRequest.scheduled_start)} at {formatTime(
-										serviceRequest.scheduled_start
-									)}
-								</p>
-							</div>
-						</div>
-					{/if}
-				{/if}
-			</div>
+			<Timeline 
+				serviceRequestId={serviceRequest.id} 
+				refreshData={() => invalidateAll()} 
+			/>
 		</section>
 
 			<!-- Media Attachments Section -->
