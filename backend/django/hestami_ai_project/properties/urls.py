@@ -12,7 +12,10 @@ urlpatterns = [
     path('<uuid:property_id>/permit-status/', views.update_property_permit_status, name='update_property_permit_status'),
     path('<uuid:property_id>/access/', views.grant_property_access, name='grant_property_access'),
     path('<uuid:property_id>/access/<uuid:access_id>/', views.update_property_access, name='update_property_access'),
-    path('<uuid:property_id>/scraped-data/', views.create_property_scraped_data, name='create_property_scraped_data'),
+    path('<uuid:property_id>/scraped-data/create', views.create_property_scraped_data, name='create_property_scraped_data'),
+    path('<uuid:property_id>/scraped-data/', views.list_property_scraped_data, name='list_property_scraped_data'),
+    path('<uuid:property_id>/scraped-data/<uuid:scraped_data_id>/', views.update_property_scraped_data, name='update_property_scraped_data'),
+    path('<uuid:property_id>/scraped-data/<uuid:scraped_data_id>/delete/', views.delete_property_scraped_data, name='delete_property_scraped_data'),
     
     # Permit History URLs
     path('permits/', views.list_permit_history, name='list_all_permit_history'),

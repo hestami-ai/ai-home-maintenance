@@ -269,7 +269,7 @@ class Media(models.Model):
     file = models.FileField(
         upload_to=get_upload_path,
         validators=[FileExtensionValidator(
-            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov']
+            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'md', 'pdf', 'docx', 'txt', 'doc']
         )]
     )
     file_type = models.CharField(max_length=50)

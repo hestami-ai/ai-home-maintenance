@@ -52,3 +52,43 @@ class IsHestamaiStaff(permissions.BasePermission):
             request.user.is_staff and 
             request.user.user_role == 'STAFF'
         )
+
+
+class IsServiceRequestParticipant(permissions.BasePermission):
+    """
+    Custom permission to only allow participants of a service request to access its timeline.
+    Participants include:
+    - The property owner who created the request
+    - The assigned service provider
+    - Hestami AI staff members
+    """
+    def has_permission(self, request, view):
+        # Staff can always access
+        if request.user.is_staff:
+            return True
+            
+        # For other users, we'll check object permissions
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        
+        # Staff can access all service requests
+        if user.is_staff:
+            return True
+            
+        # For ServiceRequest objects
+        if hasattr(obj, 'property'):
+            # Property owners can access their own requests
+            if user.user_role == 'PROPERTY_OWNER':
+                return obj.property.owner == user
+                
+            # Service providers can access requests assigned to them
+            elif user.user_role == 'SERVICE_PROVIDER':
+                return obj.provider and obj.provider.user == user
+                
+        # For TimelineEntry objects, check the parent service request
+        elif hasattr(obj, 'service_request'):
+            return self.has_object_permission(request, view, obj.service_request)
+            
+        return False

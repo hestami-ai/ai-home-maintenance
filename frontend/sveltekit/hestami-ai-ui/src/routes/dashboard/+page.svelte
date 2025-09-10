@@ -76,7 +76,6 @@
 	
 	// Process user role on mount for additional logging and debugging
 	onMount(() => {
-		console.log('User data:', user);
 		
 		if (user) {
 			userDebugInfo = `User data found: ${JSON.stringify(user)}`;
@@ -102,13 +101,11 @@
 			userDebugInfo = 'No user data found';
 		}
 		
-		console.log('Determined user role:', userRole);
 	});
 	
 	// For development/testing purposes
 	function switchRole(role: string) {
 		userRole = role;
-		console.log('Manually switched role to:', role);
 	}
 </script>
 

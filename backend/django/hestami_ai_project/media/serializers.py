@@ -177,8 +177,14 @@ class MediaSerializer(serializers.ModelSerializer):
         
         # Validate file type
         allowed_types = {
+            # Images
             'image/jpeg', 'image/png', 'image/gif',
-            'video/mp4', 'video/quicktime'
+            # Videos
+            'video/mp4', 'video/quicktime',
+            # Documents
+            'text/plain', 'text/markdown', 'application/pdf',
+            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/markdown', 'text/x-markdown'
         }
         if file_mime not in allowed_types:
             raise serializers.ValidationError(

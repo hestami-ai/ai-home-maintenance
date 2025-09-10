@@ -543,3 +543,7 @@ class ServiceResearch(models.Model):
 
     def __str__(self):
         return f"Research for {self.service_request.title} by {self.researched_by.email if self.researched_by else 'Unknown'}"
+
+
+# Import timeline models
+from .timeline_models import TimelineEntry, TimelineComment, TimelineReadReceipt, TimelineEntryType, CommentType, VisibilityType

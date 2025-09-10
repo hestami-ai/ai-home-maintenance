@@ -36,85 +36,77 @@ PERMIT_RETRY_INTERVAL_DAYS = int(os.environ.get('PERMIT_RETRY_INTERVAL_DAYS', '7
 
 
 @shared_task(
-    bind=True,
-    name="properties.process_property_county_queue",
+    name="properties.check_property_county_queue",
     ignore_result=False,
-    soft_time_limit=3600,  # 1 hour soft time limit
-    time_limit=3900,  # 1 hour 5 minutes hard time limit
+    soft_time_limit=300,  # 5 minutes is more than enough for a single check
+    time_limit=360,
     acks_late=True
 )
-def process_property_county_queue(self):
+def check_property_county_queue():
     """
-    Background task that continuously checks for properties with status PENDING and missing county info,
+    Background task that checks for properties with status PENDING and missing county info,
     and launches a Temporal workflow to find the county for each property.
     
-    This task runs in an infinite loop, checking for properties that need processing,
-    processing them in batches, and then sleeping for a configurable amount of time
-    before checking again.
+    This task runs once per invocation and processes a batch of properties.
+    It is scheduled to run periodically by Celery Beat.
     """
-    # Get the sleep time from environment variables
-    sleep_time = PROPERTY_COUNTY_PROCESSOR_INTERVAL
+    logger.debug("Checking for properties that need county information")
     
-    logger.debug(f"Starting property county processor with sleep time of {sleep_time} seconds")
-    
-    # Run in an infinite loop
-    while True:
-        try:
-            # Find properties with PENDING status and empty county field
-            pending_properties = Property.objects.filter(
-                status=PropertyStatus.PENDING
-            ).filter(
-                Q(county__isnull=True) | Q(county='')
-            ).order_by('created_at')[:10]  # Process in batches of 10
-            
-            if not pending_properties.exists():
-                logger.debug("No pending properties found. Sleeping...")
-                time.sleep(sleep_time)
-                continue
-            
-            logger.debug(f"Found {pending_properties.count()} pending properties that need county information")
-            
-            # Process each property
-            for property_obj in pending_properties:
-                try:
-                    with transaction.atomic():
-                        # Prevent other processes from processing this property
-                        # by updating its status to a temporary value
-                        Property.objects.filter(id=property_obj.id).update(
-                            status="COUNTY_PROCESSING"
-                        )
-                    
-                    # Launch Temporal workflow to find county information
-                    workflow_launched = launch_property_county_workflow(property_obj.id)
-                    
-                    if workflow_launched:
-                        logger.debug(f"Successfully launched county workflow for property {property_obj.id}")
-                        # Note: The workflow will update the property status to ACTIVE when it completes
-                    else:
-                        logger.error(f"Failed to launch county workflow for property {property_obj.id}")
-                        # Revert status back to PENDING if workflow launch failed
-                        Property.objects.filter(id=property_obj.id).update(
-                            status=PropertyStatus.PENDING
-                        )
-                
-                except Exception as e:
-                    logger.exception(f"Error processing property {property_obj.id}: {str(e)}")
-                    # Revert status in case of error
-                    try:
-                        Property.objects.filter(id=property_obj.id).update(
-                            status=PropertyStatus.PENDING
-                        )
-                    except Exception as revert_error:
-                        logger.error(f"Error reverting property status: {str(revert_error)}")
-            
-            # Sleep before the next cycle
-            logger.debug(f"Completed processing cycle. Sleeping for {sleep_time} seconds...")
-            time.sleep(sleep_time)
+    try:
+        # Find properties with PENDING status and empty county field
+        pending_properties = Property.objects.filter(
+            status=PropertyStatus.PENDING
+        ).filter(
+            Q(county__isnull=True) | Q(county='')
+        ).order_by('created_at')[:10]  # Process in batches of 10
         
-        except Exception as e:
-            logger.exception(f"Error in property county processor loop: {str(e)}")
-            # Sleep before trying again
-            time.sleep(sleep_time)
+        if not pending_properties.exists():
+            logger.debug("No pending properties found that need county information")
+            return 0
+        
+        logger.info(f"Found {pending_properties.count()} pending properties that need county information")
+        
+        # Process each property
+        processed_count = 0
+        for property_obj in pending_properties:
+            try:
+                with transaction.atomic():
+                    # Prevent other processes from processing this property
+                    # by updating its status to a temporary value
+                    Property.objects.filter(id=property_obj.id).update(
+                        status="COUNTY_PROCESSING"
+                    )
+                
+                # Launch Temporal workflow to find county information
+                workflow_launched = launch_property_county_workflow(str(property_obj.id))
+                
+                if workflow_launched:
+                    logger.info(f"Successfully launched county workflow for property {property_obj.id}")
+                    processed_count += 1
+                    # Note: The workflow will update the property status to ACTIVE when it completes
+                else:
+                    logger.error(f"Failed to launch county workflow for property {property_obj.id}")
+                    # Revert status back to PENDING if workflow launch failed
+                    Property.objects.filter(id=property_obj.id).update(
+                        status=PropertyStatus.PENDING
+                    )
+            
+            except Exception as e:
+                logger.exception(f"Error processing property {property_obj.id} for county lookup: {str(e)}")
+                # Revert status in case of error
+                try:
+                    Property.objects.filter(id=property_obj.id).update(
+                        status=PropertyStatus.PENDING
+                    )
+                except Exception as revert_error:
+                    logger.error(f"Error reverting property status: {str(revert_error)}")
+        
+        logger.info(f"Processed {processed_count} properties for county lookup")
+        return processed_count
+        
+    except Exception as e:
+        logger.exception(f"Error in check_property_county_queue: {str(e)}")
+        return 0
 
 
 def launch_property_county_workflow(property_id: str) -> bool:
@@ -186,98 +178,69 @@ async def _launch_workflow(workflow_id: str, property_id: str) -> bool:
 
 
 @shared_task(
-    bind=True,
-    name="properties.process_permit_retrieval_queue",
+    name="properties.check_permit_retrieval_queue",
     ignore_result=False,
-    soft_time_limit=3600,  # 1 hour soft time limit
-    time_limit=3900,  # 1 hour 5 minutes hard time limit
+    soft_time_limit=300,  # 5 minutes is more than enough for a single check
+    time_limit=360,
     acks_late=True
 )
-def process_permit_retrieval_queue(self):
+def check_permit_retrieval_queue():
     """
-    Background task that continuously checks for properties with status NEVER_ATTEMPTED
+    Background task that checks for properties with status NEVER_ATTEMPTED
     for permit retrieval, and launches a Temporal workflow to retrieve permit history.
     
-    This task runs in an infinite loop, checking for properties that need processing,
-    processing them in batches, and then sleeping for a configurable amount of time
-    before checking again.
+    This task runs once per invocation and processes a batch of properties.
+    It is scheduled to run periodically by Celery Beat.
     """
-    # Get the sleep time from environment variables
-    sleep_time = PERMIT_PROCESSOR_INTERVAL
+    logger.debug("Checking for properties ready for permit retrieval")
     
-    logger.debug(f"Starting permit retrieval processor with sleep time of {sleep_time} seconds")
-    
-    # Run in an infinite loop
-    while True:
-        try:
-            # Find properties ready for permit retrieval:
-            # - permit_retrieval_status = 'NEVER_ATTEMPTED'
-            # - status = 'ACTIVE' (property is active)
-            # - county is not null/empty
-            # - address is not null/empty
-            ready_properties = Property.objects.filter(
-                permit_retrieval_status='NEVER_ATTEMPTED',
-                status=PropertyStatus.ACTIVE
-            ).filter(
-                Q(county__isnull=False) & ~Q(county='')
-            ).filter(
-                Q(address__isnull=False) & ~Q(address='')
-            ).order_by('created_at')  # Process oldest first
-            
-            if not ready_properties.exists():
-                logger.debug("No properties ready for permit retrieval. Sleeping...")
-                time.sleep(sleep_time)
-                continue
-            
-            logger.info(f"Found {ready_properties.count()} properties ready for permit retrieval")
-            
-            # Process each property
-            for property_obj in ready_properties:
-                try:
-                    with transaction.atomic():
-                        # Update status to SCHEDULED to prevent other processes from processing
-                        Property.objects.filter(id=property_obj.id).update(
-                            permit_retrieval_status='SCHEDULED'
-                        )
-                    
-                    # Launch Temporal workflow to retrieve permit history
-                    workflow_launched = launch_permit_retrieval_workflow(
-                        str(property_obj.id),
-                        property_obj.address,
-                        property_obj.county
-                    )
-                    
-                    if workflow_launched:
-                        logger.info(f"Successfully launched permit retrieval workflow for property {property_obj.id}")
-                        # Note: The workflow will update the status as it progresses
-                    else:
-                        logger.error(f"Failed to launch permit retrieval workflow for property {property_obj.id}")
-                        # Revert status back to NEVER_ATTEMPTED if workflow launch failed
-                        Property.objects.filter(id=property_obj.id).update(
-                            permit_retrieval_status='NEVER_ATTEMPTED'
-                        )
-                
-                except Exception as e:
-                    logger.exception(f"Error processing property {property_obj.id} for permit retrieval: {str(e)}")
-                    # Revert status in case of error
-                    try:
-                        Property.objects.filter(id=property_obj.id).update(
-                            permit_retrieval_status='NEVER_ATTEMPTED'
-                        )
-                    except Exception as revert_error:
-                        logger.error(f"Error reverting permit retrieval status: {str(revert_error)}")
-            
-            # Sleep before the next cycle
-            logger.debug(f"Completed permit processing cycle. Sleeping for {sleep_time} seconds...")
-            time.sleep(sleep_time)
+    try:
+        # Find properties ready for permit retrieval:
+        # - permit_retrieval_status = 'NEVER_ATTEMPTED'
+        # - status = 'ACTIVE' (property is active)
+        # - county is not null/empty
+        # - address is not null/empty
+        ready_properties = Property.objects.filter(
+            permit_retrieval_status='NEVER_ATTEMPTED',
+            status=PropertyStatus.ACTIVE
+        ).filter(
+            Q(county__isnull=False) & ~Q(county='')
+        ).filter(
+            Q(address__isnull=False) & ~Q(address='')
+        ).order_by('created_at')[:10]  # Process in batches of 10
         
-        except Exception as e:
-            logger.exception(f"Error in permit retrieval processor loop: {str(e)}")
-            # Sleep before trying again
-            time.sleep(sleep_time)
+        if not ready_properties.exists():
+            logger.debug("No properties ready for permit retrieval")
+            return 0
+            
+        logger.info(f"Found {ready_properties.count()} properties ready for permit retrieval")
+        
+        # Process each property
+        processed_count = 0
+        for property_obj in ready_properties:
+            try:
+                # Launch the workflow
+                if launch_permit_retrieval_workflow(str(property_obj.id), property_obj.address, property_obj.county, property_obj.state):
+                    # Update the property status
+                    property_obj.permit_retrieval_status = 'IN_PROGRESS'
+                    property_obj.save(update_fields=['permit_retrieval_status'])
+                    logger.info(f"Launched workflow for property {property_obj.id}")
+                    processed_count += 1
+                else:
+                    logger.warning(f"Failed to launch workflow for property {property_obj.id}")
+            except Exception as e:
+                logger.exception(f"Error processing property {property_obj.id}: {str(e)}")
+                # Continue with next property
+        
+        logger.info(f"Processed {processed_count} properties for permit retrieval")
+        return processed_count
+        
+    except Exception as e:
+        logger.exception(f"Error in check_permit_retrieval_queue: {str(e)}")
+        return 0
 
 
-def launch_permit_retrieval_workflow(property_id: str, address: str, county: str) -> bool:
+def launch_permit_retrieval_workflow(property_id: str, address: str, county: str, state: str) -> bool:
     """
     Launch a Temporal workflow to retrieve permit history for a property.
     Uses the Temporal Python SDK with gRPC directly.
@@ -286,6 +249,7 @@ def launch_permit_retrieval_workflow(property_id: str, address: str, county: str
         property_id: The ID of the property to process
         address: The property address
         county: The property county
+        state: The property state
         
     Returns:
         bool: True if workflow was successfully launched, False otherwise
@@ -305,14 +269,14 @@ def launch_permit_retrieval_workflow(property_id: str, address: str, county: str
         permit_retry_days = int(os.getenv('PERMIT_RETRY_INTERVAL_DAYS', '7'))
         
         # Use asyncio to run the async Temporal client code
-        return asyncio.run(_launch_permit_workflow(workflow_id, property_id, address, county, permit_retry_days))
+        return asyncio.run(_launch_permit_workflow(workflow_id, property_id, address, county, state, permit_retry_days))
     
     except Exception as e:
         logger.exception(f"Error launching PropertyPermitRetrievalWorkflow: {str(e)}")
         return False
 
 
-async def _launch_permit_workflow(workflow_id: str, property_id: str, address: str, county: str, permit_retry_interval_days: int) -> bool:
+async def _launch_permit_workflow(workflow_id: str, property_id: str, address: str, county: str, state: str, permit_retry_interval_days: int) -> bool:
     """
     Internal async function to launch the permit retrieval Temporal workflow.
     
@@ -321,6 +285,8 @@ async def _launch_permit_workflow(workflow_id: str, property_id: str, address: s
         property_id: The ID of the property to process
         address: The property address
         county: The property county
+        state: The property state
+        permit_retry_interval_days: Number of days to wait before retrying failed permit retrievals
         
     Returns:
         bool: True if the workflow was successfully launched
@@ -338,7 +304,7 @@ async def _launch_permit_workflow(workflow_id: str, property_id: str, address: s
         handle = await client.start_workflow(
             "PropertyPermitRetrievalWorkflow",  # The workflow type name
             # Pass the parameters the workflow needs
-            args=[str(property_id), address, county, permit_retry_interval_days],
+            args=[str(property_id), address, county, state, permit_retry_interval_days],
             id=workflow_id,           # Unique workflow ID
             task_queue=TEMPORAL_PROPERTY_TASK_QUEUE,
             retry_policy=RetryPolicy(
@@ -356,21 +322,4 @@ async def _launch_permit_workflow(workflow_id: str, property_id: str, address: s
         return False
 
 
-# Function to start the property county processor
-def start_property_county_processor():
-    """
-    Start the property county processor task.
-    This should be called when the Celery worker starts.
-    """
-    logger.info("Starting property county processor task")
-    process_property_county_queue.delay()
 
-
-# Function to start the permit retrieval processor
-def start_permit_retrieval_processor():
-    """
-    Start the permit retrieval processor task.
-    This should be called when the Celery worker starts.
-    """
-    logger.info("Starting permit retrieval processor task")
-    process_permit_retrieval_queue.delay()

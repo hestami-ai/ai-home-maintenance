@@ -229,4 +229,5 @@ volumes
 # Others
 set_env_vars.bat
 .archive
-chrome_data
+backend/browser-use/web-ui/data/
+backend/browser-use/web-ui/tmp/

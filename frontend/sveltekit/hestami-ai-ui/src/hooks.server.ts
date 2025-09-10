@@ -64,5 +64,6 @@ const errorHandler: Handle = async ({ event, resolve }) => {
   }
 };
 
+
 // Export the sequence of handlers
 export const handle = sequence(authHandler, errorHandler);

@@ -50,6 +50,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Login - Hestami AI</title>
+	<meta name="description" content="Sign in to your Hestami AI account" />
+</svelte:head>
+
 <div class="flex flex-col min-h-screen">
 	<!-- App Bar -->
 	<AppBar background="bg-surface-100-800-token" border="border-b border-surface-300-600-token">

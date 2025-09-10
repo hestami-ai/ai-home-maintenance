@@ -8,7 +8,7 @@ import logging
 
 from users.models import User
 from properties.models import Property
-from services.models import ServiceRequest, ServiceProvider
+from services.models.base_models import ServiceRequest, ServiceProvider
 
 logger = logging.getLogger('security')
 

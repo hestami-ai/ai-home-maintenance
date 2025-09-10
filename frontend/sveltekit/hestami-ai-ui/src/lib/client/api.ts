@@ -13,11 +13,15 @@ export async function fetchWithAuth<T = any>(
   options: RequestInit = {}
 ): Promise<T> {
   try {
-    // Set default headers if not provided
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+    // Create a proper Headers object
+    const headers = new Headers(options.headers);
+    
+    // Only set Content-Type to application/json if:
+    // 1. It's not already set in options.headers
+    // 2. The body is not FormData (browser will set the correct Content-Type with boundary)
+    if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
+      headers.set('Content-Type', 'application/json');
+    }
 
     // Make the request
     const response = await fetch(endpoint, {
@@ -36,13 +40,23 @@ export async function fetchWithAuth<T = any>(
       }
 
       // Handle other errors
-      const errorData = await response.json().catch(() => ({}));
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = {};
+      }
       throw new Error(errorData.error || errorData.message || `Request failed with status ${response.status}`);
     }
 
     // Parse and return JSON response
-    const data = await response.json();
-    return data as T;
+    try {
+      const data = await response.json();
+      return data as T;
+    } catch (e) {
+      // Some responses might not be JSON (like 204 No Content)
+      return {} as T;
+    }
   } catch (error) {
     // Re-throw the error for component-level handling
     throw error;
@@ -74,9 +88,12 @@ export function apiPost<T = any, U = any>(
   data: U,
   options: RequestInit = {}
 ): Promise<T> {
+  // Don't stringify FormData objects
+  const body = data instanceof FormData ? data : JSON.stringify(data);
+  
   return fetchWithAuth<T>(endpoint, {
     method: 'POST',
-    body: JSON.stringify(data),
+    body,
     ...options,
   });
 }

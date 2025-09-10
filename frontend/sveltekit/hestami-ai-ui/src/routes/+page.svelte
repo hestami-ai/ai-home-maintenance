@@ -3,6 +3,11 @@
 	import { Bell, CalendarClock, Shield } from 'lucide-svelte';
 </script>
 
+<svelte:head>
+	<title>Hestami AI - Home Maintenance Made Intelligent</title>
+	<meta name="description" content="Hestami AI helps you manage your home maintenance tasks with the power of artificial intelligence." />
+</svelte:head>
+
 <div class="flex flex-col min-h-screen">
 	<!-- App Bar -->
 	<AppBar background="bg-surface-100-800-token" border="border-b border-surface-300-600-token">

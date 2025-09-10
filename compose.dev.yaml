@@ -30,7 +30,7 @@ services:
   frontend:
     build: 
       context: .
-      dockerfile: ./docker/frontend/nextjs/Dockerfile
+      dockerfile: ./docker/frontend/sveltekit/Dockerfile
       args:
         ENV_NPM_BUILD_FILE: ./.env.local
     container_name: frontend-dev
@@ -185,7 +185,14 @@ services:
       dockerfile: Dockerfile
     container_name: ollama-dev
     environment:
-      - OLLAMA_CONTEXT_LENGTH=42768
+      - OLLAMA_DEFAULT_MODEL=qwen3:4b-q4_K_M
+      - OLLAMA_CONTEXT_LENGTH=40960
+      - OLLAMA_FLASH_ATTENTION=true
+      - OLLAMA_INTEL_GPU=true
+      - OLLAMA_NEW_ENGINE=true
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MULTIUSER_CACHE=true
     ports:
       - "11434:11434"
     volumes:

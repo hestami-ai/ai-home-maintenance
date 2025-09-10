@@ -6,6 +6,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 import logging
 from django.utils import timezone
 from datetime import datetime
+from django.db.models import Q
 
 from users.models import User
 
@@ -58,5 +59,52 @@ def list_users(request):
         logger.error(f"Error retrieving users list: {str(e)}")
         return Response(
             {"error": "Failed to retrieve users list"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def search_users(request):
+    """
+    Search for users by username, first name, or last name.
+    Used for @mention functionality in comments.
+    """
+    try:
+        # Get search query from request
+        query = request.GET.get('q', '')
+        
+        if not query:
+            return Response([], status=status.HTTP_200_OK)
+        
+        # Search for users matching the query
+        users = User.objects.filter(
+            Q(username__icontains=query) | 
+            Q(first_name__icontains=query) | 
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query)
+        ).exclude(id=request.user.id)  # Exclude current user
+        
+        # Limit results for performance
+        users = users[:10]
+        
+        # Format user data for mention
+        user_data = []
+        for user in users:
+            user_data.append({
+                "id": str(user.id),
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name
+            })
+        
+        return Response(user_data)
+    
+    except Exception as e:
+        logger.error(f"Error searching users: {str(e)}")
+        return Response(
+            {"error": "Failed to search users"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -8,13 +8,13 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { Cookies } from '@sveltejs/kit';
 import { getRedisClient, SESSION_COOKIE_NAME, SESSION_DURATION } from '../redis';
-import { SVELTE_KIT_DJANGO_API_BASE_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { dev } from '$app/environment';
 import type { User, AuthTokens, AuthSession } from '$lib/types';
 import { AUTH_ENDPOINTS } from '$lib/types';
 
 // API base URL
-export const API_BASE_URL = SVELTE_KIT_DJANGO_API_BASE_URL || 'http://localhost:8050';
+export const API_BASE_URL = env.SVELTE_KIT_DJANGO_API_BASE_URL || 'http://localhost:8050';
 
 /**
  * Create a new authenticated session
@@ -57,7 +57,7 @@ export async function createSession(
     cookies.set(SESSION_COOKIE_NAME, sessionId, {
       path: '/',
       httpOnly: true,
-      secure: !dev,
+      secure: false, // Set to false for testing in non-HTTPS environments
       sameSite: 'strict',
       maxAge: SESSION_DURATION
     });
@@ -225,7 +225,7 @@ export async function refreshTokens(sessionId: string): Promise<boolean> {
  */
 export function checkAuthentication(cookies: Cookies, returnUrl: string): string {
   const sessionId = cookies.get(SESSION_COOKIE_NAME);
-  
+  console.log('Session ID:', sessionId);
   if (!sessionId) {
     console.log('No session found, redirecting to login page');
     throw redirect(302, `/login?returnUrl=${encodeURIComponent(returnUrl)}`);

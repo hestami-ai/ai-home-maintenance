@@ -3,10 +3,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from services.models import ServiceRequest, ServiceRequestClarification, ServiceProvider
+from services.models.base_models import ServiceRequest, ServiceRequestClarification, ServiceProvider
 from datetime import datetime
-
-# Create your views here.
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
