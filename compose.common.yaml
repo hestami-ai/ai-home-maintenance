@@ -1,4 +1,4 @@
-name: hestami-ai
+name: hestami-ai-common
 
 networks:
   traefik-public:
