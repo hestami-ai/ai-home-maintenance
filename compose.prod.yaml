@@ -44,6 +44,7 @@ services:
     depends_on:
       - api
       - static
+    restart: unless-stopped
 
   api:
     build: 
@@ -64,6 +65,7 @@ services:
       - init-volumes
     networks:
       - backend-prod
+    restart: unless-stopped
 
 
   db:
@@ -74,12 +76,12 @@ services:
       - postgres_data_prod:/var/lib/postgresql/data
     networks:
       - backend-prod
+    restart: unless-stopped
 
   static:
     build: 
       context: ./backend/static
       dockerfile: ../../docker/static/Dockerfile
-    restart: unless-stopped
     volumes:
       - "./volumes/prod/static/templates/etc/nginx:/templates/etc/nginx:ro"
       - "hestami_media_data_prod:/usr/share/nginx/html/:ro"
@@ -95,6 +97,7 @@ services:
       - "traefik.http.services.hestamistatic.loadbalancer.server.port=80"
     networks:
       - traefik-public
+    restart: unless-stopped
 
 
   redis:
@@ -103,6 +106,7 @@ services:
     #  - "6379:6379"
     networks:
       - backend-prod
+    restart: unless-stopped
 
   clamav:
     image: clamav/clamav:latest
@@ -113,3 +117,4 @@ services:
       - CLAMAV_NO_MILTERD=true
     networks:
       - backend-prod
+    restart: unless-stopped
