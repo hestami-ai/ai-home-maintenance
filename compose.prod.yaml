@@ -88,8 +88,8 @@ services:
 
   static:
     build: 
-      context: .
-      dockerfile: ./docker/static/Dockerfile
+      context: ./backend/static
+      dockerfile: ../../docker/static/Dockerfile
     volumes:
       - "./volumes/prod/static/templates/etc/nginx:/templates/etc/nginx:ro"
       - "hestami_media_data_prod:/usr/share/nginx/html/:ro"
