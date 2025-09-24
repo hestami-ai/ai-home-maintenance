@@ -23,7 +23,7 @@ services:
     image: busybox
     container_name: init-volumes-prod
     volumes:
-      - "./volumes/prod/static/hestami_media_data_prod:/mnt/hestami-static:rw"
+      - "hestami_media_data_prod:/mnt/hestami-static:rw"
     command: >
       /bin/sh -c "mkdir -p /mnt/hestami-static/media /mnt/hestami-static/static &&
       chown -R 999:999 /mnt/hestami-static &&
@@ -58,7 +58,7 @@ services:
       dockerfile: ./docker/backend/django/Dockerfile
     command: python manage.py runserver 0.0.0.0:8050
     volumes:
-      - "./volumes/prod/static/hestami_media_data_prod:/mnt/hestami-static:rw"
+      - "hestami_media_data_prod:/mnt/hestami-static:rw"
     #ports:
     #  - 8050:8050
     env_file:
@@ -92,7 +92,7 @@ services:
       dockerfile: ./docker/static/Dockerfile
     volumes:
       - "./volumes/prod/static/templates/etc/nginx:/templates/etc/nginx:ro"
-      - "./volumes/prod/static/hestami_media_data_prod:/usr/share/nginx/html/:ro"
+      - "hestami_media_data_prod:/usr/share/nginx/html/:ro"
     env_file:
       - ./.env.prod
     command: >
