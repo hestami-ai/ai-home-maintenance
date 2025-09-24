@@ -3,12 +3,15 @@ name: hestami-ai-prod
 networks:
   traefik-public:
     name: traefik-public
+    external: true
     driver: bridge
   backend-dev:
     name: backend-dev
+    external: true
     driver: bridge
   backend-prod:
     name: backend-prod
+    external: true
     driver: bridge
 
 volumes:
@@ -25,6 +28,8 @@ services:
       /bin/sh -c "mkdir -p /mnt/hestami-static/media /mnt/hestami-static/static &&
       chown -R 999:999 /mnt/hestami-static &&
       chmod -R 775 /mnt/hestami-static"
+    runtime: runc
+
   frontend:
     build: 
       context: .
@@ -45,6 +50,7 @@ services:
       - api
       - static
     restart: unless-stopped
+    runtime: runc
 
   api:
     build: 
@@ -66,6 +72,7 @@ services:
     networks:
       - backend-prod
     restart: unless-stopped
+    runtime: runc
 
 
   db:
@@ -77,6 +84,7 @@ services:
     networks:
       - backend-prod
     restart: unless-stopped
+    runtime: runc
 
   static:
     build: 
@@ -98,7 +106,7 @@ services:
     networks:
       - traefik-public
     restart: unless-stopped
-
+    runtime: runc
 
   redis:
     image: redis:8.0-M02-alpine3.20
@@ -107,6 +115,7 @@ services:
     networks:
       - backend-prod
     restart: unless-stopped
+    runtime: runc
 
   clamav:
     image: clamav/clamav:latest
@@ -118,3 +127,4 @@ services:
     networks:
       - backend-prod
     restart: unless-stopped
+    runtime: runc
