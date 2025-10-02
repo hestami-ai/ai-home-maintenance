@@ -144,8 +144,8 @@ services:
   clamav:
     image: clamav/clamav:latest
     container_name: clamav
-    ports:
-      - "3310:3310"
+    #ports:
+    #  - "3310:3310"
     environment:
       - CLAMAV_NO_MILTERD=true
     networks:
