@@ -131,7 +131,8 @@ struct PropertyAPITests: View {
             heatingSystem: nil,
             squareFootage: "1500",
             gatedCommunity: false,
-            airConditioning: false
+            airConditioning: false,
+            createdFrom: "ios_app_tests"
         )
         
         let testProp = PropertyCreateRequest(

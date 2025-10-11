@@ -13,6 +13,14 @@ class ServicesViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        // Check if we have a valid session
+        if !NetworkManager.shared.hasSessionCookie() {
+            print("⚠️ ServicesViewModel: No session cookie found. User may need to log in again.")
+            errorMessage = "Session expired. Please log in again."
+            isLoading = false
+            return
+        }
+        
         do {
             let apiServices = try await ServiceCatalogService.shared.getServices()
             
@@ -24,6 +32,7 @@ class ServicesViewModel: ObservableObject {
             services = uiServices
             isLoading = false
         } catch {
+            print("❌ ServicesViewModel: Error loading services: \(error)")
             errorMessage = "Failed to load services: \(error.localizedDescription)"
             isLoading = false
             // Load dummy data for development/testing

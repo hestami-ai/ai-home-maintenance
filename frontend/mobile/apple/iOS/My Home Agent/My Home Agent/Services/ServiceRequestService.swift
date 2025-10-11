@@ -1,12 +1,18 @@
 import Foundation
 
+// Response wrapper for service requests list
+struct ServiceRequestsResponse: Codable {
+    let serviceRequests: [ServiceRequest]
+}
+
 class ServiceRequestService {
     static let shared = ServiceRequestService()
     
     private init() {}
     
     func getRequests() async throws -> [ServiceRequest] {
-        return try await NetworkManager.shared.request(endpoint: "/api/services/requests/")
+        let response: ServiceRequestsResponse = try await NetworkManager.shared.request(endpoint: "/api/services/requests/")
+        return response.serviceRequests
     }
     
     func getRequestsForProperty(propertyId: String) async throws -> [ServiceRequest] {

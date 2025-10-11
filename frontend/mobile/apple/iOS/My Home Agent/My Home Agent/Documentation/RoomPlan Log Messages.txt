@@ -1,0 +1,168 @@
+🎯 Coordinator initialized: <My_Home_Agent.RoomCaptureCoordinator: 0x131da7640>
+🏗️ Creating RoomCaptureWrapperViewController
+🔧 RoomCaptureWrapperViewController viewDidLoad
+✅ Capture session created with delegate: Optional(<My_Home_Agent.RoomCaptureCoordinator: 0x131da7640>)
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/suFeatheringCreateMergedOcclusionMask.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arKitPassthrough.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arSegmentationComposite.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute0.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute1.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute2.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute3.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute4.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute5.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute6.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute7.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute8.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute9.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute10.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute11.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute12.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute13.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute14.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute15.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/suFeatheringCreateMergedOcclusionMask.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arKitPassthrough.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arSegmentationComposite.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute0.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute1.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute2.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute3.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute4.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute5.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute6.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute7.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute8.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute9.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute10.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute11.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute12.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute13.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute14.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute15.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
+✅ Capture view created
+▶️ Starting room capture session with SESSION DELEGATE...
+✅ Room capture session started
+✅ Session delegate: YES
+🎬 SESSION DELEGATE: didStartWith configuration!!!
+Attempting to enable an already-enabled session. Ignoring...
+💬 SESSION DELEGATE: didProvide instruction
+Skipping integration due to poor slam at time: 509184.006650 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509184.206647 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509184.406645 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509184.606642 vio_initialized(0) map_size(0) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509184.806639 vio_initialized(0) map_size(0) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509185.006636 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509185.206633 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509185.406630 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509185.606627 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509185.806625 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509186.006622 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509186.206619 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509186.406616 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509186.606613 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+Skipping integration due to poor slam at time: 509186.806610 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
+💬 SESSION DELEGATE: didProvide instruction
+Candidate list not empty but no nearby keyframes are available
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 1 walls, 0 doors, 0 windows
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 0 windows
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 3 walls, 0 doors, 1 windows
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 4 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 6 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 6 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 6 walls, 0 doors, 1 windows
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 6 walls, 0 doors, 1 windows
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+➖ SESSION DELEGATE: didRemove called
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+💬 SESSION DELEGATE: didProvide instruction
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 5 walls, 0 doors, 1 windows
+👆 Done button tapped
+👆 Done button tapped - stopping session
+📊 Current state: captureSession=true, latestCapturedRoom=true
+✅ Stop called on capture session
+📱 SESSION DELEGATE: didEndWith called!!!
+   Error: none
+   Latest room: present
+✅ Using latest captured room with 5 walls
+🚪 Dismissing modal - setting isPresented = false
+🛑 View will disappear - stopping session
+♻️ RoomCaptureWrapperViewController deinit
+♻️ Coordinator deinit
