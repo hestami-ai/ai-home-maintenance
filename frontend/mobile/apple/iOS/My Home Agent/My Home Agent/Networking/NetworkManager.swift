@@ -107,8 +107,14 @@ public enum NetworkError: Error, Equatable, LocalizedError {
 public class NetworkManager {
     public static let shared = NetworkManager()
     
-    //private let baseURL = "https://api.hestami.ai"
-    private let baseURL = "http://192.168.4.33:3000"
+    // API server configuration
+    private let baseURL = "https://dev-homeservices.hestami-ai.com"
+    
+    // Static media server configuration
+    private var staticMediaHost = "dev-static.hestami-ai.com" // Default value, should be configured at app startup
+    private var staticMediaPort = "443" // Default value, should be configured at app startup
+    private let localhostMediaPattern = "http://localhost:8090/media-secure"
+    
     private let session: URLSession
     private let jsonDecoder = JSONDecoder()
     private let cacheManager = CacheManager.shared
@@ -119,6 +125,63 @@ public class NetworkManager {
     // Configuration options
     var shouldUseCache = true
     var shouldCacheResponses = true
+    
+    // Media server configuration methods
+    public func configureStaticMediaServer(host: String, port: String) {
+        print("🌐 NetworkManager: Configuring static media server: \(host):\(port)")
+        if !host.isEmpty {
+            self.staticMediaHost = host
+        }
+        if !port.isEmpty {
+            self.staticMediaPort = port
+        }
+    }
+    
+    // Public method to rewrite any media URL string
+    public func rewriteMediaURL(_ urlString: String) -> String {
+        // Only attempt to rewrite if we have valid host and port and it matches our pattern
+        guard !staticMediaHost.isEmpty, !staticMediaPort.isEmpty, urlString.contains(localhostMediaPattern) else {
+            return urlString
+        }
+        
+        // Create the replacement URL pattern
+        //let replacementPattern = "https://\(staticMediaHost):\(staticMediaPort)/media-secure"
+        let replacementPattern = "https://\(staticMediaHost)/media-secure"
+        
+        // Replace the localhost pattern with our configured host/port
+        let rewrittenURL = urlString.replacingOccurrences(
+            of: localhostMediaPattern,
+            with: replacementPattern
+        )
+        
+        print("🌐 NetworkManager: Rewrote URL:\n  From: \(urlString)\n  To: \(rewrittenURL)")
+        return rewrittenURL
+    }
+    
+    // Helper method to rewrite media URLs in response data
+    private func rewriteMediaURLs(in data: Data) -> Data {
+        // Only attempt to rewrite if we have valid host and port
+        guard !staticMediaHost.isEmpty, !staticMediaPort.isEmpty else {
+            return data
+        }
+        
+        // Convert data to string for search and replace
+        guard var responseString = String(data: data, encoding: .utf8) else {
+            return data
+        }
+        
+        // Replace all occurrences of localhost media URLs
+        if responseString.contains(localhostMediaPattern) {
+            responseString = rewriteMediaURL(responseString)
+            
+            // Convert back to data
+            if let modifiedData = responseString.data(using: .utf8) {
+                return modifiedData
+            }
+        }
+        
+        return data
+    }
     
     public init() {
         // Create a default session with cookie handling
@@ -190,22 +253,12 @@ public class NetworkManager {
     
     // Check if we have a session cookie
     public func hasSessionCookie() -> Bool {
-        // Check manual cookie storage first
-        if cookieStorage.keys.contains("hestami_session") {
-            return true
+        let hasSession = getSessionCookieValue() != nil
+        print("🍪 NetworkManager: hasSessionCookie = \(hasSession)")
+        if hasSession {
+            print("🍪 NetworkManager: Session cookie value: \(getSessionCookieValue() ?? "none")")
         }
-        
-        // Then check system cookie storage
-        if let url = URL(string: baseURL),
-           let cookies = HTTPCookieStorage.shared.cookies(for: url) {
-            for cookie in cookies {
-                if cookie.name == "hestami_session" {
-                    return true
-                }
-            }
-        }
-        
-        return false
+        return hasSession
     }
     
     // Get the session cookie value if available
@@ -436,12 +489,15 @@ public class NetworkManager {
         case 200...299:
             // Success
             do {
-                let decodedResponse = try jsonDecoder.decode(T.self, from: responseData)
+                // Rewrite any media URLs in the response before decoding
+                let processedData = rewriteMediaURLs(in: responseData)
+                
+                let decodedResponse = try jsonDecoder.decode(T.self, from: processedData)
                 
                 // Cache the successful response if it's a GET request
                 if method == .get && shouldCacheResponse {
                     let cacheKey = cacheManager.cacheKey(for: request)
-                    cacheManager.cacheData(responseData, for: cacheKey)
+                    cacheManager.cacheData(processedData, for: cacheKey)
                 }
                 
                 return decodedResponse
@@ -474,6 +530,13 @@ public class NetworkManager {
                let message = errorData["message"] ?? errorData["error"] {
                 errorMessage = message
             }
+            
+            // Check if this is a session expiration issue
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                print("❌ NetworkManager: Authentication error (\(httpResponse.statusCode)). Session may have expired.")
+                print("❌ NetworkManager: Current session cookie: \(getSessionCookieValue() ?? "none")")
+            }
+            
             throw NetworkError.serverError(errorMessage)
         case 500...599:
             // Server error

@@ -33,7 +33,7 @@ class PropertiesViewModel: ObservableObject {
         city: String,
         state: String,
         zipCode: String,
-        country: String = "US",
+        country: String = "United States",
         propertyType: String? = nil,
         bedrooms: String? = nil,
         bathrooms: String? = nil,
@@ -56,7 +56,8 @@ class PropertiesViewModel: ObservableObject {
                 heatingSystem: nil,
                 squareFootage: squareFootage,
                 gatedCommunity: false,
-                airConditioning: false
+                airConditioning: false,
+                createdFrom: "ios_app"
             )
         }
         
@@ -116,7 +117,8 @@ class PropertiesViewModel: ObservableObject {
                 heatingSystem: nil,
                 squareFootage: squareFootage,
                 gatedCommunity: false,
-                airConditioning: false
+                airConditioning: false,
+                createdFrom: "ios_app"
             )
         }
         
@@ -210,7 +212,8 @@ class PropertiesViewModel: ObservableObject {
                     heatingSystem: "Forced Air",
                     squareFootage: "2000",
                     gatedCommunity: false,
-                    airConditioning: true
+                    airConditioning: true,
+                    createdFrom: "dummy_data"
                 ),
                 serviceRequests: [],
                 geocodeAddress: nil,
@@ -251,7 +254,8 @@ class PropertiesViewModel: ObservableObject {
                     heatingSystem: "Heat Pump",
                     squareFootage: "1200",
                     gatedCommunity: true,
-                    airConditioning: true
+                    airConditioning: true,
+                    createdFrom: "dummy_data"
                 ),
                 serviceRequests: [],
                 geocodeAddress: nil,

@@ -4,7 +4,11 @@ struct AddEditPropertyView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = PropertiesViewModel()
     @State private var name: String = ""
-    @State private var address: String = ""
+    @State private var streetAddress: String = ""
+    @State private var city: String = ""
+    @State private var state: String = ""
+    @State private var zipCode: String = ""
+    @State private var country: String = "United States"
     @State private var propertyType: String = "Single Family Home"
     @State private var squareFootage: String = ""
     @State private var bedrooms: String = ""
@@ -14,13 +18,25 @@ struct AddEditPropertyView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     
-    let propertyTypes = ["Single Family Home", "Condo", "Apartment", "Townhouse", "Vacation Home", "Commercial", "Other"]
+    let propertyTypes = ["Single Family Home", "Condominium", "Townhouse", "Apartment", "Multi-Family Home", "Vacation Home", "Mobile Home", "Commercial", "Other"]
+    let countries = ["United States", "Canada", "Mexico", "Other"]
     let isEditing: Bool
     var property: Property?
+    let onSave: (() -> Void)?
     
-    init(property: Property? = nil) {
+    init(property: Property? = nil, onSave: (() -> Void)? = nil) {
         self.property = property
         self.isEditing = property != nil
+        self.onSave = onSave
+    }
+    
+    private var isFormValid: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !streetAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !state.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !zipCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !country.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
     
     var body: some View {
@@ -35,7 +51,42 @@ struct AddEditPropertyView: View {
                         FormField(title: "Property Name", placeholder: "Enter property name", text: $name)
                         
                         // Property Address
-                        FormField(title: "Address", placeholder: "Enter property address", text: $address)
+                        FormField(title: "Street Address", placeholder: "Enter street address", text: $streetAddress)
+
+                        FormField(title: "City", placeholder: "Enter city", text: $city)
+
+                        FormField(title: "State", placeholder: "Enter state", text: $state)
+
+                        FormField(title: "ZIP Code", placeholder: "Enter ZIP code", text: $zipCode, keyboardType: .numbersAndPunctuation)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Country")
+                                .font(AppTheme.bodyFont.bold())
+                                .foregroundColor(AppTheme.primaryText)
+
+                            Menu {
+                                ForEach(countries, id: \.self) { option in
+                                    Button(option) {
+                                        country = option
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(country)
+                                        .foregroundColor(AppTheme.primaryText)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                }
+                                .padding()
+                                .background(AppTheme.cardBackground)
+                                .cornerRadius(10)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(AppTheme.borderColor, lineWidth: 1)
+                                )
+                            }
+                        }
                         
                         // Property Type
                         VStack(alignment: .leading, spacing: 8) {
@@ -116,8 +167,8 @@ struct AddEditPropertyView: View {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 20)
-                    .disabled(name.isEmpty || address.isEmpty)
-                    .opacity(name.isEmpty || address.isEmpty ? 0.6 : 1)
+                    .disabled(!isFormValid)
+                    .opacity(isFormValid ? 1 : 0.6)
                 }
             }
             
@@ -141,7 +192,11 @@ struct AddEditPropertyView: View {
             if let property = property {
                 // Populate fields with existing property data
                 name = property.title
-                address = property.address
+                streetAddress = property.address
+                city = property.city
+                state = property.state
+                zipCode = property.zipCode
+                country = property.country
                 
                 // Get values from descriptives if available
                 if let descriptives = property.descriptives {
@@ -159,8 +214,8 @@ struct AddEditPropertyView: View {
     
     private func submitProperty() {
         // Validate inputs
-        guard !name.isEmpty, !address.isEmpty else {
-            alertMessage = "Please enter property name and address"
+        guard isFormValid else {
+            alertMessage = "Please complete all required fields"
             showingAlert = true
             return
         }
@@ -173,32 +228,24 @@ struct AddEditPropertyView: View {
                         id: property.id,
                         title: name,
                         description: description,
-                        address: address,
-                        city: property.city,
-                        state: property.state,
-                        zipCode: property.zipCode,
-                        country: property.country,
+                        address: streetAddress,
+                        city: city,
+                        state: state,
+                        zipCode: zipCode,
+                        country: country,
                         propertyType: propertyType.isEmpty ? nil : propertyType,
                         bedrooms: bedrooms.isEmpty ? nil : bedrooms,
                         bathrooms: bathrooms.isEmpty ? nil : bathrooms,
                         yearBuilt: yearBuilt.isEmpty ? nil : yearBuilt,
                         squareFootage: squareFootage.isEmpty ? nil : squareFootage
                     )
+                    onSave?()
                     dismiss()
                 } catch {
                     alertMessage = "Failed to update property: \(error.localizedDescription)"
                     showingAlert = true
                 }
             } else {
-                // Create new property - parse address components
-                let addressComponents = address.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                let streetAddress = addressComponents.first ?? address
-                let city = addressComponents.count > 1 ? addressComponents[1] : "Unknown"
-                let stateZip = addressComponents.count > 2 ? addressComponents[2] : ""
-                let stateZipComponents = stateZip.split(separator: " ").map { $0.trimmingCharacters(in: .whitespaces) }
-                let state = stateZipComponents.first ?? "Unknown"
-                let zipCode = stateZipComponents.count > 1 ? stateZipComponents[1] : "00000"
-                
                 await viewModel.createProperty(
                     title: name,
                     description: description,
@@ -206,7 +253,7 @@ struct AddEditPropertyView: View {
                     city: city,
                     state: state,
                     zipCode: zipCode,
-                    country: "US",
+                    country: country,
                     propertyType: propertyType.isEmpty ? nil : propertyType,
                     bedrooms: bedrooms.isEmpty ? nil : bedrooms,
                     bathrooms: bathrooms.isEmpty ? nil : bathrooms,
@@ -215,6 +262,7 @@ struct AddEditPropertyView: View {
                 )
                 
                 if viewModel.errorMessage == nil {
+                    onSave?()
                     dismiss()
                 } else {
                     alertMessage = viewModel.errorMessage ?? "An unknown error occurred"
@@ -238,7 +286,6 @@ struct FormField: View {
                 .foregroundColor(AppTheme.primaryText)
             
             TextField(placeholder, text: $text)
-                .disableInputAssistant()
                 .foregroundColor(AppTheme.primaryText)
                 .padding()
                 .background(AppTheme.cardBackground)

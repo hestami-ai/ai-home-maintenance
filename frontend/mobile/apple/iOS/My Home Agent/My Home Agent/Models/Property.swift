@@ -26,11 +26,84 @@ struct Property: Identifiable, Codable {
     let permitRetrievalError: String?
     let permitNextRetrievalAt: Date?
     let permitRetrievalWorkflowId: String?
-    let featuredImage: String?
-    let media: [Media]?
+    private let _featuredImage: String?
+    private let _media: [Media]?
+    
+    // Computed properties that rewrite media URLs
+    var featuredImage: String? {
+        guard let image = _featuredImage else { return nil }
+        return NetworkManager.shared.rewriteMediaURL(image)
+    }
+    
+    var media: [Media]? {
+        return _media?.map { mediaItem in
+            var updatedItem = mediaItem
+            if !mediaItem.fileUrl.isEmpty {
+                updatedItem.fileUrl = NetworkManager.shared.rewriteMediaURL(mediaItem.fileUrl)
+            }
+            return updatedItem
+        }
+    }
     
     // UI properties
     var image: UIImage?
+    
+    // Custom initializer to handle the renamed properties
+    init(
+        id: String,
+        title: String,
+        description: String,
+        address: String,
+        city: String,
+        state: String,
+        zipCode: String,
+        county: String?,
+        country: String,
+        status: PropertyStatus,
+        createdAt: Date,
+        updatedAt: Date,
+        owner: String,
+        ownerDetails: User,
+        mediaCount: Int,
+        descriptives: PropertyDescriptives?,
+        serviceRequests: [ServiceRequest]?,
+        geocodeAddress: GeocodeAddress?,
+        geocodeAddressSource: String?,
+        permitRetrievalStatus: String?,
+        permitLastRetrievedAt: Date?,
+        permitRetrievalError: String?,
+        permitNextRetrievalAt: Date?,
+        permitRetrievalWorkflowId: String?,
+        featuredImage: String?,
+        media: [Media]?
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.address = address
+        self.city = city
+        self.state = state
+        self.zipCode = zipCode
+        self.county = county
+        self.country = country
+        self.status = status
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.owner = owner
+        self.ownerDetails = ownerDetails
+        self.mediaCount = mediaCount
+        self.descriptives = descriptives
+        self.serviceRequests = serviceRequests
+        self.geocodeAddress = geocodeAddress
+        self.geocodeAddressSource = geocodeAddressSource
+        self.permitRetrievalStatus = permitRetrievalStatus
+        self.permitLastRetrievedAt = permitLastRetrievedAt
+        self.permitRetrievalError = permitRetrievalError
+        self.permitNextRetrievalAt = permitNextRetrievalAt
+        self.permitRetrievalWorkflowId = permitRetrievalWorkflowId
+        self._featuredImage = featuredImage
+        self._media = media
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -57,8 +130,8 @@ struct Property: Identifiable, Codable {
         case permitRetrievalError
         case permitNextRetrievalAt
         case permitRetrievalWorkflowId
-        case featuredImage
-        case media
+        case _featuredImage = "featuredImage"
+        case _media = "media"
     }
 }
 
@@ -89,6 +162,7 @@ struct PropertyDescriptives: Codable {
     let squareFootage: String?
     let gatedCommunity: Bool?
     let airConditioning: Bool?
+    let createdFrom: String?
     
     enum CodingKeys: String, CodingKey {
         case garage
@@ -103,6 +177,7 @@ struct PropertyDescriptives: Codable {
         case squareFootage
         case gatedCommunity
         case airConditioning
+        case createdFrom = "created_from"
     }
 }
 

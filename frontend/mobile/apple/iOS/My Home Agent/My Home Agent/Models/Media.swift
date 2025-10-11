@@ -14,10 +14,26 @@ struct Media: Identifiable, Codable {
     let title: String
     let description: String
     let uploadDate: Date
-    let fileUrl: String
-    let thumbnailSmallUrl: String?
-    let thumbnailMediumUrl: String?
-    let thumbnailLargeUrl: String?
+    var fileUrl: String
+    private let _thumbnailSmallUrl: String?
+    private let _thumbnailMediumUrl: String?
+    private let _thumbnailLargeUrl: String?
+    
+    // Computed properties that rewrite thumbnail URLs
+    var thumbnailSmallUrl: String? {
+        guard let url = _thumbnailSmallUrl else { return nil }
+        return NetworkManager.shared.rewriteMediaURL(url)
+    }
+    
+    var thumbnailMediumUrl: String? {
+        guard let url = _thumbnailMediumUrl else { return nil }
+        return NetworkManager.shared.rewriteMediaURL(url)
+    }
+    
+    var thumbnailLargeUrl: String? {
+        guard let url = _thumbnailLargeUrl else { return nil }
+        return NetworkManager.shared.rewriteMediaURL(url)
+    }
     let isImage: Bool
     let isVideo: Bool
     let mediaType: MediaType
@@ -48,9 +64,9 @@ struct Media: Identifiable, Codable {
         case description
         case uploadDate
         case fileUrl
-        case thumbnailSmallUrl
-        case thumbnailMediumUrl
-        case thumbnailLargeUrl
+        case _thumbnailSmallUrl = "thumbnailSmallUrl"
+        case _thumbnailMediumUrl = "thumbnailMediumUrl"
+        case _thumbnailLargeUrl = "thumbnailLargeUrl"
         case isImage
         case isVideo
         case mediaType

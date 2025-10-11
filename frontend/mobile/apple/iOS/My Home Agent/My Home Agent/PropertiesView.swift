@@ -95,8 +95,12 @@ struct PropertiesView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showingAddProperty) {
-            AddEditPropertyView()
+        .sheet(isPresented: $showingAddProperty) {
+            AddEditPropertyView(onSave: {
+                Task {
+                    await viewModel.loadProperties()
+                }
+            })
         }
         .alert("Delete Property", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -537,9 +541,6 @@ struct PropertyDetailView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .navigationDestination(isPresented: $showingEditProperty) {
-            AddEditPropertyView(property: property)
-        }
         .alert("Room Scanning Not Available", isPresented: $viewModel.showRoomPlanAlert) {
             Button("OK", role: .cancel) { }
         } message: {
