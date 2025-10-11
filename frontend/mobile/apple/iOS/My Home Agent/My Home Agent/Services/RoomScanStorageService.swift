@@ -47,10 +47,14 @@ class RoomScanStorageService {
         
         do {
             let data = try Data(contentsOf: metadataFileURL)
-            let metadata = try JSONDecoder().decode(RoomScanMetadata.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let metadata = try decoder.decode(RoomScanMetadata.self, from: data)
             return metadata
         } catch {
             print("❌ RoomScanStorage: Failed to load metadata: \(error)")
+            print("⚠️ RoomScanStorage: Attempting to delete corrupted metadata file")
+            try? fileManager.removeItem(at: metadataFileURL)
             return RoomScanMetadata()
         }
     }

@@ -131,6 +131,10 @@ struct SavedRoomScansView: View {
     
     private func loadScans() {
         scans = storageService.getAllScans()
+        print("📂 SavedRoomScansView: Loaded \(scans.count) scans")
+        for scan in scans {
+            print("   - \(scan.name) (ID: \(scan.id))")
+        }
     }
     
     private func updateStorageSize() {
