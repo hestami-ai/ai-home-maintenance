@@ -1,0 +1,57 @@
+tls:
+  certificates:
+    # Default certificate (listed first)
+    - certFile: /etc/traefik/certs/alpha-deliveries.com.pem
+      keyFile: /etc/traefik/certs/alpha-deliveries.com.key
+      stores:
+        - default
+
+    # Hestami AI domain certificate
+    - certFile: /etc/traefik/certs/hestami-ai.com.pem
+      keyFile: /etc/traefik/certs/hestami-ai.com.key
+      stores:
+        - default
+
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: false
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+
+  stores:
+    default: {}
+
+http:
+  routers:
+    joomla:
+      entryPoints:
+        - websecure
+      rule: "Host(`www.hestami-ai.com`)"
+      service: "joomla"
+      tls: {}
+
+      
+  services:
+    joomla:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:8080"
+        passHostHeader: true
+
+    dev_homeservices:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://192.168.4.33:3000"
+
+    dev_static:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://192.168.4.33:8090"

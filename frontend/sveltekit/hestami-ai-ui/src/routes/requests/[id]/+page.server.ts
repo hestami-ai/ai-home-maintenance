@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { apiGet } from '$lib/server/api';
 import * as auth from '$lib/server/auth';
 import type { ServiceRequest, Media } from '$lib/types';
+import { rewriteStaticMediaUrls } from '$lib/server/utils';
 
 /**
  * Server-side load function for service request details page
@@ -41,10 +42,13 @@ export const load: PageServerLoad = async ({ params, cookies, url, depends }) =>
         url.pathname
       );
       
+      // Apply static media URL rewriting to media data
+      const rewrittenMediaData = rewriteStaticMediaUrls(mediaResponse.data) as Media[];
+      
       // Return both the service request and its media
       return {
         serviceRequest: requestResponse.data,
-        media: mediaResponse.data || [],
+        media: rewrittenMediaData || [],
         error: null
       };
     } catch (mediaError) {

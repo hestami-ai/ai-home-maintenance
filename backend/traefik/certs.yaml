@@ -1,0 +1,11 @@
+# ./volumes/dev/traefik/certs/certs.yaml
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/hai.crt
+      keyFile: /etc/traefik/certs/hai.key
+
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/hai.crt
+        keyFile: /etc/traefik/certs/hai.key

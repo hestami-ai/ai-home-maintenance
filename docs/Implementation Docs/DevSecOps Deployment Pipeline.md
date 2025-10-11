@@ -290,7 +290,7 @@ Describe directory layout on server:
 
 # **VARIABLES (fill with placeholders, top of files or README)**
 
-* `GHCR_NAMESPACE=yourorg`
+* `GHCR_NAMESPACE=hestami-ai`
 
 * `APP_NAME=hestami-ai`
 
