@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { apiGet } from '$lib/server/api';
 import type { Property, Media } from '$lib/types';
+import { rewriteStaticMediaUrls } from '$lib/server/utils';
 
 /**
  * Server-side load function for property details page
@@ -37,8 +38,11 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
       
       console.log(`Successfully fetched ${mediaResponse.data.length} media items for property ID: ${propertyId}`);
       
+      // Apply static media URL rewriting to media data
+      const rewrittenMediaData = rewriteStaticMediaUrls(mediaResponse.data) as Media[];
+      
       // Find the preferred exterior street view image for the main image
-      const exteriorStreetViewImage = mediaResponse.data.find(
+      const exteriorStreetViewImage = rewrittenMediaData.find(
         (media: Media) => 
           media.media_type === 'IMAGE' && 
           media.location_type === 'EXTERIOR' && 
@@ -47,7 +51,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
       );
       
       // If no exterior street view, fall back to any exterior image
-      const exteriorImage = !exteriorStreetViewImage ? mediaResponse.data.find(
+      const exteriorImage = !exteriorStreetViewImage ? rewrittenMediaData.find(
         (media: Media) => 
           media.media_type === 'IMAGE' && 
           media.location_type === 'EXTERIOR' && 
@@ -55,7 +59,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
       ) : null;
       
       // If no exterior image at all, fall back to any image
-      const anyImage = (!exteriorStreetViewImage && !exteriorImage) ? mediaResponse.data.find(
+      const anyImage = (!exteriorStreetViewImage && !exteriorImage) ? rewrittenMediaData.find(
         (media: Media) => 
           media.media_type === 'IMAGE' && 
           !media.is_deleted
@@ -71,7 +75,7 @@ export const load: PageServerLoad = async ({ params, cookies, url }) => {
           // Use file_url which already contains the full URL with authentication tokens
           featuredImage: featuredImage ? featuredImage.file_url : null,
           // Keep all media items for use in the property details page
-          media: mediaResponse.data
+          media: rewrittenMediaData
         }
       };
     } catch (mediaErr) {

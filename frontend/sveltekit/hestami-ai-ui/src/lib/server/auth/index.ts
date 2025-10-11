@@ -57,7 +57,7 @@ export async function createSession(
     cookies.set(SESSION_COOKIE_NAME, sessionId, {
       path: '/',
       httpOnly: true,
-      secure: false, // Set to false for testing in non-HTTPS environments
+      secure: true, // Set to false for testing in non-HTTPS environments
       sameSite: 'strict',
       maxAge: SESSION_DURATION
     });

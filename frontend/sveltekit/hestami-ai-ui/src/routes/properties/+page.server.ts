@@ -3,6 +3,7 @@ import type { PageServerLoad, Actions } from './$types';
 import type { Cookies } from '@sveltejs/kit';
 import { apiPost, apiDelete } from '$lib/server/api';
 import type { Property } from '$lib/types';
+import { rewriteStaticMediaUrls } from '$lib/server/utils';
 
 /**
  * Server-side load function for properties page
@@ -30,9 +31,13 @@ export const load: PageServerLoad = async ({ cookies, url, fetch, depends }) => 
       throw new Error(`API returned ${response.status}: ${response.statusText}`);
     }
     
-    // Parse and return the properties data
+    // Parse the properties data
     const data = await response.json();
-    return data;
+    
+    // Apply static media URL rewriting
+    const rewrittenData = rewriteStaticMediaUrls(data);
+    
+    return rewrittenData;
   } catch (err) {
     console.error('Error fetching properties:', err);
     throw error(500, 'An unexpected error occurred while loading properties');

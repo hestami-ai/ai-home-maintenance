@@ -43,6 +43,11 @@ services:
     depends_on:
       - api
       - static
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`homeservices.hai`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
 
   api:
     build: 
@@ -99,6 +104,11 @@ services:
       - backend-dev
     depends_on:
       - init-volumes
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.static.rule=Host(`static.hai`)"
+      - "traefik.http.routers.static.tls=true"
+      - "traefik.http.services.static.loadbalancer.server.port=80"
 
   ai-agents:
     build:
@@ -237,3 +247,29 @@ services:
     networks:
       - backend-dev
 
+
+  traefik:
+    image: traefik:v3.2.1
+    container_name: traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=backend-dev"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--providers.file.directory=/etc/traefik/certs"
+      - "--providers.file.watch=true"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "443:443"
+    volumes:
+      - "./volumes/dev/traefik/certs:/etc/traefik/certs:ro"
+      - "//var/run/docker.sock://var/run/docker.sock"
+      - "./volumes/dev/traefik/logs:/var/log/traefik"
+    networks:
+      - backend-dev

@@ -43,7 +43,7 @@ export function processMobileSession(request: Request, cookies: Cookies): boolea
     cookies.set(SESSION_COOKIE_NAME, sessionCookie, {
       path: '/',
       httpOnly: true,
-      secure: false, // Set to false for testing in non-HTTPS environments
+      secure: true, // Set to false for testing in non-HTTPS environments
       sameSite: 'strict',
       maxAge: 60 * 60 * 24 * 7 // 1 week in seconds
     });
