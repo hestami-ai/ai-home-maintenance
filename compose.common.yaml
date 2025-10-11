@@ -38,29 +38,24 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.dev_homeservices.rule=Host(`dev-homeservices.hestami-ai.com`)"
       - "traefik.http.routers.dev_homeservices.tls=true"
-      #- "traefik.http.services.dev_homeservices.loadbalancer.server.port=80"
       - "traefik.http.routers.dev_homeservices.entrypoints=websecure"
-      - "traefik.http.routers.dev_homeservices.tls=true"
       - "traefik.http.routers.dev_homeservices.service=dev_homeservices"
       - "traefik.http.routers.dev_homeservices.middlewares=env-dev"
       - "traefik.http.services.dev_homeservices.loadbalancer.passhostheader=true"
-      - "traefik.http.services.dev_homeservices.loadbalancer.servers.0.url=http://192.168.4.33:3000"
+
       - "traefik.http.routers.dev_static.rule=Host(`dev-static.hestami-ai.com`)"
       - "traefik.http.routers.dev_static.tls=true"
-      #- "traefik.http.services.dev_static.loadbalancer.server.port=80"
       - "traefik.http.routers.dev_static.entrypoints=websecure"
-      - "traefik.http.routers.dev_static.tls=true"
       - "traefik.http.routers.dev_static.service=dev_static"
       - "traefik.http.routers.dev_static.middlewares=env-dev"
       - "traefik.http.services.dev_static.loadbalancer.passhostheader=true"
-      - "traefik.http.services.dev_static.loadbalancer.servers.0.url=http://192.168.4.33:8090"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "443:443"
     volumes:
       - "./volumes/common/traefik/certs:/etc/traefik/certs:ro"
-      - "//var/run/docker.sock://var/run/docker.sock"
+      - "/var/run/docker.sock:/var/run/docker.sock"
       - "./volumes/common/traefik/logs:/var/log/traefik"
     networks:
       - traefik-public
