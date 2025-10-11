@@ -2,21 +2,28 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft } from 'lucide-svelte';
-	import VirtualTourViewer from '$lib/components/virtual-tour/VirtualTourViewer.svelte';
+	import { browser } from '$app/environment';
+	import type { PageData } from './$types';
+	
+	// Get data from server load function
+	export let data: PageData;
 	
 	// Get property ID from route params
 	const propertyId = $page.params.id;
 	
-	// Mock property data - in a real app, this would come from an API
-	const property = {
-		id: propertyId,
-		address: '123 Main Street',
-		city: 'Boston',
-		state: 'MA',
-		zipCode: '02108',
-		// Sample panorama URL - replace with your actual panorama images
-		panoramaUrl: 'https://photo-sphere-viewer-data.netlify.app/assets/sphere.jpg'
-	};
+	// Extract property and panoramas from server data
+	const { property, panoramas } = data;
+	
+	// Get the first panorama URL (or null if none available)
+	const panoramaUrl = panoramas.length > 0 ? panoramas[0].file_url : null;
+	
+	// Dynamically import VirtualTourViewer only on client-side
+	let VirtualTourViewer: any;
+	if (browser) {
+		import('$lib/components/virtual-tour/VirtualTourViewer.svelte').then((module) => {
+			VirtualTourViewer = module.default;
+		});
+	}
 	
 	// Function to navigate back to property details
 	function goBack() {
@@ -36,7 +43,7 @@
 	<!-- Property info header -->
 	<div class="card p-4">
 		<h1 class="h2">Virtual Tour</h1>
-		<p class="text-surface-600-300-token">{property.address}, {property.city}, {property.state} {property.zipCode}</p>
+		<p class="text-surface-600-300-token">{property.address}, {property.city}, {property.state} {property.zip_code}</p>
 	</div>
 	
 	<!-- Virtual Tour Viewer -->
@@ -47,16 +54,35 @@
 		</div>
 		
 		<div class="card-body">
-			<VirtualTourViewer 
-				panoramaUrl={property.panoramaUrl} 
-				title={property.address}
-			/>
+			{#if panoramaUrl}
+				{#if VirtualTourViewer}
+					<svelte:component this={VirtualTourViewer} 
+						panoramaUrl={panoramaUrl} 
+						title={property.address}
+					/>
+				{:else}
+					<div class="flex items-center justify-center h-[500px]">
+						<div class="text-center">
+							<div class="animate-pulse">Loading virtual tour viewer...</div>
+						</div>
+					</div>
+				{/if}
+			{:else}
+				<div class="alert variant-ghost-warning p-8 text-center">
+					<h3 class="h4 mb-2">No Virtual Tour Available</h3>
+					<p class="text-surface-600-300-token">
+						This property does not currently have a 360° panorama or virtual tour available.
+					</p>
+				</div>
+			{/if}
 		</div>
 		
-		<div class="card-footer pt-4">
-			<p class="text-sm text-surface-600-300-token">
-				<strong>Tip:</strong> Use your mouse to drag and look around. Scroll to zoom in and out. On mobile, use two fingers to navigate.
-			</p>
-		</div>
+		{#if panoramaUrl}
+			<div class="card-footer pt-4">
+				<p class="text-sm text-surface-600-300-token">
+					<strong>Tip:</strong> Use your mouse to drag and look around. Scroll to zoom in and out. On mobile, use two fingers to navigate.
+				</p>
+			</div>
+		{/if}
 	</div>
 </div>
