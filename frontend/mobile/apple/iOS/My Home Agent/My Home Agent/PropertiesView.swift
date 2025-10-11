@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RoomPlan
+import AVKit
 
 struct PropertiesView: View {
     @StateObject private var viewModel = PropertiesViewModel()
@@ -469,20 +470,18 @@ struct PropertyDetailView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         
-                        // Service Requests
-                        if let serviceRequests = property.serviceRequests, !serviceRequests.isEmpty {
+                        // Media Gallery
+                        if let media = property.media, !media.isEmpty {
                             Divider()
                                 .background(AppTheme.borderColor)
                                 .padding(.vertical, 8)
                             
-                            Text("Service Requests")
+                            Text("Media Gallery")
                                 .font(AppTheme.subheadlineFont.bold())
                                 .foregroundColor(AppTheme.primaryText)
-                                .padding(.bottom, 4)
+                                .padding(.bottom, 8)
                             
-                            ForEach(serviceRequests) { request in
-                                ServiceRequestRow(request: request)
-                            }
+                            PropertyMediaGalleryView(media: media)
                         }
                         
                         Divider()
@@ -525,9 +524,9 @@ struct PropertyDetailView: View {
                             }
                         }
                         
-                        NavigationLink(destination: ServicesView()) {
-                            ActionButtonView(icon: "magnifyingglass", title: "Browse Services")
-                        }
+                        //NavigationLink(destination: ServicesView()) {
+                        //    ActionButtonView(icon: "magnifyingglass", title: "Browse Services")
+                        //}
                         
                         NavigationLink(destination: RequestsView()) {
                             ActionButtonView(icon: "list.bullet.rectangle", title: "View Requests")

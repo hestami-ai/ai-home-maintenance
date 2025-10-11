@@ -270,8 +270,12 @@ struct RoomPlanView: View {
     }
     
     private func saveScan(name: String, propertyId: String?) async {
-        guard let capturedRoom = capturedRoom else { return }
+        guard let capturedRoom = capturedRoom else {
+            print("❌ RoomPlanView: No captured room to save")
+            return
+        }
         
+        print("💾 RoomPlanView: Starting to save scan '\(name)'")
         isSaving = true
         showSaveDialog = false
         
@@ -282,12 +286,15 @@ struct RoomPlanView: View {
                 propertyId: propertyId
             )
             
+            print("✅ RoomPlanView: Scan saved successfully with ID \(scan.id)")
+            
             await MainActor.run {
                 self.savedScan = scan
                 self.isSaving = false
                 HapticManager.shared.playNotificationFeedback(type: .success)
             }
         } catch {
+            print("❌ RoomPlanView: Failed to save scan: \(error)")
             await MainActor.run {
                 self.isSaving = false
                 self.permissionAlertMessage = "Failed to save scan: \(error.localizedDescription)"
