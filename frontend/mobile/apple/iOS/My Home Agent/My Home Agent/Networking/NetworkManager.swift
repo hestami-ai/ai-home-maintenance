@@ -123,7 +123,7 @@ public class NetworkManager {
     private var cookieStorage: [String: String] = [:]
     
     // Configuration options
-    var shouldUseCache = true
+    var shouldUseCache = true  // Enable smart caching
     var shouldCacheResponses = true
     
     // Media server configuration methods
@@ -375,9 +375,11 @@ public class NetworkManager {
             }
         }
         
-        // Determine if we should use cache for this request
-        let shouldUseCache = useCache ?? self.shouldUseCache
-        let shouldCacheResponse = cacheResponse ?? self.shouldCacheResponses
+        // Determine if we should use cache for this request using smart caching
+        let urlString = request.url?.absoluteString ?? ""
+        let cachePolicy = cacheManager.shouldCacheResource(url: urlString)
+        let shouldUseCache = useCache ?? (self.shouldUseCache && cachePolicy.shouldCache)
+        let shouldCacheResponse = cacheResponse ?? (self.shouldCacheResponses && cachePolicy.shouldCache)
         
         // Only use cache for GET requests
         if method == .get && shouldUseCache {
@@ -387,10 +389,11 @@ public class NetworkManager {
             if let cachedData = cacheManager.getCachedData(for: cacheKey) {
                 do {
                     let cachedResponse = try jsonDecoder.decode(T.self, from: cachedData)
+                    print("✅ NetworkManager: Using cached response for \(endpoint)")
                     return cachedResponse
                 } catch {
                     // If decoding fails, continue with network request
-                    print("Failed to decode cached response: \(error)")
+                    print("⚠️ NetworkManager: Failed to decode cached response: \(error)")
                 }
             }
         }
@@ -499,7 +502,13 @@ public class NetworkManager {
                 // Cache the successful response if it's a GET request
                 if method == .get && shouldCacheResponse {
                     let cacheKey = cacheManager.cacheKey(for: request)
-                    cacheManager.cacheData(processedData, for: cacheKey)
+                    cacheManager.cacheData(processedData, for: cacheKey, ttl: cachePolicy.ttl)
+                    print("💾 NetworkManager: Cached response for \(endpoint) with TTL: \(cachePolicy.ttl ?? 0)s")
+                }
+                
+                // Invalidate related caches on mutations (POST, PUT, PATCH, DELETE)
+                if [.post, .put, .patch, .delete].contains(method) {
+                    invalidateRelatedCaches(for: endpoint)
                 }
                 
                 return decodedResponse
@@ -546,5 +555,41 @@ public class NetworkManager {
         default:
             throw NetworkError.httpError(statusCode: httpResponse.statusCode, data: responseData)
         }
+    }
+    
+    // MARK: - Cache Invalidation
+    
+    /// Invalidate caches related to a mutated endpoint
+    private func invalidateRelatedCaches(for endpoint: String) {
+        // Properties endpoints
+        if endpoint.contains("/api/properties") {
+            cacheManager.invalidateCache(matching: "/api/properties")
+            print("🗑️ NetworkManager: Invalidated property caches")
+        }
+        
+        // User profile endpoints
+        if endpoint.contains("/api/users/profile") {
+            cacheManager.invalidateCache(matching: "/api/users/profile")
+            print("🗑️ NetworkManager: Invalidated user profile cache")
+        }
+        
+        // Service requests endpoints
+        if endpoint.contains("/api/service-requests") {
+            cacheManager.invalidateCache(matching: "/api/service-requests")
+            print("🗑️ NetworkManager: Invalidated service request caches")
+        }
+        
+        // Add more endpoint patterns as needed
+    }
+    
+    /// Public method to manually invalidate specific caches
+    public func invalidateCache(for pattern: String) {
+        cacheManager.invalidateCache(matching: pattern)
+    }
+    
+    /// Public method to clear all caches
+    public func clearAllCaches() {
+        cacheManager.clearCache()
+        print("🗑️ NetworkManager: Cleared all caches")
     }
 }

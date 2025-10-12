@@ -5,7 +5,10 @@ public class CacheManager {
     
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
-    private let expirationInterval: TimeInterval = 3600 * 24 // 24 hours
+    
+    // Different TTLs for different resource types
+    private let defaultExpirationInterval: TimeInterval = 3600 * 24 // 24 hours for media
+    private let apiDataExpirationInterval: TimeInterval = 300 // 5 minutes for API data
     
     private init() {
         // Get the cache directory
@@ -24,8 +27,8 @@ public class CacheManager {
     
     // MARK: - Cache Operations
     
-    public func cacheData(_ data: Data, for key: String) {
-        let cacheMetadata = CacheMetadata(timestamp: Date())
+    public func cacheData(_ data: Data, for key: String, ttl: TimeInterval? = nil) {
+        let cacheMetadata = CacheMetadata(timestamp: Date(), ttl: ttl)
         let cacheItem = CacheItem(metadata: cacheMetadata, data: data)
         
         do {
@@ -48,8 +51,9 @@ public class CacheManager {
             let data = try Data(contentsOf: fileURL)
             let cacheItem = try JSONDecoder().decode(CacheItem.self, from: data)
             
-            // Check if cache is expired
-            if Date().timeIntervalSince(cacheItem.metadata.timestamp) > expirationInterval {
+            // Check if cache is expired using the stored TTL or default
+            let ttl = cacheItem.metadata.ttl ?? defaultExpirationInterval
+            if Date().timeIntervalSince(cacheItem.metadata.timestamp) > ttl {
                 // Cache expired, delete it
                 try? fileManager.removeItem(at: fileURL)
                 return nil
@@ -80,7 +84,8 @@ public class CacheManager {
                 if let data = try? Data(contentsOf: fileURL),
                    let cacheItem = try? JSONDecoder().decode(CacheItem.self, from: data) {
                     
-                    if Date().timeIntervalSince(cacheItem.metadata.timestamp) > expirationInterval {
+                    let ttl = cacheItem.metadata.ttl ?? defaultExpirationInterval
+                    if Date().timeIntervalSince(cacheItem.metadata.timestamp) > ttl {
                         try fileManager.removeItem(at: fileURL)
                     }
                 }
@@ -115,12 +120,50 @@ public class CacheManager {
         
         return key
     }
+    
+    // MARK: - Selective Cache Invalidation
+    
+    /// Invalidate cache entries matching a URL pattern
+    public func invalidateCache(matching pattern: String) {
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
+            for fileURL in contents {
+                let filename = fileURL.lastPathComponent
+                // Convert back from sanitized filename to check if it matches pattern
+                let urlPattern = pattern.replacingOccurrences(of: "/", with: "_")
+                                       .replacingOccurrences(of: ":", with: "_")
+                if filename.contains(urlPattern) {
+                    try? fileManager.removeItem(at: fileURL)
+                    print("🗑️ CacheManager: Invalidated cache for: \(filename)")
+                }
+            }
+        } catch {
+            print("❌ CacheManager: Error invalidating cache: \(error)")
+        }
+    }
+    
+    /// Check if a resource should be cached based on its URL
+    public func shouldCacheResource(url: String) -> (shouldCache: Bool, ttl: TimeInterval?) {
+        // Media files - cache with long TTL
+        if url.contains("/media-secure/") || url.contains("/media/") {
+            return (true, defaultExpirationInterval) // 24 hours
+        }
+        
+        // API endpoints - don't cache by default (too risky)
+        if url.contains("/api/") {
+            return (false, nil)
+        }
+        
+        // Everything else - no cache
+        return (false, nil)
+    }
 }
 
 // MARK: - Cache Models
 
 public struct CacheMetadata: Codable {
     public let timestamp: Date
+    public let ttl: TimeInterval? // Custom TTL per cache item
 }
 
 public struct CacheItem: Codable {

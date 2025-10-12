@@ -49,18 +49,18 @@ class PropertiesViewModel: ObservableObject {
         
         if propertyType != nil || bedrooms != nil || bathrooms != nil || yearBuilt != nil || squareFootage != nil {
             descriptives = PropertyDescriptives(
+                propertyType: propertyType,
+                yearBuilt: yearBuilt.flatMap { Int($0) },
+                squareFootage: squareFootage.flatMap { Int($0) },
+                bedrooms: bedrooms.flatMap { Int($0) },
+                bathrooms: bathrooms,
+                unitNumber: nil,
                 garage: false,
                 basement: false,
-                bedrooms: bedrooms,
-                bathrooms: bathrooms,
-                utilities: nil,
-                yearBuilt: yearBuilt,
-                unitNumber: nil,
-                propertyType: propertyType,
-                heatingSystem: nil,
-                squareFootage: squareFootage,
                 gatedCommunity: false,
+                heatingSystem: nil,
                 airConditioning: false,
+                utilities: nil,
                 createdFrom: "ios_app"
             )
         }
@@ -98,34 +98,10 @@ class PropertiesViewModel: ObservableObject {
         city: String? = nil,
         state: String? = nil,
         zipCode: String? = nil,
+        county: String? = nil,
         country: String? = nil,
-        propertyType: String? = nil,
-        bedrooms: String? = nil,
-        bathrooms: String? = nil,
-        yearBuilt: String? = nil,
-        squareFootage: String? = nil
+        descriptives: PropertyDescriptives? = nil
     ) async throws -> Property {
-        // Create descriptives if any are provided
-        var descriptives: PropertyDescriptives? = nil
-        
-        if propertyType != nil || bedrooms != nil || bathrooms != nil || yearBuilt != nil || squareFootage != nil {
-            descriptives = PropertyDescriptives(
-                garage: false,
-                basement: false,
-                bedrooms: bedrooms,
-                bathrooms: bathrooms,
-                utilities: nil,
-                yearBuilt: yearBuilt,
-                unitNumber: nil,
-                propertyType: propertyType,
-                heatingSystem: nil,
-                squareFootage: squareFootage,
-                gatedCommunity: false,
-                airConditioning: false,
-                createdFrom: "ios_app"
-            )
-        }
-        
         // Create update request
         let updateRequest = PropertyUpdateRequest(
             title: title,
@@ -134,6 +110,7 @@ class PropertiesViewModel: ObservableObject {
             city: city,
             state: state,
             zipCode: zipCode,
+            county: county,
             country: country,
             descriptives: descriptives
         )
@@ -205,18 +182,18 @@ class PropertiesViewModel: ObservableObject {
                 ownerDetails: dummyOwner,
                 mediaCount: 0,
                 descriptives: PropertyDescriptives(
+                    propertyType: "Single Family Home",
+                    yearBuilt: 2010,
+                    squareFootage: 2000,
+                    bedrooms: 3,
+                    bathrooms: "2",
+                    unitNumber: nil,
                     garage: true,
                     basement: true,
-                    bedrooms: "3",
-                    bathrooms: "2",
-                    utilities: nil,
-                    yearBuilt: "2010",
-                    unitNumber: nil,
-                    propertyType: "Single Family Home",
-                    heatingSystem: "Forced Air",
-                    squareFootage: "2000",
                     gatedCommunity: false,
+                    heatingSystem: "Forced Air",
                     airConditioning: true,
+                    utilities: nil,
                     createdFrom: "dummy_data"
                 ),
                 serviceRequests: [],
@@ -247,18 +224,18 @@ class PropertiesViewModel: ObservableObject {
                 ownerDetails: dummyOwner,
                 mediaCount: 0,
                 descriptives: PropertyDescriptives(
+                    propertyType: "Condo",
+                    yearBuilt: 2015,
+                    squareFootage: 1200,
+                    bedrooms: 2,
+                    bathrooms: "2",
+                    unitNumber: "303",
                     garage: false,
                     basement: false,
-                    bedrooms: "2",
-                    bathrooms: "2",
-                    utilities: nil,
-                    yearBuilt: "2015",
-                    unitNumber: "303",
-                    propertyType: "Condo",
-                    heatingSystem: "Heat Pump",
-                    squareFootage: "1200",
                     gatedCommunity: true,
+                    heatingSystem: "Heat Pump",
                     airConditioning: true,
+                    utilities: nil,
                     createdFrom: "dummy_data"
                 ),
                 serviceRequests: [],

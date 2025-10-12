@@ -22,6 +22,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         NetworkManager.shared.configureStaticMediaServer(host: mediaHost, port: mediaPort)
         print("🔧 AppDelegate: Configured static media server: \(mediaHost):\(mediaPort)")
         
+        // Clear expired caches on app startup
+        CacheManager.shared.clearExpiredCache()
+        print("🔧 AppDelegate: Cleared expired caches")
+        
         // Test URL rewriting (deferred to avoid blocking startup)
         let testUrl = "http://localhost:8090/media-secure/test/image.jpg"
         let rewrittenUrl = NetworkManager.shared.rewriteMediaURL(testUrl)

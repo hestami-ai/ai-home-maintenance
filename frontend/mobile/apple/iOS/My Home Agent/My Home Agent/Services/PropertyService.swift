@@ -24,10 +24,17 @@ class PropertyService {
     }
     
     func updateProperty(id: String, updates: PropertyUpdateRequest) async throws -> Property {
+        let params = updates.toDictionary()
+        print("🔄 PropertyService: Updating property \(id)")
+        print("📦 PropertyService: Update parameters: \(params)")
+        if let descriptives = params["descriptives"] as? [String: Any] {
+            print("📋 PropertyService: Descriptives keys: \(descriptives.keys.sorted())")
+        }
+        
         return try await NetworkManager.shared.request(
-            endpoint: "/api/properties/\(id)/",
-            method: .put,
-            parameters: updates.toDictionary()
+            endpoint: "/api/properties/\(id)",
+            method: .patch,
+            parameters: params
         )
     }
     
@@ -84,6 +91,7 @@ struct PropertyUpdateRequest: Codable {
     let city: String?
     let state: String?
     let zipCode: String?
+    let county: String?
     let country: String?
     let descriptives: PropertyDescriptives?
     
@@ -96,6 +104,7 @@ struct PropertyUpdateRequest: Codable {
         if let city = city { dict["city"] = city }
         if let state = state { dict["state"] = state }
         if let zipCode = zipCode { dict["zip_code"] = zipCode }
+        if let county = county { dict["county"] = county }
         if let country = country { dict["country"] = country }
         
         if let descriptives = descriptives {
