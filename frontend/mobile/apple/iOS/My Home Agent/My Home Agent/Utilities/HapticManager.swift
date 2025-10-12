@@ -17,13 +17,17 @@ class HapticManager {
     // MARK: - Initialization
     
     private init() {
-        setupHaptics()
+        // Don't initialize haptics in init - do it lazily when first needed
+        // This prevents blocking the main thread during app startup
     }
     
     // MARK: - Setup
     
-    /// Sets up the haptic engine if the device supports it
-    private func setupHaptics() {
+    /// Sets up the haptic engine if the device supports it (called lazily)
+    private func setupHapticsIfNeeded() {
+        // Skip if already set up or doesn't support haptics
+        guard engine == nil else { return }
+        
         // Check if the device supports haptics
         let hapticCapability = CHHapticEngine.capabilitiesForHardware()
         supportsHaptics = hapticCapability.supportsHaptics
@@ -34,46 +38,35 @@ class HapticManager {
             return
         }
         
-        // Create and configure the engine
-        do {
-            engine = try CHHapticEngine()
-            try engine?.start()
-            
-            // The engine stops when the app goes to the background, so restart it when needed
-            engine?.resetHandler = { [weak self] in
-                print("Haptic engine needs reset")
-                do {
-                    try self?.engine?.start()
-                } catch {
-                    print("Failed to restart the haptic engine: \(error)")
+        // Create and configure the engine on a background thread to avoid blocking
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                let newEngine = try CHHapticEngine()
+                
+                // Set up handlers before starting
+                newEngine.resetHandler = { [weak self] in
+                    print("Haptic engine needs reset")
+                    do {
+                        try self?.engine?.start()
+                    } catch {
+                        print("Failed to restart the haptic engine: \(error)")
+                    }
                 }
-            }
-            
-            // If the engine stops for any reason, attempt to restart it
-            engine?.stoppedHandler = { reason in
-                print("Haptic engine stopped for reason: \(reason.rawValue)")
-                switch reason {
-                case .audioSessionInterrupt:
-                    print("Audio session interrupt")
-                case .applicationSuspended:
-                    print("Application suspended")
-                case .idleTimeout:
-                    print("Idle timeout")
-                case .systemError:
-                    print("System error")
-                case .notifyWhenFinished:
-                    print("Notify when finished")
-                case .engineDestroyed:
-                    print("Engine destroyed")
-                case .gameControllerDisconnect:
-                    print("Game controller disconnect")
-                @unknown default:
-                    print("Unknown reason")
+                
+                newEngine.stoppedHandler = { reason in
+                    print("Haptic engine stopped for reason: \(reason.rawValue)")
                 }
+                
+                try newEngine.start()
+                
+                // Store the engine
+                DispatchQueue.main.async {
+                    self?.engine = newEngine
+                }
+                
+            } catch let error {
+                print("Haptic engine creation error: \(error)")
             }
-            
-        } catch let error {
-            print("Haptic engine creation error: \(error)")
         }
     }
     
@@ -106,6 +99,9 @@ class HapticManager {
     /// - Parameter intensity: The intensity of the haptic pattern (0.0 to 1.0)
     /// - Parameter sharpness: The sharpness of the haptic pattern (0.0 to 1.0)
     func playCustomHaptic(intensity: Float = 1.0, sharpness: Float = 1.0) {
+        // Set up haptics if needed (lazy initialization)
+        setupHapticsIfNeeded()
+        
         // Fall back to simple feedback if advanced haptics aren't supported
         guard supportsHaptics, let engine = engine else {
             playFeedback(style: .medium)
