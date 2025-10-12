@@ -11,7 +11,7 @@ from django.db import transaction
 from .models import Media, MediaType, MediaSubType, LocationType, LocationSubType
 from properties.models import Property, PropertyAccess
 from services.models.base_models import ServiceRequest, ServiceReport
-from .serializers import MediaSerializer
+from .serializers import MediaSerializer, MediaMetadataUpdateSerializer
 import logging
 import os
 from django.conf import settings
@@ -189,6 +189,72 @@ def delete_media(request, media_id):
     except Exception as e:
         logger.error(f"Error deleting media: {str(e)}")
         return Response({"error": "Failed to delete media"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['PATCH'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def update_media_metadata(request, media_id):
+    """
+    Update media metadata (title, description, media_type, location, etc.).
+    Requires authentication and permission to manage media for the property.
+    Does not allow updating file, uploader, or parent relationships.
+    """
+    try:
+        media = get_object_or_404(Media, id=media_id, is_deleted=False)
+        
+        # Check access permission based on parent type
+        if media.property_ref:
+            # For property media, check property access
+            if not has_property_access(request.user, media.property_ref.id, 'manage_media'):
+                logger.warning(f"User {request.user.id} denied access to update media {media_id}")
+                return Response(
+                    {"error": "You don't have permission to update this media"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        elif media.service_request:
+            # For service request media, check if user is the requester or service provider
+            if media.service_request.requester != request.user and media.uploader != request.user:
+                logger.warning(f"User {request.user.id} denied access to update service request media {media_id}")
+                return Response(
+                    {"error": "You don't have permission to update this media"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        elif media.service_report:
+            # For service report media, check if user is the service provider
+            if media.uploader != request.user:
+                logger.warning(f"User {request.user.id} denied access to update service report media {media_id}")
+                return Response(
+                    {"error": "You don't have permission to update this media"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            # No parent relationship - only uploader can update
+            if media.uploader != request.user:
+                logger.warning(f"User {request.user.id} denied access to update orphaned media {media_id}")
+                return Response(
+                    {"error": "You don't have permission to update this media"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Update metadata using serializer
+        serializer = MediaMetadataUpdateSerializer(media, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            logger.info(f"Media {media_id} metadata updated by user {request.user.id}")
+            
+            # Return full media object with all fields
+            full_serializer = MediaSerializer(media)
+            return Response(full_serializer.data, status=status.HTTP_200_OK)
+        
+        logger.warning(f"Invalid data for media update {media_id}: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"Error updating media metadata: {str(e)}")
+        return Response(
+            {"error": "Failed to update media metadata", "details": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 @api_view(['GET'])
 @authentication_classes([JWTAuthentication])
