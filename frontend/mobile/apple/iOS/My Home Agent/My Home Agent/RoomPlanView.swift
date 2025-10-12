@@ -26,6 +26,7 @@ struct RoomPlanView: View {
     @State private var savedScan: RoomScan?
     @State private var showSavedScansView = false
     @State private var showRoomCaptureView = false
+    @State private var isProcessingScan = false
     
     let propertyId: String?
     
@@ -48,7 +49,7 @@ struct RoomPlanView: View {
             .padding()
         }
         .fullScreenCover(isPresented: $showRoomCaptureView) {
-            RoomCaptureModalView(capturedRoom: $capturedRoom, isPresented: $showRoomCaptureView)
+            RoomCaptureModalView(capturedRoom: $capturedRoom, isPresented: $showRoomCaptureView, isProcessing: $isProcessingScan)
         }
         .navigationTitle("Room Scan")
         .navigationBarTitleDisplayMode(.large)
@@ -291,7 +292,7 @@ struct RoomPlanView: View {
             await MainActor.run {
                 self.savedScan = scan
                 self.isSaving = false
-                HapticManager.shared.playNotificationFeedback(type: .success)
+                // Skip haptic - can cause hangs
             }
         } catch {
             print("❌ RoomPlanView: Failed to save scan: \(error)")
@@ -299,7 +300,7 @@ struct RoomPlanView: View {
                 self.isSaving = false
                 self.permissionAlertMessage = "Failed to save scan: \(error.localizedDescription)"
                 self.showPermissionAlert = true
-                HapticManager.shared.playNotificationFeedback(type: .error)
+                // Skip haptic - can cause hangs
             }
         }
     }
@@ -321,7 +322,7 @@ struct RoomPlanView: View {
                 await MainActor.run {
                     self.savedScan = updatedScan
                     self.isUploading = false
-                    HapticManager.shared.playNotificationFeedback(type: .success)
+                    // Skip haptic - can cause hangs
                 }
             }
         } catch {
@@ -329,7 +330,7 @@ struct RoomPlanView: View {
                 self.isUploading = false
                 self.permissionAlertMessage = "Failed to upload scan: \(error.localizedDescription)"
                 self.showPermissionAlert = true
-                HapticManager.shared.playNotificationFeedback(type: .error)
+                // Skip haptic - can cause hangs
             }
         }
     }
@@ -340,12 +341,16 @@ struct RoomPlanView: View {
 class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
     @Binding var capturedRoom: CapturedRoom?
     @Binding var isPresented: Bool
+    @Binding var isProcessing: Bool
     var captureSession: RoomCaptureSession?
     private var latestCapturedRoom: CapturedRoom?
+    weak var viewController: RoomCaptureWrapperViewController?
+    private var hasReceivedFirstInstruction = false
     
-    init(capturedRoom: Binding<CapturedRoom?>, isPresented: Binding<Bool>) {
+    init(capturedRoom: Binding<CapturedRoom?>, isPresented: Binding<Bool>, isProcessing: Binding<Bool>) {
         _capturedRoom = capturedRoom
         _isPresented = isPresented
+        _isProcessing = isProcessing
         super.init()
         print("🎯 Coordinator initialized: \(self)")
     }
@@ -364,10 +369,31 @@ class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
     }
     
     @objc func doneButtonTapped() {
-        print("👆 Done button tapped - stopping session")
+        print("👆 Done button tapped - finishing immediately")
         print("📊 Current state: captureSession=\(captureSession != nil), latestCapturedRoom=\(latestCapturedRoom != nil)")
-        captureSession?.stop()
-        print("✅ Stop called on capture session")
+        
+        // Use the latest captured room immediately instead of waiting for stop callback
+        DispatchQueue.main.async {
+            if let room = self.latestCapturedRoom {
+                print("✅ Using latest captured room immediately")
+                self.capturedRoom = room
+            } else {
+                print("⚠️ No room captured")
+                self.capturedRoom = nil
+            }
+            
+            print("🚪 Dismissing modal immediately")
+            self.isPresented = false
+            
+            // Skip haptic feedback - it can cause 30+ second hangs when initializing the haptic engine
+            // The visual feedback of dismissal is sufficient
+        }
+        
+        // Stop session in background (don't wait for it)
+        DispatchQueue.global(qos: .background).async {
+            self.captureSession?.stop()
+            print("✅ Stop called on capture session (background)")
+        }
     }
     
     // RoomCaptureSessionDelegate methods
@@ -383,17 +409,20 @@ class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
         print("   Latest room: \(latestCapturedRoom != nil ? "present" : "nil")")
         
         DispatchQueue.main.async {
+            // Hide processing indicator
+            self.isProcessing = false
+            
             if let error = error {
                 print("❌ Error: \(error.localizedDescription)")
-                HapticManager.shared.playNotificationFeedback(type: .error)
+                // Skip haptic - causes 30+ second hangs
                 self.capturedRoom = nil
             } else if let room = self.latestCapturedRoom {
                 print("✅ Using latest captured room with \(room.walls.count) walls")
-                HapticManager.shared.playNotificationFeedback(type: .success)
+                // Skip haptic - causes 30+ second hangs
                 self.capturedRoom = room
             } else {
                 print("⚠️ No room captured")
-                HapticManager.shared.playNotificationFeedback(type: .warning)
+                // Skip haptic - causes 30+ second hangs
                 self.capturedRoom = nil
             }
             
@@ -418,16 +447,27 @@ class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
     
     func captureSession(_ session: RoomCaptureSession, didProvide instruction: RoomCaptureSession.Instruction) {
         print("💬 SESSION DELEGATE: didProvide instruction")
+        
+        // Hide overlay on first instruction - camera is now fully ready
+        if !hasReceivedFirstInstruction {
+            hasReceivedFirstInstruction = true
+            print("📹 First instruction received - camera is ready, hiding overlay")
+            DispatchQueue.main.async {
+                self.viewController?.hideInitializingOverlay()
+            }
+        }
     }
     
     func captureSession(_ session: RoomCaptureSession, didStartWith configuration: RoomCaptureSession.Configuration) {
         print("🎬 SESSION DELEGATE: didStartWith configuration!!!")
+        print("📹 Session started, waiting for first instruction to confirm camera is ready")
     }
 }
 
 struct RoomCaptureModalView: UIViewControllerRepresentable {
     @Binding var capturedRoom: CapturedRoom?
     @Binding var isPresented: Bool
+    @Binding var isProcessing: Bool
     
     func makeUIViewController(context: Context) -> RoomCaptureWrapperViewController {
         print("🏗️ Creating RoomCaptureWrapperViewController")
@@ -437,11 +477,12 @@ struct RoomCaptureModalView: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: RoomCaptureWrapperViewController, context: Context) {
-        // No updates needed
+        // Update processing overlay
+        uiViewController.setProcessing(context.coordinator.isProcessing)
     }
     
     func makeCoordinator() -> RoomCaptureCoordinator {
-        RoomCaptureCoordinator(capturedRoom: $capturedRoom, isPresented: $isPresented)
+        RoomCaptureCoordinator(capturedRoom: $capturedRoom, isPresented: $isPresented, isProcessing: $isProcessing)
     }
 }
 
@@ -450,6 +491,54 @@ class RoomCaptureWrapperViewController: UIViewController {
     var coordinator: RoomCaptureCoordinator?
     private var captureView: RoomPlan.RoomCaptureView!
     private var captureSession: RoomCaptureSession!
+    private var processingOverlay: UIView?
+    private var activityIndicator: UIActivityIndicatorView?
+    
+    func setProcessing(_ isProcessing: Bool) {
+        if isProcessing {
+            showProcessingOverlay()
+        } else {
+            hideProcessingOverlay()
+        }
+    }
+    
+    private func showProcessingOverlay() {
+        guard processingOverlay == nil else { return }
+        
+        let overlay = UIView(frame: view.bounds)
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        let indicator = UIActivityIndicatorView(style: .large)
+        indicator.color = .white
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
+        overlay.addSubview(indicator)
+        
+        let label = UILabel()
+        label.text = "Processing scan..."
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 17, weight: .medium)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(label)
+        
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            indicator.centerYAnchor.constraint(equalTo: overlay.centerYAnchor, constant: -20),
+            label.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            label.topAnchor.constraint(equalTo: indicator.bottomAnchor, constant: 16)
+        ])
+        
+        view.addSubview(overlay)
+        processingOverlay = overlay
+        activityIndicator = indicator
+    }
+    
+    private func hideProcessingOverlay() {
+        processingOverlay?.removeFromSuperview()
+        processingOverlay = nil
+        activityIndicator = nil
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -464,6 +553,7 @@ class RoomCaptureWrapperViewController: UIViewController {
         captureSession = captureView.captureSession
         captureSession.delegate = coordinator
         coordinator?.captureSession = captureSession
+        coordinator?.viewController = self
         
         print("✅ Capture view created and connected to session")
         print("✅ Session delegate set: \(String(describing: captureSession.delegate))")
@@ -489,11 +579,82 @@ class RoomCaptureWrapperViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        
+        // Show loading overlay immediately
+        showInitializingOverlay()
+        
         print("▶️ Starting room capture session with SESSION DELEGATE...")
         let config = RoomCaptureSession.Configuration()
         captureSession.run(configuration: config)
         print("✅ Room capture session started")
         print("✅ Session delegate: \(captureSession.delegate != nil ? "YES" : "NO")")
+        
+        // Safety timeout: hide overlay after 15 seconds if still showing (didStartWith should hide it much sooner)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+            self?.hideInitializingOverlay()
+        }
+    }
+    
+    private func showInitializingOverlay() {
+        let overlay = UIView(frame: view.bounds)
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        overlay.tag = 9999 // Tag to identify and remove later
+        
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.color = .white
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+        activityIndicator.startAnimating()
+        overlay.addSubview(activityIndicator)
+        
+        let label = UILabel()
+        label.text = "Initializing Camera..."
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 17, weight: .medium)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(label)
+        
+        let sublabel = UILabel()
+        sublabel.text = "This may take 10-15 seconds on first launch"
+        sublabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        sublabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        sublabel.textAlignment = .center
+        sublabel.numberOfLines = 2
+        sublabel.translatesAutoresizingMaskIntoConstraints = false
+        overlay.addSubview(sublabel)
+        
+        NSLayoutConstraint.activate([
+            activityIndicator.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: overlay.centerYAnchor, constant: -30),
+            label.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            label.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 20),
+            sublabel.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            sublabel.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 8),
+            sublabel.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 40),
+            sublabel.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -40)
+        ])
+        
+        view.addSubview(overlay)
+    }
+    
+    
+    func hideInitializingOverlay() {
+        guard view.viewWithTag(9999) != nil else {
+            print("⏱️ Overlay already hidden")
+            return
+        }
+        
+        print("⏱️ Hiding initialization overlay")
+        
+        if let overlay = view.viewWithTag(9999) {
+            UIView.animate(withDuration: 0.3, animations: {
+                overlay.alpha = 0
+            }) { _ in
+                overlay.removeFromSuperview()
+                print("⏱️ Overlay removed from view")
+            }
+        }
     }
     
     @objc private func doneButtonTapped() {
@@ -503,8 +664,9 @@ class RoomCaptureWrapperViewController: UIViewController {
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        print("🛑 View will disappear - stopping session")
-        captureSession.stop()
+        print("🛑 View will disappear - session already stopped in background")
+        // Don't call stop() here - it's already being called in background from doneButtonTapped()
+        // Calling stop() on main thread blocks UI for 20+ seconds
     }
     
     deinit {
@@ -608,7 +770,7 @@ extension RoomCaptureViewController: RoomCaptureViewDelegate {
         
         if let error = error {
             print("❌ Room capture ended with error: \(error.localizedDescription)")
-            HapticManager.shared.playNotificationFeedback(type: .error)
+            // Skip haptic - causes 30+ second hangs
             delegate?.captureViewController(self, didFinishWith: nil)
         } else {
             print("✅ Room capture ended successfully")
@@ -616,11 +778,11 @@ extension RoomCaptureViewController: RoomCaptureViewDelegate {
             // Use the latest captured room from didUpdate
             if let room = latestCapturedRoom {
                 print("✅ Using latestCapturedRoom from didUpdate")
-                HapticManager.shared.playNotificationFeedback(type: .success)
+                // Skip haptic - causes 30+ second hangs
                 delegate?.captureViewController(self, didFinishWith: room)
             } else {
                 print("⚠️ No latestCapturedRoom available")
-                HapticManager.shared.playNotificationFeedback(type: .warning)
+                // Skip haptic - causes 30+ second hangs
                 delegate?.captureViewController(self, didFinishWith: nil)
             }
         }

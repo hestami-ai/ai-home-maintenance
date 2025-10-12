@@ -5,7 +5,7 @@ struct UploadScanDialog: View {
     let onUpload: (String) -> Void
     let onCancel: () -> Void
     
-    @StateObject private var propertiesViewModel = PropertiesViewModel()
+    @ObservedObject private var propertiesViewModel = PropertiesViewModel.shared
     @State private var selectedPropertyId: String?
     @Environment(\.dismiss) private var dismiss
     
@@ -44,16 +44,28 @@ struct UploadScanDialog: View {
                                 .foregroundColor(AppTheme.errorColor)
                                 .italic()
                         } else {
-                            Picker("Property", selection: $selectedPropertyId) {
-                                Text("Select a property").tag(nil as String?)
-                                ForEach(propertiesViewModel.properties) { property in
-                                    Text(property.title).tag(property.id as String?)
+                            Menu {
+                                Button("Select a property") {
+                                    selectedPropertyId = nil
                                 }
+                                ForEach(propertiesViewModel.properties) { property in
+                                    Button(property.title) {
+                                        selectedPropertyId = property.id
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(selectedPropertyId == nil ? "Select a property" : (propertiesViewModel.properties.first(where: { $0.id == selectedPropertyId })?.title ?? "Select a property"))
+                                        .font(AppTheme.bodyFont)
+                                        .foregroundColor(AppTheme.primaryText)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                }
+                                .padding()
+                                .background(AppTheme.cardBackground)
+                                .cornerRadius(8)
                             }
-                            .pickerStyle(MenuPickerStyle())
-                            .padding()
-                            .background(AppTheme.cardBackground)
-                            .cornerRadius(8)
                         }
                     }
                     .padding(.horizontal)

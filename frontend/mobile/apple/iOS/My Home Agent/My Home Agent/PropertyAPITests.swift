@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PropertyAPITests: View {
-    @StateObject private var viewModel = PropertiesViewModel()
+    @ObservedObject private var viewModel = PropertiesViewModel.shared
     @State private var testResults: [String] = []
     @State private var isRunningTests = false
     @State private var testProperty: Property?

@@ -10,7 +10,7 @@ import RoomPlan
 import AVKit
 
 struct PropertiesView: View {
-    @StateObject private var viewModel = PropertiesViewModel()
+    @ObservedObject private var viewModel = PropertiesViewModel.shared
     @State private var showingAddProperty = false
     @State private var showingDeleteAlert = false
     @State private var propertyToDelete: Property?
@@ -238,7 +238,7 @@ struct PropertyRowView: View {
 
 struct PropertyDetailView: View {
     let property: Property
-    @StateObject private var viewModel = PropertiesViewModel()
+    @ObservedObject private var viewModel = PropertiesViewModel.shared
     @State private var showingEditProperty = false
     @State private var selectedMediaIndex = 0
     
