@@ -1,5 +1,6 @@
 import SwiftUI
-import QuickLook
+import SceneKit
+import RoomPlan
 
 struct SavedRoomScansView: View {
     @Environment(\.dismiss) private var dismiss
@@ -7,8 +8,7 @@ struct SavedRoomScansView: View {
     @State private var selectedScan: RoomScan?
     @State private var showDeleteAlert = false
     @State private var scanToDelete: RoomScan?
-    @State private var showQuickLook = false
-    @State private var quickLookURL: URL?
+    @State private var scanToView: RoomScan?
     @State private var showUploadDialog = false
     @State private var scanToUpload: RoomScan?
     @State private var storageSize: String = ""
@@ -54,10 +54,9 @@ struct SavedRoomScansView: View {
             loadScans()
             updateStorageSize()
         }
-        .sheet(isPresented: $showQuickLook) {
-            if let url = quickLookURL {
-                QuickLookView(url: url)
-            }
+        .fullScreenCover(item: $scanToView) { scan in
+            RoomScanViewerView(scan: scan, isPresented: $scanToView)
+                .interactiveDismissDisabled(true)
         }
         .sheet(isPresented: $showUploadDialog) {
             if let scan = scanToUpload {
@@ -130,10 +129,16 @@ struct SavedRoomScansView: View {
     }
     
     private func loadScans() {
+        print("📂 SavedRoomScansView: Loading scans...")
         scans = storageService.getAllScans()
         print("📂 SavedRoomScansView: Loaded \(scans.count) scans")
-        for scan in scans {
-            print("   - \(scan.name) (ID: \(scan.id))")
+        if scans.isEmpty {
+            print("⚠️ SavedRoomScansView: No scans found!")
+        } else {
+            for scan in scans {
+                print("   - \(scan.name) (ID: \(scan.id))")
+                print("     File exists: \(FileManager.default.fileExists(atPath: scan.fileURL.path))")
+            }
         }
     }
     
@@ -142,8 +147,11 @@ struct SavedRoomScansView: View {
     }
     
     private func viewScan(_ scan: RoomScan) {
-        quickLookURL = scan.fileURL
-        showQuickLook = true
+        print("👁️ Opening viewer for scan: \(scan.name)")
+        print("   File URL: \(scan.fileURL.path)")
+        print("🚫 Showing custom viewer")
+        
+        scanToView = scan
     }
     
     private func uploadScan(scan: RoomScan, propertyId: String) async {
@@ -203,6 +211,18 @@ struct ScanCard: View {
                     Text(formatDate(scan.createdAt))
                         .font(AppTheme.captionFont)
                         .foregroundColor(AppTheme.secondaryText)
+                    
+                    // Show floorplan indicator if available
+                    if scan.floorplanURL != nil {
+                        HStack(spacing: 4) {
+                            Image(systemName: "map.fill")
+                                .font(.caption2)
+                            Text("Floorplan available")
+                                .font(.caption2)
+                        }
+                        .foregroundColor(AppTheme.accentColor)
+                        .padding(.top, 2)
+                    }
                 }
                 
                 Spacer()
@@ -300,36 +320,466 @@ struct ScanCard: View {
     }
 }
 
-// MARK: - QuickLook View
+// MARK: - Room Scan Viewer
 
-struct QuickLookView: UIViewControllerRepresentable {
-    let url: URL
+struct RoomScanViewerView: View {
+    let scan: RoomScan
+    @Binding var isPresented: RoomScan?
+    @State private var showShareSheet = false
+    @State private var isViewReady = false
+    @State private var selectedTab = 0 // 0 = 3D Model, 1 = Floorplan
+    @State private var useMetric = true
+    @State private var showMeasurementToggle = false
     
-    func makeUIViewController(context: Context) -> QLPreviewController {
-        let controller = QLPreviewController()
-        controller.dataSource = context.coordinator
-        return controller
+    var body: some View {
+        VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button(action: { 
+                        print("🚪 Closing viewer")
+                        isPresented = nil 
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title2)
+                            Text("Close")
+                                .font(AppTheme.bodyFont)
+                        }
+                        .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(scan.name)
+                        .font(AppTheme.titleFont)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    
+                    Spacer()
+                    
+                    // Measurement toggle (only show when floorplan is visible)
+                    if selectedTab == 1 {
+                        Button(action: { useMetric.toggle() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "ruler")
+                                    .font(.caption)
+                                Text(useMetric ? "m" : "ft")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(6)
+                        }
+                    }
+                    
+                    Button(action: { showShareSheet = true }) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding()
+                .background(Color.black.opacity(0.8))
+                
+                // Tab selector
+                if scan.floorplanURL != nil {
+                    Picker("View Type", selection: $selectedTab) {
+                        Text("3D Model").tag(0)
+                        Text("Floorplan").tag(1)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(AppTheme.cardBackground)
+                }
+                
+                // Content area
+                GeometryReader { geometry in
+                    if selectedTab == 0 {
+                        // 3D Viewer
+                        if isViewReady {
+                            SceneKitView(url: scan.fileURL)
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                        } else {
+                            AppTheme.primaryBackground
+                                .overlay(
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.accentColor))
+                                        .scaleEffect(1.5)
+                                )
+                        }
+                    } else {
+                        // Floorplan viewer
+                        FloorplanImageView(scan: scan, useMetric: useMetric)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .background(AppTheme.primaryBackground)
+                    }
+                }
+                .background(AppTheme.primaryBackground)
+                .edgesIgnoringSafeArea(.bottom)
+                .ignoresSafeArea(.all)
+        }
+        .background(AppTheme.primaryBackground)
+        .onAppear {
+            print("📺 RoomScanViewerView appeared")
+            
+            // Delay showing the SceneKit view to ensure proper layout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                print("✅ RoomScanViewerView: Setting isViewReady = true")
+                isViewReady = true
+            }
+            
+        }
+        .onDisappear {
+            print("📺 RoomScanViewerView disappeared")
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ActivityView(activityItems: [scan.fileURL])
+        }
+    }
+}
+
+// MARK: - Floorplan Image View
+
+struct FloorplanImageView: View {
+    let scan: RoomScan
+    let useMetric: Bool
+    @State private var floorplanImage: UIImage?
+    @State private var isLoading = true
+    @State private var currentScale: CGFloat = 1.0
+    @State private var currentOffset: CGSize = .zero
+    
+    var body: some View {
+        Group {
+            if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.accentColor))
+                    .scaleEffect(1.5)
+            } else if let image = floorplanImage {
+                GeometryReader { geometry in
+                    ZoomableScrollView(scale: $currentScale, offset: $currentOffset) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+                }
+                .overlay(
+                    // Zoom controls
+                    VStack {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 12) {
+                                // Zoom in button
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        currentScale = min(currentScale + 0.5, 5.0)
+                                    }
+                                }) {
+                                    Image(systemName: "plus.magnifyingglass")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white)
+                                        .frame(width: 40, height: 40)
+                                        .background(Color.black.opacity(0.6))
+                                        .cornerRadius(8)
+                                }
+                                
+                                // Zoom out button
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        currentScale = max(currentScale - 0.5, 1.0)
+                                        if currentScale == 1.0 {
+                                            currentOffset = .zero
+                                        }
+                                    }
+                                }) {
+                                    Image(systemName: "minus.magnifyingglass")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white)
+                                        .frame(width: 40, height: 40)
+                                        .background(Color.black.opacity(0.6))
+                                        .cornerRadius(8)
+                                }
+                                
+                                // Reset button
+                                if currentScale > 1.0 {
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            currentScale = 1.0
+                                            currentOffset = .zero
+                                        }
+                                    }) {
+                                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(.white)
+                                            .frame(width: 40, height: 40)
+                                            .background(Color.black.opacity(0.6))
+                                            .cornerRadius(8)
+                                    }
+                                }
+                            }
+                            .padding()
+                        }
+                        Spacer()
+                    }
+                )
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "map")
+                        .font(.system(size: 48))
+                        .foregroundColor(AppTheme.secondaryText)
+                    Text("Floorplan not available")
+                        .font(AppTheme.bodyFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                }
+            }
+        }
+        .onAppear {
+            loadFloorplan()
+        }
+        .onChange(of: useMetric) {
+            // Reset zoom when changing units
+            currentScale = 1.0
+            currentOffset = .zero
+            loadFloorplan()
+        }
     }
     
-    func updateUIViewController(_ uiViewController: QLPreviewController, context: Context) {}
+    private func loadFloorplan() {
+        isLoading = true
+        
+        // Try to load CapturedRoom data and regenerate with current units
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                // Load the CapturedRoom data
+                let capturedRoom = try RoomScanStorageService.shared.loadCapturedRoomData(for: scan.id)
+                
+                // Generate floorplan with current measurement system
+                let image = FloorplanGeneratorService.shared.generateFloorplan(
+                    from: capturedRoom,
+                    useMetric: useMetric
+                )
+                
+                DispatchQueue.main.async {
+                    self.floorplanImage = image
+                    self.isLoading = false
+                }
+            } catch {
+                print("❌ Failed to regenerate floorplan: \(error)")
+                
+                // Fallback: try to load the saved floorplan image
+                if let floorplanURL = scan.floorplanURL,
+                   FileManager.default.fileExists(atPath: floorplanURL.path),
+                   let image = UIImage(contentsOfFile: floorplanURL.path) {
+                    print("✅ Loaded saved floorplan as fallback")
+                    DispatchQueue.main.async {
+                        self.floorplanImage = image
+                        self.isLoading = false
+                    }
+                } else {
+                    print("⚠️ No floorplan available")
+                    DispatchQueue.main.async {
+                        self.floorplanImage = nil
+                        self.isLoading = false
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Zoomable Scroll View
+
+struct ZoomableScrollView<Content: View>: UIViewRepresentable {
+    @Binding var scale: CGFloat
+    @Binding var offset: CGSize
+    let content: Content
+    
+    init(scale: Binding<CGFloat>, offset: Binding<CGSize>, @ViewBuilder content: () -> Content) {
+        self._scale = scale
+        self._offset = offset
+        self.content = content()
+    }
+    
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.maximumZoomScale = 5.0
+        scrollView.minimumZoomScale = 1.0
+        scrollView.bouncesZoom = true
+        scrollView.showsHorizontalScrollIndicator = true
+        scrollView.showsVerticalScrollIndicator = true
+        
+        let hostingController = UIHostingController(rootView: content)
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(hostingController.view)
+        
+        context.coordinator.hostingController = hostingController
+        
+        NSLayoutConstraint.activate([
+            hostingController.view.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            hostingController.view.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            hostingController.view.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            hostingController.view.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+        ])
+        
+        return scrollView
+    }
+    
+    func updateUIView(_ scrollView: UIScrollView, context: Context) {
+        scrollView.zoomScale = scale
+        context.coordinator.hostingController?.rootView = content
+    }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(url: url)
+        Coordinator(scale: $scale, offset: $offset)
     }
     
-    class Coordinator: NSObject, QLPreviewControllerDataSource {
-        let url: URL
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        @Binding var scale: CGFloat
+        @Binding var offset: CGSize
+        var hostingController: UIHostingController<Content>?
         
-        init(url: URL) {
-            self.url = url
+        init(scale: Binding<CGFloat>, offset: Binding<CGSize>) {
+            self._scale = scale
+            self._offset = offset
         }
         
-        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
-            return 1
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            return hostingController?.view
         }
         
-        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
-            return url as QLPreviewItem
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            // Avoid "Modifying state during view update" warning
+            DispatchQueue.main.async {
+                self.scale = scrollView.zoomScale
+            }
+        }
+        
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            // Avoid "Modifying state during view update" warning
+            let newOffset = CGSize(
+                width: scrollView.contentOffset.x,
+                height: scrollView.contentOffset.y
+            )
+            DispatchQueue.main.async {
+                self.offset = newOffset
+            }
+        }
+    }
+}
+
+// MARK: - SceneKit View
+
+struct SceneKitView: UIViewRepresentable {
+    let url: URL
+    
+    func makeUIView(context: Context) -> SCNView {
+        print("🎬 SceneKitView: Creating view for URL: \(url.path)")
+        
+        // Create with a default frame to avoid zero-size issues
+        let sceneView = SCNView(frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        sceneView.backgroundColor = .black
+        sceneView.allowsCameraControl = true
+        sceneView.autoenablesDefaultLighting = false  // Disable default lighting (too bright)
+        sceneView.antialiasingMode = .multisampling4X
+        sceneView.showsStatistics = false  // Hide FPS stats
+        sceneView.isOpaque = true
+        sceneView.contentMode = .scaleAspectFit
+        sceneView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        
+        // Check if file exists
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            print("❌ SceneKitView: File does not exist at path: \(url.path)")
+            return sceneView
+        }
+        
+        print("✅ SceneKitView: File exists, loading scene...")
+        
+        // Load the USDZ scene - use file:// scheme explicitly
+        do {
+            // Ensure we're using file URL scheme
+            var fileURL = url
+            if fileURL.scheme == nil {
+                fileURL = URL(fileURLWithPath: url.path)
+            }
+            
+            let scene = try SCNScene(url: fileURL, options: [
+                .checkConsistency: true,
+                .flattenScene: false
+            ])
+            
+            print("✅ SceneKitView: Scene loaded successfully")
+            print("   Root node children count: \(scene.rootNode.childNodes.count)")
+            
+            sceneView.scene = scene
+            
+            // Setup camera
+            let cameraNode = SCNNode()
+            cameraNode.camera = SCNCamera()
+            cameraNode.camera?.zFar = 1000
+            cameraNode.position = SCNVector3(x: 0, y: 3, z: 8)
+            cameraNode.look(at: SCNVector3(x: 0, y: 0, z: 0))
+            scene.rootNode.addChildNode(cameraNode)
+            sceneView.pointOfView = cameraNode
+            
+            // Add ambient light (reduced intensity to avoid washed-out look)
+            let ambientLight = SCNNode()
+            ambientLight.light = SCNLight()
+            ambientLight.light?.type = .ambient
+            ambientLight.light?.color = UIColor.white
+            ambientLight.light?.intensity = 200  // Reduced from 500
+            scene.rootNode.addChildNode(ambientLight)
+            
+            // Add directional light (reduced intensity)
+            let directionalLight = SCNNode()
+            directionalLight.light = SCNLight()
+            directionalLight.light?.type = .directional
+            directionalLight.light?.color = UIColor.white
+            directionalLight.light?.intensity = 400  // Reduced from 1000
+            directionalLight.position = SCNVector3(x: 5, y: 10, z: 5)
+            directionalLight.look(at: SCNVector3(x: 0, y: 0, z: 0))
+            scene.rootNode.addChildNode(directionalLight)
+            
+            print("✅ SceneKitView: Camera and lighting configured")
+            
+        } catch {
+            print("❌ SceneKitView: Failed to load scene: \(error)")
+        }
+        
+        return sceneView
+    }
+    
+    func updateUIView(_ uiView: SCNView, context: Context) {
+        print("🔄 SceneKitView: updateUIView called")
+        print("   View frame: \(uiView.frame)")
+        print("   View bounds: \(uiView.bounds)")
+        print("   Scene: \(uiView.scene != nil ? "present" : "nil")")
+        print("   Background color: \(uiView.backgroundColor?.description ?? "nil")")
+        
+        // Force layout and render when frame changes
+        if uiView.frame.size != .zero && uiView.scene != nil {
+            print("✅ SceneKitView: Valid frame detected, forcing render")
+            
+            // Force immediate render
+            DispatchQueue.main.async {
+                uiView.setNeedsDisplay()
+                uiView.layoutIfNeeded()
+                
+                // Force SceneKit to render
+                if let scene = uiView.scene {
+                    uiView.scene = nil
+                    uiView.scene = scene
+                    print("🔄 SceneKitView: Scene reassigned to trigger render")
+                }
+            }
+        } else if uiView.frame.size == .zero {
+            print("⚠️ SceneKitView: Frame is still zero")
         }
     }
 }

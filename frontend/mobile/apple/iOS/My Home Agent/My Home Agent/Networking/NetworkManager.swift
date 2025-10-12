@@ -232,8 +232,10 @@ public class NetworkManager {
         }
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
         
-        // Clear expired cache on init
-        cacheManager.clearExpiredCache()
+        // Clear expired cache on init (async to avoid blocking app startup)
+        Task.detached(priority: .utility) {
+            self.cacheManager.clearExpiredCache()
+        }
     }
     
     // Clear all cookies for the domain

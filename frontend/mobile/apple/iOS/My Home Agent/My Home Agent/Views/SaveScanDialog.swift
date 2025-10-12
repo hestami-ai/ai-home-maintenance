@@ -3,7 +3,7 @@ import SwiftUI
 struct SaveScanDialog: View {
     @Binding var scanName: String
     @Binding var selectedPropertyId: String?
-    @StateObject private var propertiesViewModel = PropertiesViewModel()
+    @ObservedObject private var propertiesViewModel = PropertiesViewModel.shared
     
     let onSave: (String, String?) -> Void
     let onCancel: () -> Void
@@ -46,16 +46,28 @@ struct SaveScanDialog: View {
                                 .foregroundColor(AppTheme.secondaryText)
                                 .italic()
                         } else {
-                            Picker("Property", selection: $selectedPropertyId) {
-                                Text("None").tag(nil as String?)
-                                ForEach(propertiesViewModel.properties) { property in
-                                    Text(property.title).tag(property.id as String?)
+                            Menu {
+                                Button("None") {
+                                    selectedPropertyId = nil
                                 }
+                                ForEach(propertiesViewModel.properties) { property in
+                                    Button(property.title) {
+                                        selectedPropertyId = property.id
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Text(selectedPropertyId == nil ? "None" : (propertiesViewModel.properties.first(where: { $0.id == selectedPropertyId })?.title ?? "None"))
+                                        .font(AppTheme.bodyFont)
+                                        .foregroundColor(AppTheme.primaryText)
+                                    Spacer()
+                                    Image(systemName: "chevron.down")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                }
+                                .padding()
+                                .background(AppTheme.cardBackground)
+                                .cornerRadius(8)
                             }
-                            .pickerStyle(MenuPickerStyle())
-                            .padding()
-                            .background(AppTheme.cardBackground)
-                            .cornerRadius(8)
                         }
                     }
                     .padding(.horizontal)
@@ -105,8 +117,11 @@ struct SaveScanDialog: View {
                 scanName = "Room Scan \(formatter.string(from: Date()))"
             }
             
-            Task {
-                await propertiesViewModel.loadProperties()
+            // Only load properties if not already loaded (cache)
+            if propertiesViewModel.properties.isEmpty && !propertiesViewModel.isLoading {
+                Task {
+                    await propertiesViewModel.loadProperties()
+                }
             }
         }
     }

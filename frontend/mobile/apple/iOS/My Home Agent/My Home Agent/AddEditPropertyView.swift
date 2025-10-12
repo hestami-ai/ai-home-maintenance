@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AddEditPropertyView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel = PropertiesViewModel()
+    @ObservedObject private var viewModel = PropertiesViewModel.shared
     @State private var name: String = ""
     @State private var streetAddress: String = ""
     @State private var city: String = ""

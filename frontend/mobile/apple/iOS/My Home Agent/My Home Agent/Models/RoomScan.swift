@@ -8,6 +8,7 @@ struct RoomScan: Identifiable, Codable {
     let createdAt: Date
     let fileURL: URL
     let thumbnailURL: URL?
+    let floorplanURL: URL?
     let uploadStatus: UploadStatus
     let backendMediaId: String?
     
@@ -25,6 +26,7 @@ struct RoomScan: Identifiable, Codable {
         case createdAt
         case fileURL
         case thumbnailURL
+        case floorplanURL
         case uploadStatus
         case backendMediaId
     }
@@ -36,6 +38,7 @@ struct RoomScan: Identifiable, Codable {
         createdAt: Date = Date(),
         fileURL: URL,
         thumbnailURL: URL? = nil,
+        floorplanURL: URL? = nil,
         uploadStatus: UploadStatus = .notUploaded,
         backendMediaId: String? = nil
     ) {
@@ -45,6 +48,7 @@ struct RoomScan: Identifiable, Codable {
         self.createdAt = createdAt
         self.fileURL = fileURL
         self.thumbnailURL = thumbnailURL
+        self.floorplanURL = floorplanURL
         self.uploadStatus = uploadStatus
         self.backendMediaId = backendMediaId
     }

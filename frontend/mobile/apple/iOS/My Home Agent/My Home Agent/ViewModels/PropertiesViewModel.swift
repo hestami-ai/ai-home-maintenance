@@ -3,10 +3,14 @@ import SwiftUI
 
 @MainActor
 class PropertiesViewModel: ObservableObject {
+    static let shared = PropertiesViewModel()
+    
     @Published var properties: [Property] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var showRoomPlanAlert = false
+    
+    private init() {} // Private init to enforce singleton pattern
     
     func loadProperties() async {
         isLoading = true

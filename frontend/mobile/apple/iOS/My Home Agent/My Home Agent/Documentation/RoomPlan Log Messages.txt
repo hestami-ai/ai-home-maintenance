@@ -1,168 +1,795 @@
-🎯 Coordinator initialized: <My_Home_Agent.RoomCaptureCoordinator: 0x131da7640>
+🌐 NetworkManager: Configuring static media server: dev-static.hestami-ai.com:443
+🔧 AppDelegate: Configured static media server: dev-static.hestami-ai.com:443
+🌐 NetworkManager: Rewrote URL:
+  From: http://localhost:8090/media-secure/test/image.jpg
+  To: https://dev-static.hestami-ai.com/media-secure/test/image.jpg
+🔧 AppDelegate: URL rewriting test:
+  Original: http://localhost:8090/media-secure/test/image.jpg
+  Rewritten: https://dev-static.hestami-ai.com/media-secure/test/image.jpg
+🍪 NetworkManager: hasSessionCookie = true
+🍪 NetworkManager: Session cookie value: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+🔐 AuthManager: Validating session by fetching user profile
+🌐 NetworkManager: Request to https://dev-homeservices.hestami-ai.com/api/users/profile/ with method GET
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔎 NetworkManager: Request headers for /api/users/profile/:
+🔎 - Content-Type: application/json
+🔎 - Accept: application/json
+🔐 AuthManager: Session is valid
+✅ SplashScreenViewModel: Session is valid, proceeding to main app
+🍪 NetworkManager: hasSessionCookie = true
+🍪 NetworkManager: Session cookie value: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+🍪 NetworkManager: hasSessionCookie = true
+🍪 NetworkManager: Session cookie value: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+🔐 AuthManager: Validating session by fetching user profile
+🌐 NetworkManager: Request to https://dev-homeservices.hestami-ai.com/api/users/profile/ with method GET
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔎 NetworkManager: Request headers for /api/users/profile/:
+🔎 - Content-Type: application/json
+🔎 - Accept: application/json
+🔐 AuthManager: Session is valid
+🔐 ===== AUTHENTICATION VERIFICATION SUMMARY =====
+🍪 NetworkManager: hasSessionCookie = true
+🍪 NetworkManager: Session cookie value: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+🔐 AuthManager: isAuthenticated = true
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔐 ===== END AUTHENTICATION VERIFICATION =====
+🌐 NetworkManager: Request to https://dev-homeservices.hestami-ai.com/api/properties/ with method GET
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔎 NetworkManager: Request headers for /api/properties/:
+🔎 - Accept: application/json
+🔎 - Content-Type: application/json
+🔐 ===== AUTHENTICATION VERIFICATION SUMMARY =====
+🍪 NetworkManager: hasSessionCookie = true
+🍪 NetworkManager: Session cookie value: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+🔐 AuthManager: isAuthenticated = true
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔐 ===== END AUTHENTICATION VERIFICATION =====
+🍪 NetworkManager: hasSessionCookie = true
+🍪 NetworkManager: Session cookie value: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+🌐 NetworkManager: Request to https://dev-homeservices.hestami-ai.com/api/properties/ with method GET
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔎 NetworkManager: Request headers for /api/properties/:
+🔎 - Accept: application/json
+🔎 - Content-Type: application/json
+🌐 NetworkManager: Request to https://dev-homeservices.hestami-ai.com/api/users/profile/ with method GET
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔎 NetworkManager: Request headers for /api/users/profile/:
+🔎 - Accept: application/json
+🔎 - Content-Type: application/json
+✅ DashboardViewModel: User profile loaded successfully
+🎯 Coordinator initialized: <My_Home_Agent.RoomCaptureCoordinator: 0x118264600>
 🏗️ Creating RoomCaptureWrapperViewController
 🔧 RoomCaptureWrapperViewController viewDidLoad
-✅ Capture session created with delegate: Optional(<My_Home_Agent.RoomCaptureCoordinator: 0x131da7640>)
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/suFeatheringCreateMergedOcclusionMask.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arKitPassthrough.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arSegmentationComposite.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute0.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute1.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute2.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute3.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute4.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute5.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute6.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute7.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute8.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute9.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute10.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute11.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute12.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute13.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute14.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute15.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/suFeatheringCreateMergedOcclusionMask.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arKitPassthrough.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arSegmentationComposite.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute0.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute1.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute2.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute3.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute4.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute5.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute6.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute7.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute8.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute9.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute10.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute11.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute12.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute13.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute14.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute15.rematerial' in bundle at '/private/var/containers/Bundle/Application/1E370B6A-3999-4C89-B146-24B5C43C7987/My Home Agent.app'. Loading via asset path.
-✅ Capture view created
+Type: stdio
+Could not locate file 'default-binaryarchive.metallib' in bundle.
+Type: Error | Timestamp: 2025-10-11 16:29:17.242523-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Foundation.IO | TID: 0x6dbf90
+Video texture allocator is not initialized.
+Type: Error | Timestamp: 2025-10-11 16:29:17.288486-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Video | TID: 0x6dbf90
+[VideoLightSpillGenerator] [VideoLightSpillMPSCallsPrewarm] Failed to create input texture
+Type: Error | Timestamp: 2025-10-11 16:29:17.288503-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Video | TID: 0x6dbf90
+Registering library (/System/Library/PrivateFrameworks/CoreRE.framework/default.metallib) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.300522-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/suFeatheringCreateMergedOcclusionMask.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.335930-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arKitPassthrough.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.352346-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arSegmentationComposite.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.359431-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute0.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.360876-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute1.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.362443-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute2.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.363318-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute3.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.370360-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute4.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.371409-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute5.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.372132-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute6.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.372869-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute7.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.373568-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute8.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.374497-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute9.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.375257-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute10.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.376063-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute11.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.376779-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute12.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.377532-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute13.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.378203-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute14.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.379128-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute15.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.379830-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/suFeatheringCreateMergedOcclusionMask.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429572-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arKitPassthrough.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429613-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arSegmentationComposite.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429641-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute0.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429669-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute1.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429703-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute2.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429735-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute3.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429761-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute4.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429785-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute5.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429812-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute6.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429836-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute7.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429863-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute8.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429891-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute9.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429917-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute10.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429940-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute11.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429974-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute12.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.429999-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute13.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.430025-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute14.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.430050-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Could not resolve material name 'engine:BuiltinRenderGraphResources/AR/arInPlacePostProcessCombinedPermute15.rematerial' in bundle at '/private/var/containers/Bundle/Application/79AB7499-7205-4F4D-A7E1-72EA029C4C1E/My Home Agent.app'. Loading via asset path.
+Type: Error | Timestamp: 2025-10-11 16:29:17.430173-04:00 | Process: My Home Agent | Library: RealityFoundation | Subsystem: com.apple.RealityKit | Category: Assets | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.477538-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.509305-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.509327-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.527479-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.527498-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.535556-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.535573-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.539479-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:17.539495-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+✅ Capture view created and connected to session
+✅ Session delegate set: Optional(<My_Home_Agent.RoomCaptureCoordinator: 0x118264600>)
+Type: stdio
+App is being debugged, do not track this hang
+Type: Error | Timestamp: 2025-10-11 16:29:17.552404-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+Hang detected: 1.73s (debugger attached, not reporting)
+Type: Error | Timestamp: 2025-10-11 16:29:17.552415-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
 ▶️ Starting room capture session with SESSION DELEGATE...
 ✅ Room capture session started
 ✅ Session delegate: YES
 🎬 SESSION DELEGATE: didStartWith configuration!!!
+📹 Session started, waiting for first instruction to confirm camera is ready
+Type: stdio
+<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:275) - (err=-12784)
+Type: Error | Timestamp: 2025-10-11 16:29:18.094235-04:00 | Process: My Home Agent | Library: CMCapture | Subsystem: com.apple.cameracapture | Category:  | TID: 0x6dc10f
+<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:511) - (err=-12784)
+Type: Error | Timestamp: 2025-10-11 16:29:18.094265-04:00 | Process: My Home Agent | Library: CMCapture | Subsystem: com.apple.cameracapture | Category:  | TID: 0x6dc10f
+<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:275) - (err=-12784)
+Type: Error | Timestamp: 2025-10-11 16:29:18.094574-04:00 | Process: My Home Agent | Library: CMCapture | Subsystem: com.apple.cameracapture | Category:  | TID: 0x6dc10f
+<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:511) - (err=-12784)
+Type: Error | Timestamp: 2025-10-11 16:29:18.094651-04:00 | Process: My Home Agent | Library: CMCapture | Subsystem: com.apple.cameracapture | Category:  | TID: 0x6dc10f
+<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:275) - (err=-12784)
+Type: Error | Timestamp: 2025-10-11 16:29:18.094888-04:00 | Process: My Home Agent | Library: CMCapture | Subsystem: com.apple.cameracapture | Category:  | TID: 0x6dc10f
+<<<< FigCaptureSourceRemote >>>> Fig assert: "err == 0 " at bail (FigCaptureSourceRemote.m:511) - (err=-12784)
+Type: Error | Timestamp: 2025-10-11 16:29:18.094926-04:00 | Process: My Home Agent | Library: CMCapture | Subsystem: com.apple.cameracapture | Category:  | TID: 0x6dc10f
 Attempting to enable an already-enabled session. Ignoring...
+Type: Error | Timestamp: 2025-10-11 16:29:18.399636-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3d.recon.sng | TID: 0x6dc10e
+App is being debugged, do not track this hang
+Type: Error | Timestamp: 2025-10-11 16:29:30.614489-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+Hang detected: 11.94s (debugger attached, not reporting)
+Type: Error | Timestamp: 2025-10-11 16:29:30.614672-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
 💬 SESSION DELEGATE: didProvide instruction
-Skipping integration due to poor slam at time: 509184.006650 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509184.206647 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509184.406645 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509184.606642 vio_initialized(0) map_size(0) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509184.806639 vio_initialized(0) map_size(0) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509185.006636 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509185.206633 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509185.406630 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509185.606627 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509185.806625 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509186.006622 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509186.206619 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509186.406616 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509186.606613 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-Skipping integration due to poor slam at time: 509186.806610 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(0) slam_mode(RegularSLAM)
-💬 SESSION DELEGATE: didProvide instruction
+📹 First instruction received - camera is ready, hiding overlay
+⏱️ Hiding initialization overlay
+generating texture with resolution of 1292, 1292
+Type: stdio
+Call to RETransformComponentSetLocalSRT contains NaN. Skipping.
+Type: Error | Timestamp: 2025-10-11 16:29:30.770346-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: API | TID: 0x6dbf90
+⏱️ Overlay removed from view
+warning: using linearization / solving fallback.
+Type: stdio
+Skipping integration due to poor slam at time: 689198.376154 vio_initialized(0) map_size(0) tracking_state_is_nominal(0) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:32.250532-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc216
+Skipping integration due to poor slam at time: 689198.576153 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:32.448937-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc2bc
+Skipping integration due to poor slam at time: 689198.776151 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:32.649472-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc212
+Skipping integration due to poor slam at time: 689198.976149 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:32.849164-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc2bc
+Skipping integration due to poor slam at time: 689199.176147 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:33.049206-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc111
+⏱️ Overlay already hidden
+Type: stdio
+Skipping integration due to poor slam at time: 689199.376145 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:33.248976-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc114
+Skipping integration due to poor slam at time: 689199.576143 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:33.450371-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc211
+Skipping integration due to poor slam at time: 689199.776141 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:33.650044-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc114
+Skipping integration due to poor slam at time: 689199.976139 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:33.849239-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc10e
+Skipping integration due to poor slam at time: 689200.176137 vio_initialized(0) map_size(1) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:34.049098-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc2bc
+Skipping integration due to poor slam at time: 689200.376135 vio_initialized(0) map_size(2) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:34.250031-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc114
+Skipping integration due to poor slam at time: 689200.576133 vio_initialized(0) map_size(2) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:34.450098-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc10f
+Skipping integration due to poor slam at time: 689200.776131 vio_initialized(0) map_size(2) tracking_state_is_nominal(1) is_3dof(0) reinitialize_attempts(1) slam_mode(RegularSLAM)
+Type: Error | Timestamp: 2025-10-11 16:29:34.651143-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc10e
 Candidate list not empty but no nearby keyframes are available
+Type: Error | Timestamp: 2025-10-11 16:29:35.053481-04:00 | Process: My Home Agent | Library: Recon3D | Subsystem: com.apple.Recon3D | Category: cv3dapi.recon3d | TID: 0x6dc111
 💬 SESSION DELEGATE: didProvide instruction
 🔄 SESSION DELEGATE: didChange called!!!
 ➕ SESSION DELEGATE: didAdd called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 1 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
+Type: stdio
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:37.806694-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
+Registering library (memorylib_4954104896) that already exists in shader manager. Library will be overwritten.
+Type: Error | Timestamp: 2025-10-11 16:29:37.807213-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: AssetTypes | TID: 0x6dbf90
 💬 SESSION DELEGATE: didProvide instruction
+Type: stdio
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866041-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAREnvProbe::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866420-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableDynamicLighting::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866429-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'SupportsPrefilteredProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866437-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866444-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866450-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderForBlur::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866525-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866537-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableTransparency::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866548-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866557-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866565-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866572-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866581-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'PerceptualBlendingMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866587-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVirtualEnvironmentProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866594-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866601-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLRotation::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866607-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLBlending::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866649-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShaderGraphLightSpill::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866665-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866691-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAREnvProbe::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866699-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableDynamicLighting::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866705-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'SupportsPrefilteredProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866713-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866719-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866728-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderForBlur::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866735-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866745-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableTransparency::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866752-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866759-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866765-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866774-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866781-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'PerceptualBlendingMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866788-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVirtualEnvironmentProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866796-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866802-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLRotation::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866809-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLBlending::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866822-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShaderGraphLightSpill::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866828-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableInverseToneMapping::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866882-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableScreenVideoLetterBoxPadding::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.866893-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876494-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876510-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876516-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876523-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876533-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876538-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876703-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876710-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876715-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876721-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876726-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876732-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableInverseToneMapping::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876741-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableScreenVideoLetterBoxPadding::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.876748-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881177-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAREnvProbe::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881189-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableDynamicLighting::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881196-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'SupportsPrefilteredProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881201-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881207-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881211-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderForBlur::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881219-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableBaseColorMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881224-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881229-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableEmissiveMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881235-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableRoughnessMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881240-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableMetallicMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881269-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAOMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881275-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableSpecularMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881280-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881285-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881291-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableTransparency::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881296-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881301-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881306-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableMultiUVs::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881312-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVertexColor::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881317-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'VertexColorOption::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881322-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableGlow::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881327-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881333-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881338-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVirtualEnvironmentProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881343-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881349-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLRotation::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881354-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLBlending::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881359-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShaderGraphLightSpill::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881365-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881385-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAREnvProbe::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881393-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableDynamicLighting::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881398-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'SupportsPrefilteredProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881403-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881408-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881413-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderForBlur::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881419-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableBaseColorMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881424-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881431-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableEmissiveMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881436-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableRoughnessMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881441-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableMetallicMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881446-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAOMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881451-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableSpecularMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881723-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881729-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881736-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableTransparency::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881741-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881746-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881751-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableMultiUVs::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881756-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVertexColor::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881784-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'VertexColorOption::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881790-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableGlow::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881796-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881801-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881806-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVirtualEnvironmentProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881812-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881817-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLRotation::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881822-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLBlending::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881827-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShaderGraphLightSpill::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.881832-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887191-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887204-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887210-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887216-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887221-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887226-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887269-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887284-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887293-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887311-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887319-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887325-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887332-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887338-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887343-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887348-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887353-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887359-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableInverseToneMapping::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887369-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableScreenVideoLetterBoxPadding::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:37.887375-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+Type: stdio
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.422937-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAREnvProbe::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.422982-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableDynamicLighting::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.422998-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'SupportsPrefilteredProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423019-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423040-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423245-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderForBlur::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423261-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423278-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableTransparency::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423293-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423306-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423322-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423351-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423367-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'PerceptualBlendingMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423380-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVirtualEnvironmentProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423393-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423407-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLRotation::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423420-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLBlending::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423435-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShaderGraphLightSpill::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423448-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423502-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableAREnvProbe::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423531-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableDynamicLighting::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423558-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'SupportsPrefilteredProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423575-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423597-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423612-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderForBlur::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423625-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoat::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423640-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableTransparency::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423653-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423666-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423678-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShadowedDynamicLight::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423713-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423727-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'PerceptualBlendingMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423735-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVirtualEnvironmentProbes::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423741-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableClearcoatNormalMap::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423749-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLRotation::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423755-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableIBLBlending::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423761-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableShaderGraphLightSpill::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423772-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableInverseToneMapping::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423785-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableScreenVideoLetterBoxPadding::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.423794-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+Type: stdio
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428333-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428354-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428363-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428372-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428378-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428384-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'RenderToCompositeLayer::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428450-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableVRROnCapableDevice::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428457-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnablePtCrossing::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428463-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'UseBaseColorMapAsTintMask::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428469-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableOpacityThreshold::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428475-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'DitherMode::runtimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428486-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableInverseToneMapping::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428501-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+Found no parameter definition for shader constant 'EnableScreenVideoLetterBoxPadding::videoRuntimeFunctionConstants'
+Type: Error | Timestamp: 2025-10-11 16:29:41.428507-04:00 | Process: My Home Agent | Library: CoreRE | Subsystem: com.apple.re | Category: Graphics | TID: 0x6dc20a
+🔄 SESSION DELEGATE: didChange called!!!
+➕ SESSION DELEGATE: didAdd called!!!
+➖ SESSION DELEGATE: didRemove called
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 ➕ SESSION DELEGATE: didAdd called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
-💬 SESSION DELEGATE: didProvide instruction
-🔄 SESSION DELEGATE: didChange called!!!
-➕ SESSION DELEGATE: didAdd called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 2 walls, 0 doors, 0 windows
+   Room has 2 walls, 0 doors, 1 windows
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 2 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 ➕ SESSION DELEGATE: didAdd called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
    Room has 3 walls, 0 doors, 1 windows
-💬 SESSION DELEGATE: didProvide instruction
-🔄 SESSION DELEGATE: didChange called!!!
-➕ SESSION DELEGATE: didAdd called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 4 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-➕ SESSION DELEGATE: didAdd called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-➕ SESSION DELEGATE: didAdd called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 6 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 6 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 6 walls, 0 doors, 1 windows
+   Room has 3 walls, 0 doors, 1 windows
 💬 SESSION DELEGATE: didProvide instruction
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 6 walls, 0 doors, 1 windows
-💬 SESSION DELEGATE: didProvide instruction
-🔄 SESSION DELEGATE: didChange called!!!
-➖ SESSION DELEGATE: didRemove called
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
+   Room has 3 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
+   Room has 3 walls, 0 doors, 1 windows
 🔄 SESSION DELEGATE: didChange called!!!
 🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
-💬 SESSION DELEGATE: didProvide instruction
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
-🔄 SESSION DELEGATE: didChange called!!!
-🔄 SESSION DELEGATE: didUpdate called!!!
-   Room has 5 walls, 0 doors, 1 windows
+   Room has 3 walls, 0 doors, 1 windows
 👆 Done button tapped
-👆 Done button tapped - stopping session
+👆 Done button tapped - finishing immediately
 📊 Current state: captureSession=true, latestCapturedRoom=true
-✅ Stop called on capture session
+✅ Stop called on capture session (background)
+✅ Using latest captured room immediately
+🚪 Dismissing modal immediately
+🛑 View will disappear - session already stopped in background
+🔄 SESSION DELEGATE: didChange called!!!
+🔄 SESSION DELEGATE: didUpdate called!!!
+   Room has 3 walls, 0 doors, 1 windows
 📱 SESSION DELEGATE: didEndWith called!!!
    Error: none
    Latest room: present
-✅ Using latest captured room with 5 walls
+✅ Using latest captured room with 3 walls
 🚪 Dismissing modal - setting isPresented = false
-🛑 View will disappear - stopping session
 ♻️ RoomCaptureWrapperViewController deinit
 ♻️ Coordinator deinit
+🌐 NetworkManager: Request to https://dev-homeservices.hestami-ai.com/api/properties/ with method GET
+🍪 NetworkManager: === COOKIE DEBUG ===
+🍪 NetworkManager: Found 1 cookies in system storage for https://dev-homeservices.hestami-ai.com:
+🍪 - hestami_session: f764b3e9-91e4-4930-8e2b-f56fff29f8f3
+    Domain: dev-homeservices.hestami-ai.com, Path: /
+    Expires: 2025-10-16 16:13:16 +0000
+    Secure: true, HTTPOnly: true
+🍪 NetworkManager: Found 0 cookies in manual storage:
+🍪 NetworkManager: === END COOKIE DEBUG ===
+🔎 NetworkManager: Request headers for /api/properties/:
+🔎 - Accept: application/json
+🔎 - Content-Type: application/json
+Type: stdio
+App is being debugged, do not track this hang
+Type: Error | Timestamp: 2025-10-11 16:29:59.685416-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+Hang detected: 3.48s (debugger attached, not reporting)
+Type: Error | Timestamp: 2025-10-11 16:29:59.685445-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+App is being debugged, do not track this hang
+Type: Error | Timestamp: 2025-10-11 16:30:07.408329-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+Hang detected: 6.13s (debugger attached, not reporting)
+Type: Error | Timestamp: 2025-10-11 16:30:07.408376-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+App is being debugged, do not track this hang
+Type: Error | Timestamp: 2025-10-11 16:30:24.669242-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+Hang detected: 5.95s (debugger attached, not reporting)
+Type: Error | Timestamp: 2025-10-11 16:30:24.669258-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+App is being debugged, do not track this hang
+Type: Error | Timestamp: 2025-10-11 16:30:29.423611-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
+Hang detected: 4.75s (debugger attached, not reporting)
+Type: Error | Timestamp: 2025-10-11 16:30:29.423630-04:00 | Process: My Home Agent | Library: HangTracer | Subsystem: com.apple.hangtracer | Category:  | TID: 0x6dbf90
