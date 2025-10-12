@@ -71,7 +71,7 @@ struct DashboardView: View {
                         } else {
                             // Properties list
                             ForEach(viewModel.properties) { property in
-                                NavigationLink(destination: PropertyDetailView(property: property)) {
+                                NavigationLink(destination: PropertyDetailView(propertyId: property.id)) {
                                     DashboardPropertyCard(property: property)
                                 }
                             }

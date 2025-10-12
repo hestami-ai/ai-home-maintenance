@@ -55,7 +55,7 @@ struct PropertiesView: View {
                 } else {
                     List {
                         ForEach(viewModel.properties) { property in
-                            NavigationLink(destination: PropertyDetailView(property: property)) {
+                            NavigationLink(destination: PropertyDetailView(propertyId: property.id)) {
                                 PropertyRowView(property: property)
                             }
                             .listRowBackground(AppTheme.cardBackground)
@@ -237,12 +237,85 @@ struct PropertyRowView: View {
 }
 
 struct PropertyDetailView: View {
-    let property: Property
+    let propertyId: String
     @ObservedObject private var viewModel = PropertiesViewModel.shared
     @State private var showingEditProperty = false
     @State private var selectedMediaIndex = 0
     
+    // Computed property to get the latest property data from viewModel
+    private var property: Property? {
+        viewModel.properties.first { $0.id == propertyId }
+    }
+    
+    // Value mapping for display
+    private let valueDisplayMap: [String: String] = [
+        // Heating systems
+        "forced_air": "Forced Air",
+        "radiant": "Radiant",
+        "heat_pump": "Heat Pump",
+        "baseboard": "Baseboard",
+        "boiler": "Boiler",
+        "geothermal": "Geothermal",
+        // Cooling systems
+        "central_ac": "Central AC",
+        "window_units": "Window Units",
+        "evaporative": "Evaporative",
+        "ductless_mini_split": "Ductless Mini-Split",
+        // Fuels
+        "natural_gas": "Natural Gas",
+        "propane": "Propane",
+        // Materials
+        "asphalt_shingle": "Asphalt Shingle",
+        "fiber_cement": "Fiber Cement",
+        "chain_link": "Chain Link",
+        "wrought_iron": "Wrought Iron",
+        "pier_beam": "Pier & Beam",
+        // Pool/Fence types
+        "inground": "In-Ground",
+        "aboveground": "Above-Ground"
+    ]
+    
+    private func displayValue(_ value: String?) -> String {
+        guard let value = value else { return "Unknown" }
+        return valueDisplayMap[value] ?? value.capitalized
+    }
+    
     var body: some View {
+        Group {
+            if let property = property {
+                propertyDetailContent(for: property)
+            } else {
+                // Property not found or loading
+                ZStack {
+                    AppTheme.primaryBackground.edgesIgnoringSafeArea(.all)
+                    VStack(spacing: 16) {
+                        ProgressView("Loading property...")
+                            .foregroundColor(AppTheme.primaryText)
+                        Text("Property ID: \(propertyId)")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.secondaryText)
+                        Text("Properties in list: \(viewModel.properties.count)")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.secondaryText)
+                    }
+                }
+                .onAppear {
+                    print("🔍 PropertyDetailView: Looking for property \(propertyId)")
+                    print("🔍 PropertyDetailView: Properties in viewModel: \(viewModel.properties.map { $0.id })")
+                    
+                    // If properties list is empty, try to load them
+                    if viewModel.properties.isEmpty {
+                        Task {
+                            await viewModel.loadProperties()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func propertyDetailContent(for property: Property) -> some View {
         ZStack {
             AppTheme.primaryBackground.edgesIgnoringSafeArea(.all)
             
@@ -415,16 +488,16 @@ struct PropertyDetailView: View {
                             Text("Property Details")
                                 .font(AppTheme.subheadlineFont.bold())
                                 .foregroundColor(AppTheme.primaryText)
-                                .padding(.bottom, 4)
+                                .padding(.bottom, 8)
                             
-                            // Property Stats Grid
+                            // Key Stats (Always Visible)
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                                 if let squareFootage = descriptives.squareFootage {
                                     PropertyStatView(icon: "square.fill", title: "Square Footage", value: "\(squareFootage) sq ft")
                                 }
                                 
                                 if let bedrooms = descriptives.bedrooms {
-                                    PropertyStatView(icon: "bed.double.fill", title: "Bedrooms", value: bedrooms)
+                                    PropertyStatView(icon: "bed.double.fill", title: "Bedrooms", value: "\(bedrooms)")
                                 }
                                 
                                 if let bathrooms = descriptives.bathrooms {
@@ -432,25 +505,156 @@ struct PropertyDetailView: View {
                                 }
                                 
                                 if let yearBuilt = descriptives.yearBuilt {
-                                    PropertyStatView(icon: "calendar", title: "Year Built", value: yearBuilt)
-                                }
-                                
-                                if descriptives.garage == true {
-                                    PropertyStatView(icon: "car.fill", title: "Garage", value: "Yes")
-                                }
-                                
-                                if descriptives.basement == true {
-                                    PropertyStatView(icon: "arrow.down.square.fill", title: "Basement", value: "Yes")
-                                }
-                                
-                                if descriptives.airConditioning == true {
-                                    PropertyStatView(icon: "thermometer.snowflake", title: "A/C", value: "Yes")
-                                }
-                                
-                                if let heatingSystem = descriptives.heatingSystem {
-                                    PropertyStatView(icon: "thermometer.sun.fill", title: "Heating", value: heatingSystem)
+                                    PropertyStatView(icon: "calendar", title: "Year Built", value: "\(yearBuilt)")
                                 }
                             }
+                            
+                            // Expandable Sections
+                            VStack(spacing: 12) {
+                                // Structure & Features
+                                ExpandableDetailSection(
+                                    title: "Structure & Features",
+                                    icon: "building.2.fill"
+                                ) {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        if let stories = descriptives.stories {
+                                            DetailRow(label: "Stories", value: "\(stories)")
+                                        }
+                                        if let lotSize = descriptives.lotSize {
+                                            DetailRow(label: "Lot Size", value: lotSize)
+                                        }
+                                        if descriptives.basement == true {
+                                            DetailRow(label: "Basement", value: "Yes")
+                                            if let basementType = descriptives.basementType {
+                                                DetailRow(label: "Basement Type", value: displayValue(basementType), indented: true)
+                                            }
+                                        }
+                                        if descriptives.garage == true {
+                                            DetailRow(label: "Garage", value: "Yes")
+                                            if let garageType = descriptives.garageType {
+                                                DetailRow(label: "Garage Type", value: displayValue(garageType), indented: true)
+                                            }
+                                            if let garageSpaces = descriptives.garageSpaces {
+                                                DetailRow(label: "Garage Spaces", value: "\(garageSpaces)", indented: true)
+                                            }
+                                        }
+                                        if descriptives.attic == true {
+                                            DetailRow(label: "Attic", value: "Yes")
+                                            if let atticAccess = descriptives.atticAccess {
+                                                DetailRow(label: "Attic Access", value: displayValue(atticAccess), indented: true)
+                                            }
+                                        }
+                                        if descriptives.crawlSpace == true {
+                                            DetailRow(label: "Crawl Space", value: "Yes")
+                                        }
+                                    }
+                                }
+                                
+                                // HVAC & Climate
+                                ExpandableDetailSection(
+                                    title: "HVAC & Climate",
+                                    icon: "thermometer.medium"
+                                ) {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        if let heatingSystem = descriptives.heatingSystem {
+                                            DetailRow(label: "Heating System", value: displayValue(heatingSystem))
+                                        }
+                                        if let heatingFuel = descriptives.heatingFuel {
+                                            DetailRow(label: "Heating Fuel", value: displayValue(heatingFuel))
+                                        }
+                                        if let coolingSystem = descriptives.coolingSystem {
+                                            DetailRow(label: "Cooling System", value: displayValue(coolingSystem))
+                                        }
+                                        if descriptives.airConditioning == true {
+                                            DetailRow(label: "Air Conditioning", value: "Yes")
+                                        }
+                                        if let hvacAge = descriptives.hvacAge {
+                                            DetailRow(label: "HVAC Age", value: "\(hvacAge) years")
+                                        }
+                                        if let hvacBrand = descriptives.hvacBrand {
+                                            DetailRow(label: "HVAC Brand", value: hvacBrand)
+                                        }
+                                        if let thermostatType = descriptives.thermostatType {
+                                            DetailRow(label: "Thermostat", value: displayValue(thermostatType))
+                                        }
+                                    }
+                                }
+                                
+                                // Exterior & Roofing
+                                ExpandableDetailSection(
+                                    title: "Exterior & Roofing",
+                                    icon: "house.fill"
+                                ) {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        if let roofType = descriptives.roofType {
+                                            DetailRow(label: "Roof Type", value: displayValue(roofType))
+                                        }
+                                        if let roofAge = descriptives.roofAge {
+                                            DetailRow(label: "Roof Age", value: roofAge)
+                                        }
+                                        if let exteriorMaterial = descriptives.exteriorMaterial {
+                                            DetailRow(label: "Exterior Material", value: displayValue(exteriorMaterial))
+                                        }
+                                        if let foundationType = descriptives.foundationType {
+                                            DetailRow(label: "Foundation", value: displayValue(foundationType))
+                                        }
+                                        if descriptives.fence == true {
+                                            DetailRow(label: "Fence", value: "Yes")
+                                            if let fenceType = descriptives.fenceType {
+                                                DetailRow(label: "Fence Type", value: displayValue(fenceType), indented: true)
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Utilities & Systems
+                                ExpandableDetailSection(
+                                    title: "Utilities & Systems",
+                                    icon: "bolt.fill"
+                                ) {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        if let waterSource = descriptives.waterSource {
+                                            DetailRow(label: "Water Source", value: displayValue(waterSource))
+                                        }
+                                        if let sewerSystem = descriptives.sewerSystem {
+                                            DetailRow(label: "Sewer System", value: displayValue(sewerSystem))
+                                        }
+                                        if descriptives.gasService == true {
+                                            DetailRow(label: "Gas Service", value: "Yes")
+                                        }
+                                        if let electricalPanel = descriptives.electricalPanel {
+                                            DetailRow(label: "Electrical Panel", value: displayValue(electricalPanel))
+                                        }
+                                        if let electricalAmps = descriptives.electricalAmps {
+                                            DetailRow(label: "Electrical Amps", value: "\(electricalAmps)A")
+                                        }
+                                    }
+                                }
+                                
+                                // Outdoor Features (if applicable)
+                                if descriptives.pool == true || descriptives.patio == true || descriptives.deck == true {
+                                    ExpandableDetailSection(
+                                        title: "Outdoor Features",
+                                        icon: "sun.max.fill"
+                                    ) {
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            if descriptives.pool == true {
+                                                DetailRow(label: "Pool", value: "Yes")
+                                                if let poolType = descriptives.poolType {
+                                                    DetailRow(label: "Pool Type", value: displayValue(poolType), indented: true)
+                                                }
+                                            }
+                                            if descriptives.patio == true {
+                                                DetailRow(label: "Patio", value: "Yes")
+                                            }
+                                            if descriptives.deck == true {
+                                                DetailRow(label: "Deck", value: "Yes")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.top, 8)
                         }
                         
                         // Description
@@ -540,6 +744,16 @@ struct PropertyDetailView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .sheet(isPresented: $showingEditProperty) {
+            NavigationView {
+                AddEditPropertyView(property: property, onSave: {
+                    // Refresh the property list after editing
+                    Task {
+                        await viewModel.loadProperties()
+                    }
+                })
+            }
+        }
         .alert("Room Scanning Not Available", isPresented: $viewModel.showRoomPlanAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -632,6 +846,85 @@ struct EmptyPropertiesView: View {
             .padding(.top, 20)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Expandable Detail Section Component
+
+struct ExpandableDetailSection<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: () -> Content
+    @State private var isExpanded: Bool = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack {
+                    Image(systemName: icon)
+                        .foregroundColor(AppTheme.accentPrimary)
+                        .frame(width: 24)
+                    
+                    Text(title)
+                        .font(AppTheme.bodyFont.bold())
+                        .foregroundColor(AppTheme.primaryText)
+                    
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(AppTheme.secondaryText)
+                        .font(.caption)
+                }
+                .padding()
+                .background(AppTheme.cardBackground)
+                .cornerRadius(8)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Expandable Content
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 0) {
+                    content()
+                }
+                .padding()
+                .background(AppTheme.cardBackground.opacity(0.5))
+                .cornerRadius(8)
+                .padding(.top, 4)
+            }
+        }
+    }
+}
+
+// MARK: - Detail Row Component
+
+struct DetailRow: View {
+    let label: String
+    let value: String
+    var indented: Bool = false
+    
+    var body: some View {
+        HStack(alignment: .top) {
+            if indented {
+                Spacer()
+                    .frame(width: 20)
+            }
+            
+            Text(label)
+                .font(AppTheme.captionFont)
+                .foregroundColor(AppTheme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Text(value)
+                .font(AppTheme.captionFont.bold())
+                .foregroundColor(AppTheme.primaryText)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 4)
     }
 }
 

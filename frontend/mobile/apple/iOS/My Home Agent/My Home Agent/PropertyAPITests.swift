@@ -120,18 +120,18 @@ struct PropertyAPITests: View {
         testResults.append("Testing: Create Property")
         
         let descriptives = PropertyDescriptives(
+            propertyType: "Test Property",
+            yearBuilt: 2020,
+            squareFootage: 1500,
+            bedrooms: 3,
+            bathrooms: "2.5",
+            unitNumber: nil,
             garage: false,
             basement: false,
-            bedrooms: "3",
-            bathrooms: "2.5",
-            utilities: nil,
-            yearBuilt: "2020",
-            unitNumber: nil,
-            propertyType: "Test Property",
-            heatingSystem: nil,
-            squareFootage: "1500",
             gatedCommunity: false,
+            heatingSystem: nil,
             airConditioning: false,
+            utilities: nil,
             createdFrom: "ios_app_tests"
         )
         
@@ -176,6 +176,7 @@ struct PropertyAPITests: View {
             city: nil,
             state: nil,
             zipCode: nil,
+            county: nil,
             country: nil,
             descriptives: nil
         )

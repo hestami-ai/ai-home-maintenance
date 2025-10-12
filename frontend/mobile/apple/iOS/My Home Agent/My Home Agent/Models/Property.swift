@@ -1,6 +1,26 @@
 import Foundation
 import UIKit
 
+// Helper extension for flexible Int decoding (handles both Int and String from backend)
+extension KeyedDecodingContainer {
+    func decodeFlexibleInt(forKey key: K) throws -> Int? {
+        // Try to decode as Int first
+        if let intValue = try? decodeIfPresent(Int.self, forKey: key) {
+            return intValue
+        }
+        // If that fails, try to decode as String and convert
+        if let stringValue = try? decodeIfPresent(String.self, forKey: key) {
+            // Return nil for empty strings
+            if stringValue.isEmpty {
+                return nil
+            }
+            // Try to convert string to int
+            return Int(stringValue)
+        }
+        return nil
+    }
+}
+
 struct Property: Identifiable, Codable {
     let id: String
     let title: String
@@ -150,33 +170,329 @@ enum PropertyStatus: String, Codable {
 }
 
 struct PropertyDescriptives: Codable {
-    let garage: Bool?
-    let basement: Bool?
-    let bedrooms: String?
-    let bathrooms: String?
-    let utilities: PropertyUtilities?
-    let yearBuilt: String?
-    let unitNumber: String?
+    // Basic Property Info
     let propertyType: String?
-    let heatingSystem: String?
-    let squareFootage: String?
+    let yearBuilt: Int?
+    let squareFootage: Int?
+    let lotSize: String?
+    let stories: Int?
+    let bedrooms: Int?
+    let bathrooms: String?
+    let unitNumber: String?
+    
+    // Access & Security
     let gatedCommunity: Bool?
+    let accessCode: String?
+    let accessInstructions: String?
+    let parkingType: String?
+    let parkingSpaces: Int?
+    
+    // Structure & Features
+    let basement: Bool?
+    let basementType: String?
+    let garage: Bool?
+    let garageType: String?
+    let garageSpaces: Int?
+    let attic: Bool?
+    let atticAccess: String?
+    let crawlSpace: Bool?
+    
+    // HVAC & Climate Control
+    let heatingSystem: String?
+    let heatingFuel: String?
+    let coolingSystem: String?
     let airConditioning: Bool?
+    let hvacAge: Int?
+    let hvacBrand: String?
+    let hvacModel: String?
+    let thermostatType: String?
+    
+    // Utilities & Systems
+    let utilities: PropertyUtilities?
+    let waterSource: String?
+    let sewerSystem: String?
+    let electricalPanel: String?
+    let electricalAmps: Int?
+    let gasService: Bool?
+    let waterHeater: PropertyWaterHeater?
+    
+    // Plumbing
+    let plumbingType: String?
+    let waterShutoffLocation: String?
+    let mainDrainCleanout: String?
+    
+    // Electrical
+    let electricalPanelLocation: String?
+    let wiringType: String?
+    
+    // Roofing & Exterior
+    let roofType: String?
+    let roofAge: String?
+    let exteriorMaterial: String?
+    let foundationType: String?
+    
+    // Appliances
+    let appliances: PropertyAppliances?
+    
+    // Smart Home & Internet
+    let internetService: Bool?
+    let internetProvider: String?
+    let smartHomeDevices: [String]?
+    
+    // Landscaping & Exterior
+    let sprinklerSystem: Bool?
+    let pool: Bool?
+    let poolType: String?
+    let fence: Bool?
+    let fenceType: String?
+    let deck: Bool?
+    let deckMaterial: String?
+    let patio: Bool?
+    let patioMaterial: String?
+    
+    // Special Considerations
+    let petFriendly: Bool?
+    let smokingAllowed: Bool?
+    let wheelchairAccessible: Bool?
+    let fireplace: Bool?
+    let fireplaceType: String?
+    
+    // Maintenance & Notes
+    let maintenanceNotes: String?
+    let specialInstructions: String?
+    
+    // Legacy field
     let createdFrom: String?
     
+    // Custom decoder to handle flexible Int/String types from backend
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Decode strings
+        propertyType = try container.decodeIfPresent(String.self, forKey: .propertyType)
+        lotSize = try container.decodeIfPresent(String.self, forKey: .lotSize)
+        bathrooms = try container.decodeIfPresent(String.self, forKey: .bathrooms)
+        unitNumber = try container.decodeIfPresent(String.self, forKey: .unitNumber)
+        accessCode = try container.decodeIfPresent(String.self, forKey: .accessCode)
+        accessInstructions = try container.decodeIfPresent(String.self, forKey: .accessInstructions)
+        parkingType = try container.decodeIfPresent(String.self, forKey: .parkingType)
+        basementType = try container.decodeIfPresent(String.self, forKey: .basementType)
+        garageType = try container.decodeIfPresent(String.self, forKey: .garageType)
+        atticAccess = try container.decodeIfPresent(String.self, forKey: .atticAccess)
+        heatingSystem = try container.decodeIfPresent(String.self, forKey: .heatingSystem)
+        heatingFuel = try container.decodeIfPresent(String.self, forKey: .heatingFuel)
+        coolingSystem = try container.decodeIfPresent(String.self, forKey: .coolingSystem)
+        hvacBrand = try container.decodeIfPresent(String.self, forKey: .hvacBrand)
+        hvacModel = try container.decodeIfPresent(String.self, forKey: .hvacModel)
+        thermostatType = try container.decodeIfPresent(String.self, forKey: .thermostatType)
+        waterSource = try container.decodeIfPresent(String.self, forKey: .waterSource)
+        sewerSystem = try container.decodeIfPresent(String.self, forKey: .sewerSystem)
+        electricalPanel = try container.decodeIfPresent(String.self, forKey: .electricalPanel)
+        plumbingType = try container.decodeIfPresent(String.self, forKey: .plumbingType)
+        waterShutoffLocation = try container.decodeIfPresent(String.self, forKey: .waterShutoffLocation)
+        mainDrainCleanout = try container.decodeIfPresent(String.self, forKey: .mainDrainCleanout)
+        electricalPanelLocation = try container.decodeIfPresent(String.self, forKey: .electricalPanelLocation)
+        wiringType = try container.decodeIfPresent(String.self, forKey: .wiringType)
+        roofType = try container.decodeIfPresent(String.self, forKey: .roofType)
+        roofAge = try container.decodeIfPresent(String.self, forKey: .roofAge)
+        exteriorMaterial = try container.decodeIfPresent(String.self, forKey: .exteriorMaterial)
+        foundationType = try container.decodeIfPresent(String.self, forKey: .foundationType)
+        internetProvider = try container.decodeIfPresent(String.self, forKey: .internetProvider)
+        poolType = try container.decodeIfPresent(String.self, forKey: .poolType)
+        fenceType = try container.decodeIfPresent(String.self, forKey: .fenceType)
+        deckMaterial = try container.decodeIfPresent(String.self, forKey: .deckMaterial)
+        patioMaterial = try container.decodeIfPresent(String.self, forKey: .patioMaterial)
+        fireplaceType = try container.decodeIfPresent(String.self, forKey: .fireplaceType)
+        maintenanceNotes = try container.decodeIfPresent(String.self, forKey: .maintenanceNotes)
+        specialInstructions = try container.decodeIfPresent(String.self, forKey: .specialInstructions)
+        createdFrom = try container.decodeIfPresent(String.self, forKey: .createdFrom)
+        
+        // Decode flexible Int fields (can be Int or String in JSON)
+        yearBuilt = try container.decodeFlexibleInt(forKey: .yearBuilt)
+        squareFootage = try container.decodeFlexibleInt(forKey: .squareFootage)
+        stories = try container.decodeFlexibleInt(forKey: .stories)
+        bedrooms = try container.decodeFlexibleInt(forKey: .bedrooms)
+        parkingSpaces = try container.decodeFlexibleInt(forKey: .parkingSpaces)
+        garageSpaces = try container.decodeFlexibleInt(forKey: .garageSpaces)
+        hvacAge = try container.decodeFlexibleInt(forKey: .hvacAge)
+        electricalAmps = try container.decodeFlexibleInt(forKey: .electricalAmps)
+        
+        // Decode booleans
+        gatedCommunity = try container.decodeIfPresent(Bool.self, forKey: .gatedCommunity)
+        basement = try container.decodeIfPresent(Bool.self, forKey: .basement)
+        garage = try container.decodeIfPresent(Bool.self, forKey: .garage)
+        attic = try container.decodeIfPresent(Bool.self, forKey: .attic)
+        crawlSpace = try container.decodeIfPresent(Bool.self, forKey: .crawlSpace)
+        airConditioning = try container.decodeIfPresent(Bool.self, forKey: .airConditioning)
+        gasService = try container.decodeIfPresent(Bool.self, forKey: .gasService)
+        internetService = try container.decodeIfPresent(Bool.self, forKey: .internetService)
+        sprinklerSystem = try container.decodeIfPresent(Bool.self, forKey: .sprinklerSystem)
+        pool = try container.decodeIfPresent(Bool.self, forKey: .pool)
+        fence = try container.decodeIfPresent(Bool.self, forKey: .fence)
+        deck = try container.decodeIfPresent(Bool.self, forKey: .deck)
+        patio = try container.decodeIfPresent(Bool.self, forKey: .patio)
+        petFriendly = try container.decodeIfPresent(Bool.self, forKey: .petFriendly)
+        smokingAllowed = try container.decodeIfPresent(Bool.self, forKey: .smokingAllowed)
+        wheelchairAccessible = try container.decodeIfPresent(Bool.self, forKey: .wheelchairAccessible)
+        fireplace = try container.decodeIfPresent(Bool.self, forKey: .fireplace)
+        
+        // Decode nested objects
+        utilities = try container.decodeIfPresent(PropertyUtilities.self, forKey: .utilities)
+        waterHeater = try container.decodeIfPresent(PropertyWaterHeater.self, forKey: .waterHeater)
+        appliances = try container.decodeIfPresent(PropertyAppliances.self, forKey: .appliances)
+        smartHomeDevices = try container.decodeIfPresent([String].self, forKey: .smartHomeDevices)
+    }
+    
+    // Convenience initializer for common fields
+    init(
+        propertyType: String? = nil,
+        yearBuilt: Int? = nil,
+        squareFootage: Int? = nil,
+        bedrooms: Int? = nil,
+        bathrooms: String? = nil,
+        unitNumber: String? = nil,
+        garage: Bool? = nil,
+        basement: Bool? = nil,
+        gatedCommunity: Bool? = nil,
+        heatingSystem: String? = nil,
+        airConditioning: Bool? = nil,
+        utilities: PropertyUtilities? = nil,
+        createdFrom: String? = nil
+    ) {
+        self.propertyType = propertyType
+        self.yearBuilt = yearBuilt
+        self.squareFootage = squareFootage
+        self.lotSize = nil
+        self.stories = nil
+        self.bedrooms = bedrooms
+        self.bathrooms = bathrooms
+        self.unitNumber = unitNumber
+        self.gatedCommunity = gatedCommunity
+        self.accessCode = nil
+        self.accessInstructions = nil
+        self.parkingType = nil
+        self.parkingSpaces = nil
+        self.basement = basement
+        self.basementType = nil
+        self.garage = garage
+        self.garageType = nil
+        self.garageSpaces = nil
+        self.attic = nil
+        self.atticAccess = nil
+        self.crawlSpace = nil
+        self.heatingSystem = heatingSystem
+        self.heatingFuel = nil
+        self.coolingSystem = nil
+        self.airConditioning = airConditioning
+        self.hvacAge = nil
+        self.hvacBrand = nil
+        self.hvacModel = nil
+        self.thermostatType = nil
+        self.utilities = utilities
+        self.waterSource = nil
+        self.sewerSystem = nil
+        self.electricalPanel = nil
+        self.electricalAmps = nil
+        self.gasService = nil
+        self.waterHeater = nil
+        self.plumbingType = nil
+        self.waterShutoffLocation = nil
+        self.mainDrainCleanout = nil
+        self.electricalPanelLocation = nil
+        self.wiringType = nil
+        self.roofType = nil
+        self.roofAge = nil
+        self.exteriorMaterial = nil
+        self.foundationType = nil
+        self.appliances = nil
+        self.internetService = nil
+        self.internetProvider = nil
+        self.smartHomeDevices = nil
+        self.sprinklerSystem = nil
+        self.pool = nil
+        self.poolType = nil
+        self.fence = nil
+        self.fenceType = nil
+        self.deck = nil
+        self.deckMaterial = nil
+        self.patio = nil
+        self.patioMaterial = nil
+        self.petFriendly = nil
+        self.smokingAllowed = nil
+        self.wheelchairAccessible = nil
+        self.fireplace = nil
+        self.fireplaceType = nil
+        self.maintenanceNotes = nil
+        self.specialInstructions = nil
+        self.createdFrom = createdFrom
+    }
+    
     enum CodingKeys: String, CodingKey {
-        case garage
-        case basement
+        case propertyType
+        case yearBuilt
+        case squareFootage
+        case lotSize
+        case stories
         case bedrooms
         case bathrooms
-        case utilities
-        case yearBuilt
         case unitNumber
-        case propertyType
-        case heatingSystem
-        case squareFootage
         case gatedCommunity
+        case accessCode
+        case accessInstructions
+        case parkingType
+        case parkingSpaces
+        case basement
+        case basementType
+        case garage
+        case garageType
+        case garageSpaces
+        case attic
+        case atticAccess
+        case crawlSpace
+        case heatingSystem
+        case heatingFuel
+        case coolingSystem
         case airConditioning
+        case hvacAge
+        case hvacBrand
+        case hvacModel
+        case thermostatType
+        case utilities
+        case waterSource
+        case sewerSystem
+        case electricalPanel
+        case electricalAmps
+        case gasService
+        case waterHeater
+        case plumbingType
+        case waterShutoffLocation
+        case mainDrainCleanout
+        case electricalPanelLocation
+        case wiringType
+        case roofType
+        case roofAge
+        case exteriorMaterial
+        case foundationType
+        case appliances
+        case internetService
+        case internetProvider
+        case smartHomeDevices
+        case sprinklerSystem
+        case pool
+        case poolType
+        case fence
+        case fenceType
+        case deck
+        case deckMaterial
+        case patio
+        case patioMaterial
+        case petFriendly
+        case smokingAllowed
+        case wheelchairAccessible
+        case fireplace
+        case fireplaceType
+        case maintenanceNotes
+        case specialInstructions
         case createdFrom = "created_from"
     }
 }
@@ -195,6 +511,27 @@ struct PropertyUtilities: Codable {
         case electricity
         case internetCable
     }
+}
+
+struct PropertyWaterHeater: Codable {
+    let type: String?
+    let fuel: String?
+    let capacity: String?
+    let age: Int?
+    let brand: String?
+    let model: String?
+}
+
+struct PropertyAppliances: Codable {
+    let refrigerator: Bool?
+    let stove: Bool?
+    let dishwasher: Bool?
+    let washer: Bool?
+    let dryer: Bool?
+    let microwave: Bool?
+    let oven: Bool?
+    let range: Bool?
+    let garbageDisposal: Bool?
 }
 
 struct GeocodeAddress: Codable {
