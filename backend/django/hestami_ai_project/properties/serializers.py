@@ -33,6 +33,44 @@ class PropertySerializer(serializers.ModelSerializer):
             context={'depth': 0}  # Add depth context to control nesting
         ).data
     
+    def validate_descriptives(self, value):
+        """
+        Basic validation for descriptives field.
+        Ensures it's a dictionary and performs simple type checking.
+        """
+        if value is None:
+            return value
+            
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Descriptives must be a JSON object")
+        
+        # Optional: Add basic validation for common fields
+        # if 'bathrooms' in value and value['bathrooms'] is not None:
+        #     try:
+        #         bathrooms = float(value['bathrooms'])
+        #         if bathrooms < 0:
+        #             raise serializers.ValidationError("Bathrooms cannot be negative")
+        #     except (ValueError, TypeError):
+        #         raise serializers.ValidationError("Bathrooms must be a number")
+        
+        # if 'bedrooms' in value and value['bedrooms'] is not None:
+        #     try:
+        #         bedrooms = int(value['bedrooms'])
+        #         if bedrooms < 0:
+        #             raise serializers.ValidationError("Bedrooms cannot be negative")
+        #     except (ValueError, TypeError):
+        #         raise serializers.ValidationError("Bedrooms must be a number")
+        
+        # if 'yearBuilt' in value and value['yearBuilt'] is not None:
+        #     try:
+        #         year = int(value['yearBuilt'])
+        #         if year < 1800 or year > 2100:
+        #             raise serializers.ValidationError("Year built must be between 1800 and 2100")
+        #     except (ValueError, TypeError):
+        #         raise serializers.ValidationError("Year built must be a number")
+        
+        return value
+    
     def create(self, validated_data):
         validated_data['owner'] = self.context['request'].user
         return super().create(validated_data)

@@ -200,6 +200,9 @@ def get_upload_path(instance, filename):
     Generate the upload path for media files.
     Format: media/properties/<property_id>/<year>/<month>/<day>/<uuid>.<extension>
     """
+    import logging
+    logger = logging.getLogger('security')
+    
     ext = os.path.splitext(filename)[1].lower()
     date = timezone.now()
     
@@ -207,17 +210,21 @@ def get_upload_path(instance, filename):
     if instance.property_ref:
         # Direct property media
         property_id = str(instance.property_ref.id)
+        logger.info(f"get_upload_path: Using property_ref: {property_id}")
     elif instance.service_request and instance.service_request.property:
         # Service request media - get property from service request
         property_id = str(instance.service_request.property.id)
+        logger.info(f"get_upload_path: Using service_request.property: {property_id}")
     elif instance.service_report and instance.service_report.service_request and instance.service_report.service_request.property:
         # Service report media - get property from service request via service report
         property_id = str(instance.service_report.service_request.property.id)
+        logger.info(f"get_upload_path: Using service_report.service_request.property: {property_id}")
     else:
         # Fallback if no property reference can be found
         property_id = 'unknown'
+        logger.warning(f"get_upload_path: No property reference found, using 'unknown'")
     
-    return os.path.join(
+    upload_path = os.path.join(
         settings.PROPERTY_MEDIA_PATH.format(
             property_id=property_id,
             year=date.strftime('%Y'),
@@ -226,6 +233,9 @@ def get_upload_path(instance, filename):
         ),
         f"{instance.id}{ext}"
     )
+    
+    logger.info(f"get_upload_path: Generated path: {upload_path}")
+    return upload_path
 
 class Media(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -317,14 +327,21 @@ class Media(models.Model):
         return f"{self.title or self.original_filename}"
 
     def clean(self):
-        # Ensure only one parent relationship is set
-        parents = [
-            self.property_ref is not None,
+        # Count primary parent relationships (property_ref can coexist with service_request/service_report)
+        # The primary parent is the direct relationship: property, service_request, or service_report
+        # property_ref is a denormalized field that can be set alongside service_request/service_report
+        primary_parents = [
             self.service_request is not None,
             self.service_report is not None
         ]
-        if sum(parents) != 1:
-            raise ValidationError("Media must belong to exactly one parent (Property, ServiceRequest, or ServiceReport)")
+        
+        # If no service_request or service_report, then property_ref must be set
+        if sum(primary_parents) == 0 and self.property_ref is None:
+            raise ValidationError("Media must belong to a Property, ServiceRequest, or ServiceReport")
+        
+        # If service_request or service_report is set, only one should be set
+        if sum(primary_parents) > 1:
+            raise ValidationError("Media cannot belong to both ServiceRequest and ServiceReport")
 
         # Ensure report_photo_type is only set for service report media
         if self.report_photo_type and not self.service_report:

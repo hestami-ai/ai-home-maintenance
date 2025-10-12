@@ -43,6 +43,7 @@ services:
     depends_on:
       - api
       - static
+      - traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`homeservices.hai`)"
@@ -104,6 +105,7 @@ services:
       - backend-dev
     depends_on:
       - init-volumes
+      - traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.static.rule=Host(`static.hai`)"
@@ -138,8 +140,8 @@ services:
       - backend-dev
 
   clamav:
-    image: clamav/clamav:latest
-    container_name: clamav
+    image: clamav/clamav:stable
+    container_name: clamav-dev
     ports:
       - "3310:3310"
     environment:

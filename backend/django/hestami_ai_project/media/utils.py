@@ -11,8 +11,12 @@ import uuid
 def scan_file(file):
     """
     Scan a file using ClamAV.
+    Accepts either an UploadedFile (with .chunks() method) or a FieldFile (with .path attribute).
     Returns (is_clean, message)
     """
+    import logging
+    logger = logging.getLogger('security')
+    
     try:
         # Initialize ClamAV client
         cd = ClamdNetworkSocket(
@@ -20,26 +24,60 @@ def scan_file(file):
             port=int(settings.CLAMD_PORT)
         )
         
-        # Create a temporary file
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            for chunk in file.chunks():
-                tmp_file.write(chunk)
-            tmp_file.flush()
+        # Check if this is a FieldFile (already saved to disk) or an UploadedFile
+        if hasattr(file, 'path'):
+            file_path = file.path
+            logger.info(f"Scanning file from disk path: {file_path}")
+            logger.info(f"File exists check: {os.path.exists(file_path)}")
             
+            if not os.path.exists(file_path):
+                return False, f"File path check failure: No such file or directory."
+            
+            # File is already on disk, read it and send to ClamAV via instream
             try:
-                # Scan the temporary file
-                scan_result = cd.scan(tmp_file.name)
-                file_scan_result = scan_result.get(tmp_file.name)
+                with open(file_path, 'rb') as f:
+                    scan_result = cd.instream(f)
                 
-                if file_scan_result is None:
+                # instream returns {'stream': ('OK', None)} or {'stream': ('FOUND', 'malware_name')}
+                stream_result = scan_result.get('stream')
+                
+                if stream_result is None:
                     return True, "File is clean"
-                elif file_scan_result[0] == "OK":
+                elif stream_result[0] == "OK":
                     return True, "File is clean"
                 else:
-                    return False, f"Malware detected: {file_scan_result[1]}"
-            finally:
-                # Clean up the temporary file
-                os.unlink(tmp_file.name)
+                    return False, f"Malware detected: {stream_result[1]}"
+            except Exception as scan_error:
+                logger.error(f"ClamAV scan error: {str(scan_error)}", exc_info=True)
+                return False, f"Scan error: {str(scan_error)}"
+        
+        elif hasattr(file, 'chunks'):
+            # File is an UploadedFile, send chunks directly to ClamAV via instream
+            try:
+                # Create a BytesIO buffer from the file chunks
+                from io import BytesIO
+                buffer = BytesIO()
+                for chunk in file.chunks():
+                    buffer.write(chunk)
+                buffer.seek(0)  # Reset to beginning
+                
+                # Scan the buffer
+                scan_result = cd.instream(buffer)
+                
+                # instream returns {'stream': ('OK', None)} or {'stream': ('FOUND', 'malware_name')}
+                stream_result = scan_result.get('stream')
+                
+                if stream_result is None:
+                    return True, "File is clean"
+                elif stream_result[0] == "OK":
+                    return True, "File is clean"
+                else:
+                    return False, f"Malware detected: {stream_result[1]}"
+            except Exception as scan_error:
+                logger.error(f"ClamAV scan error: {str(scan_error)}", exc_info=True)
+                return False, f"Scan error: {str(scan_error)}"
+        else:
+            return False, "Invalid file object: no path or chunks method available"
                 
     except Exception as e:
         return False, f"Error scanning file: {str(e)}"

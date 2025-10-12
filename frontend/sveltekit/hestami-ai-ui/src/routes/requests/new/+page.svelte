@@ -282,7 +282,7 @@
 			<div class="file-upload-container border-2 border-dashed border-surface-300-600-token rounded-lg p-6 text-center">
 				<label for="file-upload" class="cursor-pointer flex flex-col items-center justify-center gap-2">
 					<Upload class="h-8 w-8 text-surface-500-400-token" />
-					<span class="text-surface-700-200-token">Click to upload or drag and drop</span>
+					<span class="text-surface-700-200-token">Click to select files or drag and drop</span>
 					<span class="text-xs text-surface-500-400-token">PNG, JPG, MP4 up to 10MB</span>
 				</label>
 				<input 

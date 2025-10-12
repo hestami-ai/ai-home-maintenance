@@ -194,23 +194,30 @@ class MediaSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, data):
-        # Ensure only one parent is set
-        parents = [
-            'property_ref' in data,
-            'service_request' in data,
-            'service_report' in data
+        # Count primary parent relationships (property_ref can coexist with service_request/service_report)
+        primary_parents = [
+            'service_request' in data and data['service_request'] is not None,
+            'service_report' in data and data['service_report'] is not None
         ]
-        if sum(parents) != 1:
+        
+        # If no service_request or service_report, then property_ref must be set
+        if sum(primary_parents) == 0 and ('property_ref' not in data or data['property_ref'] is None):
             raise serializers.ValidationError(
-                "Media must belong to exactly one parent (Property, ServiceRequest, or ServiceReport)"
+                "Media must belong to a Property, ServiceRequest, or ServiceReport"
+            )
+        
+        # If service_request or service_report is set, only one should be set
+        if sum(primary_parents) > 1:
+            raise serializers.ValidationError(
+                "Media cannot belong to both ServiceRequest and ServiceReport"
             )
 
         # Validate report_photo_type
-        if 'service_report' in data and not data.get('report_photo_type'):
+        if 'service_report' in data and data['service_report'] is not None and not data.get('report_photo_type'):
             raise serializers.ValidationError(
                 "report_photo_type must be set for service report media"
             )
-        if data.get('report_photo_type') and 'service_report' not in data:
+        if data.get('report_photo_type') and ('service_report' not in data or data['service_report'] is None):
             raise serializers.ValidationError(
                 "report_photo_type can only be set for service report media"
             )

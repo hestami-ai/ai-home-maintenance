@@ -119,6 +119,14 @@ def scan_file(self, media_id):
         media = Media.objects.get(id=media_id)
         logger.info(f"Starting to scan media {media_id}, file: {media.file.name}")
         
+        # Log file path details for debugging
+        import os
+        if hasattr(media.file, 'path'):
+            logger.info(f"File path: {media.file.path}")
+            logger.info(f"File exists: {os.path.exists(media.file.path)}")
+        else:
+            logger.warning(f"Media file does not have a path attribute")
+        
         # Store scan status in metadata
         if not media.metadata:
             media.metadata = {}
