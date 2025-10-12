@@ -17,6 +17,7 @@ urlpatterns = [
     
     # Common media endpoints
     path('<uuid:media_id>/', views.delete_media, name='delete_media'),
+    path('<uuid:media_id>/update/', views.update_media_metadata, name='update_media_metadata'),
     path('<uuid:media_id>/status/', views.media_processing_status, name='media_processing_status'),
     path('types/', views.get_media_types, name='media_types'),
     path('locations/', views.get_location_types, name='location_types'),

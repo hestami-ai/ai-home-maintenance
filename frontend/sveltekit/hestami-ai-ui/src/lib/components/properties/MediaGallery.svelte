@@ -4,12 +4,24 @@
   import type { Media } from '$lib/types';
   
   export let media: Media[] = [];
+  export let mediaTypes: any[] = [];
+  export let locationTypes: any[] = [];
   
   const dispatch = createEventDispatcher();
   
   let filterLocation = 'all';
   let deleteConfirmId: string | null = null;
   let deletingId: string | null = null;
+  let editingMedia: Media | null = null;
+  let editForm = {
+    title: '',
+    description: '',
+    media_type: '',
+    media_sub_type: '',
+    location_type: '',
+    location_sub_type: ''
+  };
+  let isUpdating = false;
   
   // Filter media by location type
   $: filteredMedia = media.filter(m => {
@@ -18,8 +30,8 @@
     return m.location_type === filterLocation;
   });
   
-  // Get unique location types from media
-  $: locationTypes = Array.from(new Set(media.map(m => m.location_type))).filter(Boolean);
+  // Get unique location types from media for filter dropdown
+  $: uniqueLocationTypes = Array.from(new Set(media.map(m => m.location_type))).filter(Boolean);
   
   function formatLocationLabel(locationType: string): string {
     return locationType
@@ -42,6 +54,72 @@
   
   function cancelDelete() {
     deleteConfirmId = null;
+  }
+  
+  function showEditModal(item: Media) {
+    editingMedia = item;
+    editForm = {
+      title: item.title || '',
+      description: item.description || '',
+      media_type: item.media_type || '',
+      media_sub_type: item.media_sub_type || '',
+      location_type: item.location_type || '',
+      location_sub_type: item.location_sub_type || ''
+    };
+  }
+  
+  function cancelEdit() {
+    editingMedia = null;
+    editForm = {
+      title: '',
+      description: '',
+      media_type: '',
+      media_sub_type: '',
+      location_type: '',
+      location_sub_type: ''
+    };
+  }
+  
+  function getLocationSubtypes(locationType: string) {
+    if (!Array.isArray(locationTypes)) return [];
+    const location = locationTypes.find(l => l.type === locationType);
+    return location?.subtypes || [];
+  }
+  
+  function getMediaSubtypes(mediaType: string) {
+    if (!Array.isArray(mediaTypes)) return [];
+    const type = mediaTypes.find(t => t.type === mediaType);
+    return type?.subtypes || [];
+  }
+  
+  async function updateMedia() {
+    if (!browser || !editingMedia) return;
+    
+    isUpdating = true;
+    
+    try {
+      const response = await fetch(`/api/media/${editingMedia.id}/update`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(editForm)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update media');
+      }
+      
+      cancelEdit();
+      dispatch('updated');
+    } catch (error: any) {
+      console.error('Error updating media:', error);
+      alert(error.message || 'Failed to update media');
+    } finally {
+      isUpdating = false;
+    }
   }
   
   async function deleteMedia(mediaId: string) {
@@ -95,7 +173,7 @@
         class="select"
       >
         <option value="all">All Locations</option>
-        {#each locationTypes as locationType}
+        {#each uniqueLocationTypes as locationType}
           <option value={locationType}>{formatLocationLabel(locationType)}</option>
         {/each}
       </select>
@@ -198,14 +276,24 @@
                 <span class="text-sm opacity-50">Processing...</span>
               {/if}
               
-              <button
-                type="button"
-                on:click={() => showDeleteConfirm(item.id)}
-                disabled={deletingId === item.id}
-                class="btn btn-sm variant-ghost-error disabled:opacity-50"
-              >
-                {deletingId === item.id ? 'Deleting...' : 'Delete'}
-              </button>
+              <div class="flex space-x-2">
+                <button
+                  type="button"
+                  on:click={() => showEditModal(item)}
+                  class="btn btn-sm variant-ghost"
+                  title="Edit metadata"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  on:click={() => showDeleteConfirm(item.id)}
+                  disabled={deletingId === item.id}
+                  class="btn btn-sm variant-ghost-error disabled:opacity-50"
+                >
+                  {deletingId === item.id ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>
           
@@ -243,10 +331,143 @@
   {/if}
 </div>
 
+<!-- Edit Media Modal -->
+{#if editingMedia}
+  <div class="fixed inset-0 bg-surface-backdrop-token flex items-center justify-center p-4 z-50">
+    <div class="card p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true">
+      <h3 class="h3 mb-4">Edit Media</h3>
+      
+      <form on:submit|preventDefault={updateMedia} class="space-y-4">
+        <!-- Title -->
+        <div>
+          <label for="edit-title" class="label">
+            <span>Title</span>
+          </label>
+          <input
+            id="edit-title"
+            type="text"
+            bind:value={editForm.title}
+            class="input"
+            placeholder="Enter title"
+          />
+        </div>
+        
+        <!-- Description -->
+        <div>
+          <label for="edit-description" class="label">
+            <span>Description</span>
+          </label>
+          <textarea
+            id="edit-description"
+            bind:value={editForm.description}
+            rows="3"
+            class="textarea"
+            placeholder="Enter description"
+          ></textarea>
+        </div>
+        
+        <!-- Media Type -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="edit-media-type" class="label">
+              <span>Media Type</span>
+            </label>
+            <select
+              id="edit-media-type"
+              bind:value={editForm.media_type}
+              class="select"
+            >
+              <option value="">Select type...</option>
+              {#if Array.isArray(mediaTypes)}
+                {#each mediaTypes as type}
+                  <option value={type.type}>{type.label}</option>
+                {/each}
+              {/if}
+            </select>
+          </div>
+          
+          <div>
+            <label for="edit-media-subtype" class="label">
+              <span>Media Sub-Type</span>
+            </label>
+            <select
+              id="edit-media-subtype"
+              bind:value={editForm.media_sub_type}
+              class="select"
+            >
+              <option value="">Select sub-type...</option>
+              {#each getMediaSubtypes(editForm.media_type) as subtype}
+                <option value={subtype.type}>{subtype.label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+        
+        <!-- Location Type -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label for="edit-location-type" class="label">
+              <span>Location Type</span>
+            </label>
+            <select
+              id="edit-location-type"
+              bind:value={editForm.location_type}
+              class="select"
+            >
+              <option value="">Select location...</option>
+              {#if Array.isArray(locationTypes)}
+                {#each locationTypes as location}
+                  <option value={location.type}>{location.label}</option>
+                {/each}
+              {/if}
+            </select>
+          </div>
+          
+          <div>
+            <label for="edit-location-subtype" class="label">
+              <span>Location Sub-Type</span>
+            </label>
+            <select
+              id="edit-location-subtype"
+              bind:value={editForm.location_sub_type}
+              class="select"
+            >
+              <option value="">Select sub-location...</option>
+              {#each getLocationSubtypes(editForm.location_type) as subtype}
+                <option value={subtype.type}>{subtype.label}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="flex space-x-2 pt-4">
+          <button
+            type="button"
+            on:click={cancelEdit}
+            class="btn variant-ghost flex-1"
+            disabled={isUpdating}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            class="btn variant-filled-primary flex-1"
+            disabled={isUpdating}
+          >
+            {isUpdating ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{/if}
+
 <style>
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

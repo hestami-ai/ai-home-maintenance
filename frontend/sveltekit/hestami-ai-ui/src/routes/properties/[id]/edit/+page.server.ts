@@ -71,10 +71,11 @@ export const load: PageServerLoad = async ({ params, cookies, url, parent }) => 
         apiGet(cookies, '/api/properties/schema/descriptives/choices/', {}, url.pathname)
       ]);
       
-      mediaTypes = typesResponse.data;
-      locationTypes = locationsResponse.data;
-      descriptivesSchema = schemaResponse.data.schema;
-      fieldChoices = choicesResponse.data;
+      // Ensure we always have arrays, even if API returns unexpected data
+      mediaTypes = Array.isArray(typesResponse.data) ? typesResponse.data : [];
+      locationTypes = Array.isArray(locationsResponse.data) ? locationsResponse.data : [];
+      descriptivesSchema = schemaResponse.data?.schema || {};
+      fieldChoices = choicesResponse.data || {};
     } catch (optionsErr) {
       console.error('Error fetching options:', optionsErr);
       // Continue with empty options if fetch fails
