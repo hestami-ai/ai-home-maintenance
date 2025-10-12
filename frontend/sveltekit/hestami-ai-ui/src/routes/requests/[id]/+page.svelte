@@ -17,7 +17,6 @@
 	} from 'lucide-svelte';
 	import Timeline from '$lib/components/timeline/Timeline.svelte';
 	import MediaGallery from '$lib/components/MediaGallery.svelte';
-	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { format } from 'date-fns';
 	import type { ServiceRequest, Media } from '$lib/types';
@@ -48,6 +47,129 @@
 	let currentFileIndex = 0;
 	let totalFiles = 0;
 	let overallProgress = 0;
+
+	// Handle media upload using direct fetch to API route
+	async function handleMediaUpload() {
+		if (!files || files.length === 0) {
+			uploadError = 'Please select at least one file to upload';
+			return;
+		}
+
+		// Reset states
+		isUploading = true;
+		uploadSuccess = false;
+		uploadError = '';
+		totalFiles = files.length;
+		currentFileIndex = 0;
+		overallProgress = 0;
+
+		// Initialize progress tracking for each file
+		uploadResults = Array.from(files).map((file) => ({
+			fileName: file.name,
+			success: false,
+			progress: 0
+		}));
+
+		try {
+			// Upload each file
+			for (let i = 0; i < files.length; i++) {
+				currentFileIndex = i;
+				const file = files[i];
+
+				// Create FormData for this file
+				const formData = new FormData();
+				formData.append('file', file);
+				formData.append('title', file.name);
+
+				try {
+					// Upload using XMLHttpRequest for progress tracking
+					const result = await uploadFileWithProgress(
+						`/api/media/services/requests/${serviceRequest.id}/upload`,
+						formData,
+						i
+					);
+
+					uploadResults[i].success = true;
+					uploadResults[i].progress = 100;
+				} catch (error) {
+					console.error(`Error uploading file ${file.name}:`, error);
+					uploadResults[i].success = false;
+					uploadResults[i].message = error instanceof Error ? error.message : 'Upload failed';
+					uploadResults[i].progress = 0;
+				}
+
+				// Update overall progress
+				overallProgress = Math.round(((i + 1) / totalFiles) * 100);
+			}
+
+			// Check if all uploads succeeded
+			const allSuccess = uploadResults.every((r) => r.success);
+			uploadSuccess = allSuccess;
+
+			if (!allSuccess) {
+				uploadError = 'Some files failed to upload';
+			} else {
+				// Clear files after successful upload
+				setTimeout(() => {
+					files = null;
+					uploadResults = [];
+				}, 1500);
+				// Refresh media list
+				invalidateAll();
+			}
+		} catch (error) {
+			console.error('Error during upload process:', error);
+			uploadError = error instanceof Error ? error.message : 'An unexpected error occurred';
+		} finally {
+			isUploading = false;
+		}
+	}
+
+	// Upload a single file with progress tracking
+	function uploadFileWithProgress(
+		url: string,
+		formData: FormData,
+		fileIndex: number
+	): Promise<any> {
+		return new Promise((resolve, reject) => {
+			const xhr = new XMLHttpRequest();
+
+			// Track upload progress
+			xhr.upload.addEventListener('progress', (event) => {
+				if (event.lengthComputable) {
+					const fileProgress = Math.round((event.loaded / event.total) * 100);
+					uploadResults[fileIndex].progress = fileProgress;
+				}
+			});
+
+			// Handle completion
+			xhr.addEventListener('load', () => {
+				if (xhr.status >= 200 && xhr.status < 300) {
+					try {
+						const response = JSON.parse(xhr.responseText);
+						resolve(response);
+					} catch (e) {
+						resolve(xhr.responseText);
+					}
+				} else {
+					reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText}`));
+				}
+			});
+
+			// Handle errors
+			xhr.addEventListener('error', () => {
+				reject(new Error('Network error during upload'));
+			});
+
+			xhr.addEventListener('abort', () => {
+				reject(new Error('Upload aborted'));
+			});
+
+			// Send the request
+			xhr.open('POST', url);
+			xhr.send(formData);
+		});
+	}
 
 	// Format date for display
 	function formatDate(dateString: string): string {
@@ -280,254 +402,7 @@
 					{/if}
 
 					<!-- Upload form -->
-					<form
-						method="POST"
-						action="?/uploadMedia"
-						enctype="multipart/form-data"
-						use:enhance={({ formData }) => {
-							// Reset states
-							isUploading = true;
-							uploadSuccess = false;
-							uploadError = '';
-
-							// Initialize progress tracking
-							totalFiles = files ? files.length : 0;
-							currentFileIndex = 0;
-							overallProgress = 0;
-
-							// Initialize progress tracking for each file
-							if (files) {
-								uploadResults = Array.from(files).map((file) => ({
-									fileName: file.name,
-									success: false,
-									progress: 0
-								}));
-							}
-
-							// Store original fetch to restore it later
-							const originalFetch = window.fetch;
-
-							// Override fetch with our custom implementation to track progress
-							window.fetch = function (input, init) {
-								// Only intercept POST requests with FormData body (file uploads)
-								if (init && init.method === 'POST' && init.body instanceof FormData) {
-									return new Promise((resolve, reject) => {
-										const xhr = new XMLHttpRequest();
-
-										// Open the request
-										const url = typeof input === 'string' ? input : (input as Request).url || '';
-										const method = init?.method || 'POST';
-										xhr.open(method, url);
-
-										// Set headers
-										if (init.headers) {
-											Object.entries(init.headers).forEach(([key, value]) => {
-												if (typeof value === 'string') {
-													xhr.setRequestHeader(key, value);
-												}
-											});
-										}
-
-										// Track upload progress
-										xhr.upload.addEventListener('progress', (event) => {
-											if (event.lengthComputable) {
-												// Update progress for current file
-												const fileProgress = Math.round((event.loaded / event.total) * 100);
-
-												// Update the progress in uploadResults
-												if (currentFileIndex < uploadResults.length) {
-													uploadResults[currentFileIndex].progress = fileProgress;
-
-													// Calculate overall progress
-													const completedFiles = currentFileIndex;
-													const currentProgress = fileProgress / 100;
-													overallProgress = Math.round(
-														((completedFiles + currentProgress) / totalFiles) * 100
-													);
-												}
-											}
-										});
-
-										// Handle load completion
-										xhr.addEventListener('load', () => {
-											// Create headers object from response headers
-											const responseHeaders = new Headers();
-											const headerString = xhr.getAllResponseHeaders();
-											const headerPairs = headerString.trim().split(/[\r\n]+/);
-
-											headerPairs.forEach((line) => {
-												const parts = line.split(': ');
-												const header = parts.shift();
-												const value = parts.join(': ');
-												if (header && value) {
-													responseHeaders.append(header, value);
-												}
-											});
-
-											// Create response object
-											const response = new Response(xhr.responseText, {
-												status: xhr.status,
-												statusText: xhr.statusText,
-												headers: responseHeaders
-											});
-
-											resolve(response);
-										});
-
-										// Handle errors
-										xhr.addEventListener('error', () => {
-											reject(new Error('Network error'));
-										});
-
-										xhr.addEventListener('abort', () => {
-											reject(new Error('Request aborted'));
-										});
-
-										// Send the request
-										// Convert FormData to a format XMLHttpRequest can handle
-										if (init.body instanceof FormData) {
-											xhr.send(init.body);
-										} else {
-											// For other body types, convert or send null
-											xhr.send(null);
-										}
-									});
-								}
-
-								// For non-file uploads, use the original fetch
-								return originalFetch(input, init);
-							};
-
-							// Manually add files to the FormData - Django expects a single 'file' field
-							if (files && files.length > 0) {
-								formData.append('file', files[0]);
-								formData.append('title', files[0].name);
-								console.log(
-									'File added to form data:',
-									files[0].name,
-									'Size:',
-									files[0].size,
-									'Type:',
-									files[0].type
-								);
-							} else {
-								console.log('No files to upload');
-								// Show error message and cancel submission
-								uploadError = 'Please select a file to upload';
-								isUploading = false;
-								return;
-							}
-
-							return async ({ result }) => {
-								// Restore original fetch function
-								window.fetch = originalFetch;
-
-								// Reset uploading state
-								isUploading = false;
-								console.log('Upload result:', result);
-
-								// Update progress to 100% for all files for visual feedback
-								uploadResults = uploadResults.map((item) => ({
-									...item,
-									progress: 100
-								}));
-
-								if (result.type === 'success') {
-									interface UploadResult {
-										success: boolean;
-										message: string;
-										results?: Array<{ fileName: string; success: boolean; message?: string }>;
-									}
-
-									// First convert to unknown, then check properties
-									const resultData = result.data as unknown;
-
-									// Type guard function to check if data matches our interface
-									function isUploadResult(data: unknown): data is UploadResult {
-										return (
-											data !== null &&
-											typeof data === 'object' &&
-											'success' in data &&
-											typeof (data as any).success === 'boolean'
-										);
-									}
-
-									// Check if the data has the expected structure
-									if (isUploadResult(resultData)) {
-										// Now TypeScript knows resultData is UploadResult
-										uploadSuccess = resultData.success;
-
-										// Update success/failure status from server response
-										if (Array.isArray(resultData.results)) {
-											// Merge server results with our progress tracking
-											uploadResults = uploadResults.map((progressItem) => {
-												const serverResult = resultData.results?.find(
-													(r) => r.fileName === progressItem.fileName
-												);
-												return {
-													...progressItem,
-													success: serverResult ? serverResult.success : false,
-													message: serverResult?.message
-												};
-											});
-										}
-
-										// Clear files after successful upload
-										if (resultData.success) {
-											// Wait a moment to show the success state
-											setTimeout(() => {
-												files = null;
-											}, 1500);
-											// Invalidate data to refresh media list
-											invalidateAll();
-										}
-									} else {
-										uploadSuccess = false;
-										uploadError = 'Received unexpected response format';
-									}
-								} else if (result.type === 'failure') {
-									// Handle the failure case
-									uploadSuccess = false;
-
-									// Try to parse the data if it's a string (which appears to be the case from the error)
-									let parsedData;
-									if (typeof result.data === 'string') {
-										try {
-											parsedData = JSON.parse(result.data);
-											console.log('Parsed error data:', parsedData);
-
-											// Check if it's an array with the error message
-											if (Array.isArray(parsedData) && parsedData.length > 0) {
-												// The last item in the array seems to be the error message
-												const errorMessage = parsedData[parsedData.length - 1];
-												if (typeof errorMessage === 'string') {
-													uploadError = errorMessage;
-													return;
-												}
-											}
-										} catch (e) {
-											console.error('Failed to parse error data:', e);
-										}
-									}
-
-									// If we couldn't parse the data or extract a message, fall back to the original approach
-									const resultData = parsedData || result.data;
-
-									// Check if resultData is an object with a message property
-									if (resultData && typeof resultData === 'object' && 'message' in resultData) {
-										uploadError = String(resultData.message);
-									} else if (result.status === 400) {
-										// If we have a 400 status, it's likely the 'No files were uploaded' error
-										uploadError = 'No files were selected for upload';
-									} else {
-										// Generic error message
-										uploadError = `Failed to upload media (Status: ${result.status})`;
-									}
-								}
-							};
-						}}
-						class="space-y-4"
-					>
+					<div class="space-y-4">
 						<!-- File upload area -->
 						<div
 							class="file-upload-container border-surface-300-600-token rounded-lg border-2 border-dashed p-6 text-center"
@@ -537,7 +412,7 @@
 								class="flex cursor-pointer flex-col items-center justify-center gap-2"
 							>
 								<Upload class="text-surface-500-400-token h-8 w-8" />
-								<span class="text-surface-700-200-token">Click to upload or drag and drop</span>
+								<span class="text-surface-700-200-token">Click to select files or drag and drop</span>
 								<span class="text-surface-500-400-token text-xs">PNG, JPG, MP4 up to 10MB</span>
 							</label>
 							<input
@@ -643,9 +518,10 @@
 
 						<!-- Upload button -->
 						<button
-							type="submit"
+							type="button"
 							class="btn variant-filled-primary w-full"
 							disabled={!files || files.length === 0 || isUploading}
+							on:click={handleMediaUpload}
 						>
 							{#if isUploading}
 								<div class="flex items-center justify-center gap-2">
@@ -658,7 +534,7 @@
 								Upload Media
 							{/if}
 						</button>
-					</form>
+					</div>
 				</div>
 			</section>
 		</div>

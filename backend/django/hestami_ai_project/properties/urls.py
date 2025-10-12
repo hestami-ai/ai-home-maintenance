@@ -1,9 +1,15 @@
 from django.urls import path
 from . import views
+from . import views_schema
 
 app_name = 'properties'
 
 urlpatterns = [
+    # Schema endpoints
+    path('schema/descriptives/', views_schema.get_descriptives_schema, name='descriptives_schema'),
+    path('schema/descriptives/choices/', views_schema.get_descriptives_choices, name='descriptives_choices'),
+    
+    # Property CRUD
     path('', views.list_properties, name='list_properties'),
     path('create/', views.create_property, name='create_property'),
     path('<uuid:property_id>/', views.property_detail, name='property_detail'),

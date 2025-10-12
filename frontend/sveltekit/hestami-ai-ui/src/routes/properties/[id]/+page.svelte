@@ -16,7 +16,17 @@
 		Square, 
 		Calendar, 
 		DollarSign, 
-		Car
+		Car,
+		Flame,
+		Snowflake,
+		Wind,
+		Zap,
+		Droplet,
+		Hammer,
+		Layers,
+		Trees,
+		Waves,
+		Fence as FenceIcon
 	} from 'lucide-svelte';
 	
 	// Get data from server-side load function using runes
@@ -53,23 +63,20 @@
 	const descriptives = property?.descriptives || {};
 	
 	// Extract values from descriptives with fallbacks
-	const propertyType = descriptives.propertyType || 'Residential';
+	const propertyType = descriptives.propertyType || 'N/A';
 	const yearBuilt = descriptives.yearBuilt || 'N/A';
 	const squareFeet = descriptives.squareFootage || 'N/A';
 	const bedrooms = descriptives.bedrooms || 'N/A';
 	const bathrooms = descriptives.bathrooms || 'N/A';
-	const parkingSpaces = descriptives.garage ? '1+' : 'N/A';
-	const rent = 0; // Not in current API model, using 0 as placeholder
-	const deposit = 0; // Not in current API model, using 0 as placeholder
-	const availableFrom = new Date().toISOString().split('T')[0]; // Default to today
+	const parkingSpaces = descriptives.garageSpaces || (descriptives.garage ? '1+' : 'N/A');
 	
-	// Features list from descriptives
-	const features: string[] = [];
-	if (descriptives.airConditioning) features.push('Central Air Conditioning');
-	if (descriptives.heatingSystem) features.push('Heating System: ' + descriptives.heatingSystem);
-	if (descriptives.garage) features.push('Garage');
-	if (descriptives.basement) features.push('Basement');
-	if (descriptives.gatedCommunity) features.push('Gated Community');
+	// Helper function to format field labels
+	function formatLabel(value: string): string {
+		if (!value) return value;
+		return value.split('_').map(word => 
+			word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+		).join(' ');
+	}
 	
 	// Main image - use featured image if available
 	const mainImage = property.featuredImage;
@@ -250,10 +257,16 @@
 
 <div class="space-y-8">
 	<!-- Back button and title -->
-	<div class="flex items-center space-x-2">
+	<div class="flex items-center justify-between">
 		<button class="btn btn-sm variant-soft" onclick={goBack}>
 			<ArrowLeft class="h-4 w-4 mr-1" />
 			Back to Properties
+		</button>
+		<button class="btn btn-sm variant-filled-primary" onclick={() => goto(`/properties/${propertyId}/edit`)}>
+			<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+			</svg>
+			Edit Property
 		</button>
 	</div>
 
@@ -322,13 +335,6 @@
 				<div>
 					<div class="text-sm text-surface-600-300-token">Square Feet</div>
 					<div class="font-semibold">{squareFeet}</div>
-				</div>
-			</div>
-			<div class="flex items-center">
-				<DollarSign class="h-5 w-5 mr-2 text-primary-500" />
-				<div>
-					<div class="text-sm text-surface-600-300-token">Monthly Rent</div>
-					<div class="font-semibold">{formatCurrency(rent)}</div>
 				</div>
 			</div>
 		</div>
@@ -427,38 +433,212 @@
 							</div>
 						</div>
 						
-						<div>
-							<h3 class="h4 mb-2">Financial Information</h3>
-							<ul class="space-y-2">
-								<li class="flex items-center">
-									<DollarSign class="h-5 w-5 mr-2 text-primary-500" />
-									<span class="text-surface-600-300-token mr-2">Monthly Rent:</span>
-									<span class="font-medium">{formatCurrency(0.00)}</span>
-								</li>
-								<li class="flex items-center">
-									<DollarSign class="h-5 w-5 mr-2 text-primary-500" />
-									<span class="text-surface-600-300-token mr-2">Security Deposit:</span>
-									<span class="font-medium">{formatCurrency(0.00)}</span>
-								</li>
-								<li class="flex items-center">
-									<Calendar class="h-5 w-5 mr-2 text-primary-500" />
-									<span class="text-surface-600-300-token mr-2">Available From:</span>
-									<span class="font-medium">{formatDate("2025-05-02")}</span>
-								</li>
-							</ul>
-						</div>
-					</div>
-					
-					<div>
-						<h3 class="h4 mb-2">Features & Amenities</h3>
-						<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-							{#each features as feature}
-								<div class="flex items-center">
-									<div class="h-2 w-2 rounded-full bg-primary-500 mr-2"></div>
-									<span class="text-sm">{feature}</span>
+						<!-- HVAC & Climate Control -->
+						{#if descriptives.heatingSystem || descriptives.coolingSystem || descriptives.airConditioning}
+							<div>
+								<h3 class="h4 mb-2">HVAC & Climate Control</h3>
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+									{#if descriptives.heatingSystem}
+										<div class="flex items-start">
+											<Flame class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+											<div>
+												<div class="font-medium">Heating System</div>
+												<div class="text-sm text-surface-600-300-token">{formatLabel(descriptives.heatingSystem)}</div>
+											</div>
+										</div>
+									{/if}
+									{#if descriptives.coolingSystem}
+										<div class="flex items-start">
+											<Snowflake class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+											<div>
+												<div class="font-medium">Cooling System</div>
+												<div class="text-sm text-surface-600-300-token">{formatLabel(descriptives.coolingSystem)}</div>
+											</div>
+										</div>
+									{/if}
+									{#if descriptives.airConditioning}
+										<div class="flex items-start">
+											<Wind class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+											<div>
+												<div class="font-medium">Air Conditioning</div>
+												<div class="text-sm text-surface-600-300-token">Yes</div>
+											</div>
+										</div>
+									{/if}
+									{#if descriptives.hvacAge}
+										<div class="flex items-start">
+											<Calendar class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+											<div>
+												<div class="font-medium">HVAC Age</div>
+												<div class="text-sm text-surface-600-300-token">{descriptives.hvacAge} years</div>
+											</div>
+										</div>
+									{/if}
+									{#if descriptives.hvacBrand}
+										<div class="flex items-start">
+											<Wind class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+											<div>
+												<div class="font-medium">HVAC Brand</div>
+												<div class="text-sm text-surface-600-300-token">{descriptives.hvacBrand}</div>
+											</div>
+										</div>
+									{/if}
 								</div>
-							{/each}
+							</div>
+						{/if}
+					
+					<!-- Structure & Features -->
+					{#if descriptives.basement || descriptives.garage || descriptives.attic || descriptives.pool || descriptives.fence || descriptives.deck || descriptives.patio}
+						<div>
+							<h3 class="h4 mb-2">Structure & Features</h3>
+							<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+								{#if descriptives.basement}
+									<div class="flex items-center">
+										<Layers class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Basement{descriptives.basementType ? ` (${formatLabel(descriptives.basementType)})` : ''}</span>
+									</div>
+								{/if}
+								{#if descriptives.garage}
+									<div class="flex items-center">
+										<Car class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Garage{descriptives.garageType ? ` (${formatLabel(descriptives.garageType)})` : ''}</span>
+									</div>
+								{/if}
+								{#if descriptives.attic}
+									<div class="flex items-center">
+										<Home class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Attic</span>
+									</div>
+								{/if}
+								{#if descriptives.pool}
+									<div class="flex items-center">
+										<Waves class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Pool{descriptives.poolType ? ` (${formatLabel(descriptives.poolType)})` : ''}</span>
+									</div>
+								{/if}
+								{#if descriptives.fence}
+									<div class="flex items-center">
+										<FenceIcon class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Fence{descriptives.fenceType ? ` (${formatLabel(descriptives.fenceType)})` : ''}</span>
+									</div>
+								{/if}
+								{#if descriptives.gatedCommunity}
+									<div class="flex items-center">
+										<Home class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Gated Community</span>
+									</div>
+								{/if}
+								{#if descriptives.deck}
+									<div class="flex items-center">
+										<Layers class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Deck{descriptives.deckMaterial ? ` (${formatLabel(descriptives.deckMaterial)})` : ''}</span>
+									</div>
+								{/if}
+								{#if descriptives.patio}
+									<div class="flex items-center">
+										<Square class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Patio{descriptives.patioMaterial ? ` (${formatLabel(descriptives.patioMaterial)})` : ''}</span>
+									</div>
+								{/if}
+								{#if descriptives.sprinklerSystem}
+									<div class="flex items-center">
+										<Droplet class="h-4 w-4 mr-2 text-primary-500" />
+										<span class="text-sm">Sprinkler System</span>
+									</div>
+								{/if}
+							</div>
 						</div>
+					{/if}
+					
+					<!-- Roofing & Exterior -->
+					{#if descriptives.roofType || descriptives.roofAge || descriptives.exteriorMaterial || descriptives.foundationType}
+						<div>
+							<h3 class="h4 mb-2">Roofing & Exterior</h3>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+								{#if descriptives.roofType}
+									<div class="flex items-start">
+										<Home class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Roof Type</div>
+											<div class="text-sm text-surface-600-300-token">{formatLabel(descriptives.roofType)}</div>
+										</div>
+									</div>
+								{/if}
+								{#if descriptives.roofAge}
+									<div class="flex items-start">
+										<Calendar class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Roof Age</div>
+											<div class="text-sm text-surface-600-300-token">{descriptives.roofAge} years</div>
+										</div>
+									</div>
+								{/if}
+								{#if descriptives.exteriorMaterial}
+									<div class="flex items-start">
+										<Layers class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Exterior Material</div>
+											<div class="text-sm text-surface-600-300-token">{formatLabel(descriptives.exteriorMaterial)}</div>
+										</div>
+									</div>
+								{/if}
+								{#if descriptives.foundationType}
+									<div class="flex items-start">
+										<Hammer class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Foundation Type</div>
+											<div class="text-sm text-surface-600-300-token">{formatLabel(descriptives.foundationType)}</div>
+										</div>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
+					
+					<!-- Utilities -->
+					{#if descriptives.utilities && (descriptives.utilities.gas || descriptives.utilities.electricity || descriptives.utilities.water)}
+						<div>
+							<h3 class="h4 mb-2">Utilities</h3>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+								{#if descriptives.utilities.gas}
+									<div class="flex items-start">
+										<Flame class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Gas</div>
+											<div class="text-sm text-surface-600-300-token">{descriptives.utilities.gas}</div>
+										</div>
+									</div>
+								{/if}
+								{#if descriptives.utilities.electricity}
+									<div class="flex items-start">
+										<Zap class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Electricity</div>
+											<div class="text-sm text-surface-600-300-token">{descriptives.utilities.electricity}</div>
+										</div>
+									</div>
+								{/if}
+								{#if descriptives.utilities.water}
+									<div class="flex items-start">
+										<Droplet class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Water</div>
+											<div class="text-sm text-surface-600-300-token">{descriptives.utilities.water}</div>
+										</div>
+									</div>
+								{/if}
+								{#if descriptives.utilities.sewer}
+									<div class="flex items-start">
+										<Droplet class="h-4 w-4 mr-2 mt-1 text-primary-500" />
+										<div>
+											<div class="font-medium">Sewer</div>
+											<div class="text-sm text-surface-600-300-token">{descriptives.utilities.sewer}</div>
+										</div>
+									</div>
+								{/if}
+							</div>
+						</div>
+					{/if}
 					</div>
 				</div>
 			{/if}

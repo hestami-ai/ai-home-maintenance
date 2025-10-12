@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Count, Sum
 from django.utils import timezone
+from django.db import transaction
 from .models import Media, MediaType, MediaSubType, LocationType, LocationSubType
 from properties.models import Property, PropertyAccess
 from services.models.base_models import ServiceRequest, ServiceReport
@@ -115,22 +116,24 @@ def upload_media(request, property_id):
 
         media = serializer.save()
         
-        # Queue media processing task
-        from .tasks import process_media_task
-        task = process_media_task.delay(media.id)
+        # Queue media processing task after transaction commits to ensure file is on disk
+        def queue_processing():
+            from .tasks import process_media_task
+            task = process_media_task.delay(media.id)
+            
+            # Store initial task status in cache
+            cache_key = f'media_processing_{media.id}'
+            cache.set(cache_key, {
+                'status': 'queued',
+                'task_id': task.id
+            }, timeout=3600)
         
-        # Store initial task status in cache
-        cache_key = f'media_processing_{media.id}'
-        cache.set(cache_key, {
-            'status': 'queued',
-            'task_id': task.id
-        }, timeout=3600)
+        transaction.on_commit(queue_processing)
         
         logger.info(f"Media uploaded successfully by user {request.user.id} for property {property_id}")
         return Response({
             **serializer.data,
-            'processing_status': 'queued',
-            'task_id': task.id
+            'processing_status': 'queued'
         }, status=status.HTTP_201_CREATED)
     
     except Exception as e:
@@ -372,13 +375,14 @@ def upload_service_request_media(request, request_id):
         if file_type not in [MediaType.IMAGE, MediaType.VIDEO]:
             file_type = MediaType.FILE
 
-        # Create media object
+        # Create media object with property reference
         media = Media.objects.create(
             file=uploaded_file,
             title=request.POST.get('title', uploaded_file.name),
             description=request.POST.get('description', ''),
             uploader=request.user,
             service_request=service_request,
+            property_ref=service_request.property,
             file_type=file_type,
             file_size=uploaded_file.size,
             original_filename=uploaded_file.name,
@@ -386,8 +390,8 @@ def upload_service_request_media(request, request_id):
             media_type=file_type
         )
 
-        # Scan file for viruses asynchronously
-        scan_file.delay(media.id)
+        # Scan file for viruses asynchronously after transaction commits
+        transaction.on_commit(lambda: scan_file.delay(media.id))
 
         return Response(
             MediaSerializer(media).data,
@@ -507,13 +511,14 @@ def upload_service_report_media(request, report_id):
         if file_type not in [MediaType.IMAGE, MediaType.VIDEO]:
             file_type = MediaType.FILE
 
-        # Create media object
+        # Create media object with property reference
         media = Media.objects.create(
             file=uploaded_file,
             title=request.POST.get('title', uploaded_file.name),
             description=request.POST.get('description', ''),
             uploader=request.user,
             service_report=service_report,
+            property_ref=service_report.service_request.property,
             file_type=file_type,
             file_size=uploaded_file.size,
             original_filename=uploaded_file.name,
@@ -521,8 +526,8 @@ def upload_service_report_media(request, report_id):
             media_type=file_type
         )
 
-        # Scan file for viruses asynchronously
-        scan_file.delay(media.id)
+        # Scan file for viruses asynchronously after transaction commits
+        transaction.on_commit(lambda: scan_file.delay(media.id))
 
         return Response(
             MediaSerializer(media).data,

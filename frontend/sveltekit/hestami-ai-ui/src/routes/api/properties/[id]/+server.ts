@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
-import { apiGet, apiPut, apiDelete } from '$lib/server/api';
+import { apiGet, apiPut, apiPatch, apiDelete } from '$lib/server/api';
 import type { Property, Media } from '$lib/types';
 
 /**
@@ -79,6 +79,39 @@ export async function PUT({ params, request, cookies, url }: RequestEvent) {
     
     // Forward to Django backend
     const response = await apiPut(
+      cookies,
+      `/api/properties/${propertyId}/update/`,
+      propertyData,
+      {},
+      url.pathname
+    );
+    
+    return json(response.data, { status: response.status });
+  } catch (error) {
+    console.error(`Error updating property ${params.id}:`, error);
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Failed to update property';
+      
+    return json(
+      { error: errorMessage },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH endpoint to partially update a property
+ * Maps to Django's /<uuid:property_id>/update/ endpoint
+ */
+export async function PATCH({ params, request, cookies, url }: RequestEvent) {
+  try {
+    const propertyId = params.id;
+    const propertyData = await request.json();
+    
+    // Forward to Django backend
+    const response = await apiPatch(
       cookies,
       `/api/properties/${propertyId}/update/`,
       propertyData,

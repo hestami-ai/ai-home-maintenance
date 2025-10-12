@@ -242,6 +242,13 @@ export interface Media {
   created_at?: string;
   updated_at?: string;
   processing_status?: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  metadata?: {
+    scan_status?: 'SCANNING' | 'COMPLETED' | 'FAILED';
+    is_safe?: boolean;
+    scan_message?: string;
+    scan_date?: string;
+    [key: string]: any;
+  };
 }
 
 /**
@@ -255,6 +262,7 @@ export interface Property {
   city: string;
   state: string;
   zip_code: string;
+  county?: string;
   country: string;
   status: string;
   created_at: string;

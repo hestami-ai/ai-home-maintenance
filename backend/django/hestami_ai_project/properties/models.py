@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 import uuid
+from .descriptives_schema import get_default_descriptives
 
 class PropertyStatus(models.TextChoices):
     ACTIVE = 'ACTIVE', 'Active'
@@ -43,7 +44,11 @@ class Property(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
-    descriptives = models.JSONField(default=dict, blank=True)
+    descriptives = models.JSONField(
+        default=get_default_descriptives, 
+        blank=True,
+        help_text="Structured property descriptive data including HVAC, utilities, structure, etc."
+    )
 
     # Permit retrieval status tracking
     permit_retrieval_status = models.CharField(
