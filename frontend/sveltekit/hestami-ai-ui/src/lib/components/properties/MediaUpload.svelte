@@ -30,12 +30,20 @@
   
   // Get location subtypes for a given location type
   function getLocationSubtypes(locationType: string) {
+    if (!Array.isArray(locationTypes)) {
+      console.warn('locationTypes is not an array:', locationTypes);
+      return [];
+    }
     const location = locationTypes.find(l => l.type === locationType);
     return location?.subtypes || [];
   }
   
   // Get media subtypes for a given media type
   function getMediaSubtypes(mediaType: string) {
+    if (!Array.isArray(mediaTypes)) {
+      console.warn('mediaTypes is not an array:', mediaTypes);
+      return [];
+    }
     const type = mediaTypes.find(t => t.type === mediaType);
     return type?.subtypes || [];
   }
