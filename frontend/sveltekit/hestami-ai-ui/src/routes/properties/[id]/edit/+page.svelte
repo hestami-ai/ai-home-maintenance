@@ -128,7 +128,10 @@
         <div class="border-t border-gray-200 pt-8">
           <MediaGallery 
             {media}
+            {mediaTypes}
+            {locationTypes}
             on:deleted={handleMediaDeleted}
+            on:updated={handleMediaUploaded}
           />
         </div>
       </div>

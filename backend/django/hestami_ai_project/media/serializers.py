@@ -248,3 +248,34 @@ class MediaSerializer(serializers.ModelSerializer):
         
         # Create the media object
         return super().create(validated_data)
+
+
+class MediaMetadataUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating media metadata only.
+    Does not allow updating file, uploader, or parent relationships.
+    """
+    media_type = serializers.ChoiceField(choices=MediaType.choices, required=False)
+    media_sub_type = serializers.ChoiceField(choices=MediaSubType.choices, required=False)
+    location_type = serializers.ChoiceField(choices=LocationType.choices, required=False, allow_blank=True)
+    location_sub_type = serializers.ChoiceField(choices=LocationSubType.choices, required=False, allow_blank=True)
+    
+    class Meta:
+        model = Media
+        fields = [
+            'title', 'description', 'media_type', 'media_sub_type',
+            'location_type', 'location_sub_type'
+        ]
+    
+    def validate(self, data):
+        # Validate that location_sub_type matches location_type
+        location_type = data.get('location_type', self.instance.location_type if self.instance else None)
+        location_sub_type = data.get('location_sub_type', self.instance.location_sub_type if self.instance else None)
+        
+        if location_type and location_sub_type:
+            if not LocationSubType.validate_for_type(location_type, location_sub_type):
+                raise serializers.ValidationError({
+                    'location_sub_type': f'Invalid sub-type "{location_sub_type}" for location type "{location_type}"'
+                })
+        
+        return data

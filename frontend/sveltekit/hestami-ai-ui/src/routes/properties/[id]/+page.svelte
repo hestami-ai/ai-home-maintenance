@@ -491,58 +491,58 @@
 					{#if descriptives.basement || descriptives.garage || descriptives.attic || descriptives.pool || descriptives.fence || descriptives.deck || descriptives.patio}
 						<div>
 							<h3 class="h4 mb-2">Structure & Features</h3>
-							<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 								{#if descriptives.basement}
 									<div class="flex items-center">
-										<Layers class="h-4 w-4 mr-2 text-primary-500" />
+										<Layers class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Basement{descriptives.basementType ? ` (${formatLabel(descriptives.basementType)})` : ''}</span>
 									</div>
 								{/if}
 								{#if descriptives.garage}
 									<div class="flex items-center">
-										<Car class="h-4 w-4 mr-2 text-primary-500" />
+										<Car class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Garage{descriptives.garageType ? ` (${formatLabel(descriptives.garageType)})` : ''}</span>
 									</div>
 								{/if}
 								{#if descriptives.attic}
 									<div class="flex items-center">
-										<Home class="h-4 w-4 mr-2 text-primary-500" />
+										<Home class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Attic</span>
 									</div>
 								{/if}
 								{#if descriptives.pool}
 									<div class="flex items-center">
-										<Waves class="h-4 w-4 mr-2 text-primary-500" />
+										<Waves class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Pool{descriptives.poolType ? ` (${formatLabel(descriptives.poolType)})` : ''}</span>
 									</div>
 								{/if}
 								{#if descriptives.fence}
 									<div class="flex items-center">
-										<FenceIcon class="h-4 w-4 mr-2 text-primary-500" />
+										<FenceIcon class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Fence{descriptives.fenceType ? ` (${formatLabel(descriptives.fenceType)})` : ''}</span>
 									</div>
 								{/if}
 								{#if descriptives.gatedCommunity}
 									<div class="flex items-center">
-										<Home class="h-4 w-4 mr-2 text-primary-500" />
+										<Home class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Gated Community</span>
 									</div>
 								{/if}
 								{#if descriptives.deck}
 									<div class="flex items-center">
-										<Layers class="h-4 w-4 mr-2 text-primary-500" />
+										<Layers class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Deck{descriptives.deckMaterial ? ` (${formatLabel(descriptives.deckMaterial)})` : ''}</span>
 									</div>
 								{/if}
 								{#if descriptives.patio}
 									<div class="flex items-center">
-										<Square class="h-4 w-4 mr-2 text-primary-500" />
+										<Square class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Patio{descriptives.patioMaterial ? ` (${formatLabel(descriptives.patioMaterial)})` : ''}</span>
 									</div>
 								{/if}
 								{#if descriptives.sprinklerSystem}
 									<div class="flex items-center">
-										<Droplet class="h-4 w-4 mr-2 text-primary-500" />
+										<Droplet class="h-4 w-4 mr-2 mt-1 text-primary-500" />
 										<span class="text-sm">Sprinkler System</span>
 									</div>
 								{/if}
