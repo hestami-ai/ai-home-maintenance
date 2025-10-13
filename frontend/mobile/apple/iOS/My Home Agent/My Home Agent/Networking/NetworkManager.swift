@@ -108,7 +108,7 @@ public class NetworkManager {
     public static let shared = NetworkManager()
     
     // API server configuration
-    private let baseURL = "https://dev-homeservices.hestami-ai.com"
+    public let baseURL = "https://dev-homeservices.hestami-ai.com"
     
     // Static media server configuration
     private var staticMediaHost = "dev-static.hestami-ai.com" // Default value, should be configured at app startup
