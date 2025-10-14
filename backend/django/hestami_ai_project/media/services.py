@@ -49,6 +49,9 @@ class MediaProcessor:
         3. Extract EXIF data
         """
         try:
+            # Reset file pointer to beginning (after virus scan)
+            media_instance.file.seek(0)
+            
             # Open image using PIL
             image = Image.open(media_instance.file)
             

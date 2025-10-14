@@ -71,9 +71,36 @@ export const load: PageServerLoad = async ({ params, cookies, url, parent }) => 
         apiGet(cookies, '/api/properties/schema/descriptives/choices/', {}, url.pathname)
       ]);
       
-      // Ensure we always have arrays, even if API returns unexpected data
-      mediaTypes = Array.isArray(typesResponse.data) ? typesResponse.data : [];
-      locationTypes = Array.isArray(locationsResponse.data) ? locationsResponse.data : [];
+      // Transform Django API response to array format for components
+      // Django returns: { types: [...], subTypes: {...} }
+      // We need: [{ type: 'X', label: 'X', subtypes: [...] }]
+      
+      if (typesResponse.data?.types && typesResponse.data?.subTypes) {
+        mediaTypes = typesResponse.data.types.map((type: any) => ({
+          type: type.value,
+          label: type.label,
+          subtypes: (typesResponse.data.subTypes[type.value] || []).map((sub: any) => ({
+            type: sub.value,
+            label: sub.label
+          }))
+        }));
+      } else {
+        mediaTypes = Array.isArray(typesResponse.data) ? typesResponse.data : [];
+      }
+      
+      if (locationsResponse.data?.types && locationsResponse.data?.subTypes) {
+        locationTypes = locationsResponse.data.types.map((type: any) => ({
+          type: type.value,
+          label: type.label,
+          subtypes: (locationsResponse.data.subTypes[type.value] || []).map((sub: any) => ({
+            type: sub.value,
+            label: sub.label
+          }))
+        }));
+      } else {
+        locationTypes = Array.isArray(locationsResponse.data) ? locationsResponse.data : [];
+      }
+      
       descriptivesSchema = schemaResponse.data?.schema || {};
       fieldChoices = choicesResponse.data || {};
     } catch (optionsErr) {

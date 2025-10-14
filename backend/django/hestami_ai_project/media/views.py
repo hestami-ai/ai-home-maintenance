@@ -16,7 +16,7 @@ import logging
 import os
 from django.conf import settings
 from django.core.cache import cache
-from .tasks import scan_file
+from .utils import scan_file as scan_file_util
 
 logger = logging.getLogger('security')
 
@@ -95,12 +95,6 @@ def upload_media(request, property_id):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         uploaded_file = request.FILES['file']
-        is_clean, message = scan_file(uploaded_file)
-        if not is_clean:
-            logger.warning(f"File scan failed: {message}")
-            return Response({
-                'error': f'File rejected: {message}'
-            }, status=status.HTTP_400_BAD_REQUEST)
 
         # Create media directories if they don't exist
         os.makedirs(os.path.join(settings.MEDIA_ROOT, 'properties', str(property_id)), exist_ok=True)
@@ -441,14 +435,14 @@ def upload_service_request_media(request, request_id):
         if file_type not in [MediaType.IMAGE, MediaType.VIDEO]:
             file_type = MediaType.FILE
 
-        # Create media object with property reference
+        # Create media object for service request (no property_ref)
         media = Media.objects.create(
             file=uploaded_file,
             title=request.POST.get('title', uploaded_file.name),
             description=request.POST.get('description', ''),
             uploader=request.user,
             service_request=service_request,
-            property_ref=service_request.property,
+            # Note: property_ref is NOT set - media belongs to service_request only
             file_type=file_type,
             file_size=uploaded_file.size,
             original_filename=uploaded_file.name,
@@ -456,8 +450,12 @@ def upload_service_request_media(request, request_id):
             media_type=file_type
         )
 
-        # Scan file for viruses asynchronously after transaction commits
-        transaction.on_commit(lambda: scan_file.delay(media.id))
+        # Queue media processing (includes virus scan + thumbnails)
+        def queue_processing():
+            from .tasks import process_media_task
+            process_media_task.delay(media.id)
+        
+        transaction.on_commit(queue_processing)
 
         return Response(
             MediaSerializer(media).data,
@@ -592,8 +590,12 @@ def upload_service_report_media(request, report_id):
             media_type=file_type
         )
 
-        # Scan file for viruses asynchronously after transaction commits
-        transaction.on_commit(lambda: scan_file.delay(media.id))
+        # Queue media processing (includes virus scan + thumbnails)
+        def queue_processing():
+            from .tasks import process_media_task
+            process_media_task.delay(media.id)
+        
+        transaction.on_commit(queue_processing)
 
         return Response(
             MediaSerializer(media).data,

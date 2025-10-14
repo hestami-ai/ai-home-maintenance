@@ -86,16 +86,25 @@ export async function apiPost<T = any, U = any>(
     // Check authentication
     const sessionId = auth.checkAuthentication(cookies, returnUrl);
     
+    // Detect if body is FormData (for file uploads)
+    const isFormData = body instanceof FormData;
+    
+    // Prepare headers - don't set Content-Type for FormData (browser sets it with boundary)
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      ...(options.headers || {})
+    };
+    
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
     // Make API request
     const response = await auth.apiRequest(sessionId, endpoint, {
       ...options,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(options.headers || {})
-      },
-      body: JSON.stringify(body)
+      headers,
+      body: isFormData ? body : JSON.stringify(body)
     });
     
     // Handle error status codes

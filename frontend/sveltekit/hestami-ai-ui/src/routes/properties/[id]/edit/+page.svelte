@@ -16,9 +16,6 @@
   // Reactive statement to update media when data changes
   $: ({ property, media, mediaTypes, locationTypes } = data);
   
-  // Debug: Log property data
-  $: console.log('Property data:', property);
-  
   function handlePropertySaved() {
     saveStatus = 'success';
     setTimeout(() => {
@@ -57,18 +54,10 @@
 <div class="container mx-auto px-4 py-8 max-w-7xl">
   <!-- Header -->
   <div class="mb-8">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="h1">Edit Property</h1>
-        <p class="mt-2">{property.title}</p>
-        <p class="text-sm opacity-70">{property.address}, {property.city}, {property.state}</p>
-      </div>
-      <button
-        on:click={handleCancel}
-        class="btn variant-ghost"
-      >
-        Cancel
-      </button>
+    <div>
+      <h1 class="h1">Edit Property</h1>
+      <p class="mt-2">{property.title}</p>
+      <p class="text-sm opacity-70">{property.address}, {property.city}, {property.state}</p>
     </div>
   </div>
 
@@ -115,6 +104,7 @@
         {fieldChoices}
         on:saved={handlePropertySaved}
         on:error={(e) => handlePropertyError(e.detail)}
+        on:cancel={handleCancel}
       />
     {:else if activeTab === 'media'}
       <div class="p-6 space-y-8">

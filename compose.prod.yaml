@@ -38,11 +38,21 @@ services:
         ENV_NPM_BUILD_FILE: ./.env.prod
     env_file:
       - ./.env.prod
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Production: allow more concurrent uploads
+        reservations:
+          memory: 1G  # Base memory for app
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`homeservices.hestami-ai.com`)"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      # Enable request buffering for large uploads
+      - "traefik.http.middlewares.frontend-buffering.buffering.maxRequestBodyBytes=104857600"  # 100MB
+      - "traefik.http.middlewares.frontend-buffering.buffering.memRequestBodyBytes=104857600"  # 100MB in memory
+      - "traefik.http.routers.frontend.middlewares=frontend-buffering"
     networks:
       - traefik-public
       - backend-prod

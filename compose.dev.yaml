@@ -26,6 +26,11 @@ services:
       /bin/sh -c "mkdir -p /mnt/hestami-static/media /mnt/hestami-static/static &&
       chown -R 999:999 /mnt/hestami-static &&
       chmod -R 775 /mnt/hestami-static"
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   frontend:
     build: 
@@ -38,18 +43,35 @@ services:
       - "3000:3000"
     env_file:
       - ./.env.local
+    environment:
+      - BODY_SIZE_LIMIT=104857600  # 100MB in bytes
     networks:
       - backend-dev
     depends_on:
       - api
       - static
       - traefik
+    deploy:
+      resources:
+        limits:
+          memory: 2G  # Allow ~20 concurrent 100MB uploads
+        reservations:
+          memory: 512M  # Base memory for app
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`homeservices.hai`)"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
-
+      # Enable request buffering for large uploads
+      - "traefik.http.middlewares.frontend-buffering.buffering.maxRequestBodyBytes=104857600"  # 100MB
+      - "traefik.http.middlewares.frontend-buffering.buffering.memRequestBodyBytes=104857600"  # 100MB in memory
+      - "traefik.http.routers.frontend.middlewares=frontend-buffering"
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+  
   api:
     build: 
       context: .
@@ -72,7 +94,11 @@ services:
     networks:
       - backend-dev
       - temporal-network
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
   db:
     image: postgres:17
     container_name: db-dev
@@ -84,7 +110,11 @@ services:
       - postgres_data_dev:/var/lib/postgresql/data
     networks:
       - backend-dev
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
   static:
     build: 
       context: ./backend/static
@@ -111,11 +141,16 @@ services:
       - "traefik.http.routers.static.rule=Host(`static.hai`)"
       - "traefik.http.routers.static.tls=true"
       - "traefik.http.services.static.loadbalancer.server.port=80"
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
   ai-agents:
     build:
       context: .
       dockerfile: ./docker/backend/fastapi/Dockerfile
+    container_name: ai-agents-dev
     volumes:
       - ./backend/fastapi:/app
     environment:
@@ -130,15 +165,23 @@ services:
       - ollama
     networks:
       - backend-dev
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
   redis:
     image: redis:8.0-M02-alpine3.20
-    container_name: redis
+    container_name: redis-dev
     ports:
       - "6379:6379"
     networks:
       - backend-dev
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
   clamav:
     image: clamav/clamav:stable
     container_name: clamav-dev
@@ -148,7 +191,11 @@ services:
       - CLAMAV_NO_MILTERD=true
     networks:
       - backend-dev
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"   
   elasticsearch:
     image: elasticsearch:8.11.1
     container_name: elasticsearch-dev
@@ -169,10 +216,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"   
   vllm_container:
     image: vllm/vllm-openai:latest
-    container_name: vllm_container
+    container_name: vllm-container-dev
     runtime: nvidia
     deploy:
       resources:
@@ -219,7 +270,11 @@ services:
               capabilities: [gpu]
     networks:
       - backend-dev
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"   
   temporal-workers:
     build:
       context: .
@@ -234,7 +289,11 @@ services:
       - temporal-network
     depends_on:
       - api
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"   
   html-chunker:
     build:
       context: .
@@ -248,11 +307,15 @@ services:
       - "./volumes/dev/html-chunker:/root/html-chunker:rw"
     networks:
       - backend-dev
-
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"   
 
   traefik:
     image: traefik:v3.2.1
-    container_name: traefik
+    container_name: traefik-dev
     command:
       - "--api.insecure=false"
       - "--providers.docker=true"
@@ -265,13 +328,26 @@ services:
       - "--log.level=DEBUG"
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
+      # Optimize for large file uploads
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=180s"
+      # Increase max request body size for file uploads (100MB)
+      - "--entrypoints.websecure.http.middlewares=upload-limit@docker"
+      # HTTP/2 settings for large uploads
+      - "--entrypoints.websecure.http2.maxConcurrentStreams=250"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "443:443"
     volumes:
       - "./volumes/dev/traefik/certs:/etc/traefik/certs:ro"
-      - "//var/run/docker.sock://var/run/docker.sock"
+      - "/var/run/docker.sock:/var/run/docker.sock"
       - "./volumes/dev/traefik/logs:/var/log/traefik"
     networks:
       - backend-dev
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"  

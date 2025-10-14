@@ -46,7 +46,43 @@ def process_media_task(self, media_id):
         logger.info(f"Media file details - size: {media.file_size}, type: {media.file_type}")
         logger.info(f"Media file path: {media.file.path}")
         
-        # Process the media
+        # Step 1: Scan for viruses FIRST
+        from .utils import scan_file as scan_file_util
+        is_clean, scan_message = scan_file_util(media.file)
+        
+        if not is_clean:
+            logger.warning(f"Virus detected in media {media_id}: {scan_message}")
+            # Mark as infected and delete file
+            media.metadata['scan_status'] = 'INFECTED'
+            media.metadata['scan_message'] = scan_message
+            media.metadata['scan_completed_at'] = timezone.now().isoformat()
+            media.is_deleted = True
+            media.save(update_fields=['metadata', 'is_deleted'])
+            
+            # Delete the file from disk
+            if media.file:
+                try:
+                    media.file.delete(save=False)
+                    logger.info(f"Deleted infected file for media {media_id}")
+                except Exception as delete_error:
+                    logger.error(f"Error deleting infected file: {delete_error}")
+            
+            # Update cache
+            cache.set(cache_key, {
+                'status': 'failed',
+                'error': f'File rejected: {scan_message}'
+            }, timeout=3600)
+            
+            return {'status': 'infected', 'media_id': media_id, 'message': scan_message}
+        
+        # File is clean - record scan result
+        logger.info(f"Media {media_id} passed virus scan")
+        media.metadata['scan_status'] = 'CLEAN'
+        media.metadata['scan_message'] = scan_message
+        media.metadata['scan_completed_at'] = timezone.now().isoformat()
+        media.save(update_fields=['metadata'])
+        
+        # Step 2: Process the media (thumbnails, metadata, etc.)
         MediaProcessor.process_media(media)
         
         # Update cache with success status
