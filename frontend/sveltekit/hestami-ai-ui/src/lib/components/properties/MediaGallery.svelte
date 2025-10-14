@@ -4,8 +4,8 @@
   import type { Media } from '$lib/types';
   
   export let media: Media[] = [];
-  export let mediaTypes: any[] = [];
-  export let locationTypes: any[] = [];
+  export let mediaTypes: any = [];
+  export let locationTypes: any = [];
   
   const dispatch = createEventDispatcher();
   
@@ -81,13 +81,13 @@
   }
   
   function getLocationSubtypes(locationType: string) {
-    if (!Array.isArray(locationTypes)) return [];
+    if (!locationType || !Array.isArray(locationTypes)) return [];
     const location = locationTypes.find(l => l.type === locationType);
     return location?.subtypes || [];
   }
   
   function getMediaSubtypes(mediaType: string) {
-    if (!Array.isArray(mediaTypes)) return [];
+    if (!mediaType || !Array.isArray(mediaTypes)) return [];
     const type = mediaTypes.find(t => t.type === mediaType);
     return type?.subtypes || [];
   }
@@ -333,9 +333,22 @@
 
 <!-- Edit Media Modal -->
 {#if editingMedia}
-  <div class="fixed inset-0 bg-surface-backdrop-token flex items-center justify-center p-4 z-50">
-    <div class="card p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true">
-      <h3 class="h3 mb-4">Edit Media</h3>
+  <div 
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" 
+    role="presentation"
+    on:click={cancelEdit}
+    on:keydown={(e) => e.key === 'Escape' && cancelEdit()}
+  >
+    <div 
+      class="card variant-filled-surface p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl" 
+      role="dialog" 
+      aria-modal="true"
+      aria-labelledby="edit-media-title"
+      tabindex="-1"
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
+      <h3 id="edit-media-title" class="h3 mb-4">Edit Media</h3>
       
       <form on:submit|preventDefault={updateMedia} class="space-y-4">
         <!-- Title -->
@@ -378,11 +391,9 @@
               class="select"
             >
               <option value="">Select type...</option>
-              {#if Array.isArray(mediaTypes)}
-                {#each mediaTypes as type}
-                  <option value={type.type}>{type.label}</option>
-                {/each}
-              {/if}
+              {#each mediaTypes as type}
+                <option value={type.type}>{type.label}</option>
+              {/each}
             </select>
           </div>
           
@@ -415,11 +426,9 @@
               class="select"
             >
               <option value="">Select location...</option>
-              {#if Array.isArray(locationTypes)}
-                {#each locationTypes as location}
-                  <option value={location.type}>{location.label}</option>
-                {/each}
-              {/if}
+              {#each locationTypes as location}
+                <option value={location.type}>{location.label}</option>
+              {/each}
             </select>
           </div>
           
@@ -441,11 +450,11 @@
         </div>
         
         <!-- Actions -->
-        <div class="flex space-x-2 pt-4">
+        <div class="flex gap-4 pt-4 border-t border-surface-300-600-token mt-6">
           <button
             type="button"
             on:click={cancelEdit}
-            class="btn variant-ghost flex-1"
+            class="btn variant-ghost-surface flex-1"
             disabled={isUpdating}
           >
             Cancel

@@ -116,6 +116,7 @@ MIDDLEWARE = [
     # Custom middleware
     'users.middleware.LoginAttemptMiddleware',
     'users.middleware.SessionManagementMiddleware',
+    'media.middleware.UploadLoggingMiddleware',  # Debug upload issues
 ]
 
 ROOT_URLCONF = 'hestami_ai.urls'
@@ -308,6 +309,8 @@ CSRF_COOKIE_SAMESITE = 'Lax'  # Use 'Strict' in production
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://homeservices.hestami-ai.com',  # SvelteKit frontend
+    'https://api.hestami-ai.com',  # Django API (for any web-based calls)
 ]
 
 # Django REST Framework settings

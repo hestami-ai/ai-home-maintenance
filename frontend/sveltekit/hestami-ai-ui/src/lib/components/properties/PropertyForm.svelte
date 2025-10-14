@@ -7,12 +7,7 @@
   export let fieldChoices: any = {};
   
   const dispatch = createEventDispatcher();
-  
-  // Debug logging
-  console.log('PropertyForm received property:', property);
-  console.log('Property city:', property.city);
-  console.log('Property state:', property.state);
-  console.log('Property zip_code:', property.zip_code);
+
   
   // Form state
   let formData = {
@@ -28,8 +23,6 @@
     descriptives: property.descriptives || {}
   };
   
-  // Debug formData
-  console.log('FormData initialized:', formData);
   
   // Descriptives state (with defaults from existing property data)
   let descriptives = {
@@ -840,8 +833,16 @@
     {/if}
   </div>
 
-  <!-- Submit Button -->
-  <div class="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
+  <!-- Action Buttons -->
+  <div class="flex items-center justify-end gap-4 pt-6 border-t border-gray-200">
+    <button
+      type="button"
+      on:click={() => dispatch('cancel')}
+      disabled={isSubmitting}
+      class="btn variant-ghost-surface"
+    >
+      Cancel
+    </button>
     <button
       type="submit"
       disabled={isSubmitting}

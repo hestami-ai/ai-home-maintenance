@@ -15,6 +15,7 @@
     progress: number;
     error: string | null;
     success: boolean;
+    retryCount: number;
     metadata: {
       title: string;
       description: string;
@@ -45,7 +46,9 @@
       return [];
     }
     const type = mediaTypes.find(t => t.type === mediaType);
-    return type?.subtypes || [];
+    const subtypes = type?.subtypes || [];
+    console.log(`getMediaSubtypes(${mediaType}):`, subtypes);
+    return subtypes;
   }
   
   function handleFileSelect(event: Event) {
@@ -58,22 +61,31 @@
   }
   
   function addFiles(files: File[]) {
-    const newUploads: FileUpload[] = files.map(file => ({
-      file,
-      id: Math.random().toString(36).substring(7),
-      uploading: false,
-      progress: 0,
-      error: null,
-      success: false,
-      metadata: {
-        title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
-        description: '',
-        media_type: file.type.startsWith('image/') ? 'IMAGE' : file.type.startsWith('video/') ? 'VIDEO' : 'FILE',
-        media_sub_type: 'REGULAR',
-        location_type: 'INTERIOR',
-        location_sub_type: ''
-      }
-    }));
+    const newUploads: FileUpload[] = files.map(file => {
+      const mediaType = file.type.startsWith('image/') ? 'IMAGE' : file.type.startsWith('video/') ? 'VIDEO' : 'FILE';
+      const subtypes = getMediaSubtypes(mediaType);
+      const defaultSubtype = subtypes.length > 0 ? subtypes[0].type : 'REGULAR';
+      
+      console.log(`File: ${file.name}, mediaType: ${mediaType}, defaultSubtype: ${defaultSubtype}`);
+      
+      return {
+        file,
+        id: Math.random().toString(36).substring(7),
+        uploading: false,
+        progress: 0,
+        error: null,
+        success: false,
+        retryCount: 0,
+        metadata: {
+          title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+          description: '',
+          media_type: mediaType,
+          media_sub_type: defaultSubtype,
+          location_type: 'INTERIOR',
+          location_sub_type: ''
+        }
+      };
+    });
     
     uploads = [...uploads, ...newUploads];
   }
@@ -92,41 +104,128 @@
     try {
       const formData = new FormData();
       formData.append('file', upload.file);
+      // Ensure media_sub_type is never undefined
+      if (!upload.metadata.media_sub_type || upload.metadata.media_sub_type === 'undefined') {
+        console.error('media_sub_type is undefined! Setting to REGULAR');
+        upload.metadata.media_sub_type = 'REGULAR';
+      }
+      
       formData.append('title', upload.metadata.title);
       formData.append('description', upload.metadata.description);
       formData.append('media_type', upload.metadata.media_type);
       formData.append('media_sub_type', upload.metadata.media_sub_type);
       formData.append('location_type', upload.metadata.location_type);
       
+      // Add file metadata
+      formData.append('file_type', upload.file.type);
+      formData.append('file_size', upload.file.size.toString());
+      formData.append('original_filename', upload.file.name);
+      formData.append('mime_type', upload.file.type);
+      
       if (upload.metadata.location_sub_type) {
         formData.append('location_sub_type', upload.metadata.location_sub_type);
       }
       
-      const response = await fetch(`/api/media/properties/${propertyId}/upload/`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
+      // Use XMLHttpRequest for better compatibility with large uploads (same as service requests)
+      const result = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            upload.progress = Math.round((event.loaded / event.total) * 100);
+            uploads = uploads; // Trigger reactivity
+          }
+        });
+        
+        // Handle completion
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response);
+            } catch (e) {
+              resolve(xhr.responseText);
+            }
+          } else {
+            reject({ status: xhr.status, statusText: xhr.statusText, responseText: xhr.responseText });
+          }
+        });
+        
+        // Handle errors
+        xhr.addEventListener('error', () => {
+          reject({ status: 0, statusText: 'Network error during upload' });
+        });
+        
+        xhr.addEventListener('abort', () => {
+          reject({ status: 0, statusText: 'Upload aborted' });
+        });
+        
+        // Send the request (no trailing slash - matches service request pattern)
+        xhr.open('POST', `/api/media/properties/${propertyId}/upload`);
+        xhr.withCredentials = true; // Include cookies
+        xhr.send(formData);
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
+      // Success - no error handling needed since promise rejects on error
+      upload.success = true;
+      upload.uploading = false;
+      uploads = uploads;
+      dispatch('upload-complete', result);
+    } catch (err: any) {
+      // Handle errors from XMLHttpRequest rejection
+      const status = err.status || 500;
+      let errorMessage = 'Upload failed';
+      let shouldRetry = false;
+      
+      switch (status) {
+        case 413:
+          errorMessage = `File too large. Maximum size is 100MB. Your file is ${(upload.file.size / 1024 / 1024).toFixed(1)}MB.`;
+          break;
+        case 429:
+          errorMessage = 'Server is busy. Retrying automatically...';
+          shouldRetry = true;
+          break;
+        case 503:
+          errorMessage = 'Server temporarily unavailable. Retrying automatically...';
+          shouldRetry = true;
+          break;
+        case 504:
+          errorMessage = 'Upload timed out. Please check your connection and try again.';
+          break;
+        case 500:
+          errorMessage = 'Server error occurred. Please try again or contact support.';
+          break;
+        case 0:
+          errorMessage = err.statusText || 'Network error occurred';
+          break;
+        default:
+          try {
+            const errorData = JSON.parse(err.responseText);
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            errorMessage = `Upload failed (${status})`;
+          }
       }
       
-      upload.success = true;
-      upload.progress = 100;
+      // Auto-retry for transient errors (429, 503)
+      if (shouldRetry && upload.retryCount < 3) {
+        upload.retryCount++;
+        upload.error = `${errorMessage} (Attempt ${upload.retryCount + 1}/4)`;
+        uploads = uploads;
+        
+        // Exponential backoff: 2s, 4s, 8s
+        const delay = Math.pow(2, upload.retryCount) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Retry the upload
+        return uploadFile(upload);
+      }
       
-      // Remove successful upload after a delay
-      setTimeout(() => {
-        removeUpload(upload.id);
-        dispatch('uploaded');
-      }, 2000);
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      upload.error = error.message || 'Upload failed';
-    } finally {
+      // Set error and stop
+      upload.error = errorMessage;
       upload.uploading = false;
-      uploads = uploads; // Trigger reactivity
+      uploads = uploads;
     }
   }
   
@@ -233,24 +332,73 @@
           <!-- Metadata Form -->
           {#if !upload.success}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <label for="title-{upload.id}" class="block text-xs font-medium text-gray-700 mb-1">Title</label>
+              <div class="md:col-span-2">
+                <label for="title-{upload.id}" class="label text-xs mb-1"><span>Title</span></label>
                 <input
                   id="title-{upload.id}"
                   type="text"
                   bind:value={upload.metadata.title}
                   disabled={upload.uploading}
-                  class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
+                  class="input text-sm"
                 />
               </div>
               
               <div>
-                <label for="location-type-{upload.id}" class="block text-xs font-medium text-gray-700 mb-1">Location Type</label>
+                <label for="media-type-{upload.id}" class="label text-xs mb-1"><span>Media Type</span></label>
+                <select
+                  id="media-type-{upload.id}"
+                  value={upload.metadata.media_type}
+                  on:change={(e) => {
+                    const target = e.target as HTMLSelectElement;
+                    upload.metadata.media_type = target.value;
+                    // Reset media_sub_type when media_type changes
+                    const subtypes = getMediaSubtypes(target.value);
+                    upload.metadata.media_sub_type = subtypes.length > 0 ? subtypes[0].type : '';
+                    uploads = uploads;
+                  }}
+                  disabled={upload.uploading}
+                  class="select text-sm"
+                >
+                  {#each mediaTypes as type}
+                    <option value={type.type}>{type.label}</option>
+                  {/each}
+                </select>
+              </div>
+              
+              {#if getMediaSubtypes(upload.metadata.media_type).length > 0}
+                <div>
+                  <label for="media-sub-type-{upload.id}" class="label text-xs mb-1"><span>Media Sub-Type</span></label>
+                  <select
+                    id="media-sub-type-{upload.id}"
+                    value={upload.metadata.media_sub_type}
+                    on:change={(e) => {
+                      const target = e.target as HTMLSelectElement;
+                      upload.metadata.media_sub_type = target.value;
+                      uploads = uploads;
+                    }}
+                    disabled={upload.uploading}
+                    class="select text-sm"
+                  >
+                    {#each getMediaSubtypes(upload.metadata.media_type) as subtype}
+                      <option value={subtype.type}>{subtype.label}</option>
+                    {/each}
+                  </select>
+                </div>
+              {/if}
+              
+              <div>
+                <label for="location-type-{upload.id}" class="label text-xs mb-1"><span>Location Type</span></label>
                 <select
                   id="location-type-{upload.id}"
-                  bind:value={upload.metadata.location_type}
+                  value={upload.metadata.location_type}
+                  on:change={(e) => {
+                    const target = e.target as HTMLSelectElement;
+                    upload.metadata.location_type = target.value;
+                    upload.metadata.location_sub_type = '';
+                    uploads = uploads;
+                  }}
                   disabled={upload.uploading}
-                  class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
+                  class="select text-sm"
                 >
                   {#each locationTypes as locationType}
                     <option value={locationType.type}>{locationType.label}</option>
@@ -260,12 +408,17 @@
               
               {#if getLocationSubtypes(upload.metadata.location_type).length > 0}
                 <div>
-                  <label for="location-subtype-{upload.id}" class="block text-xs font-medium text-gray-700 mb-1">Specific Location</label>
+                  <label for="location-subtype-{upload.id}" class="label text-xs mb-1"><span>Specific Location</span></label>
                   <select
                     id="location-subtype-{upload.id}"
-                    bind:value={upload.metadata.location_sub_type}
+                    value={upload.metadata.location_sub_type}
+                    on:change={(e) => {
+                      const target = e.target as HTMLSelectElement;
+                      upload.metadata.location_sub_type = target.value;
+                      uploads = uploads;
+                    }}
                     disabled={upload.uploading}
-                    class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
+                    class="select text-sm"
                   >
                     <option value="">Select...</option>
                     {#each getLocationSubtypes(upload.metadata.location_type) as subtype}
@@ -276,13 +429,13 @@
               {/if}
               
               <div class="md:col-span-2">
-                <label for="description-{upload.id}" class="block text-xs font-medium text-gray-700 mb-1">Description (optional)</label>
+                <label for="description-{upload.id}" class="label text-xs mb-1"><span>Description (optional)</span></label>
                 <textarea
                   id="description-{upload.id}"
                   bind:value={upload.metadata.description}
                   disabled={upload.uploading}
                   rows="2"
-                  class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
+                  class="textarea text-sm"
                 ></textarea>
               </div>
             </div>

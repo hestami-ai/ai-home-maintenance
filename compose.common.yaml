@@ -34,6 +34,12 @@ services:
       - "--log.level=DEBUG"
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
+      # Optimize for large file uploads (media, videos, etc.)
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=180s"
+      # HTTP/2 settings for large uploads
+      - "--entrypoints.websecure.http2.maxConcurrentStreams=250"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dev_homeservices.rule=Host(`dev-homeservices.hestami-ai.com`)"
