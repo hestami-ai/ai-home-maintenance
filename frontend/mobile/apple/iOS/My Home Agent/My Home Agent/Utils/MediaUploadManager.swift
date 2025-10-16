@@ -49,39 +49,31 @@ class MediaUploadManager: NSObject, ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Upload media files for a property
-    func uploadMedia(files: [URL], propertyId: String, completion: @escaping (Result<[Media], Error>) -> Void) {
-        // Validate files
-        let validatedFiles = files.compactMap { validateFile($0) }
+    /// Upload media files for a property with metadata
+    func uploadMedia(tasks: [MediaUploadTask], completion: @escaping (Result<[Media], Error>) -> Void) {
+        print("🟢 MediaUploadManager: uploadMedia called with \(tasks.count) tasks")
         
-        guard !validatedFiles.isEmpty else {
+        guard !tasks.isEmpty else {
+            print("❌ MediaUploadManager: No tasks to upload")
             completion(.failure(MediaUploadError.noValidFiles))
             return
         }
         
-        // Create upload tasks
-        let tasks = validatedFiles.map { fileInfo in
-            MediaUploadTask(
-                id: UUID().uuidString,
-                fileURL: fileInfo.url,
-                fileName: fileInfo.fileName,
-                fileSize: fileInfo.fileSize,
-                mimeType: fileInfo.mimeType,
-                propertyId: propertyId
-            )
-        }
+        print("🟢 MediaUploadManager: Created \(tasks.count) upload tasks")
         
-        // Add to queue
+        // Add to queue and start upload on main queue
         DispatchQueue.main.async {
             self.uploadQueue.append(contentsOf: tasks)
-        }
-        
-        // Start uploading based on strategy
-        switch config.uploadStrategy {
-        case .sequential:
-            uploadSequentially(completion: completion)
-        case .parallel(let maxConcurrent):
-            uploadInParallel(maxConcurrent: maxConcurrent, completion: completion)
+            print("🟢 MediaUploadManager: Queue now has \(self.uploadQueue.count) tasks")
+            
+            // Start uploading based on strategy
+            switch self.config.uploadStrategy {
+            case .sequential:
+                print("🟢 MediaUploadManager: Starting sequential upload")
+                self.uploadSequentially(completion: completion)
+            case .parallel(let maxConcurrent):
+                self.uploadInParallel(maxConcurrent: maxConcurrent, completion: completion)
+            }
         }
     }
     
@@ -113,16 +105,20 @@ class MediaUploadManager: NSObject, ObservableObject {
     /// Retry failed upload
     func retryUpload(taskId: String, completion: @escaping (Result<[Media], Error>) -> Void) {
         guard let index = uploadQueue.firstIndex(where: { $0.id == taskId }) else {
+            print("❌ MediaUploadManager: Task \(taskId) not found in queue for retry")
             return
         }
+        
+        print("🔄 MediaUploadManager: Retrying task: \(uploadQueue[index].fileName)")
         
         DispatchQueue.main.async {
             self.uploadQueue[index].status = .pending
             self.uploadQueue[index].error = nil
             self.uploadQueue[index].progress = 0.0
+            
+            // Start upload after status update completes
+            self.uploadSequentially(completion: completion)
         }
-        
-        uploadSequentially(completion: completion)
     }
     
     // MARK: - Private Methods
@@ -136,11 +132,21 @@ class MediaUploadManager: NSObject, ObservableObject {
     }
     
     private func uploadNextInQueue(completion: @escaping (Result<[Media], Error>) -> Void) {
+        print("🟡 MediaUploadManager: uploadNextInQueue called, queue has \(uploadQueue.count) tasks")
+        
+        // Log status of all tasks
+        for (index, task) in uploadQueue.enumerated() {
+            print("   Task \(index): \(task.fileName) - status: \(task.status)")
+        }
+        
         // Find next pending task
         guard let nextTask = uploadQueue.first(where: { $0.status == .pending }) else {
             // All done
+            print("🟡 MediaUploadManager: No more pending tasks")
             let uploadedMedia = uploadQueue.compactMap { $0.uploadedMedia }
             let hasErrors = uploadQueue.contains { $0.status == .failed }
+            
+            print("🟡 MediaUploadManager: Upload complete - \(uploadedMedia.count) successful, hasErrors: \(hasErrors)")
             
             DispatchQueue.main.async {
                 self.isUploading = false
@@ -155,6 +161,8 @@ class MediaUploadManager: NSObject, ObservableObject {
             }
             return
         }
+        
+        print("🟡 MediaUploadManager: Found pending task: \(nextTask.fileName)")
         
         // Update current index
         if let index = uploadQueue.firstIndex(where: { $0.id == nextTask.id }) {
@@ -199,21 +207,33 @@ class MediaUploadManager: NSObject, ObservableObject {
     }
     
     private func uploadTask(_ task: MediaUploadTask, completion: @escaping (Result<Media, Error>) -> Void) {
+        print("🟠 MediaUploadManager: uploadTask called for \(task.fileName)")
+        print("🟠 MediaUploadManager: File URL: \(task.fileURL)")
+        print("🟠 MediaUploadManager: Property ID: \(task.propertyId)")
+        
         DispatchQueue.main.async {
             if let index = self.uploadQueue.firstIndex(where: { $0.id == task.id }) {
                 self.uploadQueue[index].status = .uploading
+                print("🟠 MediaUploadManager: Task status set to uploading")
             }
         }
         
         // Create multipart form data
+        print("🟠 MediaUploadManager: Creating multipart form data...")
         guard let boundary = createMultipartFormData(for: task) else {
+            print("❌ MediaUploadManager: Failed to create multipart form data")
             completion(.failure(MediaUploadError.invalidFileData))
             return
         }
+        print("🟠 MediaUploadManager: Multipart form data created successfully")
         
         // Create request
-        let endpoint = "/api/properties/\(task.propertyId)/media/upload/"
-        guard let url = URL(string: NetworkManager.shared.baseURL + endpoint) else {
+        let endpoint = "/api/media/properties/\(task.propertyId)/upload"
+        let fullURL = NetworkManager.shared.baseURL + endpoint
+        print("🟠 MediaUploadManager: Upload URL: \(fullURL)")
+        
+        guard let url = URL(string: fullURL) else {
+            print("❌ MediaUploadManager: Invalid URL: \(fullURL)")
             completion(.failure(MediaUploadError.invalidURL))
             return
         }
@@ -221,18 +241,52 @@ class MediaUploadManager: NSObject, ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary.boundaryString)", forHTTPHeaderField: "Content-Type")
+        // Note: Timeout is controlled by URLSession configuration (5 min request, 10 min resource)
         
-        // Add authentication
+        // Add authentication - session cookie
         if let sessionCookie = NetworkManager.shared.getSessionCookieValue() {
+            print("🟠 MediaUploadManager: Adding session cookie")
             request.setValue("hestami_session=\(sessionCookie)", forHTTPHeaderField: "Cookie")
+        } else {
+            print("⚠️ MediaUploadManager: No session cookie found")
         }
         
-        // Create upload task
-        let uploadTask = session.uploadTask(with: request, fromFile: boundary.fileURL) { data, response, error in
+        // Add CSRF token if available (though browser doesn't use it)
+        NetworkManager.shared.addCSRFToken(to: &request)
+        
+        // Log request details
+        print("🟠 MediaUploadManager: Request details:")
+        print("   URL: \(request.url?.absoluteString ?? "nil")")
+        print("   Method: \(request.httpMethod ?? "nil")")
+        if let headers = request.allHTTPHeaderFields {
+            print("   Headers:")
+            for (key, value) in headers {
+                print("     \(key): \(value)")
+            }
+        }
+        
+        print("🟠 MediaUploadManager: Creating URLSession upload task...")
+        
+        // Read the multipart body data
+        guard let bodyData = try? Data(contentsOf: boundary.fileURL) else {
+            print("❌ MediaUploadManager: Failed to read multipart body file")
+            completion(.failure(MediaUploadError.invalidFileData))
+            return
+        }
+        print("🟠 MediaUploadManager: Multipart body size: \(bodyData.count) bytes")
+        
+        // Create upload task with data instead of file
+        let uploadTask = session.uploadTask(with: request, from: bodyData) { data, response, error in
+            print("🎯 MediaUploadManager: ===== UPLOAD COMPLETION HANDLER CALLED =====")
+            print("🎯 Error: \(error?.localizedDescription ?? "nil")")
+            print("🎯 Response: \(response.debugDescription)")
+            print("🎯 Data size: \(data?.count ?? 0) bytes")
+            
             // Clean up temp file
             try? FileManager.default.removeItem(at: boundary.fileURL)
             
             if let error = error {
+                print("❌ MediaUploadManager: Upload failed with error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
@@ -257,24 +311,64 @@ class MediaUploadManager: NSObject, ObservableObject {
             do {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
+                
+                // Configure date decoding to handle ISO 8601 format
+                let dateFormatter = ISO8601DateFormatter()
+                dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                decoder.dateDecodingStrategy = .custom { decoder in
+                    let container = try decoder.singleValueContainer()
+                    let dateString = try container.decode(String.self)
+                    
+                    // Try ISO 8601 with fractional seconds
+                    if let date = dateFormatter.date(from: dateString) {
+                        return date
+                    }
+                    
+                    // Try ISO 8601 without fractional seconds
+                    dateFormatter.formatOptions = [.withInternetDateTime]
+                    if let date = dateFormatter.date(from: dateString) {
+                        return date
+                    }
+                    
+                    // Try standard date formatter as fallback
+                    let fallbackFormatter = DateFormatter()
+                    fallbackFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ"
+                    fallbackFormatter.locale = Locale(identifier: "en_US_POSIX")
+                    fallbackFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+                    if let date = fallbackFormatter.date(from: dateString) {
+                        return date
+                    }
+                    
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date string: \(dateString)")
+                }
+                
                 let media = try decoder.decode(Media.self, from: data)
+                print("✅ Successfully decoded media response: \(media.id)")
                 completion(.success(media))
             } catch {
                 print("❌ Failed to decode media response: \(error)")
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("❌ Response JSON: \(responseString)")
+                }
                 completion(.failure(MediaUploadError.decodingError(error)))
             }
         }
         
         uploadTasks[task.id] = uploadTask
+        print("🟠 MediaUploadManager: Starting upload task...")
         uploadTask.resume()
+        print("🟠 MediaUploadManager: Upload task resumed")
     }
     
     private func createMultipartFormData(for task: MediaUploadTask) -> (fileURL: URL, boundaryString: String)? {
         let boundary = "Boundary-\(UUID().uuidString)"
         
+        print("🔵 createMultipartFormData: Reading file data from \(task.fileURL)")
         guard let fileData = try? Data(contentsOf: task.fileURL) else {
+            print("❌ createMultipartFormData: Failed to read file data")
             return nil
         }
+        print("🔵 createMultipartFormData: File data size: \(fileData.count) bytes")
         
         var body = Data()
         
@@ -288,7 +382,61 @@ class MediaUploadManager: NSObject, ObservableObject {
         // Add title
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"title\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.title.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add description
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.description.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add media_type
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"media_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.mediaType.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add media_sub_type
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"media_sub_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.mediaSubType.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add location_type
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"location_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.locationType.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add location_sub_type
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"location_sub_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.locationSubType.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add file_type (MIME type)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.mimeType.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add file_size (as string)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file_size\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(task.fileSize)".data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add original_filename
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"original_filename\"\r\n\r\n".data(using: .utf8)!)
         body.append(task.fileName.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add mime_type (same as file_type)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"mime_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append(task.mimeType.data(using: .utf8)!)
         body.append("\r\n".data(using: .utf8)!)
         
         // Close boundary
@@ -372,9 +520,10 @@ class MediaUploadManager: NSObject, ObservableObject {
 
 // MARK: - URLSessionTaskDelegate
 
-extension MediaUploadManager: URLSessionTaskDelegate {
+extension MediaUploadManager: URLSessionTaskDelegate, URLSessionDataDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
         let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
+        print("📊 MediaUploadManager: Upload progress: \(Int(progress * 100))% (\(totalBytesSent)/\(totalBytesExpectedToSend) bytes)")
         
         // Find the task and update progress
         DispatchQueue.main.async {
@@ -383,6 +532,37 @@ extension MediaUploadManager: URLSessionTaskDelegate {
                 self.uploadQueue[index].progress = progress
                 self.updateOverallProgress()
             }
+        }
+    }
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        print("📥 MediaUploadManager: Received response")
+        if let httpResponse = response as? HTTPURLResponse {
+            print("📥 Status code: \(httpResponse.statusCode)")
+            print("📥 Headers: \(httpResponse.allHeaderFields)")
+        }
+        completionHandler(.allow)
+    }
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        print("📥 MediaUploadManager: Received data: \(data.count) bytes")
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📥 Response body: \(responseString)")
+        }
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        print("🏁 MediaUploadManager: URLSession task completed")
+        if let error = error {
+            print("❌ MediaUploadManager: URLSession task error: \(error.localizedDescription)")
+            print("❌ Error code: \((error as NSError).code)")
+            print("❌ Error domain: \((error as NSError).domain)")
+        } else {
+            print("✅ MediaUploadManager: URLSession task completed successfully")
+        }
+        
+        if let httpResponse = task.response as? HTTPURLResponse {
+            print("🏁 Final status code: \(httpResponse.statusCode)")
         }
     }
 }
@@ -396,6 +576,14 @@ struct MediaUploadTask: Identifiable {
     let fileSize: Int64
     let mimeType: String
     let propertyId: String
+    
+    // Metadata fields
+    var title: String
+    var description: String
+    var mediaType: String
+    var mediaSubType: String
+    var locationType: String
+    var locationSubType: String
     
     var status: UploadStatus = .pending
     var progress: Double = 0.0
