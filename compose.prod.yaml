@@ -71,7 +71,16 @@ services:
     build: 
       context: .
       dockerfile: ./docker/backend/django/Dockerfile
-    command: python manage.py runserver 0.0.0.0:8050
+    command: >
+      gunicorn hestami_ai.wsgi:application
+      --bind 0.0.0.0:8050
+      --workers 8
+      --worker-class gevent
+      --worker-connections 200
+      --timeout 300
+      --access-logfile -
+      --error-logfile -
+      --log-level info
     volumes:
       - "hestami_media_data_prod:/mnt/hestami-static:rw"
     #ports:
@@ -158,6 +167,7 @@ services:
     #  - "3310:3310"
     environment:
       - CLAMAV_NO_MILTERD=true
+      - CLAMAV_MAX_FILE_SIZE=100M
     networks:
       - backend-prod
     restart: unless-stopped

@@ -98,7 +98,7 @@
 				thumbnail: media.file_url,
 				area: 'Floorplan',
 				description: media.title || media.description || `${property.address} - Floorplan`,
-				uploadDate: new Date(media.created_at || new Date().toISOString()),
+				uploadDate: new Date(media.upload_date),
 				tags: ['floorplan'],
 				width: 1200,
 				height: 800
@@ -178,7 +178,7 @@
 					media.location_type === 'EXTERIOR' ? 'Exterior' : 
 					media.location_type || 'Other',
 				description: media.title || media.description || `${property.address} - ${media.location_type || 'Property'}`,
-				uploadDate: new Date(media.created_at || new Date().toISOString()),
+				uploadDate: new Date(media.upload_date),
 				tags: [
 					media.location_type?.toLowerCase() || 'other',
 					media.location_sub_type?.toLowerCase() || 'general'

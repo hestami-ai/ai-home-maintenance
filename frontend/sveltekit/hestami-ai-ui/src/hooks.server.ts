@@ -1,5 +1,5 @@
 import { sequence } from '@sveltejs/kit/hooks';
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import type { User } from '$lib/types';
 import { SESSION_COOKIE_NAME } from '$lib/server/redis';
 import { getUserData } from '$lib/server/auth';

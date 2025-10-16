@@ -46,43 +46,11 @@ def process_media_task(self, media_id):
         logger.info(f"Media file details - size: {media.file_size}, type: {media.file_type}")
         logger.info(f"Media file path: {media.file.path}")
         
-        # Step 1: Scan for viruses FIRST
-        from .utils import scan_file as scan_file_util
-        is_clean, scan_message = scan_file_util(media.file)
+        # Note: Virus scanning is now done synchronously during upload (before file is saved)
+        # This task only handles thumbnail generation and metadata extraction
+        logger.info(f"Processing media {media_id} (virus scan already completed during upload)")
         
-        if not is_clean:
-            logger.warning(f"Virus detected in media {media_id}: {scan_message}")
-            # Mark as infected and delete file
-            media.metadata['scan_status'] = 'INFECTED'
-            media.metadata['scan_message'] = scan_message
-            media.metadata['scan_completed_at'] = timezone.now().isoformat()
-            media.is_deleted = True
-            media.save(update_fields=['metadata', 'is_deleted'])
-            
-            # Delete the file from disk
-            if media.file:
-                try:
-                    media.file.delete(save=False)
-                    logger.info(f"Deleted infected file for media {media_id}")
-                except Exception as delete_error:
-                    logger.error(f"Error deleting infected file: {delete_error}")
-            
-            # Update cache
-            cache.set(cache_key, {
-                'status': 'failed',
-                'error': f'File rejected: {scan_message}'
-            }, timeout=3600)
-            
-            return {'status': 'infected', 'media_id': media_id, 'message': scan_message}
-        
-        # File is clean - record scan result
-        logger.info(f"Media {media_id} passed virus scan")
-        media.metadata['scan_status'] = 'CLEAN'
-        media.metadata['scan_message'] = scan_message
-        media.metadata['scan_completed_at'] = timezone.now().isoformat()
-        media.save(update_fields=['metadata'])
-        
-        # Step 2: Process the media (thumbnails, metadata, etc.)
+        # Process the media (thumbnails, metadata, etc.)
         MediaProcessor.process_media(media)
         
         # Update cache with success status
@@ -122,14 +90,21 @@ def process_media_task(self, media_id):
         }, timeout=3600)
         
         try:
-            # Update metadata with failure status
+            # Update metadata with failure status and mark as deleted
             media = Media.objects.get(id=media_id)
             if not media.metadata:
                 media.metadata = {}
             media.metadata['processing_status'] = 'failed'
             media.metadata['processing_error'] = str(exc)
             media.metadata['processing_failed_at'] = timezone.now().isoformat()
-            media.save(update_fields=['metadata'])
+            
+            # Mark media as deleted so it doesn't appear to users
+            # This handles edge cases where file type validation passed but processing failed
+            media.is_deleted = True
+            media.deleted_at = timezone.now()
+            media.save(update_fields=['metadata', 'is_deleted', 'deleted_at'])
+            
+            logger.warning(f"Marked media {media_id} as deleted due to processing failure")
         except Exception as inner_exc:
             logger.error(f"Error updating metadata for failed media {media_id}: {str(inner_exc)}")
             
@@ -148,8 +123,16 @@ def process_media_task(self, media_id):
 )
 def scan_file(self, media_id):
     """
-    Scan a media file for viruses asynchronously
+    DEPRECATED: Scan a media file for viruses asynchronously
+    
+    This task is no longer used. Virus scanning is now done synchronously
+    during upload (before the file is saved to disk) for better security.
+    
+    This task is kept for backwards compatibility with any queued tasks,
+    but should not be called by new code.
     """
+    logger.warning(f"DEPRECATED: scan_file task called for media {media_id}. "
+                   "Virus scanning is now done synchronously during upload.")
     try:
         # Get media instance
         media = Media.objects.get(id=media_id)
