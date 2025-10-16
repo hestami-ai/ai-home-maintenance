@@ -87,7 +87,7 @@ def upload_media(request, property_id):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Scan file for viruses
+        # Validate file exists
         if 'file' not in request.FILES:
             logger.error("No file found in request")
             return Response({
@@ -95,6 +95,30 @@ def upload_media(request, property_id):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         uploaded_file = request.FILES['file']
+        
+        # Reset file pointer to beginning before virus scan
+        uploaded_file.seek(0)
+        
+        # Scan file for viruses BEFORE saving to disk
+        from .virus_scan import scan_file
+        
+        logger.info(f"Scanning file {uploaded_file.name} for viruses...")
+        is_clean, scan_message = scan_file(uploaded_file)
+        
+        if not is_clean:
+            logger.error(f"Virus detected in file {uploaded_file.name}: {scan_message}")
+            return Response({
+                'error': 'File failed virus scan',
+                'details': {
+                    'virus_name': scan_message,
+                    'message': 'The uploaded file contains malicious content and has been rejected.'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.info(f"File {uploaded_file.name} passed virus scan")
+        
+        # Reset file pointer after virus scan
+        uploaded_file.seek(0)
 
         # Create media directories if they don't exist
         os.makedirs(os.path.join(settings.MEDIA_ROOT, 'properties', str(property_id)), exist_ok=True)
@@ -430,6 +454,30 @@ def upload_service_request_media(request, request_id):
 
         uploaded_file = request.FILES['file']
         
+        # Reset file pointer to beginning before virus scan
+        uploaded_file.seek(0)
+        
+        # Scan file for viruses BEFORE saving to disk
+        from .virus_scan import scan_file
+        
+        logger.info(f"Scanning file {uploaded_file.name} for viruses...")
+        is_clean, scan_message = scan_file(uploaded_file)
+        
+        if not is_clean:
+            logger.error(f"Virus detected in file {uploaded_file.name}: {scan_message}")
+            return Response({
+                'error': 'File failed virus scan',
+                'details': {
+                    'virus_name': scan_message,
+                    'message': 'The uploaded file contains malicious content and has been rejected.'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.info(f"File {uploaded_file.name} passed virus scan")
+        
+        # Reset file pointer after virus scan
+        uploaded_file.seek(0)
+        
         # Get file information
         file_type = uploaded_file.content_type.split('/')[0].upper()
         if file_type not in [MediaType.IMAGE, MediaType.VIDEO]:
@@ -569,6 +617,30 @@ def upload_service_report_media(request, report_id):
             )
 
         uploaded_file = request.FILES['file']
+        
+        # Reset file pointer to beginning before virus scan
+        uploaded_file.seek(0)
+        
+        # Scan file for viruses BEFORE saving to disk
+        from .virus_scan import scan_file
+        
+        logger.info(f"Scanning file {uploaded_file.name} for viruses...")
+        is_clean, scan_message = scan_file(uploaded_file)
+        
+        if not is_clean:
+            logger.error(f"Virus detected in file {uploaded_file.name}: {scan_message}")
+            return Response({
+                'error': 'File failed virus scan',
+                'details': {
+                    'virus_name': scan_message,
+                    'message': 'The uploaded file contains malicious content and has been rejected.'
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.info(f"File {uploaded_file.name} passed virus scan")
+        
+        # Reset file pointer after virus scan
+        uploaded_file.seek(0)
         
         # Get file information
         file_type = uploaded_file.content_type.split('/')[0].upper()

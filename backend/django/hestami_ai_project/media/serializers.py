@@ -172,21 +172,27 @@ class MediaSerializer(serializers.ModelSerializer):
             )
         
         # Read file mime type
-        file_mime = magic.from_buffer(value.read(1024), mime=True)
+        file_content = value.read(1024)
+        file_mime = magic.from_buffer(file_content, mime=True)
         value.seek(0)  # Reset file pointer
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"File validation - Name: {value.name}, Detected MIME: {file_mime}, Size: {file_size}")
         
         # Validate file type
         allowed_types = {
-            # Images
-            'image/jpeg', 'image/png', 'image/gif',
+            # Images (AVIF removed - not supported by Pillow without plugin)
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
             # Videos
-            'video/mp4', 'video/quicktime',
+            'video/mp4', 'video/quicktime', 'video/webm',
             # Documents
             'text/plain', 'text/markdown', 'application/pdf',
             'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'text/markdown', 'text/x-markdown'
         }
         if file_mime not in allowed_types:
+            logger.error(f"File type validation failed - Detected: {file_mime}, Allowed: {allowed_types}")
             raise serializers.ValidationError(
                 f"Unsupported file type. Allowed types: {', '.join(allowed_types)}"
             )

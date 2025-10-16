@@ -34,6 +34,7 @@ WORKDIR /app
 # Copy built application from builder stage
 COPY --from=builder /app/build ./build/
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/ecosystem.config.cjs ./
 COPY --from=builder /app/node_modules ./node_modules/
 
 EXPOSE 3000
@@ -41,4 +42,4 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV BODY_SIZE_LIMIT=104857600
 
-CMD ["node", "build"]
+CMD ["npx", "pm2-runtime", "start", "ecosystem.config.cjs"]

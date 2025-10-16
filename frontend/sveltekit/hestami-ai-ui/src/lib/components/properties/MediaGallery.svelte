@@ -299,8 +299,8 @@
           
           <!-- Delete Confirmation Modal -->
           {#if deleteConfirmId === item.id}
-            <div class="absolute inset-0 bg-surface-backdrop-token flex items-center justify-center p-4 z-10">
-              <div class="card p-4 max-w-sm w-full" role="dialog" aria-modal="true" tabindex="-1" on:click|stopPropagation>
+            <div class="absolute inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
+              <div class="card p-6 max-w-sm w-full bg-white dark:bg-surface-800 shadow-xl border border-surface-300 dark:border-surface-600" role="dialog" aria-modal="true" tabindex="-1" on:click|stopPropagation>
                 <h5 class="h5 mb-2">Delete Media?</h5>
                 <p class="text-sm mb-4">
                   Are you sure you want to delete "{item.title}"? This action cannot be undone.
