@@ -122,6 +122,9 @@ public class NetworkManager {
     // Manual cookie storage for HttpOnly cookies
     private var cookieStorage: [String: String] = [:]
     
+    // CSRF token storage
+    private var csrfToken: String?
+    
     // Configuration options
     var shouldUseCache = true  // Enable smart caching
     var shouldCacheResponses = true
@@ -250,7 +253,8 @@ public class NetworkManager {
         
         // Clear our manual cookie storage
         self.cookieStorage.removeAll()
-        print("🍪 NetworkManager: Cleared manual cookie storage")
+        self.csrfToken = nil
+        print("🍪 NetworkManager: Cleared manual cookie storage and CSRF token")
     }
     
     // Check if we have a session cookie
@@ -281,6 +285,37 @@ public class NetworkManager {
         }
         
         return nil
+    }
+    
+    // Get the CSRF token value if available
+    public func getCSRFToken() -> String? {
+        // Check cached CSRF token first
+        if let token = csrfToken {
+            return token
+        }
+        
+        // Then check system cookie storage
+        if let url = URL(string: baseURL),
+           let cookies = HTTPCookieStorage.shared.cookies(for: url) {
+            for cookie in cookies {
+                if cookie.name == "csrftoken" {
+                    csrfToken = cookie.value
+                    return cookie.value
+                }
+            }
+        }
+        
+        return nil
+    }
+    
+    // Add CSRF token to a request if available
+    public func addCSRFToken(to request: inout URLRequest) {
+        if let token = getCSRFToken() {
+            request.setValue(token, forHTTPHeaderField: "X-CSRFToken")
+            print("🔐 NetworkManager: Added CSRF token to request")
+        } else {
+            print("⚠️ NetworkManager: No CSRF token available")
+        }
     }
     
     // Debug function to print all cookies in storage
@@ -471,6 +506,12 @@ public class NetworkManager {
                             // Store in our manual cookie storage
                             self.cookieStorage[name] = value
                             print("🍪 NetworkManager: Stored cookie: \(name)=\(value)")
+                            
+                            // Cache CSRF token separately for easy access
+                            if name == "csrftoken" {
+                                self.csrfToken = value
+                                print("🔐 NetworkManager: Cached CSRF token")
+                            }
                             
                             // Check if this is an HttpOnly cookie (look for HttpOnly flag)
                             let isHttpOnly = parts.contains { $0.lowercased() == "httponly" }

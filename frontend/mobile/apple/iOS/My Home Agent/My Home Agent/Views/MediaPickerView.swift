@@ -316,11 +316,6 @@ struct MediaSelectionSheet: View {
                     sourceType: .photoLibrary,
                     selectionLimit: selectionLimit
                 )
-                .onDisappear {
-                    if !selectedFiles.isEmpty {
-                        isPresented = false
-                    }
-                }
             }
             .sheet(isPresented: $showingCamera) {
                 MediaPickerView(
@@ -328,10 +323,11 @@ struct MediaSelectionSheet: View {
                     sourceType: .camera,
                     selectionLimit: 1
                 )
-                .onDisappear {
-                    if !selectedFiles.isEmpty {
-                        isPresented = false
-                    }
+            }
+            .onChange(of: selectedFiles) { oldFiles, newFiles in
+                // Dismiss the selection sheet when files are selected
+                if !newFiles.isEmpty {
+                    isPresented = false
                 }
             }
         }

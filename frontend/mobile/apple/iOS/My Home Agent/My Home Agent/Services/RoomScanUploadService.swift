@@ -86,7 +86,7 @@ class RoomScanUploadService {
             throw NetworkError.invalidURL
         }
         
-        let endpoint = "/api/properties/\(propertyId)/media/upload/"
+        let endpoint = "/api/media/properties/\(propertyId)/upload"
         guard let url = URL(string: baseURL.absoluteString + endpoint) else {
             throw NetworkError.invalidURL
         }
@@ -101,6 +101,9 @@ class RoomScanUploadService {
         if let sessionCookie = networkManager.getSessionCookieValue() {
             request.addValue("hestami_session=\(sessionCookie)", forHTTPHeaderField: "Cookie")
         }
+        
+        // Add CSRF token if available (though browser doesn't use it)
+        networkManager.addCSRFToken(to: &request)
         
         // Build multipart body
         var body = Data()
@@ -126,6 +129,11 @@ class RoomScanUploadService {
         body.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n".data(using: .utf8)!)
         body.append("\(description)\r\n".data(using: .utf8)!)
         
+        // Add media_type (FILE for 3D models)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"media_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("FILE\r\n".data(using: .utf8)!)
+        
         // Add media_sub_type
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"media_sub_type\"\r\n\r\n".data(using: .utf8)!)
@@ -135,6 +143,31 @@ class RoomScanUploadService {
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"location_type\"\r\n\r\n".data(using: .utf8)!)
         body.append("INTERIOR\r\n".data(using: .utf8)!)
+        
+        // Add location_sub_type (empty, optional)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"location_sub_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // Add file_type (MIME type)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(mimeType)\r\n".data(using: .utf8)!)
+        
+        // Add file_size (as string)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file_size\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(fileData.count)\r\n".data(using: .utf8)!)
+        
+        // Add original_filename
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"original_filename\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(filename)\r\n".data(using: .utf8)!)
+        
+        // Add mime_type (same as file_type)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"mime_type\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(mimeType)\r\n".data(using: .utf8)!)
         
         // Close boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
