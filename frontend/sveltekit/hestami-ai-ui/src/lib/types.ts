@@ -230,7 +230,7 @@ export interface Media {
   thumbnail_large_url: string;
   is_image: boolean;
   is_video: boolean;
-  media_type: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'OTHER';
+  media_type: 'IMAGE' | 'VIDEO' | '3D_MODEL' | 'DOCUMENT' | 'OTHER';
   media_sub_type: string;
   location_type: string;
   location_sub_type: string;
@@ -289,4 +289,44 @@ export interface PropertyInput {
   zip_code: string;
   country: string;
   descriptives?: PropertyDescriptives;
+}
+
+/**
+ * Password management types
+ */
+export interface PasswordChangeRequest {
+  old_password: string;
+  new_password: string;
+  confirm_password?: string; // Optional frontend validation
+}
+
+export interface PasswordChangeResponse {
+  message: string;
+  success: boolean;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetResponse {
+  message: string;
+  success: boolean;
+}
+
+export interface PasswordResetConfirmRequest {
+  token: string;
+  new_password: string;
+  confirm_password?: string; // Optional frontend validation
+}
+
+export interface PasswordResetConfirmResponse {
+  message: string;
+  success: boolean;
+}
+
+export interface PasswordValidationError {
+  error: string;
+  field?: string;
+  details?: string[];
 }

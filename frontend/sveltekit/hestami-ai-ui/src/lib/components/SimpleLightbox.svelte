@@ -1,11 +1,29 @@
 <script lang="ts">
 	import type { PropertyImage } from './types';
+	import ModelViewer from './ModelViewer.svelte';
 	
 	// Component props
-	export let image: PropertyImage | null = null;
+	export let image: (PropertyImage & { mediaType?: string }) | null = null;
 	export let isOpen: boolean = false;
 	export let onClose: () => void = () => {};
 	export let containerClass: string = '';
+	
+	// Debug logging flag
+	const DEBUG_EVENTS = true;
+	
+	// Check if this is a 3D model
+	$: is3DModel = image?.mediaType === '3D_MODEL';
+	
+	// Debug logger
+	function logEvent(eventName: string, target: any, detail?: any) {
+		if (DEBUG_EVENTS) {
+			console.log(`[SimpleLightbox] ${eventName}:`, {
+				target: target?.className || target?.tagName || target,
+				detail,
+				timestamp: Date.now()
+			});
+		}
+	}
 	
 	// Zoom and pan state
 	let zoomLevel = 1;
@@ -137,7 +155,7 @@
 	}
 </script>
 
-<svelte:window on:mousemove={handleMouseMove} on:mouseup={handleMouseUp} />
+<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} />
 
 {#if isOpen && image}
 	<!-- Accessible dialog overlay -->
@@ -147,13 +165,23 @@
 		aria-modal="true"
 		aria-label="Image lightbox"
 		tabindex="0"
-		on:keydown={handleKeyDown}
+		onkeydown={handleKeyDown}
 	>
-		<!-- Background overlay click handler -->
+		<!-- Background overlay click handler - MUST be behind content -->
 		<button 
 			type="button"
 			class="overlay-click-handler"
-			on:click={onClose}
+			onclick={(e) => {
+				logEvent('OVERLAY BUTTON CLICKED', e.target, { currentTarget: e.currentTarget });
+				// Only close if clicking the overlay itself, not children
+				if (e.target === e.currentTarget) {
+					onClose();
+				}
+			}}
+			onmousedown={(e) => logEvent('overlay-mousedown', e.target)}
+			onmouseup={(e) => logEvent('overlay-mouseup', e.target)}
+			onpointerdown={(e) => logEvent('overlay-pointerdown', e.target)}
+			onpointerup={(e) => logEvent('overlay-pointerup', e.target)}
 			aria-label="Close lightbox"
 		></button>
 		
@@ -163,75 +191,149 @@
 			role="document"
 		>
 			<!-- Removed invisible click handler that was blocking mouse events -->
-			<!-- Image container with zoom and pan applied -->
-			<div 
-				class="image-container"
-				class:draggable={zoomLevel > 1}
-			>
-				<!-- Accessible div for pan interaction with ARIA role -->
+			<!-- Content container - 3D Model or Image -->
+			{#if is3DModel}
+				<!-- 3D Model Viewer -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<!-- svelte-ignore a11y_click_events_have_key_keys -->
 				<div 
-					class="image-pan-area"
-					role="button"
-					tabindex={zoomLevel > 1 ? 0 : -1}
-					aria-label="Pan image"
-					aria-disabled={zoomLevel <= 1}
-					on:mousedown={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						handleMouseDown(e);
+					class="model-container"
+					onclick={(e) => { 
+						logEvent('model-container-click', e.target, { bubbles: e.bubbles, cancelable: e.cancelable });
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
 					}}
-					on:touchstart={(e) => {
-						e.stopPropagation();
-						handleTouchStart(e);
+					onmousedown={(e) => { 
+						logEvent('model-container-mousedown', e.target, { button: e.button });
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
 					}}
-					on:touchmove={(e) => {
-						if (isDragging) {
-							e.preventDefault();
-							e.stopPropagation();
-							handleTouchMove(e);
-						}
+					onmousemove={(e) => { 
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
 					}}
-					on:touchend={(e) => {
-						e.stopPropagation();
-						handleTouchEnd();
+					onmouseup={(e) => { 
+						logEvent('model-container-mouseup', e.target, { button: e.button });
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
 					}}
-					on:touchcancel={(e) => {
-						e.stopPropagation();
-						handleTouchEnd();
+					onpointerdown={(e) => { 
+						logEvent('model-container-pointerdown', e.target, { pointerType: e.pointerType, button: e.button });
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
 					}}
-					on:keydown={(e) => {
-						if (e.key === 'Enter' && zoomLevel > 1) {
-							// Create a synthetic mouse event for keyboard activation
-							const syntheticEvent = {
-								clientX: window.innerWidth / 2,
-								clientY: window.innerHeight / 2,
-								pageX: window.innerWidth / 2,
-								pageY: window.innerHeight / 2,
-								preventDefault: () => {},
-								stopPropagation: () => {}
-							} as MouseEvent;
-							handleMouseDown(syntheticEvent);
-						}
+					onpointermove={(e) => { 
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
+					}}
+					onpointerup={(e) => { 
+						logEvent('model-container-pointerup', e.target, { pointerType: e.pointerType, button: e.button });
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
+					}}
+					onpointercancel={(e) => { 
+						logEvent('model-container-pointercancel', e.target);
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
+					}}
+					onwheel={(e) => { 
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
+					}}
+					ontouchstart={(e) => { 
+						logEvent('model-container-touchstart', e.target);
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
+					}}
+					ontouchmove={(e) => { 
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
+					}}
+					ontouchend={(e) => { 
+						logEvent('model-container-touchend', e.target);
+						e.stopPropagation(); 
+						e.stopImmediatePropagation(); 
 					}}
 				>
-					<div class="image-wrapper" style="transform: scale({zoomLevel}) translate({panX}px, {panY}px);">
-						<img 
-							src={image.url} 
-							alt={image.description || image.area || 'Property image'} 
-							class="lightbox-image"
-							draggable="false"
-						/>
+					<ModelViewer 
+						src={image.url} 
+						alt={image.description || image.area || '3D Model'}
+						height="100%"
+						width="100%"
+					/>
+				</div>
+			{:else}
+				<!-- Image container with zoom and pan applied -->
+				<div 
+					class="image-container"
+					class:draggable={zoomLevel > 1}
+				>
+					<!-- Accessible div for pan interaction with ARIA role -->
+					<div 
+						class="image-pan-area"
+						role="button"
+						tabindex={zoomLevel > 1 ? 0 : -1}
+						aria-label="Pan image"
+						aria-disabled={zoomLevel <= 1}
+						onmousedown={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							handleMouseDown(e);
+						}}
+						ontouchstart={(e) => {
+							e.stopPropagation();
+							handleTouchStart(e);
+						}}
+						ontouchmove={(e) => {
+							if (isDragging) {
+								e.preventDefault();
+								e.stopPropagation();
+								handleTouchMove(e);
+							}
+						}}
+						ontouchend={(e) => {
+							e.stopPropagation();
+							handleTouchEnd();
+						}}
+						ontouchcancel={(e) => {
+							e.stopPropagation();
+							handleTouchEnd();
+						}}
+						onkeydown={(e) => {
+							if (e.key === 'Enter' && zoomLevel > 1) {
+								// Create a synthetic mouse event for keyboard activation
+								const syntheticEvent = {
+									clientX: window.innerWidth / 2,
+									clientY: window.innerHeight / 2,
+									pageX: window.innerWidth / 2,
+									pageY: window.innerHeight / 2,
+									preventDefault: () => {},
+									stopPropagation: () => {}
+								} as MouseEvent;
+								handleMouseDown(syntheticEvent);
+							}
+						}}
+					>
+						<div class="image-wrapper" style="transform: scale({zoomLevel}) translate({panX}px, {panY}px);">
+							<img 
+								src={image.url} 
+								alt={image.description || image.area || 'Property image'} 
+								class="lightbox-image"
+								draggable="false"
+							/>
+						</div>
 					</div>
 				</div>
-			</div>
+			{/if}
 			
 			
-			<!-- Zoom controls -->
+			<!-- Zoom controls (only for images, not 3D models) -->
+			{#if !is3DModel}
 			<div class="zoom-controls">
 				<button 
 					type="button" 
 					class="zoom-button zoom-in" 
-					on:click|stopPropagation={zoomIn}
+					onclick={(e) => { e.stopPropagation(); zoomIn(); }}
 					aria-label="Zoom in"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -245,7 +347,7 @@
 				<button 
 					type="button" 
 					class="zoom-button zoom-out" 
-					on:click|stopPropagation={zoomOut}
+					onclick={(e) => { e.stopPropagation(); zoomOut(); }}
 					aria-label="Zoom out"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -258,7 +360,7 @@
 				<button 
 					type="button" 
 					class="zoom-button zoom-reset" 
-					on:click|stopPropagation={resetZoom}
+					onclick={(e) => { e.stopPropagation(); resetZoom(); }}
 					aria-label="Reset zoom"
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -267,6 +369,7 @@
 					</svg>
 				</button>
 			</div>
+			{/if}
 			
 			<!-- Image metadata -->
 			<div class="metadata">
@@ -287,7 +390,7 @@
 			<button 
 				type="button" 
 				class="close-button" 
-				on:click|stopPropagation={onClose}
+				onclick={(e) => { e.stopPropagation(); onClose(); }}
 				aria-label="Close lightbox"
 			>
 				×
@@ -332,6 +435,18 @@
 		display: flex;
 		justify-content: center;
 		align-items: center;
+	}
+	
+	.model-container {
+		position: relative;
+		width: 100%;
+		flex: 1; /* Take all available space */
+		overflow: hidden;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		z-index: 10; /* Above overlay button */
+		pointer-events: auto;
 	}
 
 	.image-pan-area {
@@ -416,7 +531,8 @@
 		background: transparent;
 		border: none;
 		cursor: default;
-		z-index: 1;
+		z-index: 0; /* Behind everything */
+		pointer-events: auto;
 	}
 	
 	.content-click-handler {

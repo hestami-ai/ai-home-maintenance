@@ -1,0 +1,98 @@
+#usda 1.0
+(
+    defaultPrim = "E3ED75011D22477386773A8C883B7647"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "E3ED75011D22477386773A8C883B7647" (
+    kind = "assembly"
+)
+{
+    def Xform "Section_grp" (
+        kind = "group"
+    )
+    {
+    }
+
+    def Xform "Mesh_grp" (
+        kind = "group"
+    )
+    {
+        def Xform "Arch_grp" (
+            kind = "group"
+        )
+        {
+            def Xform "Wall_0_grp" (
+                kind = "group"
+                prepend references = @./assets/Mesh/Walls/Wall0/Wall0.usda@
+            )
+            {
+            }
+
+            def Xform "Wall_1_grp" (
+                kind = "group"
+                prepend references = @./assets/Mesh/Walls/Wall1/Wall1.usda@
+            )
+            {
+            }
+
+            def Xform "Wall_2_grp" (
+                kind = "group"
+                prepend references = [
+                    @./assets/Mesh/Walls/Wall2/Wall2.usda@,
+                    @./assets/Mesh/Walls/Wall2/Window0.usda@
+                ]
+            )
+            {
+            }
+
+            def Xform "Wall_3_grp" (
+                kind = "group"
+                prepend references = @./assets/Mesh/Walls/Wall3/Wall3.usda@
+            )
+            {
+            }
+        }
+
+        def Xform "Floor_grp" (
+            kind = "group"
+            prepend references = @./assets/Mesh/Floors/Floor0.usda@
+        )
+        {
+        }
+
+        def Xform "Object_grp" (
+            kind = "group"
+        )
+        {
+            def Xform "Chair_grp" (
+                kind = "group"
+                prepend references = [
+                    @./assets/Mesh/Chair/Chair0.usda@,
+                    @./assets/Mesh/Chair/Chair1.usda@
+                ]
+            )
+            {
+            }
+
+            def Xform "Table_grp" (
+                kind = "group"
+                prepend references = [
+                    @./assets/Mesh/Table/Table0.usda@,
+                    @./assets/Mesh/Table/Table1.usda@
+                ]
+            )
+            {
+            }
+
+            def Xform "Television_grp" (
+                kind = "group"
+                prepend references = @./assets/Mesh/Television/Television0.usda@
+            )
+            {
+            }
+        }
+    }
+}
+
