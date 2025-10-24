@@ -30,6 +30,11 @@ class MediaProcessor:
             mime_type = magic.from_buffer(media_instance.file.read(1024), mime=True)
             media_instance.file.seek(0)
             
+            # Skip processing for 3D models (USDZ files - all variants)
+            if mime_type in ['model/vnd.usdz+zip', 'model/vnd.pixar.usd-binary+zip']:
+                logger.info(f"Skipping processing for 3D model {media_instance.id} (MIME: {mime_type})")
+                return True
+            
             if mime_type.startswith('image/'):
                 MediaProcessor._process_image(media_instance)
             elif mime_type.startswith('video/'):

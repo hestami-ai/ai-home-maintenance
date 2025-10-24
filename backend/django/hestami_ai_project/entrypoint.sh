@@ -73,6 +73,84 @@ echo "Redis started"
 
 echo ""
 
+# Configure USDZ MIME type detection
+echo "Configuring USDZ MIME type detection..."
+
+# Check if USDZ is already configured in magic files
+USDZ_CONFIGURED=false
+
+# Check /etc/magic for any USDZ-related MIME types
+if [ -f /etc/magic ] && (grep -q "model/vnd.usdz+zip" /etc/magic || grep -q "model/vnd.pixar.usd" /etc/magic); then
+    echo "USDZ already configured in /etc/magic"
+    USDZ_CONFIGURED=true
+fi
+
+# Check /usr/share/file/magic/ for any USDZ-related MIME types
+if [ -d /usr/share/file/magic/ ] && (grep -r "model/vnd.usdz+zip" /usr/share/file/magic/ > /dev/null 2>&1 || grep -r "model/vnd.pixar.usd" /usr/share/file/magic/ > /dev/null 2>&1); then
+    echo "USDZ already configured in /usr/share/file/magic/"
+    USDZ_CONFIGURED=true
+fi
+
+# Check /usr/share/file/magic.mgc (compiled magic file)
+if [ -f /usr/share/file/magic.mgc ]; then
+    echo "Compiled magic file exists at /usr/share/file/magic.mgc"
+    
+    # Test if the compiled magic database recognizes USDZ
+    # Create a temporary test file with USDZ-like signature
+    TEST_FILE=$(mktemp)
+    # Write ZIP signature (PK\003\004) followed by minimal ZIP header and .usda filename
+    printf 'PK\003\004\024\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000model.usda' > "$TEST_FILE"
+    
+    # Test with file command
+    DETECTED_MIME=$(file --mime-type -b "$TEST_FILE" 2>/dev/null)
+    
+    if [ "$DETECTED_MIME" = "model/vnd.usdz+zip" ] || [ "$DETECTED_MIME" = "model/vnd.pixar.usd-ascii+zip" ] || [ "$DETECTED_MIME" = "model/vnd.pixar.usd-text+zip" ]; then
+        echo "Compiled magic database recognizes USDZ format (detected as: $DETECTED_MIME)"
+        USDZ_CONFIGURED=true
+    else
+        echo "Compiled magic database does not recognize USDZ (detected as: $DETECTED_MIME)"
+    fi
+    
+    # Clean up test file
+    rm -f "$TEST_FILE"
+fi
+
+# If USDZ is not configured, add it to /etc/magic
+if [ "$USDZ_CONFIGURED" = false ]; then
+    echo "Adding USDZ MIME type detection to /etc/magic..."
+    
+    # Create /etc/magic if it doesn't exist
+    if [ ! -f /etc/magic ]; then
+        touch /etc/magic
+        echo "Created /etc/magic"
+    fi
+    
+    # Add USDZ magic pattern
+    # USDZ files are ZIP archives containing USD files
+    # We use distinct MIME types to differentiate between internal formats:
+    # - USDA (ASCII) - Text format, supported by Three.js USDZLoader
+    # - USDC (Crate) - Binary format, NOT YET supported by Three.js USDZLoader
+    cat >> /etc/magic << 'EOF'
+
+# USDZ (Universal Scene Description ZIP) - Apple AR format
+# USDZ files are ZIP archives (PK signature) containing .usd, .usda, .usdc, or .usdt files
+# Check for specific internal formats to provide more detailed MIME types
+0       string          PK\003\004
+# USDA (ASCII/Text) - Supported by Three.js USDZLoader
+>30     search/256      .usda           model/vnd.usdz+zip
+# USDC (Crate/Binary) - NOT YET supported by Three.js USDZLoader
+>30     search/256      .usdc           model/vnd.pixar.usd-binary+zip
+# Generic USD - Fallback
+>30     search/256      .usd            model/vnd.usdz+zip
+EOF
+    
+    echo "USDZ MIME type detection added to /etc/magic"
+else
+    echo "USDZ MIME type detection already configured"
+fi
+
+echo ""
+
 #echo "Sleep 60 seconds..."
 #sleep 60
 

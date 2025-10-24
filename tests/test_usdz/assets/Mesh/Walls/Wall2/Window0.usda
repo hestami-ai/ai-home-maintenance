@@ -1,0 +1,48 @@
+#usda 1.0
+(
+    defaultPrim = "Window0"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Window0" (
+    assetInfo = {
+        asset identifier = @./Window0.usda@
+        string name = "Window0"
+    }
+    customData = {
+        string Category = "Window"
+        string UUID = "FE372925-0F9A-4916-8441-763F87B854A9"
+    }
+    kind = "component"
+)
+{
+    def Mesh "Window0"
+    {
+        int[] faceVertexCounts = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+        int[] faceVertexIndices = [0, 1, 2, 0, 3, 1, 5, 7, 4, 6, 5, 4, 8, 9, 10, 10, 11, 8, 12, 13, 14, 14, 15, 12, 16, 17, 18, 18, 19, 16, 20, 21, 22, 20, 22, 23]
+        rel material:binding = </Window0/Window0_color>
+        normal3f[] normals = [(0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0), (-0, 1, 0), (-0, 1, 0), (-0, 1, 0), (-0, 1, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0)]
+        point3f[] points = [(-0.9579669, -0.8011445, 0), (0.9579669, 0.8011445, 0), (-0.9579669, 0.8011445, 0), (0.9579669, -0.8011445, 0), (-0.9579669, -0.8011445, -0.08), (0.9579669, 0.8011445, -0.08), (-0.9579669, 0.8011445, -0.08), (0.9579669, -0.8011445, -0.08), (0.9579669, 0.8011445, 0), (0.9579669, -0.8011445, 0), (0.9579669, -0.8011445, -0.08), (0.9579669, 0.8011445, -0.08), (-0.9579669, 0.8011445, 0), (0.9579669, 0.8011445, 0), (0.9579669, 0.8011445, -0.08), (-0.9579669, 0.8011445, -0.08), (-0.9579669, -0.8011445, 0), (-0.9579669, 0.8011445, 0), (-0.9579669, 0.8011445, -0.08), (-0.9579669, -0.8011445, -0.08), (0.9579669, -0.8011445, 0), (-0.9579669, -0.8011445, 0), (-0.9579669, -0.8011445, -0.08), (0.9579669, -0.8011445, -0.08)]
+        uniform token subdivisionScheme = "none"
+        matrix4d xformOp:transform = ( (0.9503890872001648, 0, 0.31106358766555786, 0), (0, 1, 0, 0), (-0.31106361746788025, 0, 0.9503890872001648, 0), (1.233452558517456, 0.37993544340133667, -2.2915735244750977, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Material "Window0_color"
+    {
+        token outputs:surface.connect = </Window0/Window0_color/surfaceShader.outputs:surface>
+
+        def Shader "surfaceShader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (0, 0, 0)
+            color3f inputs:emissiveColor = (0, 0, 0)
+            normal3f inputs:normal = (1, 1, 1)
+            float inputs:occlusion = 1
+            float inputs:opacity = 0
+            token outputs:surface
+        }
+    }
+}
+
