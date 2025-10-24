@@ -15,6 +15,7 @@ struct PropertyDetailView: View {
     @State private var showingEditProperty = false
     @State private var selectedMediaIndex = 0
     @State private var showingMediaSelection = false
+    @State private var showingMetadataInput = false
     @State private var showingUploadProgress = false
     @State private var selectedFiles: [URL] = []
     @ObservedObject private var uploadManager = MediaUploadManager.shared
@@ -506,13 +507,13 @@ struct PropertyDetailView: View {
                                     .foregroundColor(AppTheme.buttonText)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(AppTheme.accentPrimary.opacity(0.3))
+                                    .background(Color.white.opacity(0.3))
                                     .cornerRadius(12)
                             }
                         }
                         .foregroundColor(AppTheme.buttonText)
                         .padding()
-                        .background(AppTheme.buttonBackground)
+                        .background(AppTheme.accentPrimary)
                         .cornerRadius(10)
                     }
                     .padding(.horizontal)
@@ -572,6 +573,44 @@ struct PropertyDetailView: View {
                 selectionLimit: 10
             )
         }
+        .sheet(isPresented: $showingMetadataInput) {
+            MediaMetadataInputView(
+                files: selectedFiles,
+                propertyId: propertyId,
+                onUpload: { tasks in
+                    showingMetadataInput = false
+                    
+                    // Start upload with metadata
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        showingUploadProgress = true
+                        MediaUploadManager.shared.uploadMedia(tasks: tasks) { result in
+                            print("🔵 Upload completion callback triggered")
+                            
+                            // Clear selected files
+                            DispatchQueue.main.async {
+                                selectedFiles = []
+                            }
+                            
+                            // Refresh property data on completion
+                            Task {
+                                await viewModel.loadProperties()
+                            }
+                            
+                            switch result {
+                            case .success(let media):
+                                print("✅ Successfully uploaded \(media.count) files")
+                            case .failure(let error):
+                                print("❌ Upload error: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                },
+                onCancel: {
+                    showingMetadataInput = false
+                    selectedFiles = []
+                }
+            )
+        }
         .sheet(isPresented: $showingUploadProgress) {
             MediaUploadProgressView(isPresented: $showingUploadProgress)
                 .presentationDetents([.medium, .large])
@@ -580,23 +619,15 @@ struct PropertyDetailView: View {
         .onChange(of: selectedFiles) { oldFiles, newFiles in
             guard !newFiles.isEmpty else { return }
             
-            // Start upload
-            showingUploadProgress = true
-            MediaUploadManager.shared.uploadMedia(files: newFiles, propertyId: propertyId) { result in
-                // Clear selected files
-                selectedFiles = []
-                
-                // Refresh property data on completion
-                Task {
-                    await viewModel.loadProperties()
-                }
-                
-                switch result {
-                case .success(let media):
-                    print("✅ Successfully uploaded \(media.count) files")
-                case .failure(let error):
-                    print("❌ Upload error: \(error.localizedDescription)")
-                }
+            print("🔵 PropertyDetailView: Selected \(newFiles.count) files")
+            print("🔵 File URLs: \(newFiles.map { $0.lastPathComponent })")
+            
+            // Dismiss the media selection sheet first
+            showingMediaSelection = false
+            
+            // Show metadata input view
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showingMetadataInput = true
             }
         }
     }
