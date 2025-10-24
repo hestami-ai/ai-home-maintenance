@@ -182,19 +182,23 @@ class MediaSerializer(serializers.ModelSerializer):
         
         # Validate file type
         allowed_types = {
-            # Images (AVIF removed - not supported by Pillow without plugin)
+            # Images
             'image/jpeg', 'image/png', 'image/gif', 'image/webp',
             # Videos
             'video/mp4', 'video/quicktime', 'video/webm',
+            # 3D Models - USDZ files with different internal formats
+            'model/vnd.usdz+zip',              # USDA (ASCII) or generic USD - supported by Three.js
+            'model/vnd.pixar.usd-binary+zip',  # USDC (binary) - NOT YET supported by Three.js
             # Documents
             'text/plain', 'text/markdown', 'application/pdf',
             'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'text/markdown', 'text/x-markdown'
         }
+        
         if file_mime not in allowed_types:
             logger.error(f"File type validation failed - Detected: {file_mime}, Allowed: {allowed_types}")
             raise serializers.ValidationError(
-                f"Unsupported file type. Allowed types: {', '.join(allowed_types)}"
+                f"Unsupported file type '{file_mime}'. Allowed types: {', '.join(sorted(allowed_types))}"
             )
         
         return value

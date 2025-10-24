@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 class MediaType(models.TextChoices):
     IMAGE = 'IMAGE', 'Image'
     VIDEO = 'VIDEO', 'Video'
+    MODEL_3D = '3D_MODEL', '3D Model'
     FILE = 'FILE', 'File'
     OTHER = 'OTHER', 'Other'
 
@@ -17,6 +18,7 @@ class MediaSubType(models.TextChoices):
     REGULAR = 'REGULAR', 'Regular'
     DEGREE_360 = '360_DEGREE', '360 Degree'
     FLOORPLAN = 'FLOORPLAN', 'Floorplan'
+    MODEL_3D = 'USDZ', 'USDZ Model'
     DOCUMENT = 'DOCUMENT', 'Document'
     OTHER = 'OTHER', 'Other'
 
@@ -279,7 +281,7 @@ class Media(models.Model):
     file = models.FileField(
         upload_to=get_upload_path,
         validators=[FileExtensionValidator(
-            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'md', 'pdf', 'docx', 'txt', 'doc']
+            allowed_extensions=['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'md', 'pdf', 'docx', 'txt', 'doc', 'usdz']
         )]
     )
     file_type = models.CharField(max_length=50)

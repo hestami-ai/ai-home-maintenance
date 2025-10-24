@@ -1,0 +1,48 @@
+#usda 1.0
+(
+    defaultPrim = "Television0"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Television0" (
+    assetInfo = {
+        asset identifier = @./Television0.usda@
+        string name = "Television0"
+    }
+    customData = {
+        string Category = "Television"
+        string UUID = "CEECB389-F261-4F3A-B9C2-EDB7F5D61B16"
+    }
+    kind = "component"
+)
+{
+    def Mesh "Television0"
+    {
+        int[] faceVertexCounts = [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+        int[] faceVertexIndices = [0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9, 10, 8, 10, 11, 12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23]
+        rel material:binding = </Television0/Television0_color>
+        normal3f[] normals = [(0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 0, -1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, 0, 1), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, -1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0), (0, 1, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (-1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0), (1, 0, 0)]
+        point3f[] points = [(-0.71416986, -0.44658202, -0.032500006), (-0.71416986, 0.44658202, -0.032500006), (0.71416986, 0.44658202, -0.032500006), (0.71416986, -0.44658202, -0.032500006), (-0.71416986, -0.44658202, 0.032500006), (0.71416986, -0.44658202, 0.032500006), (0.71416986, 0.44658202, 0.032500006), (-0.71416986, 0.44658202, 0.032500006), (-0.71416986, -0.44658202, 0.032500006), (-0.71416986, -0.44658202, -0.032500006), (0.71416986, -0.44658202, -0.032500006), (0.71416986, -0.44658202, 0.032500006), (0.71416986, 0.44658202, 0.032500006), (0.71416986, 0.44658202, -0.032500006), (-0.71416986, 0.44658202, -0.032500006), (-0.71416986, 0.44658202, 0.032500006), (-0.71416986, 0.44658202, 0.032500006), (-0.71416986, 0.44658202, -0.032500006), (-0.71416986, -0.44658202, -0.032500006), (-0.71416986, -0.44658202, 0.032500006), (0.71416986, -0.44658202, 0.032500006), (0.71416986, -0.44658202, -0.032500006), (0.71416986, 0.44658202, -0.032500006), (0.71416986, 0.44658202, 0.032500006)]
+        uniform token subdivisionScheme = "none"
+        matrix4d xformOp:transform = ( (0.4935283064842224, 0, 0.8697296380996704, 0), (0, 1, 0, 0), (-0.8697296380996704, 0, 0.4935283064842224, 0), (1.7532514333724976, -0.02750011533498764, -1.3266736268997192, 1) )
+        uniform token[] xformOpOrder = ["xformOp:transform"]
+    }
+
+    def Material "Television0_color"
+    {
+        token outputs:surface.connect = </Television0/Television0_color/surfaceShader.outputs:surface>
+
+        def Shader "surfaceShader"
+        {
+            uniform token info:id = "UsdPreviewSurface"
+            color3f inputs:diffuseColor = (1, 1, 1)
+            color3f inputs:emissiveColor = (0, 0, 0)
+            normal3f inputs:normal = (1, 1, 1)
+            float inputs:occlusion = 1
+            float inputs:opacity = 1
+            token outputs:surface
+        }
+    }
+}
+

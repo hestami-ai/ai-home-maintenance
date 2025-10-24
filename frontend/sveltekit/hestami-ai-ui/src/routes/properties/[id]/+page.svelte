@@ -5,6 +5,7 @@
 	import ImageGallery from '$lib/components/ImageGallery.svelte';
 	import SimpleLightbox from '$lib/components/SimpleLightbox.svelte';
 	import DateRangePicker from '$lib/components/DateRangePicker.svelte';
+	import ModelViewer from '$lib/components/ModelViewer.svelte';
 	import type { PropertyImage, GalleryItem } from '$lib/components/types';
 	import type { Property, Media } from '$lib/types';
 	import { 
@@ -84,25 +85,14 @@
 	// Get media items from the API response
 	const mediaItems = property.media || [];
 	
-	// Create property floorplans array from media items
-	const propertyFloorplans = $state<PropertyImage[]>(
+	// Create property floorplans array from media items (images, videos, and 3D models)
+	// Keep as Media[] to preserve video thumbnails and other metadata
+	const propertyFloorplans = $state<Media[]>(
 		mediaItems
 			.filter((media: Media) => 
-				media.media_type === 'IMAGE' && 
 				media.media_sub_type === 'FLOORPLAN' && 
 				!media.is_deleted
 			)
-			.map((media: Media): PropertyImage => ({
-				id: media.id,
-				url: media.file_url,
-				thumbnail: media.file_url,
-				area: 'Floorplan',
-				description: media.title || media.description || `${property.address} - Floorplan`,
-				uploadDate: new Date(media.upload_date),
-				tags: ['floorplan'],
-				width: 1200,
-				height: 800
-			}))
 	);
 	
 	// Check for 360-degree media (images and videos)
@@ -676,31 +666,159 @@
 								<div class="card overflow-hidden">
 									<div 
 										class="relative cursor-pointer" 
-										onclick={() => openLightbox(floorplan)}
+										onclick={() => {
+											if (floorplan.media_type === 'VIDEO') {
+												openVideoLightbox(floorplan);
+											} else if (floorplan.media_type === '3D_MODEL') {
+												// Convert to PropertyImage format for lightbox
+												const modelImage: PropertyImage & { mediaType?: string } = {
+													id: floorplan.id,
+													url: floorplan.file_url,
+													thumbnail: floorplan.file_url,
+													area: 'Floorplan',
+													description: floorplan.title || floorplan.description || 'Floorplan',
+													uploadDate: new Date(floorplan.upload_date),
+													tags: ['floorplan'],
+													width: 1200,
+													height: 800,
+													mediaType: floorplan.media_type
+												};
+												openLightbox(modelImage);
+											} else {
+												// Image
+												const img: PropertyImage = {
+													id: floorplan.id,
+													url: floorplan.file_url,
+													thumbnail: floorplan.file_url,
+													area: 'Floorplan',
+													description: floorplan.title || floorplan.description || 'Floorplan',
+													uploadDate: new Date(floorplan.upload_date),
+													tags: ['floorplan'],
+													width: 1200,
+													height: 800
+												};
+												openLightbox(img);
+											}
+										}}
 										role="button"
 										tabindex="0"
-										onkeydown={(e) => e.key === 'Enter' && openLightbox(floorplan)}
+										onkeydown={(e) => {
+											if (e.key === 'Enter') {
+												if (floorplan.media_type === 'VIDEO') {
+													openVideoLightbox(floorplan);
+												} else if (floorplan.media_type === '3D_MODEL') {
+													const modelImage: PropertyImage & { mediaType?: string } = {
+														id: floorplan.id,
+														url: floorplan.file_url,
+														thumbnail: floorplan.file_url,
+														area: 'Floorplan',
+														description: floorplan.title || floorplan.description || 'Floorplan',
+														uploadDate: new Date(floorplan.upload_date),
+														tags: ['floorplan'],
+														width: 1200,
+														height: 800,
+														mediaType: floorplan.media_type
+													};
+													openLightbox(modelImage);
+												} else {
+													const img: PropertyImage = {
+														id: floorplan.id,
+														url: floorplan.file_url,
+														thumbnail: floorplan.file_url,
+														area: 'Floorplan',
+														description: floorplan.title || floorplan.description || 'Floorplan',
+														uploadDate: new Date(floorplan.upload_date),
+														tags: ['floorplan'],
+														width: 1200,
+														height: 800
+													};
+													openLightbox(img);
+												}
+											}
+										}}
 									>
-										<img 
-											src={floorplan.url} 
-											alt={floorplan.description || 'Property Floorplan'} 
-											class="w-full h-64 object-contain hover:scale-105 transition-transform duration-300"
-										/>
+										{#if floorplan.media_type === '3D_MODEL'}
+											<!-- 3D Model placeholder icon -->
+											<div class="w-full h-64 flex items-center justify-center bg-surface-100-800-token hover:bg-surface-200-700-token transition-colors duration-300">
+												<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-primary-500">
+													<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+													<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+													<line x1="12" y1="22.08" x2="12" y2="12"></line>
+												</svg>
+											</div>
+										{:else if floorplan.media_type === 'VIDEO'}
+											<!-- Video thumbnail with play button -->
+											<img 
+												src={floorplan.thumbnail_large_url} 
+												alt={floorplan.title || floorplan.description || 'Floorplan Video'} 
+												class="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+											/>
+											<div class="absolute inset-0 flex items-center justify-center">
+												<div class="rounded-full bg-black/50 p-3">
+													<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+														<polygon points="5 3 19 12 5 21 5 3"></polygon>
+													</svg>
+												</div>
+											</div>
+										{:else}
+											<!-- Regular image thumbnail -->
+											<img 
+												src={floorplan.file_url} 
+												alt={floorplan.title || floorplan.description || 'Property Floorplan'} 
+												class="w-full h-64 object-contain hover:scale-105 transition-transform duration-300"
+											/>
+										{/if}
 										<div class="absolute top-2 right-2">
 											<button 
 												type="button" 
 												class="btn-icon variant-filled-surface btn-sm" 
-												onclick={(e) => { e.stopPropagation(); openLightbox(floorplan); }}
+												onclick={(e) => {
+													e.stopPropagation();
+													if (floorplan.media_type === 'VIDEO') {
+														openVideoLightbox(floorplan);
+													} else if (floorplan.media_type === '3D_MODEL') {
+														const modelImage: PropertyImage & { mediaType?: string } = {
+															id: floorplan.id,
+															url: floorplan.file_url,
+															thumbnail: floorplan.file_url,
+															area: 'Floorplan',
+															description: floorplan.title || floorplan.description || 'Floorplan',
+															uploadDate: new Date(floorplan.upload_date),
+															tags: ['floorplan'],
+															width: 1200,
+															height: 800,
+															mediaType: floorplan.media_type
+														};
+														openLightbox(modelImage);
+													} else {
+														const img: PropertyImage = {
+															id: floorplan.id,
+															url: floorplan.file_url,
+															thumbnail: floorplan.file_url,
+															area: 'Floorplan',
+															description: floorplan.title || floorplan.description || 'Floorplan',
+															uploadDate: new Date(floorplan.upload_date),
+															tags: ['floorplan'],
+															width: 1200,
+															height: 800
+														};
+														openLightbox(img);
+													}
+												}}
 												aria-label="View fullscreen"
 											>
-												<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+												{#if floorplan.media_type === 'VIDEO'}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+												{:else}
+													<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+												{/if}
 											</button>
 										</div>
 									</div>
 									<div class="p-3">
-										<p class="font-medium">{floorplan.description || 'Property Floorplan'}</p>
+										<p class="font-medium">{floorplan.title || 'Floorplan'}</p>
 										<p class="text-sm text-surface-600-300-token">
-											Uploaded: {floorplan.uploadDate.toLocaleDateString()}
+											Uploaded: {new Date(floorplan.upload_date).toLocaleDateString()}
 										</p>
 									</div>
 								</div>
