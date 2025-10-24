@@ -12,23 +12,57 @@ struct MediaMetadataInputView: View {
     @State private var fileMetadata: [FileMetadata]
     
     init(files: [URL], propertyId: String, onUpload: @escaping ([MediaUploadTask]) -> Void, onCancel: @escaping () -> Void) {
-        self.files = files
         self.propertyId = propertyId
         self.onUpload = onUpload
         self.onCancel = onCancel
         
+        // Expand files to include floorplans for USDZ files
+        var expandedFiles: [URL] = []
+        for file in files {
+            print("📄 Processing file: \(file.lastPathComponent), extension: \(file.pathExtension)")
+            
+            // Verify file exists
+            let fileExists = FileManager.default.fileExists(atPath: file.path)
+            print("📄 File exists: \(fileExists) at \(file.path)")
+            
+            if fileExists {
+                expandedFiles.append(file)
+                
+                // If this is a USDZ file, check for associated floorplan
+                if file.pathExtension.lowercased() == "usdz" {
+                    print("📄 Detected USDZ file, looking for floorplan...")
+                    if let floorplanURL = Self.findFloorplanForUSDZ(file) {
+                        let floorplanExists = FileManager.default.fileExists(atPath: floorplanURL.path)
+                        print("📎 Found floorplan: \(floorplanURL.lastPathComponent), exists: \(floorplanExists)")
+                        if floorplanExists {
+                            expandedFiles.append(floorplanURL)
+                        }
+                    } else {
+                        print("📎 No floorplan found for USDZ")
+                    }
+                }
+            } else {
+                print("❌ File does not exist, skipping: \(file.path)")
+            }
+        }
+        
+        print("📄 Total files after expansion: \(expandedFiles.count)")
+        self.files = expandedFiles
+        
         // Initialize metadata for all files
-        _fileMetadata = State(initialValue: files.map { file in
+        _fileMetadata = State(initialValue: expandedFiles.map { file in
             let fileName = file.lastPathComponent
             let mimeType = Self.getMimeType(for: file)
-            let defaultMediaType = mimeType.starts(with: "video/") ? "VIDEO" : "IMAGE"
+            let isUSDZ = file.pathExtension.lowercased() == "usdz"
+            let defaultMediaType = isUSDZ ? "FILE" : (mimeType.starts(with: "video/") ? "VIDEO" : "IMAGE")
+            let defaultMediaSubType = isUSDZ ? "FLOORPLAN" : "REGULAR"
             
             return FileMetadata(
                 fileURL: file,
                 title: fileName,
                 description: "",
                 mediaType: defaultMediaType,
-                mediaSubType: "REGULAR",
+                mediaSubType: defaultMediaSubType,
                 locationType: "INTERIOR",
                 locationSubType: ""
             )
@@ -266,8 +300,22 @@ struct MediaMetadataInputView: View {
         case "gif": return "image/gif"
         case "mp4": return "video/mp4"
         case "mov": return "video/quicktime"
+        case "usdz": return "model/vnd.usdz+zip"
         default: return "application/octet-stream"
         }
+    }
+    
+    private static func findFloorplanForUSDZ(_ usdzURL: URL) -> URL? {
+        // Get the scan ID from the USDZ filename (assuming format: scanId.usdz)
+        let scanId = usdzURL.deletingPathExtension().lastPathComponent
+        
+        // Check if this USDZ file is from a RoomScan
+        let scans = RoomScanStorageService.shared.getAllScans()
+        if let scan = scans.first(where: { $0.fileURL == usdzURL || $0.id == scanId }) {
+            return scan.floorplanURL
+        }
+        
+        return nil
     }
     
     private func uploadFiles() {

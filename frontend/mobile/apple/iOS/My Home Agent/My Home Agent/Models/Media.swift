@@ -38,6 +38,26 @@ struct Media: Identifiable, Codable {
     let isVideo: Bool
     let mediaType: MediaType
     let mediaSubType: String
+    
+    // Computed property to detect 3D models
+    var is3DModel: Bool {
+        // Check if it's a 3D_MODEL type
+        if mediaType == .THREE_D_MODEL {
+            return true
+        }
+        
+        // Check mime type
+        if mimeType.contains("usdz") || mimeType.contains("model/") {
+            return true
+        }
+        
+        // Fallback: Check if it's a FILE type (legacy)
+        //if mediaType == .FILE && originalFilename.lowercased().hasSuffix(".usdz") {
+        //    return true
+        //}
+        
+        return false
+    }
     let locationType: String
     let locationSubType: String
     let locationDisplay: String?
@@ -86,6 +106,7 @@ enum MediaType: String, Codable {
     case IMAGE
     case VIDEO
     case FILE
+    case THREE_D_MODEL = "3D_MODEL"
     case UNKNOWN
     
     init(from decoder: Decoder) throws {
