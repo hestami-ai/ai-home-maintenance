@@ -5,6 +5,8 @@ struct RequestsView: View {
     @State private var searchText = ""
     @State private var selectedFilter: ServiceRequestStatus? = nil
     @State private var selectedTab = 0
+    @State private var showingCreateRequest = false
+    @State private var groupByProperty = false
     
     var filteredRequests: [ServiceRequest] {
         var filtered = viewModel.serviceRequests
@@ -30,7 +32,7 @@ struct RequestsView: View {
             VStack(spacing: 0) {
                 TabView(selection: $selectedTab) {
                     // Service Requests Tab
-                    ServiceRequestsTabView(viewModel: viewModel, searchText: $searchText, selectedFilter: $selectedFilter, filteredRequests: filteredRequests)
+                    ServiceRequestsTabView(viewModel: viewModel, searchText: $searchText, selectedFilter: $selectedFilter, filteredRequests: filteredRequests, groupByProperty: $groupByProperty)
                         .tabItem {
                             Label("Service Requests", systemImage: "wrench.and.screwdriver")
                         }
@@ -55,6 +57,22 @@ struct RequestsView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            if selectedTab == 0 {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showingCreateRequest = true
+                    }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(AppTheme.primaryText)
+                            .font(.system(size: 20, weight: .semibold))
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingCreateRequest) {
+            CreateServiceRequestView()
+        }
         .task {
             await viewModel.loadServiceRequests()
         }
@@ -504,6 +522,28 @@ struct RequestDetailView: View {
     }
 }
 
+struct PropertyHeaderView: View {
+    let property: PropertySummary?
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(property?.title ?? "Unknown Property")
+                    .font(AppTheme.bodyFont.bold())
+                    .foregroundColor(AppTheme.primaryText)
+                
+                if let property = property {
+                    Text("\(property.address), \(property.city), \(property.state)")
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 20) {
@@ -538,6 +578,26 @@ struct ServiceRequestsTabView: View {
     @Binding var searchText: String
     @Binding var selectedFilter: ServiceRequestStatus?
     let filteredRequests: [ServiceRequest]
+    @Binding var groupByProperty: Bool
+    
+    var groupedRequests: [(property: PropertySummary?, requests: [ServiceRequest])] {
+        let grouped = Dictionary(grouping: filteredRequests) { request -> String in
+            return request.property
+        }
+        
+        return grouped.map { (propertyId, requests) -> (PropertySummary?, [ServiceRequest]) in
+            let propertySummary = requests.first?.propertyDetails
+            return (propertySummary, requests.sorted { $0.createdAt > $1.createdAt })
+        }.sorted { (first, second) -> Bool in
+            if let firstTitle = first.property?.title, let secondTitle = second.property?.title {
+                return firstTitle < secondTitle
+            } else if first.property != nil {
+                return true
+            } else {
+                return false
+            }
+        }
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -567,6 +627,20 @@ struct ServiceRequestsTabView: View {
                 }
                 .padding(.horizontal)
             }
+            .padding(.vertical, 8)
+            .background(AppTheme.cardBackground.opacity(0.3))
+            
+            // Group by Property Toggle
+            HStack {
+                Text("Group by Property")
+                    .font(AppTheme.captionFont)
+                    .foregroundColor(AppTheme.primaryText)
+                Spacer()
+                Toggle("", isOn: $groupByProperty)
+                    .labelsHidden()
+                    .tint(AppTheme.accentColor)
+            }
+            .padding(.horizontal)
             .padding(.vertical, 8)
             .background(AppTheme.cardBackground.opacity(0.3))
             
@@ -601,15 +675,34 @@ struct ServiceRequestsTabView: View {
             } else if filteredRequests.isEmpty {
                 EmptyStateView()
             } else {
-                List {
-                    ForEach(filteredRequests) { request in
-                        NavigationLink(destination: RequestDetailView(request: request)) {
-                            RequestRowView(request: request)
+                if groupByProperty {
+                    // Grouped by property view
+                    List {
+                        ForEach(groupedRequests.indices, id: \.self) { index in
+                            let group = groupedRequests[index]
+                            Section(header: PropertyHeaderView(property: group.property)) {
+                                ForEach(group.requests) { request in
+                                    NavigationLink(destination: RequestDetailView(request: request)) {
+                                        RequestRowView(request: request)
+                                    }
+                                    .listRowBackground(AppTheme.cardBackground)
+                                }
+                            }
                         }
-                        .listRowBackground(AppTheme.cardBackground)
                     }
+                    .scrollContentBackground(.hidden)
+                } else {
+                    // Standard list view
+                    List {
+                        ForEach(filteredRequests) { request in
+                            NavigationLink(destination: RequestDetailView(request: request)) {
+                                RequestRowView(request: request)
+                            }
+                            .listRowBackground(AppTheme.cardBackground)
+                        }
+                    }
+                    .scrollContentBackground(.hidden)
                 }
-                .scrollContentBackground(.hidden)
             }
         }
     }

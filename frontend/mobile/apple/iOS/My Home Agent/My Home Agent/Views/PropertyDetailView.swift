@@ -17,6 +17,7 @@ struct PropertyDetailView: View {
     @State private var showingMediaSelection = false
     @State private var showingMetadataInput = false
     @State private var showingUploadProgress = false
+    @State private var showingMediaManagement = false
     @State private var selectedFiles: [URL] = []
     @ObservedObject private var uploadManager = MediaUploadManager.shared
     
@@ -518,6 +519,26 @@ struct PropertyDetailView: View {
                     }
                     .padding(.horizontal)
                     
+                    // Manage Media Button
+                    if let media = property.media, !media.isEmpty {
+                        Button(action: {
+                            showingMediaManagement = true
+                        }) {
+                            HStack {
+                                Image(systemName: "square.grid.2x2")
+                                    .font(.title3)
+                                Text("Manage Media")
+                                    .font(AppTheme.bodyFont.bold())
+                                Spacer()
+                            }
+                            .foregroundColor(AppTheme.buttonText)
+                            .padding()
+                            .background(AppTheme.accentPrimary)
+                            .cornerRadius(10)
+                        }
+                        .padding(.horizontal)
+                    }
+                    
                     // Property Actions
                     VStack(spacing: 16) {
                         if RoomCaptureSession.isSupported {
@@ -570,7 +591,8 @@ struct PropertyDetailView: View {
             MediaSelectionSheet(
                 isPresented: $showingMediaSelection,
                 selectedFiles: $selectedFiles,
-                selectionLimit: 10
+                selectionLimit: 10,
+                propertyId: propertyId
             )
         }
         .sheet(isPresented: $showingMetadataInput) {
@@ -615,6 +637,20 @@ struct PropertyDetailView: View {
             MediaUploadProgressView(isPresented: $showingUploadProgress)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: $showingMediaManagement) {
+            if let currentProperty = viewModel.properties.first(where: { $0.id == propertyId }),
+               let mediaArray = currentProperty.media {
+                MediaManagementView(
+                    propertyId: propertyId,
+                    media: Binding(
+                        get: { mediaArray },
+                        set: { newMedia in
+                            // Update will happen via viewModel.loadProperties()
+                        }
+                    )
+                )
+            }
         }
         .onChange(of: selectedFiles) { oldFiles, newFiles in
             guard !newFiles.isEmpty else { return }

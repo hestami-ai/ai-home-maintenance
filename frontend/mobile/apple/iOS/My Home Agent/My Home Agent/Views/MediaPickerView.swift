@@ -223,8 +223,10 @@ struct MediaSelectionSheet: View {
     @Binding var selectedFiles: [URL]
     @State private var showingPhotoPicker = false
     @State private var showingCamera = false
+    @State private var showingRoomScanPicker = false
     
     let selectionLimit: Int
+    let propertyId: String?
     
     var body: some View {
         NavigationView {
@@ -297,6 +299,39 @@ struct MediaSelectionSheet: View {
                     .padding(.top, 12)
                 }
                 
+                // Room Scan Option
+                Button(action: {
+                    showingRoomScanPicker = true
+                }) {
+                    HStack {
+                        Image(systemName: "cube.transparent")
+                            .font(.title2)
+                            .foregroundColor(AppTheme.accentPrimary)
+                            .frame(width: 44)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Choose Room Scan")
+                                .font(AppTheme.bodyFont.bold())
+                                .foregroundColor(AppTheme.primaryText)
+                            
+                            Text("Select a saved 3D room scan")
+                                .font(AppTheme.captionFont)
+                                .foregroundColor(AppTheme.secondaryText)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(AppTheme.secondaryText)
+                    }
+                    .padding()
+                    .background(AppTheme.cardBackground)
+                    .cornerRadius(12)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.horizontal)
+                .padding(.top, 12)
+                
                 Spacer()
             }
             .background(AppTheme.primaryBackground)
@@ -324,6 +359,12 @@ struct MediaSelectionSheet: View {
                     selectionLimit: 1
                 )
             }
+            .sheet(isPresented: $showingRoomScanPicker) {
+                RoomScanPickerView(
+                    selectedFiles: $selectedFiles,
+                    propertyId: propertyId
+                )
+            }
             .onChange(of: selectedFiles) { oldFiles, newFiles in
                 // Dismiss the selection sheet when files are selected
                 if !newFiles.isEmpty {
@@ -331,5 +372,95 @@ struct MediaSelectionSheet: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Room Scan Picker View
+
+struct RoomScanPickerView: View {
+    @Binding var selectedFiles: [URL]
+    @Environment(\.dismiss) var dismiss
+    let propertyId: String?
+    
+    @State private var scans: [RoomScan] = []
+    @State private var selectedScan: RoomScan?
+    
+    var body: some View {
+        NavigationView {
+            List {
+                ForEach(scans) { scan in
+                    Button(action: {
+                        selectedScan = scan
+                        
+                        // Verify file exists
+                        let fileExists = FileManager.default.fileExists(atPath: scan.fileURL.path)
+                        print("📁 Room scan file exists: \(fileExists) at \(scan.fileURL.path)")
+                        
+                        if fileExists {
+                            // Add USDZ file URL
+                            selectedFiles = [scan.fileURL]
+                            print("📁 Selected room scan: \(scan.name)")
+                            dismiss()
+                        } else {
+                            print("❌ Room scan file not found at: \(scan.fileURL.path)")
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "cube.transparent")
+                                .font(.title2)
+                                .foregroundColor(AppTheme.accentPrimary)
+                                .frame(width: 44)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(scan.name)
+                                    .font(AppTheme.bodyFont.bold())
+                                    .foregroundColor(AppTheme.primaryText)
+                                
+                                Text(formatDate(scan.createdAt))
+                                    .font(AppTheme.captionFont)
+                                    .foregroundColor(AppTheme.secondaryText)
+                            }
+                            
+                            Spacer()
+                            
+                            if scan.floorplanURL != nil {
+                                Image(systemName: "map")
+                                    .foregroundColor(AppTheme.accentPrimary)
+                            }
+                        }
+                    }
+                }
+            }
+            .listStyle(PlainListStyle())
+            .background(AppTheme.primaryBackground)
+            .navigationTitle("Select Room Scan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundColor(AppTheme.accentPrimary)
+                }
+            }
+            .onAppear {
+                loadScans()
+            }
+        }
+    }
+    
+    private func loadScans() {
+        if let propertyId = propertyId {
+            scans = RoomScanStorageService.shared.getScans(forPropertyId: propertyId)
+        } else {
+            scans = RoomScanStorageService.shared.getAllScans()
+        }
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
