@@ -91,6 +91,27 @@ class RequestsViewModel: ObservableObject {
         return serviceRequests.filter { $0.status == status }
     }
     
+    // Group requests by property
+    func groupedByProperty() -> [(property: PropertySummary?, requests: [ServiceRequest])] {
+        let grouped = Dictionary(grouping: serviceRequests) { request -> String in
+            return request.property
+        }
+        
+        return grouped.map { (propertyId, requests) -> (PropertySummary?, [ServiceRequest]) in
+            let propertySummary = requests.first?.propertyDetails
+            return (propertySummary, requests.sorted { $0.createdAt > $1.createdAt })
+        }.sorted { (first, second) -> Bool in
+            // Sort by property title, putting nil properties last
+            if let firstTitle = first.property?.title, let secondTitle = second.property?.title {
+                return firstTitle < secondTitle
+            } else if first.property != nil {
+                return true
+            } else {
+                return false
+            }
+        }
+    }
+    
     // Load dummy data for development and previews
     private func loadDummyData() {
         let dummyDate = Date()
