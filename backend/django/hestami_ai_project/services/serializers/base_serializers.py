@@ -3,7 +3,7 @@ from services.models.base_models import (
     ServiceProvider, ProviderCategory,
     ServiceRequest, ServiceReport, ServiceReview,
     ServiceBid, ServiceRequestClarification, ServiceRequestInterest,
-    ServiceResearch
+    ServiceResearch, ProviderOutreach
 )
 from users.serializers import UserSerializer
 from media.serializers import MediaSerializer
@@ -45,16 +45,39 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
 
 class ServiceBidSerializer(serializers.ModelSerializer):
     provider_details = ServiceProviderSerializer(source='provider', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    # Additional metadata for bid comparison (Phase 2)
+    estimated_duration_days = serializers.SerializerMethodField()
+    days_until_start = serializers.SerializerMethodField()
+    is_selected = serializers.SerializerMethodField()
     
     class Meta:
         model = ServiceBid
         fields = [
             'id', 'service_request', 'provider', 'provider_details',
-            'amount', 'description', 'estimated_duration',
-            'proposed_start_date', 'status', 'created_at',
-            'updated_at'
+            'amount', 'description', 'estimated_duration', 'estimated_duration_days',
+            'proposed_start_date', 'days_until_start', 'status', 'status_display',
+            'is_selected', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
+    
+    def get_estimated_duration_days(self, obj):
+        """Convert duration to days for easier comparison"""
+        if obj.estimated_duration:
+            return obj.estimated_duration.days + (obj.estimated_duration.seconds / 86400)
+        return None
+    
+    def get_days_until_start(self, obj):
+        """Calculate days until proposed start date"""
+        if obj.proposed_start_date:
+            delta = obj.proposed_start_date - timezone.now()
+            return delta.days
+        return None
+    
+    def get_is_selected(self, obj):
+        """Check if this bid's provider is the selected provider"""
+        return obj.service_request.selected_provider_id == obj.provider_id
     
     def validate(self, data):
         if data.get('proposed_start_date') and data['proposed_start_date'] < timezone.now():
@@ -136,6 +159,7 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     provider_details = serializers.SerializerMethodField()
     created_by_details = UserSerializer(source='created_by', read_only=True)
+    assigned_to_details = UserSerializer(source='assigned_to', read_only=True)
     bids = serializers.SerializerMethodField()
     clarifications = serializers.SerializerMethodField()
     selected_provider_details = serializers.SerializerMethodField()
@@ -153,7 +177,8 @@ class ServiceRequestSerializer(serializers.ModelSerializer):
             'scheduled_start', 'scheduled_end', 'actual_start',
             'actual_end', 'estimated_cost', 'final_cost',
             'created_at', 'updated_at', 'created_by',
-            'created_by_details', 'budget_minimum', 'budget_maximum',
+            'created_by_details', 'assigned_to', 'assigned_to_details',
+            'budget_minimum', 'budget_maximum',
             'bid_submission_deadline', 'selected_provider',
             'selected_provider_details', 'runner_up_provider',
             'runner_up_provider_details', 'bids',
@@ -301,10 +326,37 @@ class ServiceResearchSerializer(serializers.ModelSerializer):
         model = ServiceResearch
         fields = [
             'id', 'service_request', 'research_data', 'research_content',
-            'research_content_raw_text', 'data_sources', 'notes', 'researched_by', 
-            'researched_by_details', 'service_provider_created', 'created_at', 'updated_at'
+            'research_content_raw_text', 'data_sources', 'source_url', 'notes', 
+            'researched_by', 'researched_by_details', 'service_provider_created', 
+            'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at']
+        read_only_fields = ['created_at', 'updated_at']
+
+class ProviderOutreachSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ProviderOutreach model.
+    Tracks STAFF outreach to providers during the bidding phase.
+    """
+    provider_details = ServiceProviderSerializer(source='provider', read_only=True)
+    contacted_by_details = UserSerializer(source='contacted_by', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = ProviderOutreach
+        fields = [
+            'id', 'service_request', 'provider', 'provider_details',
+            'status', 'status_display', 'last_contact_date', 
+            'expected_response_date', 'notes', 'contacted_by',
+            'contacted_by_details', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def create(self, validated_data):
+        # Auto-set contacted_by to current user if not provided
+        if 'contacted_by' not in validated_data:
+            validated_data['contacted_by'] = self.context['request'].user
+        return super().create(validated_data)
+
 
 class ServiceRequestDetailSerializer(serializers.ModelSerializer):
     report = ServiceReportSerializer(read_only=True)

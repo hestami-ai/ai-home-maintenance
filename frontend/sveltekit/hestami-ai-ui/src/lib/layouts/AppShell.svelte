@@ -158,21 +158,28 @@
 				active: $page.url.pathname.startsWith('/properties')
 			}
 		] : []),
-		{
-			name: 'Service Requests',
-			iconType: 'clipboard',
-			href: '/requests',
-			active: $page.url.pathname.startsWith('/requests')
-		},
-		// Admin items for staff users
+		// Service Requests - different for STAFF vs others
 		...(user?.user_role === 'STAFF' ? [
+			{
+				name: 'Service Queue',
+				iconType: 'clipboard',
+				href: '/staff/requests',
+				active: $page.url.pathname.startsWith('/staff/requests')
+			},
 			{
 				name: 'Users',
 				iconType: 'users',
 				href: '/users',
 				active: $page.url.pathname.startsWith('/users')
 			}
-		] : []),
+		] : [
+			{
+				name: 'Service Requests',
+				iconType: 'clipboard',
+				href: '/requests',
+				active: $page.url.pathname.startsWith('/requests')
+			}
+		]),
 		// Settings for all users
 		{
 			name: 'Settings',

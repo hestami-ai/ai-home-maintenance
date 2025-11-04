@@ -86,6 +86,22 @@ export enum ServiceStatus {
 }
 
 /**
+ * Bid Status enum for STAFF workflow
+ */
+export enum BidStatus {
+  SUBMITTED = 'SUBMITTED',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  WITHDRAWN = 'WITHDRAWN'
+}
+
+/**
+ * Type unions for easier usage in components
+ */
+export type RequestStatus = ServiceStatus;
+export type RequestPriority = ServicePriority;
+
+/**
  * API response interface
  */
 export interface ApiResponse<T = any> {
@@ -180,8 +196,8 @@ export interface ServiceRequest {
   provider_details: ServiceProviderDetails | null;
   title: string;
   description: string;
-  status: string;
-  priority: string;
+  status: ServiceStatus;
+  priority: ServicePriority;
   preferred_schedule: Schedule;
   estimated_duration: string;
   scheduled_start: string | null;
@@ -194,6 +210,8 @@ export interface ServiceRequest {
   updated_at: string;
   created_by: string;
   created_by_details: User;
+  assigned_to: string | null; // STAFF-specific field
+  assigned_to_details: User | null; // STAFF-specific field
   budget_minimum: number | null;
   budget_maximum: number | null;
   bid_submission_deadline: string | null;
@@ -206,6 +224,33 @@ export interface ServiceRequest {
   media_details: any[];
   is_diy: boolean;
   research_entries: any[];
+}
+
+/**
+ * STAFF Queue Dashboard data interface
+ */
+export interface QueueData {
+  queue_counts: {
+    total: number;
+    pending: number;
+    in_research: number;
+    bidding: number;
+    accepted: number;
+    scheduled: number;
+    my_queue: number;
+    unassigned: number;
+  };
+  priority_counts: {
+    urgent: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  sla_indicators: {
+    overdue: number;
+    approaching_deadline: number;
+  };
+  requests: ServiceRequest[];
 }
 
 /**

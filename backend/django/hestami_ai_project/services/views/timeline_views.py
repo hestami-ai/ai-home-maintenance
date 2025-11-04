@@ -47,7 +47,8 @@ class TimelineEntryViewSet(viewsets.ModelViewSet):
         )
         
         # Apply visibility filters for comments
-        if hasattr(user, 'user_role'):
+        # Staff can see all entries, so skip filtering for staff users
+        if hasattr(user, 'user_role') and not user.is_staff:
             comment_filters = Q()
             
             # TimelineComment objects have visibility settings
@@ -65,11 +66,8 @@ class TimelineEntryViewSet(viewsets.ModelViewSet):
                         'ALL', 'PROVIDER_ONLY'
                     ]
                 )
-            elif user.is_staff:
-                # Staff can see all entries
-                pass
-            else:
-                # Default: only show ALL visibility
+            elif user.user_role == 'STAFF':
+                # STAFF can view all comments
                 comment_filters |= Q(
                     timelinecomment__isnull=False,
                     timelinecomment__visibility='ALL'

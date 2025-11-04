@@ -118,6 +118,25 @@ export function apiPut<T = any, U = any>(
 }
 
 /**
+ * Make a PATCH request with authentication
+ * @param endpoint - API endpoint (with leading slash)
+ * @param data - Request body data
+ * @param options - Additional fetch options
+ * @returns Promise with response data
+ */
+export function apiPatch<T = any, U = any>(
+  endpoint: string,
+  data: U,
+  options: RequestInit = {}
+): Promise<T> {
+  return fetchWithAuth<T>(endpoint, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+    ...options,
+  });
+}
+
+/**
  * Make a DELETE request with authentication
  * @param endpoint - API endpoint (with leading slash)
  * @param options - Additional fetch options

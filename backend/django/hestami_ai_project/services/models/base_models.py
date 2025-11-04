@@ -235,6 +235,14 @@ class ServiceRequest(models.Model):
         null=True,
         related_name='created_requests'
     )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_requests',
+        help_text="STAFF member assigned to handle this service request"
+    )
     is_diy = models.BooleanField(
         default=False,
         help_text="Whether this is a DIY (Do It Yourself) project"
@@ -517,6 +525,11 @@ class ServiceResearch(models.Model):
         default=list,
         help_text="List of data sources used for the research (e.g., 'Angi's List', 'Thumbtack', 'Bing Search', 'Yelp')"
     )
+    source_url = models.URLField(
+        max_length=2048,
+        blank=True,
+        help_text="URL of the source where the research data was obtained"
+    )
     notes = models.TextField(
         blank=True,
         help_text="Additional notes about the research"
@@ -543,6 +556,75 @@ class ServiceResearch(models.Model):
 
     def __str__(self):
         return f"Research for {self.service_request.title} by {self.researched_by.email if self.researched_by else 'Unknown'}"
+
+
+class ProviderOutreach(models.Model):
+    """
+    Tracks STAFF outreach to service providers for a specific service request.
+    Used to manage the provider roster and track contact status during the bidding phase.
+    """
+    class Status(models.TextChoices):
+        NOT_CONTACTED = 'NOT_CONTACTED', 'Not Contacted'
+        CONTACTED = 'CONTACTED', 'Contacted'
+        INTERESTED = 'INTERESTED', 'Interested'
+        DECLINED = 'DECLINED', 'Declined'
+        BID_SUBMITTED = 'BID_SUBMITTED', 'Bid Submitted'
+        NO_RESPONSE = 'NO_RESPONSE', 'No Response'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    service_request = models.ForeignKey(
+        ServiceRequest,
+        on_delete=models.CASCADE,
+        related_name='provider_outreach'
+    )
+    provider = models.ForeignKey(
+        ServiceProvider,
+        on_delete=models.CASCADE,
+        related_name='outreach_records'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NOT_CONTACTED
+    )
+    last_contact_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date of last contact attempt"
+    )
+    expected_response_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Expected date for provider response"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Internal notes about outreach attempts and provider responses"
+    )
+    contacted_by = models.ForeignKey(
+        'users.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='provider_outreach_contacts',
+        help_text="STAFF member who made the contact"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['service_request', 'provider']
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['service_request', 'status']),
+            models.Index(fields=['provider', 'status']),
+            models.Index(fields=['last_contact_date']),
+        ]
+        verbose_name = 'Provider Outreach'
+        verbose_name_plural = 'Provider Outreach Records'
+    
+    def __str__(self):
+        return f"Outreach to {self.provider.business_name} for {self.service_request.title}"
 
 
 # Import timeline models
