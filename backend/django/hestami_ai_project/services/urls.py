@@ -1,13 +1,37 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-# Import core views from the new location
-from services.views.base_views import (
-    list_service_categories, provider_profile, list_providers,
-    list_service_requests, create_service_request, service_request_detail,
-    start_service, complete_service, create_review, list_bids,
-    submit_bid, select_bid, submit_clarification, respond_to_clarification,
-    set_interest, track_view, add_research_data
+# Import views from refactored modules
+from services.views import (
+    # Categories
+    list_service_categories,
+    # STAFF Queue (Phase 1)
+    staff_queue_dashboard,
+    update_service_request_status,
+    # Research (Phase 1)
+    add_research_data,
+    list_research_entries,
+    # Provider Outreach (Phase 2)
+    list_create_outreach,
+    retrieve_update_delete_outreach,
+    # Bidding Management (Phase 2)
+    reopen_research,
+    # Legacy base_views
+    provider_profile,
+    list_providers,
+    list_service_requests,
+    create_service_request,
+    service_request_detail,
+    start_service,
+    complete_service,
+    create_review,
+    list_bids,
+    submit_bid,
+    select_bid,
+    submit_clarification,
+    respond_to_clarification,
+    set_interest,
+    track_view
 )
 
 # Import timeline views
@@ -16,6 +40,10 @@ from services.views.timeline_views import TimelineEntryViewSet, TimelineCommentV
 app_name = 'services'
 
 urlpatterns = [
+    # STAFF Queue Management
+    path('requests/queue/', staff_queue_dashboard, name='staff-queue-dashboard'),
+    path('requests/<uuid:request_id>/status/', update_service_request_status, name='update-service-request-status'),
+    
     # Existing endpoints
     path('categories/', list_service_categories, name='service-categories'),
     path('providers/profile/', provider_profile, name='provider-profile'),
@@ -41,8 +69,16 @@ urlpatterns = [
     path('requests/<uuid:request_id>/interest/', set_interest, name='set-interest'),
     path('requests/<uuid:request_id>/view/', track_view, name='track-view'),
     
-    # Service request research
-    path('requests/<uuid:request_id>/research/', add_research_data, name='add_research_data'),
+    # Service request research (Phase 1)
+    path('requests/<uuid:request_id>/research/', list_research_entries, name='list-research-entries'),
+    path('requests/<uuid:request_id>/research/add/', add_research_data, name='add-research-data'),
+    
+    # Provider outreach (Phase 2)
+    path('requests/<uuid:request_id>/outreach/', list_create_outreach, name='list-create-outreach'),
+    path('requests/<uuid:request_id>/outreach/<uuid:outreach_id>/', retrieve_update_delete_outreach, name='retrieve-update-delete-outreach'),
+    
+    # Bidding management (Phase 2)
+    path('requests/<uuid:request_id>/reopen-research/', reopen_research, name='reopen-research'),
     
     # Timeline endpoints
     path('requests/<uuid:service_request_id>/timeline/', 

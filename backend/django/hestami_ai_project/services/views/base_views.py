@@ -30,29 +30,6 @@ from services.permissions import (
 
 logger = logging.getLogger('security')
 
-# Service Category Views
-@api_view(['GET'])
-@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
-@permission_classes([IsAuthenticated])
-def list_service_categories(request):
-    """List all service categories"""
-    try:
-        categories = [
-            {
-                'id': category[0],
-                'name': category[1],
-            }
-            for category in ServiceCategory.choices
-        ]
-        logger.info(f"Returning {len(categories)} service categories")
-        return Response(categories)
-    except Exception as e:
-        logger.error(f"Error listing service categories: {str(e)}")
-        return Response(
-            {"error": "Failed to retrieve service categories"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
 # Service Provider Views
 @api_view(['GET', 'PUT'])
 @authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
@@ -441,7 +418,10 @@ def submit_bid(request, request_id):
 @authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def list_bids(request, request_id):
-    """List all bids for a service request"""
+    """
+    List all bids for a service request with enhanced metadata for comparison.
+    Phase 2: Enhanced with provider details and bid metadata for STAFF comparison table.
+    """
     try:
         service_request = get_object_or_404(ServiceRequest, id=request_id)
         
@@ -452,9 +432,33 @@ def list_bids(request, request_id):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        bids = ServiceBid.objects.filter(service_request=service_request)
+        # Fetch bids with related data for efficiency
+        bids = ServiceBid.objects.filter(
+            service_request=service_request
+        ).select_related('provider').order_by('-created_at')
+        
+        # Optional filtering by status
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            bids = bids.filter(status=status_filter)
+        
         serializer = ServiceBidSerializer(bids, many=True)
-        return Response(serializer.data)
+        
+        # Add summary metadata for STAFF users
+        response_data = {
+            'bids': serializer.data,
+            'summary': {
+                'total_bids': bids.count(),
+                'submitted_bids': bids.filter(status=ServiceBid.Status.SUBMITTED).count(),
+                'accepted_bids': bids.filter(status=ServiceBid.Status.ACCEPTED).count(),
+                'has_selected_provider': service_request.selected_provider is not None,
+                'selected_provider_id': str(service_request.selected_provider_id) if service_request.selected_provider else None
+            }
+        }
+        
+        logger.info(f"User {request.user.email} retrieved {bids.count()} bids for service request {service_request.id}")
+        
+        return Response(response_data)
     
     except Exception as e:
         logger.error(f"Error listing bids: {str(e)}")
@@ -467,22 +471,40 @@ def list_bids(request, request_id):
 @authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def select_bid(request, request_id, bid_id):
-    """Select a winning bid for a service request"""
+    """
+    Select a winning bid for a service request.
+    Phase 2: Enhanced with status transition to ACCEPTED and timeline logging.
+    """
     try:
-        service_request = get_object_or_404(ServiceRequest, id=request_id)
-        bid = get_object_or_404(ServiceBid, id=bid_id)
+        from services.models import TimelineEntry, TimelineEntryType
         
-        # Ensure user owns the property
-        if not request.user == service_request.property.owner:
+        service_request = get_object_or_404(ServiceRequest, id=request_id)
+        bid = get_object_or_404(ServiceBid, id=bid_id, service_request=service_request)
+        
+        # Check permissions: Property owner OR STAFF
+        is_owner = request.user == service_request.property.owner
+        is_staff = request.user.user_role == 'STAFF'
+        
+        if not (is_owner or is_staff):
             return Response(
                 {"error": "Not authorized to select bid"},
                 status=status.HTTP_403_FORBIDDEN
             )
         
+        # Validate bid is in correct status
+        if bid.status not in [ServiceBid.Status.SUBMITTED, ServiceBid.Status.UPDATED]:
+            return Response(
+                {"error": f"Cannot select bid with status {bid.status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Store previous status for timeline
+        previous_status = service_request.status
+        
         # Optional: Select runner-up
         runner_up_id = request.data.get('runner_up_bid_id')
         if runner_up_id:
-            runner_up_bid = get_object_or_404(ServiceBid, id=runner_up_id)
+            runner_up_bid = get_object_or_404(ServiceBid, id=runner_up_id, service_request=service_request)
             service_request.runner_up_provider = runner_up_bid.provider
         
         # Update service request
@@ -497,6 +519,33 @@ def select_bid(request, request_id, bid_id):
         
         bid.status = ServiceBid.Status.ACCEPTED
         bid.save()
+        
+        # Create timeline entry for bid selection (Phase 2)
+        timeline_content = (
+            f"Bid accepted from {bid.provider.business_name}. "
+            f"Amount: ${bid.amount}. "
+            f"Proposed start: {bid.proposed_start_date.strftime('%Y-%m-%d') if bid.proposed_start_date else 'TBD'}."
+        )
+        
+        TimelineEntry.objects.create(
+            service_request=service_request,
+            entry_type=TimelineEntryType.STATUS_CHANGE,
+            content=timeline_content,
+            metadata={
+                'previous_status': previous_status,
+                'new_status': ServiceRequest.Status.ACCEPTED,
+                'bid_id': str(bid.id),
+                'provider_id': str(bid.provider.id),
+                'bid_amount': str(bid.amount),
+                'action': 'bid_selected'
+            },
+            created_by=request.user
+        )
+        
+        logger.info(
+            f"User {request.user.email} selected bid {bid.id} from provider "
+            f"{bid.provider.business_name} for service request {service_request.id}"
+        )
         
         serializer = ServiceRequestSerializer(service_request)
         return Response(serializer.data)
@@ -632,62 +681,6 @@ def track_view(request, request_id):
         logger.error(f"Error tracking view: {str(e)}")
         return Response(
             {"error": "Failed to track view"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
-
-@api_view(['POST'])
-@authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
-@permission_classes([IsAuthenticated, IsHestamaiStaff])
-def add_research_data(request, request_id):
-    """Add research data to a service request and update its status"""
-    try:
-        service_request = get_object_or_404(ServiceRequest, id=request_id)
-        
-        # Create a new research entry
-        research_data = {
-            'service_request': service_request.id,
-            'research_data': request.data.get('research_data', {}),
-            'research_content': request.data.get('research_content', ''),
-            'research_content_raw_text': request.data.get('research_content_raw_text', ''),
-            'data_sources': request.data.get('data_sources', []),
-            'notes': request.data.get('notes', '')
-        }
-        
-        serializer = ServiceResearchSerializer(
-            data=research_data,
-            context={'request': request}
-        )
-        
-        if not serializer.is_valid():
-            logger.error(f"Invalid research data: {serializer.errors}")
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Save the research entry with the current user as researched_by
-        research_entry = serializer.save(researched_by=request.user)
-        
-        # Update the service request status if specified
-        update_status = request.data.get('update_status', False)
-        if update_status:
-            service_request.status = ServiceRequest.Status.IN_RESEARCH
-            service_request.save()
-        
-        # Log that we have research content and the status is IN_RESEARCH
-        has_research_content = bool(research_entry.research_content)
-        is_in_research = service_request.status == ServiceRequest.Status.IN_RESEARCH
-        
-        if has_research_content and is_in_research:
-            logger.info(f"Research entry {research_entry.id} created with content. It will be automatically processed by the background task.")
-            # No need to trigger a specific task as our background processor will pick it up
-        
-        logger.info(f"Added research data for service request: {service_request.id} by {request.user.email}")
-        return Response(
-            ServiceResearchSerializer(research_entry).data,
-            status=status.HTTP_201_CREATED
-        )
-    except Exception as e:
-        logger.error(f"Error adding research data: {str(e)}")
-        return Response(
-            {"error": "Failed to add research data"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

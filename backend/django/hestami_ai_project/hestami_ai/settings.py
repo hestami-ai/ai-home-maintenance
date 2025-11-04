@@ -175,12 +175,22 @@ LOGGING = {
             'format': '{levelname} {asctime} {name} {module} {message}',
             'style': '{',
         },
+        'celery_fmt': {
+            'format': '[%(asctime)s: %(levelname)s/%(processName)s] %(message)s',
+        },
     },
     'handlers': {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+        },
+        'celery_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOG_DIR / 'celery.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,  # Keep 5 old files
+            'formatter': 'celery_fmt',
         },
     },
     'loggers': {
@@ -203,7 +213,17 @@ LOGGING = {
             'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': True,
-        }
+        },
+        'celery': {  # Celery logs
+            'handlers': ['celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'celery.worker': {  # Celery worker logs
+            'handlers': ['celery_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
     'root': {  # Catch-all for any other logs
         'handlers': ['console'],
