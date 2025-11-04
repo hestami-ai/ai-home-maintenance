@@ -598,6 +598,28 @@ public class NetworkManager {
         }
     }
     
+    // MARK: - Media Management
+    
+    /// Delete a media file
+    func deleteMedia(mediaId: String) async throws {
+        let endpoint = "/api/media/\(mediaId)/"
+        let _: EmptyResponse = try await request(endpoint: endpoint, method: .delete)
+        
+        // Invalidate related caches
+        invalidateRelatedCaches(for: endpoint)
+    }
+    
+    /// Update media metadata
+    func updateMediaMetadata(mediaId: String, metadata: [String: Any]) async throws -> Media {
+        let endpoint = "/api/media/\(mediaId)/update/"
+        let media: Media = try await request(endpoint: endpoint, method: .patch, parameters: metadata)
+        
+        // Invalidate related caches
+        invalidateRelatedCaches(for: endpoint)
+        
+        return media
+    }
+    
     // MARK: - Cache Invalidation
     
     /// Invalidate caches related to a mutated endpoint

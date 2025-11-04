@@ -90,15 +90,22 @@ struct PropertyMediaGalleryView: View {
     }
     
     private var floorplanMedia: [Media] {
+        // Include all floorplans: images, videos, and 3D models
         media.filter { $0.mediaSubType == "FLOORPLAN" }
     }
     
     private var videoMedia: [Media] {
-        media.filter { $0.mediaType == .VIDEO }
+        // Only regular videos (exclude floorplans and 360°)
+        media.filter { $0.mediaType == .VIDEO && $0.mediaSubType != "FLOORPLAN" && $0.mediaSubType != "360_DEGREE" }
     }
     
     private var imageMedia: [Media] {
-        media.filter { $0.mediaSubType == "REGULAR" || $0.mediaSubType == "OTHER" }
+        // Only regular images (exclude floorplans, 360°, and 3D models)
+        media.filter { 
+            $0.mediaType == .IMAGE && 
+            $0.mediaSubType != "FLOORPLAN" && 
+            $0.mediaSubType != "360_DEGREE" 
+        }
     }
     
     private func toggleSection(_ section: MediaSection) {
@@ -193,9 +200,61 @@ struct MediaThumbnailView: View {
         ZStack(alignment: .bottomLeading) {
             // Thumbnail Image with overlays
             ZStack(alignment: .bottomLeading) {
-                // Thumbnail Image
+                // Try thumbnail first, fallback to full image for images
                 if let thumbnailUrl = media.thumbnailMediumUrl ?? media.thumbnailSmallUrl,
                    let url = URL(string: thumbnailUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ZStack {
+                                Rectangle()
+                                    .fill(AppTheme.cardBackground)
+                                ProgressView()
+                            }
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        case .failure:
+                            // If thumbnail fails and it's an image, try the full image
+                            if media.isImage, let fullUrl = URL(string: media.fileUrl) {
+                                AsyncImage(url: fullUrl) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    default:
+                                        ZStack {
+                                            Rectangle()
+                                                .fill(AppTheme.cardBackground)
+                                            Image(systemName: iconName(for: media))
+                                                .font(media.is3DModel ? .system(size: 40) : .title)
+                                                .foregroundColor(media.is3DModel ? AppTheme.accentPrimary : AppTheme.secondaryText)
+                                        }
+                                    }
+                                }
+                            } else {
+                                ZStack {
+                                    Rectangle()
+                                        .fill(AppTheme.cardBackground)
+                                    Image(systemName: iconName(for: media))
+                                        .font(media.is3DModel ? .system(size: 40) : .title)
+                                        .foregroundColor(media.is3DModel ? AppTheme.accentPrimary : AppTheme.secondaryText)
+                                }
+                            }
+                        @unknown default:
+                            ZStack {
+                                Rectangle()
+                                    .fill(AppTheme.cardBackground)
+                                Image(systemName: iconName(for: media))
+                                    .font(media.is3DModel ? .system(size: 40) : .title)
+                                    .foregroundColor(media.is3DModel ? AppTheme.accentPrimary : AppTheme.secondaryText)
+                            }
+                        }
+                    }
+                } else if media.isImage, let url = URL(string: media.fileUrl) {
+                    // No thumbnail available, use full image for images
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
@@ -212,24 +271,28 @@ struct MediaThumbnailView: View {
                             ZStack {
                                 Rectangle()
                                     .fill(AppTheme.cardBackground)
-                                Image(systemName: media.isVideo ? "video.slash" : "photo")
-                                    .foregroundColor(AppTheme.secondaryText)
+                                Image(systemName: iconName(for: media))
+                                    .font(media.is3DModel ? .system(size: 40) : .title)
+                                    .foregroundColor(media.is3DModel ? AppTheme.accentPrimary : AppTheme.secondaryText)
                             }
                         @unknown default:
                             ZStack {
                                 Rectangle()
                                     .fill(AppTheme.cardBackground)
-                                Image(systemName: "photo")
-                                    .foregroundColor(AppTheme.secondaryText)
+                                Image(systemName: iconName(for: media))
+                                    .font(media.is3DModel ? .system(size: 40) : .title)
+                                    .foregroundColor(media.is3DModel ? AppTheme.accentPrimary : AppTheme.secondaryText)
                             }
                         }
                     }
                 } else {
+                    // No thumbnail or full image available, show icon
                     ZStack {
                         Rectangle()
                             .fill(AppTheme.cardBackground)
-                        Image(systemName: media.isVideo ? "video" : "photo")
-                            .foregroundColor(AppTheme.secondaryText)
+                        Image(systemName: iconName(for: media))
+                            .font(media.is3DModel ? .system(size: 40) : .title)
+                            .foregroundColor(media.is3DModel ? AppTheme.accentPrimary : AppTheme.secondaryText)
                     }
                 }
                 
@@ -272,6 +335,16 @@ struct MediaThumbnailView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(AppTheme.borderColor, lineWidth: 1)
         )
+    }
+    
+    private func iconName(for media: Media) -> String {
+        if media.is3DModel {
+            return "cube.transparent"
+        } else if media.isVideo {
+            return "video"
+        } else {
+            return "photo"
+        }
     }
 }
 
@@ -318,7 +391,11 @@ struct MediaViewerView: View {
                     .background(AppTheme.cardBackground)
                     
                     // Media Content
-                    if media.isVideo {
+                    if media.is3DModel {
+                        // 3D Model Viewer - Download and display USDZ
+                        RemoteUSDZViewer(fileUrl: media.fileUrl)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if media.isVideo {
                         // Video Player
                         if let url = URL(string: media.fileUrl) {
                             VideoPlayerView(url: url)
@@ -565,5 +642,106 @@ struct VideoPlayerView: View {
                 player?.pause()
                 player = nil
             }
+    }
+}
+
+// MARK: - Remote USDZ Viewer
+
+struct RemoteUSDZViewer: View {
+    let fileUrl: String
+    @State private var localFileURL: URL?
+    @State private var isDownloading = false
+    @State private var downloadError: String?
+    
+    var body: some View {
+        ZStack {
+            if let localURL = localFileURL {
+                // Display the USDZ file using SceneKitView
+                SceneKitView(url: localURL)
+            } else if isDownloading {
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: AppTheme.accentPrimary))
+                        .scaleEffect(1.5)
+                    Text("Loading 3D Model...")
+                        .font(AppTheme.bodyFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                }
+            } else if let error = downloadError {
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 60))
+                        .foregroundColor(AppTheme.secondaryText)
+                    Text("Failed to load 3D model")
+                        .font(AppTheme.titleFont)
+                        .foregroundColor(AppTheme.primaryText)
+                    Text(error)
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+            }
+        }
+        .onAppear {
+            downloadUSDZFile()
+        }
+    }
+    
+    private func downloadUSDZFile() {
+        guard let url = URL(string: fileUrl) else {
+            downloadError = "Invalid URL"
+            return
+        }
+        
+        isDownloading = true
+        print("📥 RemoteUSDZViewer: Starting download from \(fileUrl)")
+        
+        let task = URLSession.shared.downloadTask(with: url) { tempURL, response, error in
+            // Handle errors
+            if let error = error {
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    print("❌ RemoteUSDZViewer: Download failed: \(error)")
+                    downloadError = error.localizedDescription
+                }
+                return
+            }
+            
+            guard let tempURL = tempURL else {
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    print("❌ RemoteUSDZViewer: No temp URL")
+                    downloadError = "Download failed"
+                }
+                return
+            }
+            
+            // Create a permanent location in temp directory
+            let tempDir = FileManager.default.temporaryDirectory
+            let destinationURL = tempDir.appendingPathComponent(UUID().uuidString).appendingPathExtension("usdz")
+            
+            // Copy the file BEFORE returning from completion handler
+            // (URLSession will delete tempURL after this handler completes)
+            do {
+                try FileManager.default.copyItem(at: tempURL, to: destinationURL)
+                print("✅ RemoteUSDZViewer: Downloaded to \(destinationURL.path)")
+                
+                // Update UI on main thread
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    localFileURL = destinationURL
+                }
+                
+            } catch {
+                print("❌ RemoteUSDZViewer: Failed to save file: \(error)")
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    downloadError = "Failed to save file: \(error.localizedDescription)"
+                }
+            }
+        }
+        
+        task.resume()
     }
 }
