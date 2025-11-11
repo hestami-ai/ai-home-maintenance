@@ -37,6 +37,28 @@ from services.views import (
 # Import timeline views
 from services.views.timeline_views import TimelineEntryViewSet, TimelineCommentViewSet
 
+# Import provider ingestion views
+from services.views.provider_ingestion import (
+    add_provider_to_roster,
+    get_scraped_data_status,
+    resolve_intervention,
+    list_pending_interventions
+)
+
+# Import provider search views
+from services.views.provider_search import ProviderSearchViewSet
+
+# Import scrape group views
+from services.views.scrape_groups import (
+    create_scrape_group,
+    get_scrape_group,
+    add_source_to_group,
+    remove_source_from_group,
+    process_scrape_group,
+    list_scrape_groups,
+    delete_scrape_group
+)
+
 app_name = 'services'
 
 urlpatterns = [
@@ -80,6 +102,12 @@ urlpatterns = [
     # Bidding management (Phase 2)
     path('requests/<uuid:request_id>/reopen-research/', reopen_research, name='reopen-research'),
     
+    # Provider ingestion endpoints
+    path('providers/add-to-roster/', add_provider_to_roster, name='add-provider-to-roster'),
+    path('providers/scraped/<uuid:scraped_data_id>/status/', get_scraped_data_status, name='get-scraped-data-status'),
+    path('providers/scraped/<uuid:scraped_data_id>/resolve/', resolve_intervention, name='resolve-intervention'),
+    path('providers/interventions/', list_pending_interventions, name='list-pending-interventions'),
+    
     # Timeline endpoints
     path('requests/<uuid:service_request_id>/timeline/', 
          TimelineEntryViewSet.as_view({
@@ -109,4 +137,27 @@ urlpatterns = [
              'post': 'create'
          }), 
          name='timeline-comment-create'),
+    
+    # Provider search endpoints (STAFF only)
+    path('staff/providers/search/', 
+         ProviderSearchViewSet.as_view({'get': 'search', 'post': 'search'}), 
+         name='provider-search'),
+    path('staff/providers/nearby/', 
+         ProviderSearchViewSet.as_view({'get': 'nearby'}), 
+         name='provider-nearby'),
+    path('staff/providers/semantic/', 
+         ProviderSearchViewSet.as_view({'get': 'semantic', 'post': 'semantic'}), 
+         name='provider-semantic'),
+    path('staff/providers/experienced/', 
+         ProviderSearchViewSet.as_view({'get': 'experienced'}), 
+         name='provider-experienced'),
+    
+    # Scrape group endpoints (STAFF only)
+    path('scrape-groups/', list_scrape_groups, name='list-scrape-groups'),
+    path('scrape-groups/create/', create_scrape_group, name='create-scrape-group'),
+    path('scrape-groups/<uuid:scrape_group_id>/', get_scrape_group, name='get-scrape-group'),
+    path('scrape-groups/<uuid:scrape_group_id>/sources/', add_source_to_group, name='add-source-to-group'),
+    path('scrape-groups/<uuid:scrape_group_id>/sources/<uuid:scraped_data_id>/', remove_source_from_group, name='remove-source-from-group'),
+    path('scrape-groups/<uuid:scrape_group_id>/process/', process_scrape_group, name='process-scrape-group'),
+    path('scrape-groups/<uuid:scrape_group_id>/delete/', delete_scrape_group, name='delete-scrape-group'),
 ]

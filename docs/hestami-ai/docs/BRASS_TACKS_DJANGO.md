@@ -259,7 +259,7 @@ Entity Definitions and Attributes
 
     Fields:
         user: One-to-One relationship with User
-        company_name
+        business_name
         service_categories: Array of strings
         service_areas: Array of strings (geographic areas)
         availability: One-to-One relationship with Availability
@@ -487,7 +487,7 @@ class PropertyOwnerProfile(models.Model):
 
 class ServiceProviderProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    company_name = models.CharField(max_length=255)
+    business_name = models.CharField(max_length=255)
     service_categories = ArrayField(models.CharField(max_length=100))
     service_areas = ArrayField(models.CharField(max_length=100))
     ratings_average = models.DecimalField(max_digits=3, decimal_places=2, default=0.0)

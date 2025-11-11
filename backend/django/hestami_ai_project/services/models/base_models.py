@@ -1,8 +1,10 @@
 from django.db import models
+from django.contrib.gis.db import models as gis_models
 from django.conf import settings
 import uuid
 from django.utils import timezone
 from properties.models import Property
+from pgvector.django import VectorField
 
 class ServiceCategory(models.TextChoices):
     PLUMBING = 'PLUMBING', 'Plumbing'
@@ -26,9 +28,29 @@ class ServiceResearchSources(models.TextChoices):
 
 class ServiceProvider(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    company_name = models.CharField(max_length=255)
+    business_name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    service_area = models.JSONField(default=dict)  # Store service area as GeoJSON
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Primary contact phone number"
+    )
+    website = models.URLField(
+        blank=True,
+        null=True,
+        help_text="Company website URL"
+    )
+    business_license = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Business license or registration number"
+    )
+    service_area = models.JSONField(
+        default=dict,
+        help_text="Service area with normalized geography: {normalized: {counties: [...], states: [...], independent_cities: [...]}, raw_tags: [...]}"
+    )
     is_available = models.BooleanField(default=True)
     rating = models.DecimalField(
         max_digits=3,
@@ -36,17 +58,118 @@ class ServiceProvider(models.Model):
         default=0.00
     )
     total_reviews = models.PositiveIntegerField(default=0)
+    
+    # Geospatial fields for location-based queries
+    business_location = gis_models.PointField(
+        geography=True,
+        srid=4326,  # WGS84 coordinate system
+        null=True,
+        blank=True,
+        help_text="Geographic location of business (latitude, longitude)"
+    )
+    address = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Full business address"
+    )
+    plus_code = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Google Plus Code for location"
+    )
+    geocode_address = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Structured address data from geocoding service"
+    )
+    geocode_address_source = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Source service used for geocoding (e.g., 'AZURE_MAPS')"
+    )
+    
+    # Rich merged data from all scraped sources
+    merged_data = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Consolidated data from all scraped sources (JSONB with GIN index)"
+    )
+    
+    # Vector embeddings for semantic search
+    description_embedding = VectorField(
+        dimensions=4096,  # Ollama qwen3-embedding:8b-q4_K_M produces 4096-dimensional embeddings
+        null=True,
+        blank=True,
+        help_text="Vector embedding of business description for semantic search"
+    )
+    
+    # Provenance fields for tracking data enrichment
+    enriched_sources = models.JSONField(
+        default=list,
+        help_text="Array of source URLs/names that contributed to this provider"
+    )
+    enriched_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last enrichment timestamp"
+    )
+    enrichment_metadata = models.JSONField(
+        default=dict,
+        help_text="Additional enrichment context (e.g., confidence scores, merge history)"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        indexes = [
+            # Spatial index for location queries
+            gis_models.Index(fields=['business_location']),
+        ]
 
     def __str__(self):
-        return f"{self.company_name}"
+        return f"{self.business_name}"
 
     @property
     def average_rating(self):
         if self.total_reviews > 0:
             return self.rating / self.total_reviews
         return 0.0
+
+
+class ScrapeGroup(models.Model):
+    """
+    Groups related scrapes for the same business entity.
+    When staff manually scrapes multiple sources for one provider,
+    they can link them together via a scrape group.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    search_query = models.CharField(
+        max_length=255,
+        help_text="Search query used to find this provider (e.g., 'Milcon HVAC')"
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='scrape_groups',
+        help_text="Staff member who created this scrape group"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Additional notes about this scrape group"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['created_by', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"ScrapeGroup: {self.search_query} ({self.scraped_data.count()} scrapes)"
 
 
 class ServiceProviderScrapedData(models.Model):
@@ -58,21 +181,42 @@ class ServiceProviderScrapedData(models.Model):
     service_provider = models.ForeignKey(
         ServiceProvider,
         on_delete=models.CASCADE,
-        related_name='scraped_data'
+        related_name='scraped_data',
+        null=True,
+        blank=True,
+        help_text="Linked service provider (nullable for new scraped data)"
+    )
+    scrape_group = models.ForeignKey(
+        ScrapeGroup,
+        on_delete=models.PROTECT,
+        related_name='scraped_data',
+        null=True,
+        blank=True,
+        help_text="Optional group linking related scrapes for the same entity"
     )
     source_name = models.CharField(
         max_length=255,
         help_text="Name of the source website (e.g., 'Yelp', 'Angi', 'HomeAdvisor')"
     )
     source_url = models.URLField(
+        max_length=2048,
         help_text="URL of the scraped page"
     )
     raw_html = models.TextField(
+        blank=True,
         help_text="Raw HTML content from web scraping"
+    )
+    raw_text = models.TextField(
+        blank=True,
+        help_text="Plain text content extracted from the page"
     )
     processed_data = models.JSONField(
         default=dict,
         help_text="Processed structured data extracted from raw HTML"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Additional notes or context about this scraped data"
     )
     scrape_status = models.CharField(
         max_length=50,
@@ -81,18 +225,45 @@ class ServiceProviderScrapedData(models.Model):
             ('in_progress', 'In Progress'),
             ('completed', 'Completed'),
             ('failed', 'Failed'),
+            ('paused_intervention', 'Paused - Needs Intervention'),
         ],
         default='pending',
-        help_text="Status of the scraping process"
+        help_text="Status of the scraping and processing workflow"
     )
     error_message = models.TextField(
         blank=True,
         null=True,
-        help_text="Error message if scraping failed"
+        help_text="Error message if scraping/processing failed"
+    )
+    intervention_reason = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Explanation for why manual intervention is needed"
+    )
+    candidate_providers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of candidate provider IDs when manual intervention is needed"
+    )
+    match_scores = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Match scores for candidate providers (provider_id -> score)"
+    )
+    workflow_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="DBOS workflow ID for tracking"
     )
     last_scraped_at = models.DateTimeField(
         auto_now=True,
         help_text="Timestamp of when the data was last scraped"
+    )
+    processed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of when the data was successfully processed"
     )
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -103,10 +274,12 @@ class ServiceProviderScrapedData(models.Model):
             models.Index(fields=['source_name']),
             models.Index(fields=['scrape_status']),
         ]
-        unique_together = ['service_provider', 'source_url']
+        # Note: unique_together removed since service_provider can be null initially
     
     def __str__(self):
-        return f"{self.source_name} data for {self.service_provider.company_name}"
+        if self.service_provider:
+            return f"{self.source_name} data for {self.service_provider.business_name}"
+        return f"{self.source_name} data (unlinked)"
 
 class ProviderCategory(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -126,7 +299,7 @@ class ProviderCategory(models.Model):
         verbose_name_plural = 'Provider Categories'
 
     def __str__(self):
-        return f"{self.provider.company_name} - {self.get_category_display()}"
+        return f"{self.provider.business_name} - {self.get_category_display()}"
 
 class ServiceRequest(models.Model):
     class Status(models.TextChoices):
@@ -381,7 +554,7 @@ class ServiceBid(models.Model):
         ]
 
     def __str__(self):
-        return f"Bid on {self.service_request.title} by {self.provider.company_name}"
+        return f"Bid on {self.service_request.title} by {self.provider.business_name}"
 
     def save(self, *args, **kwargs):
         if self.pk:  # If this is an update
@@ -458,7 +631,7 @@ class ServiceRequestView(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.provider.company_name} viewed {self.service_request.title}"
+        return f"{self.provider.business_name} viewed {self.service_request.title}"
 
 class ServiceRequestInterest(models.Model):
     class Interest(models.TextChoices):
@@ -496,7 +669,7 @@ class ServiceRequestInterest(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.provider.company_name} is {self.interest_status} in {self.service_request.title}"
+        return f"{self.provider.business_name} is {self.interest_status} in {self.service_request.title}"
 
 class ServiceResearch(models.Model):
     """

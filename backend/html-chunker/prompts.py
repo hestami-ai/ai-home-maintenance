@@ -2,6 +2,7 @@
 Centralized prompt templates for HTML extraction.
 """
 import logging
+from typing import Optional
 
 # Create a module-level logger
 logger = logging.getLogger(__name__)
@@ -147,22 +148,103 @@ FINAL_OUTPUT_REQUIREMENTS = """
 - **Use `null` for missing values**, instead of empty strings or placeholders.
 """
 
-def get_full_extraction_prompt(schema_str, instruction_prompt=None):
+# Google Maps specific prompt components
+GOOGLE_MAPS_INTRODUCTION = """
+You are a deterministic entity extractor. Read the JSON Schema carefully and output ONLY a single JSON object that strictly conforms to it (no comments, no extra keys, no trailing text).
+"""
+
+GOOGLE_MAPS_CRITICAL_RULES = """
+### **CRITICAL RULES**
+- Do NOT invent or guess. If a field is not explicitly present, OMIT the field entirely.
+- Never duplicate generic labels (e.g., "Open ⋅ Closes 6 PM") into day-specific hours unless each day is explicitly stated.
+- Dates must be ISO-8601 (YYYY-MM-DD). If only relative dates are present (e.g., "4 weeks ago"), OMIT the "date" field for that review.
+- Keep numbers numeric and percentages as numbers 0–100. Do NOT round up unknown distributions (omit rating_distribution if unknown).
+- Only use URLs that appear verbatim in the input.
+- Social media = links to website or social profiles found in the text (no fabrication).
+- Services "not_offered" must be explicitly stated as not offered; otherwise omit that field.
+- If license/awards/background check are not explicitly present, omit them.
+- HTML data sometimes has hints about the actual rating values that is not explicit in the raw text; e.g., an HTML tag may specify the rating value vs. being explicit text.
+- Use the Raw text data to cross check the extracted HTML data when available.
+"""
+
+GOOGLE_MAPS_SERVICE_AREA_RULES = """
+### **Service Areas & Address Rules**
+- **Service Areas**: Only extract when the text explicitly states coverage using verbs like "serves", "serving", "service area", "we serve", "areas we cover", or a list under a "Service areas" heading. Do not infer from the street address, city, ZIP, maps labels, or Plus Codes.
+- **Plus Code**: If you see a token matching the pattern like "59XW+F5 Waterford, Virginia" (Google Plus Code format), this is NOT a service area. It is a location identifier and should be ignored or noted separately if needed, but NOT placed in service_areas.
+- **Address vs Area**: Street, city, state, ZIP → contact_information.address. Only dedicated "we serve …" phrasing → service_areas.
+"""
+
+GOOGLE_MAPS_EXTRACTION_STEPS = """
+### **EXTRACTION STEPS** (internal, do not output):
+1. **Normalize the raw text**: Strip icons/emoji and UI chrome like "Write a review", "Save", "Share", "Directions", "Send to phone", "Nearby".
+2. **Extract core information**:
+   - Name: from <h1> or first business title line.
+   - Overall rating and total reviews if numerically stated.
+   - Address (street, city, state, ZIP) and phone if present.
+   - Website(s) and social links.
+   - Services mentioned explicitly (e.g., roofing, siding, windows, doors) from About/Reviews; do not infer.
+   - Individual review data: reviewer, platform (e.g., "Google" if recognizable), review_text, service_performed if explicitly stated or directly quoted; omit date if not ISO.
+   - Media: count images you can see numerically; otherwise omit total_photos.
+3. **Map to the schema**: OMIT any property you cannot support with explicit evidence.
+"""
+
+GOOGLE_MAPS_OUTPUT_FORMAT = """
+### **OUTPUT**
+- Return ONLY valid JSON per the provided schema. No prose.
+- Preserve capitalization of proper nouns in strings.
+- Use arrays where specified and keep field types exact.
+- OMIT fields that are not explicitly present in the source data.
+"""
+
+def get_full_extraction_prompt(schema_str, instruction_prompt=None, source: Optional[str] = None):
     """
     Get the full extraction prompt with schema and instructions.
     
     Args:
         schema_str: JSON schema as a string
         instruction_prompt: Optional custom instruction prompt
+        source: Optional source identifier (e.g., 'google_maps', 'thumbtack')
         
     Returns:
         Full prompt text
     """
+    # Import here to avoid circular dependency
+    from source_detector import SOURCE_GOOGLE_MAPS
+    
+    # Use source-specific prompt if available
+    if source == SOURCE_GOOGLE_MAPS:
+        return f"""{GOOGLE_MAPS_INTRODUCTION}
+
+{GOOGLE_MAPS_CRITICAL_RULES}
+
+---
+
+{GOOGLE_MAPS_SERVICE_AREA_RULES}
+
+---
+
+{GOOGLE_MAPS_EXTRACTION_STEPS}
+
+---
+
+{GOOGLE_MAPS_OUTPUT_FORMAT}
+
+---
+
+### **JSON SCHEMA** (do not alter):
+<BEGIN_SCHEMA>
+{schema_str}
+</BEGIN_SCHEMA>
+
+### **SOURCE DATA:**
+{{content}}
+"""
+    
     # Use default extraction rules if no custom instruction is provided
     if instruction_prompt is None:
         instruction_prompt = EXTRACTION_RULES
         
-    # Construct the full prompt with clear section separators
+    # Construct the full prompt with clear section separators (Generic/Thumbtack style)
     return f"""{EXTRACTION_INTRODUCTION}
 
 ---
@@ -197,7 +279,7 @@ def get_full_extraction_prompt(schema_str, instruction_prompt=None):
 {{content}}
 """
 
-def get_extraction_prompt_with_content(schema_str, content, instruction_prompt=None):
+def get_extraction_prompt_with_content(schema_str, content, instruction_prompt=None, source: Optional[str] = None):
     """
     Get the full extraction prompt with schema, instructions, and content.
     
@@ -205,11 +287,12 @@ def get_extraction_prompt_with_content(schema_str, content, instruction_prompt=N
         schema_str: JSON schema as a string
         content: HTML content to extract from
         instruction_prompt: Optional custom instruction prompt
+        source: Optional source identifier (e.g., 'google_maps', 'thumbtack')
         
     Returns:
         Full prompt text with content
     """
-    prompt_template = get_full_extraction_prompt(schema_str, instruction_prompt)
+    prompt_template = get_full_extraction_prompt(schema_str, instruction_prompt, source)
     return prompt_template.replace("{content}", content)
 
 # Export key functions and variables
@@ -221,6 +304,11 @@ __all__ = [
     'OUTPUT_FORMAT_REQUIREMENTS',
     'EXAMPLE_JSON_OUTPUT',
     'FINAL_OUTPUT_REQUIREMENTS',
+    'GOOGLE_MAPS_INTRODUCTION',
+    'GOOGLE_MAPS_CRITICAL_RULES',
+    'GOOGLE_MAPS_SERVICE_AREA_RULES',
+    'GOOGLE_MAPS_EXTRACTION_STEPS',
+    'GOOGLE_MAPS_OUTPUT_FORMAT',
     'get_full_extraction_prompt',
     'get_extraction_prompt_with_content'
 ]

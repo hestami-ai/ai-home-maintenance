@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',  # PostGIS support
 
     'rest_framework',
     'rest_framework.authtoken',
@@ -145,7 +146,7 @@ WSGI_APPLICATION = 'hestami_ai.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.environ.get('SQL_ENGINE', 'django.db.backends.sqlite3'),
+        'ENGINE': os.environ.get('SQL_ENGINE', 'django.contrib.gis.db.backends.postgis'),  # PostGIS engine
         'NAME': os.environ.get('SQL_DATABASE', BASE_DIR / 'db.sqlite3'),
         'USER': os.environ.get('SQL_USER', 'defaultsqlite3user'),
         'PASSWORD': os.environ.get('SQL_PASSWORD', 'defaultsqlite3password'),
@@ -506,6 +507,10 @@ CELERY_BEAT_SCHEDULE = {
     'process-pending-service-requests': {
         'task': 'services.tasks.process_pending_service_requests',
         'schedule': float(os.environ.get('SERVICE_REQUEST_PROCESSOR_INTERVAL', '5')),  # Run every 5 seconds by default
+    },
+    'process-pending-service-provider-scraped-data': {
+        'task': 'services.process_pending_service_provider_scraped_data',
+        'schedule': float(os.environ.get('SERVICE_PROVIDER_PROCESSOR_INTERVAL', '5')),  # Run every 60 seconds by default
     },
 }
 

@@ -112,7 +112,7 @@ We will be using Agile's "Thin Vertical Slice" concept to generate the implement
         ```python
         class PropertyOwnerProfile:
             user = OneToOneField(User)
-            company_name = CharField(null=True, blank=True)
+            business_name = CharField(null=True, blank=True)
             billing_address = TextField()
             tax_id = CharField(null=True, blank=True)
             preferred_contact_method = CharField(choices=['EMAIL', 'PHONE'])
@@ -121,7 +121,7 @@ We will be using Agile's "Thin Vertical Slice" concept to generate the implement
         ```python
         class ServiceProviderProfile:
             user = OneToOneField(User)
-            company_name = CharField()
+            business_name = CharField()
             business_license = CharField()
             insurance_info = JSONField()
             service_areas = ArrayField(CharField())  # Geographic areas served

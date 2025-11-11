@@ -1,4 +1,4 @@
-FROM ollama/ollama:0.9.2
+FROM ollama/ollama:0.12.9
 
 # Copy startup script
 COPY start.sh /start.sh

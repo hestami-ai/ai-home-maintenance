@@ -35,7 +35,8 @@ def process_html(
     api_key: Optional[str] = None,
     output_file: Optional[str] = None,
     show_token_counts: bool = False,
-    text_content: Optional[str] = None
+    text_content: Optional[str] = None,
+    source_url: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Process HTML content to extract structured information using a remote LLM.
@@ -50,11 +51,17 @@ def process_html(
         output_file: Optional path to write the output JSON to
         show_token_counts: Whether to display token counts for each chunk
         text_content: Optional raw text content to use as a cross-check for extraction
+        source_url: Optional source URL to detect data source and select appropriate prompt
         
     Returns:
         Extracted data as a dictionary
     """
     logger.info("Processing HTML content")
+    
+    # Detect source from URL if provided
+    from source_detector import detect_source_from_url, get_source_display_name
+    source = detect_source_from_url(source_url)
+    logger.info(f"Detected source: {get_source_display_name(source)}")
     
     # Validate the LLM provider
     if llm not in LLM_PROVIDERS:
@@ -100,7 +107,7 @@ def process_html(
         schema_path = determine_schema_path(html_content, None)
         
         # Calculate prompt template tokens
-        prompt_template_tokens = get_prompt_template_tokens(llm, model, schema_path)
+        prompt_template_tokens = get_prompt_template_tokens(llm, model, schema_path, source)
         logger.debug(f"Prompt template requires {prompt_template_tokens} tokens")
         
         # Calculate available tokens for content
@@ -119,7 +126,7 @@ def process_html(
             logger.info("Processing entire HTML in a single extraction...")
             
             # Extract information directly
-            result = extract_directly(preprocessed_html, llm, model, schema_path, api_key)
+            result = extract_directly(preprocessed_html, llm, model, schema_path, api_key, source)
         else:
             logger.info(f"HTML content too large ({html_tokens} tokens), splitting into chunks...")
             
@@ -151,7 +158,7 @@ def process_html(
                 logger.info(f"Processing chunk {i+1}/{len(chunks)}... ({chunk_tokens} tokens)")
                 
                 # Extract information from the chunk
-                chunk_result = extract_from_chunk(chunk, llm, model, schema_path, api_key)
+                chunk_result = extract_from_chunk(chunk, llm, model, schema_path, api_key, source)
                 
                 # Add the chunk result to the list
                 chunk_results.append(chunk_result)
@@ -193,7 +200,8 @@ def process_html_file(
     max_tokens: int = 8000, 
     overlap_percent: float = 0.1,
     show_token_counts: bool = False,
-    text_content: Optional[str] = None
+    text_content: Optional[str] = None,
+    source_url: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Process an HTML file and extract information using an LLM.
@@ -208,6 +216,7 @@ def process_html_file(
         overlap_percent: Percentage of overlap between chunks (as a decimal)
         show_token_counts: Whether to display token counts for each chunk
         text_content: Optional raw text content to use as a cross-check for extraction
+        source_url: Optional source URL to detect data source and select appropriate prompt
         
     Returns:
         Extracted data as a dictionary
@@ -233,7 +242,8 @@ def process_html_file(
         api_key=api_key,
         output_file=output_file,
         show_token_counts=show_token_counts,
-        text_content=text_content
+        text_content=text_content,
+        source_url=source_url
     )
     
     return result
@@ -253,7 +263,7 @@ def determine_schema_path(html_content: str, extraction_type: Optional[str] = No
     # In the future, this could be more sophisticated based on the content
     return os.path.join(os.path.dirname(__file__), 'schemas', 'service-provider-schema.json')
 
-def extract_directly(html_content: str, llm: str, model: str, schema_path: str, api_key: Optional[str] = None) -> Dict[str, Any]:
+def extract_directly(html_content: str, llm: str, model: str, schema_path: str, api_key: Optional[str] = None, source: Optional[str] = None) -> Dict[str, Any]:
     """
     Extract information directly from HTML content without chunking.
     
@@ -263,6 +273,7 @@ def extract_directly(html_content: str, llm: str, model: str, schema_path: str, 
         model: Model name
         schema_path: Path to the schema file
         api_key: Optional API key
+        source: Optional source identifier for prompt selection
         
     Returns:
         Extracted information as a dictionary
@@ -278,9 +289,9 @@ def extract_directly(html_content: str, llm: str, model: str, schema_path: str, 
     prompt_text = EXTRACTION_RULES
 
     # Extract information using the LLM
-    return extract_with_llm(prompt_text, html_content, llm, model, schema_type, api_key)
+    return extract_with_llm(prompt_text, html_content, llm, model, schema_type, api_key, source)
 
-def extract_from_chunk(chunk: str, llm: str, model: str, schema_path: str, api_key: Optional[str] = None) -> Dict[str, Any]:
+def extract_from_chunk(chunk: str, llm: str, model: str, schema_path: str, api_key: Optional[str] = None, source: Optional[str] = None) -> Dict[str, Any]:
     """
     Extract information from a chunk of HTML content.
     
@@ -290,6 +301,7 @@ def extract_from_chunk(chunk: str, llm: str, model: str, schema_path: str, api_k
         model: Model name
         schema_path: Path to the schema file
         api_key: Optional API key
+        source: Optional source identifier for prompt selection
         
     Returns:
         Extracted information as a dictionary
@@ -303,10 +315,10 @@ def extract_from_chunk(chunk: str, llm: str, model: str, schema_path: str, api_k
     prompt_text = EXTRACTION_RULES
     
     # Extract information using the LLM
-    return extract_with_llm(prompt_text, chunk, llm, model, schema_type, api_key)
+    return extract_with_llm(prompt_text, chunk, llm, model, schema_type, api_key, source)
 
 def extract_with_llm(prompt_text: str, chunk: str, llm: str, model: str, schema_type: str, 
-                     api_key: Optional[str] = None) -> Dict[str, Any]:
+                     api_key: Optional[str] = None, source: Optional[str] = None) -> Dict[str, Any]:
     """
     Send a prompt and chunk of text to the specified LLM and return structured JSON.
     
@@ -317,6 +329,7 @@ def extract_with_llm(prompt_text: str, chunk: str, llm: str, model: str, schema_
         model: The model name
         schema_type: Type of schema to use (e.g., 'business_info', 'services', etc.)
         api_key: Optional API key for providers that require it
+        source: Optional source identifier for prompt selection
         
     Returns:
         Extracted data as a dictionary
@@ -325,7 +338,7 @@ def extract_with_llm(prompt_text: str, chunk: str, llm: str, model: str, schema_
     
     try:
         # Create the extraction prompt
-        full_prompt = create_extraction_prompt(prompt_text, chunk, schema_type)
+        full_prompt = create_extraction_prompt(prompt_text, chunk, schema_type, source)
         
         # Call the LLM
         response = call_llm(llm, model, full_prompt, api_key)
@@ -437,7 +450,7 @@ def call_llm(llm_provider: str, model: str, prompt: str, api_key: Optional[str] 
                 json={
                     'model': model,
                     'prompt': prompt,
-                    'system': "You are a helpful assistant that extracts structured information from HTML content.",
+                    'system': "You are an intelligent deterministic entity extractor component that reviews and understands the supplied schema and then extracts the relevant information from the supplied unstructured text.",
                     'temperature': 0.1,
                     'stream': False
                 }
@@ -516,7 +529,7 @@ def call_llm(llm_provider: str, model: str, prompt: str, api_key: Optional[str] 
         logger.error(f"Error calling {llm_provider} API: {str(e)}")
         raise
 
-def create_extraction_prompt(prompt_text: str, chunk: str, schema_type: str) -> str:
+def create_extraction_prompt(prompt_text: str, chunk: str, schema_type: str, source: Optional[str] = None) -> str:
     """
     Create a prompt for extraction with the specified schema.
     
@@ -524,6 +537,7 @@ def create_extraction_prompt(prompt_text: str, chunk: str, schema_type: str) -> 
         prompt_text: The instruction prompt
         chunk: The text chunk to process
         schema_type: Type of schema to use
+        source: Optional source identifier for prompt selection
         
     Returns:
         Full prompt text
@@ -536,7 +550,7 @@ def create_extraction_prompt(prompt_text: str, chunk: str, schema_type: str) -> 
     schema_str = json.dumps(schema, indent=2)
     
     # Create the full prompt using the centralized prompt template
-    return get_extraction_prompt_with_content(schema_str, chunk, prompt_text)
+    return get_extraction_prompt_with_content(schema_str, chunk, prompt_text, source)
 
 def _parse_json_response(content: str) -> Dict[str, Any]:
     """
@@ -571,10 +585,21 @@ def _parse_json_response(content: str) -> Dict[str, Any]:
             return parsed_json
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse full content as JSON: {e}")
-            logger.debug(f"Content: {content}")
+            # Show context around the error position
+            if hasattr(e, 'pos') and e.pos:
+                start = max(0, e.pos - 50)
+                end = min(len(content), e.pos + 50)
+                context = content[start:end]
+                logger.error(f"Error context: ...{context}...")
+            logger.debug(f"Content (first 1000 chars): {content[:1000]}")
             
             # Try to clean the response and parse again
             cleaned_response = content.strip()
+            
+            # Remove invalid control characters (but keep valid ones like \n, \t, \r)
+            # Control characters are 0x00-0x1F except for \t (0x09), \n (0x0A), \r (0x0D)
+            cleaned_response = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', cleaned_response)
+            
             # Remove any text before the first '{'
             first_brace = cleaned_response.find('{')
             if first_brace != -1:
@@ -588,7 +613,7 @@ def _parse_json_response(content: str) -> Dict[str, Any]:
             cleaned_response = re.sub(r'//.*?$', '', cleaned_response, flags=re.MULTILINE)  # Remove // comments
             cleaned_response = re.sub(r'/\*.*?\*/', '', cleaned_response, flags=re.DOTALL)  # Remove /* */ comments
             
-            logger.debug(f"Cleaned JSON for parsing:\n{cleaned_response}")
+            logger.debug(f"Cleaned JSON for parsing (first 500 chars):\n{cleaned_response[:500]}")
                 
             try:
                 parsed_json = json.loads(cleaned_response)

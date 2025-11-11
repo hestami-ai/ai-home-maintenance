@@ -101,6 +101,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>User Management - Hestami AI</title>
+	<meta name="description" content="Manage users and permissions" />
+</svelte:head>
+
 <div class="container mx-auto p-4 space-y-6">
 	<header class="flex justify-between items-center">
 		<div>

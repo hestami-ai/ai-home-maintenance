@@ -1,4 +1,7 @@
 from django.apps import AppConfig
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ServicesConfig(AppConfig):
@@ -7,7 +10,10 @@ class ServicesConfig(AppConfig):
     
     def ready(self):
         """
-        App initialization code when Django starts.
+        Initialize services when Django starts.
+        
+        Note: DBOS is NOT initialized here because it doesn't work with multi-process
+        Gunicorn workers (PostgreSQL connections cannot be shared across processes).
+        DBOS is initialized lazily per-worker when first needed.
         """
-        # No signal imports needed as we're using a background processor instead
-        pass
+        logger.info("Services app ready (DBOS will initialize per-worker)")

@@ -151,7 +151,7 @@ export interface PropertyDescriptives {
 export interface ServiceProviderDetails {
   id: string;
   users_details: User[];
-  company_name: string;
+  business_name: string;
   description: string;
   service_area: any; // GeoJSON object
   is_available: boolean;

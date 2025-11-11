@@ -29,6 +29,14 @@ from .bidding import (
     reopen_research
 )
 
+# Provider ingestion views
+from .provider_ingestion import (
+    add_provider_to_roster,
+    get_scraped_data_status,
+    resolve_intervention,
+    list_pending_interventions
+)
+
 # Legacy base_views imports (for backward compatibility)
 from .base_views import (
     provider_profile,
@@ -67,6 +75,12 @@ __all__ = [
     
     # Bidding Management (Phase 2)
     'reopen_research',
+    
+    # Provider Ingestion
+    'add_provider_to_roster',
+    'get_scraped_data_status',
+    'resolve_intervention',
+    'list_pending_interventions',
     
     # Legacy base_views
     'provider_profile',

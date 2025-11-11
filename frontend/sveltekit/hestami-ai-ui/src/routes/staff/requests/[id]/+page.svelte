@@ -43,14 +43,16 @@
 	let selectedStatus = $state(serviceRequest.status);
 	let isUpdatingStatus = $state(false);
 	
-	// Provider Outreach (Phase 2)
-	let showAddProviderModal = $state(false);
-	let newOutreach = $state({
-		provider: '',
-		status: 'NOT_CONTACTED',
-		notes: ''
+	// Sync selectedStatus when serviceRequest changes (e.g., after reload)
+	$effect(() => {
+		// Only update if different to avoid infinite loops
+		if (selectedStatus !== serviceRequest.status) {
+			selectedStatus = serviceRequest.status;
+		}
 	});
-	let isSavingOutreach = $state(false);
+	
+	// Provider Outreach (Phase 2)
+	// Note: Add Provider modal removed - use Research Providers page instead
 	
 	// Bid Selection (Phase 2)
 	let showBidSelectionModal = $state(false);
@@ -201,42 +203,6 @@
 	}
 	
 	// Provider Outreach Functions (Phase 2)
-	async function addProviderOutreach() {
-		if (!newOutreach.provider) {
-			alert('Please select a provider');
-			return;
-		}
-		
-		try {
-			isSavingOutreach = true;
-			
-			await apiPost(`/api/services/requests/${serviceRequest.id}/outreach/`, {
-				provider: newOutreach.provider,
-				status: newOutreach.status,
-				notes: newOutreach.notes
-			});
-			
-			// Reload outreach records
-			const response = await fetch(`/api/services/requests/${serviceRequest.id}/outreach/`);
-			if (response.ok) {
-				providerOutreach = await response.json();
-			}
-			
-			// Reset form
-			newOutreach = {
-				provider: '',
-				status: 'NOT_CONTACTED',
-				notes: ''
-			};
-			showAddProviderModal = false;
-		} catch (err) {
-			console.error('Error adding provider outreach:', err);
-			alert('Failed to add provider to roster');
-		} finally {
-			isSavingOutreach = false;
-		}
-	}
-	
 	async function updateOutreachStatus(outreachId: string, newStatus: string) {
 		try {
 			await apiPatch(`/api/services/requests/${serviceRequest.id}/outreach/${outreachId}/`, {
@@ -327,6 +293,11 @@
 		return allowedStatuses.includes(serviceRequest.status);
 	}
 </script>
+
+<svelte:head>
+	<title>Service Request: {serviceRequest.title} - Hestami AI</title>
+	<meta name="description" content="Manage service request details" />
+</svelte:head>
 
 <div class="container mx-auto p-6 space-y-6">
 	<!-- Header -->
@@ -494,6 +465,7 @@
 								
 								<!-- Data Sources -->
 								<div class="space-y-2">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="label">
 										<span class="text-sm font-semibold">Data Sources</span>
 									</label>
@@ -520,6 +492,7 @@
 								
 								<!-- Rich Text Content -->
 								<div class="space-y-2">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="label">
 										<span class="text-sm font-semibold">Rich Text Content * (paste formatted content)</span>
 									</label>
@@ -531,6 +504,7 @@
 								
 								<!-- Raw Text Content -->
 								<div class="space-y-2">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="label">
 										<span class="text-sm font-semibold">Raw Text/HTML Content * (paste raw text or HTML)</span>
 									</label>
@@ -546,6 +520,7 @@
 								
 								<!-- Additional Notes -->
 								<div class="space-y-2">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="label">
 										<span class="text-sm font-semibold">Additional Notes (optional)</span>
 									</label>
@@ -610,9 +585,9 @@
 									<h3 class="h4">Provider Roster</h3>
 									<button 
 										class="btn variant-filled-primary btn-sm"
-										onclick={() => (showAddProviderModal = true)}
+										onclick={() => goto(`/staff/requests/${serviceRequest.id}/research`)}
 									>
-										Add Provider
+										Research Providers
 									</button>
 								</div>
 								
@@ -641,7 +616,7 @@
 																	{outreach.provider_details?.business_name || 'Unknown'}
 																</div>
 																<div class="text-xs text-surface-600-300-token">
-																	{outreach.provider_details?.service_area || ''}
+																	{outreach.provider_details?.phone || ''}
 																</div>
 															</td>
 															<td>
@@ -776,6 +751,7 @@
 				<div class="space-y-3">
 					<!-- Status Change -->
 					<div>
+						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label class="label mb-2">
 							<span class="text-sm font-semibold">Change Status</span>
 						</label>
@@ -881,76 +857,16 @@
 	</div>
 </div>
 
-<!-- Add Provider Modal (Phase 2) -->
-{#if showAddProviderModal}
-	<div class="modal-backdrop" onclick={() => (showAddProviderModal = false)}>
-		<div class="modal card variant-filled-surface p-6 w-full max-w-md bg-surface-50-900-token" onclick={(e) => e.stopPropagation()}>
-			<h3 class="h3 mb-4">Add Provider to Roster</h3>
-			
-			<div class="space-y-4">
-				<div>
-					<label class="label mb-2">
-						<span class="text-sm font-semibold">Provider ID</span>
-					</label>
-					<input
-						type="text"
-						bind:value={newOutreach.provider}
-						placeholder="Enter provider UUID"
-						class="input"
-					/>
-					<p class="text-xs text-surface-600-300-token mt-1">
-						Note: Provider selection UI will be added in future iteration
-					</p>
-				</div>
-				
-				<div>
-					<label class="label mb-2">
-						<span class="text-sm font-semibold">Initial Status</span>
-					</label>
-					<select bind:value={newOutreach.status} class="select">
-						<option value="NOT_CONTACTED">Not Contacted</option>
-						<option value="CONTACTED">Contacted</option>
-						<option value="INTERESTED">Interested</option>
-					</select>
-				</div>
-				
-				<div>
-					<label class="label mb-2">
-						<span class="text-sm font-semibold">Notes</span>
-					</label>
-					<textarea
-						bind:value={newOutreach.notes}
-						placeholder="Add any notes about this provider..."
-						rows="3"
-						class="textarea"
-					></textarea>
-				</div>
-			</div>
-			
-			<div class="flex gap-2 justify-end mt-6">
-				<button 
-					class="btn variant-ghost-surface" 
-					onclick={() => (showAddProviderModal = false)}
-					disabled={isSavingOutreach}
-				>
-					Cancel
-				</button>
-				<button 
-					class="btn variant-filled-primary" 
-					onclick={addProviderOutreach}
-					disabled={isSavingOutreach}
-				>
-					{isSavingOutreach ? 'Adding...' : 'Add Provider'}
-				</button>
-			</div>
-		</div>
-	</div>
-{/if}
+<!-- Add Provider Modal removed - use Research Providers page instead -->
 
 <!-- Bid Selection Confirmation Modal (Phase 2) -->
 {#if showBidSelectionModal && selectedBidForAction}
-	<div class="modal-backdrop" onclick={() => (showBidSelectionModal = false)}>
-		<div class="modal card variant-filled-surface p-6 w-full max-w-lg bg-surface-50-900-token" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div class="modal-backdrop" role="presentation" onclick={() => (showBidSelectionModal = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="modal card variant-filled-surface p-6 w-full max-w-lg bg-surface-50-900-token" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
 			<h3 class="h3 mb-4">Confirm Bid Selection</h3>
 			
 			<div class="space-y-4">
@@ -1018,8 +934,12 @@
 
 <!-- Reopen Research Modal (Phase 2) -->
 {#if showReopenResearchModal}
-	<div class="modal-backdrop" onclick={() => (showReopenResearchModal = false)}>
-		<div class="modal card variant-filled-surface p-6 w-full max-w-lg bg-surface-50-900-token" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div class="modal-backdrop" role="presentation" onclick={() => (showReopenResearchModal = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="modal card variant-filled-surface p-6 w-full max-w-lg bg-surface-50-900-token" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
 			<h3 class="h3 mb-4">Reopen Research</h3>
 			
 			<div class="space-y-4">
@@ -1035,6 +955,7 @@
 				</div>
 				
 				<div>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label class="label mb-2">
 						<span class="text-sm font-semibold">Reason for Reopening *</span>
 					</label>

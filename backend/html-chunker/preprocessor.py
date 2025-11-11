@@ -70,8 +70,18 @@ def preprocess_html(html_content: str) -> str:
     for tag in soup.find_all('img', attrs={'src': True}):
         del tag['src']
 
+    # Convert back to string
     processed_html = str(soup)
-
+    
+    # Remove invalid control characters that could cause JSON parsing issues
+    # Keep valid ones: \t (0x09), \n (0x0A), \r (0x0D)
+    # Remove: 0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F
+    original_length = len(processed_html)
+    processed_html = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', processed_html)
+    
+    if len(processed_html) < original_length:
+        logger.debug(f"Removed {original_length - len(processed_html)} invalid control characters from HTML")
+    
     logger.info(f"Original HTML length: {len(html_content)} characters")
     logger.info(f"Preprocessed HTML length: {len(processed_html)} characters")
     logger.debug(f"Full preprocessed HTML:")
@@ -139,15 +149,18 @@ def extract_with_html2text(html_content: str) -> str:
     # Consolidate multiple spaces
     extracted_text = re.sub(r' +', ' ', extracted_text)
     
+    # Remove invalid control characters that could cause JSON parsing issues
+    # Keep valid ones: \t (0x09), \n (0x0A), \r (0x0D)
+    original_length = len(extracted_text)
+    extracted_text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', '', extracted_text)
+    
+    if len(extracted_text) < original_length:
+        logger.debug(f"Removed {original_length - len(extracted_text)} invalid control characters from raw text")
     
     logger.debug(f"Raw text extraction completed")
     logger.debug(f"Extracted text length: {len(extracted_text)} characters")
-    logger.debug(f"Full extracted text:")
-    logger.debug(f"{extracted_text}")
-    logger.debug("Text extraction complete")
     
-    return extracted_text
-
+    return extracted_text.strip()
 
 def is_html_content(content: str) -> bool:
     """

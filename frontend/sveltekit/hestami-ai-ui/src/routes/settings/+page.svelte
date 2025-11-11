@@ -44,6 +44,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Settings - Hestami AI</title>
+	<meta name="description" content="Manage your account settings and preferences" />
+</svelte:head>
+
 <div class="container mx-auto p-4 space-y-8">
 	<header>
 		<h1 class="h1">Settings</h1>

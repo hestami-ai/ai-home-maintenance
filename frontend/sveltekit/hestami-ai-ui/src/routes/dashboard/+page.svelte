@@ -58,6 +58,15 @@
 	// Get the user role from the user data
 	let userRole = $state('');
 	
+	// Dynamic title based on role
+	const pageTitle = $derived(
+		userRole === 'staff' 
+			? 'Staff Dashboard'
+			: userRole === 'provider'
+			? 'Provider Dashboard'
+			: 'Dashboard'
+	);
+	
 	// Map backend role to frontend role
 	function mapUserRole(backendRole: string): string {
 		const roleMap: Record<string, string> = {
@@ -108,6 +117,11 @@
 		userRole = role;
 	}
 </script>
+
+<svelte:head>
+	<title>{pageTitle} - Hestami AI</title>
+	<meta name="description" content="Your personalized dashboard" />
+</svelte:head>
 
 <div class="container mx-auto space-y-8 pb-8">
 	<!-- Welcome Header -->

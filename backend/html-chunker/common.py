@@ -36,12 +36,12 @@ def setup_logging(log_level: str = "INFO") -> logging.Logger:
 # Constants shared across modules
 LLM_PROVIDERS = ['openai', 'anthropic', 'ollama', 'vllm', 'cerebras']
 DEFAULT_LLM = 'ollama'
-DEFAULT_MODEL = 'qwen2.5:14b-instruct-q4_1'
+DEFAULT_MODEL = 'qwen3:4b-q4_K_M'
 DEFAULT_MODELS = {
     'openai': 'gpt-4',
     'anthropic': 'claude-3-opus-20240229',
-    'ollama': 'qwen2.5:14b-instruct-q4_1',
-    'vllm': 'qwen2.5:14b-instruct-q4_1',
+    'ollama': 'qwen3:4b-q4_K_M',
+    'vllm': 'qwen3:4b-q4_K_M',
     'cerebras': 'cerebras-gpt-2.7b'
 }
 
@@ -60,7 +60,7 @@ MODEL_CONTEXT_SIZES = {
     'claude-instant-1.2': 100000,
     'llama3': 8192,
     'llama3:70b': 8192,
-    'qwen2.5:14b-instruct-q4_1': 32768
+    'qwen3:4b-q4_K_M': 32768
 }
 
 def get_model_context_size(llm: str, model: str) -> int:

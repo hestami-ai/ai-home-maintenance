@@ -103,7 +103,7 @@ export default function PropertyDetailsPage() {
             preferred_schedule: sr.preferred_schedule,
             estimated_duration: sr.estimated_duration,
             budget: sr.budget_maximum,
-            provider: sr.provider?.company_name,
+            provider: sr.provider?.business_name,
             status,
             created_at: sr.created_at,
             updated_at: sr.updated_at,
