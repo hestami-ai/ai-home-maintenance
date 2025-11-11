@@ -4,6 +4,7 @@ FROM python:3.12-slim
 RUN apt-get update && apt-get install -y \
     netcat-traditional \
     gcc \
+    g++ \
     ffmpeg \
     libpq-dev \
     python3-dev \
@@ -13,12 +14,15 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libglx-mesa0 \
     libglib2.0-0 \
+    gdal-bin \
+    libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 ENV DJANGO_SETTINGS_MODULE=hestami_ai.settings
 ENV PYTHONPATH=/app
+ENV GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
 
 # Create django user and group
 RUN groupadd -r django && useradd -r -g django django

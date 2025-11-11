@@ -12,6 +12,8 @@ networks:
 volumes:
   hestami_media_data_dev:
   postgres_data_dev:
+    external: true
+    name: hestami-ai-dev_postgres_data_dev  #TODO: Identify a better way to handle this (ref: Postgres volume name; database upgrades and migration, etc. [11/06/2025])
   elasticsearch_data_dev:
   ollama_models_dev:
     driver: local
@@ -81,8 +83,8 @@ services:
       gunicorn hestami_ai.wsgi:application
       --bind 0.0.0.0:8050
       --workers 4
-      --worker-class gevent
-      --worker-connections 100
+      --worker-class sync
+      --backlog 1024
       --timeout 120
       --reload
       --access-logfile -
@@ -108,15 +110,33 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+#  db-old:
+#    image: postgres:17
+#    container_name: db-old-dev
+#    env_file:
+#      - ./.env.local
+#    ports:
+#      - "5433:5432"
+#    volumes:
+#      - postgres_data_dev-cloned:/var/lib/postgresql/data
+#    networks:
+#      - backend-dev
+#    logging:
+#      driver: "local"
+#      options:
+#        max-size: "20m"
+#        max-file: "5"
   db:
-    image: postgres:17
+    build:
+      context: ./docker/backend/postgres
+      dockerfile: Dockerfile
     container_name: db-dev
     env_file:
       - ./.env.local
     ports:
-      - "5432:5432"
+      - "5432:5432"  # Different port to run alongside old db
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql  # PostgreSQL 18 uses /var/lib/postgresql
     networks:
       - backend-dev
     logging:
@@ -270,7 +290,7 @@ services:
       - OLLAMA_NEW_ENGINE=true
       - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_NUM_PARALLEL=1
-      - OLLAMA_MULTIUSER_CACHE=true
+      - OLLAMA_MULTIUSER_CACHE=false
     ports:
       - "11434:11434"
     volumes:
@@ -326,7 +346,9 @@ services:
       driver: "local"
       options:
         max-size: "20m"
-        max-file: "5"   
+        max-file: "5"
+    depends_on:
+      - ollama   
 
   traefik:
     image: traefik:v3.2.1

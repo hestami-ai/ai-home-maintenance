@@ -91,9 +91,19 @@ export async function apiPost<T = any, U = any>(
     
     // Prepare headers - don't set Content-Type for FormData (browser sets it with boundary)
     const headers: Record<string, string> = {
-      'Accept': 'application/json',
-      ...(options.headers || {})
+      'Accept': 'application/json'
     };
+    
+    // Convert Headers object to plain object if needed
+    if (options.headers) {
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headers[key] = value;
+        });
+      } else {
+        Object.assign(headers, options.headers);
+      }
+    }
     
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';

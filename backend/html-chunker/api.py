@@ -36,6 +36,7 @@ EXTRACTOR_REGISTRY = {
 class HTMLExtractionRequest(BaseModel):
     html_content: str
     text_content: Optional[str] = None
+    source_url: Optional[str] = None
     llm: str = DEFAULT_LLM
     model: str = DEFAULT_MODEL
     max_tokens: int = 24048
@@ -57,7 +58,8 @@ async def extract_from_html(
     max_tokens: int = Form(24048),
     overlap_percent: float = Form(0.1),
     log_level: str = Form("INFO"),
-    text_content: Optional[str] = Form(None)
+    text_content: Optional[str] = Form(None),
+    source_url: Optional[str] = Form(None)
 ):
     """
     Extract structured information from an uploaded HTML file.
@@ -70,6 +72,7 @@ async def extract_from_html(
         overlap_percent: Percentage of overlap between chunks
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         text_content: Optional raw text content to use as a cross-check for extraction
+        source_url: Optional source URL to detect data source (e.g., Google Maps, Thumbtack)
         
     Returns:
         Extracted data as JSON
@@ -95,8 +98,6 @@ async def extract_from_html(
     
     logger.info(f"Extraction request received with LLM: {llm}, model: {model}")
     logger.info(f"Log level set to: {log_level_upper}")
-    if text_content:
-        logger.info("Raw text content provided for cross-checking")
     
     # Validate LLM provider
     if llm not in LLM_PROVIDERS:
@@ -107,6 +108,12 @@ async def extract_from_html(
         contents = await file.read()
         html_content = contents.decode("utf-8")
         
+        logger.info(f"HTML content size: {len(html_content)} bytes")
+        if text_content:
+            logger.info(f"Raw text content size: {len(text_content)} bytes")
+        if source_url:
+            logger.info(f"Source URL provided: {source_url}")
+        
         # Process the HTML content using the process_html function
         extracted_data = process_html(
             html_content,
@@ -114,7 +121,8 @@ async def extract_from_html(
             model=model,
             max_tokens=max_tokens,
             overlap_percent=overlap_percent,
-            text_content=text_content
+            text_content=text_content,
+            source_url=source_url
         )
         return extracted_data
     except Exception as e:
@@ -156,6 +164,8 @@ async def extract_from_html_string(request: HTMLExtractionRequest):
     logger.info(f"HTML content size: {len(request.html_content)} bytes")
     if request.text_content:
         logger.info(f"Raw text content size: {len(request.text_content)} bytes")
+    if request.source_url:
+        logger.info(f"Source URL provided: {request.source_url}")
     
     # Validate LLM provider
     if request.llm not in LLM_PROVIDERS:
@@ -169,7 +179,8 @@ async def extract_from_html_string(request: HTMLExtractionRequest):
             model=request.model,
             max_tokens=request.max_tokens,
             overlap_percent=request.overlap_percent,
-            text_content=request.text_content
+            text_content=request.text_content,
+            source_url=request.source_url
         )
         return extracted_data
     except Exception as e:

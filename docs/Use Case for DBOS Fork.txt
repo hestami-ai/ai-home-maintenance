@@ -1,0 +1,133 @@
+This is a use case for DBOS workflow forks. Below are some log outputs for a workflow that failed. However, when it was restarted, it started from the beginning of the workflow it seems. 
+
+
+
+INFO 2025-11-04 21:03:16,594 services.workflows.provider_ingestion provider_ingestion Starting workflow for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+
+INFO 2025-11-04 21:03:16,600 services.workflows.provider_ingestion provider_ingestion Extracting HTML for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+
+INFO 2025-11-04 21:03:16,601 services.workflows.provider_ingestion provider_ingestion Processed data already exists for 51f43e03-cbf0-4821-a982-9b7efd64bdfe, skipping extraction
+
+INFO 2025-11-04 21:03:16,609 services.workflows.provider_ingestion provider_ingestion Loading context for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+
+INFO 2025-11-04 21:03:16,618 services.workflows.provider_ingestion provider_ingestion Normalizing geography
+
+WARNING 2025-11-04 21:03:16,619 services.workflows.provider_ingestion provider_ingestion No service areas found in processed data
+
+INFO 2025-11-04 21:03:16,624 services.workflows.provider_ingestion provider_ingestion Resolving identity for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+
+ERROR 2025-11-04 21:03:16,629 services.workflows.provider_ingestion provider_ingestion Workflow failed for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe: 'list' object has no attribute 'get'
+
+Traceback (most recent call last):
+
+  File "/app/services/workflows/provider_ingestion.py", line 76, in process_scraped_data
+
+    resolution_result = self.resolve_identity(scraped_data_id, processed_data, context)
+
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_core.py", line 1186, in wrapper
+
+    return invoke_step(*args, **kwargs)
+
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_core.py", line 1174, in invoke_step
+
+    return outcome()
+
+           ^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_outcome.py", line 159, in __call__
+
+    return self._func()
+
+           ^^^^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_outcome.py", line 124, in <lambda>
+
+    return Immediate[T](lambda: Immediate._also(self._func, cm))
+
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_outcome.py", line 121, in _also
+
+    return func()
+
+           ^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_outcome.py", line 116, in <lambda>
+
+    return Immediate[T](lambda: Immediate._intercept(self._func, interceptor))
+
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_outcome.py", line 108, in _intercept
+
+    return intercepted if not isinstance(intercepted, NoResult) else func()
+
+                                                                     ^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_outcome.py", line 94, in <lambda>
+
+    return Immediate(lambda: next(self._func))
+
+                             ^^^^^^^^^^^^^^^^
+
+  File "/usr/local/lib/python3.12/site-packages/dbos/_core.py", line 1124, in record_step_result
+
+    output = func()
+
+             ^^^^^^
+
+  File "/app/services/workflows/provider_ingestion.py", line 265, in resolve_identity
+
+    matched_provider, action, intervention_reason = resolve_identity(
+
+                                                    ^^^^^^^^^^^^^^^^^
+
+  File "/app/services/workflows/identity_resolution.py", line 217, in resolve_identity
+
+    matches = find_matching_providers(scraped_data, weights)
+
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/app/services/workflows/identity_resolution.py", line 191, in find_matching_providers
+
+    score, components = calculate_match_score(scraped_data, provider, weights)
+
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/app/services/workflows/identity_resolution.py", line 81, in calculate_match_score
+
+    scraped_website = normalize_website(business_info.get('social_media', {}).get('website'))
+
+                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+AttributeError: 'list' object has no attribute 'get'
+
+INFO 2025-11-04 21:03:16,643 services.workflows.provider_ingestion provider_ingestion Updating status for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe to failed
+
+Here is a second example of a workflow that was restarted after a failure and completed, but appears to have run the full workflow again.
+
+[2025-11-04 21:46:23,637: INFO/ForkPoolWorker-4] Starting workflow for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+[2025-11-04 21:46:23,641: INFO/ForkPoolWorker-4] Extracting HTML for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+[2025-11-04 21:46:23,643: INFO/ForkPoolWorker-4] Processed data already exists for 51f43e03-cbf0-4821-a982-9b7efd64bdfe, skipping extraction
+[2025-11-04 21:46:23,652: INFO/ForkPoolWorker-4] Loading context for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+[2025-11-04 21:46:23,660: INFO/ForkPoolWorker-4] Normalizing geography
+[2025-11-04 21:46:23,661: WARNING/ForkPoolWorker-4] No service areas found in processed data
+[2025-11-04 21:46:23,667: INFO/ForkPoolWorker-4] Resolving identity for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+[2025-11-04 21:46:23,669: INFO/ForkPoolWorker-4] No matching providers found, will create new provider
+[2025-11-04 21:46:23,675: INFO/ForkPoolWorker-4] Consolidating fields
+[2025-11-04 21:46:23,682: INFO/ForkPoolWorker-4] Persisting provider for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe
+[2025-11-04 21:46:23,687: INFO/ForkPoolWorker-4] Created new provider 84ab362f-51e6-4e83-9704-6c5b44a3018d
+[2025-11-04 21:46:23,710: INFO/ForkPoolWorker-4] Created 3 category links for provider 84ab362f-51e6-4e83-9704-6c5b44a3018d
+[2025-11-04 21:46:23,721: INFO/ForkPoolWorker-4] Updating status for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe to completed
+[2025-11-04 21:46:23,729: INFO/ForkPoolWorker-4] Workflow completed for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe, provider 84ab362f-51e6-4e83-9704-6c5b44a3018d
+[2025-11-04 21:46:23,734: INFO/ForkPoolWorker-4] DBOS workflow launched for scraped data 51f43e03-cbf0-4821-a982-9b7efd64bdfe: status=completed
+[2025-11-04 21:46:23,735: INFO/ForkPoolWorker-4] Service provider scraped data processing complete: {'status': 'success', 'processed': 1, 'failed': 0, 'message': 'Processed 1 records, 0 failed'}
+
+
+
+Review the following document for more information on how to handle workflow forks:
+https://www.dbos.dev/blog/handling-failures-workflow-forks

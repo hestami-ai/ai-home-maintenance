@@ -37,7 +37,7 @@ describe('ProfilePage', () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        company_name: 'Test Company',
+        business_name: 'Test Company',
         billing_address: '123 Test St',
         tax_id: '123456789',
       }),

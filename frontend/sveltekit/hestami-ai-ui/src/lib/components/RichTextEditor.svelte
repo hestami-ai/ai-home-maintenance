@@ -8,7 +8,7 @@
 	let { value = $bindable(''), placeholder = 'Start typing...' }: { value?: string; placeholder?: string } = $props();
 	
 	let element: HTMLDivElement;
-	let editor: Editor | null = null;
+	let editor: Editor | null = $state(null);
 	
 	onMount(() => {
 		editor = new Editor({
@@ -127,6 +127,8 @@
 <style>
 	:global(.ProseMirror) {
 		min-height: 200px;
+		max-height: 400px;
+		overflow-y: auto;
 	}
 	
 	:global(.ProseMirror:focus) {

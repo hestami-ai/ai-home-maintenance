@@ -1,0 +1,35 @@
+# DBOS Configuration
+# This file configures DBOS to use Django's PostgreSQL database for state tracking
+
+database:
+  # DBOS will use the DATABASE_URL environment variable
+  # which is already configured for Django
+  # DBOS creates a separate 'dbos' schema for its internal state
+  hostname: "${POSTGRES_HOST:localhost}"
+  port: ${POSTGRES_PORT:5432}
+  username: "${POSTGRES_USER:postgres}"
+  password: "${POSTGRES_PASSWORD:postgres}"
+  app_db_name: "${POSTGRES_DB:hestami_ai}"
+  sys_db_name: "${POSTGRES_DB:hestami_ai}"
+  app_db_schema: "public"
+  sys_db_schema: "dbos"
+  connectionTimeoutMillis: 3000
+  ssl: false
+
+# Application configuration
+application:
+  # Django app name
+  name: "hestami-ai-services"
+  
+# Logging configuration
+logging:
+  logLevel: "INFO"
+  
+# Telemetry configuration (optional)
+telemetry:
+  logs:
+    OTLPExporter:
+      logsEndpoint: "${OTEL_LOGS_ENDPOINT:}"
+  traces:
+    OTLPExporter:
+      tracesEndpoint: "${OTEL_TRACES_ENDPOINT:}"

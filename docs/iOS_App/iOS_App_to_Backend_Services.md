@@ -216,7 +216,7 @@ struct ServiceProvider: Codable {
     
     enum CodingKeys: String, CodingKey {
         case id
-        case companyName = "company_name"
+        case companyName = "business_name"
         case description
         case rating
         case totalReviews = "total_reviews"

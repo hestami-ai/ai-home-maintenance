@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar';
 import { useThemeMode } from '@/hooks/useThemeMode';
 
 interface ProfileData {
-  company_name?: string;
+  business_name?: string;
   billing_address?: string;
   tax_id?: string;
   preferred_contact_method?: string;
@@ -105,14 +105,14 @@ export default function ProfilePage() {
     <>
       <div className="grid grid-cols-6 gap-6">
         <div className="col-span-6 sm:col-span-4">
-          <label htmlFor="company_name" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label htmlFor="business_name" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
             Company Name
           </label>
           <input
             type="text"
-            name="company_name"
-            id="company_name"
-            value={profileData.company_name || ''}
+            name="business_name"
+            id="business_name"
+            value={profileData.business_name || ''}
             onChange={handleInputChange}
             disabled={!isEditing}
             className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-main focus:ring-primary-main sm:text-sm dark:bg-gray-700 dark:text-white"

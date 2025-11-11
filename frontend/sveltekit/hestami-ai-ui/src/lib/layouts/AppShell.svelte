@@ -18,6 +18,7 @@
 	import ChevronRight from 'lucide-svelte/icons/chevron-right';
 	import ClipboardList from 'lucide-svelte/icons/clipboard-list';
 	import ChartArea from 'lucide-svelte/icons/chart-area';
+	import Briefcase from 'lucide-svelte/icons/briefcase';
 	
 	
 	
@@ -167,6 +168,12 @@
 				active: $page.url.pathname.startsWith('/staff/requests')
 			},
 			{
+				name: 'Provider Management',
+				iconType: 'briefcase',
+				href: '/staff/providers',
+				active: $page.url.pathname.startsWith('/staff/providers')
+			},
+			{
 				name: 'Users',
 				iconType: 'users',
 				href: '/users',
@@ -281,6 +288,8 @@
 								<ClipboardList />
 							{:else if item.iconType === 'chart-area'}
 								<ChartArea />
+							{:else if item.iconType === 'briefcase'}
+								<Briefcase />
 							{/if}
 						</div>
 						{#if !sidebarCollapsed}
@@ -316,6 +325,8 @@
 								<Settings />
 							{:else if item.iconType === 'clipboard'}
 								<ClipboardList />
+							{:else if item.iconType === 'briefcase'}
+								<Briefcase />
 							{/if}
 							<span>{item.name}</span>
 						</a>

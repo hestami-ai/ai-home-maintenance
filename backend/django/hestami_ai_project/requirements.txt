@@ -1,6 +1,8 @@
 Django==5.1.1
 psycopg2==2.9.9
 pillow==10.4.0
+GDAL==3.10.3
+pgvector==0.4.1
 gunicorn==23.0.0
 gevent==24.2.1
 dj-rest-auth==6.0.0
@@ -27,4 +29,6 @@ squareup==40.0.0.220250123
 django-money==3.5.3
 django-filter==24.1
 temporalio==1.9.0
+rapidfuzz>=3.0.0
 dbos==2.3.0
+httpx==0.28.1

@@ -137,6 +137,11 @@
 	}
 </script>
 
+<svelte:head>
+	<title>Service Queue - Hestami AI</title>
+	<meta name="description" content="Manage service requests queue" />
+</svelte:head>
+
 <div class="container mx-auto p-6 space-y-6">
 	<!-- Header -->
 	<header class="flex justify-between items-center">
@@ -259,6 +264,12 @@
 									e.stopPropagation();
 									deleteSavedFilter(i);
 								}}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.stopPropagation();
+										deleteSavedFilter(i);
+									}
+								}}
 								role="button"
 								tabindex="0"
 							>
@@ -372,8 +383,12 @@
 
 <!-- Save Filter Modal -->
 {#if showSaveFilterModal}
-	<div class="modal-backdrop" onclick={() => (showSaveFilterModal = false)}>
-		<div class="modal card p-6 w-full max-w-md" onclick={(e) => e.stopPropagation()}>
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<div class="modal-backdrop" role="presentation" onclick={() => (showSaveFilterModal = false)}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="modal card p-6 w-full max-w-md" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
 			<h3 class="h3 mb-4">Save Current Filters</h3>
 			<input
 				type="text"

@@ -32,16 +32,26 @@ class ServiceProviderSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True
     )
+    distance = serializers.SerializerMethodField()
     
     class Meta:
         model = ServiceProvider
         fields = [
-            'id', 'users_details', 'company_name',
-            'description', 'service_area', 'is_available',
+            'id', 'users_details', 'business_name',
+            'description', 'phone', 'website', 'address',
+            'service_area', 'is_available',
             'rating', 'total_reviews', 'average_rating',
-            'categories_info', 'created_at', 'updated_at'
+            'categories_info', 'distance', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at']
+    
+    def get_distance(self, obj):
+        """Return distance in miles if it was annotated by the query."""
+        distance = getattr(obj, 'distance', None)
+        if distance is not None:
+            # Convert Distance object to float (miles)
+            return float(distance.mi)
+        return None
 
 class ServiceBidSerializer(serializers.ModelSerializer):
     provider_details = ServiceProviderSerializer(source='provider', read_only=True)

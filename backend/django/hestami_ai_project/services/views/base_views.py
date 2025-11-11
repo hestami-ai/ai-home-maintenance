@@ -67,28 +67,101 @@ def provider_profile(request):
 @authentication_classes([JWTAuthentication, ServiceTokenAuthentication])
 @permission_classes([IsAuthenticated])
 def list_providers(request):
-    """List service providers filtered by category and location"""
+    """
+    List service providers filtered by category and location.
+    
+    Query parameters:
+    - service_request_id: Filter by service request (uses property location and category)
+    - category: Filter by service category
+    - location: Filter by location (not implemented)
+    - radius_miles: Search radius in miles (default: 25, requires service_request_id)
+    """
     try:
+        service_request_id = request.query_params.get('service_request_id')
         category_id = request.query_params.get('category')
-        location = request.query_params.get('location')
+        radius_miles = float(request.query_params.get('radius_miles', 25))
         
         providers = ServiceProvider.objects.filter(is_available=True)
         
-        if category_id:
+        # If service_request_id is provided, filter by location and category
+        if service_request_id:
+            service_request = get_object_or_404(ServiceRequest, id=service_request_id)
+            
+            # Get property geocode data
+            property_obj = service_request.property
+            geocode_data = property_obj.geocode_address
+            
+            # Extract latitude and longitude from geocode_address
+            # Azure Maps stores it in results[0].position.{lat,lon}
+            latitude = None
+            longitude = None
+            
+            if geocode_data:
+                # Try Azure Maps format first
+                results = geocode_data.get('results', [])
+                if results and len(results) > 0:
+                    position = results[0].get('position', {})
+                    latitude = position.get('lat')
+                    longitude = position.get('lon')
+                else:
+                    # Fallback to direct lat/lon (if stored differently)
+                    latitude = geocode_data.get('latitude')
+                    longitude = geocode_data.get('longitude')
+            
+            if not latitude or not longitude:
+                logger.warning(
+                    f"Service request {service_request_id} property has no geocoded location. "
+                    f"Address: {property_obj.address}, {property_obj.city}, {property_obj.state}. "
+                    f"Geocode data: {geocode_data}"
+                )
+                return Response({
+                    'count': 0,
+                    'results': [],
+                    'message': 'Property location not geocoded. Please update property address.'
+                })
+            
+            # Filter by service category
+            service_category = service_request.category
             providers = providers.filter(
-                categories__id=category_id,
+                providercategory__category=service_category,
                 providercategory__is_active=True
+            ).distinct()
+            
+            # Filter by geographic proximity using PostGIS
+            from django.contrib.gis.geos import Point
+            from django.contrib.gis.measure import D
+            from django.contrib.gis.db.models.functions import Distance
+            
+            # Create Point from property coordinates
+            property_point = Point(float(longitude), float(latitude), srid=4326)
+            
+            # Find providers within radius
+            providers = providers.filter(
+                business_location__distance_lte=(property_point, D(mi=radius_miles))
+            ).annotate(
+                distance=Distance('business_location', property_point)
+            ).order_by('distance')
+            
+            logger.info(
+                f"Found {providers.count()} providers for service request {service_request_id} "
+                f"(category: {service_category}, location: {latitude},{longitude}, radius: {radius_miles} mi)"
             )
         
-        if location:
-            # Implement location-based filtering using service_area
-            pass
+        elif category_id:
+            # Legacy category filtering
+            providers = providers.filter(
+                providercategory__category=category_id,
+                providercategory__is_active=True
+            ).distinct()
         
         serializer = ServiceProviderSerializer(providers, many=True)
-        return Response(serializer.data)
+        return Response({
+            'count': len(serializer.data),
+            'results': serializer.data
+        })
     
     except Exception as e:
-        logger.error(f"Error listing providers: {str(e)}")
+        logger.error(f"Error listing providers: {str(e)}", exc_info=True)
         return Response(
             {"error": "Failed to retrieve providers"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR

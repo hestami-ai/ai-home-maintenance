@@ -166,6 +166,10 @@ python manage.py makemigrations
 echo "Applying database migrations..."
 python manage.py migrate
 
+# Initialize DBOS schema
+echo "Initializing DBOS schema..."
+python manage.py init_dbos_schema
+
 # Generate API documentation
 # echo "Generating API documentation..."
 # python manage.py spectacular --file openapi-schema.json

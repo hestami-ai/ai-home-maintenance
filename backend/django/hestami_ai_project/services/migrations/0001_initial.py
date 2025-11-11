@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
             name='ServiceProvider',
             fields=[
                 ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('company_name', models.CharField(max_length=255)),
+                ('business_name', models.CharField(max_length=255)),
                 ('description', models.TextField(blank=True)),
                 ('service_area', models.JSONField(default=dict)),
                 ('is_available', models.BooleanField(default=True)),

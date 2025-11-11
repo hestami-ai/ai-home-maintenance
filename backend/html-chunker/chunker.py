@@ -62,7 +62,7 @@ def get_tokenizer(model: str):
     # Simple tokenizer that splits on whitespace
     return lambda text: text.split()
 
-def get_prompt_template_tokens(llm: str, model: str, schema_path: str) -> int:
+def get_prompt_template_tokens(llm: str, model: str, schema_path: str, source: Optional[str] = None) -> int:
     """
     Calculate the number of tokens in the prompt template.
     
@@ -70,6 +70,7 @@ def get_prompt_template_tokens(llm: str, model: str, schema_path: str) -> int:
         llm: The LLM provider
         model: The model name
         schema_path: Path to the schema file
+        source: Optional source identifier for prompt selection
         
     Returns:
         Number of tokens in the prompt template
@@ -85,7 +86,7 @@ def get_prompt_template_tokens(llm: str, model: str, schema_path: str) -> int:
         schema_str = json.dumps(schema, indent=2)
         
         # Get the template prompt from the centralized prompts module
-        template_prompt = get_full_extraction_prompt(schema_str)
+        template_prompt = get_full_extraction_prompt(schema_str, source=source)
         
         # Replace the content placeholder with a short placeholder
         template_prompt = template_prompt.replace("{content}", "[HTML_CONTENT_PLACEHOLDER]")
