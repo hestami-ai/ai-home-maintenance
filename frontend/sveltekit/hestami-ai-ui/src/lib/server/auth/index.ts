@@ -338,7 +338,7 @@ export async function loginWithCredentials(
   cookies: Cookies
 ): Promise<{ success: boolean; user?: User; error?: string }> {
   try {
-    // Call Django login endpoint
+    // 1. Authenticate with Django
     const response = await fetch(`${API_BASE_URL}${AUTH_ENDPOINTS.LOGIN}`, {
       method: 'POST',
       headers: {
@@ -360,8 +360,8 @@ export async function loginWithCredentials(
     
     const data = await response.json();
     
-    // Create session
-    await createSession(
+    // 2. Create Django session
+    const sessionId = await createSession(
       cookies,
       data.user,
       {
@@ -369,6 +369,32 @@ export async function loginWithCredentials(
         refreshToken: data.refresh
       }
     );
+    
+    // 3. Authenticate with LibreChat (non-blocking, don't fail login if this fails)
+    try {
+      const { getLibreChatPasswordFromDjango, authenticateLibreChat, setLibreChatSession } = await import('../librechat');
+      
+      // Get LibreChat password from Django
+      const librechatPassword = await getLibreChatPasswordFromDjango(data.access);
+      
+      if (librechatPassword) {
+        // Authenticate with LibreChat
+        const librechatSession = await authenticateLibreChat(email, librechatPassword);
+        
+        if (librechatSession) {
+          // Store LibreChat session in Redis
+          await setLibreChatSession(sessionId, librechatSession);
+          console.log(`LibreChat session established for ${email}`);
+        } else {
+          console.warn(`LibreChat authentication failed for ${email}, chat features may not work`);
+        }
+      } else {
+        console.warn(`Could not retrieve LibreChat password for ${email}, chat features may not work`);
+      }
+    } catch (librechatError) {
+      console.error('LibreChat authentication error:', librechatError);
+      // Don't fail the login if LibreChat authentication fails
+    }
     
     return {
       success: true,

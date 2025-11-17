@@ -50,7 +50,7 @@ services:
     networks:
       - backend-dev
     depends_on:
-      - api
+      - django-api
       - static
       - traefik
     deploy:
@@ -74,11 +74,11 @@ services:
         max-size: "20m"
         max-file: "5"
   
-  api:
+  django-api:
     build: 
       context: .
       dockerfile: ./docker/backend/django/Dockerfile
-    container_name: api-dev
+    container_name: django-api-dev
     command: >
       gunicorn hestami_ai.wsgi:application
       --bind 0.0.0.0:8050
@@ -323,7 +323,7 @@ services:
       - backend-dev
       - temporal-network
     depends_on:
-      - api
+      - django-api
     logging:
       driver: "local"
       options:

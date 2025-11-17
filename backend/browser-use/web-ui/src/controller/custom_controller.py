@@ -489,7 +489,7 @@ class CustomController(Controller):
                 html_content = await page.evaluate("() => document.documentElement.outerHTML")
 
                 # Determine endpoint
-                base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://api:8050/api/properties/")
+                base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://django-api:8050/api/properties/")
                 endpoint = f"{base_url}{params.property_id}/scraped-data/create"
 
                 if not endpoint:
@@ -566,7 +566,7 @@ class CustomController(Controller):
                     html_content = await page.evaluate("() => document.documentElement.outerHTML")
 
                     # Determine endpoint
-                    base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://api:8050/api/properties/")
+                    base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://django-api:8050/api/properties/")
                     endpoint = f"{base_url}{params.property_id}/scraped-data/create"
 
                     # Prepare payload and headers
@@ -696,7 +696,7 @@ class CustomController(Controller):
                     html_content = await page.evaluate("() => document.documentElement.outerHTML")
 
                     # Determine endpoint
-                    base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://api:8050/api/properties/")
+                    base_url = os.getenv("BROWSER_USE_SCRAPED_API_BASE_URL", "http://django-api:8050/api/properties/")
                     endpoint = f"{base_url}{params.property_id}/scraped-data/create"
 
                     # Prepare payload and headers

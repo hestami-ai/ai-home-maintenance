@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createSession } from '$lib/server/auth';
+import { ensureLibreChatSession } from '$lib/server/librechat';
 import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 
@@ -35,7 +36,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
         // If login was successful, create server-side session
         if (response.ok && data.access && data.refresh && data.user) {
             // Create session in Redis
-            await createSession(
+            const sessionId = await createSession(
                 cookies,
                 {
                     id: data.user.id,
@@ -50,6 +51,19 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
                     refreshToken: data.refresh
                 }
             );
+            
+            // Establish LibreChat session
+            try {
+                console.log('Establishing LibreChat session for user:', data.user.email);
+                
+                if (sessionId) {
+                    await ensureLibreChatSession(sessionId, data.user.email);
+                    console.log('LibreChat session established successfully');
+                }
+            } catch (error) {
+                console.error('Error establishing LibreChat session:', error);
+                // Don't fail the login if LibreChat session fails
+            }
             
             // Return success with minimal user data
             return json({

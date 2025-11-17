@@ -19,6 +19,7 @@
 	import ClipboardList from 'lucide-svelte/icons/clipboard-list';
 	import ChartArea from 'lucide-svelte/icons/chart-area';
 	import Briefcase from 'lucide-svelte/icons/briefcase';
+	import MessageSquare from 'lucide-svelte/icons/message-square';
 	
 	
 	
@@ -149,6 +150,13 @@
 			iconType: 'chart-area',
 			href: '/dashboard',
 			active: $page.url.pathname === '/dashboard'
+		},
+		// Chat for all users
+		{
+			name: 'Ask An AI Handyman',
+			iconType: 'message-square',
+			href: '/chat',
+			active: $page.url.pathname.startsWith('/chat')
 		},
 		// Property management for property owners only
 		...(isPropertyOwner ? [
@@ -290,6 +298,8 @@
 								<ChartArea />
 							{:else if item.iconType === 'briefcase'}
 								<Briefcase />
+							{:else if item.iconType === 'message-square'}
+								<MessageSquare />
 							{/if}
 						</div>
 						{#if !sidebarCollapsed}
@@ -325,8 +335,12 @@
 								<Settings />
 							{:else if item.iconType === 'clipboard'}
 								<ClipboardList />
+							{:else if item.iconType === 'chart-area'}
+								<ChartArea />
 							{:else if item.iconType === 'briefcase'}
 								<Briefcase />
+							{:else if item.iconType === 'message-square'}
+								<MessageSquare />
 							{/if}
 							<span>{item.name}</span>
 						</a>

@@ -56,7 +56,7 @@ if not all([SQUARE_PLAN_ID_FREE, SQUARE_PLAN_ID_CORE, SQUARE_PLAN_ID_WHOLE]):
         "SQUARE_PLAN_ID_FREE, SQUARE_PLAN_ID_CORE, SQUARE_PLAN_ID_WHOLE"
     )
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'api']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'django-api']
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -512,6 +512,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'services.process_pending_service_provider_scraped_data',
         'schedule': float(os.environ.get('SERVICE_PROVIDER_PROCESSOR_INTERVAL', '5')),  # Run every 60 seconds by default
     },
+    'sync-unsynced-librechat-users': {
+        'task': 'users.sync_unsynced_librechat_users',
+        'schedule': float(os.environ.get('LIBRECHAT_SYNC_INTERVAL', '10')),  # Run every 5 minutes by default
+    },
+    'check-failed-librechat-syncs': {
+        'task': 'users.check_failed_librechat_syncs',
+        'schedule': float(os.environ.get('LIBRECHAT_CHECK_FAILED_INTERVAL', '3600')),  # Run every hour by default
+    },
 }
 
 # Task-specific settings
@@ -547,3 +555,15 @@ TEMPORAL_SETTINGS = {
 
 # Service account token for API authentication
 TEMPORAL_SERVICE_ACCOUNT_TOKEN = os.environ.get('TEMPORAL_SERVICE_ACCOUNT_TOKEN')
+
+# LibreChat Integration Settings
+LIBRECHAT_API_URL = os.environ.get('LIBRECHAT_API_URL', 'http://librechat:3080')
+LIBRECHAT_ENCRYPTION_KEY = os.environ.get('LIBRECHAT_ENCRYPTION_KEY')
+
+# Validate LibreChat encryption key is set
+if not LIBRECHAT_ENCRYPTION_KEY:
+    import warnings
+    warnings.warn(
+        "LIBRECHAT_ENCRYPTION_KEY is not set. LibreChat integration will not work. "
+        "Generate a key with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+    )

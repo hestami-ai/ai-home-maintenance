@@ -15,7 +15,7 @@ from tools.find_county import find_county
 logger = logging.getLogger(__name__)
 
 # Get environment variables
-API_BASE_URL = os.getenv("DJANGO_API_URL", "http://api:8050")
+API_BASE_URL = os.getenv("DJANGO_API_URL", "http://django-api:8050")
 SERVICE_TOKEN = os.getenv("TEMPORAL_SERVICE_ACCOUNT_TOKEN")
 BROWSER_USE_WEBUI_URL = os.getenv("BROWSER_USE_WEBUI_URL", "http://browser-use-webui:7788")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
