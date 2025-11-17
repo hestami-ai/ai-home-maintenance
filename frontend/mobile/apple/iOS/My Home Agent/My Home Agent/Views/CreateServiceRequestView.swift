@@ -18,6 +18,24 @@ struct CreateServiceRequestView: View {
     @State private var scheduledEnd: Date?
     @State private var useSchedule = false
     
+    // Preferred schedule
+    @State private var timeSlots: [TimeSlotInput] = []
+    @State private var isFlexible = false
+    @State private var scheduleNotes = ""
+    
+    struct TimeSlotInput: Identifiable {
+        let id = UUID()
+        var date: Date
+        var startTime: Date
+        var endTime: Date
+        
+        init(date: Date = Date().addingTimeInterval(86400), startTime: Date = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date()) ?? Date(), endTime: Date = Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: Date()) ?? Date()) {
+            self.date = date
+            self.startTime = startTime
+            self.endTime = endTime
+        }
+    }
+    
     // Media attachment
     @State private var selectedMediaItems: [PhotosPickerItem] = []
     @State private var loadedMedia: [MediaItem] = []
@@ -74,6 +92,8 @@ struct CreateServiceRequestView: View {
                         prioritySection
                         
                         scheduleSection
+                        
+                        preferredScheduleSection
                         
                         photoAttachmentSection
                         
@@ -547,17 +567,24 @@ struct CreateServiceRequestView: View {
     }
     
     private func generateVideoThumbnail(from url: URL) -> UIImage? {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
         
-        do {
-            let cgImage = try imageGenerator.copyCGImage(at: .zero, actualTime: nil)
-            return UIImage(cgImage: cgImage)
-        } catch {
-            print("Error generating video thumbnail: \(error)")
-            return nil
+        var thumbnail: UIImage?
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: .zero)]) { _, image, _, result, error in
+            if let error = error {
+                print("Error generating video thumbnail: \(error)")
+            } else if let image = image {
+                thumbnail = UIImage(cgImage: image)
+            }
+            semaphore.signal()
         }
+        
+        semaphore.wait()
+        return thumbnail
     }
     
     private func loadProperties() async {
@@ -582,6 +609,9 @@ struct CreateServiceRequestView: View {
         
         Task {
             do {
+                // Build preferred schedule if time slots exist
+                let preferredScheduleData = buildPreferredScheduleData()
+                
                 let newRequest = try await viewModel.createServiceRequest(
                     propertyId: property.id,
                     title: title,
@@ -589,7 +619,8 @@ struct CreateServiceRequestView: View {
                     category: selectedCategory,
                     priority: selectedPriority,
                     scheduledStart: useSchedule ? scheduledStart : nil,
-                    scheduledEnd: useSchedule ? scheduledEnd : nil
+                    scheduledEnd: useSchedule ? scheduledEnd : nil,
+                    preferredSchedule: preferredScheduleData
                 )
                 
                 // Upload media if any were selected
@@ -609,6 +640,35 @@ struct CreateServiceRequestView: View {
                 }
             }
         }
+    }
+    
+    private func buildPreferredScheduleData() -> [String: Any]? {
+        guard !timeSlots.isEmpty else { return nil }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm"
+        
+        let timeSlotsData: [[String: String]] = timeSlots.map { slot in
+            return [
+                "date": dateFormatter.string(from: slot.date),
+                "startTime": timeFormatter.string(from: slot.startTime),
+                "endTime": timeFormatter.string(from: slot.endTime)
+            ]
+        }
+        
+        var scheduleData: [String: Any] = [
+            "timeSlots": timeSlotsData,
+            "flexible": isFlexible
+        ]
+        
+        if !scheduleNotes.isEmpty {
+            scheduleData["notes"] = scheduleNotes
+        }
+        
+        return scheduleData
     }
     
     private func uploadMedia(for requestId: String) async throws {
@@ -679,6 +739,148 @@ struct CreateServiceRequestView: View {
         case .UNKNOWN:
             return Color.gray
         }
+    }
+    
+    // MARK: - Preferred Schedule Section
+    
+    private var preferredScheduleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Preferred Schedule")
+                .font(AppTheme.bodyFont.bold())
+                .foregroundColor(AppTheme.primaryText)
+            
+            Text("Add your available dates and times for service visits")
+                .font(AppTheme.captionFont)
+                .foregroundColor(AppTheme.secondaryText)
+            
+            // Time slots list
+            ForEach(timeSlots) { slot in
+                timeSlotCard(slot: slot)
+            }
+            
+            // Add time slot button
+            Button(action: addTimeSlot) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(AppTheme.accentColor)
+                    Text("Add Available Time")
+                        .font(AppTheme.bodyFont)
+                        .foregroundColor(AppTheme.accentColor)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(AppTheme.inputBackground)
+                .cornerRadius(AppTheme.cornerRadius)
+            }
+            
+            // Flexible toggle
+            if !timeSlots.isEmpty {
+                Toggle(isOn: $isFlexible) {
+                    Text("I'm flexible with timing")
+                        .font(AppTheme.bodyFont)
+                        .foregroundColor(AppTheme.primaryText)
+                }
+                .tint(AppTheme.accentColor)
+                
+                // Optional notes
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Additional Notes (Optional)")
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                    
+                    TextField("e.g., Prefer morning appointments", text: $scheduleNotes, axis: .vertical)
+                        .lineLimit(2...4)
+                        .padding()
+                        .background(AppTheme.inputBackground)
+                        .foregroundColor(AppTheme.primaryText)
+                        .cornerRadius(AppTheme.cornerRadius)
+                }
+            }
+        }
+        .padding()
+        .background(AppTheme.cardBackground)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.borderColor, lineWidth: 1)
+        )
+    }
+    
+    private func timeSlotCard(slot: TimeSlotInput) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "calendar")
+                    .foregroundColor(AppTheme.accentColor)
+                Text("Available Time Slot")
+                    .font(AppTheme.bodyFont.bold())
+                    .foregroundColor(AppTheme.primaryText)
+                
+                Spacer()
+                
+                Button(action: {
+                    removeTimeSlot(slot)
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(AppTheme.errorColor)
+                }
+            }
+            
+            // Date picker
+            DatePicker("Date", selection: binding(for: slot).date, displayedComponents: .date)
+                .datePickerStyle(.compact)
+                .foregroundColor(AppTheme.primaryText)
+                .accentColor(AppTheme.accentColor)
+            
+            // Time range
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Start Time")
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                    DatePicker("", selection: binding(for: slot).startTime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .foregroundColor(AppTheme.primaryText)
+                        .accentColor(AppTheme.accentColor)
+                }
+                
+                Image(systemName: "arrow.right")
+                    .foregroundColor(AppTheme.secondaryText)
+                    .padding(.top, 20)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("End Time")
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                    DatePicker("", selection: binding(for: slot).endTime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .foregroundColor(AppTheme.primaryText)
+                        .accentColor(AppTheme.accentColor)
+                }
+            }
+        }
+        .padding()
+        .background(AppTheme.inputBackground)
+        .cornerRadius(AppTheme.cornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: AppTheme.cornerRadius)
+                .stroke(AppTheme.borderColor.opacity(0.5), lineWidth: 1)
+        )
+    }
+    
+    private func addTimeSlot() {
+        let newSlot = TimeSlotInput()
+        timeSlots.append(newSlot)
+    }
+    
+    private func removeTimeSlot(_ slot: TimeSlotInput) {
+        timeSlots.removeAll { $0.id == slot.id }
+    }
+    
+    private func binding(for slot: TimeSlotInput) -> Binding<TimeSlotInput> {
+        guard let index = timeSlots.firstIndex(where: { $0.id == slot.id }) else {
+            fatalError("Time slot not found")
+        }
+        return $timeSlots[index]
     }
 }
 

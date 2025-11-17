@@ -298,7 +298,7 @@ struct RequestDetailView: View {
                                 Text("Provider:")
                                     .foregroundColor(AppTheme.secondaryText)
                                 Spacer()
-                                Text(provider.companyName)
+                                Text(provider.businessName)
                                     .foregroundColor(AppTheme.primaryText)
                             }
                         }

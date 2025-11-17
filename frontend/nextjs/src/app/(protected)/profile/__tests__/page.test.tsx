@@ -76,15 +76,15 @@ describe('ProfilePage', () => {
     render(<ProfilePage />);
 
     // Initial state - fields should be disabled
-    const companyNameInput = screen.getByLabelText('Company Name');
-    expect(companyNameInput).toBeDisabled();
+    const businessNameInput = screen.getByLabelText('Company Name');
+    expect(businessNameInput).toBeDisabled();
 
     // Click edit button
     const editButton = screen.getByText('Edit Profile');
     fireEvent.click(editButton);
 
     // Fields should now be enabled
-    expect(companyNameInput).not.toBeDisabled();
+    expect(businessNameInput).not.toBeDisabled();
 
     // Cancel button should appear
     expect(screen.getByText('Cancel')).toBeInTheDocument();
@@ -98,8 +98,8 @@ describe('ProfilePage', () => {
     fireEvent.click(editButton);
 
     // Update a field
-    const companyNameInput = screen.getByLabelText('Company Name');
-    fireEvent.change(companyNameInput, { target: { value: 'New Company Name' } });
+    const businessNameInput = screen.getByLabelText('Company Name');
+    fireEvent.change(businessNameInput, { target: { value: 'New Company Name' } });
 
     // Submit form
     const saveButton = screen.getByText('Save Changes');
