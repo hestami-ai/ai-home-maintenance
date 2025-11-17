@@ -13,6 +13,7 @@ from .views.auth_views import (
 )
 from .views.dashboard_views import staff_dashboard_stats
 from .views.user_views import list_users, search_users
+from .views.librechat_views import LibreChatPasswordView
 
 app_name = 'users'
 
@@ -36,4 +37,7 @@ urlpatterns = [
     # User management endpoints
     path('list/', list_users, name='list_users'),  # This becomes /api/users/list/
     path('search/', search_users, name='search_users'),  # This becomes /api/users/search/
+    
+    # LibreChat integration
+    path('librechat-password/', LibreChatPasswordView.as_view(), name='librechat_password'),
 ]

@@ -1,7 +1,10 @@
 import uuid
+import secrets
 
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
+from django.conf import settings
+from cryptography.fernet import Fernet
 
 class UserRoles(models.TextChoices):
     PROPERTY_OWNER = 'PROPERTY_OWNER', 'Property Owner'
@@ -66,6 +69,25 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         related_name='users'
     )
+    
+    # LibreChat integration fields
+    librechat_user_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="LibreChat internal user ID"
+    )
+    librechat_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Last successful sync with LibreChat"
+    )
+    librechat_password_encrypted = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="Encrypted password for LibreChat authentication"
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['user_role']
@@ -78,3 +100,46 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_service_account(self):
         return self.user_role == UserRoles.SERVICE_ACCOUNT
+    
+    def generate_librechat_password(self) -> str:
+        """
+        Generate and encrypt a random password for LibreChat authentication.
+        
+        Returns:
+            str: The plaintext password (for immediate use in provisioning)
+        """
+        # Generate 32-character random password
+        password = secrets.token_urlsafe(32)
+        
+        # Encrypt and store
+        encryption_key = getattr(settings, 'LIBRECHAT_ENCRYPTION_KEY', None)
+        if not encryption_key:
+            raise ValueError("LIBRECHAT_ENCRYPTION_KEY not configured in settings")
+        
+        cipher = Fernet(encryption_key.encode())
+        encrypted = cipher.encrypt(password.encode())
+        self.librechat_password_encrypted = encrypted.decode()
+        self.save(update_fields=['librechat_password_encrypted'])
+        
+        return password
+    
+    def get_librechat_password(self) -> str:
+        """
+        Decrypt and return the LibreChat password.
+        
+        Returns:
+            str: The decrypted plaintext password
+            
+        Raises:
+            ValueError: If no LibreChat password is set or encryption key is missing
+        """
+        if not self.librechat_password_encrypted:
+            raise ValueError("No LibreChat password set for this user")
+        
+        encryption_key = getattr(settings, 'LIBRECHAT_ENCRYPTION_KEY', None)
+        if not encryption_key:
+            raise ValueError("LIBRECHAT_ENCRYPTION_KEY not configured in settings")
+        
+        cipher = Fernet(encryption_key.encode())
+        decrypted = cipher.decrypt(self.librechat_password_encrypted.encode())
+        return decrypted.decode()

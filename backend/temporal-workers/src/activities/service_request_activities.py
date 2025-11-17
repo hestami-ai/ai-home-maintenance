@@ -44,7 +44,7 @@ async def get_service_request_details(request_id: str) -> Dict[str, Any]:
     """
     try:
         # Get API base URL from environment variable
-        api_base_url = os.getenv("DJANGO_API_URL", "http://api:8050")
+        api_base_url = os.getenv("DJANGO_API_URL", "http://django-api:8050")
         
         # Get API token from environment variable
         api_token = os.getenv("TEMPORAL_SERVICE_ACCOUNT_TOKEN")
@@ -148,7 +148,7 @@ async def update_service_request_status(request_id: str, status: str) -> Dict[st
     """
     try:
         # Get API base URL from environment variable
-        api_base_url = os.getenv("DJANGO_API_URL", "http://api:8050")
+        api_base_url = os.getenv("DJANGO_API_URL", "http://django-api:8050")
         
         # Get API token from environment variable
         api_token = os.getenv("TEMPORAL_SERVICE_ACCOUNT_TOKEN")

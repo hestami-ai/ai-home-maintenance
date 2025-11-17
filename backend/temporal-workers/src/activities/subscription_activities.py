@@ -1,7 +1,7 @@
 import os
 from temporalio import activity
 
-API_BASE_URL = os.getenv("DJANGO_API_URL", "http://api:8050")
+API_BASE_URL = os.getenv("DJANGO_API_URL", "http://django-api:8050")
 SERVICE_TOKEN = os.getenv("TEMPORAL_SERVICE_ACCOUNT_TOKEN")
 
 @activity.defn(name="create_square_subscription")

@@ -19,6 +19,7 @@ from temporalio.exceptions import TemporalError
 import asyncio
 import logging
 import threading
+from dbos import DBOS
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,31 @@ class UserRegistrationView(generics.CreateAPIView):
                 
                 user = serializer.save()
                 logger.info(f"Created user with ID: {user.id}")
+                
+                # Generate LibreChat password
+                try:
+                    librechat_password = user.generate_librechat_password()
+                    logger.info(f"Generated LibreChat password for user {user.id}")
+                except Exception as e:
+                    logger.error(f"Failed to generate LibreChat password: {str(e)}")
+                    # Continue with registration even if LibreChat password generation fails
+                    librechat_password = None
+                
+                # Start LibreChat provisioning workflow (non-blocking)
+                if librechat_password:
+                    try:
+                        from users.workflows.librechat_provisioning import provision_librechat_user
+                        workflow_id = f"provision-librechat-{user.id}"
+                        DBOS.start_workflow(
+                            provision_librechat_user,
+                            user_id=str(user.id),
+                            librechat_password=librechat_password,
+                            workflow_id=workflow_id
+                        )
+                        logger.info(f"Started LibreChat provisioning workflow {workflow_id}")
+                    except Exception as e:
+                        logger.error(f"Failed to start LibreChat provisioning workflow: {str(e)}")
+                        # Don't fail registration if LibreChat provisioning fails
                 
                 # Generate tokens
                 refresh = RefreshToken.for_user(user)

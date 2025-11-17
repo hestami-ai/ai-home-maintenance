@@ -271,3 +271,9 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# LibreChat
+backend/LibreChat-main/data-node
+backend/LibreChat-main/meili_data_v1.12
+backend/LibreChat-main/logs
+

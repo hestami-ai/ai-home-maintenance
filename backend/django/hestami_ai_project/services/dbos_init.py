@@ -9,7 +9,8 @@ import logging
 from typing import Optional
 from dbos import DBOS
 
-logger = logging.getLogger(__name__)
+# Use celery logger so DBOS initialization logs go to celery.log when triggered by Celery
+logger = logging.getLogger('celery')
 
 _dbos_instance: Optional[DBOS] = None
 _dbos_pid: Optional[int] = None  # Track which process initialized DBOS
