@@ -188,12 +188,21 @@ extension ServiceRequestStatus {
 }
 
 struct PreferredSchedule: Codable {
-    let date: String?
+    let timeSlots: [TimeSlot]?
     let flexible: Bool?
+    let notes: String?
+    
+    // Legacy support
+    let date: String?
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        timeSlots = try? container.decodeIfPresent([TimeSlot].self, forKey: .timeSlots)
+        notes = try? container.decodeIfPresent(String.self, forKey: .notes)
+        
+        // Legacy field
         date = try? container.decodeIfPresent(String.self, forKey: .date)
+        
         // Accept both string and bool for 'flexible'
         if let boolValue = try? container.decodeIfPresent(Bool.self, forKey: .flexible) {
             flexible = boolValue
@@ -203,9 +212,53 @@ struct PreferredSchedule: Codable {
             flexible = nil
         }
     }
+    
+    init(timeSlots: [TimeSlot], flexible: Bool = false, notes: String? = nil) {
+        self.timeSlots = timeSlots
+        self.flexible = flexible
+        self.notes = notes
+        self.date = nil
+    }
 
     private enum CodingKeys: String, CodingKey {
-        case date
+        case timeSlots
         case flexible
+        case notes
+        case date
+    }
+}
+
+struct TimeSlot: Codable, Identifiable {
+    let id: UUID
+    let date: String
+    let startTime: String
+    let endTime: String
+    
+    init(id: UUID = UUID(), date: String, startTime: String, endTime: String) {
+        self.id = id
+        self.date = date
+        self.startTime = startTime
+        self.endTime = endTime
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case date
+        case startTime
+        case endTime
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = UUID()
+        self.date = try container.decode(String.self, forKey: .date)
+        self.startTime = try container.decode(String.self, forKey: .startTime)
+        self.endTime = try container.decode(String.self, forKey: .endTime)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(date, forKey: .date)
+        try container.encode(startTime, forKey: .startTime)
+        try container.encode(endTime, forKey: .endTime)
     }
 }

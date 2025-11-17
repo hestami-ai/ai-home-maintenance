@@ -276,6 +276,49 @@ final class AuthManager {
         // Only return true if biometrics are available AND we have stored credentials
         return canEvaluate && storedEmail != nil && storedPassword != nil
     }
+    
+    // Register method for new user signup
+    func register(
+        email: String,
+        password: String,
+        confirmPassword: String,
+        firstName: String,
+        lastName: String,
+        phoneNumber: String,
+        userRole: String
+    ) async throws -> User {
+        print("📝 AuthManager: Attempting registration with email: \(email)")
+        
+        let parameters: [String: Any] = [
+            "email": email,
+            "password": password,
+            "confirm_password": confirmPassword,
+            "first_name": firstName,
+            "last_name": lastName,
+            "phone_number": phoneNumber,
+            "user_role": userRole,
+            "service_provider": NSNull()
+        ]
+        
+        print("📝 AuthManager: Sending registration request to /api/users/register/")
+        
+        do {
+            let registerResponse: RegisterResponse = try await NetworkManager.shared.request(
+                endpoint: "/api/users/register/",
+                method: .post,
+                parameters: parameters
+            )
+            
+            print("✅ AuthManager: Registration successful")
+            return registerResponse.user
+        } catch let networkError as NetworkError {
+            print("❌ AuthManager: Registration failed with network error: \(networkError)")
+            throw AuthError.networkError(networkError)
+        } catch {
+            print("❌ AuthManager: Registration failed with error: \(error)")
+            throw AuthError.loginFailed
+        }
+    }
 }
 
 // Auth response models - Deprecated, use LoginResponse instead
@@ -286,4 +329,10 @@ struct AuthResponse: Decodable {
 // RefreshResponse is no longer used as server doesn't provide tokens
 struct RefreshResponse: Decodable {
     // Empty placeholder structure
+}
+
+// Registration response model
+struct RegisterResponse: Decodable {
+    let user: User
+    let message: String?
 }
