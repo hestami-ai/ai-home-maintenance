@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 class RoomScanUploadService {
     static let shared = RoomScanUploadService()
@@ -52,7 +53,7 @@ class RoomScanUploadService {
             )
             try storageService.updateScan(updatedScan)
             
-            print("✅ RoomScanUpload: Successfully uploaded scan \(scan.id) to backend as media \(media.id)")
+            AppLogger.media.info("Successfully uploaded scan \(scan.id, privacy: .public) to backend as media \(media.id, privacy: .public)")
             return media
             
         } catch {
@@ -69,7 +70,7 @@ class RoomScanUploadService {
             )
             try? storageService.updateScan(updatedScan)
             
-            print("❌ RoomScanUpload: Failed to upload scan \(scan.id): \(error)")
+            AppLogger.media.error("Failed to upload scan \(scan.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
             throw error
         }
     }
@@ -174,8 +175,8 @@ class RoomScanUploadService {
         
         request.httpBody = body
         
-        print("🌐 RoomScanUpload: Uploading file to \(url.absoluteString)")
-        print("🌐 RoomScanUpload: File size: \(fileData.count) bytes")
+        AppLogger.media.info("Uploading file to: \(url.absoluteString, privacy: .public)")
+        AppLogger.media.debug("File size: \(fileData.count, privacy: .public) bytes")
         
         // Make the request
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -184,11 +185,11 @@ class RoomScanUploadService {
             throw NetworkError.invalidResponse
         }
         
-        print("🌐 RoomScanUpload: Response status code: \(httpResponse.statusCode)")
+        AppLogger.network.debug("Response status code: \(httpResponse.statusCode, privacy: .public)")
         
         guard httpResponse.statusCode == 201 else {
             if let errorString = String(data: data, encoding: .utf8) {
-                print("❌ RoomScanUpload: Error response: \(errorString)")
+                AppLogger.network.error("Error response: \(errorString, privacy: .public)")
             }
             throw NetworkError.httpError(statusCode: httpResponse.statusCode, data: data)
         }
@@ -230,7 +231,7 @@ class RoomScanUploadService {
         }
         
         let media = try decoder.decode(Media.self, from: data)
-        print("✅ RoomScanUpload: Successfully uploaded media with ID: \(media.id)")
+        AppLogger.media.info("Successfully uploaded media with ID: \(media.id, privacy: .public)")
         
         return media
     }
@@ -260,7 +261,7 @@ class RoomScanUploadService {
                 )
                 uploadedMedia.append(media)
             } catch {
-                print("❌ RoomScanUpload: Failed to upload scan \(scan.id): \(error)")
+                AppLogger.media.error("Failed to upload scan \(scan.id, privacy: .public): \(error.localizedDescription, privacy: .public)")
                 // Continue with next scan
             }
         }

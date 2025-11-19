@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftUI
 
 class ErrorHandler {
@@ -47,13 +48,13 @@ class ErrorHandler {
     func logError(_ error: Error, file: String = #file, function: String = #function, line: Int = #line) {
         #if DEBUG
         let fileName = (file as NSString).lastPathComponent
-        print("❌ ERROR: \(error.localizedDescription)")
-        print("📍 Location: \(fileName):\(line) - \(function)")
+        AppLogger.app.error("ERROR: \(error.localizedDescription, privacy: .public)")
+        AppLogger.app.debug("Location: \(fileName, privacy: .public):\(line, privacy: .public) - \(function, privacy: .public)")
         
         if let networkError = error as? NetworkError, case .httpError(let statusCode, let data) = networkError {
-            print("📡 Status Code: \(statusCode)")
+            AppLogger.network.debug("Status Code: \(statusCode, privacy: .public)")
             if let data = data, let responseString = String(data: data, encoding: .utf8) {
-                print("📄 Response: \(responseString)")
+                AppLogger.network.debug("Response: \(responseString, privacy: .public)")
             }
         }
         #endif

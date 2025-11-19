@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import OSLog
 
 @MainActor
 class ChatViewModel: ObservableObject {
@@ -34,32 +35,26 @@ class ChatViewModel: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        print("📱 ChatViewModel: Initialized")
+        AppLogger.app.debug("ChatViewModel: Initialized")
     }
     
     // MARK: - Load Conversations
     
     func loadConversations() async {
-        // Prevent duplicate loading
+        // Prevent duplicate concurrent loading
         guard !isLoadingConversations else {
-            print("⚠️ ChatViewModel: Already loading conversations, skipping duplicate call")
+            AppLogger.app.warning("Already loading conversations, skipping duplicate call")
             return
         }
         
-        // Skip if already loaded (unless explicitly refreshing)
-        guard !hasLoadedConversations else {
-            print("⚠️ ChatViewModel: Conversations already loaded, skipping")
-            return
-        }
-        
-        print("📱 ChatViewModel: Loading conversations")
+        AppLogger.app.info("Loading conversations")
         isLoadingConversations = true
         error = nil
         
         do {
             conversations = try await chatService.fetchConversations()
             hasLoadedConversations = true
-            print("✅ ChatViewModel: Loaded \(conversations.count) conversations")
+            AppLogger.app.info("Loaded \(self.conversations.count, privacy: .public) conversations")
             
             // Auto-select first conversation if available and none selected
             if selectedConversationId == nil, let firstConversation = conversations.first {
@@ -68,15 +63,17 @@ class ChatViewModel: ObservableObject {
         } catch {
             // Check if it's a cancellation error
             if let urlError = error as? URLError, urlError.code == .cancelled {
-                print("⚠️ ChatViewModel: Conversation loading cancelled")
+                AppLogger.app.debug("Conversation loading cancelled")
+                isLoadingConversations = false
                 return
             }
             if (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled {
-                print("⚠️ ChatViewModel: Conversation loading cancelled (NSError)")
+                AppLogger.app.debug("Conversation loading cancelled (NSError)")
+                isLoadingConversations = false
                 return
             }
             
-            print("❌ ChatViewModel: Failed to load conversations: \(error)")
+            AppLogger.error("Failed to load conversations", error: error, category: AppLogger.app)
             self.error = "Failed to load conversations: \(error.localizedDescription)"
             showError = true
         }
@@ -87,7 +84,7 @@ class ChatViewModel: ObservableObject {
     // MARK: - Select Conversation
     
     func selectConversation(_ conversationId: String) async {
-        print("📱 ChatViewModel: Selecting conversation: \(conversationId)")
+        AppLogger.app.debug("Selecting conversation: \(conversationId, privacy: .public)")
         selectedConversationId = conversationId
         await loadMessages(for: conversationId)
     }
@@ -95,25 +92,25 @@ class ChatViewModel: ObservableObject {
     // MARK: - Load Messages
     
     func loadMessages(for conversationId: String) async {
-        print("📱 ChatViewModel: Loading messages for: \(conversationId)")
+        AppLogger.app.info("Loading messages for: \(conversationId, privacy: .public)")
         isLoadingMessages = true
         error = nil
         
         do {
             messages = try await chatService.fetchMessages(conversationId: conversationId)
-            print("✅ ChatViewModel: Loaded \(messages.count) messages")
+            AppLogger.app.info("Loaded \(self.messages.count, privacy: .public) messages")
         } catch {
             // Check if it's a cancellation error
             if let urlError = error as? URLError, urlError.code == .cancelled {
-                print("⚠️ ChatViewModel: Message loading cancelled")
+                AppLogger.app.debug("Message loading cancelled")
                 return
             }
             if (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled {
-                print("⚠️ ChatViewModel: Message loading cancelled (NSError)")
+                AppLogger.app.debug("Message loading cancelled (NSError)")
                 return
             }
             
-            print("❌ ChatViewModel: Failed to load messages: \(error)")
+            AppLogger.error("Failed to load messages", error: error, category: AppLogger.app)
             self.error = "Failed to load messages: \(error.localizedDescription)"
             showError = true
             messages = []
@@ -126,11 +123,11 @@ class ChatViewModel: ObservableObject {
     
     func sendMessage(_ text: String) async {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            print("⚠️ ChatViewModel: Cannot send empty message")
+            AppLogger.app.warning("Cannot send empty message")
             return
         }
         
-        print("📱 ChatViewModel: Sending message")
+        AppLogger.app.info("Sending message")
         isSendingMessage = true
         error = nil
         
@@ -168,13 +165,13 @@ class ChatViewModel: ObservableObject {
                     )
                     
                     conversations.insert(newConversation, at: 0)
-                    print("✅ ChatViewModel: Created new conversation: \(newConversationId)")
+                    AppLogger.app.info("Created new conversation: \(newConversationId, privacy: .public)")
                 }
             }
             
-            print("✅ ChatViewModel: Message sent successfully")
+            AppLogger.app.info("Message sent successfully")
         } catch {
-            print("❌ ChatViewModel: Failed to send message: \(error)")
+            AppLogger.error("Failed to send message", error: error, category: AppLogger.app)
             self.error = "Failed to send message: \(error.localizedDescription)"
             showError = true
         }
@@ -185,7 +182,7 @@ class ChatViewModel: ObservableObject {
     // MARK: - Create New Conversation
     
     func createNewConversation() {
-        print("📱 ChatViewModel: Creating new conversation")
+        AppLogger.app.debug("Creating new conversation")
         selectedConversationId = nil
         messages = []
         error = nil
@@ -194,7 +191,7 @@ class ChatViewModel: ObservableObject {
     // MARK: - Delete Conversation
     
     func deleteConversation(_ conversationId: String) async {
-        print("📱 ChatViewModel: Deleting conversation: \(conversationId)")
+        AppLogger.app.info("Deleting conversation: \(conversationId, privacy: .public)")
         
         do {
             try await chatService.deleteConversation(conversationId: conversationId)
@@ -213,9 +210,9 @@ class ChatViewModel: ObservableObject {
                 }
             }
             
-            print("✅ ChatViewModel: Conversation deleted")
+            AppLogger.app.info("Conversation deleted")
         } catch {
-            print("❌ ChatViewModel: Failed to delete conversation: \(error)")
+            AppLogger.error("Failed to delete conversation", error: error, category: AppLogger.app)
             self.error = "Failed to delete conversation: \(error.localizedDescription)"
             showError = true
         }
@@ -224,7 +221,7 @@ class ChatViewModel: ObservableObject {
     // MARK: - Update Conversation Title
     
     func updateConversationTitle(_ conversationId: String, title: String) async {
-        print("📱 ChatViewModel: Updating conversation title")
+        AppLogger.app.info("Updating conversation title")
         
         do {
             try await chatService.updateConversation(conversationId: conversationId, title: title)
@@ -232,9 +229,9 @@ class ChatViewModel: ObservableObject {
             // Reload conversations to get updated data
             await loadConversations()
             
-            print("✅ ChatViewModel: Conversation title updated")
+            AppLogger.app.info("Conversation title updated")
         } catch {
-            print("❌ ChatViewModel: Failed to update conversation: \(error)")
+            AppLogger.error("Failed to update conversation", error: error, category: AppLogger.app)
             self.error = "Failed to update conversation: \(error.localizedDescription)"
             showError = true
         }

@@ -525,7 +525,7 @@ struct CreateServiceRequestView: View {
                         // Clean up temp file
                         try? FileManager.default.removeItem(at: fileURL)
                     } catch {
-                        print("Error processing video: \(error)")
+                        AppLogger.error("Error processing video", error: error, category: AppLogger.media)
                     }
                 } else if let image = UIImage(data: data) {
                     // Handle image
@@ -576,7 +576,7 @@ struct CreateServiceRequestView: View {
         
         imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: .zero)]) { _, image, _, result, error in
             if let error = error {
-                print("Error generating video thumbnail: \(error)")
+                AppLogger.error("Error generating video thumbnail", error: error, category: AppLogger.media)
             } else if let image = image {
                 thumbnail = UIImage(cgImage: image)
             }
@@ -878,7 +878,10 @@ struct CreateServiceRequestView: View {
     
     private func binding(for slot: TimeSlotInput) -> Binding<TimeSlotInput> {
         guard let index = timeSlots.firstIndex(where: { $0.id == slot.id }) else {
-            fatalError("Time slot not found")
+            // Log error and return a default binding to prevent crash
+            AppLogger.app.error("Time slot not found: \(slot.id, privacy: .public)")
+            // Return a constant binding as fallback - this shouldn't happen in normal operation
+            return .constant(slot)
         }
         return $timeSlots[index]
     }

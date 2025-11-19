@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @MainActor
 class MediaMetadataViewModel: ObservableObject {
@@ -30,9 +31,9 @@ class MediaMetadataViewModel: ObservableObject {
                 mediaSubTypes = response.subTypes[firstMediaType] ?? []
             }
             
-            print("✅ Loaded \(mediaTypes.count) media types and \(mediaSubTypes.count) sub-types")
+            AppLogger.app.info("Loaded \(self.mediaTypes.count, privacy: .public) media types and \(self.mediaSubTypes.count, privacy: .public) sub-types")
         } catch {
-            print("❌ Failed to load media types: \(error)")
+            AppLogger.error("Failed to load media types", error: error, category: AppLogger.app)
             errorMessage = "Failed to load media types"
             // Set defaults if API fails
             setDefaultMediaTypes()
@@ -51,13 +52,15 @@ class MediaMetadataViewModel: ObservableObject {
             locationTypes = response.types
             allLocationSubTypes = response.subTypes
             
-            print("✅ Loaded \(locationTypes.count) location types")
-            print("✅ Location sub-types dictionary keys: \(allLocationSubTypes.keys)")
+            AppLogger.app.info("Loaded \(self.locationTypes.count, privacy: .public) location types")
+            #if DEBUG
+            AppLogger.app.debug("Location sub-types dictionary keys: \(self.allLocationSubTypes.keys, privacy: .public)")
             for (key, subtypes) in allLocationSubTypes {
-                print("   \(key): \(subtypes.count) subtypes")
+                AppLogger.app.debug("  \(key, privacy: .public): \(subtypes.count, privacy: .public) subtypes")
             }
+            #endif
         } catch {
-            print("❌ Failed to load location types: \(error)")
+            AppLogger.error("Failed to load location types", error: error, category: AppLogger.app)
             errorMessage = "Failed to load location types"
             // Set defaults if API fails
             setDefaultLocationTypes()
@@ -69,12 +72,14 @@ class MediaMetadataViewModel: ObservableObject {
     func loadLocationSubTypes(for locationType: String) async {
         // Get subtypes from the cached dictionary
         locationSubTypes = allLocationSubTypes[locationType] ?? []
-        print("✅ loadLocationSubTypes called for '\(locationType)'")
-        print("   Available keys in dictionary: \(allLocationSubTypes.keys)")
-        print("   Loaded \(locationSubTypes.count) location sub-types")
-        if !locationSubTypes.isEmpty {
-            print("   Sub-types: \(locationSubTypes.map { $0.label })")
+        #if DEBUG
+        AppLogger.app.debug("loadLocationSubTypes called for '\(locationType, privacy: .public)'")
+        AppLogger.app.debug("  Available keys in dictionary: \(self.allLocationSubTypes.keys, privacy: .public)")
+        AppLogger.app.debug("  Loaded \(self.locationSubTypes.count, privacy: .public) location sub-types")
+        if !self.locationSubTypes.isEmpty {
+            AppLogger.app.debug("  Sub-types: \(self.locationSubTypes.map { $0.label }, privacy: .public)")
         }
+        #endif
     }
     
     // MARK: - Default Values (Fallback)

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import OSLog
 
 // Create a proper test class
 class LoginResponseTests {
@@ -29,15 +30,15 @@ class LoginResponseTests {
             let response = try jsonDecoder.decode(LoginResponse.self, from: data)
             
             // Print the result
-            print("✅ Test passed! Successfully parsed LoginResponse")
-            print("User: \(response.user.firstName) \(response.user.lastName)")
-            print("Email: \(response.user.email)")
-            print("Role: \(response.user.userRole)")
-            print("Display Name: \(response.user.displayName)")
-            print("Initials: \(response.user.initials)")
+            AppLogger.app.info("Test passed! Successfully parsed LoginResponse")
+            AppLogger.app.debug("User: \(response.user.firstName, privacy: .public) \(response.user.lastName, privacy: .public)")
+            AppLogger.app.debug("Email: \(response.user.email, privacy: .public)")
+            AppLogger.app.debug("Role: \(response.user.userRole, privacy: .public)")
+            AppLogger.app.debug("Display Name: \(response.user.displayName, privacy: .public)")
+            AppLogger.app.debug("Initials: \(response.user.initials, privacy: .public)")
         } catch {
             // Print any errors
-            print("❌ Test failed with error: \(error)")
+            AppLogger.error("Test failed", error: error, category: AppLogger.app)
         }
     }
 }

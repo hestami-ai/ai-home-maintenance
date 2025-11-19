@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import CoreHaptics
+import OSLog
 
 /// A utility class to manage haptic feedback throughout the app
 class HapticManager {
@@ -34,7 +35,7 @@ class HapticManager {
         
         // If the device doesn't support haptics, we'll fall back to UIFeedbackGenerator
         guard supportsHaptics else {
-            print("Device does not support haptics")
+            AppLogger.app.debug("Device does not support haptics")
             return
         }
         
@@ -45,16 +46,16 @@ class HapticManager {
                 
                 // Set up handlers before starting
                 newEngine.resetHandler = { [weak self] in
-                    print("Haptic engine needs reset")
+                    AppLogger.app.debug("Haptic engine needs reset")
                     do {
                         try self?.engine?.start()
                     } catch {
-                        print("Failed to restart the haptic engine: \(error)")
+                        AppLogger.error("Failed to restart the haptic engine", error: error, category: AppLogger.app)
                     }
                 }
                 
                 newEngine.stoppedHandler = { reason in
-                    print("Haptic engine stopped for reason: \(reason.rawValue)")
+                    AppLogger.app.debug("Haptic engine stopped for reason: \(reason.rawValue, privacy: .public)")
                 }
                 
                 try newEngine.start()
@@ -65,7 +66,7 @@ class HapticManager {
                 }
                 
             } catch let error {
-                print("Haptic engine creation error: \(error)")
+                AppLogger.error("Haptic engine creation error", error: error, category: AppLogger.app)
             }
         }
     }
@@ -126,7 +127,7 @@ class HapticManager {
             try player.start(atTime: CHHapticTimeImmediate)
         } catch {
             // If there's an error, fall back to simple feedback
-            print("Failed to play custom haptic pattern: \(error)")
+            AppLogger.error("Failed to play custom haptic pattern", error: error, category: AppLogger.app)
             playFeedback(style: .medium)
         }
     }
@@ -135,7 +136,7 @@ class HapticManager {
     /// - Parameter error: The error to handle
     func handleHapticError(_ error: Error) {
         // Log the error
-        print("Haptic error: \(error)")
+        AppLogger.error("Haptic error", error: error, category: AppLogger.app)
         
         // If it's a specific error related to missing files, we can ignore it
         if let nsError = error as NSError?,
@@ -143,13 +144,13 @@ class HapticManager {
            nsError.code == 260,
            let filePath = nsError.userInfo["NSFilePath"] as? String,
            filePath.contains("hapticpatternlibrary.plist") {
-            print("Ignoring missing haptic pattern library error - this is expected in the simulator")
+            AppLogger.app.debug("Ignoring missing haptic pattern library error - this is expected in the simulator")
         } else {
             // For other errors, attempt to restart the engine
             do {
                 try engine?.start()
             } catch {
-                print("Failed to restart haptic engine: \(error)")
+                AppLogger.error("Failed to restart haptic engine", error: error, category: AppLogger.app)
             }
         }
     }

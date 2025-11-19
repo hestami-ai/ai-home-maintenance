@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftUI
 
 @MainActor
@@ -15,7 +16,7 @@ class ServicesViewModel: ObservableObject {
         
         // Check if we have a valid session
         if !NetworkManager.shared.hasSessionCookie() {
-            print("⚠️ ServicesViewModel: No session cookie found. User may need to log in again.")
+            AppLogger.auth.warning("No session cookie found. User may need to log in again.")
             errorMessage = "Session expired. Please log in again."
             isLoading = false
             return
@@ -32,7 +33,7 @@ class ServicesViewModel: ObservableObject {
             services = uiServices
             isLoading = false
         } catch {
-            print("❌ ServicesViewModel: Error loading services: \(error)")
+            AppLogger.error("Error loading services", error: error, category: AppLogger.app)
             errorMessage = "Failed to load services: \(error.localizedDescription)"
             isLoading = false
             // Load dummy data for development/testing
@@ -45,7 +46,7 @@ class ServicesViewModel: ObservableObject {
             let fetchedCategories = try await ServiceCatalogService.shared.getServiceCategories()
             categories = fetchedCategories
         } catch {
-            print("Failed to load categories: \(error.localizedDescription)")
+            AppLogger.error("Failed to load categories", error: error, category: AppLogger.app)
             // Set some default categories
             categories = ["Maintenance", "Repair", "Cleaning", "Renovation", "Other"]
         }

@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 public class CacheManager {
     public static let shared = CacheManager()
@@ -20,7 +21,7 @@ public class CacheManager {
             do {
                 try fileManager.createDirectory(at: cacheDirectory, withIntermediateDirectories: true)
             } catch {
-                print("Error creating cache directory: \(error)")
+                AppLogger.error("Error creating cache directory", error: error, category: AppLogger.app)
             }
         }
     }
@@ -36,7 +37,7 @@ public class CacheManager {
             let encodedData = try JSONEncoder().encode(cacheItem)
             try encodedData.write(to: fileURL)
         } catch {
-            print("Error caching data: \(error)")
+            AppLogger.error("Error caching data", error: error, category: AppLogger.app)
         }
     }
     
@@ -61,7 +62,7 @@ public class CacheManager {
             
             return cacheItem.data
         } catch {
-            print("Error retrieving cached data: \(error)")
+            AppLogger.error("Error retrieving cached data", error: error, category: AppLogger.app)
             return nil
         }
     }
@@ -73,7 +74,7 @@ public class CacheManager {
                 try fileManager.removeItem(at: fileURL)
             }
         } catch {
-            print("Error clearing cache: \(error)")
+            AppLogger.error("Error clearing cache", error: error, category: AppLogger.app)
         }
     }
     
@@ -91,7 +92,7 @@ public class CacheManager {
                 }
             }
         } catch {
-            print("Error clearing expired cache: \(error)")
+            AppLogger.error("Error clearing expired cache", error: error, category: AppLogger.app)
         }
     }
     
@@ -134,11 +135,11 @@ public class CacheManager {
                                        .replacingOccurrences(of: ":", with: "_")
                 if filename.contains(urlPattern) {
                     try? fileManager.removeItem(at: fileURL)
-                    print("🗑️ CacheManager: Invalidated cache for: \(filename)")
+                    AppLogger.app.debug("Invalidated cache for: \(filename, privacy: .public)")
                 }
             }
         } catch {
-            print("❌ CacheManager: Error invalidating cache: \(error)")
+            AppLogger.error("Error invalidating cache", error: error, category: AppLogger.app)
         }
     }
     
