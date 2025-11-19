@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 /// View for inputting metadata before uploading media files
 struct MediaMetadataInputView: View {
@@ -19,34 +20,40 @@ struct MediaMetadataInputView: View {
         // Expand files to include floorplans for USDZ files
         var expandedFiles: [URL] = []
         for file in files {
-            print("📄 Processing file: \(file.lastPathComponent), extension: \(file.pathExtension)")
+            #if DEBUG
+            AppLogger.media.debug("Processing file: \(file.lastPathComponent, privacy: .public), extension: \(file.pathExtension, privacy: .public)")
+            #endif
             
             // Verify file exists
             let fileExists = FileManager.default.fileExists(atPath: file.path)
-            print("📄 File exists: \(fileExists) at \(file.path)")
+            #if DEBUG
+            AppLogger.media.debug("File exists: \(fileExists, privacy: .public) at \(file.path, privacy: .public)")
+            #endif
             
             if fileExists {
                 expandedFiles.append(file)
                 
                 // If this is a USDZ file, check for associated floorplan
                 if file.pathExtension.lowercased() == "usdz" {
-                    print("📄 Detected USDZ file, looking for floorplan...")
+                    AppLogger.media.debug("Detected USDZ file, looking for floorplan...")
                     if let floorplanURL = Self.findFloorplanForUSDZ(file) {
                         let floorplanExists = FileManager.default.fileExists(atPath: floorplanURL.path)
-                        print("📎 Found floorplan: \(floorplanURL.lastPathComponent), exists: \(floorplanExists)")
+                        #if DEBUG
+                        AppLogger.media.debug("Found floorplan: \(floorplanURL.lastPathComponent, privacy: .public), exists: \(floorplanExists, privacy: .public)")
+                        #endif
                         if floorplanExists {
                             expandedFiles.append(floorplanURL)
                         }
                     } else {
-                        print("📎 No floorplan found for USDZ")
+                        AppLogger.media.debug("No floorplan found for USDZ")
                     }
                 }
             } else {
-                print("❌ File does not exist, skipping: \(file.path)")
+                AppLogger.media.error("File does not exist, skipping: \(file.path, privacy: .public)")
             }
         }
         
-        print("📄 Total files after expansion: \(expandedFiles.count)")
+        AppLogger.media.info("Total files after expansion: \(expandedFiles.count, privacy: .public)")
         self.files = expandedFiles
         
         // Initialize metadata for all files

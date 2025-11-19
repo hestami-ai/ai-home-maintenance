@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SceneKit
+import OSLog
 
 struct Panorama360View: View {
     let imageURL: URL
@@ -78,16 +79,16 @@ struct Panorama360View: View {
     }
     
     private func loadImage() {
-        print("🌐 Panorama360View: Loading image from URL: \(imageURL.absoluteString)")
+        AppLogger.media.info("Loading 360° image from URL: \(imageURL.absoluteString, privacy: .public)")
         
         URLSession.shared.dataTask(with: imageURL) { data, response, error in
             DispatchQueue.main.async {
                 if let data = data, let loadedImage = UIImage(data: data) {
-                    print("✅ Panorama360View: Successfully loaded image - Size: \(loadedImage.size)")
+                    AppLogger.media.info("Successfully loaded 360° image - Size: \(loadedImage.size.width, privacy: .public)x\(loadedImage.size.height, privacy: .public)")
                     self.image = loadedImage
                     self.isLoading = false
                 } else {
-                    print("❌ Panorama360View: Failed to load image - Error: \(error?.localizedDescription ?? "Unknown")")
+                    AppLogger.media.error("Failed to load 360° image - Error: \(error?.localizedDescription ?? "Unknown", privacy: .public)")
                     self.loadError = true
                     self.isLoading = false
                 }

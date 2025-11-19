@@ -1,6 +1,7 @@
 import Foundation
 import RoomPlan
 import UIKit
+import OSLog
 
 class RoomScanStorageService {
     static let shared = RoomScanStorageService()
@@ -10,10 +11,10 @@ class RoomScanStorageService {
     private let scansDirectoryName = "RoomScans"
     
     private init() {
-        print("📁 RoomScanStorage: Initializing")
-        print("   Documents directory: \(documentsDirectory.path)")
-        print("   Scans directory: \(scansDirectory.path)")
-        print("   Metadata file: \(metadataFileURL.path)")
+        AppLogger.storage.debug("RoomScanStorage: Initializing")
+        AppLogger.storage.debug("Documents directory: \(self.documentsDirectory.path, privacy: .public)")
+        AppLogger.storage.debug("Scans directory: \(self.scansDirectory.path, privacy: .public)")
+        AppLogger.storage.debug("Metadata file: \(self.metadataFileURL.path, privacy: .public)")
         createScansDirectoryIfNeeded()
     }
     
@@ -35,9 +36,9 @@ class RoomScanStorageService {
         if !fileManager.fileExists(atPath: scansDirectory.path) {
             do {
                 try fileManager.createDirectory(at: scansDirectory, withIntermediateDirectories: true)
-                print("📁 RoomScanStorage: Created scans directory at \(scansDirectory.path)")
+                AppLogger.storage.info("Created scans directory at \(self.scansDirectory.path, privacy: .public)")
             } catch {
-                print("❌ RoomScanStorage: Failed to create scans directory: \(error)")
+                AppLogger.error("Failed to create scans directory", error: error, category: AppLogger.storage)
             }
         }
     }
@@ -46,7 +47,7 @@ class RoomScanStorageService {
     
     private func loadMetadata() -> RoomScanMetadata {
         guard fileManager.fileExists(atPath: metadataFileURL.path) else {
-            print("📋 RoomScanStorage: No metadata file exists, returning empty")
+            AppLogger.storage.debug("No metadata file exists, returning empty")
             return RoomScanMetadata()
         }
         
@@ -55,19 +56,19 @@ class RoomScanStorageService {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
             let metadata = try decoder.decode(RoomScanMetadata.self, from: data)
-            print("📋 RoomScanStorage: Loaded metadata with \(metadata.scans.count) scans")
+            AppLogger.storage.debug("Loaded metadata with \(metadata.scans.count, privacy: .public) scans")
             return metadata
         } catch {
-            print("❌ RoomScanStorage: Failed to load metadata: \(error)")
-            print("⚠️ RoomScanStorage: Attempting to delete corrupted metadata file")
+            AppLogger.error("Failed to load metadata", error: error, category: AppLogger.storage)
+            AppLogger.storage.warning("Attempting to delete corrupted metadata file")
             try? fileManager.removeItem(at: metadataFileURL)
             return RoomScanMetadata()
         }
     }
     
     private func saveMetadata(_ metadata: RoomScanMetadata) throws {
-        print("💾 RoomScanStorage: Attempting to save metadata with \(metadata.scans.count) scans")
-        print("   Metadata file path: \(metadataFileURL.path)")
+        AppLogger.storage.debug("Attempting to save metadata with \(metadata.scans.count, privacy: .public) scans")
+        AppLogger.storage.debug("Metadata file path: \(self.metadataFileURL.path, privacy: .public)")
         
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -75,25 +76,25 @@ class RoomScanStorageService {
         
         do {
             let data = try encoder.encode(metadata)
-            print("   Encoded \(data.count) bytes of JSON")
+            AppLogger.storage.debug("Encoded \(data.count, privacy: .public) bytes of JSON")
             try data.write(to: metadataFileURL, options: .atomic)
-            print("✅ RoomScanStorage: Saved metadata with \(metadata.scans.count) scans")
+            AppLogger.storage.info("Saved metadata with \(metadata.scans.count, privacy: .public) scans")
             
             // Verify it was written
             if fileManager.fileExists(atPath: metadataFileURL.path) {
                 let verifyData = try Data(contentsOf: metadataFileURL)
-                print("✅ RoomScanStorage: Verified metadata file exists (\(verifyData.count) bytes)")
+                AppLogger.storage.debug("Verified metadata file exists (\(verifyData.count, privacy: .public) bytes)")
                 
                 // Verify we can decode it back
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 let verifyMetadata = try decoder.decode(RoomScanMetadata.self, from: verifyData)
-                print("✅ RoomScanStorage: Verified metadata is valid with \(verifyMetadata.scans.count) scans")
+                AppLogger.storage.debug("Verified metadata is valid with \(verifyMetadata.scans.count, privacy: .public) scans")
             } else {
-                print("❌ RoomScanStorage: Metadata file does not exist after write!")
+                AppLogger.storage.error("Metadata file does not exist after write!")
             }
         } catch {
-            print("❌ RoomScanStorage: Failed to save metadata: \(error)")
+            AppLogger.error("Failed to save metadata", error: error, category: AppLogger.storage)
             throw error
         }
     }
@@ -109,18 +110,18 @@ class RoomScanStorageService {
         let fileName = "\(scanId).usdz"
         let fileURL = scansDirectory.appendingPathComponent(fileName)
         
-        print("💾 RoomScanStorage: Starting export to \(fileURL.path)")
-        print("   Scans directory: \(scansDirectory.path)")
-        print("   Directory exists: \(fileManager.fileExists(atPath: scansDirectory.path))")
+        AppLogger.roomScan.debug("Starting export to \(fileURL.path, privacy: .public)")
+        AppLogger.roomScan.debug("Scans directory: \(self.scansDirectory.path, privacy: .public)")
+        AppLogger.roomScan.debug("Directory exists: \(self.fileManager.fileExists(atPath: self.scansDirectory.path), privacy: .public)")
         
         // Export the USDZ file on main thread (RoomPlan requires this)
         let exportResult = await MainActor.run {
             do {
                 try capturedRoom.export(to: fileURL)
-                print("✅ RoomScanStorage: Export completed on main thread")
+                AppLogger.roomScan.info("Export completed on main thread")
                 return Result<Void, Error>.success(())
             } catch {
-                print("❌ RoomScanStorage: Export failed: \(error)")
+                AppLogger.error("Export failed", error: error, category: AppLogger.roomScan)
                 return Result<Void, Error>.failure(error)
             }
         }
@@ -140,14 +141,14 @@ class RoomScanStorageService {
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "USDZ file was not created at expected path"]
             )
-            print("❌ RoomScanStorage: File verification failed - file does not exist")
+            AppLogger.roomScan.error("File verification failed - file does not exist")
             throw error
         }
         
         // Get file size
         let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
         let fileSize = attributes[.size] as? Int64 ?? 0
-        print("✅ RoomScanStorage: File verified - size: \(fileSize) bytes")
+        AppLogger.roomScan.debug("File verified - size: \(fileSize, privacy: .public) bytes")
         
         // Generate thumbnail
         let thumbnailURL = try? await generateThumbnail(for: capturedRoom, scanId: scanId)
@@ -176,14 +177,14 @@ class RoomScanStorageService {
         metadata.scans.append(roomScan)
         try saveMetadata(metadata)
         
-        print("✅ RoomScanStorage: Saved room scan '\(name)' with ID \(scanId)")
+        AppLogger.roomScan.info("Saved room scan '\(name, privacy: .public)' with ID \(scanId, privacy: .public)")
         return roomScan
     }
     
     // MARK: - CapturedRoom Data Storage
     
     private func saveCapturedRoomData(_ capturedRoom: CapturedRoom, scanId: String) async throws -> URL {
-        print("💾 RoomScanStorage: Saving CapturedRoom data...")
+        AppLogger.roomScan.debug("Saving CapturedRoom data...")
         
         let capturedRoomFileName = "\(scanId)_room_data.json"
         let capturedRoomURL = scansDirectory.appendingPathComponent(capturedRoomFileName)
@@ -195,7 +196,7 @@ class RoomScanStorageService {
         let data = try encoder.encode(capturedRoom)
         try data.write(to: capturedRoomURL, options: .atomic)
         
-        print("✅ RoomScanStorage: Saved CapturedRoom data at \(capturedRoomURL.path)")
+        AppLogger.roomScan.debug("Saved CapturedRoom data at \(capturedRoomURL.path, privacy: .public)")
         return capturedRoomURL
     }
     
@@ -217,7 +218,7 @@ class RoomScanStorageService {
     // MARK: - Floorplan Generation
     
     private func generateFloorplan(for capturedRoom: CapturedRoom, scanId: String) async throws -> URL {
-        print("🏗️ RoomScanStorage: Generating floorplan...")
+        AppLogger.roomScan.debug("Generating floorplan...")
         
         // Move floorplan generation to background thread to avoid blocking UI
         return try await withCheckedThrowingContinuation { continuation in
@@ -229,7 +230,7 @@ class RoomScanStorageService {
                 
                 do {
                     let floorplanURL = try FloorplanGeneratorService.shared.saveFloorplan(floorplanImage, for: scanId)
-                    print("✅ RoomScanStorage: Floorplan generated at \(floorplanURL.path)")
+                    AppLogger.roomScan.info("Floorplan generated at \(floorplanURL.path, privacy: .public)")
                     continuation.resume(returning: floorplanURL)
                 } catch {
                     continuation.resume(throwing: error)
@@ -276,7 +277,7 @@ class RoomScanStorageService {
                 if let data = image.pngData() {
                     do {
                         try data.write(to: thumbnailURL)
-                        print("🖼️ RoomScanStorage: Generated thumbnail at \(thumbnailURL.path)")
+                        AppLogger.roomScan.debug("Generated thumbnail at \(thumbnailURL.path, privacy: .public)")
                         continuation.resume(returning: thumbnailURL)
                     } catch {
                         continuation.resume(throwing: error)
@@ -291,42 +292,46 @@ class RoomScanStorageService {
     // MARK: - Retrieve Room Scans
     
     func getAllScans() -> [RoomScan] {
-        print("🔍 RoomScanStorage: getAllScans() called")
+        AppLogger.storage.debug("getAllScans() called")
         
         // List actual files in directory
         do {
             let files = try fileManager.contentsOfDirectory(at: scansDirectory, includingPropertiesForKeys: [.fileSizeKey])
-            print("📁 RoomScanStorage: Found \(files.count) files in scans directory:")
+            AppLogger.storage.debug("Found \(files.count, privacy: .public) files in scans directory")
+            #if DEBUG
             for file in files {
                 let attrs = try? fileManager.attributesOfItem(atPath: file.path)
                 let size = attrs?[.size] as? Int64 ?? 0
-                print("   - \(file.lastPathComponent) (\(size) bytes)")
+                AppLogger.storage.debug("  - \(file.lastPathComponent, privacy: .public) (\(size, privacy: .public) bytes)")
             }
+            #endif
         } catch {
-            print("❌ RoomScanStorage: Failed to list directory: \(error)")
+            AppLogger.error("Failed to list directory", error: error, category: AppLogger.storage)
         }
         
         let metadata = loadMetadata()
-        print("🔍 RoomScanStorage: Checking \(metadata.scans.count) scans for file existence")
+        AppLogger.storage.debug("Checking \(metadata.scans.count, privacy: .public) scans for file existence")
         
         // Filter out scans where the file doesn't exist (orphaned metadata)
         let validScans = metadata.scans.filter { scan in
             let exists = fileManager.fileExists(atPath: scan.fileURL.path)
-            print("   Scan '\(scan.name)': file exists = \(exists) at \(scan.fileURL.path)")
+            #if DEBUG
+            AppLogger.storage.debug("Scan '\(scan.name, privacy: .public)': file exists = \(exists, privacy: .public)")
+            #endif
             if !exists {
-                print("⚠️ RoomScanStorage: Found orphaned scan '\(scan.name)' - file missing")
+                AppLogger.storage.warning("Found orphaned scan '\(scan.name, privacy: .public)' - file missing")
             }
             return exists
         }
         
-        print("🔍 RoomScanStorage: Found \(validScans.count) valid scans out of \(metadata.scans.count)")
+        AppLogger.storage.debug("Found \(validScans.count, privacy: .public) valid scans out of \(metadata.scans.count, privacy: .public)")
         
         // Update metadata if we found orphaned entries
         if validScans.count != metadata.scans.count {
             var updatedMetadata = metadata
             updatedMetadata.scans = validScans
             try? saveMetadata(updatedMetadata)
-            print("🧹 RoomScanStorage: Cleaned up \(metadata.scans.count - validScans.count) orphaned metadata entries")
+            AppLogger.storage.info("Cleaned up \(metadata.scans.count - validScans.count, privacy: .public) orphaned metadata entries")
         }
         
         return validScans.sorted { $0.createdAt > $1.createdAt }
@@ -351,16 +356,16 @@ class RoomScanStorageService {
                 }
                 
                 // This is an orphaned file - delete it
-                print("🗑️ RoomScanStorage: Deleting orphaned file: \(fileURL.lastPathComponent)")
+                AppLogger.storage.info("Deleting orphaned file: \(fileURL.lastPathComponent, privacy: .public)")
                 try? fileManager.removeItem(at: fileURL)
                 deletedCount += 1
             }
             
             if deletedCount > 0 {
-                print("🧹 RoomScanStorage: Cleaned up \(deletedCount) orphaned file(s)")
+                AppLogger.storage.info("Cleaned up \(deletedCount, privacy: .public) orphaned file(s)")
             }
         } catch {
-            print("⚠️ RoomScanStorage: Failed to cleanup orphaned files: \(error)")
+            AppLogger.error("Failed to cleanup orphaned files", error: error, category: AppLogger.storage)
         }
     }
     
@@ -387,7 +392,7 @@ class RoomScanStorageService {
         
         metadata.scans[index] = updatedScan
         try saveMetadata(metadata)
-        print("✅ RoomScanStorage: Updated scan \(updatedScan.id)")
+        AppLogger.storage.info("Updated scan \(updatedScan.id, privacy: .public)")
     }
     
     // MARK: - Delete Room Scan
@@ -402,20 +407,20 @@ class RoomScanStorageService {
         // Delete USDZ file
         if fileManager.fileExists(atPath: scan.fileURL.path) {
             try fileManager.removeItem(at: scan.fileURL)
-            print("🗑️ RoomScanStorage: Deleted USDZ file at \(scan.fileURL.path)")
+            AppLogger.storage.info("Deleted USDZ file at \(scan.fileURL.path, privacy: .public)")
         }
         
         // Delete thumbnail if exists
         if let thumbnailURL = scan.thumbnailURL, fileManager.fileExists(atPath: thumbnailURL.path) {
             try fileManager.removeItem(at: thumbnailURL)
-            print("🗑️ RoomScanStorage: Deleted thumbnail at \(thumbnailURL.path)")
+            AppLogger.storage.info("Deleted thumbnail at \(thumbnailURL.path, privacy: .public)")
         }
         
         // Remove from metadata
         metadata.scans.removeAll { $0.id == id }
         try saveMetadata(metadata)
         
-        print("✅ RoomScanStorage: Deleted scan \(id)")
+        AppLogger.storage.info("Deleted scan \(id, privacy: .public)")
     }
     
     // MARK: - Storage Info
@@ -433,7 +438,7 @@ class RoomScanStorageService {
                 }
             }
         } catch {
-            print("❌ RoomScanStorage: Failed to calculate storage size: \(error)")
+            AppLogger.error("Failed to calculate storage size", error: error, category: AppLogger.storage)
         }
         
         return totalSize

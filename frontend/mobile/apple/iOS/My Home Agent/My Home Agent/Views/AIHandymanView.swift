@@ -53,8 +53,10 @@ struct AIHandymanView: View {
         } message: {
             Text("Are you sure you want to delete this conversation? This action cannot be undone.")
         }
-        .task {
-            await viewModel.loadConversations()
+        .onAppear {
+            Task {
+                await viewModel.loadConversations()
+            }
         }
     }
     

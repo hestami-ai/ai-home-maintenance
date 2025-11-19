@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import OSLog
 
 class DashboardViewModel: ObservableObject {
     // Published properties for UI
@@ -28,7 +29,7 @@ class DashboardViewModel: ObservableObject {
                     }
                 } else {
                     // Session is invalid, try to login with stored credentials
-                    print("❌ DashboardViewModel: Session validation failed, attempting to login with stored credentials")
+                    AppLogger.auth.warning("Session validation failed, attempting to login with stored credentials")
                     do {
                         if let email = AuthManager.shared.storedEmail, let password = AuthManager.shared.storedPassword {
                             _ = try await AuthManager.shared.login(email: email, password: password, rememberMe: AuthManager.shared.isRememberMeEnabled)
@@ -45,7 +46,7 @@ class DashboardViewModel: ObservableObject {
                         }
                     } catch {
                         // Login failed, post logout notification
-                        print("❌ DashboardViewModel: Login with stored credentials failed: \(error.localizedDescription)")
+                        AppLogger.error("Login with stored credentials failed", error: error, category: AppLogger.auth)
                         await MainActor.run {
                             NotificationCenter.default.post(name: NSNotification.Name("LogoutRequired"), object: nil)
                         }
@@ -63,7 +64,7 @@ class DashboardViewModel: ObservableObject {
     // Optional background fetch of user profile - won't block main functionality
     func loadCurrentUserInBackground() {
         guard AuthManager.shared.isAuthenticated else {
-            print("⚠️ DashboardViewModel: Not authenticated, skipping user profile fetch")
+            AppLogger.app.debug("Not authenticated, skipping user profile fetch")
             return
         }
         
@@ -78,27 +79,27 @@ class DashboardViewModel: ObservableObject {
                 
                 await MainActor.run {
                     self.currentUser = user
-                    print("✅ DashboardViewModel: User profile loaded successfully")
+                    AppLogger.app.info("User profile loaded successfully")
                 }
             } catch let networkError as NetworkError {
                 await MainActor.run {
                     // Handle specific network errors but don't disrupt app flow
                     switch networkError {
                     case .timeoutError:
-                        print("ℹ️ DashboardViewModel: Connection timed out while loading user profile")
+                        AppLogger.network.debug("Connection timed out while loading user profile")
                     case .connectionError:
-                        print("ℹ️ DashboardViewModel: Connection error while loading user profile")
+                        AppLogger.network.debug("Connection error while loading user profile")
                     case .unauthorized:
-                        print("ℹ️ DashboardViewModel: Unauthorized access while loading user profile")
+                        AppLogger.auth.warning("Unauthorized access while loading user profile")
                         // Only post logout notification if this is an actual auth issue
                         NotificationCenter.default.post(name: Notification.Name("LogoutRequired"), object: nil)
                     default:
-                        print("ℹ️ DashboardViewModel: Could not load user profile: \(networkError.localizedDescription)")
+                        AppLogger.app.debug("Could not load user profile: \(networkError.localizedDescription, privacy: .public)")
                     }
                 }
             } catch {
                 // Just log the error but don't disrupt the app flow
-                print("ℹ️ DashboardViewModel: Could not load user profile: \(error.localizedDescription)")
+                AppLogger.app.debug("Could not load user profile: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -155,14 +156,14 @@ class DashboardViewModel: ObservableObject {
                     }
                     
                     self.showError = true
-                    print("❌ DashboardViewModel: Error fetching properties: \(networkError)")
+                    AppLogger.error("Error fetching properties", error: networkError, category: AppLogger.app)
                 }
             } catch {
                 await MainActor.run {
                     self.isLoadingProperties = false
                     self.errorMessage = "Failed to load properties: \(error.localizedDescription)"
                     self.showError = true
-                    print("❌ DashboardViewModel: Error fetching properties: \(error)")
+                    AppLogger.error("Error fetching properties", error: error, category: AppLogger.app)
                 }
             }
         }

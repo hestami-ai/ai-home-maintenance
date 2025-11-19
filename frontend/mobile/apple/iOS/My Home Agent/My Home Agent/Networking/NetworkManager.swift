@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 public enum HTTPMethod: String {
     case get = "GET"
@@ -107,12 +108,18 @@ public enum NetworkError: Error, Equatable, LocalizedError {
 public class NetworkManager {
     public static let shared = NetworkManager()
     
-    // API server configuration
-    public let baseURL = "https://dev-homeservices.hestami-ai.com"
+    // API server configuration - now uses AppConfiguration
+    public var baseURL: String {
+        return AppConfiguration.apiBaseURL
+    }
     
     // Static media server configuration
-    private var staticMediaHost = "dev-static.hestami-ai.com" // Default value, should be configured at app startup
-    private var staticMediaPort = "443" // Default value, should be configured at app startup
+    private var staticMediaHost: String {
+        return AppConfiguration.staticMediaHost
+    }
+    private var staticMediaPort: String {
+        return AppConfiguration.staticMediaPort
+    }
     private let localhostMediaPattern = "http://localhost:8090/media-secure"
     
     private let session: URLSession
@@ -125,19 +132,20 @@ public class NetworkManager {
     // CSRF token storage
     private var csrfToken: String?
     
-    // Configuration options
-    var shouldUseCache = true  // Enable smart caching
-    var shouldCacheResponses = true
+    // Configuration options - now uses AppConfiguration
+    var shouldUseCache: Bool {
+        return AppConfiguration.enableCaching
+    }
+    var shouldCacheResponses: Bool {
+        return AppConfiguration.enableCaching
+    }
     
     // Media server configuration methods
+    // NOTE: Configuration is now managed by AppConfiguration based on build environment
+    // This method is deprecated but kept for backward compatibility
+    @available(*, deprecated, message: "Use AppConfiguration instead")
     public func configureStaticMediaServer(host: String, port: String) {
-        print("🌐 NetworkManager: Configuring static media server: \(host):\(port)")
-        if !host.isEmpty {
-            self.staticMediaHost = host
-        }
-        if !port.isEmpty {
-            self.staticMediaPort = port
-        }
+        AppLogger.notice("Deprecated configureStaticMediaServer called - using AppConfiguration instead", category: AppLogger.network)
     }
     
     // Public method to rewrite any media URL string
@@ -157,7 +165,7 @@ public class NetworkManager {
             with: replacementPattern
         )
         
-        print("🌐 NetworkManager: Rewrote URL:\n  From: \(urlString)\n  To: \(rewrittenURL)")
+        AppLogger.network.debug("Rewrote URL: \(urlString, privacy: .public) -> \(rewrittenURL, privacy: .public)")
         return rewrittenURL
     }
     
@@ -254,15 +262,15 @@ public class NetworkManager {
         // Clear our manual cookie storage
         self.cookieStorage.removeAll()
         self.csrfToken = nil
-        print("🍪 NetworkManager: Cleared manual cookie storage and CSRF token")
+        AppLogger.network.debug("Cleared manual cookie storage and CSRF token")
     }
     
     // Check if we have a session cookie
     public func hasSessionCookie() -> Bool {
         let hasSession = getSessionCookieValue() != nil
-        print("🍪 NetworkManager: hasSessionCookie = \(hasSession)")
-        if hasSession {
-            print("🍪 NetworkManager: Session cookie value: \(getSessionCookieValue() ?? "none")")
+        AppLogger.network.debug("hasSessionCookie = \(hasSession, privacy: .public)")
+        if hasSession, let cookieValue = getSessionCookieValue() {
+            AppLogger.debugSensitive("Session cookie value", sensitiveData: cookieValue, category: AppLogger.network)
         }
         return hasSession
     }
@@ -312,39 +320,40 @@ public class NetworkManager {
     public func addCSRFToken(to request: inout URLRequest) {
         if let token = getCSRFToken() {
             request.setValue(token, forHTTPHeaderField: "X-CSRFToken")
-            print("🔐 NetworkManager: Added CSRF token to request")
+            AppLogger.network.debug("Added CSRF token to request")
         } else {
-            print("⚠️ NetworkManager: No CSRF token available")
+            AppLogger.network.warning("No CSRF token available")
         }
     }
     
     // Debug function to print all cookies in storage
     public func debugCookies() {
-        print("🍪 NetworkManager: === COOKIE DEBUG ===")
+        #if DEBUG
+        AppLogger.network.debug("=== COOKIE DEBUG ===")
         
         // Print system cookies
-        if let url = URL(string: baseURL) {
+        if let url = URL(string: self.baseURL) {
             let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
-            print("🍪 NetworkManager: Found \(cookies.count) cookies in system storage for \(baseURL):")
+            AppLogger.network.debug("Found \(cookies.count, privacy: .public) cookies in system storage for \(self.baseURL, privacy: .public)")
             
             for cookie in cookies {
-                print("🍪 - \(cookie.name): \(cookie.value)")
-                print("    Domain: \(cookie.domain), Path: \(cookie.path)")
-                print("    Expires: \(cookie.expiresDate?.description ?? "N/A")")
-                print("    Secure: \(cookie.isSecure), HTTPOnly: \(cookie.isHTTPOnly)")
-                // Note: SameSite policy isn't directly accessible in HTTPCookie
+                AppLogger.debugSensitive("Cookie \(cookie.name)", sensitiveData: cookie.value, category: AppLogger.network)
+                AppLogger.network.debug("  Domain: \(cookie.domain, privacy: .public), Path: \(cookie.path, privacy: .public)")
+                AppLogger.network.debug("  Expires: \(cookie.expiresDate?.description ?? "N/A", privacy: .public)")
+                AppLogger.network.debug("  Secure: \(cookie.isSecure, privacy: .public), HTTPOnly: \(cookie.isHTTPOnly, privacy: .public)")
             }
         } else {
-            print("🍪 NetworkManager: Invalid URL for cookie debugging")
+            AppLogger.network.warning("Invalid URL for cookie debugging")
         }
         
         // Print manually stored cookies
-        print("🍪 NetworkManager: Found \(cookieStorage.count) cookies in manual storage:")
-        for (name, value) in cookieStorage {
-            print("🍪 - \(name): \(value) (manually stored)")
+        AppLogger.network.debug("Found \(self.cookieStorage.count, privacy: .public) cookies in manual storage")
+        for (name, value) in self.cookieStorage {
+            AppLogger.debugSensitive("Cookie \(name) (manual)", sensitiveData: value, category: AppLogger.network)
         }
         
-        print("🍪 NetworkManager: === END COOKIE DEBUG ===")
+        AppLogger.network.debug("=== END COOKIE DEBUG ===")
+        #endif
     }
     
     public func request<T: Decodable>(
@@ -355,7 +364,7 @@ public class NetworkManager {
         useCache: Bool? = nil,
         cacheResponse: Bool? = nil
     ) async throws -> T {
-        print("🌐 NetworkManager: Request to \(baseURL)\(endpoint) with method \(method.rawValue)")
+        AppLogger.logRequest(method: method.rawValue, endpoint: endpoint, parameters: parameters)
         
         // Construct URL
         guard let url = URL(string: baseURL + endpoint) else {
@@ -377,19 +386,26 @@ public class NetworkManager {
             // Format cookies as name=value; name2=value2
             let cookieString = self.cookieStorage.map { key, value in "\(key)=\(value)" }.joined(separator: "; ")
             request.addValue(cookieString, forHTTPHeaderField: "Cookie")
-            print("🍪 NetworkManager: Adding cookie header: \(cookieString)")
+            AppLogger.debugSensitive("Adding cookie header", sensitiveData: cookieString, category: AppLogger.network)
         }
         
         // Debug cookies before request
         debugCookies()
-        print("🔎 NetworkManager: Request headers for \(endpoint):")
+        #if DEBUG
+        AppLogger.network.debug("Request headers for \(endpoint, privacy: .public):")
         if let allHeaders = request.allHTTPHeaderFields, !allHeaders.isEmpty {
             for (key, value) in allHeaders {
-                print("🔎 - \(key): \(value)")
+                let isSensitive = key.lowercased().contains("cookie") || key.lowercased().contains("auth") || key.lowercased().contains("token")
+                if isSensitive {
+                    AppLogger.debugSensitive("Header \(key)", sensitiveData: value, category: AppLogger.network)
+                } else {
+                    AppLogger.network.debug("  \(key, privacy: .public): \(value, privacy: .public)")
+                }
             }
         } else {
-            print("🔎 NetworkManager: No headers found for request")
+            AppLogger.network.debug("No headers found for request")
         }
+        #endif
         
         // Add parameters
         if let parameters = parameters {
@@ -424,11 +440,11 @@ public class NetworkManager {
             if let cachedData = cacheManager.getCachedData(for: cacheKey) {
                 do {
                     let cachedResponse = try jsonDecoder.decode(T.self, from: cachedData)
-                    print("✅ NetworkManager: Using cached response for \(endpoint)")
+                    AppLogger.network.debug("Using cached response for \(endpoint, privacy: .public)")
                     return cachedResponse
                 } catch {
                     // If decoding fails, continue with network request
-                    print("⚠️ NetworkManager: Failed to decode cached response: \(error)")
+                    AppLogger.network.warning("Failed to decode cached response: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
@@ -438,49 +454,51 @@ public class NetworkManager {
         var urlResponse: URLResponse!
         
         do {
-            print("🌐 NetworkManager: Executing request to \(request.url?.absoluteString ?? "unknown")")
+            AppLogger.network.debug("Executing request to \(request.url?.absoluteString ?? "unknown", privacy: .public)")
             // Make the request
             let (data, response) = try await session.data(for: request)
             responseData = data
             urlResponse = response
         } catch let urlError as URLError {
             // Handle specific URLError cases
-            print("❌ NetworkManager: URLError occurred: \(urlError.localizedDescription), code: \(urlError.code.rawValue)")
+            AppLogger.network.error("URLError occurred: \(urlError.localizedDescription, privacy: .public), code: \(urlError.code.rawValue, privacy: .public)")
             
             switch urlError.code {
             case .timedOut:
-                print("❌ NetworkManager: Request timed out")
+                AppLogger.network.error("Request timed out")
                 throw NetworkError.timeoutError
             case .notConnectedToInternet:
-                print("❌ NetworkManager: Not connected to internet")
+                AppLogger.network.error("Not connected to internet")
                 throw NetworkError.connectionError
             case .cannotConnectToHost:
-                print("❌ NetworkManager: Cannot connect to host")
+                AppLogger.network.error("Cannot connect to host")
                 throw NetworkError.connectionError
             default:
-                print("❌ NetworkManager: Other URL error: \(urlError)")
+                AppLogger.network.error("Other URL error: \(urlError.localizedDescription, privacy: .public)")
                 throw NetworkError.unknownError(urlError)
             }
         } catch {
-            print("❌ NetworkManager: Unexpected error: \(error)")
+            AppLogger.network.error("Unexpected error: \(error.localizedDescription, privacy: .public)")
             throw NetworkError.unknownError(error)
         }
         
         // Check for HTTP response
         guard let httpResponse = urlResponse as? HTTPURLResponse else {
-            print("❌ NetworkManager: Invalid response type received")
+            AppLogger.network.error("Invalid response type received")
             throw NetworkError.invalidResponse
         }
         
         // Debug: Print all response headers
-        print("🔍 NetworkManager: Response headers from \(httpResponse.url?.absoluteString ?? "unknown"):")
+        #if DEBUG
+        AppLogger.network.debug("Response headers from \(httpResponse.url?.absoluteString ?? "unknown", privacy: .public):")
         if let allHeaders = httpResponse.allHeaderFields as? [String: Any], !allHeaders.isEmpty {
             for (key, value) in allHeaders {
-                print("🔍 - \(key): \(value)")
+                AppLogger.network.debug("  \(key, privacy: .public): \(String(describing: value), privacy: .public)")
             }
         } else {
-            print("🔍 NetworkManager: No response headers found")
+            AppLogger.network.debug("No response headers found")
         }
+        #endif
         
         // Process cookies from response manually
         if let headerFields = httpResponse.allHeaderFields as? [String: String] {
@@ -488,10 +506,10 @@ public class NetworkManager {
             let setCookieHeaders = headerFields.filter { $0.key.lowercased() == "set-cookie" }
             
             if !setCookieHeaders.isEmpty {
-                print("🍪 NetworkManager: Received \(setCookieHeaders.count) Set-Cookie headers")
+                AppLogger.network.debug("Received \(setCookieHeaders.count, privacy: .public) Set-Cookie headers")
                 
                 for (_, cookieHeader) in setCookieHeaders {
-                    print("🍪 NetworkManager: Processing cookie header: \(cookieHeader)")
+                    AppLogger.debugSensitive("Processing cookie header", sensitiveData: cookieHeader, category: AppLogger.network)
                     
                     // Parse the cookie string
                     let parts = cookieHeader.split(separator: ";").map { String($0).trimmingCharacters(in: .whitespaces) }
@@ -505,17 +523,17 @@ public class NetworkManager {
                             
                             // Store in our manual cookie storage
                             self.cookieStorage[name] = value
-                            print("🍪 NetworkManager: Stored cookie: \(name)=\(value)")
+                            AppLogger.debugSensitive("Stored cookie \(name)", sensitiveData: value, category: AppLogger.network)
                             
                             // Cache CSRF token separately for easy access
                             if name == "csrftoken" {
                                 self.csrfToken = value
-                                print("🔐 NetworkManager: Cached CSRF token")
+                                AppLogger.network.debug("Cached CSRF token")
                             }
                             
                             // Check if this is an HttpOnly cookie (look for HttpOnly flag)
                             let isHttpOnly = parts.contains { $0.lowercased() == "httponly" }
-                            print("🍪 NetworkManager: Cookie \(name) is\(isHttpOnly ? "" : " not") HttpOnly")
+                            AppLogger.network.debug("Cookie \(name, privacy: .public) is\(isHttpOnly ? "" : " not", privacy: .public) HttpOnly")
                         }
                     }
                 }
@@ -525,10 +543,12 @@ public class NetworkManager {
         // Debug cookies after response
         debugCookies()
         
-        print("🌐 NetworkManager: Received response with status code: \(httpResponse.statusCode)")
+        AppLogger.logResponse(statusCode: httpResponse.statusCode, endpoint: endpoint)
+        #if DEBUG
         if let responseString = String(data: responseData, encoding: .utf8) {
-            print("🌐 NetworkManager: Response data: \(responseString)")
+            AppLogger.network.debug("Response data: \(responseString, privacy: .public)")
         }
+        #endif
         
         // Handle HTTP status codes
         switch httpResponse.statusCode {
@@ -544,7 +564,7 @@ public class NetworkManager {
                 if method == .get && shouldCacheResponse {
                     let cacheKey = cacheManager.cacheKey(for: request)
                     cacheManager.cacheData(processedData, for: cacheKey, ttl: cachePolicy.ttl)
-                    print("💾 NetworkManager: Cached response for \(endpoint) with TTL: \(cachePolicy.ttl ?? 0)s")
+                    AppLogger.network.debug("Cached response for \(endpoint, privacy: .public) with TTL: \(cachePolicy.ttl ?? 0, privacy: .public)s")
                 }
                 
                 // Invalidate related caches on mutations (POST, PUT, PATCH, DELETE)
@@ -554,11 +574,13 @@ public class NetworkManager {
                 
                 return decodedResponse
             } catch {
-                print("❌ NetworkManager: Decoding error: \(error)")
-                print("❌ NetworkManager: Failed to decode type: \(T.self)")
+                AppLogger.network.error("Decoding error: \(error.localizedDescription, privacy: .public)")
+                AppLogger.network.error("Failed to decode type: \(String(describing: T.self), privacy: .public)")
+                #if DEBUG
                 if let responseString = String(data: responseData, encoding: .utf8) {
-                    print("❌ NetworkManager: Raw response data: \(responseString)")
+                    AppLogger.network.error("Raw response data: \(responseString, privacy: .public)")
                 }
+                #endif
                 throw NetworkError.decodingError(error)
             }
         case 401:
@@ -585,8 +607,12 @@ public class NetworkManager {
             
             // Check if this is a session expiration issue
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                print("❌ NetworkManager: Authentication error (\(httpResponse.statusCode)). Session may have expired.")
-                print("❌ NetworkManager: Current session cookie: \(getSessionCookieValue() ?? "none")")
+                AppLogger.network.error("Authentication error (\(httpResponse.statusCode, privacy: .public)). Session may have expired.")
+                if let sessionCookie = getSessionCookieValue() {
+                    AppLogger.debugSensitive("Current session cookie", sensitiveData: sessionCookie, category: AppLogger.network)
+                } else {
+                    AppLogger.network.error("No session cookie found")
+                }
             }
             
             throw NetworkError.serverError(errorMessage)
@@ -627,19 +653,19 @@ public class NetworkManager {
         // Properties endpoints
         if endpoint.contains("/api/properties") {
             cacheManager.invalidateCache(matching: "/api/properties")
-            print("🗑️ NetworkManager: Invalidated property caches")
+            AppLogger.storage.debug("Invalidated property caches")
         }
         
         // User profile endpoints
         if endpoint.contains("/api/users/profile") {
             cacheManager.invalidateCache(matching: "/api/users/profile")
-            print("🗑️ NetworkManager: Invalidated user profile cache")
+            AppLogger.storage.debug("Invalidated user profile cache")
         }
         
         // Service requests endpoints
         if endpoint.contains("/api/service-requests") {
             cacheManager.invalidateCache(matching: "/api/service-requests")
-            print("🗑️ NetworkManager: Invalidated service request caches")
+            AppLogger.storage.debug("Invalidated service request caches")
         }
         
         // Add more endpoint patterns as needed
@@ -653,6 +679,6 @@ public class NetworkManager {
     /// Public method to clear all caches
     public func clearAllCaches() {
         cacheManager.clearCache()
-        print("🗑️ NetworkManager: Cleared all caches")
+        AppLogger.storage.info("Cleared all caches")
     }
 }

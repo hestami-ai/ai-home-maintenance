@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 class ChatService {
     static let shared = ChatService()
@@ -10,7 +11,7 @@ class ChatService {
     
     /// Fetch all conversations for the current user
     func fetchConversations() async throws -> [Conversation] {
-        print("📱 ChatService: Fetching conversations")
+        AppLogger.app.info("Fetching conversations")
         
         do {
             // Try to get the full response structure first
@@ -20,41 +21,41 @@ class ChatService {
                 parameters: nil
             )
             
-            print("✅ ChatService: Fetched \(response.conversations.count) conversations")
+            AppLogger.app.info("Fetched \(response.conversations.count, privacy: .public) conversations")
             return response.conversations
         } catch {
             // Check if it's a cancellation error
             if let urlError = error as? URLError, urlError.code == .cancelled {
-                print("⚠️ ChatService: Conversation fetch cancelled")
+                AppLogger.app.debug("Conversation fetch cancelled")
                 throw error
             }
             if (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled {
-                print("⚠️ ChatService: Conversation fetch cancelled (NSError)")
+                AppLogger.app.debug("Conversation fetch cancelled (NSError)")
                 throw error
             }
             
             // Fallback: Try to decode as array directly
-            print("⚠️ ChatService: Failed to decode as ConversationsResponse, trying array")
+            AppLogger.app.debug("Failed to decode as ConversationsResponse, trying array")
             do {
                 let conversations: [Conversation] = try await networkManager.request(
                     endpoint: "/api/chat/convos",
                     method: .get,
                     parameters: nil
                 )
-                print("✅ ChatService: Fetched \(conversations.count) conversations (array format)")
+                AppLogger.app.info("Fetched \(conversations.count, privacy: .public) conversations (array format)")
                 return conversations
             } catch {
                 // Check cancellation again
                 if let urlError = error as? URLError, urlError.code == .cancelled {
-                    print("⚠️ ChatService: Conversation fetch cancelled (fallback)")
+                    AppLogger.app.debug("Conversation fetch cancelled (fallback)")
                     throw error
                 }
                 if (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled {
-                    print("⚠️ ChatService: Conversation fetch cancelled (fallback NSError)")
+                    AppLogger.app.debug("Conversation fetch cancelled (fallback NSError)")
                     throw error
                 }
                 
-                print("❌ ChatService: Failed to fetch conversations: \(error)")
+                AppLogger.error("Failed to fetch conversations", error: error, category: AppLogger.app)
                 throw error
             }
         }
@@ -64,7 +65,7 @@ class ChatService {
     
     /// Fetch messages for a specific conversation
     func fetchMessages(conversationId: String) async throws -> [LibreChatMessage] {
-        print("📱 ChatService: Fetching messages for conversation: \(conversationId)")
+        AppLogger.app.info("Fetching messages for conversation: \(conversationId, privacy: .public)")
         
         do {
             // Use query parameter format like the web UI
@@ -74,20 +75,20 @@ class ChatService {
                 parameters: nil
             )
             
-            print("✅ ChatService: Fetched \(messages.count) messages")
+            AppLogger.app.info("Fetched \(messages.count, privacy: .public) messages")
             return messages
         } catch {
             // Check if it's a cancellation error
             if let urlError = error as? URLError, urlError.code == .cancelled {
-                print("⚠️ ChatService: Message fetch cancelled")
+                AppLogger.app.debug("Message fetch cancelled")
                 throw error
             }
             if (error as NSError).domain == NSURLErrorDomain && (error as NSError).code == NSURLErrorCancelled {
-                print("⚠️ ChatService: Message fetch cancelled (NSError)")
+                AppLogger.app.debug("Message fetch cancelled (NSError)")
                 throw error
             }
             
-            print("❌ ChatService: Failed to fetch messages: \(error)")
+            AppLogger.error("Failed to fetch messages", error: error, category: AppLogger.app)
             throw error
         }
     }
@@ -99,9 +100,11 @@ class ChatService {
         text: String,
         conversationId: String? = nil
     ) async throws -> SendMessageResponse {
-        print("📱 ChatService: Sending message")
-        print("📱 ChatService: Text: \(text.prefix(50))...")
-        print("📱 ChatService: Conversation ID: \(conversationId ?? "new")")
+        AppLogger.app.info("Sending message")
+        #if DEBUG
+        AppLogger.app.debug("Text: \(text.prefix(50), privacy: .public)...")
+        AppLogger.app.debug("Conversation ID: \(conversationId ?? "new", privacy: .public)")
+        #endif
         
         // Generate message IDs
         let messageId = UUID().uuidString
@@ -138,14 +141,16 @@ class ChatService {
         )
         
         if let error = response.error {
-            print("❌ ChatService: Error in response: \(error)")
+            AppLogger.app.error("Error in response: \(error, privacy: .public)")
             throw NSError(domain: "ChatService", code: -1, userInfo: [NSLocalizedDescriptionKey: error])
         }
         
-        print("✅ ChatService: Message sent successfully")
+        AppLogger.app.info("Message sent successfully")
+        #if DEBUG
         if let convId = response.conversation?.conversationId {
-            print("✅ ChatService: Conversation ID: \(convId)")
+            AppLogger.app.debug("Conversation ID: \(convId, privacy: .public)")
         }
+        #endif
         
         return response
     }
@@ -154,7 +159,7 @@ class ChatService {
     
     /// Delete a conversation
     func deleteConversation(conversationId: String) async throws {
-        print("📱 ChatService: Deleting conversation: \(conversationId)")
+        AppLogger.app.info("Deleting conversation: \(conversationId, privacy: .public)")
         
         let _: EmptyResponse = try await networkManager.request(
             endpoint: "/api/chat/convos/\(conversationId)",
@@ -162,14 +167,14 @@ class ChatService {
             parameters: nil
         )
         
-        print("✅ ChatService: Conversation deleted")
+        AppLogger.app.info("Conversation deleted")
     }
     
     // MARK: - Update Conversation
     
     /// Update conversation title
     func updateConversation(conversationId: String, title: String) async throws {
-        print("📱 ChatService: Updating conversation title: \(conversationId)")
+        AppLogger.app.info("Updating conversation title: \(conversationId, privacy: .public)")
         
         let parameters: [String: Any] = [
             "conversationId": conversationId,
@@ -182,6 +187,6 @@ class ChatService {
             parameters: parameters
         )
         
-        print("✅ ChatService: Conversation updated")
+        AppLogger.app.info("Conversation updated")
     }
 }

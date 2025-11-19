@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftUI
 
 @MainActor
@@ -31,7 +32,7 @@ class SignupViewModel: ObservableObject {
     }
     
     func register() async {
-        print("📝 SignupViewModel: Starting registration process")
+        AppLogger.auth.info("Starting registration process")
         
         guard formValid else {
             error = NSError(domain: "SignupViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Please fill in all fields"])
@@ -49,7 +50,7 @@ class SignupViewModel: ObservableObject {
         error = nil
         
         do {
-            print("📝 SignupViewModel: Calling AuthManager.register")
+            AppLogger.auth.debug("Calling AuthManager.register")
             _ = try await AuthManager.shared.register(
                 email: email,
                 password: password,
@@ -60,12 +61,11 @@ class SignupViewModel: ObservableObject {
                 userRole: userRole
             )
             
-            print("✅ SignupViewModel: Registration successful")
+            AppLogger.auth.info("Registration successful")
             registrationSuccessful = true
             isLoading = false
         } catch {
-            print("❌ SignupViewModel: Registration failed with error: \(error)")
-            print("❌ SignupViewModel: Error description: \(error.localizedDescription)")
+            AppLogger.error("Registration failed", error: error, category: AppLogger.auth)
             
             // Store the error for display
             self.error = error
