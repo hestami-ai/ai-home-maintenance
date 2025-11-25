@@ -21,7 +21,8 @@ services:
     #image: ghcr.io/danny-avila/librechat-dev:latest
     image: librechat/librechat:v0.8.0
     restart: always
-    user: "${UID}:${GID}"
+    #user: "${UID}:${GID}"  #Valid for Linux
+    user: "0:0"  #Valid for Windows
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:

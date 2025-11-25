@@ -276,4 +276,7 @@ fastlane/test_output
 backend/LibreChat-main/data-node
 backend/LibreChat-main/meili_data_v1.12
 backend/LibreChat-main/logs
+backend/LibreChat-main/uploads
+backend/LibreChat-main/images
+docs/LibreChat-main
 

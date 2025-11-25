@@ -4,6 +4,9 @@ from . import views
 app_name = 'media'
 
 urlpatterns = [
+    # Virus scan endpoint (no persistence, just scan)
+    path('scan/', views.scan_media, name='scan_media'),
+    
     # Property media endpoints
     path('properties/<uuid:property_id>/upload/', views.upload_media, name='upload_media'),
     path('properties/<uuid:property_id>/', views.list_property_media, name='list_property_media'),
