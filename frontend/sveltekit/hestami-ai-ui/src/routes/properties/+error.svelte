@@ -12,12 +12,12 @@
 <div class="flex flex-col min-h-screen">
 	<!-- App Bar -->
 	<AppBar background="bg-surface-100-800-token" border="border-b border-surface-300-600-token">
-		<div slot="lead">
+		{#snippet lead()}
 			<a href="/" class="flex items-center gap-2">
 				<img src="/logo.svg" alt="Logo" class="w-8 h-8" />
 				<h1 class="h3">Hestami AI</h1>
 			</a>
-		</div>
+		{/snippet}
 	</AppBar>
 	
 	<!-- Error Content -->
@@ -36,11 +36,11 @@
 			
 			<div class="space-y-4">
 				{#if $page.status === 401 || $page.error?.message?.includes('Authentication')}
-					<button class="btn preset-filled-primary w-full" on:click={goToLogin}>
+					<button class="btn preset-filled-primary w-full" onclick={goToLogin}>
 						Log In
 					</button>
 				{:else}
-					<button class="btn preset-filled-secondary w-full" on:click={() => window.location.reload()}>
+					<button class="btn preset-filled-secondary w-full" onclick={() => window.location.reload()}>
 						Try Again
 					</button>
 				{/if}

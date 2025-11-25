@@ -20,6 +20,9 @@ from .utils import scan_file as scan_file_util
 
 logger = logging.getLogger('security')
 
+# Allowed file extensions for chat uploads (same as Media model)
+ALLOWED_CHAT_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'mp4', 'mov', 'md', 'pdf', 'docx', 'txt', 'doc', 'usdz']
+
 def has_property_access(user, property_id, permission):
     """
     Check if a user has access to manage media for a property.
@@ -58,6 +61,97 @@ def has_property_access(user, property_id, permission):
     except Exception as e:
         logger.error(f"Error checking property access: {str(e)}")
         return False
+
+
+@api_view(['POST'])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def scan_media(request):
+    """
+    Scan a media file for viruses/malware without persisting to database.
+    Used by SvelteKit proxy before forwarding files to LibreChat.
+    
+    Returns:
+        - is_clean: boolean indicating if file passed virus scan
+        - message: scan result message
+        - filename: original filename (for reference)
+        - content_type: MIME type of the file
+    """
+    try:
+        logger.info(f"Received media scan request from user {request.user.id}")
+        
+        # Validate file exists
+        if 'file' not in request.FILES:
+            logger.error("No file found in scan request")
+            return Response({
+                'error': 'No file was submitted'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        uploaded_file = request.FILES['file']
+        filename = uploaded_file.name
+        content_type = uploaded_file.content_type
+        file_size = uploaded_file.size
+        
+        logger.info(f"Scanning file: {filename}, type: {content_type}, size: {file_size}")
+        
+        # Validate file extension
+        ext = os.path.splitext(filename)[1].lower().lstrip('.')
+        if ext not in ALLOWED_CHAT_EXTENSIONS:
+            logger.warning(f"File extension not allowed: {ext}")
+            return Response({
+                'is_clean': False,
+                'message': f'File type .{ext} is not allowed. Allowed types: {", ".join(ALLOWED_CHAT_EXTENSIONS)}',
+                'filename': filename,
+                'content_type': content_type
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate file size (use Django settings)
+        max_size = getattr(settings, 'FILE_UPLOAD_MAX_MEMORY_SIZE', 104857600)  # 100MB default
+        if file_size > max_size:
+            logger.warning(f"File too large: {file_size} > {max_size}")
+            return Response({
+                'is_clean': False,
+                'message': f'File size ({file_size} bytes) exceeds maximum allowed ({max_size} bytes)',
+                'filename': filename,
+                'content_type': content_type
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Reset file pointer to beginning before virus scan
+        uploaded_file.seek(0)
+        
+        # Scan file for viruses
+        from .virus_scan import scan_file
+        
+        logger.info(f"Starting virus scan for {filename}...")
+        is_clean, scan_message = scan_file(uploaded_file)
+        
+        if not is_clean:
+            logger.error(f"Virus detected in file {filename}: {scan_message}")
+            return Response({
+                'is_clean': False,
+                'message': scan_message,
+                'filename': filename,
+                'content_type': content_type
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.info(f"File {filename} passed virus scan")
+        
+        return Response({
+            'is_clean': True,
+            'message': 'File passed virus scan',
+            'filename': filename,
+            'content_type': content_type,
+            'file_size': file_size
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"Error scanning media: {str(e)}")
+        return Response({
+            'error': 'Failed to scan media',
+            'details': str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['POST'])
 @authentication_classes([JWTAuthentication])

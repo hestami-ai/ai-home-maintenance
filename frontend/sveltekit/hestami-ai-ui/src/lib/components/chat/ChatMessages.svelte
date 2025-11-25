@@ -61,6 +61,40 @@
     
     return '';
   }
+  
+  /**
+   * Get file attachments from LibreChat message format
+   * LibreChat stores files in message.files array with filepath, filename, type, etc.
+   */
+  function getMessageFiles(message: any): Array<{ url: string; name: string; type: string }> {
+    if (!message.files || !Array.isArray(message.files)) {
+      return [];
+    }
+    
+    return message.files.map((file: any) => {
+      // LibreChat stores images with filepath like "/images/userId/filename.jpg"
+      // We need to proxy these through our API or LibreChat directly
+      let url = file.filepath || file.url || '';
+      
+      // If it's a relative path, make it absolute via LibreChat proxy
+      if (url.startsWith('/images/') || url.startsWith('/uploads/')) {
+        url = `/api/chat/files/serve${url}`;
+      }
+      
+      return {
+        url,
+        name: file.filename || file.name || 'file',
+        type: file.type || 'application/octet-stream'
+      };
+    });
+  }
+  
+  /**
+   * Check if file type is an image
+   */
+  function isImageType(type: string): boolean {
+    return type?.startsWith('image/') || false;
+  }
 </script>
 
 <div bind:this={messagesContainer} class="messages-container p-4 space-y-4">
@@ -83,24 +117,70 @@
             </span>
           {/if}
         </div>
+        <!-- Display file attachments above the text for user messages -->
+        {#if message.isCreatedByUser}
+          {@const files = getMessageFiles(message)}
+          {#if files.length > 0}
+            <div class="message-files mb-2 flex flex-wrap gap-2">
+              {#each files as file}
+                <div class="file-attachment">
+                  {#if isImageType(file.type)}
+                    <button 
+                      type="button"
+                      class="block p-0 border-0 bg-transparent cursor-pointer"
+                      onclick={() => window.open(file.url, '_blank')}
+                      aria-label="View {file.name} full size"
+                    >
+                      <img 
+                        src={file.url} 
+                        alt={file.name} 
+                        class="max-w-xs max-h-48 rounded-lg object-cover hover:opacity-90 transition-opacity"
+                      />
+                    </button>
+                  {:else}
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 bg-black/10 dark:bg-white/10 rounded text-sm hover:bg-black/20 dark:hover:bg-white/20">
+                      📎 {file.name}
+                    </a>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
+        
         <div class="message-text prose prose-sm dark:prose-invert max-w-none">
           {@html marked(getMessageText(message))}
         </div>
         
-        {#if message.files && message.files.length > 0}
-          <div class="message-files mt-2 space-y-2">
-            {#each message.files as file}
-              <div class="file-attachment">
-                {#if file.type?.startsWith('image/')}
-                  <img src={file.url} alt={file.name} class="max-w-sm rounded-lg" />
-                {:else}
-                  <a href={file.url} target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">
-                    📎 {file.name}
-                  </a>
-                {/if}
-              </div>
-            {/each}
-          </div>
+        <!-- Display file attachments below the text for assistant messages -->
+        {#if !message.isCreatedByUser}
+          {@const files = getMessageFiles(message)}
+          {#if files.length > 0}
+            <div class="message-files mt-2 flex flex-wrap gap-2">
+              {#each files as file}
+                <div class="file-attachment">
+                  {#if isImageType(file.type)}
+                    <button 
+                      type="button"
+                      class="block p-0 border-0 bg-transparent cursor-pointer"
+                      onclick={() => window.open(file.url, '_blank')}
+                      aria-label="View {file.name} full size"
+                    >
+                      <img 
+                        src={file.url} 
+                        alt={file.name} 
+                        class="max-w-xs max-h-48 rounded-lg object-cover hover:opacity-90 transition-opacity"
+                      />
+                    </button>
+                  {:else}
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 px-2 py-1 bg-black/10 dark:bg-white/10 rounded text-sm hover:bg-black/20 dark:hover:bg-white/20">
+                      📎 {file.name}
+                    </a>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+          {/if}
         {/if}
       </div>
     </div>

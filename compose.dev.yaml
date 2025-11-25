@@ -4,10 +4,10 @@ networks:
   backend-dev:
     name: backend-dev
     driver: bridge
-  temporal-network:
-    name: temporal-network
-    external: true
-    driver: bridge
+#  temporal-network:
+#    name: temporal-network
+#    external: true
+#    driver: bridge
 
 volumes:
   hestami_media_data_dev:
@@ -104,7 +104,7 @@ services:
       - ./.env.local
     networks:
       - backend-dev
-      - temporal-network
+    #  - temporal-network
     logging:
       driver: "local"
       options:
@@ -321,7 +321,7 @@ services:
       - ./.env.local
     networks:
       - backend-dev
-      - temporal-network
+    #  - temporal-network
     depends_on:
       - django-api
     logging:

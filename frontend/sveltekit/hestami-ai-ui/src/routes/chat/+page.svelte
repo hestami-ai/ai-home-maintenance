@@ -56,12 +56,27 @@
   }
   
   /**
-   * Send a message
+   * File attachment type from ChatInput
    */
-  async function handleSendMessage(event: CustomEvent<{ text: string }>) {
-    const { text } = event.detail;
+  interface UploadedFile {
+    file_id: string;
+    _id?: string;
+    filename: string;
+    type: string;
+    size: number;
+    width?: number;
+    height?: number;
+    filepath?: string;
+  }
+  
+  /**
+   * Send a message with optional file attachments
+   */
+  async function handleSendMessage(data: { text: string; files: UploadedFile[] }) {
+    const { text, files } = data;
     
-    if (!text.trim()) return;
+    // Allow sending if there's text OR files
+    if (!text.trim() && (!files || files.length === 0)) return;
     
     isLoading = true;
     error = null;
@@ -71,28 +86,54 @@
       const messageId = crypto.randomUUID();
       const parentMessageId = '00000000-0000-0000-0000-000000000000'; // Root message
       
+      // Build the request body
+      const requestBody: Record<string, unknown> = {
+        text: text || ' ', // LibreChat requires text, use space if only files
+        sender: 'User',
+        clientTimestamp: new Date().toISOString(),
+        isCreatedByUser: true,
+        parentMessageId,
+        messageId,
+        error: false,
+        endpoint: 'google',
+        model: 'gemini-2.5-flash-lite',
+        agent_id: 'ephemeral',  // Required by LibreChat middleware
+        conversationId: selectedConversationId,
+        thinking: false,  // Disable thinking mode (not supported by gemini-2.5-flash-lite)
+        clientOptions: {
+          disableStreaming: true  // Disable streaming to avoid parse errors
+        }
+      };
+      
+      // Add file attachments if present
+      if (files && files.length > 0) {
+        // LibreChat expects files in a specific format
+        requestBody.files = files.map(f => ({
+          file_id: f.file_id,
+          filename: f.filename,
+          filepath: f.filepath,
+          type: f.type,
+          size: f.size,
+          width: f.width,
+          height: f.height
+        }));
+        
+        // Also add image array for image files (LibreChat format)
+        const imageFiles = files.filter(f => 
+          f.type?.startsWith('image/') || 
+          ['jpg', 'jpeg', 'png', 'gif'].some(ext => f.filename?.toLowerCase().endsWith(`.${ext}`))
+        );
+        if (imageFiles.length > 0) {
+          requestBody.imageUrls = imageFiles.map(f => f.filepath);
+        }
+      }
+      
       const response = await fetch('/api/chat/agents/chat/google', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          text,
-          sender: 'User',
-          clientTimestamp: new Date().toISOString(),
-          isCreatedByUser: true,
-          parentMessageId,
-          messageId,
-          error: false,
-          endpoint: 'google',
-          model: 'gemini-2.0-flash-lite',
-          agent_id: 'ephemeral',  // Required by LibreChat middleware
-          conversationId: selectedConversationId,
-          thinking: false,  // Disable thinking mode (not supported by gemini-2.0-flash-lite)
-          clientOptions: {
-            disableStreaming: true  // Disable streaming to avoid parse errors
-          }
-        })
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
@@ -222,7 +263,7 @@
     <!-- Input Area -->
     <div class="border-t border-surface-300-600-token bg-surface-50-900-token p-4">
       <ChatInput
-        on:send={handleSendMessage}
+        onSend={handleSendMessage}
         disabled={isLoading}
       />
     </div>
