@@ -83,12 +83,9 @@ class RoomScanUploadService {
         title: String,
         description: String
     ) async throws -> Media {
-        guard let baseURL = URL(string: "https://dev-homeservices.hestami-ai.com") else {
-            throw NetworkError.invalidURL
-        }
-        
+        // Use AppConfiguration for environment-aware base URL
         let endpoint = "/api/media/properties/\(propertyId)/upload"
-        guard let url = URL(string: baseURL.absoluteString + endpoint) else {
+        guard let url = URL(string: AppConfiguration.apiBaseURL + endpoint) else {
             throw NetworkError.invalidURL
         }
         

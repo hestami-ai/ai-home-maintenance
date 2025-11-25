@@ -53,10 +53,7 @@ struct RequestsView: View {
         }
         .background(AppTheme.primaryBackground)
         .navigationTitle(selectedTab == 0 ? "Service Requests" : "Ask My AI Handyman")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .standardToolbar()
         .toolbar {
             if selectedTab == 0 {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -111,9 +108,9 @@ struct RequestRowView: View {
                     .font(.headline)
                     .foregroundColor(AppTheme.primaryText)
                 Spacer()
-                SharedStatusBadge(
-                    statusColor: statusColor(request.status), 
-                    text: request.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
+                UnifiedStatusBadge(
+                    text: request.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized,
+                    color: statusColor(request.status)
                 )
             }
             
@@ -207,258 +204,218 @@ struct RequestDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Status Header
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(request.title)
-                                .font(AppTheme.titleFont)
-                                .foregroundColor(AppTheme.primaryText)
-                            Text(request.createdAt.formatted(date: .long, time: .shortened))
-                                .font(AppTheme.captionFont)
-                                .foregroundColor(AppTheme.secondaryText)
+                    CardView {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(request.title)
+                                    .font(AppTheme.titleFont)
+                                    .foregroundColor(AppTheme.primaryText)
+                                Text(request.createdAt.formatted(date: .long, time: .shortened))
+                                    .font(AppTheme.captionFont)
+                                    .foregroundColor(AppTheme.secondaryText)
+                            }
+                            Spacer()
+                            UnifiedStatusBadge(
+                                text: request.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized,
+                                color: statusColor(request.status)
+                            )
                         }
-                        Spacer()
-                        SharedStatusBadge(
-                            statusColor: statusColor(request.status), 
-                            text: request.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized
-                        )
                     }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
                     
                     // Property
                     if let propertyDetails = request.propertyDetails {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Property")
-                                .font(AppTheme.bodyFont.bold())
-                                .foregroundColor(AppTheme.primaryText)
-                            
-                            Text(propertyDetails.title)
-                                .font(AppTheme.bodyFont)
-                                .foregroundColor(AppTheme.primaryText)
-                            
-                            Text("\(propertyDetails.address), \(propertyDetails.city), \(propertyDetails.state) \(propertyDetails.zipCode)")
-                                .font(AppTheme.captionFont)
-                                .foregroundColor(AppTheme.secondaryText)
+                        CardView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Property")
+                                    .font(AppTheme.bodyFont.bold())
+                                    .foregroundColor(AppTheme.primaryText)
+                                
+                                Text(propertyDetails.title)
+                                    .font(AppTheme.bodyFont)
+                                    .foregroundColor(AppTheme.primaryText)
+                                
+                                Text("\(propertyDetails.address), \(propertyDetails.city), \(propertyDetails.state) \(propertyDetails.zipCode)")
+                                    .font(AppTheme.captionFont)
+                                    .foregroundColor(AppTheme.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding()
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.borderColor, lineWidth: 1)
-                        )
                     } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Property")
-                                .font(AppTheme.bodyFont.bold())
-                                .foregroundColor(AppTheme.primaryText)
-                            Text("Property ID: \(request.property)")
-                                .font(AppTheme.bodyFont)
-                                .foregroundColor(AppTheme.secondaryText)
+                        CardView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Property")
+                                    .font(AppTheme.bodyFont.bold())
+                                    .foregroundColor(AppTheme.primaryText)
+                                Text("Property ID: \(request.property)")
+                                    .font(AppTheme.bodyFont)
+                                    .foregroundColor(AppTheme.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding()
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.borderColor, lineWidth: 1)
-                        )
                     }
                     
                     // Category and Priority
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Details")
-                            .font(AppTheme.bodyFont.bold())
-                            .foregroundColor(AppTheme.primaryText)
-                        
-                        HStack {
-                            Text("Category:")
-                                .foregroundColor(AppTheme.secondaryText)
-                            Spacer()
-                            Text(request.categoryDisplay ?? request.category)
-                                .foregroundColor(AppTheme.primaryText)
-                        }
-                        
-                        HStack {
-                            Text("Priority:")
-                                .foregroundColor(AppTheme.secondaryText)
-                            Spacer()
-                            Text(request.priority.rawValue.capitalized)
-                                .foregroundColor(priorityColor(request.priority))
-                                .fontWeight(.semibold)
-                        }
-                        
-                        if let provider = request.providerDetails {
-                            HStack {
-                                Text("Provider:")
-                                    .foregroundColor(AppTheme.secondaryText)
-                                Spacer()
-                                Text(provider.businessName)
-                                    .foregroundColor(AppTheme.primaryText)
-                            }
-                        }
-                    }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
-                    
-                    // Description
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(AppTheme.bodyFont.bold())
-                            .foregroundColor(AppTheme.primaryText)
-                        Text(request.description)
-                            .font(AppTheme.bodyFont)
-                            .foregroundColor(AppTheme.secondaryText)
-                    }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
-                    
-                    // Media Gallery
-                    if let mediaDetails = request.mediaDetails, !mediaDetails.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Media")
+                    CardView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Details")
                                 .font(AppTheme.bodyFont.bold())
                                 .foregroundColor(AppTheme.primaryText)
                             
-                            TabView(selection: $selectedMediaIndex) {
-                                ForEach(0..<mediaDetails.count, id: \.self) { index in
-                                    if mediaDetails[index].isImage, let url = URL(string: mediaDetails[index].fileUrl) {
-                                        AsyncImage(url: url) { phase in
-                                            switch phase {
-                                            case .empty:
-                                                ProgressView()
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fit)
-                                            case .failure:
-                                                Image(systemName: "photo")
-                                                    .font(.largeTitle)
-                                                    .foregroundColor(AppTheme.secondaryText)
-                                            @unknown default:
-                                                EmptyView()
-                                            }
-                                        }
-                                        .tag(index)
-                                    } else {
-                                        VStack {
-                                            Image(systemName: mediaDetails[index].isVideo ? "film" : "doc")
-                                                .font(.largeTitle)
-                                                .foregroundColor(AppTheme.secondaryText)
-                                            Text(mediaDetails[index].title)
-                                                .font(.caption)
-                                                .foregroundColor(AppTheme.secondaryText)
-                                        }
-                                        .tag(index)
-                                    }
+                            HStack {
+                                Text("Category:")
+                                    .foregroundColor(AppTheme.secondaryText)
+                                Spacer()
+                                Text(request.categoryDisplay ?? request.category)
+                                    .foregroundColor(AppTheme.primaryText)
+                            }
+                            
+                            HStack {
+                                Text("Priority:")
+                                    .foregroundColor(AppTheme.secondaryText)
+                                Spacer()
+                                Text(request.priority.rawValue.capitalized)
+                                    .foregroundColor(priorityColor(request.priority))
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            if let provider = request.providerDetails {
+                                HStack {
+                                    Text("Provider:")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    Spacer()
+                                    Text(provider.businessName)
+                                        .foregroundColor(AppTheme.primaryText)
                                 }
                             }
-                            .tabViewStyle(PageTabViewStyle())
-                            .frame(height: 200)
-                            .cornerRadius(12)
                         }
-                        .padding()
-                        .background(AppTheme.cardBackground)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(AppTheme.borderColor, lineWidth: 1)
-                        )
+                    }
+                    
+                    // Description
+                    CardView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description")
+                                .font(AppTheme.bodyFont.bold())
+                                .foregroundColor(AppTheme.primaryText)
+                            Text(request.description)
+                                .font(AppTheme.bodyFont)
+                                .foregroundColor(AppTheme.secondaryText)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    // Media Gallery
+                    if let mediaDetails = request.mediaDetails, !mediaDetails.isEmpty {
+                        CardView {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Media")
+                                    .font(AppTheme.bodyFont.bold())
+                                    .foregroundColor(AppTheme.primaryText)
+                                
+                                TabView(selection: $selectedMediaIndex) {
+                                    ForEach(0..<mediaDetails.count, id: \.self) { index in
+                                        if mediaDetails[index].isImage, let url = URL(string: mediaDetails[index].fileUrl) {
+                                            AsyncImage(url: url) { phase in
+                                                switch phase {
+                                                case .empty:
+                                                    ProgressView()
+                                                case .success(let image):
+                                                    image
+                                                        .resizable()
+                                                        .aspectRatio(contentMode: .fit)
+                                                case .failure:
+                                                    Image(systemName: "photo")
+                                                        .font(.largeTitle)
+                                                        .foregroundColor(AppTheme.secondaryText)
+                                                @unknown default:
+                                                    EmptyView()
+                                                }
+                                            }
+                                            .tag(index)
+                                        } else {
+                                            VStack {
+                                                Image(systemName: mediaDetails[index].isVideo ? "film" : "doc")
+                                                    .font(.largeTitle)
+                                                    .foregroundColor(AppTheme.secondaryText)
+                                                Text(mediaDetails[index].title)
+                                                    .font(.caption)
+                                                    .foregroundColor(AppTheme.secondaryText)
+                                            }
+                                            .tag(index)
+                                        }
+                                    }
+                                }
+                                .tabViewStyle(PageTabViewStyle())
+                                .frame(height: 200)
+                                .cornerRadius(12)
+                            }
+                        }
                     }
                     
                     // Dates
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Schedule")
-                            .font(AppTheme.bodyFont.bold())
-                            .foregroundColor(AppTheme.primaryText)
-                        
-                        HStack {
-                            Text("Created:")
-                                .foregroundColor(AppTheme.secondaryText)
-                            Spacer()
-                            Text(request.createdAt.formatted(date: .long, time: .shortened))
+                    CardView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Schedule")
+                                .font(AppTheme.bodyFont.bold())
                                 .foregroundColor(AppTheme.primaryText)
-                        }
-                        
-                        if let scheduledStart = request.scheduledStart {
+                            
                             HStack {
-                                Text("Scheduled Start:")
+                                Text("Created:")
                                     .foregroundColor(AppTheme.secondaryText)
                                 Spacer()
-                                Text(scheduledStart.formatted(date: .long, time: .shortened))
+                                Text(request.createdAt.formatted(date: .long, time: .shortened))
                                     .foregroundColor(AppTheme.primaryText)
                             }
-                        }
-                        
-                        if let scheduledEnd = request.scheduledEnd {
-                            HStack {
-                                Text("Scheduled End:")
-                                    .foregroundColor(AppTheme.secondaryText)
-                                Spacer()
-                                Text(scheduledEnd.formatted(date: .long, time: .shortened))
-                                    .foregroundColor(AppTheme.primaryText)
+                            
+                            if let scheduledStart = request.scheduledStart {
+                                HStack {
+                                    Text("Scheduled Start:")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    Spacer()
+                                    Text(scheduledStart.formatted(date: .long, time: .shortened))
+                                        .foregroundColor(AppTheme.primaryText)
+                                }
                             }
-                        }
-                        
-                        if let actualStart = request.actualStart {
-                            HStack {
-                                Text("Actual Start:")
-                                    .foregroundColor(AppTheme.secondaryText)
-                                Spacer()
-                                Text(actualStart.formatted(date: .long, time: .shortened))
-                                    .foregroundColor(AppTheme.primaryText)
+                            
+                            if let scheduledEnd = request.scheduledEnd {
+                                HStack {
+                                    Text("Scheduled End:")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    Spacer()
+                                    Text(scheduledEnd.formatted(date: .long, time: .shortened))
+                                        .foregroundColor(AppTheme.primaryText)
+                                }
                             }
-                        }
-                        
-                        if let actualEnd = request.actualEnd {
-                            HStack {
-                                Text("Actual End:")
-                                    .foregroundColor(AppTheme.secondaryText)
-                                Spacer()
-                                Text(actualEnd.formatted(date: .long, time: .shortened))
-                                    .foregroundColor(AppTheme.primaryText)
+                            
+                            if let actualStart = request.actualStart {
+                                HStack {
+                                    Text("Actual Start:")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    Spacer()
+                                    Text(actualStart.formatted(date: .long, time: .shortened))
+                                        .foregroundColor(AppTheme.primaryText)
+                                }
+                            }
+                            
+                            if let actualEnd = request.actualEnd {
+                                HStack {
+                                    Text("Actual End:")
+                                        .foregroundColor(AppTheme.secondaryText)
+                                    Spacer()
+                                    Text(actualEnd.formatted(date: .long, time: .shortened))
+                                        .foregroundColor(AppTheme.primaryText)
+                                }
                             }
                         }
                     }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
                     
                     // Actions
                     if request.status == .PENDING || request.status == .IN_PROGRESS || request.status == .SCHEDULED {
                         Button(action: {
                             isShowingCancelAlert = true
                         }) {
-                            HStack {
-                                Spacer()
-                                Text("Cancel Request")
-                                    .font(AppTheme.bodyFont.bold())
-                                Spacer()
-                            }
-                            .padding()
-                            .background(AppTheme.errorColor.opacity(0.8))
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                            Text("Cancel Request")
                         }
+                        .buttonStyle(DestructiveButtonStyle())
                         .padding(.top, 10)
                         .alert("Cancel Service Request", isPresented: $isShowingCancelAlert) {
                             Button("Cancel Request", role: .destructive) {
@@ -466,7 +423,6 @@ struct RequestDetailView: View {
                                     try? await viewModel.cancelServiceRequest(requestId: request.id)
                                 }
                             }
-                            Button("Keep Request", role: .cancel) {}
                         } message: {
                             Text("Are you sure you want to cancel this service request? This action cannot be undone.")
                         }
@@ -475,10 +431,7 @@ struct RequestDetailView: View {
                 .padding()
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .standardToolbar(displayMode: .inline)
     }
     
     // Helper function to get status color
@@ -673,7 +626,11 @@ struct ServiceRequestsTabView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredRequests.isEmpty {
-                EmptyStateView()
+                UnifiedEmptyStateView(
+                    icon: "doc.text.magnifyingglass",
+                    title: "No Service Requests Found",
+                    message: "Your service requests will appear here"
+                )
             } else {
                 if groupByProperty {
                     // Grouped by property view

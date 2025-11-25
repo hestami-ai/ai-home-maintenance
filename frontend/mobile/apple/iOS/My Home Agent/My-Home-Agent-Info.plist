@@ -2,33 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array/>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	
-	<!-- Privacy - Camera Usage Description -->
-	<key>NSCameraUsageDescription</key>
-	<string>My Home Agent needs camera access to scan and create 3D models of your rooms for accurate home maintenance planning.</string>
-	
-	<!-- Privacy - Photo Library Usage Description -->
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>My Home Agent needs access to your photo library to save room scans and attach photos to service requests.</string>
-	
-	<!-- Privacy - Photo Library Add Usage Description (iOS 14+) -->
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>My Home Agent needs permission to save room scans and property photos to your photo library.</string>
-	
-	<!-- App Transport Security Settings -->
+	<key>CFBundleURLTypes</key>
+	<array>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Allow localhost for development only - remove or configure for production -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
-		<!-- Exception domains for specific servers if needed -->
 		<key>NSExceptionDomains</key>
 		<dict>
-			<!-- Development server exception - REMOVE FOR PRODUCTION -->
 			<key>localhost</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
@@ -38,5 +20,7 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array/>
 </dict>
 </plist>
