@@ -28,6 +28,18 @@ struct DashboardView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 20) {
+                    // Hestami AI Logo at top center
+                    HStack {
+                        Spacer()
+                        Image("hestami-logo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 80, height: 80)
+                        Spacer()
+                    }
+                    .padding(.top, 10)
+                    .padding(.bottom, 5)
+                    
                     // Properties Section
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {

@@ -145,43 +145,45 @@ final class AuthManager {
     func validateSession() async -> Bool {
         // First check if we have a session cookie
         guard NetworkManager.shared.hasSessionCookie() else {
-            print("🔐 AuthManager: No session cookie found, session is invalid")
+            AppLogger.auth.debug("No session cookie found, session is invalid")
             return false
         }
         
         // If we have a cookie, verify it works by fetching the profile
         do {
-            print("🔐 AuthManager: Validating session by fetching user profile")
+            AppLogger.auth.debug("Validating session by fetching user profile")
             let _: User = try await NetworkManager.shared.request(
                 endpoint: "/api/users/profile/", 
                 method: .get,
                 parameters: [:] // Empty parameters for POST request
             )
-            print("🔐 AuthManager: Session is valid")
+            AppLogger.auth.info("Session is valid")
             return true
         } catch {
-            print("🔐 AuthManager: Session validation failed: \(error.localizedDescription)")
+            AppLogger.auth.warning("Session validation failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
     
     // Verify authentication setup by checking cookies and headers
     func verifyAuthenticationSetup() {
-        print("🔐 ===== AUTHENTICATION VERIFICATION SUMMARY =====")
-        print("🔐 AuthManager: isAuthenticated = \(isAuthenticated)")
+        #if DEBUG
+        AppLogger.auth.debug("===== AUTHENTICATION VERIFICATION SUMMARY =====")
+        AppLogger.auth.debug("isAuthenticated = \(self.isAuthenticated, privacy: .public)")
         
         // Use NetworkManager's cookie debugging
         NetworkManager.shared.debugCookies()
         
-        print("🔐 ===== END AUTHENTICATION VERIFICATION =====")
+        AppLogger.auth.debug("===== END AUTHENTICATION VERIFICATION =====")
+        #endif
     }
     
     // Login method with email and password
     func login(email: String, password: String, rememberMe: Bool = false) async throws -> User {
-        print(" AuthManager: Attempting login with email: \(email)")
+        AppLogger.debugSensitive("Attempting login with email", sensitiveData: email, category: AppLogger.auth)
         let parameters = ["email": email, "password": password]
         
-        print(" AuthManager: Sending login request to /api/users/login/")
+        AppLogger.auth.debug("Sending login request to /api/users/login/")
         
         do {
             let loginResponse: LoginResponse = try await NetworkManager.shared.request(
@@ -190,7 +192,7 @@ final class AuthManager {
                 parameters: parameters
             )
             
-            print(" AuthManager: Login successful")
+            AppLogger.auth.info("Login successful")
             
             // Store credentials if Remember Me is enabled
             self.isRememberMeEnabled = rememberMe
@@ -203,8 +205,8 @@ final class AuthManager {
             
             // Verify that we have a session cookie after login
             if !NetworkManager.shared.hasSessionCookie() {
-                print("🔐 AuthManager: Warning - No session cookie found after login")
-                print("🔐 AuthManager: Login failed - server did not provide a session cookie")
+                AppLogger.auth.error("Warning - No session cookie found after login")
+                AppLogger.auth.error("Login failed - server did not provide a session cookie")
                 
                 // Debug cookies after failed login
                 NetworkManager.shared.debugCookies()
@@ -218,11 +220,11 @@ final class AuthManager {
             return loginResponse.user
         } catch let networkError as NetworkError {
             // Convert NetworkError to AuthError with better message
-            print("🔐 AuthManager: Login failed due to network error: \(networkError.errorDescription ?? "Unknown error")")
+            AppLogger.error("Login failed due to network error", error: networkError, category: AppLogger.auth)
             throw AuthError.networkError(networkError)
         } catch {
             // Handle other errors
-            print("🔐 AuthManager: Login failed with error: \(error.localizedDescription)")
+            AppLogger.error("Login failed", error: error, category: AppLogger.auth)
             throw AuthError.loginFailed
         }
     }
@@ -244,7 +246,7 @@ final class AuthManager {
             throw AuthError.refreshFailed
         }
         
-        print(" AuthManager: Refreshing authentication")
+        AppLogger.auth.debug("Refreshing authentication")
         
         // Re-login with stored credentials
         _ = try await login(email: email, password: password, rememberMe: isRememberMeEnabled)
@@ -259,7 +261,7 @@ final class AuthManager {
         }
         
         // Authentication is now based solely on cookies
-        print("🔐 AuthManager: Logging out")
+        AppLogger.auth.info("Logging out")
         
         // Clear all cookies
         NetworkManager.shared.clearCookies()
@@ -276,6 +278,49 @@ final class AuthManager {
         // Only return true if biometrics are available AND we have stored credentials
         return canEvaluate && storedEmail != nil && storedPassword != nil
     }
+    
+    // Register method for new user signup
+    func register(
+        email: String,
+        password: String,
+        confirmPassword: String,
+        firstName: String,
+        lastName: String,
+        phoneNumber: String,
+        userRole: String
+    ) async throws -> User {
+        AppLogger.debugSensitive("Attempting registration with email", sensitiveData: email, category: AppLogger.auth)
+        
+        let parameters: [String: Any] = [
+            "email": email,
+            "password": password,
+            "confirm_password": confirmPassword,
+            "first_name": firstName,
+            "last_name": lastName,
+            "phone_number": phoneNumber,
+            "user_role": userRole,
+            "service_provider": NSNull()
+        ]
+        
+        AppLogger.auth.debug("Sending registration request to /api/users/register/")
+        
+        do {
+            let registerResponse: RegisterResponse = try await NetworkManager.shared.request(
+                endpoint: "/api/users/register/",
+                method: .post,
+                parameters: parameters
+            )
+            
+            AppLogger.auth.info("Registration successful")
+            return registerResponse.user
+        } catch let networkError as NetworkError {
+            AppLogger.error("Registration failed with network error", error: networkError, category: AppLogger.auth)
+            throw AuthError.networkError(networkError)
+        } catch {
+            AppLogger.error("Registration failed", error: error, category: AppLogger.auth)
+            throw AuthError.loginFailed
+        }
+    }
 }
 
 // Auth response models - Deprecated, use LoginResponse instead
@@ -286,4 +331,10 @@ struct AuthResponse: Decodable {
 // RefreshResponse is no longer used as server doesn't provide tokens
 struct RefreshResponse: Decodable {
     // Empty placeholder structure
+}
+
+// Registration response model
+struct RegisterResponse: Decodable {
+    let user: User
+    let message: String?
 }

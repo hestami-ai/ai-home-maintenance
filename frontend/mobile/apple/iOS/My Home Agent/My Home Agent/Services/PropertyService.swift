@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import SwiftUI
 
 class PropertyService {
@@ -25,11 +26,13 @@ class PropertyService {
     
     func updateProperty(id: String, updates: PropertyUpdateRequest) async throws -> Property {
         let params = updates.toDictionary()
-        print("🔄 PropertyService: Updating property \(id)")
-        print("📦 PropertyService: Update parameters: \(params)")
+        AppLogger.app.info("Updating property \(id, privacy: .public)")
+        #if DEBUG
+        AppLogger.app.debug("Update parameters: \(params, privacy: .public)")
         if let descriptives = params["descriptives"] as? [String: Any] {
-            print("📋 PropertyService: Descriptives keys: \(descriptives.keys.sorted())")
+            AppLogger.app.debug("Descriptives keys: \(descriptives.keys.sorted(), privacy: .public)")
         }
+        #endif
         
         return try await NetworkManager.shared.request(
             endpoint: "/api/properties/\(id)",

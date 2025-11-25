@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import OSLog
 
 @MainActor
 class LoginViewModel: ObservableObject {
@@ -13,20 +14,19 @@ class LoginViewModel: ObservableObject {
     @Published var showErrorAlert = false
     
     func login() async {
-        print("📝 LoginViewModel: Starting login process")
-        print("📝 LoginViewModel: Email: \(email), RememberMe: \(rememberMe)")
+        AppLogger.auth.info("Starting login process")
+        AppLogger.auth.debug("Email: \(self.email, privacy: .public), RememberMe: \(self.rememberMe, privacy: .public)")
         isLoading = true
         error = nil
         
         do {
-            print("📝 LoginViewModel: Calling AuthManager.login")
+            AppLogger.auth.debug("Calling AuthManager.login")
             _ = try await AuthManager.shared.login(email: email, password: password, rememberMe: rememberMe)
-            print("📝 LoginViewModel: Login successful")
+            AppLogger.auth.info("Login successful")
             isAuthenticated = true
             isLoading = false
         } catch {
-            print("❌ LoginViewModel: Login failed with error: \(error)")
-            print("❌ LoginViewModel: Error description: \(error.localizedDescription)")
+            AppLogger.error("Login failed", error: error, category: AppLogger.auth)
             
             // Store the error for display
             self.error = error

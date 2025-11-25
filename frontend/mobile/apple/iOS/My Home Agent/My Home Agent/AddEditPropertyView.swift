@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 struct AddEditPropertyView: View {
     @Environment(\.dismiss) private var dismiss
@@ -537,7 +538,7 @@ struct AddEditPropertyView: View {
     
     // Load property data into form fields
     private func loadPropertyData(_ property: Property) {
-        print("🔄 AddEditPropertyView: Loading property data for: \(property.title)")
+        AppLogger.app.info("Loading property data for: \(property.title, privacy: .public)")
         
         // Basic Info
         name = property.title
@@ -551,16 +552,20 @@ struct AddEditPropertyView: View {
         
         // Load descriptives if available
         guard let desc = property.descriptives else {
-            print("⚠️ AddEditPropertyView: No descriptives found for property")
+            AppLogger.app.warning("No descriptives found for property")
             return
         }
         
-        print("📋 AddEditPropertyView: Loading descriptives...")
+        AppLogger.app.debug("Loading descriptives...")
         
         // Property Details - Map backend values to display labels
-        print("🏠 Backend propertyType: '\(desc.propertyType ?? "nil")'")
+        #if DEBUG
+        AppLogger.app.debug("Backend propertyType: '\(desc.propertyType ?? "nil", privacy: .public)'")
+        #endif
         propertyType = toDisplayValue(desc.propertyType, choices: propertyTypeMap)
-        print("🏠 Display propertyType: '\(propertyType)'")
+        #if DEBUG
+        AppLogger.app.debug("Display propertyType: '\(propertyType, privacy: .public)'")
+        #endif
         squareFootage = desc.squareFootage.map { String($0) } ?? ""
         lotSize = desc.lotSize ?? ""
         stories = desc.stories.map { String($0) } ?? ""
@@ -571,9 +576,13 @@ struct AddEditPropertyView: View {
         
         // Structure & Features - Map backend values to display labels
         basement = desc.basement ?? false
-        print("🏗️ Backend basementType: '\(desc.basementType ?? "nil")'")
+        #if DEBUG
+        AppLogger.app.debug("Backend basementType: '\(desc.basementType ?? "nil", privacy: .public)'")
+        #endif
         basementType = toDisplayValue(desc.basementType, choices: basementTypeMap)
-        print("🏗️ Display basementType: '\(basementType)'")
+        #if DEBUG
+        AppLogger.app.debug("Display basementType: '\(basementType, privacy: .public)'")
+        #endif
         garage = desc.garage ?? false
         garageType = toDisplayValue(desc.garageType, choices: garageTypeMap)
         garageSpaces = desc.garageSpaces.map { String($0) } ?? ""
@@ -582,9 +591,13 @@ struct AddEditPropertyView: View {
         crawlSpace = desc.crawlSpace ?? false
         
         // HVAC - Map backend values to display labels
-        print("🔥 Backend heatingSystem: '\(desc.heatingSystem ?? "nil")'")
+        #if DEBUG
+        AppLogger.app.debug("Backend heatingSystem: '\(desc.heatingSystem ?? "nil", privacy: .public)'")
+        #endif
         heatingSystem = toDisplayValue(desc.heatingSystem, choices: heatingSystemMap)
-        print("🔥 Display heatingSystem: '\(heatingSystem)'")
+        #if DEBUG
+        AppLogger.app.debug("Display heatingSystem: '\(heatingSystem, privacy: .public)'")
+        #endif
         
         heatingFuel = toDisplayValue(desc.heatingFuel, choices: heatingFuelMap)
         coolingSystem = toDisplayValue(desc.coolingSystem, choices: coolingSystemMap)
@@ -598,7 +611,7 @@ struct AddEditPropertyView: View {
         exteriorMaterial = toDisplayValue(desc.exteriorMaterial, choices: exteriorMaterialMap)
         foundationType = toDisplayValue(desc.foundationType, choices: foundationTypeMap)
         
-        print("✅ AddEditPropertyView: Finished loading property data")
+        AppLogger.app.info("Finished loading property data")
         
         // Access & Security
         gatedCommunity = desc.gatedCommunity ?? false
@@ -629,11 +642,9 @@ struct AddEditPropertyView: View {
         maintenanceNotes = desc.maintenanceNotes ?? ""
         specialInstructions = desc.specialInstructions ?? ""
         
-        print("✅ AddEditPropertyView: Final loaded values:")
-        print("   propertyType: '\(propertyType)'")
-        print("   heatingSystem: '\(heatingSystem)'")
-        print("   coolingSystem: '\(coolingSystem)'")
-        print("   basementType: '\(basementType)'")
+        #if DEBUG
+        AppLogger.app.debug("Final loaded values: propertyType='\(propertyType, privacy: .public)', heatingSystem='\(heatingSystem, privacy: .public)', coolingSystem='\(coolingSystem, privacy: .public)', basementType='\(basementType, privacy: .public)'")
+        #endif
     }
     
     // Build complete descriptives dictionary with all fields mapped to backend values
@@ -724,7 +735,7 @@ struct AddEditPropertyView: View {
             let jsonData = try JSONSerialization.data(withJSONObject: descriptivesDict.compactMapValues { $0 })
             descriptives = try JSONDecoder().decode(PropertyDescriptives.self, from: jsonData)
         } catch {
-            print("Error encoding descriptives: \(error)")
+            AppLogger.error("Error encoding descriptives", error: error, category: AppLogger.app)
             alertMessage = "Failed to prepare property data"
             showingAlert = true
             return

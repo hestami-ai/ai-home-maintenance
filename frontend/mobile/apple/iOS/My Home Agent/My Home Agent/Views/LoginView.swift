@@ -3,6 +3,7 @@ import Foundation
 
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
+    @State private var showSignup = false
     
     var body: some View {
         ZStack {
@@ -108,7 +109,7 @@ struct LoginView: View {
                         .foregroundColor(AppTheme.secondaryText)
                     
                     Button(action: {
-                        // Sign up action
+                        showSignup = true
                     }) {
                         Text("Sign Up")
                             .foregroundColor(AppTheme.successColor)
@@ -125,6 +126,9 @@ struct LoginView: View {
         }
         .fullScreenCover(isPresented: $viewModel.isAuthenticated) {
             TabViewContainer()
+        }
+        .fullScreenCover(isPresented: $showSignup) {
+            SignupView()
         }
         .alert(isPresented: $viewModel.showErrorAlert) {
             if let error = viewModel.error {

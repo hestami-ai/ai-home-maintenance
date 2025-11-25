@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 struct RefreshControl: View {
     @Binding var isRefreshing: Bool
@@ -80,7 +81,7 @@ struct RefreshControl_Previews: PreviewProvider {
     static var previews: some View {
         ScrollView {
             RefreshControl(isRefreshing: .constant(false), coordinateSpace: .named("pullToRefresh")) {
-                print("Refreshing...")
+                AppLogger.app.debug("Refreshing...")
             }
             
             Text("Pull to refresh example")

@@ -1,6 +1,7 @@
 import SwiftUI
 import SceneKit
 import RoomPlan
+import OSLog
 
 struct SavedRoomScansView: View {
     @Environment(\.dismiss) private var dismiss
@@ -129,16 +130,18 @@ struct SavedRoomScansView: View {
     }
     
     private func loadScans() {
-        print("📂 SavedRoomScansView: Loading scans...")
+        AppLogger.storage.debug("Loading scans...")
         scans = storageService.getAllScans()
-        print("📂 SavedRoomScansView: Loaded \(scans.count) scans")
+        AppLogger.storage.info("Loaded \(scans.count, privacy: .public) scans")
         if scans.isEmpty {
-            print("⚠️ SavedRoomScansView: No scans found!")
+            AppLogger.storage.warning("No scans found!")
         } else {
+            #if DEBUG
             for scan in scans {
-                print("   - \(scan.name) (ID: \(scan.id))")
-                print("     File exists: \(FileManager.default.fileExists(atPath: scan.fileURL.path))")
+                AppLogger.storage.debug("- \(scan.name, privacy: .public) (ID: \(scan.id, privacy: .public))")
+                AppLogger.storage.debug("  File exists: \(FileManager.default.fileExists(atPath: scan.fileURL.path), privacy: .public)")
             }
+            #endif
         }
     }
     
@@ -147,9 +150,11 @@ struct SavedRoomScansView: View {
     }
     
     private func viewScan(_ scan: RoomScan) {
-        print("👁️ Opening viewer for scan: \(scan.name)")
-        print("   File URL: \(scan.fileURL.path)")
-        print("🚫 Showing custom viewer")
+        AppLogger.roomScan.info("Opening viewer for scan: \(scan.name, privacy: .public)")
+        #if DEBUG
+        AppLogger.roomScan.debug("File URL: \(scan.fileURL.path, privacy: .public)")
+        AppLogger.roomScan.debug("Showing custom viewer")
+        #endif
         
         scanToView = scan
     }
@@ -185,7 +190,7 @@ struct SavedRoomScansView: View {
             scanToDelete = nil
             HapticManager.shared.playNotificationFeedback(type: .success)
         } catch {
-            print("Failed to delete scan: \(error)")
+            AppLogger.error("Failed to delete scan", error: error, category: AppLogger.storage)
             HapticManager.shared.playNotificationFeedback(type: .error)
         }
     }
@@ -336,7 +341,7 @@ struct RoomScanViewerView: View {
                 // Header
                 HStack {
                     Button(action: { 
-                        print("🚪 Closing viewer")
+                        AppLogger.roomScan.debug("Closing viewer")
                         isPresented = nil 
                     }) {
                         HStack(spacing: 8) {
@@ -424,17 +429,17 @@ struct RoomScanViewerView: View {
         }
         .background(AppTheme.primaryBackground)
         .onAppear {
-            print("📺 RoomScanViewerView appeared")
+            AppLogger.roomScan.debug("RoomScanViewerView appeared")
             
             // Delay showing the SceneKit view to ensure proper layout
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                print("✅ RoomScanViewerView: Setting isViewReady = true")
+                AppLogger.roomScan.debug("Setting isViewReady = true")
                 isViewReady = true
             }
             
         }
         .onDisappear {
-            print("📺 RoomScanViewerView disappeared")
+            AppLogger.roomScan.debug("RoomScanViewerView disappeared")
         }
         .sheet(isPresented: $showShareSheet) {
             ActivityView(activityItems: [scan.fileURL])
@@ -568,19 +573,19 @@ struct FloorplanImageView: View {
                     self.isLoading = false
                 }
             } catch {
-                print("❌ Failed to regenerate floorplan: \(error)")
+                AppLogger.error("Failed to regenerate floorplan", error: error, category: AppLogger.roomScan)
                 
                 // Fallback: try to load the saved floorplan image
                 if let floorplanURL = scan.floorplanURL,
                    FileManager.default.fileExists(atPath: floorplanURL.path),
                    let image = UIImage(contentsOfFile: floorplanURL.path) {
-                    print("✅ Loaded saved floorplan as fallback")
+                    AppLogger.roomScan.info("Loaded saved floorplan as fallback")
                     DispatchQueue.main.async {
                         self.floorplanImage = image
                         self.isLoading = false
                     }
                 } else {
-                    print("⚠️ No floorplan available")
+                    AppLogger.roomScan.warning("No floorplan available")
                     DispatchQueue.main.async {
                         self.floorplanImage = nil
                         self.isLoading = false
@@ -680,7 +685,7 @@ struct SceneKitView: UIViewRepresentable {
     let url: URL
     
     func makeUIView(context: Context) -> SCNView {
-        print("🎬 SceneKitView: Creating view for URL: \(url.path)")
+        AppLogger.roomScan.debug("SceneKitView: Creating view for URL: \(url.path, privacy: .public)")
         
         // Create with a default frame to avoid zero-size issues
         let sceneView = SCNView(frame: CGRect(x: 0, y: 0, width: 100, height: 100))
@@ -695,11 +700,11 @@ struct SceneKitView: UIViewRepresentable {
         
         // Check if file exists
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("❌ SceneKitView: File does not exist at path: \(url.path)")
+            AppLogger.roomScan.error("SceneKitView: File does not exist at path: \(url.path, privacy: .public)")
             return sceneView
         }
         
-        print("✅ SceneKitView: File exists, loading scene...")
+        AppLogger.roomScan.debug("SceneKitView: File exists, loading scene...")
         
         // Load the USDZ scene - use file:// scheme explicitly
         do {
@@ -714,8 +719,10 @@ struct SceneKitView: UIViewRepresentable {
                 .flattenScene: false
             ])
             
-            print("✅ SceneKitView: Scene loaded successfully")
-            print("   Root node children count: \(scene.rootNode.childNodes.count)")
+            AppLogger.roomScan.info("SceneKitView: Scene loaded successfully")
+            #if DEBUG
+            AppLogger.roomScan.debug("Root node children count: \(scene.rootNode.childNodes.count, privacy: .public)")
+            #endif
             
             sceneView.scene = scene
             
@@ -746,25 +753,29 @@ struct SceneKitView: UIViewRepresentable {
             directionalLight.look(at: SCNVector3(x: 0, y: 0, z: 0))
             scene.rootNode.addChildNode(directionalLight)
             
-            print("✅ SceneKitView: Camera and lighting configured")
+            AppLogger.roomScan.debug("SceneKitView: Camera and lighting configured")
             
         } catch {
-            print("❌ SceneKitView: Failed to load scene: \(error)")
+            AppLogger.error("SceneKitView: Failed to load scene", error: error, category: AppLogger.roomScan)
         }
         
         return sceneView
     }
     
     func updateUIView(_ uiView: SCNView, context: Context) {
-        print("🔄 SceneKitView: updateUIView called")
-        print("   View frame: \(uiView.frame)")
-        print("   View bounds: \(uiView.bounds)")
-        print("   Scene: \(uiView.scene != nil ? "present" : "nil")")
-        print("   Background color: \(uiView.backgroundColor?.description ?? "nil")")
+        #if DEBUG
+        AppLogger.roomScan.debug("SceneKitView: updateUIView called")
+        AppLogger.roomScan.debug("View frame: \(String(describing: uiView.frame), privacy: .public)")
+        AppLogger.roomScan.debug("View bounds: \(String(describing: uiView.bounds), privacy: .public)")
+        AppLogger.roomScan.debug("Scene: \(uiView.scene != nil ? "present" : "nil", privacy: .public)")
+        AppLogger.roomScan.debug("Background color: \(uiView.backgroundColor?.description ?? "nil", privacy: .public)")
+        #endif
         
         // Force layout and render when frame changes
         if uiView.frame.size != .zero && uiView.scene != nil {
-            print("✅ SceneKitView: Valid frame detected, forcing render")
+            #if DEBUG
+            AppLogger.roomScan.debug("SceneKitView: Valid frame detected, forcing render")
+            #endif
             
             // Force immediate render
             DispatchQueue.main.async {
@@ -775,11 +786,15 @@ struct SceneKitView: UIViewRepresentable {
                 if let scene = uiView.scene {
                     uiView.scene = nil
                     uiView.scene = scene
-                    print("🔄 SceneKitView: Scene reassigned to trigger render")
+                    #if DEBUG
+                    AppLogger.roomScan.debug("SceneKitView: Scene reassigned to trigger render")
+                    #endif
                 }
             }
         } else if uiView.frame.size == .zero {
-            print("⚠️ SceneKitView: Frame is still zero")
+            #if DEBUG
+            AppLogger.roomScan.debug("SceneKitView: Frame is still zero")
+            #endif
         }
     }
 }

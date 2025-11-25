@@ -9,6 +9,7 @@ import SwiftUI
 import RoomPlan
 import AVFoundation
 import CoreHaptics
+import OSLog
 
 struct RoomPlanView: View {
     @State private var isScanning = false
@@ -272,11 +273,11 @@ struct RoomPlanView: View {
     
     private func saveScan(name: String, propertyId: String?) async {
         guard let capturedRoom = capturedRoom else {
-            print("❌ RoomPlanView: No captured room to save")
+            AppLogger.roomScan.error("No captured room to save")
             return
         }
         
-        print("💾 RoomPlanView: Starting to save scan '\(name)'")
+        AppLogger.roomScan.info("Starting to save scan '\(name, privacy: .public)'")
         isSaving = true
         showSaveDialog = false
         
@@ -287,7 +288,7 @@ struct RoomPlanView: View {
                 propertyId: propertyId
             )
             
-            print("✅ RoomPlanView: Scan saved successfully with ID \(scan.id)")
+            AppLogger.roomScan.info("Scan saved successfully with ID \(scan.id, privacy: .public)")
             
             await MainActor.run {
                 self.savedScan = scan
@@ -295,7 +296,7 @@ struct RoomPlanView: View {
                 // Skip haptic - can cause hangs
             }
         } catch {
-            print("❌ RoomPlanView: Failed to save scan: \(error)")
+            AppLogger.error("Failed to save scan", error: error, category: AppLogger.roomScan)
             await MainActor.run {
                 self.isSaving = false
                 self.permissionAlertMessage = "Failed to save scan: \(error.localizedDescription)"
@@ -352,37 +353,40 @@ class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
         _isPresented = isPresented
         _isProcessing = isProcessing
         super.init()
-        print("🎯 Coordinator initialized: \(self)")
+        AppLogger.roomScan.debug("Coordinator initialized")
     }
     
     // NSCoding required methods (not actually used, but required for compilation)
     required init?(coder: NSCoder) {
-        fatalError("NSCoding not supported")
+        // This should never be called since we're not using storyboards
+        AppLogger.roomScan.error("NSCoding init(coder:) called unexpectedly - not supported")
+        return nil
     }
     
     func encode(with coder: NSCoder) {
-        fatalError("NSCoding not supported")
+        // This should never be called since we're not using storyboards
+        AppLogger.roomScan.error("NSCoding encode(with:) called unexpectedly - not supported")
     }
     
     deinit {
-        print("♻️ Coordinator deinit")
+        AppLogger.roomScan.debug("Coordinator deinit")
     }
     
     @objc func doneButtonTapped() {
-        print("👆 Done button tapped - finishing immediately")
-        print("📊 Current state: captureSession=\(captureSession != nil), latestCapturedRoom=\(latestCapturedRoom != nil)")
+        AppLogger.roomScan.debug("Done button tapped - finishing immediately")
+        AppLogger.roomScan.debug("Current state: captureSession=\(self.captureSession != nil, privacy: .public), latestCapturedRoom=\(self.latestCapturedRoom != nil, privacy: .public)")
         
         // Use the latest captured room immediately instead of waiting for stop callback
         DispatchQueue.main.async {
             if let room = self.latestCapturedRoom {
-                print("✅ Using latest captured room immediately")
+                AppLogger.roomScan.debug("Using latest captured room immediately")
                 self.capturedRoom = room
             } else {
-                print("⚠️ No room captured")
+                AppLogger.roomScan.warning("No room captured")
                 self.capturedRoom = nil
             }
             
-            print("🚪 Dismissing modal immediately")
+            AppLogger.roomScan.debug("Dismissing modal immediately")
             self.isPresented = false
             
             // Skip haptic feedback - it can cause 30+ second hangs when initializing the haptic engine
@@ -392,66 +396,68 @@ class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
         // Stop session in background (don't wait for it)
         DispatchQueue.global(qos: .background).async {
             self.captureSession?.stop()
-            print("✅ Stop called on capture session (background)")
+            AppLogger.roomScan.debug("Stop called on capture session (background)")
         }
     }
     
     // RoomCaptureSessionDelegate methods
     func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
-        print("🔄 SESSION DELEGATE: didUpdate called!!!")
-        print("   Room has \(room.walls.count) walls, \(room.doors.count) doors, \(room.windows.count) windows")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didUpdate called")
+        AppLogger.roomScan.debug("Room has \(room.walls.count, privacy: .public) walls, \(room.doors.count, privacy: .public) doors, \(room.windows.count, privacy: .public) windows")
         latestCapturedRoom = room
     }
     
     func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
-        print("📱 SESSION DELEGATE: didEndWith called!!!")
-        print("   Error: \(error?.localizedDescription ?? "none")")
-        print("   Latest room: \(latestCapturedRoom != nil ? "present" : "nil")")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didEndWith called")
+        if let error = error {
+            AppLogger.roomScan.error("Error: \(error.localizedDescription, privacy: .public)")
+        }
+        AppLogger.roomScan.debug("Latest room: \(self.latestCapturedRoom != nil ? "present" : "nil", privacy: .public)")
         
         DispatchQueue.main.async {
             // Hide processing indicator
             self.isProcessing = false
             
             if let error = error {
-                print("❌ Error: \(error.localizedDescription)")
+                AppLogger.roomScan.error("Capture session ended with error: \(error.localizedDescription, privacy: .public)")
                 // Skip haptic - causes 30+ second hangs
                 self.capturedRoom = nil
             } else if let room = self.latestCapturedRoom {
-                print("✅ Using latest captured room with \(room.walls.count) walls")
+                AppLogger.roomScan.info("Using latest captured room with \(room.walls.count, privacy: .public) walls")
                 // Skip haptic - causes 30+ second hangs
                 self.capturedRoom = room
             } else {
-                print("⚠️ No room captured")
+                AppLogger.roomScan.warning("No room captured")
                 // Skip haptic - causes 30+ second hangs
                 self.capturedRoom = nil
             }
             
-            print("🚪 Dismissing modal - setting isPresented = false")
+            AppLogger.roomScan.debug("Dismissing modal - setting isPresented = false")
             self.isPresented = false
         }
     }
     
     func captureSession(_ session: RoomCaptureSession, didAdd room: CapturedRoom) {
-        print("➕ SESSION DELEGATE: didAdd called!!!")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didAdd called")
         latestCapturedRoom = room
     }
     
     func captureSession(_ session: RoomCaptureSession, didChange room: CapturedRoom) {
-        print("🔄 SESSION DELEGATE: didChange called!!!")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didChange called")
         latestCapturedRoom = room
     }
     
     func captureSession(_ session: RoomCaptureSession, didRemove room: CapturedRoom) {
-        print("➖ SESSION DELEGATE: didRemove called")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didRemove called")
     }
     
     func captureSession(_ session: RoomCaptureSession, didProvide instruction: RoomCaptureSession.Instruction) {
-        print("💬 SESSION DELEGATE: didProvide instruction")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didProvide instruction")
         
         // Hide overlay on first instruction - camera is now fully ready
         if !hasReceivedFirstInstruction {
             hasReceivedFirstInstruction = true
-            print("📹 First instruction received - camera is ready, hiding overlay")
+            AppLogger.roomScan.debug("First instruction received - camera is ready, hiding overlay")
             DispatchQueue.main.async {
                 self.viewController?.hideInitializingOverlay()
             }
@@ -459,8 +465,8 @@ class RoomCaptureCoordinator: NSObject, RoomCaptureSessionDelegate, NSCoding {
     }
     
     func captureSession(_ session: RoomCaptureSession, didStartWith configuration: RoomCaptureSession.Configuration) {
-        print("🎬 SESSION DELEGATE: didStartWith configuration!!!")
-        print("📹 Session started, waiting for first instruction to confirm camera is ready")
+        AppLogger.roomScan.debug("SESSION DELEGATE: didStartWith configuration")
+        AppLogger.roomScan.debug("Session started, waiting for first instruction to confirm camera is ready")
     }
 }
 
@@ -470,7 +476,7 @@ struct RoomCaptureModalView: UIViewControllerRepresentable {
     @Binding var isProcessing: Bool
     
     func makeUIViewController(context: Context) -> RoomCaptureWrapperViewController {
-        print("🏗️ Creating RoomCaptureWrapperViewController")
+        AppLogger.roomScan.debug("Creating RoomCaptureWrapperViewController")
         let wrapper = RoomCaptureWrapperViewController()
         wrapper.coordinator = context.coordinator
         return wrapper
@@ -542,7 +548,7 @@ class RoomCaptureWrapperViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        print("🔧 RoomCaptureWrapperViewController viewDidLoad")
+        AppLogger.roomScan.debug("RoomCaptureWrapperViewController viewDidLoad")
         
         // Create capture view first
         captureView = RoomPlan.RoomCaptureView(frame: view.bounds)
@@ -555,8 +561,8 @@ class RoomCaptureWrapperViewController: UIViewController {
         coordinator?.captureSession = captureSession
         coordinator?.viewController = self
         
-        print("✅ Capture view created and connected to session")
-        print("✅ Session delegate set: \(String(describing: captureSession.delegate))")
+        AppLogger.roomScan.debug("Capture view created and connected to session")
+        AppLogger.roomScan.debug("Session delegate set: \(String(describing: self.captureSession.delegate), privacy: .public)")
         
         // Add Done button
         let doneButton = UIButton(type: .system)
@@ -583,11 +589,11 @@ class RoomCaptureWrapperViewController: UIViewController {
         // Show loading overlay immediately
         showInitializingOverlay()
         
-        print("▶️ Starting room capture session with SESSION DELEGATE...")
+        AppLogger.roomScan.info("Starting room capture session with SESSION DELEGATE")
         let config = RoomCaptureSession.Configuration()
         captureSession.run(configuration: config)
-        print("✅ Room capture session started")
-        print("✅ Session delegate: \(captureSession.delegate != nil ? "YES" : "NO")")
+        AppLogger.roomScan.info("Room capture session started")
+        AppLogger.roomScan.debug("Session delegate: \(self.captureSession.delegate != nil ? "YES" : "NO", privacy: .public)")
         
         // Safety timeout: hide overlay after 15 seconds if still showing (didStartWith should hide it much sooner)
         DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
@@ -641,36 +647,36 @@ class RoomCaptureWrapperViewController: UIViewController {
     
     func hideInitializingOverlay() {
         guard view.viewWithTag(9999) != nil else {
-            print("⏱️ Overlay already hidden")
+            AppLogger.roomScan.debug("Overlay already hidden")
             return
         }
         
-        print("⏱️ Hiding initialization overlay")
+        AppLogger.roomScan.debug("Hiding initialization overlay")
         
         if let overlay = view.viewWithTag(9999) {
             UIView.animate(withDuration: 0.3, animations: {
                 overlay.alpha = 0
             }) { _ in
                 overlay.removeFromSuperview()
-                print("⏱️ Overlay removed from view")
+                AppLogger.roomScan.debug("Overlay removed from view")
             }
         }
     }
     
     @objc private func doneButtonTapped() {
-        print("👆 Done button tapped")
+        AppLogger.roomScan.debug("Done button tapped")
         coordinator?.doneButtonTapped()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        print("🛑 View will disappear - session already stopped in background")
+        AppLogger.roomScan.debug("View will disappear - session already stopped in background")
         // Don't call stop() here - it's already being called in background from doneButtonTapped()
         // Calling stop() on main thread blocks UI for 20+ seconds
     }
     
     deinit {
-        print("♻️ RoomCaptureWrapperViewController deinit")
+        AppLogger.roomScan.debug("RoomCaptureWrapperViewController deinit")
     }
 }
 
@@ -696,7 +702,7 @@ class RoomCaptureViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        print("🔧 Setting up RoomCaptureView...")
+        AppLogger.roomScan.debug("Setting up RoomCaptureView...")
         
         roomCaptureView = RoomPlan.RoomCaptureView()
         roomCaptureView.delegate = self
@@ -728,31 +734,31 @@ class RoomCaptureViewController: UIViewController {
             doneButton.heightAnchor.constraint(equalToConstant: 44)
         ])
         
-        print("✅ Delegate set to: \(String(describing: roomCaptureView.delegate))")
-        print("✅ RoomCaptureView setup complete")
+        AppLogger.roomScan.debug("Delegate set to: \(String(describing: self.roomCaptureView.delegate), privacy: .public)")
+        AppLogger.roomScan.debug("RoomCaptureView setup complete")
     }
     
     @objc private func doneButtonTapped() {
-        print("👆 Done button tapped - stopping session")
+        AppLogger.roomScan.debug("Done button tapped - stopping session")
         roomCaptureView.captureSession.stop(pauseARSession: true)
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        print("▶️ Starting room capture session...")
+        AppLogger.roomScan.info("Starting room capture session")
         let config = RoomCaptureSession.Configuration()
         roomCaptureView.captureSession.run(configuration: config)
-        print("✅ Room capture session started")
+        AppLogger.roomScan.info("Room capture session started")
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        print("🛑 View will disappear - stopping session")
+        AppLogger.roomScan.debug("View will disappear - stopping session")
         roomCaptureView.captureSession.stop(pauseARSession: true)
     }
     
     deinit {
-        print("♻️ RoomCaptureViewController deinit")
+        AppLogger.roomScan.debug("RoomCaptureViewController deinit")
         roomCaptureView?.delegate = nil
     }
 }
@@ -760,28 +766,28 @@ class RoomCaptureViewController: UIViewController {
 extension RoomCaptureViewController: RoomCaptureViewDelegate {
     // This delegate method is called during scanning to provide updates
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didUpdate room: CapturedRoom) {
-        print("🔄 RoomCaptureDelegate: didUpdate called - storing latest room")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didUpdate called - storing latest room")
         latestCapturedRoom = room
     }
     
     // This is called when the scan completes (user stops or session ends)
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didEndWith data: CapturedRoomData, error: Error?) {
-        print("📱 RoomCaptureDelegate: didEndWith CapturedRoomData called")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didEndWith CapturedRoomData called")
         
         if let error = error {
-            print("❌ Room capture ended with error: \(error.localizedDescription)")
+            AppLogger.roomScan.error("Room capture ended with error: \(error.localizedDescription, privacy: .public)")
             // Skip haptic - causes 30+ second hangs
             delegate?.captureViewController(self, didFinishWith: nil)
         } else {
-            print("✅ Room capture ended successfully")
+            AppLogger.roomScan.info("Room capture ended successfully")
             
             // Use the latest captured room from didUpdate
             if let room = latestCapturedRoom {
-                print("✅ Using latestCapturedRoom from didUpdate")
+                AppLogger.roomScan.debug("Using latestCapturedRoom from didUpdate")
                 // Skip haptic - causes 30+ second hangs
                 delegate?.captureViewController(self, didFinishWith: room)
             } else {
-                print("⚠️ No latestCapturedRoom available")
+                AppLogger.roomScan.warning("No latestCapturedRoom available")
                 // Skip haptic - causes 30+ second hangs
                 delegate?.captureViewController(self, didFinishWith: nil)
             }
@@ -790,29 +796,29 @@ extension RoomCaptureViewController: RoomCaptureViewDelegate {
     
     // This is called when a room is added
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didAdd room: CapturedRoom) {
-        print("➕ RoomCaptureDelegate: didAdd called - storing room")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didAdd called - storing room")
         latestCapturedRoom = room
     }
     
     // This is called when a room is removed
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didRemove room: CapturedRoom) {
-        print("➖ RoomCaptureDelegate: didRemove called")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didRemove called")
     }
     
     // This is called when a room is changed
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didChange room: CapturedRoom) {
-        print("🔄 RoomCaptureDelegate: didChange called - storing room")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didChange called - storing room")
         latestCapturedRoom = room
     }
     
     // This is called to provide instructions
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didProvide instruction: RoomCaptureSession.Instruction) {
-        print("💡 RoomCaptureDelegate: didProvide instruction: \(instruction)")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didProvide instruction: \(String(describing: instruction), privacy: .public)")
     }
     
     // This is called when scanning starts
     func captureView(_ captureView: RoomPlan.RoomCaptureView, didStartWith configuration: RoomCaptureSession.Configuration) {
-        print("🎬 RoomCaptureDelegate: didStartWith configuration")
+        AppLogger.roomScan.debug("RoomCaptureDelegate: didStartWith configuration")
     }
 }
 

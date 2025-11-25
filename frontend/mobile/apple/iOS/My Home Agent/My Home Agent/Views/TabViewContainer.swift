@@ -1,4 +1,5 @@
 import SwiftUI
+import OSLog
 
 /// A wrapper around MainTabView to avoid redeclaration issues
 struct TabViewContainer: View {
@@ -20,7 +21,7 @@ struct TabViewContainer: View {
     private func setupNotificationObserver() {
         // Add observer for logout notifications
         NotificationCenter.default.addObserver(forName: NSNotification.Name("LogoutRequired"), object: nil, queue: .main) { _ in
-            print("📱 TabViewContainer: Received LogoutRequired notification")
+            AppLogger.auth.info("Received LogoutRequired notification")
             // Show login view on the main thread
             DispatchQueue.main.async {
                 showLoginView = true
