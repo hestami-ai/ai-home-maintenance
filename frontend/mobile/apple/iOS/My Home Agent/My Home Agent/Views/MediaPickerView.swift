@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
-import UIKit
+import UniformTypeIdentifiers
+import OSLog
 
 /// SwiftUI wrapper for media selection (gallery and camera)
 struct MediaPickerView: UIViewControllerRepresentable {
@@ -103,7 +104,7 @@ struct MediaPickerView: UIViewControllerRepresentable {
         private func loadImage(from itemProvider: NSItemProvider, completion: @escaping (URL?) -> Void) {
             itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, error in
                 guard let url = url, error == nil else {
-                    print("❌ Failed to load image: \(error?.localizedDescription ?? "unknown error")")
+                    AppLogger.media.error("Failed to load image: \(error?.localizedDescription ?? "unknown error", privacy: .public)")
                     completion(nil)
                     return
                 }
@@ -120,7 +121,7 @@ struct MediaPickerView: UIViewControllerRepresentable {
                     try FileManager.default.copyItem(at: url, to: tempURL)
                     completion(tempURL)
                 } catch {
-                    print("❌ Failed to copy image: \(error)")
+                    AppLogger.error("Failed to copy image", error: error, category: AppLogger.media)
                     completion(nil)
                 }
             }
@@ -129,7 +130,7 @@ struct MediaPickerView: UIViewControllerRepresentable {
         private func loadVideo(from itemProvider: NSItemProvider, completion: @escaping (URL?) -> Void) {
             itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { url, error in
                 guard let url = url, error == nil else {
-                    print("❌ Failed to load video: \(error?.localizedDescription ?? "unknown error")")
+                    AppLogger.media.error("Failed to load video: \(error?.localizedDescription ?? "unknown error", privacy: .public)")
                     completion(nil)
                     return
                 }
@@ -146,7 +147,7 @@ struct MediaPickerView: UIViewControllerRepresentable {
                     try FileManager.default.copyItem(at: url, to: tempURL)
                     completion(tempURL)
                 } catch {
-                    print("❌ Failed to copy video: \(error)")
+                    AppLogger.error("Failed to copy video", error: error, category: AppLogger.media)
                     completion(nil)
                 }
             }
@@ -184,7 +185,7 @@ struct MediaPickerView: UIViewControllerRepresentable {
                         self.parent.selectedFiles = [tempURL]
                     }
                 } catch {
-                    print("❌ Failed to copy video from camera: \(error)")
+                    AppLogger.error("Failed to copy video from camera", error: error, category: AppLogger.media)
                 }
             }
         }
@@ -208,7 +209,7 @@ struct MediaPickerView: UIViewControllerRepresentable {
                     try imageData.write(to: tempURL)
                     completion(tempURL)
                 } catch {
-                    print("❌ Failed to save image: \(error)")
+                    AppLogger.error("Failed to save image", error: error, category: AppLogger.media)
                     completion(nil)
                 }
             }
@@ -394,15 +395,17 @@ struct RoomScanPickerView: View {
                         
                         // Verify file exists
                         let fileExists = FileManager.default.fileExists(atPath: scan.fileURL.path)
-                        print("📁 Room scan file exists: \(fileExists) at \(scan.fileURL.path)")
+                        #if DEBUG
+                        AppLogger.storage.debug("Room scan file exists: \(fileExists, privacy: .public) at \(scan.fileURL.path, privacy: .public)")
+                        #endif
                         
                         if fileExists {
                             // Add USDZ file URL
                             selectedFiles = [scan.fileURL]
-                            print("📁 Selected room scan: \(scan.name)")
+                            AppLogger.storage.info("Selected room scan: \(scan.name, privacy: .public)")
                             dismiss()
                         } else {
-                            print("❌ Room scan file not found at: \(scan.fileURL.path)")
+                            AppLogger.storage.error("Room scan file not found at: \(scan.fileURL.path, privacy: .public)")
                         }
                     }) {
                         HStack {

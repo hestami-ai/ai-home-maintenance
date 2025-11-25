@@ -30,7 +30,7 @@ class ServiceRequestService {
         let parameters = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         
         return try await NetworkManager.shared.request(
-            endpoint: "/api/services/requests/create/",
+            endpoint: "/api/services/requests/",
             method: .post,
             parameters: parameters
         )
@@ -38,7 +38,7 @@ class ServiceRequestService {
     
     func createRequest(parameters: [String: Any]) async throws -> ServiceRequest {
         return try await NetworkManager.shared.request(
-            endpoint: "/api/services/requests/create/",
+            endpoint: "/api/services/requests/",
             method: .post,
             parameters: parameters
         )

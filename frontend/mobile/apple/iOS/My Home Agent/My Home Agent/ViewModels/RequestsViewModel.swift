@@ -46,10 +46,11 @@ class RequestsViewModel: ObservableObject {
         category: String,
         priority: ServiceRequestPriority = .MEDIUM,
         scheduledStart: Date? = nil,
-        scheduledEnd: Date? = nil
+        scheduledEnd: Date? = nil,
+        preferredSchedule: [String: Any]? = nil
     ) async throws -> ServiceRequest {
         // Create request parameters
-        let parameters: [String: Any] = [
+        var parameters: [String: Any] = [
             "property": propertyId,
             "title": title,
             "description": description,
@@ -58,6 +59,10 @@ class RequestsViewModel: ObservableObject {
             "scheduled_start": scheduledStart?.ISO8601Format() as Any,
             "scheduled_end": scheduledEnd?.ISO8601Format() as Any
         ]
+        
+        if let preferredSchedule = preferredSchedule {
+            parameters["preferred_schedule"] = preferredSchedule
+        }
         
         let newRequest = try await serviceRequestService.createRequest(parameters: parameters)
         serviceRequests.append(newRequest)

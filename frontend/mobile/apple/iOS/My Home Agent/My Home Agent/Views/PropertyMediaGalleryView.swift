@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVKit
+import OSLog
 
 // MARK: - Media Gallery Components
 
@@ -417,11 +418,10 @@ struct MediaViewerView: View {
                                 Panorama360View(imageURL: url)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     .onAppear {
-                                        print("🎯 MediaViewerView: Opening 360° image")
-                                        print("   Media ID: \(media.id)")
-                                        print("   Title: \(media.title)")
-                                        print("   SubType: \(media.mediaSubType)")
-                                        print("   File URL: \(media.fileUrl)")
+                                        #if DEBUG
+                                        AppLogger.media.debug("Opening 360° image: ID=\(media.id, privacy: .public), Title=\(media.title, privacy: .public), SubType=\(media.mediaSubType, privacy: .public)")
+                                        AppLogger.media.debug("  File URL: \(media.fileUrl, privacy: .public)")
+                                        #endif
                                     }
                                 
                                 // 360° Indicator Badge
@@ -695,14 +695,14 @@ struct RemoteUSDZViewer: View {
         }
         
         isDownloading = true
-        print("📥 RemoteUSDZViewer: Starting download from \(fileUrl)")
+        AppLogger.media.info("Starting USDZ download from: \(fileUrl, privacy: .public)")
         
         let task = URLSession.shared.downloadTask(with: url) { tempURL, response, error in
             // Handle errors
             if let error = error {
                 DispatchQueue.main.async {
                     isDownloading = false
-                    print("❌ RemoteUSDZViewer: Download failed: \(error)")
+                    AppLogger.error("USDZ download failed", error: error, category: AppLogger.media)
                     downloadError = error.localizedDescription
                 }
                 return
@@ -711,7 +711,7 @@ struct RemoteUSDZViewer: View {
             guard let tempURL = tempURL else {
                 DispatchQueue.main.async {
                     isDownloading = false
-                    print("❌ RemoteUSDZViewer: No temp URL")
+                    AppLogger.media.error("USDZ download failed: No temp URL")
                     downloadError = "Download failed"
                 }
                 return
@@ -725,7 +725,7 @@ struct RemoteUSDZViewer: View {
             // (URLSession will delete tempURL after this handler completes)
             do {
                 try FileManager.default.copyItem(at: tempURL, to: destinationURL)
-                print("✅ RemoteUSDZViewer: Downloaded to \(destinationURL.path)")
+                AppLogger.media.info("USDZ downloaded to: \(destinationURL.path, privacy: .public)")
                 
                 // Update UI on main thread
                 DispatchQueue.main.async {
@@ -734,7 +734,7 @@ struct RemoteUSDZViewer: View {
                 }
                 
             } catch {
-                print("❌ RemoteUSDZViewer: Failed to save file: \(error)")
+                AppLogger.error("Failed to save USDZ file", error: error, category: AppLogger.media)
                 DispatchQueue.main.async {
                     isDownloading = false
                     downloadError = "Failed to save file: \(error.localizedDescription)"

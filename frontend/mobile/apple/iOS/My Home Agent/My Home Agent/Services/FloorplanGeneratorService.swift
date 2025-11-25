@@ -1,6 +1,7 @@
 import Foundation
 import RoomPlan
 import UIKit
+import OSLog
 
 extension UIColor {
     func darker() -> UIColor {
@@ -18,15 +19,19 @@ class FloorplanGeneratorService {
     // MARK: - Generate Floorplan Image
     
     func generateFloorplan(from capturedRoom: CapturedRoom, size: CGSize = CGSize(width: 1024, height: 1024), useMetric: Bool = true) -> UIImage? {
-        print("🏗️ FloorplanGenerator: Starting floorplan generation (useMetric: \(useMetric))")
+        AppLogger.roomScan.info("Starting floorplan generation (useMetric: \(useMetric, privacy: .public))")
         
         // Calculate dominant wall angle to align floorplan
         let alignmentAngle = calculateAlignmentAngle(from: capturedRoom)
-        print("   Alignment angle: \(alignmentAngle * 180 / .pi) degrees")
+        #if DEBUG
+        AppLogger.roomScan.debug("Alignment angle: \(alignmentAngle * 180 / .pi, privacy: .public) degrees")
+        #endif
         
         // Calculate room bounds AFTER rotation for proper centering
         let bounds = calculateRoomBounds(from: capturedRoom, alignmentAngle: alignmentAngle)
-        print("   Room bounds (after rotation): (minX: \(bounds.minX), maxX: \(bounds.maxX), minZ: \(bounds.minZ), maxZ: \(bounds.maxZ))")
+        #if DEBUG
+        AppLogger.roomScan.debug("Room bounds (after rotation): (minX: \(bounds.minX, privacy: .public), maxX: \(bounds.maxX, privacy: .public), minZ: \(bounds.minZ, privacy: .public), maxZ: \(bounds.maxZ, privacy: .public))")
+        #endif
         
         // Create image context
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -48,16 +53,11 @@ class FloorplanGeneratorService {
             let scale = calculateScale(bounds: bounds, imageSize: size, legendWidth: legendWidth, legendHeight: legendHeight, legendPadding: legendPadding, labelPadding: labelPadding)
             let offset = calculateOffset(bounds: bounds, imageSize: size, scale: scale, legendWidth: legendWidth, legendHeight: legendHeight, legendPadding: legendPadding, labelPadding: labelPadding)
             
-            print("   Scale: \(scale), Offset: (\(offset.x), \(offset.y))")
-            print("   Canvas size: \(size.width) x \(size.height)")
-            
-            // Log what we found
-            print("   RoomPlan detected:")
-            print("      Walls: \(capturedRoom.walls.count)")
-            print("      Doors: \(capturedRoom.doors.count)")
-            print("      Windows: \(capturedRoom.windows.count)")
-            print("      Openings: \(capturedRoom.openings.count)")
-            print("      Objects: \(capturedRoom.objects.count)")
+            #if DEBUG
+            AppLogger.roomScan.debug("Scale: \(scale, privacy: .public), Offset: (\(offset.x, privacy: .public), \(offset.y, privacy: .public))")
+            AppLogger.roomScan.debug("Canvas size: \(size.width, privacy: .public) x \(size.height, privacy: .public)")
+            AppLogger.roomScan.debug("RoomPlan detected: Walls: \(capturedRoom.walls.count, privacy: .public), Doors: \(capturedRoom.doors.count, privacy: .public), Windows: \(capturedRoom.windows.count, privacy: .public), Openings: \(capturedRoom.openings.count, privacy: .public), Objects: \(capturedRoom.objects.count, privacy: .public)")
+            #endif
             
             // Combine all surfaces for reclassification
             var allSurfaces: [CapturedRoom.Surface] = []
@@ -70,19 +70,27 @@ class FloorplanGeneratorService {
             let reclassified = reclassifySurfaces(allSurfaces)
             
             // Draw walls (only actual walls, not doors/windows)
-            print("   Drawing \(reclassified.walls.count) walls")
+            #if DEBUG
+            AppLogger.roomScan.debug("Drawing \(reclassified.walls.count, privacy: .public) walls")
+            #endif
             drawWalls(reclassified.walls, context: ctx, scale: scale, offset: offset, bounds: bounds, alignmentAngle: alignmentAngle)
             
             // Draw doors
-            print("   Drawing \(reclassified.doors.count) doors")
+            #if DEBUG
+            AppLogger.roomScan.debug("Drawing \(reclassified.doors.count, privacy: .public) doors")
+            #endif
             drawDoors(reclassified.doors, context: ctx, scale: scale, offset: offset, bounds: bounds, alignmentAngle: alignmentAngle)
             
             // Draw windows
-            print("   Drawing \(reclassified.windows.count) windows")
+            #if DEBUG
+            AppLogger.roomScan.debug("Drawing \(reclassified.windows.count, privacy: .public) windows")
+            #endif
             drawWindows(reclassified.windows, context: ctx, scale: scale, offset: offset, bounds: bounds, alignmentAngle: alignmentAngle)
             
             // Draw openings
-            print("   Drawing \(reclassified.openings.count) openings")
+            #if DEBUG
+            AppLogger.roomScan.debug("Drawing \(reclassified.openings.count, privacy: .public) openings")
+            #endif
             drawOpenings(reclassified.openings, context: ctx, scale: scale, offset: offset, bounds: bounds, alignmentAngle: alignmentAngle)
             
             // Draw furniture and objects
@@ -95,7 +103,7 @@ class FloorplanGeneratorService {
             drawLegend(context: ctx, imageSize: size, hasWindows: !reclassified.windows.isEmpty, hasDoors: !reclassified.doors.isEmpty, hasOpenings: !reclassified.openings.isEmpty)
         }
         
-        print("✅ FloorplanGenerator: Floorplan generated")
+        AppLogger.roomScan.info("Floorplan generated")
         return image
     }
     
@@ -107,31 +115,45 @@ class FloorplanGeneratorService {
         var windows: [CapturedRoom.Surface] = []
         var openings: [CapturedRoom.Surface] = []
         
-        print("🔍 Analyzing \(surfaces.count) surfaces for reclassification...")
+        #if DEBUG
+        AppLogger.roomScan.debug("Analyzing \(surfaces.count, privacy: .public) surfaces for reclassification...")
+        #endif
         
         for (index, surface) in surfaces.enumerated() {
             // First check if RoomPlan already classified it correctly
             switch surface.category {
             case .wall:
-                print("   Surface \(index): wall - checking heuristics")
+                #if DEBUG
+                AppLogger.roomScan.debug("Surface \(index, privacy: .public): wall - checking heuristics")
+                #endif
                 break // Continue to heuristics
             case .door:
-                print("   Surface \(index): door (pre-classified)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Surface \(index, privacy: .public): door (pre-classified)")
+                #endif
                 doors.append(surface)
                 continue
             case .window:
-                print("   Surface \(index): window (pre-classified)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Surface \(index, privacy: .public): window (pre-classified)")
+                #endif
                 windows.append(surface)
                 continue
             case .opening:
-                print("   Surface \(index): opening (pre-classified)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Surface \(index, privacy: .public): opening (pre-classified)")
+                #endif
                 openings.append(surface)
                 continue
             case .floor:
-                print("   Surface \(index): floor (ignored)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Surface \(index, privacy: .public): floor (ignored)")
+                #endif
                 continue // Ignore floors
             @unknown default:
-                print("   Surface \(index): unknown category")
+                #if DEBUG
+                AppLogger.roomScan.debug("Surface \(index, privacy: .public): unknown category")
+                #endif
                 walls.append(surface)
                 continue
             }
@@ -145,14 +167,18 @@ class FloorplanGeneratorService {
             let transform = surface.transform
             let yPosition = transform.columns.3.y
             
-            print("      Dimensions: width=\(width)m, height=\(height)m, y=\(yPosition)m")
+            #if DEBUG
+            AppLogger.roomScan.debug("Dimensions: width=\(width, privacy: .public)m, height=\(height, privacy: .public)m, y=\(yPosition, privacy: .public)m")
+            #endif
             
             // Heuristics for windows:
             // - Smaller width (< 3.0m)
             // - Higher Y position (> 0.4m from floor)
             // - Shorter height (< 2.2m)
             if width < 3.0 && height < 2.2 && yPosition > 0.4 {
-                print("   🪟 Reclassified surface as WINDOW (width: \(width)m, height: \(height)m, y: \(yPosition)m)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Reclassified surface as WINDOW (width: \(width, privacy: .public)m, height: \(height, privacy: .public)m, y: \(yPosition, privacy: .public)m)")
+                #endif
                 windows.append(surface)
                 continue
             }
@@ -162,7 +188,9 @@ class FloorplanGeneratorService {
             // - Full height (> 1.5m)
             // - Low Y position (near floor, < 0.5m)
             if width > 0.5 && width < 1.5 && height > 1.5 && yPosition < 0.5 {
-                print("   🚪 Reclassified surface as DOOR (width: \(width)m, height: \(height)m, y: \(yPosition)m)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Reclassified surface as DOOR (width: \(width, privacy: .public)m, height: \(height, privacy: .public)m, y: \(yPosition, privacy: .public)m)")
+                #endif
                 doors.append(surface)
                 continue
             }
@@ -172,21 +200,23 @@ class FloorplanGeneratorService {
             // - Full height (> 1.8m)
             // - Low Y position
             if width > 0.7 && width < 2.5 && height > 1.8 && yPosition < 0.5 {
-                print("   🚶 Reclassified surface as OPENING (width: \(width)m, height: \(height)m, y: \(yPosition)m)")
+                #if DEBUG
+                AppLogger.roomScan.debug("Reclassified surface as OPENING (width: \(width, privacy: .public)m, height: \(height, privacy: .public)m, y: \(yPosition, privacy: .public)m)")
+                #endif
                 openings.append(surface)
                 continue
             }
             
             // Default: keep as wall
-            print("      → Keeping as WALL")
+            #if DEBUG
+            AppLogger.roomScan.debug("Keeping as WALL")
+            #endif
             walls.append(surface)
         }
         
-        print("📊 Reclassification results:")
-        print("   Walls: \(walls.count)")
-        print("   Doors: \(doors.count)")
-        print("   Windows: \(windows.count)")
-        print("   Openings: \(openings.count)")
+        #if DEBUG
+        AppLogger.roomScan.debug("Reclassification results: Walls: \(walls.count, privacy: .public), Doors: \(doors.count, privacy: .public), Windows: \(windows.count, privacy: .public), Openings: \(openings.count, privacy: .public)")
+        #endif
         
         return (walls, doors, windows, openings)
     }
@@ -213,7 +243,9 @@ class FloorplanGeneratorService {
         let transform = wall.transform
         let angle = atan2(transform.columns.0.z, transform.columns.0.x)
         
-        print("   Longest wall: \(maxLength)m, angle: \(angle * 180 / .pi)°")
+        #if DEBUG
+        AppLogger.roomScan.debug("Longest wall: \(maxLength, privacy: .public)m, angle: \(angle * 180 / .pi, privacy: .public)°")
+        #endif
         
         // Return the negative angle to align the longest wall horizontally
         return -angle
@@ -411,7 +443,9 @@ class FloorplanGeneratorService {
     }
     
     private func drawWindows(_ windows: [CapturedRoom.Surface], context: CGContext, scale: CGFloat, offset: CGPoint, bounds: (minX: Float, maxX: Float, minZ: Float, maxZ: Float), alignmentAngle: Float) {
-        print("   🪟 Drawing \(windows.count) windows...")
+        #if DEBUG
+        AppLogger.roomScan.debug("Drawing \(windows.count, privacy: .public) windows...")
+        #endif
         context.setStrokeColor(UIColor.systemBlue.cgColor)
         context.setLineWidth(6.0)  // Thicker to be more visible
         
@@ -451,16 +485,22 @@ class FloorplanGeneratorService {
             )
             
             // Draw window as thick blue line
-            print("      Window \(index): from (\(start.x), \(start.y)) to (\(end.x), \(end.y))")
+            #if DEBUG
+            AppLogger.roomScan.debug("Window \(index, privacy: .public): from (\(start.x, privacy: .public), \(start.y, privacy: .public)) to (\(end.x, privacy: .public), \(end.y, privacy: .public))")
+            #endif
             context.move(to: start)
             context.addLine(to: end)
         }
         context.strokePath()
-        print("   ✅ Windows drawn")
+        #if DEBUG
+        AppLogger.roomScan.debug("Windows drawn")
+        #endif
     }
     
     private func drawOpenings(_ openings: [CapturedRoom.Surface], context: CGContext, scale: CGFloat, offset: CGPoint, bounds: (minX: Float, maxX: Float, minZ: Float, maxZ: Float), alignmentAngle: Float) {
-        print("   🚶 Drawing \(openings.count) openings...")
+        #if DEBUG
+        AppLogger.roomScan.debug("Drawing \(openings.count, privacy: .public) openings...")
+        #endif
         context.setStrokeColor(UIColor.systemRed.cgColor)  // Changed to red for visibility
         context.setLineWidth(5.0)  // Thicker
         context.setLineDash(phase: 0, lengths: [8, 4])  // Longer dashes
@@ -501,13 +541,17 @@ class FloorplanGeneratorService {
             )
             
             // Draw opening as dashed red line
-            print("      Opening \(index): from (\(start.x), \(start.y)) to (\(end.x), \(end.y))")
+            #if DEBUG
+            AppLogger.roomScan.debug("Opening \(index, privacy: .public): from (\(start.x, privacy: .public), \(start.y, privacy: .public)) to (\(end.x, privacy: .public), \(end.y, privacy: .public))")
+            #endif
             context.move(to: start)
             context.addLine(to: end)
         }
         context.strokePath()
         context.setLineDash(phase: 0, lengths: [])
-        print("   ✅ Openings drawn")
+        #if DEBUG
+        AppLogger.roomScan.debug("Openings drawn")
+        #endif
     }
     
     private func drawObjects(_ objects: [CapturedRoom.Object], context: CGContext, scale: CGFloat, offset: CGPoint, bounds: (minX: Float, maxX: Float, minZ: Float, maxZ: Float), alignmentAngle: Float) {
@@ -850,7 +894,7 @@ class FloorplanGeneratorService {
         }
         
         try data.write(to: fileURL)
-        print("💾 FloorplanGenerator: Saved floorplan to \(fileURL.path)")
+        AppLogger.roomScan.info("Saved floorplan to \(fileURL.path, privacy: .public)")
         
         return fileURL
     }

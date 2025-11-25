@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OSLog
 import RoomPlan
 import AVKit
 
@@ -79,8 +80,10 @@ struct PropertyDetailView: View {
                     }
                 }
                 .onAppear {
-                    print("🔍 PropertyDetailView: Looking for property \(propertyId)")
-                    print("🔍 PropertyDetailView: Properties in viewModel: \(viewModel.properties.map { $0.id })")
+                    #if DEBUG
+                    AppLogger.app.debug("Looking for property \(propertyId, privacy: .public)")
+                    AppLogger.app.debug("Properties in viewModel: \(viewModel.properties.map { $0.id }, privacy: .public)")
+                    #endif
                     
                     // If properties list is empty, try to load them
                     if viewModel.properties.isEmpty {
@@ -606,7 +609,7 @@ struct PropertyDetailView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         showingUploadProgress = true
                         MediaUploadManager.shared.uploadMedia(tasks: tasks) { result in
-                            print("🔵 Upload completion callback triggered")
+                            AppLogger.media.debug("Upload completion callback triggered")
                             
                             // Clear selected files
                             DispatchQueue.main.async {
@@ -620,9 +623,9 @@ struct PropertyDetailView: View {
                             
                             switch result {
                             case .success(let media):
-                                print("✅ Successfully uploaded \(media.count) files")
+                                AppLogger.media.info("Successfully uploaded \(media.count, privacy: .public) files")
                             case .failure(let error):
-                                print("❌ Upload error: \(error.localizedDescription)")
+                                AppLogger.error("Upload error", error: error, category: AppLogger.media)
                             }
                         }
                     }
@@ -655,8 +658,10 @@ struct PropertyDetailView: View {
         .onChange(of: selectedFiles) { oldFiles, newFiles in
             guard !newFiles.isEmpty else { return }
             
-            print("🔵 PropertyDetailView: Selected \(newFiles.count) files")
-            print("🔵 File URLs: \(newFiles.map { $0.lastPathComponent })")
+            AppLogger.media.info("Selected \(newFiles.count, privacy: .public) files")
+            #if DEBUG
+            AppLogger.media.debug("File URLs: \(newFiles.map { $0.lastPathComponent }, privacy: .public)")
+            #endif
             
             // Dismiss the media selection sheet first
             showingMediaSelection = false

@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Combine
+import OSLog
 
 /// Manages media file uploads with progress tracking and error handling
 class MediaUploadManager: NSObject, ObservableObject {
@@ -51,25 +52,25 @@ class MediaUploadManager: NSObject, ObservableObject {
     
     /// Upload media files for a property with metadata
     func uploadMedia(tasks: [MediaUploadTask], completion: @escaping (Result<[Media], Error>) -> Void) {
-        print("🟢 MediaUploadManager: uploadMedia called with \(tasks.count) tasks")
+        AppLogger.media.debug("uploadMedia called with \(tasks.count, privacy: .public) tasks")
         
         guard !tasks.isEmpty else {
-            print("❌ MediaUploadManager: No tasks to upload")
+            AppLogger.media.error("No tasks to upload")
             completion(.failure(MediaUploadError.noValidFiles))
             return
         }
         
-        print("🟢 MediaUploadManager: Created \(tasks.count) upload tasks")
+        AppLogger.media.debug("Created \(tasks.count, privacy: .public) upload tasks")
         
         // Add to queue and start upload on main queue
         DispatchQueue.main.async {
             self.uploadQueue.append(contentsOf: tasks)
-            print("🟢 MediaUploadManager: Queue now has \(self.uploadQueue.count) tasks")
+            AppLogger.media.debug("Queue now has \(self.uploadQueue.count, privacy: .public) tasks")
             
             // Start uploading based on strategy
             switch self.config.uploadStrategy {
             case .sequential:
-                print("🟢 MediaUploadManager: Starting sequential upload")
+                AppLogger.media.debug("Starting sequential upload")
                 self.uploadSequentially(completion: completion)
             case .parallel(let maxConcurrent):
                 self.uploadInParallel(maxConcurrent: maxConcurrent, completion: completion)
@@ -105,11 +106,11 @@ class MediaUploadManager: NSObject, ObservableObject {
     /// Retry failed upload
     func retryUpload(taskId: String, completion: @escaping (Result<[Media], Error>) -> Void) {
         guard let index = uploadQueue.firstIndex(where: { $0.id == taskId }) else {
-            print("❌ MediaUploadManager: Task \(taskId) not found in queue for retry")
+            AppLogger.media.warning("Task \(taskId, privacy: .public) not found in queue for retry")
             return
         }
         
-        print("🔄 MediaUploadManager: Retrying task: \(uploadQueue[index].fileName)")
+        AppLogger.media.info("Retrying task: \(self.uploadQueue[index].fileName, privacy: .public)")
         
         DispatchQueue.main.async {
             self.uploadQueue[index].status = .pending
@@ -132,21 +133,23 @@ class MediaUploadManager: NSObject, ObservableObject {
     }
     
     private func uploadNextInQueue(completion: @escaping (Result<[Media], Error>) -> Void) {
-        print("🟡 MediaUploadManager: uploadNextInQueue called, queue has \(uploadQueue.count) tasks")
+        AppLogger.media.debug("uploadNextInQueue called, queue has \(self.uploadQueue.count, privacy: .public) tasks")
         
         // Log status of all tasks
-        for (index, task) in uploadQueue.enumerated() {
-            print("   Task \(index): \(task.fileName) - status: \(task.status)")
+        #if DEBUG
+        for (index, task) in self.uploadQueue.enumerated() {
+            AppLogger.media.debug("  Task \(index, privacy: .public): \(task.fileName, privacy: .public) - status: \(String(describing: task.status), privacy: .public)")
         }
+        #endif
         
         // Find next pending task
         guard let nextTask = uploadQueue.first(where: { $0.status == .pending }) else {
             // All done
-            print("🟡 MediaUploadManager: No more pending tasks")
+            AppLogger.media.debug("No more pending tasks")
             let uploadedMedia = uploadQueue.compactMap { $0.uploadedMedia }
             let hasErrors = uploadQueue.contains { $0.status == .failed }
             
-            print("🟡 MediaUploadManager: Upload complete - \(uploadedMedia.count) successful, hasErrors: \(hasErrors)")
+            AppLogger.media.info("Upload complete - \(uploadedMedia.count, privacy: .public) successful, hasErrors: \(hasErrors, privacy: .public)")
             
             DispatchQueue.main.async {
                 self.isUploading = false
@@ -162,7 +165,7 @@ class MediaUploadManager: NSObject, ObservableObject {
             return
         }
         
-        print("🟡 MediaUploadManager: Found pending task: \(nextTask.fileName)")
+        AppLogger.media.debug("Found pending task: \(nextTask.fileName, privacy: .public)")
         
         // Update current index
         if let index = uploadQueue.firstIndex(where: { $0.id == nextTask.id }) {
@@ -207,33 +210,33 @@ class MediaUploadManager: NSObject, ObservableObject {
     }
     
     private func uploadTask(_ task: MediaUploadTask, completion: @escaping (Result<Media, Error>) -> Void) {
-        print("🟠 MediaUploadManager: uploadTask called for \(task.fileName)")
-        print("🟠 MediaUploadManager: File URL: \(task.fileURL)")
-        print("🟠 MediaUploadManager: Property ID: \(task.propertyId)")
+        AppLogger.media.debug("uploadTask called for \(task.fileName, privacy: .public)")
+        AppLogger.media.debug("File URL: \(task.fileURL.path, privacy: .public)")
+        AppLogger.media.debug("Property ID: \(task.propertyId, privacy: .public)")
         
         DispatchQueue.main.async {
             if let index = self.uploadQueue.firstIndex(where: { $0.id == task.id }) {
                 self.uploadQueue[index].status = .uploading
-                print("🟠 MediaUploadManager: Task status set to uploading")
+                AppLogger.media.debug("Task status set to uploading")
             }
         }
         
         // Create multipart form data
-        print("🟠 MediaUploadManager: Creating multipart form data...")
+        AppLogger.media.debug("Creating multipart form data...")
         guard let boundary = createMultipartFormData(for: task) else {
-            print("❌ MediaUploadManager: Failed to create multipart form data")
+            AppLogger.media.error("Failed to create multipart form data")
             completion(.failure(MediaUploadError.invalidFileData))
             return
         }
-        print("🟠 MediaUploadManager: Multipart form data created successfully")
+        AppLogger.media.debug("Multipart form data created successfully")
         
         // Create request
         let endpoint = "/api/media/properties/\(task.propertyId)/upload"
         let fullURL = NetworkManager.shared.baseURL + endpoint
-        print("🟠 MediaUploadManager: Upload URL: \(fullURL)")
+        AppLogger.media.debug("Upload URL: \(fullURL, privacy: .public)")
         
         guard let url = URL(string: fullURL) else {
-            print("❌ MediaUploadManager: Invalid URL: \(fullURL)")
+            AppLogger.media.error("Invalid URL: \(fullURL, privacy: .public)")
             completion(.failure(MediaUploadError.invalidURL))
             return
         }
@@ -245,48 +248,58 @@ class MediaUploadManager: NSObject, ObservableObject {
         
         // Add authentication - session cookie
         if let sessionCookie = NetworkManager.shared.getSessionCookieValue() {
-            print("🟠 MediaUploadManager: Adding session cookie")
+            AppLogger.media.debug("Adding session cookie")
             request.setValue("hestami_session=\(sessionCookie)", forHTTPHeaderField: "Cookie")
         } else {
-            print("⚠️ MediaUploadManager: No session cookie found")
+            AppLogger.media.warning("No session cookie found")
         }
         
         // Add CSRF token if available (though browser doesn't use it)
         NetworkManager.shared.addCSRFToken(to: &request)
         
         // Log request details
-        print("🟠 MediaUploadManager: Request details:")
-        print("   URL: \(request.url?.absoluteString ?? "nil")")
-        print("   Method: \(request.httpMethod ?? "nil")")
+        #if DEBUG
+        AppLogger.media.debug("Request details:")
+        AppLogger.media.debug("  URL: \(request.url?.absoluteString ?? "nil", privacy: .public)")
+        AppLogger.media.debug("  Method: \(request.httpMethod ?? "nil", privacy: .public)")
         if let headers = request.allHTTPHeaderFields {
-            print("   Headers:")
             for (key, value) in headers {
-                print("     \(key): \(value)")
+                let isSensitive = key.lowercased().contains("cookie") || key.lowercased().contains("auth")
+                if isSensitive {
+                    AppLogger.debugSensitive("Header \(key)", sensitiveData: value, category: AppLogger.media)
+                } else {
+                    AppLogger.media.debug("  \(key, privacy: .public): \(value, privacy: .public)")
+                }
             }
         }
+        #endif
         
-        print("🟠 MediaUploadManager: Creating URLSession upload task...")
+        AppLogger.media.debug("Creating URLSession upload task...")
         
         // Read the multipart body data
         guard let bodyData = try? Data(contentsOf: boundary.fileURL) else {
-            print("❌ MediaUploadManager: Failed to read multipart body file")
+            AppLogger.media.error("Failed to read multipart body file")
             completion(.failure(MediaUploadError.invalidFileData))
             return
         }
-        print("🟠 MediaUploadManager: Multipart body size: \(bodyData.count) bytes")
+        AppLogger.media.debug("Multipart body size: \(bodyData.count, privacy: .public) bytes")
         
         // Create upload task with data instead of file
         let uploadTask = session.uploadTask(with: request, from: bodyData) { data, response, error in
-            print("🎯 MediaUploadManager: ===== UPLOAD COMPLETION HANDLER CALLED =====")
-            print("🎯 Error: \(error?.localizedDescription ?? "nil")")
-            print("🎯 Response: \(response.debugDescription)")
-            print("🎯 Data size: \(data?.count ?? 0) bytes")
+            AppLogger.media.debug("===== UPLOAD COMPLETION HANDLER CALLED =====")
+            if let error = error {
+                AppLogger.media.error("Error: \(error.localizedDescription, privacy: .public)")
+            }
+            #if DEBUG
+            AppLogger.media.debug("Response: \(response.debugDescription, privacy: .public)")
+            AppLogger.media.debug("Data size: \(data?.count ?? 0, privacy: .public) bytes")
+            #endif
             
             // Clean up temp file
             try? FileManager.default.removeItem(at: boundary.fileURL)
             
             if let error = error {
-                print("❌ MediaUploadManager: Upload failed with error: \(error.localizedDescription)")
+                AppLogger.media.error("Upload failed with error: \(error.localizedDescription, privacy: .public)")
                 completion(.failure(error))
                 return
             }
@@ -298,7 +311,7 @@ class MediaUploadManager: NSObject, ObservableObject {
             
             guard (200...299).contains(httpResponse.statusCode) else {
                 let errorMessage = data.flatMap { String(data: $0, encoding: .utf8) } ?? "Unknown error"
-                print("❌ Upload failed with status \(httpResponse.statusCode): \(errorMessage)")
+                AppLogger.media.error("Upload failed with status \(httpResponse.statusCode, privacy: .public): \(errorMessage, privacy: .public)")
                 completion(.failure(MediaUploadError.serverError(statusCode: httpResponse.statusCode, message: errorMessage)))
                 return
             }
@@ -343,32 +356,34 @@ class MediaUploadManager: NSObject, ObservableObject {
                 }
                 
                 let media = try decoder.decode(Media.self, from: data)
-                print("✅ Successfully decoded media response: \(media.id)")
+                AppLogger.media.info("Successfully decoded media response: \(media.id, privacy: .public)")
                 completion(.success(media))
             } catch {
-                print("❌ Failed to decode media response: \(error)")
+                AppLogger.media.error("Failed to decode media response: \(error.localizedDescription, privacy: .public)")
+                #if DEBUG
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("❌ Response JSON: \(responseString)")
+                    AppLogger.media.error("Response JSON: \(responseString, privacy: .public)")
                 }
+                #endif
                 completion(.failure(MediaUploadError.decodingError(error)))
             }
         }
         
         uploadTasks[task.id] = uploadTask
-        print("🟠 MediaUploadManager: Starting upload task...")
+        AppLogger.media.debug("Starting upload task...")
         uploadTask.resume()
-        print("🟠 MediaUploadManager: Upload task resumed")
+        AppLogger.media.debug("Upload task resumed")
     }
     
     private func createMultipartFormData(for task: MediaUploadTask) -> (fileURL: URL, boundaryString: String)? {
         let boundary = "Boundary-\(UUID().uuidString)"
         
-        print("🔵 createMultipartFormData: Reading file data from \(task.fileURL)")
+        AppLogger.media.debug("createMultipartFormData: Reading file data from \(task.fileURL.path, privacy: .public)")
         guard let fileData = try? Data(contentsOf: task.fileURL) else {
-            print("❌ createMultipartFormData: Failed to read file data")
+            AppLogger.media.error("createMultipartFormData: Failed to read file data")
             return nil
         }
-        print("🔵 createMultipartFormData: File data size: \(fileData.count) bytes")
+        AppLogger.media.debug("createMultipartFormData: File data size: \(fileData.count, privacy: .public) bytes")
         
         var body = Data()
         
@@ -448,7 +463,7 @@ class MediaUploadManager: NSObject, ObservableObject {
             try body.write(to: tempURL)
             return (tempURL, boundary)
         } catch {
-            print("❌ Failed to write multipart data: \(error)")
+            AppLogger.media.error("Failed to write multipart data: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -456,13 +471,13 @@ class MediaUploadManager: NSObject, ObservableObject {
     private func validateFile(_ url: URL) -> (url: URL, fileName: String, fileSize: Int64, mimeType: String)? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
               let fileSize = attributes[.size] as? Int64 else {
-            print("⚠️ Could not get file attributes for: \(url.lastPathComponent)")
+            AppLogger.media.warning("Could not get file attributes for: \(url.lastPathComponent, privacy: .public)")
             return nil
         }
         
         // Check file size
         if fileSize > config.maxFileSize {
-            print("⚠️ File too large: \(url.lastPathComponent) (\(fileSize) bytes)")
+            AppLogger.media.warning("File too large: \(url.lastPathComponent, privacy: .public) (\(fileSize, privacy: .public) bytes)")
             return nil
         }
         
@@ -483,14 +498,14 @@ class MediaUploadManager: NSObject, ObservableObject {
         case "mov":
             mimeType = "video/quicktime"
         default:
-            print("⚠️ Unsupported file type: \(fileExtension)")
+            AppLogger.media.warning("Unsupported file type: \(fileExtension, privacy: .public)")
             return nil
         }
         
         // Validate MIME type
         let allowedTypes = config.allowedImageTypes + config.allowedVideoTypes
         guard allowedTypes.contains(mimeType) else {
-            print("⚠️ File type not allowed: \(mimeType)")
+            AppLogger.media.warning("File type not allowed: \(mimeType, privacy: .public)")
             return nil
         }
         
@@ -523,7 +538,7 @@ class MediaUploadManager: NSObject, ObservableObject {
 extension MediaUploadManager: URLSessionTaskDelegate, URLSessionDataDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
         let progress = Double(totalBytesSent) / Double(totalBytesExpectedToSend)
-        print("📊 MediaUploadManager: Upload progress: \(Int(progress * 100))% (\(totalBytesSent)/\(totalBytesExpectedToSend) bytes)")
+        AppLogger.media.debug("Upload progress: \(Int(progress * 100), privacy: .public)% (\(totalBytesSent, privacy: .public)/\(totalBytesExpectedToSend, privacy: .public) bytes)")
         
         // Find the task and update progress
         DispatchQueue.main.async {
@@ -536,33 +551,37 @@ extension MediaUploadManager: URLSessionTaskDelegate, URLSessionDataDelegate {
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        print("📥 MediaUploadManager: Received response")
+        AppLogger.media.debug("Received response")
+        #if DEBUG
         if let httpResponse = response as? HTTPURLResponse {
-            print("📥 Status code: \(httpResponse.statusCode)")
-            print("📥 Headers: \(httpResponse.allHeaderFields)")
+            AppLogger.media.debug("Status code: \(httpResponse.statusCode, privacy: .public)")
+            AppLogger.media.debug("Headers: \(String(describing: httpResponse.allHeaderFields), privacy: .public)")
         }
+        #endif
         completionHandler(.allow)
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        print("📥 MediaUploadManager: Received data: \(data.count) bytes")
+        AppLogger.media.debug("Received data: \(data.count, privacy: .public) bytes")
+        #if DEBUG
         if let responseString = String(data: data, encoding: .utf8) {
-            print("📥 Response body: \(responseString)")
+            AppLogger.media.debug("Response body: \(responseString, privacy: .public)")
         }
+        #endif
     }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        print("🏁 MediaUploadManager: URLSession task completed")
+        AppLogger.media.debug("URLSession task completed")
         if let error = error {
-            print("❌ MediaUploadManager: URLSession task error: \(error.localizedDescription)")
-            print("❌ Error code: \((error as NSError).code)")
-            print("❌ Error domain: \((error as NSError).domain)")
+            AppLogger.media.error("URLSession task error: \(error.localizedDescription, privacy: .public)")
+            AppLogger.media.error("Error code: \((error as NSError).code, privacy: .public)")
+            AppLogger.media.error("Error domain: \((error as NSError).domain, privacy: .public)")
         } else {
-            print("✅ MediaUploadManager: URLSession task completed successfully")
+            AppLogger.media.info("URLSession task completed successfully")
         }
         
         if let httpResponse = task.response as? HTTPURLResponse {
-            print("🏁 Final status code: \(httpResponse.statusCode)")
+            AppLogger.media.debug("Final status code: \(httpResponse.statusCode, privacy: .public)")
         }
     }
 }

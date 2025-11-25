@@ -12,23 +12,21 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     private func configureNetworkSettings() async {
-        // Configure static media server with appropriate host and port
-        // In a real app, these might come from a configuration file or environment
-        // For now, we'll use the development server IP address
-        let mediaHost = "dev-static.hestami-ai.com"  // Replace with actual media server host
-        let mediaPort = "443"          // Replace with actual media server port
-        
-        // Configure the NetworkManager (this is synchronous and fast)
-        NetworkManager.shared.configureStaticMediaServer(host: mediaHost, port: mediaPort)
-        print("🔧 AppDelegate: Configured static media server: \(mediaHost):\(mediaPort)")
+        // Network configuration is now handled by AppConfiguration
+        // Static media server settings are automatically configured based on build environment
+        AppLogger.info("Static media server: \(AppConfiguration.staticMediaHost):\(AppConfiguration.staticMediaPort)", category: AppLogger.network)
         
         // Clear expired caches on app startup
         CacheManager.shared.clearExpiredCache()
-        print("🔧 AppDelegate: Cleared expired caches")
+        AppLogger.info("Cleared expired caches", category: AppLogger.storage)
         
-        // Test URL rewriting (deferred to avoid blocking startup)
-        let testUrl = "http://localhost:8090/media-secure/test/image.jpg"
-        let rewrittenUrl = NetworkManager.shared.rewriteMediaURL(testUrl)
-        print("🔧 AppDelegate: URL rewriting test:\n  Original: \(testUrl)\n  Rewritten: \(rewrittenUrl)")
+        // Test URL rewriting in debug builds only
+        #if DEBUG
+        if AppConfiguration.allowLocalhostConnections {
+            let testUrl = "http://localhost:8090/media-secure/test/image.jpg"
+            let rewrittenUrl = NetworkManager.shared.rewriteMediaURL(testUrl)
+            AppLogger.debug("URL rewriting test:\n  Original: \(testUrl)\n  Rewritten: \(rewrittenUrl)", category: AppLogger.network)
+        }
+        #endif
     }
 }
