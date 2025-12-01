@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Model Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a2e;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        #container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ffffff;
+            z-index: 100;
+        }
+        
+        #loading.hidden {
+            display: none;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ff6b6b;
+            padding: 20px;
+            z-index: 100;
+        }
+        
+        #error.hidden {
+            display: none;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 50;
+        }
+        
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .control-btn.active {
+            background: #4CAF50;
+            border-color: #4CAF50;
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>Loading 3D Model...</p>
+    </div>
+    
+    <div id="error" class="hidden">
+        <p id="error-message">Failed to load model</p>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" id="resetBtn">Reset View</button>
+        <button class="control-btn" id="wireframeBtn">Wireframe</button>
+    </div>
+    
+    <div id="info">
+        <p id="model-info"></p>
+    </div>
+
+    <!-- Import maps for Three.js modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import * as fflate from 'three/addons/libs/fflate.module.js';
+        
+        // Get model URL from query parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const modelUrl = urlParams.get('src');
+        
+        // DOM elements
+        const container = document.getElementById('container');
+        const loadingEl = document.getElementById('loading');
+        const errorEl = document.getElementById('error');
+        const errorMessage = document.getElementById('error-message');
+        const modelInfo = document.getElementById('model-info');
+        const resetBtn = document.getElementById('resetBtn');
+        const wireframeBtn = document.getElementById('wireframeBtn');
+        
+        // Three.js setup
+        let scene, camera, renderer, controls, model;
+        let isWireframe = false;
+        
+        // ============================================================
+        // Custom USDA Parser (ported from SvelteKit DebugUSDAParser)
+        // ============================================================
+        class CustomUSDAParser {
+            parseText(text) {
+                const root = {};
+                const lines = text.split('\n');
+                let string = null;
+                let target = root;
+                const stack = [root];
+                
+                // For handling multi-line arrays
+                let arrayKey = null;
+                let arrayValue = [];
+                let inArray = false;
+
+                for (const line of lines) {
+                    // Handle multi-line array continuation
+                    if (inArray) {
+                        const trimmed = line.trim();
+                        if (trimmed === ']') {
+                            target[arrayKey] = arrayValue;
+                            inArray = false;
+                            arrayKey = null;
+                            arrayValue = [];
+                        } else if (trimmed) {
+                            arrayValue.push(trimmed.replace(/,$/, ''));
+                        }
+                        continue;
+                    }
+
+                    if (line.includes('=')) {
+                        const assignment = line.split('=');
+                        const lhs = assignment[0].trim();
+                        const rhs = assignment[1].trim();
+
+                        if (rhs.endsWith('{')) {
+                            const group = {};
+                            stack.push(group);
+                            target[lhs] = group;
+                            target = group;
+                        } else if (rhs.endsWith('(')) {
+                            const values = rhs.slice(0, -1);
+                            target[lhs] = values;
+                            const meta = {};
+                            stack.push(meta);
+                            target = meta;
+                        } else if (rhs === '[') {
+                            inArray = true;
+                            arrayKey = lhs;
+                            arrayValue = [];
+                        } else {
+                            target[lhs] = rhs;
+                        }
+                    } else if (line.endsWith('{')) {
+                        const group = target[string] || {};
+                        stack.push(group);
+                        target[string] = group;
+                        target = group;
+                    } else if (line.endsWith('}')) {
+                        stack.pop();
+                        if (stack.length === 0) continue;
+                        target = stack[stack.length - 1];
+                    } else if (line.endsWith('(')) {
+                        const meta = {};
+                        stack.push(meta);
+                        string = line.split('(')[0].trim() || string;
+                        target[string] = meta;
+                        target = meta;
+                    } else if (line.endsWith(')')) {
+                        stack.pop();
+                        target = stack[stack.length - 1];
+                    } else {
+                        string = line.trim();
+                    }
+                }
+                return root;
+            }
+
+            parse(text, assets) {
+                const root = this.parseText(text);
+                const parser = this;
+
+                function findMeshGeometry(data) {
+                    if (!data) return undefined;
+
+                    if ('prepend references' in data) {
+                        let references = data['prepend references'];
+                        if (!Array.isArray(references)) {
+                            references = [references];
+                        }
+
+                        const processReference = (reference) => {
+                            if (typeof reference !== 'string') return undefined;
+
+                            const parts = reference.split('@');
+                            if (parts.length < 2) return undefined;
+
+                            const path = parts[1].replace(/^.\//, '');
+                            let assetData = assets[path] || assets['./' + path];
+
+                            if (!assetData) return undefined;
+
+                            if (typeof assetData === 'string') {
+                                assetData = parser.parseText(assetData);
+                            }
+
+                            const id = parts[2] ? parts[2].replace(/^<\//, '').replace(/>$/, '') : undefined;
+                            const meshGeometry = findGeometry(assetData, id);
+
+                            if (!meshGeometry) return undefined;
+
+                            const geometry = buildGeometry(meshGeometry);
+                            const material = buildMaterial(findMeshMaterial(assetData));
+                            const mesh = geometry ? new THREE.Mesh(geometry, material) : new THREE.Object3D();
+
+                            if (meshGeometry && 'matrix4d xformOp:transform' in meshGeometry) {
+                                const transform = JSON.parse('[' + meshGeometry['matrix4d xformOp:transform'].replace(/[()]*/g, '') + ']');
+                                mesh.matrix.fromArray(transform);
+                                mesh.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+                            }
+
+                            return mesh;
+                        };
+
+                        if (references.length > 1) {
+                            const group = new THREE.Group();
+                            group.name = 'MultiRefGroup';
+                            for (let i = 0; i < references.length; i++) {
+                                const child = processReference(references[i]);
+                                if (child) group.add(child);
+                            }
+                            return group;
+                        }
+
+                        return processReference(references[0]);
+                    }
+
+                    return findGeometry(data);
+                }
+
+                function findGeometry(data, id) {
+                    if (!data) return undefined;
+
+                    if (id !== undefined) {
+                        const def = `def Mesh "${id}"`;
+                        if (def in data) return data[def];
+                    }
+
+                    for (const name in data) {
+                        const object = data[name];
+                        if (name.startsWith('def Mesh')) return object;
+                        if (typeof object === 'object') {
+                            const geometry = findGeometry(object);
+                            if (geometry) return geometry;
+                        }
+                    }
+                    return undefined;
+                }
+
+                function buildGeometry(data) {
+                    if (!data) return undefined;
+
+                    const geometry = new THREE.BufferGeometry();
+                    let indices = null;
+                    let counts = null;
+                    let uvs = null;
+                    let positionsLength = -1;
+
+                    if ('int[] faceVertexIndices' in data) {
+                        indices = JSON.parse(data['int[] faceVertexIndices']);
+                    }
+
+                    if ('int[] faceVertexCounts' in data) {
+                        counts = JSON.parse(data['int[] faceVertexCounts']);
+                        indices = toTriangleIndices(indices, counts);
+                    }
+
+                    if ('point3f[] points' in data) {
+                        const positions = JSON.parse(data['point3f[] points'].replace(/[()]*/g, ''));
+                        positionsLength = positions.length;
+                        let attribute = new THREE.BufferAttribute(new Float32Array(positions), 3);
+                        if (indices !== null) attribute = toFlatBufferAttribute(attribute, indices);
+                        geometry.setAttribute('position', attribute);
+                    }
+
+                    if ('float2[] primvars:st' in data) {
+                        data['texCoord2f[] primvars:st'] = data['float2[] primvars:st'];
+                    }
+
+                    if ('texCoord2f[] primvars:st' in data) {
+                        uvs = JSON.parse(data['texCoord2f[] primvars:st'].replace(/[()]*/g, ''));
+                        let attribute = new THREE.BufferAttribute(new Float32Array(uvs), 2);
+                        if (indices !== null) attribute = toFlatBufferAttribute(attribute, indices);
+                        geometry.setAttribute('uv', attribute);
+                    }
+
+                    if ('int[] primvars:st:indices' in data && uvs !== null) {
+                        const attribute = new THREE.BufferAttribute(new Float32Array(uvs), 2);
+                        let uvIndices = JSON.parse(data['int[] primvars:st:indices']);
+                        uvIndices = toTriangleIndices(uvIndices, counts);
+                        geometry.setAttribute('uv', toFlatBufferAttribute(attribute, uvIndices));
+                    }
+
+                    if ('normal3f[] normals' in data) {
+                        const normals = JSON.parse(data['normal3f[] normals'].replace(/[()]*/g, ''));
+                        let attribute = new THREE.BufferAttribute(new Float32Array(normals), 3);
+
+                        if (normals.length === positionsLength) {
+                            if (indices !== null) attribute = toFlatBufferAttribute(attribute, indices);
+                        } else {
+                            let normIndices = Array.from(Array(normals.length / 3).keys());
+                            normIndices = toTriangleIndices(normIndices, counts);
+                            attribute = toFlatBufferAttribute(attribute, normIndices);
+                        }
+                        geometry.setAttribute('normal', attribute);
+                    } else {
+                        geometry.computeVertexNormals();
+                    }
+
+                    return geometry;
+                }
+
+                function toTriangleIndices(rawIndices, counts) {
+                    const indices = [];
+                    let offset = 0;
+                    
+                    for (let i = 0; i < counts.length; i++) {
+                        const count = counts[i];
+
+                        if (count === 3) {
+                            indices.push(rawIndices[offset], rawIndices[offset + 1], rawIndices[offset + 2]);
+                        } else if (count === 4) {
+                            indices.push(rawIndices[offset], rawIndices[offset + 1], rawIndices[offset + 2]);
+                            indices.push(rawIndices[offset], rawIndices[offset + 2], rawIndices[offset + 3]);
+                        } else if (count > 4) {
+                            // Fan triangulation for polygons with more than 4 vertices
+                            for (let j = 1; j < count - 1; j++) {
+                                indices.push(rawIndices[offset], rawIndices[offset + j], rawIndices[offset + j + 1]);
+                            }
+                        }
+                        
+                        offset += count;
+                    }
+                    return indices;
+                }
+
+                function toFlatBufferAttribute(attribute, indices) {
+                    const array = attribute.array;
+                    const itemSize = attribute.itemSize;
+                    const array2 = new array.constructor(indices.length * itemSize);
+
+                    let index = 0, index2 = 0;
+                    for (let i = 0; i < indices.length; i++) {
+                        index = indices[i] * itemSize;
+                        for (let j = 0; j < itemSize; j++) {
+                            array2[index2++] = array[index++];
+                        }
+                    }
+                    return new THREE.BufferAttribute(array2, itemSize);
+                }
+
+                function findMeshMaterial(data) {
+                    if (!data) return undefined;
+
+                    if ('rel material:binding' in data) {
+                        const reference = data['rel material:binding'];
+                        const id = reference.replace(/^<\//, '').replace(/>$/, '');
+                        const parts = id.split('/');
+                        return findMaterial(root, ` "${parts[1]}"`);
+                    }
+                    return findMaterial(data);
+                }
+
+                function findMaterial(data, id = '') {
+                    for (const name in data) {
+                        const object = data[name];
+                        if (name.startsWith('def Material' + id)) return object;
+                        if (typeof object === 'object') {
+                            const material = findMaterial(object, id);
+                            if (material) return material;
+                        }
+                    }
+                }
+
+                function buildMaterial(data) {
+                    const material = new THREE.MeshPhysicalMaterial();
+
+                    if (data !== undefined) {
+                        let surface = undefined;
+                        const surfaceConnection = data['token outputs:surface.connect'];
+
+                        if (surfaceConnection) {
+                            const match = /(\w+)\.output/.exec(surfaceConnection);
+                            if (match) {
+                                const surfaceName = match[1];
+                                surface = data[`def Shader "${surfaceName}"`];
+                            }
+                        }
+
+                        if (surface !== undefined) {
+                            if ('color3f inputs:diffuseColor' in surface) {
+                                const color = surface['color3f inputs:diffuseColor'].replace(/[()]*/g, '');
+                                material.color.fromArray(JSON.parse('[' + color + ']'));
+                            }
+
+                            if ('float inputs:roughness' in surface) {
+                                material.roughness = parseFloat(surface['float inputs:roughness']);
+                            }
+
+                            if ('float inputs:metallic' in surface) {
+                                material.metalness = parseFloat(surface['float inputs:metallic']);
+                            }
+
+                            if ('float inputs:opacity' in surface) {
+                                const opacity = parseFloat(surface['float inputs:opacity']);
+                                if (opacity < 1.0) {
+                                    material.transparent = true;
+                                    material.opacity = opacity;
+                                }
+                            }
+                        }
+                    }
+
+                    return material;
+                }
+
+                function buildObject(data) {
+                    const meshGeometry = findMeshGeometry(data);
+
+                    if (meshGeometry && (meshGeometry.isMesh || meshGeometry.isGroup || meshGeometry.isObject3D)) {
+                        return meshGeometry;
+                    }
+
+                    const geometry = buildGeometry(meshGeometry);
+                    const material = buildMaterial(findMeshMaterial(data));
+                    const mesh = geometry ? new THREE.Mesh(geometry, material) : new THREE.Object3D();
+
+                    if (meshGeometry && 'matrix4d xformOp:transform' in meshGeometry) {
+                        const array = JSON.parse('[' + meshGeometry['matrix4d xformOp:transform'].replace(/[()]*/g, '') + ']');
+                        mesh.matrix.fromArray(array);
+                        mesh.matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+                    }
+
+                    return mesh;
+                }
+
+                function buildHierarchy(data, group) {
+                    for (const name in data) {
+                        if (name.startsWith('def Scope')) {
+                            buildHierarchy(data[name], group);
+                        } else if (name.startsWith('def Xform')) {
+                            const mesh = buildObject(data[name]);
+                            if (/def Xform "(\w+)"/.test(name)) {
+                                mesh.name = /def Xform "(\w+)"/.exec(name)[1];
+                            }
+                            group.add(mesh);
+                            buildHierarchy(data[name], mesh);
+                        }
+                    }
+                }
+
+                function buildGroup(data) {
+                    const group = new THREE.Group();
+                    buildHierarchy(data, group);
+                    return group;
+                }
+
+                return buildGroup(root);
+            }
+        }
+
+        // ============================================================
+        // Custom USDZ Loader (ported from SvelteKit DebugUSDLoader)
+        // ============================================================
+        class CustomUSDZLoader {
+            parse(buffer) {
+                const usda = new CustomUSDAParser();
+
+                function parseAssets(zip) {
+                    const data = {};
+
+                    for (const filename in zip) {
+                        const normalizedPath = filename.replace(/^\.\//, '');
+
+                        if (filename.endsWith('png')) {
+                            const blob = new Blob([zip[filename]], { type: 'image/png' });
+                            data[filename] = URL.createObjectURL(blob);
+                        }
+
+                        if (filename.endsWith('usd') || filename.endsWith('usda') || filename.endsWith('usdc')) {
+                            if (isCrateFile(zip[filename])) {
+                                console.log('Found USDC (binary) file:', filename, '- not supported');
+                                data[filename] = zip[filename];
+                                if (!filename.startsWith('./')) {
+                                    data['./' + filename] = zip[filename];
+                                }
+                            } else {
+                                const text = fflate.strFromU8(zip[filename]);
+                                data[filename] = text;
+                                if (!filename.startsWith('./')) {
+                                    data['./' + filename] = text;
+                                }
+                            }
+                        }
+                    }
+                    return data;
+                }
+
+                function isCrateFile(buffer) {
+                    const crateHeader = new Uint8Array([0x50, 0x58, 0x52, 0x2D, 0x55, 0x53, 0x44, 0x43]); // PXR-USDC
+                    if (buffer.byteLength < crateHeader.length) return false;
+
+                    const view = new Uint8Array(buffer instanceof ArrayBuffer ? buffer : buffer.buffer, 0, crateHeader.length);
+                    for (let i = 0; i < crateHeader.length; i++) {
+                        if (view[i] !== crateHeader[i]) return false;
+                    }
+                    return true;
+                }
+
+                function findUSD(zip) {
+                    if (Object.keys(zip).length < 1) return undefined;
+
+                    const firstFileName = Object.keys(zip)[0];
+                    console.log('First file in USDZ:', firstFileName);
+
+                    if (firstFileName.endsWith('usda')) {
+                        return zip[firstFileName];
+                    }
+
+                    if (firstFileName.endsWith('usdc')) {
+                        throw new Error('USDC (binary) format not supported. Only USDA (ASCII) format is supported.');
+                    }
+
+                    if (firstFileName.endsWith('usd')) {
+                        if (!isCrateFile(zip[firstFileName])) {
+                            return zip[firstFileName];
+                        } else {
+                            throw new Error('USDC (binary) format not supported. Only USDA (ASCII) format is supported.');
+                        }
+                    }
+
+                    return undefined;
+                }
+
+                // Handle string input (USDA)
+                if (typeof buffer === 'string') {
+                    return usda.parse(buffer, {});
+                }
+
+                // Handle USDC (binary) - not supported
+                if (isCrateFile(buffer)) {
+                    throw new Error('USDC (binary Crate) format not supported. Only USDA (ASCII) format is supported.');
+                }
+
+                // Handle USDZ (ZIP archive)
+                console.log('Unzipping USDZ file...');
+                const zip = fflate.unzipSync(new Uint8Array(buffer));
+                console.log('USDZ contents:', Object.keys(zip));
+
+                const assets = parseAssets(zip);
+                const file = findUSD(zip);
+
+                if (!file) {
+                    throw new Error('No USD file found in USDZ archive');
+                }
+
+                const text = fflate.strFromU8(file);
+                console.log('Parsing USDA content, length:', text.length);
+
+                return usda.parse(text, assets);
+            }
+        }
+        
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                45,
+                container.clientWidth / container.clientHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(0, 2, 5);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1;
+            container.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 0.5;
+            controls.maxDistance = 50;
+            controls.target.set(0, 0, 0);
+            
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7.5);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+            
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+            fillLight.position.set(-5, 0, -5);
+            scene.add(fillLight);
+            
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x333333);
+            scene.add(gridHelper);
+            
+            // Load model
+            if (modelUrl) {
+                loadModel(modelUrl);
+            } else {
+                showError('No model URL provided');
+            }
+            
+            // Event listeners
+            window.addEventListener('resize', onWindowResize);
+            resetBtn.addEventListener('click', resetView);
+            wireframeBtn.addEventListener('click', toggleWireframe);
+            
+            // Start animation loop
+            animate();
+        }
+        
+        async function loadModel(url) {
+            // Extract extension, handling query parameters
+            const urlPath = url.split('?')[0];
+            const extension = urlPath.split('.').pop().toLowerCase();
+            console.log('Loading model with extension:', extension, 'from URL:', url);
+            
+            try {
+                // First, fetch the file to verify it's accessible
+                console.log('Fetching model file...');
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const arrayBuffer = await response.arrayBuffer();
+                console.log('Model file fetched, size:', arrayBuffer.byteLength, 'bytes');
+                
+                if (arrayBuffer.byteLength === 0) {
+                    throw new Error('Model file is empty');
+                }
+                
+                if (extension === 'usdz') {
+                    // USDZ files are ZIP archives - check the magic bytes
+                    const header = new Uint8Array(arrayBuffer.slice(0, 4));
+                    const isZip = header[0] === 0x50 && header[1] === 0x4B; // PK signature
+                    console.log('USDZ file header check - isZip:', isZip, 'bytes:', Array.from(header));
+                    
+                    try {
+                        // Use our custom loader instead of Three.js USDZLoader
+                        const loader = new CustomUSDZLoader();
+                        console.log('Parsing USDZ with CustomUSDZLoader...');
+                        const result = loader.parse(arrayBuffer);
+                        console.log('USDZ parse result:', result);
+                        handleModelLoaded(result);
+                    } catch (usdzError) {
+                        console.error('CustomUSDZLoader failed:', usdzError);
+                        showError(usdzError.message || 'USDZ format could not be parsed. Try converting to GLB format.');
+                    }
+                } else if (extension === 'glb' || extension === 'gltf') {
+                    const loader = new GLTFLoader();
+                    // Use parse instead of load since we already have the data
+                    loader.parse(
+                        arrayBuffer,
+                        '', // path for resolving relative URLs
+                        (gltf) => {
+                            console.log('GLTF parsed successfully');
+                            handleModelLoaded(gltf.scene);
+                        },
+                        (error) => {
+                            console.error('Error parsing GLTF model:', error);
+                            showError(`Failed to parse model: ${error.message || 'Unknown error'}`);
+                        }
+                    );
+                } else {
+                    // Try as GLTF/GLB anyway
+                    console.log('Unknown extension, trying as GLTF...');
+                    const loader = new GLTFLoader();
+                    loader.parse(
+                        arrayBuffer,
+                        '',
+                        (gltf) => handleModelLoaded(gltf.scene),
+                        (error) => showError(`Unsupported model format: ${extension}`)
+                    );
+                }
+            } catch (error) {
+                console.error('Error loading model:', error);
+                showError(`Failed to load model: ${error.message || 'Unknown error'}`);
+            }
+        }
+        
+        function handleModelLoaded(loadedModel) {
+            model = loadedModel;
+            
+            // Center and scale model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Center the model
+            model.position.sub(center);
+            
+            // Scale to fit in view
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) {
+                const scale = 3 / maxDim;
+                model.scale.multiplyScalar(scale);
+            }
+            
+            scene.add(model);
+            
+            // Update camera position based on model size
+            const scaledSize = size.clone().multiplyScalar(model.scale.x);
+            camera.position.set(
+                scaledSize.x * 1.5,
+                scaledSize.y * 1.5,
+                scaledSize.z * 2
+            );
+            controls.update();
+            
+            // Update info
+            modelInfo.textContent = `Model loaded: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`;
+            
+            // Hide loading
+            loadingEl.classList.add('hidden');
+        }
+        
+        function showError(message) {
+            loadingEl.classList.add('hidden');
+            errorEl.classList.remove('hidden');
+            errorMessage.textContent = message;
+        }
+        
+        function onWindowResize() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        
+        function resetView() {
+            camera.position.set(0, 2, 5);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+        
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            wireframeBtn.classList.toggle('active', isWireframe);
+            
+            if (model) {
+                model.traverse((child) => {
+                    if (child.isMesh && child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(mat => mat.wireframe = isWireframe);
+                        } else {
+                            child.material.wireframe = isWireframe;
+                        }
+                    }
+                });
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Initialize
+        init();
+        
+        // Expose functions for Android WebView interface
+        window.loadNewModel = function(url) {
+            if (model) {
+                scene.remove(model);
+                model = null;
+            }
+            loadingEl.classList.remove('hidden');
+            errorEl.classList.add('hidden');
+            loadModel(url);
+        };
+        
+        window.resetCamera = resetView;
+    </script>
+</body>
+</html>
