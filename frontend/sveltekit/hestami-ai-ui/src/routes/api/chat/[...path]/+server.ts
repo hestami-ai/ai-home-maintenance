@@ -38,6 +38,7 @@ export const GET: RequestHandler = async ({ request, cookies, params }) => {
     const path = params.path || '';
     
     // Proxy request to LibreChat
+    console.log('[Chat GET] Calling librechatRequest with email:', userData.email);
     const response = await librechatRequest(
       sessionId,
       `/api/${path}`,
@@ -47,12 +48,18 @@ export const GET: RequestHandler = async ({ request, cookies, params }) => {
       },
       userData.email  // Pass email for re-authentication if session expired
     );
+    console.log('[Chat GET] librechatRequest returned status:', response.status);
     
-    // Return response as-is (including status, headers, body)
+    // Create new headers without Content-Encoding since we've decompressed the response
+    // SvelteKit will re-compress based on what the client actually supports
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete('Content-Encoding');
+    responseHeaders.delete('Content-Length'); // Length changed after decompression
+    
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers
+      headers: responseHeaders
     });
   } catch (err) {
     console.error('Chat API GET error:', err);
@@ -244,11 +251,15 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
       });
     }
     
-    // For non-streaming responses, return as-is
+    // For non-streaming responses, strip encoding headers since body is decompressed
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete('Content-Encoding');
+    responseHeaders.delete('Content-Length');
+    
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers
+      headers: responseHeaders
     });
   } catch (err) {
     console.error('[Chat POST] Error:', err);
@@ -298,11 +309,15 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
       userData.email  // Pass email for re-authentication if session expired
     );
     
-    // Return response as-is
+    // Strip encoding headers since body is decompressed
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete('Content-Encoding');
+    responseHeaders.delete('Content-Length');
+    
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers
+      headers: responseHeaders
     });
   } catch (err) {
     console.error('Chat API PUT error:', err);
@@ -354,14 +369,19 @@ export const DELETE: RequestHandler = async ({ request, cookies, params }) => {
           'Content-Type': contentType || 'application/json'
         },
         body
-      }
+      },
+      userData.email  // Pass email for re-authentication if session expired
     );
     
-    // Return response as-is
+    // Strip encoding headers since body is decompressed
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.delete('Content-Encoding');
+    responseHeaders.delete('Content-Length');
+    
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
-      headers: response.headers
+      headers: responseHeaders
     });
   } catch (err) {
     console.error('Chat API DELETE error:', err);

@@ -223,6 +223,12 @@ export async function librechatRequest(
     let headers = new Headers(options.headers);
     headers.set('Cookie', librechatSession);
     
+    // Remove Accept-Encoding to let Node.js fetch handle decompression automatically.
+    // This prevents passing through Brotli-compressed responses to clients that don't support it
+    // (e.g., iOS URLSession doesn't auto-decompress Brotli, only gzip/deflate).
+    // SvelteKit will re-compress the response based on what the actual client supports.
+    headers.delete('Accept-Encoding');
+    
     // Add User-Agent header to pass LibreChat's uaParser middleware
     headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     
@@ -267,8 +273,9 @@ export async function librechatRequest(
     });
     
     // If 401 and we have userEmail, try to re-authenticate
+    console.log('[librechatRequest] Checking re-auth conditions: status=', response.status, 'userEmail=', userEmail ? 'provided' : 'NOT PROVIDED');
     if (response.status === 401 && userEmail) {
-      console.log('[librechatRequest] Session expired, re-authenticating...');
+      console.log('[librechatRequest] Session expired, re-authenticating for:', userEmail);
       
       // Clear old session from Redis
       await setLibreChatSession(sessionId, '');
