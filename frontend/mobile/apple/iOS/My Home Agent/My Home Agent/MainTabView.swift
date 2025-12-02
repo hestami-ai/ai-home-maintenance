@@ -26,36 +26,56 @@ struct MainTabView: View {
                 }
                 .tag(0)
                 
-                // My Properties Tab
+                // Properties Tab
                 NavigationView {
                     PropertiesView()
                 }
                 .tabItem {
-                    Label("My Properties", systemImage: "house.fill")
+                    Label("Properties", systemImage: "house.fill")
                 }
                 .tag(1)
                 
-                // Service Requests Tab
+                // Requests Tab
                 NavigationView {
                     RequestsView()
                 }
                 .tabItem {
-                    Label("Service Requests", systemImage: "list.bullet.rectangle")
+                    Label("Requests", systemImage: "list.bullet.rectangle")
                 }
                 .tag(2)
                 
-                // More Tab
+                // AI Handyman Tab
                 NavigationView {
-                    MoreView(showingSidebar: $showingSidebar)
+                    AIHandymanView()
                 }
                 .tabItem {
-                    Label("More", systemImage: "ellipsis")
+                    Label("AI Handyman", systemImage: "brain.head.profile")
                 }
                 .tag(3)
             }
             .accentColor(AppTheme.successColor) // Use brighter green for better contrast
             .onAppear {
                 setupTabBarAppearance()
+            }
+            
+            // Menu button in top-right corner (like Android)
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        withAnimation {
+                            showingSidebar.toggle()
+                        }
+                    }) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.title2)
+                            .foregroundColor(AppTheme.secondaryText)
+                            .padding(12)
+                    }
+                }
+                .padding(.top, 47) // Account for status bar/Dynamic Island
+                .padding(.trailing, 4)
+                Spacer()
             }
             
             // Sidebar overlay when showing
@@ -110,60 +130,6 @@ struct MainTabView: View {
         // Apply the appearance
         UITabBar.appearance().standardAppearance = tabBarAppearance
         UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
-    }
-}
-
-struct MoreView: View {
-    @Binding var showingSidebar: Bool
-    
-    var body: some View {
-        ZStack {
-            AppTheme.primaryBackground.edgesIgnoringSafeArea(.all)
-            
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        withAnimation {
-                            showingSidebar.toggle()
-                        }
-                    }) {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.title)
-                            .foregroundColor(AppTheme.primaryText)
-                            .padding()
-                    }
-                }
-                
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Section title
-                        HStack {
-                            Text("Tools & Features")
-                                .font(AppTheme.subheadlineFont)
-                                .foregroundColor(AppTheme.secondaryText)
-                                .padding(.horizontal)
-                            Spacer()
-                        }
-                        
-                        // Available options
-                        NavigationLink(destination: EmptyView()) {
-                            MoreOptionItemView(icon: "doc.text", title: "Documents", description: "View and manage property documents")
-                        }
-                        
-                        NavigationLink(destination: EmptyView()) {
-                            MoreOptionItemView(icon: "chart.bar", title: "Reports", description: "Generate property reports and analytics")
-                        }
-                    }
-                    .padding()
-                }
-            }
-        }
-        .navigationTitle("More")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
     }
 }
 

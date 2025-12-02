@@ -389,7 +389,7 @@ private fun ChatHeader(serviceState: ChatServiceState) {
         Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
-                text = "AI Assistant",
+                text = "AI Handyman",
                 color = AppColors.PrimaryText,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
@@ -457,7 +457,7 @@ fun ChatScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "AI Assistant",
+                                text = "AI Handyman",
                                 color = AppColors.PrimaryText,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp

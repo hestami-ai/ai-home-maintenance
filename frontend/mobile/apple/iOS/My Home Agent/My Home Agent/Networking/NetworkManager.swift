@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import Compression
 
 public enum HTTPMethod: String {
     case get = "GET"
@@ -386,15 +387,37 @@ public class NetworkManager {
         // Add common headers
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue("application/json", forHTTPHeaderField: "Accept")
+        request.addValue("MyHomeAgent/1.0 iOS", forHTTPHeaderField: "User-Agent")
+        // Do NOT set Accept-Encoding manually - let URLSession handle it automatically
+        // URLSession will add its own Accept-Encoding and automatically decompress responses
+        // Disable caching to ensure fresh responses
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         
         // User-ID header removed
         
-        // Manually add cookies from our storage if available
+        // Only manually add cookies if we have cookies in manual storage that aren't in system storage
+        // URLSession will automatically add cookies from HTTPCookieStorage.shared when httpShouldSetCookies = true
+        // We only need to manually add cookies that were stored in our manual storage (e.g., HttpOnly cookies parsed manually)
         if !self.cookieStorage.isEmpty {
-            // Format cookies as name=value; name2=value2
-            let cookieString = self.cookieStorage.map { key, value in "\(key)=\(value)" }.joined(separator: "; ")
-            request.addValue(cookieString, forHTTPHeaderField: "Cookie")
-            AppLogger.debugSensitive("Adding cookie header", sensitiveData: cookieString, category: AppLogger.network)
+            // Get system cookies to avoid duplicates
+            var systemCookieNames: Set<String> = []
+            if let requestUrl = request.url,
+               let systemCookies = HTTPCookieStorage.shared.cookies(for: requestUrl) {
+                systemCookieNames = Set(systemCookies.map { $0.name })
+            }
+            
+            // Only add manual cookies that aren't already in system storage
+            let manualOnlyCookies = self.cookieStorage.filter { !systemCookieNames.contains($0.key) }
+            
+            if !manualOnlyCookies.isEmpty {
+                let cookieString = manualOnlyCookies.map { "\($0.key)=\($0.value)" }.joined(separator: "; ")
+                request.addValue(cookieString, forHTTPHeaderField: "Cookie")
+                AppLogger.debugSensitive("Adding manual-only cookie header", sensitiveData: cookieString, category: AppLogger.network)
+            } else {
+                AppLogger.network.debug("All cookies already in system storage, letting URLSession handle them")
+            }
+        } else {
+            AppLogger.network.debug("No manual cookies, letting URLSession handle system cookies automatically")
         }
         
         // Debug cookies before request
@@ -465,6 +488,7 @@ public class NetworkManager {
             AppLogger.network.debug("Executing request to \(request.url?.absoluteString ?? "unknown", privacy: .public)")
             // Make the request
             let (data, response) = try await session.data(for: request)
+            AppLogger.network.debug("Received data: \(data.count, privacy: .public) bytes immediately after request")
             responseData = data
             urlResponse = response
         } catch let urlError as URLError {
@@ -553,8 +577,16 @@ public class NetworkManager {
         
         AppLogger.logResponse(statusCode: httpResponse.statusCode, endpoint: endpoint)
         #if DEBUG
+        AppLogger.network.debug("Response data size: \(responseData.count, privacy: .public) bytes")
         if let responseString = String(data: responseData, encoding: .utf8) {
-            AppLogger.network.debug("Response data: \(responseString, privacy: .public)")
+            // Truncate long responses for logging
+            let truncated = responseString.count > 2000 ? String(responseString.prefix(2000)) + "... [truncated]" : responseString
+            AppLogger.network.debug("Response data: \(truncated, privacy: .public)")
+        } else {
+            AppLogger.network.warning("Could not decode response data as UTF-8 string")
+            // Try to log hex representation of first few bytes
+            let hexString = responseData.prefix(100).map { String(format: "%02x", $0) }.joined(separator: " ")
+            AppLogger.network.debug("Response data (hex): \(hexString, privacy: .public)")
         }
         #endif
         
@@ -688,5 +720,43 @@ public class NetworkManager {
     public func clearAllCaches() {
         cacheManager.clearCache()
         AppLogger.storage.info("Cleared all caches")
+    }
+    
+    // MARK: - Brotli Decompression
+    
+    /// Decompress Brotli-encoded data using the Compression framework
+    /// - Parameter data: Brotli-compressed data
+    /// - Returns: Decompressed data, or nil if decompression fails
+    private func decompressBrotli(_ data: Data) -> Data? {
+        // Estimate decompressed size (brotli typically achieves 20-26% compression)
+        // Start with 4x the compressed size and grow if needed
+        let destinationBufferSize = data.count * 4
+        let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: destinationBufferSize)
+        defer { destinationBuffer.deallocate() }
+        
+        let decompressedSize = data.withUnsafeBytes { sourceBuffer -> Int in
+            guard let sourcePointer = sourceBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+                return 0
+            }
+            
+            let result = compression_decode_buffer(
+                destinationBuffer,
+                destinationBufferSize,
+                sourcePointer,
+                data.count,
+                nil,
+                COMPRESSION_BROTLI
+            )
+            
+            return result
+        }
+        
+        guard decompressedSize > 0 else {
+            AppLogger.network.error("Brotli decompression failed")
+            return nil
+        }
+        
+        AppLogger.network.debug("Brotli decompressed \(data.count) bytes to \(decompressedSize) bytes")
+        return Data(bytes: destinationBuffer, count: decompressedSize)
     }
 }

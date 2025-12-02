@@ -18,6 +18,16 @@ struct Conversation: Codable, Identifiable {
         guard let createdAt = createdAt else { return nil }
         return ISO8601DateFormatter().date(from: createdAt)
     }
+    
+    // Explicit CodingKeys to handle both camelCase from API
+    // (NetworkManager uses convertFromSnakeCase which would expect snake_case)
+    enum CodingKeys: String, CodingKey {
+        case conversationId
+        case title
+        case updatedAt
+        case endpoint
+        case createdAt
+    }
 }
 
 // MARK: - Conversations Response

@@ -62,6 +62,12 @@ class ChatService private constructor() {
     suspend fun fetchConversations(): List<Conversation> = withContext(Dispatchers.IO) {
         Timber.d("Fetching conversations")
         
+        // Debug: Log session cookie status
+        val hasSession = NetworkModule.hasActiveSession()
+        val sessionHeader = NetworkModule.getSessionCookieHeader()
+        Timber.d("Has active session: $hasSession")
+        Timber.d("Session cookie header: $sessionHeader")
+        
         try {
             // First, make a raw request to see what we're getting
             val rawResponse = apiService.getConversationsRaw()
