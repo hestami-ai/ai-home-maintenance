@@ -194,6 +194,46 @@ export const POST: RequestHandler = async ({ request, cookies, params }) => {
         console.log('[Chat POST] Final data keys:', Object.keys(finalData));
       }
       
+      // If we have a final response with a conversation, check if we need to fetch the generated title
+      // LibreChat generates titles asynchronously, so the initial response may have "New Chat" as title
+      if (finalData?.conversation?.conversationId && finalData?.title === 'New Chat') {
+        console.log('[Chat POST] Title is "New Chat", fetching generated title...');
+        try {
+          // Call gen_title endpoint - it polls internally for up to 20 seconds
+          const titleResponse = await librechatRequest(
+            sessionId,
+            '/api/convos/gen_title',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                conversationId: finalData.conversation.conversationId
+              })
+            },
+            userData.email
+          );
+          
+          if (titleResponse.ok) {
+            const titleData = await titleResponse.json();
+            console.log('[Chat POST] Generated title:', titleData.title);
+            if (titleData.title) {
+              // Update the title in the response
+              finalData.title = titleData.title;
+              if (finalData.conversation) {
+                finalData.conversation.title = titleData.title;
+              }
+            }
+          } else {
+            console.log('[Chat POST] Failed to fetch generated title, status:', titleResponse.status);
+          }
+        } catch (titleErr) {
+          console.error('[Chat POST] Error fetching generated title:', titleErr);
+          // Continue with original response even if title fetch fails
+        }
+      }
+      
       // Return the final accumulated response as JSON
       return new Response(JSON.stringify(finalData || { error: 'No response received' }), {
         status: 200,
@@ -294,13 +334,24 @@ export const DELETE: RequestHandler = async ({ request, cookies, params }) => {
     // Get path from params
     const path = params.path || '';
     
+    // Get request body if present (LibreChat delete endpoints expect body with { arg: { conversationId } })
+    const contentType = request.headers.get('content-type') || '';
+    let body: string | undefined;
+    
+    if (contentType.includes('application/json')) {
+      body = await request.text();
+    }
+    
     // Proxy request to LibreChat
     const response = await librechatRequest(
       sessionId,
       `/api/${path}`,
       {
         method: 'DELETE',
-        headers: request.headers
+        headers: {
+          'Content-Type': contentType || 'application/json'
+        },
+        body
       }
     );
     

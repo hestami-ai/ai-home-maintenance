@@ -20,6 +20,11 @@
     width?: number;
     height?: number;
     filepath?: string;
+    // Document-specific fields (for PDFs, text files, etc.)
+    text?: string;     // Extracted text content from PDFs/documents
+    context?: string;  // File purpose (e.g., "message_attachment")
+    source?: string;   // Extraction method (e.g., "text")
+    embedded?: boolean;
   }
   
   interface PendingFile {
@@ -87,6 +92,7 @@
       }
       
       const result = await response.json();
+      console.log('[uploadFile] LibreChat response:', result);
       return {
         file_id: result.file_id,
         _id: result._id,
@@ -95,7 +101,12 @@
         size: result.size,
         width: result.width,
         height: result.height,
-        filepath: result.filepath
+        filepath: result.filepath,
+        // Document-specific fields
+        text: result.text,        // Extracted text content
+        context: result.context,  // File purpose
+        source: result.source,    // Extraction method
+        embedded: result.embedded
       };
     } catch (err) {
       console.error('File upload error:', err);

@@ -92,11 +92,23 @@ export const POST = async ({ request, cookies, url }: RequestEvent) => {
     // Prepare FormData for LibreChat
     const librechatFormData = new FormData();
     librechatFormData.append('file', file);
-    librechatFormData.append('endpoint', endpoint);
     
-    // Add optional metadata
-    if (toolResource) {
-      librechatFormData.append('tool_resource', toolResource);
+    // For non-image files (PDFs, docs, etc.), we need to:
+    // 1. Use endpoint='agents' to trigger processAgentFileUpload in LibreChat
+    // 2. Use tool_resource='context' to enable text extraction
+    // This enables LibreChat's "Upload as Text" feature which extracts text content from documents
+    const needsTextExtraction = !isImage;
+    const effectiveEndpoint = needsTextExtraction ? 'agents' : endpoint;
+    librechatFormData.append('endpoint', effectiveEndpoint);
+    
+    // Mark as message file attachment (required for LibreChat to process correctly)
+    librechatFormData.append('message_file', 'true');
+    
+    // Set tool_resource for text extraction
+    const effectiveToolResource = toolResource || (needsTextExtraction ? 'context' : null);
+    if (effectiveToolResource) {
+      librechatFormData.append('tool_resource', effectiveToolResource);
+      console.log(`[chat/files/upload] Using endpoint: ${effectiveEndpoint}, tool_resource: ${effectiveToolResource}`);
     }
     
     // Add image dimensions if provided (required by LibreChat for images)
@@ -128,7 +140,8 @@ export const POST = async ({ request, cookies, url }: RequestEvent) => {
     }
     
     const librechatResult = await librechatResponse.json();
-    console.log(`[chat/files/upload] LibreChat upload successful:`, librechatResult);
+    console.log(`[chat/files/upload] LibreChat upload successful:`, JSON.stringify(librechatResult, null, 2));
+    console.log(`[chat/files/upload] Response keys:`, Object.keys(librechatResult));
     
     // Return the LibreChat file info to the client
     return json({
