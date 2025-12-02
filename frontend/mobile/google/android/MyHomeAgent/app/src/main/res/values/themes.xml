@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main app theme -->
+    <style name="Theme.MyHomeAgent" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/primary_background</item>
+        <item name="android:statusBarColor">@color/primary_background</item>
+        <item name="android:navigationBarColor">@color/primary_background</item>
+    </style>
+
+    <!-- Splash screen theme for Android 12+ -->
+    <style name="Theme.MyHomeAgent.Splash" parent="Theme.MyHomeAgent">
+        <item name="android:windowBackground">@color/primary_background</item>
+    </style>
+</resources>

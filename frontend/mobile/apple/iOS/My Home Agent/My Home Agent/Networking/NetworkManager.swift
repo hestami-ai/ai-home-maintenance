@@ -295,6 +295,14 @@ public class NetworkManager {
         return nil
     }
     
+    // Get formatted cookie header string for manual requests
+    public func getSessionCookieHeader() -> String? {
+        guard let sessionValue = getSessionCookieValue() else {
+            return nil
+        }
+        return "hestami_session=\(sessionValue)"
+    }
+    
     // Get the CSRF token value if available
     public func getCSRFToken() -> String? {
         // Check cached CSRF token first

@@ -59,23 +59,13 @@ struct ServicesView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if filteredServices.isEmpty {
-                    VStack(spacing: 20) {
-                        Text(searchText.isEmpty ? "No services available" : "No matching services")
-                            .font(AppTheme.titleFont)
-                            .foregroundColor(AppTheme.primaryText)
-                            .padding(.top, 40)
-                        
-                        if !searchText.isEmpty {
-                            Button("Clear Search") {
-                                searchText = ""
-                            }
-                            .padding()
-                            .background(AppTheme.buttonBackground)
-                            .foregroundColor(AppTheme.buttonText)
-                            .cornerRadius(10)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    UnifiedEmptyStateView(
+                        icon: "magnifyingglass",
+                        title: searchText.isEmpty ? "No services available" : "No matching services",
+                        message: searchText.isEmpty ? "Check back later for new services" : "Try adjusting your search terms",
+                        actionTitle: !searchText.isEmpty ? "Clear Search" : nil,
+                        action: !searchText.isEmpty ? { searchText = "" } : nil
+                    )
                 } else {
                     List(filteredServices) { service in
                         NavigationLink(destination: ServiceDetailView(service: service)) {
@@ -88,10 +78,7 @@ struct ServicesView: View {
             }
         }
         .navigationTitle("Available Services")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .standardToolbar()
         .task {
             await viewModel.loadServices()
             await viewModel.loadCategories()
@@ -144,139 +131,111 @@ struct ServiceDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Service Header
-                    HStack {
-                        Image(systemName: service.icon)
-                            .font(.largeTitle)
-                            .foregroundColor(AppTheme.buttonBackground)
-                        
-                        VStack(alignment: .leading) {
-                            Text(service.name)
-                                .font(AppTheme.titleFont)
-                                .foregroundColor(AppTheme.primaryText)
-                            Text(service.estimatedCost)
-                                .font(AppTheme.bodyFont)
+                    CardView {
+                        HStack {
+                            Image(systemName: service.icon)
+                                .font(.largeTitle)
                                 .foregroundColor(AppTheme.buttonBackground)
+                            
+                            VStack(alignment: .leading) {
+                                Text(service.name)
+                                    .font(AppTheme.titleFont)
+                                    .foregroundColor(AppTheme.primaryText)
+                                Text(service.estimatedCost)
+                                    .font(AppTheme.bodyFont)
+                                    .foregroundColor(AppTheme.buttonBackground)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
                     
                     // Description
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Description")
-                            .font(AppTheme.bodyFont.bold())
-                            .foregroundColor(AppTheme.primaryText)
-                        Text(service.description)
-                            .font(AppTheme.bodyFont)
-                            .foregroundColor(AppTheme.secondaryText)
-                    }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
-                    
-                    // Photo Attachments
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Photos")
+                    CardView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Description")
                                 .font(AppTheme.bodyFont.bold())
                                 .foregroundColor(AppTheme.primaryText)
-                            Spacer()
-                            Button("Add Photos") {
-                                showingImagePicker = true
-                            }
-                            .foregroundColor(AppTheme.buttonBackground)
-                            .font(AppTheme.captionFont.bold())
+                            Text(service.description)
+                                .font(AppTheme.bodyFont)
+                                .foregroundColor(AppTheme.secondaryText)
                         }
-                        
-                        if !selectedPhotos.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    ForEach(0..<selectedPhotos.count, id: \.self) { index in
-                                        Image(uiImage: selectedPhotos[index])
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 100, height: 100)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(AppTheme.borderColor, lineWidth: 1)
-                                            )
+                    }
+                    
+                    // Photo Attachments
+                    CardView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Photos")
+                                    .font(AppTheme.bodyFont.bold())
+                                    .foregroundColor(AppTheme.primaryText)
+                                Spacer()
+                                Button("Add Photos") {
+                                    showingImagePicker = true
+                                }
+                                .foregroundColor(AppTheme.buttonBackground)
+                                .font(AppTheme.captionFont.bold())
+                            }
+                            
+                            if !selectedPhotos.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 10) {
+                                        ForEach(0..<selectedPhotos.count, id: \.self) { index in
+                                            Image(uiImage: selectedPhotos[index])
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 100, height: 100)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .stroke(AppTheme.borderColor, lineWidth: 1)
+                                                )
+                                        }
                                     }
                                 }
+                            } else {
+                                Text("No photos selected")
+                                    .font(AppTheme.captionFont)
+                                    .foregroundColor(AppTheme.secondaryText)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(AppTheme.cardBackground.opacity(0.5))
+                                    .cornerRadius(8)
                             }
-                        } else {
-                            Text("No photos selected")
-                                .font(AppTheme.captionFont)
-                                .foregroundColor(AppTheme.secondaryText)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(AppTheme.cardBackground.opacity(0.5))
-                                .cornerRadius(8)
                         }
                     }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
                     
                     // Notes
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Additional Notes")
-                            .font(AppTheme.bodyFont.bold())
-                            .foregroundColor(AppTheme.primaryText)
-                        TextEditor(text: $notes)
-                            .frame(height: 100)
-                            .padding(8)
-                            .background(AppTheme.cardBackground.opacity(0.5))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(AppTheme.borderColor, lineWidth: 1)
-                            )
-                            .foregroundColor(AppTheme.primaryText)
+                    CardView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Additional Notes")
+                                .font(AppTheme.bodyFont.bold())
+                                .foregroundColor(AppTheme.primaryText)
+                            TextEditor(text: $notes)
+                                .frame(height: 100)
+                                .padding(8)
+                                .background(AppTheme.cardBackground.opacity(0.5))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(AppTheme.borderColor, lineWidth: 1)
+                                )
+                                .foregroundColor(AppTheme.primaryText)
+                        }
                     }
-                    .padding()
-                    .background(AppTheme.cardBackground)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
                     
                     // Request Button
                     Button(action: {
                         showingConfirmation = true
                     }) {
                         Text("Request Service")
-                            .font(AppTheme.bodyFont.bold())
-                            .foregroundColor(AppTheme.buttonText)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(AppTheme.buttonBackground)
-                            .cornerRadius(10)
                     }
+                    .buttonStyle(PrimaryButtonStyle())
                     .padding(.top, 10)
                 }
                 .padding()
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .standardToolbar(displayMode: .inline)
         .alert("Confirm Service Request", isPresented: $showingConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Confirm") {
