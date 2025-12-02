@@ -44,7 +44,8 @@ export const GET: RequestHandler = async ({ request, cookies, params }) => {
       {
         method: 'GET',
         headers: request.headers
-      }
+      },
+      userData.email  // Pass email for re-authentication if session expired
     );
     
     // Return response as-is (including status, headers, body)
@@ -253,7 +254,8 @@ export const PUT: RequestHandler = async ({ request, cookies, params }) => {
         method: 'PUT',
         headers: request.headers,
         body
-      }
+      },
+      userData.email  // Pass email for re-authentication if session expired
     );
     
     // Return response as-is
@@ -301,7 +303,8 @@ export const DELETE: RequestHandler = async ({ request, cookies, params }) => {
       {
         method: 'DELETE',
         headers: request.headers
-      }
+      },
+      userData.email  // Pass email for re-authentication if session expired
     );
     
     // Return response as-is
