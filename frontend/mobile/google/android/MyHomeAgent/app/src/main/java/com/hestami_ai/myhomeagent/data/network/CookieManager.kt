@@ -72,7 +72,11 @@ class PersistentCookieJar(context: Context) : CookieJar {
         // Filter out expired cookies
         val validCookies = cookies.filter { !it.hasExpired() }
 
-        Timber.d("Loading ${validCookies.size} cookies for host: $host")
+        Timber.d("Loading ${validCookies.size} cookies for host: $host, URL: $url")
+        Timber.d("Cookie store hosts: ${cookieStore.keys}")
+        validCookies.forEach { cookie ->
+            Timber.d("  Cookie: ${cookie.name}=${cookie.value.take(20)}... domain=${cookie.domain}")
+        }
         return validCookies
     }
 
