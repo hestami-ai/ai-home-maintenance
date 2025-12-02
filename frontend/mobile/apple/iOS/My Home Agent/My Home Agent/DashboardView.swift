@@ -161,10 +161,7 @@ struct DashboardView: View {
             }
         }
         .navigationTitle("Dashboard")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .standardToolbar()
         .coordinateSpace(name: "pullToRefresh")
         .alert("Error", isPresented: $viewModel.showError, actions: {
             Button("Retry") {
@@ -185,69 +182,64 @@ struct DashboardPropertyCard: View {
     let property: Property
     
     var body: some View {
-        HStack(spacing: 16) {
-            // Use featuredImage if available, otherwise show a default icon
-            if let featuredImage = property.featuredImage, !featuredImage.isEmpty {
-                AsyncImage(url: URL(string: featuredImage)) { phase in
-                    switch phase {
-                    case .empty:
-                        ProgressView()
-                            .frame(width: 45, height: 45)
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 45, height: 45)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    case .failure:
-                        Image(systemName: "house.fill")
-                            .font(.title2)
-                            .foregroundColor(AppTheme.buttonBackground)
-                            .frame(width: 45, height: 45)
-                            .background(AppTheme.buttonBackground.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    @unknown default:
-                        Image(systemName: "house.fill")
-                            .font(.title2)
-                            .foregroundColor(AppTheme.buttonBackground)
-                            .frame(width: 45, height: 45)
-                            .background(AppTheme.buttonBackground.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+        CardView {
+            HStack(spacing: 16) {
+                // Use featuredImage if available, otherwise show a default icon
+                if let featuredImage = property.featuredImage, !featuredImage.isEmpty {
+                    AsyncImage(url: URL(string: featuredImage)) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: 45, height: 45)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 45, height: 45)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        case .failure:
+                            Image(systemName: "house.fill")
+                                .font(.title2)
+                                .foregroundColor(AppTheme.buttonBackground)
+                                .frame(width: 45, height: 45)
+                                .background(AppTheme.buttonBackground.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        @unknown default:
+                            Image(systemName: "house.fill")
+                                .font(.title2)
+                                .foregroundColor(AppTheme.buttonBackground)
+                                .frame(width: 45, height: 45)
+                                .background(AppTheme.buttonBackground.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
+                } else {
+                    Image(systemName: "house.fill")
+                        .font(.title2)
+                        .foregroundColor(AppTheme.buttonBackground)
+                        .frame(width: 45, height: 45)
+                        .background(AppTheme.buttonBackground.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-            } else {
-                Image(systemName: "house.fill")
-                    .font(.title2)
-                    .foregroundColor(AppTheme.buttonBackground)
-                    .frame(width: 45, height: 45)
-                    .background(AppTheme.buttonBackground.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(property.title)
-                    .font(AppTheme.bodyFont.bold())
-                    .foregroundColor(AppTheme.primaryText)
                 
-                Text(property.address)
-                    .font(AppTheme.captionFont)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(property.title)
+                        .font(AppTheme.bodyFont.bold())
+                        .foregroundColor(AppTheme.primaryText)
+                    
+                    Text(property.address)
+                        .font(AppTheme.captionFont)
+                        .foregroundColor(AppTheme.secondaryText)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
                     .foregroundColor(AppTheme.secondaryText)
-                    .lineLimit(1)
+                    .font(.caption)
             }
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(AppTheme.secondaryText)
-                .font(.caption)
         }
-        .padding(12)
-        .background(AppTheme.cardBackground)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.borderColor, lineWidth: 1)
-        )
     }
 }
 
@@ -271,61 +263,43 @@ struct DashboardRequestCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(request.title)
-                    .font(AppTheme.bodyFont.bold())
-                    .foregroundColor(AppTheme.primaryText)
+        CardView {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(request.title)
+                        .font(AppTheme.bodyFont.bold())
+                        .foregroundColor(AppTheme.primaryText)
+                    
+                    Spacer()
+                    
+                    UnifiedStatusBadge(
+                        text: getStatusDisplayText(request.status),
+                        color: request.statusColor
+                    )
+                }
                 
-                Spacer()
-                
-                DashboardStatusBadge(statusColor: request.statusColor, text: getStatusDisplayText(request.status))
-            }
-            
-            Text(request.description)
-                .font(AppTheme.captionFont)
-                .foregroundColor(AppTheme.secondaryText)
-                .lineLimit(2)
-            
-            HStack {
-                Image(systemName: "calendar")
-                    .font(.caption)
+                Text(request.description)
+                    .font(AppTheme.captionFont)
                     .foregroundColor(AppTheme.secondaryText)
+                    .lineLimit(2)
                 
-                Text(request.date, style: .date)
-                    .font(.caption)
-                    .foregroundColor(AppTheme.secondaryText)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(AppTheme.secondaryText)
-                    .font(.caption)
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.secondaryText)
+                    
+                    Text(request.date, style: .date)
+                        .font(.caption)
+                        .foregroundColor(AppTheme.secondaryText)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(AppTheme.secondaryText)
+                        .font(.caption)
+                }
             }
         }
-        .padding(12)
-        .background(AppTheme.cardBackground)
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(AppTheme.borderColor, lineWidth: 1)
-        )
-    }
-}
-
-
-struct DashboardStatusBadge: View {
-    let statusColor: Color
-    let text: String
-    
-    var body: some View {
-        Text(text)
-            .font(.caption)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(statusColor.opacity(0.2))
-            .foregroundColor(statusColor)
-            .cornerRadius(8)
     }
 }
 
@@ -354,13 +328,8 @@ struct QuickActionButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(AppTheme.cardBackground)
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(AppTheme.borderColor, lineWidth: 1)
-            )
         }
+        .buttonStyle(SecondaryButtonStyle())
     }
 }
 

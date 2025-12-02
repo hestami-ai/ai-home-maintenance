@@ -49,9 +49,13 @@ struct PropertiesView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if viewModel.properties.isEmpty {
-                    EmptyPropertiesView(onAddProperty: {
-                        showingAddProperty = true
-                    })
+                    UnifiedEmptyStateView(
+                        icon: "house.lodge",
+                        title: "No Properties Added",
+                        message: "Add properties to manage service requests and maintenance",
+                        actionTitle: "Add New Property",
+                        action: { showingAddProperty = true }
+                    )
                 } else {
                     List {
                         ForEach(viewModel.properties) { property in
@@ -83,14 +87,9 @@ struct PropertiesView: View {
                             Image(systemName: "plus.circle.fill")
                                 .font(.title3)
                             Text("Add New Property")
-                                .font(AppTheme.bodyFont)
                         }
-                        .foregroundColor(AppTheme.buttonText)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(AppTheme.buttonBackground)
-                        .cornerRadius(10)
                     }
+                    .buttonStyle(PrimaryButtonStyle())
                     .padding(.horizontal)
                     .padding(.bottom)
                 }
@@ -116,10 +115,7 @@ struct PropertiesView: View {
             Text("Are you sure you want to delete this property? This action cannot be undone.")
         }
         .navigationTitle("My Properties")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(AppTheme.primaryBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .standardToolbar()
         .task {
             await viewModel.loadProperties()
         }
@@ -186,15 +182,11 @@ struct PropertyRowView: View {
                 }
                 
                 // Status indicator
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(statusColor(property.status))
-                        .frame(width: 8, height: 8)
-                    
-                    Text(property.status.rawValue.capitalized)
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.secondaryText)
-                }
+                UnifiedStatusBadge(
+                    text: property.status.rawValue.capitalized,
+                    color: statusColor(property.status),
+                    style: .dot
+                )
             }
         }
         .padding(.vertical, 8)
@@ -324,24 +316,23 @@ struct ExpandableDetailSection<Content: View>: View {
                     isExpanded.toggle()
                 }
             }) {
-                HStack {
-                    Image(systemName: icon)
-                        .foregroundColor(AppTheme.accentPrimary)
-                        .frame(width: 24)
-                    
-                    Text(title)
-                        .font(AppTheme.bodyFont.bold())
-                        .foregroundColor(AppTheme.primaryText)
-                    
-                    Spacer()
-                    
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .foregroundColor(AppTheme.secondaryText)
-                        .font(.caption)
+                CardView(padding: 16) {
+                    HStack {
+                        Image(systemName: icon)
+                            .foregroundColor(AppTheme.accentPrimary)
+                            .frame(width: 24)
+                        
+                        Text(title)
+                            .font(AppTheme.bodyFont.bold())
+                            .foregroundColor(AppTheme.primaryText)
+                        
+                        Spacer()
+                        
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .foregroundColor(AppTheme.secondaryText)
+                            .font(.caption)
+                    }
                 }
-                .padding()
-                .background(AppTheme.cardBackground)
-                .cornerRadius(8)
             }
             .buttonStyle(PlainButtonStyle())
             

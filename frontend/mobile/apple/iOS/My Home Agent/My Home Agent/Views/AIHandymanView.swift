@@ -7,6 +7,12 @@ struct AIHandymanView: View {
     @State private var showDeleteConfirmation = false
     @State private var conversationToDelete: String?
     
+    // File picker states
+    @State private var showPhotoPicker = false
+    @State private var showDocumentPicker = false
+    @State private var showCameraPicker = false
+    @State private var showFileActionSheet = false
+    
     var body: some View {
         ZStack {
             AppTheme.primaryBackground.edgesIgnoringSafeArea(.all)
@@ -30,6 +36,33 @@ struct AIHandymanView: View {
         }
         .sheet(isPresented: $showConversationList) {
             conversationListSheet
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            PhotoPicker(isPresented: $showPhotoPicker) { files in
+                handleSelectedFiles(files)
+            }
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPicker(isPresented: $showDocumentPicker) { files in
+                handleSelectedFiles(files)
+            }
+        }
+        .sheet(isPresented: $showCameraPicker) {
+            CameraPicker(isPresented: $showCameraPicker) { file in
+                handleSelectedFiles([file])
+            }
+        }
+        .confirmationDialog("Add Attachment", isPresented: $showFileActionSheet) {
+            Button("Take Photo") {
+                showCameraPicker = true
+            }
+            Button("Photo Library") {
+                showPhotoPicker = true
+            }
+            Button("Browse Files") {
+                showDocumentPicker = true
+            }
+            Button("Cancel", role: .cancel) {}
         }
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK", role: .cancel) {
@@ -192,37 +225,88 @@ struct AIHandymanView: View {
     // MARK: - Message Input
     
     private var messageInputView: some View {
-        HStack(spacing: 12) {
-            TextField("Ask a question...", text: $userInput, axis: .vertical)
-                .disableInputAssistant()
-                .padding(12)
-                .background(AppTheme.inputBackground)
-                .cornerRadius(20)
-                .foregroundColor(AppTheme.textPrimary)
-                .lineLimit(1...5)
-            
-            Button(action: {
-                Task {
-                    let message = userInput
-                    userInput = ""
-                    await viewModel.sendMessage(message)
-                }
-            }) {
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(AppTheme.buttonText)
-                    .padding(12)
-                    .background(
-                        Circle()
-                            .fill(userInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSendingMessage
-                                  ? AppTheme.secondaryBackground
-                                  : AppTheme.accentPrimary)
-                    )
+        VStack(spacing: 8) {
+            // Pending files preview
+            if !viewModel.pendingFiles.isEmpty {
+                pendingFilesView
             }
-            .disabled(userInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSendingMessage)
+            
+            HStack(spacing: 12) {
+                // Attachment button
+                Button(action: {
+                    showFileActionSheet = true
+                }) {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppTheme.accentPrimary)
+                        .padding(12)
+                }
+                .disabled(viewModel.isSendingMessage)
+                
+                TextField("Ask a question...", text: $userInput, axis: .vertical)
+                    .disableInputAssistant()
+                    .padding(12)
+                    .background(AppTheme.inputBackground)
+                    .cornerRadius(20)
+                    .foregroundColor(AppTheme.textPrimary)
+                    .lineLimit(1...5)
+                
+                Button(action: {
+                    Task {
+                        let message = userInput
+                        userInput = ""
+                        await viewModel.sendMessage(message)
+                    }
+                }) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(AppTheme.buttonText)
+                        .padding(12)
+                        .background(
+                            Circle()
+                                .fill(canSendMessage
+                                      ? AppTheme.accentPrimary
+                                      : AppTheme.secondaryBackground)
+                        )
+                }
+                .disabled(!canSendMessage)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
-        .padding()
         .background(AppTheme.cardBackground)
+    }
+    
+    private var canSendMessage: Bool {
+        let hasText = !userInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasFiles = !viewModel.pendingFiles.isEmpty
+        return (hasText || hasFiles) && !viewModel.isSendingMessage
+    }
+    
+    // MARK: - Pending Files View
+    
+    private var pendingFilesView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Attachments (\(viewModel.pendingFiles.count))")
+                .font(AppTheme.captionFont)
+                .foregroundColor(AppTheme.secondaryText)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(viewModel.pendingFiles) { file in
+                        PendingFileCard(file: file) {
+                            viewModel.removePendingFile(file)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 4)
+            }
+            .frame(height: 100)
+        }
+        .padding(.top, 8)
+        .background(AppTheme.primaryBackground)
     }
     
     // MARK: - Conversation List Sheet
@@ -301,12 +385,122 @@ struct AIHandymanView: View {
             }
         }
     }
+    
+    // MARK: - File Handling
+    
+    private func handleSelectedFiles(_ files: [SelectedFile]) {
+        print("🎯 AIHandymanView received \(files.count) files")
+        for file in files {
+            print("🎯 Adding file to pending: \(file.filename)")
+            viewModel.addPendingFile(
+                fileData: file.data,
+                filename: file.filename,
+                mimeType: file.mimeType,
+                thumbnail: file.thumbnail
+            )
+        }
+        print("🎯 Total pending files now: \(viewModel.pendingFiles.count)")
+    }
+}
+
+// MARK: - Pending File Card
+
+struct PendingFileCard: View {
+    let file: PendingFileUpload
+    let onRemove: () -> Void
+    
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 4) {
+                // Thumbnail or icon
+                ZStack {
+                    if let thumbnail = file.thumbnail {
+                        Image(uiImage: thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 80, height: 80)
+                            .clipped()
+                            .cornerRadius(8)
+                    } else {
+                        Image(systemName: fileIcon(for: file.fileExtension))
+                            .font(.system(size: 32))
+                            .foregroundColor(AppTheme.accentPrimary)
+                            .frame(width: 80, height: 80)
+                            .background(AppTheme.cardBackground)
+                            .cornerRadius(8)
+                    }
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppTheme.borderColor, lineWidth: 1)
+                )
+                
+                // Filename
+                Text(file.filename)
+                    .font(.caption2)
+                    .foregroundColor(AppTheme.primaryText)
+                    .lineLimit(1)
+                    .frame(width: 80)
+            }
+            .opacity(file.isUploading ? 0.6 : 1.0)
+            .overlay {
+                if file.isUploading {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .cornerRadius(8)
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    }
+                    .frame(width: 80, height: 80)
+                }
+            }
+            
+            // Remove button
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(.white)
+                    .background(Circle().fill(Color.red))
+            }
+            .offset(x: 10, y: -10)
+            
+            // Error indicator
+            if file.error != nil {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                        Text("Failed")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.white)
+                    .padding(4)
+                    .background(Color.red)
+                    .cornerRadius(4)
+                }
+                .frame(width: 80, height: 80)
+            }
+        }
+        .frame(width: 90, height: 110)
+    }
+    
+    private func fileIcon(for ext: String) -> String {
+        switch ext.lowercased() {
+        case "pdf": return "doc.fill"
+        case "txt", "md": return "doc.text.fill"
+        case "doc", "docx": return "doc.richtext.fill"
+        case "mp4", "mov": return "video.fill"
+        default: return "doc.fill"
+        }
+    }
 }
 
 // MARK: - Chat Message Bubble
 
 struct ChatMessageBubble: View {
     let message: LibreChatMessage
+    @State private var selectedImageURL: IdentifiableURL?
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -314,37 +508,49 @@ struct ChatMessageBubble: View {
                 Spacer(minLength: 60)
             }
             
-            VStack(alignment: message.isFromUser ? .trailing : .leading, spacing: 4) {
-                // Message bubble with markdown support for AI responses
-                Group {
-                    if message.isFromUser {
-                        // User messages: plain text
-                        Text(message.displayText)
-                            .font(AppTheme.bodyFont)
-                            .foregroundColor(AppTheme.buttonText)
-                    } else {
-                        // AI messages: markdown rendering
-                        MarkdownText(
-                            message.displayText,
-                            textColor: AppTheme.primaryText,
-                            font: AppTheme.bodyFont
-                        )
-                    }
+            VStack(alignment: message.isFromUser ? .trailing : .leading, spacing: 8) {
+                // Display images for user messages (above text)
+                if message.isFromUser {
+                    fileAttachmentsView
                 }
-                .padding(12)
-                .background(
-                    message.isFromUser
-                    ? AppTheme.accentPrimary
-                    : AppTheme.cardBackground
-                )
-                .cornerRadius(16)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            message.isFromUser ? Color.clear : AppTheme.borderColor,
-                            lineWidth: 1
-                        )
-                )
+                
+                // Message bubble with markdown support for AI responses
+                if !message.displayText.isEmpty {
+                    Group {
+                        if message.isFromUser {
+                            // User messages: plain text
+                            Text(message.displayText)
+                                .font(AppTheme.bodyFont)
+                                .foregroundColor(AppTheme.buttonText)
+                        } else {
+                            // AI messages: markdown rendering
+                            MarkdownText(
+                                message.displayText,
+                                textColor: AppTheme.primaryText,
+                                font: AppTheme.bodyFont
+                            )
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        message.isFromUser
+                        ? AppTheme.accentPrimary
+                        : AppTheme.cardBackground
+                    )
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                message.isFromUser ? Color.clear : AppTheme.borderColor,
+                                lineWidth: 1
+                            )
+                    )
+                }
+                
+                // Display images for assistant messages (below text)
+                if !message.isFromUser {
+                    fileAttachmentsView
+                }
                 
                 // Timestamp
                 if let timestamp = message.timestamp {
@@ -357,6 +563,60 @@ struct ChatMessageBubble: View {
             
             if !message.isFromUser {
                 Spacer(minLength: 60)
+            }
+        }
+        .sheet(item: $selectedImageURL) { identifiableURL in
+            FullScreenImageViewer(imageURL: identifiableURL.url, isPresented: $selectedImageURL)
+        }
+    }
+    
+    @ViewBuilder
+    private var fileAttachmentsView: some View {
+        if let files = message.files, !files.isEmpty {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150))], spacing: 8) {
+                ForEach(files, id: \.file_id) { file in
+                    if file.isImage, let url = file.displayURL(baseURL: AppConfiguration.apiBaseURL) {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                                    .frame(width: 150, height: 150)
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(maxWidth: 200, maxHeight: 150)
+                                    .clipped()
+                                    .cornerRadius(8)
+                            case .failure:
+                                Image(systemName: "photo")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(AppTheme.secondaryText)
+                                    .frame(width: 150, height: 150)
+                                    .background(AppTheme.inputBackground)
+                                    .cornerRadius(8)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                        .onTapGesture {
+                            selectedImageURL = IdentifiableURL(url: url)
+                        }
+                    } else {
+                        // Non-image file attachment
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.fill")
+                                .foregroundColor(AppTheme.accentPrimary)
+                            Text(file.filename)
+                                .font(AppTheme.captionFont)
+                                .foregroundColor(AppTheme.primaryText)
+                                .lineLimit(1)
+                        }
+                        .padding(8)
+                        .background(AppTheme.inputBackground)
+                        .cornerRadius(8)
+                    }
+                }
             }
         }
     }

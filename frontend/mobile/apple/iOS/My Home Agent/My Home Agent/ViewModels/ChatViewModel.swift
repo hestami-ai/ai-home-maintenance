@@ -15,7 +15,12 @@ class ChatViewModel: ObservableObject {
     @Published var error: String?
     @Published var showError = false
     
+    // File upload properties
+    @Published var pendingFiles: [PendingFileUpload] = []
+    @Published var isUploadingFiles = false
+    
     private let chatService = ChatService.shared
+    private let fileUploader = ChatFileUploader.shared
     private var hasLoadedConversations = false
     
     // MARK: - Computed Properties
@@ -122,8 +127,10 @@ class ChatViewModel: ObservableObject {
     // MARK: - Send Message
     
     func sendMessage(_ text: String) async {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            AppLogger.app.warning("Cannot send empty message")
+        // Allow empty text if there are files attached
+        let hasContent = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pendingFiles.isEmpty
+        guard hasContent else {
+            AppLogger.app.warning("Cannot send empty message without attachments")
             return
         }
         
@@ -131,10 +138,25 @@ class ChatViewModel: ObservableObject {
         isSendingMessage = true
         error = nil
         
+        // Upload any pending files first
+        await uploadPendingFiles()
+        
+        // Check if any uploads failed
+        if pendingFiles.contains(where: { $0.error != nil }) {
+            self.error = "Some files failed to upload. Please remove them and try again."
+            showError = true
+            isSendingMessage = false
+            return
+        }
+        
+        // Get uploaded files
+        let uploadedFiles = pendingFiles.compactMap { $0.uploadedFile }
+        
         do {
             let response = try await chatService.sendMessage(
                 text: text,
-                conversationId: selectedConversationId
+                conversationId: selectedConversationId,
+                uploadedFiles: uploadedFiles
             )
             
             // Add user message if provided
@@ -170,6 +192,9 @@ class ChatViewModel: ObservableObject {
             }
             
             AppLogger.app.info("Message sent successfully")
+            
+            // Clear pending files after successful send
+            pendingFiles.removeAll()
         } catch {
             AppLogger.error("Failed to send message", error: error, category: AppLogger.app)
             self.error = "Failed to send message: \(error.localizedDescription)"
@@ -242,5 +267,114 @@ class ChatViewModel: ObservableObject {
     func refresh() async {
         hasLoadedConversations = false
         await loadConversations()
+    }
+    
+    // MARK: - File Upload Management
+    
+    /// Add a file to the pending upload queue
+    func addPendingFile(fileData: Data, filename: String, mimeType: String, thumbnail: UIImage? = nil) {
+        let fileExtension = (filename as NSString).pathExtension
+        
+        print("📦 ChatViewModel.addPendingFile called for: \(filename)")
+        print("📦 File size: \(fileData.count) bytes, extension: \(fileExtension)")
+        
+        // Validate file extension
+        guard FileUploadConstants.isAllowedExtension(fileExtension) else {
+            print("❌ File extension '\(fileExtension)' not allowed")
+            self.error = "File type '\(fileExtension)' is not supported"
+            showError = true
+            return
+        }
+        
+        // Validate file size
+        guard fileData.count <= FileUploadConstants.maxFileSize else {
+            print("❌ File too large: \(fileData.count) bytes")
+            self.error = "File is too large. Maximum size is 100MB"
+            showError = true
+            return
+        }
+        
+        let pendingFile = PendingFileUpload(
+            filename: filename,
+            fileData: fileData,
+            mimeType: mimeType,
+            fileExtension: fileExtension,
+            thumbnail: thumbnail
+        )
+        
+        pendingFiles.append(pendingFile)
+        print("✅ File added to pending list. Total pending: \(pendingFiles.count)")
+        AppLogger.app.info("Added pending file: \(filename, privacy: .public)")
+    }
+    
+    /// Remove a pending file
+    func removePendingFile(_ file: PendingFileUpload) {
+        pendingFiles.removeAll { $0.id == file.id }
+        AppLogger.app.info("Removed pending file: \(file.filename, privacy: .public)")
+    }
+    
+    /// Upload all pending files that haven't been uploaded yet
+    private func uploadPendingFiles() async {
+        guard !pendingFiles.isEmpty else { return }
+        
+        isUploadingFiles = true
+        
+        for index in pendingFiles.indices {
+            // Skip files that are already uploaded or currently uploading
+            guard pendingFiles[index].uploadedFile == nil,
+                  !pendingFiles[index].isUploading else {
+                continue
+            }
+            
+            // Mark as uploading
+            pendingFiles[index].isUploading = true
+            pendingFiles[index].error = nil
+            
+            do {
+                let file = pendingFiles[index]
+                
+                // Extract dimensions for images
+                var width: Int?
+                var height: Int?
+                
+                if file.isImage {
+                    if let dimensions = file.fileData.getImageDimensions() {
+                        width = dimensions.width
+                        height = dimensions.height
+                    } else {
+                        throw FileUploadError.imageProcessingFailed
+                    }
+                }
+                
+                // Upload the file
+                let uploadedFile = try await fileUploader.uploadFile(
+                    fileData: file.fileData,
+                    filename: file.filename,
+                    mimeType: file.mimeType,
+                    width: width,
+                    height: height
+                )
+                
+                // Update with uploaded file info
+                pendingFiles[index].uploadedFile = uploadedFile
+                pendingFiles[index].isUploading = false
+                pendingFiles[index].uploadProgress = 1.0
+                
+                AppLogger.app.info("Successfully uploaded: \(file.filename, privacy: .public)")
+            } catch {
+                // Mark upload as failed
+                pendingFiles[index].isUploading = false
+                pendingFiles[index].error = error.localizedDescription
+                
+                AppLogger.error("Failed to upload file", error: error, category: AppLogger.app)
+            }
+        }
+        
+        isUploadingFiles = false
+    }
+    
+    /// Clear all pending files
+    func clearPendingFiles() {
+        pendingFiles.removeAll()
     }
 }
