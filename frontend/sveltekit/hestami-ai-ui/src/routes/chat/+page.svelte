@@ -56,6 +56,43 @@
   }
   
   /**
+   * Delete a conversation
+   */
+  async function deleteConversation(conversationId: string) {
+    try {
+      // LibreChat expects DELETE to /api/convos with body { arg: { conversationId } }
+      const response = await fetch('/api/chat/convos', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          arg: {
+            conversationId,
+            source: 'button'
+          }
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete conversation');
+      }
+      
+      // Remove from local list
+      conversations = conversations.filter(c => c.conversationId !== conversationId);
+      
+      // If the deleted conversation was selected, reset to new chat state
+      if (selectedConversationId === conversationId) {
+        selectedConversationId = null;
+        messages = [];
+      }
+    } catch (err) {
+      console.error('Error deleting conversation:', err);
+      error = 'Failed to delete conversation. Please try again.';
+    }
+  }
+  
+  /**
    * File attachment type from ChatInput
    */
   interface UploadedFile {
@@ -67,6 +104,11 @@
     width?: number;
     height?: number;
     filepath?: string;
+    // Document-specific fields (for PDFs, text files, etc.)
+    text?: string;     // Extracted text content from PDFs/documents
+    context?: string;  // File purpose (e.g., "message_attachment")
+    source?: string;   // Extraction method (e.g., "text")
+    embedded?: boolean;
   }
   
   /**
@@ -115,7 +157,12 @@
           type: f.type,
           size: f.size,
           width: f.width,
-          height: f.height
+          height: f.height,
+          // Include document fields
+          text: f.text,
+          context: f.context,
+          source: f.source,
+          embedded: f.embedded
         }));
         
         // Also add image array for image files (LibreChat format)
@@ -125,6 +172,17 @@
         );
         if (imageFiles.length > 0) {
           requestBody.imageUrls = imageFiles.map(f => f.filepath);
+        }
+        
+        // For document files with extracted text, include as 'ocr' field
+        // LibreChat expects this format for "Upload as Text" feature
+        const documentFiles = files.filter(f => f.text);
+        if (documentFiles.length > 0) {
+          // Build OCR string in LibreChat format (matches their debug log format)
+          const ocrParts = documentFiles.map(f => 
+            `# "${f.filename}"\n${f.text}`
+          );
+          requestBody.ocr = `Attached document(s):\n\`\`\`md${ocrParts.join('\n\n')}\n\`\`\``;
         }
       }
       
@@ -215,6 +273,7 @@
         conversations={conversations}
         selectedId={selectedConversationId}
         on:select={(e) => selectConversation(e.detail.conversationId)}
+        on:delete={(e) => deleteConversation(e.detail.conversationId)}
       />
     </div>
   </div>

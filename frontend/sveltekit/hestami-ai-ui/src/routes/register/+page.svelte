@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import { goto } from '$app/navigation';
+	import { Turnstile } from 'svelte-turnstile';
+	
+	// Get the Turnstile site key from server-side load function
+	let { data } = $props();
 	
 	// Form state
 	let email = $state('');
@@ -12,6 +16,8 @@
 	let userRole = $state('homeowner'); // Default role
 	let isLoading = $state(false);
 	let errorMessage = $state('');
+	let captchaToken = $state('');
+	let turnstileRef: { reset: () => void } | undefined = $state();
 	
 	// Form validation
 	let passwordsMatch = $derived(password === confirmPassword || confirmPassword === '');
@@ -23,17 +29,45 @@
 		lastName && 
 		phoneNumber && 
 		userRole && 
-		passwordsMatch
+		passwordsMatch &&
+		captchaToken
 	);
+	
+	// Turnstile handlers
+	function handleCaptchaVerify(event: CustomEvent<{ token: string }>) {
+		captchaToken = event.detail.token;
+	}
+	
+	function handleCaptchaExpire() {
+		captchaToken = '';
+		errorMessage = 'Verification expired. Please try again.';
+	}
+	
+	function handleCaptchaError() {
+		captchaToken = '';
+		errorMessage = 'Failed to verify you are human. Please try again.';
+	}
+	
+	function resetCaptcha() {
+		captchaToken = '';
+		turnstileRef?.reset();
+	}
 	
 	// Form submission
 	async function handleSubmit() {
 		isLoading = true;
 		errorMessage = '';
 		
+		if (!captchaToken) {
+			errorMessage = 'Please complete the CAPTCHA';
+			isLoading = false;
+			return;
+		}
+		
 		if (!passwordsMatch) {
 			errorMessage = 'Passwords do not match';
 			isLoading = false;
+			resetCaptcha();
 			return;
 		}
 		
@@ -52,7 +86,8 @@
 					last_name: lastName,
 					phone_number: phoneNumber,
 					user_role: userRole,
-					service_provider: null // Not required for registration
+					service_provider: null, // Not required for registration
+					cf_turnstile_response: captchaToken
 				})
 			});
 			
@@ -68,6 +103,7 @@
 				} else {
 					errorMessage = 'Registration failed. Please try again.';
 				}
+				resetCaptcha();
 				return;
 			}
 			
@@ -76,6 +112,7 @@
 		} catch (error) {
 			console.error('Registration error:', error);
 			errorMessage = 'An error occurred during registration';
+			resetCaptcha();
 		} finally {
 			isLoading = false;
 		}
@@ -194,6 +231,18 @@
 						<p class="text-error-500 text-sm mt-1">Passwords do not match</p>
 					{/if}
 				</label>
+				
+				<!-- Turnstile CAPTCHA -->
+				<div class="flex justify-center">
+					<Turnstile
+						siteKey={data.turnstileSiteKey}
+						theme="auto"
+						on:turnstile-callback={handleCaptchaVerify}
+						on:turnstile-expired={handleCaptchaExpire}
+						on:turnstile-error={handleCaptchaError}
+						bind:this={turnstileRef}
+					/>
+				</div>
 				
 				<button type="submit" class="btn preset-filled-primary w-full" disabled={isLoading || !formValid}>
 					{#if isLoading}
