@@ -38,6 +38,9 @@ media3 = "1.2.1"
 # ARCore - 1.44.0+ required for 16KB page size compatibility
 arcore = "1.44.0"
 
+# Markdown
+composeMarkdown = "0.5.4"
+
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -92,6 +95,9 @@ arcore = { group = "com.google.ar", name = "core", version.ref = "arcore" }
 
 # WebView
 webkit = { group = "androidx.webkit", name = "webkit", version = "1.9.0" }
+
+# Markdown
+compose-markdown = { group = "com.github.jeziellago", name = "compose-markdown", version.ref = "composeMarkdown" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

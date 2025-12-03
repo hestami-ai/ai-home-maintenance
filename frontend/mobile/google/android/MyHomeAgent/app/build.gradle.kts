@@ -98,6 +98,9 @@ dependencies {
     // WebView for 3D model viewing
     implementation(libs.webkit)
 
+    // Markdown rendering
+    implementation(libs.compose.markdown)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
