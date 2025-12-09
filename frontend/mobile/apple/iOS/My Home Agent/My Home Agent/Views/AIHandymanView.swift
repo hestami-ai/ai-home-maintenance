@@ -551,14 +551,6 @@ struct ChatMessageBubble: View {
                 if !message.isFromUser {
                     fileAttachmentsView
                 }
-                
-                // Timestamp
-                if let timestamp = message.timestamp {
-                    Text(formatTimestamp(timestamp))
-                        .font(AppTheme.captionFont)
-                        .foregroundColor(AppTheme.secondaryText)
-                        .padding(.horizontal, 4)
-                }
             }
             
             if !message.isFromUser {
@@ -621,20 +613,6 @@ struct ChatMessageBubble: View {
         }
     }
     
-    private func formatTimestamp(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(date) {
-            formatter.dateFormat = "h:mm a"
-        } else if calendar.isDateInYesterday(date) {
-            return "Yesterday " + date.formatted(date: .omitted, time: .shortened)
-        } else {
-            formatter.dateFormat = "MMM d, h:mm a"
-        }
-        
-        return formatter.string(from: date)
-    }
 }
 
 // MARK: - Conversation Row

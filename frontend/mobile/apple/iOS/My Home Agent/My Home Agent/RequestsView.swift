@@ -4,7 +4,6 @@ struct RequestsView: View {
     @StateObject private var viewModel = RequestsViewModel()
     @State private var searchText = ""
     @State private var selectedFilter: ServiceRequestStatus? = nil
-    @State private var selectedTab = 0
     @State private var showingCreateRequest = false
     @State private var groupByProperty = false
     
@@ -29,41 +28,19 @@ struct RequestsView: View {
         ZStack {
             AppTheme.primaryBackground.edgesIgnoringSafeArea(.all)
             
-            VStack(spacing: 0) {
-                TabView(selection: $selectedTab) {
-                    // Service Requests Tab
-                    ServiceRequestsTabView(viewModel: viewModel, searchText: $searchText, selectedFilter: $selectedFilter, filteredRequests: filteredRequests, groupByProperty: $groupByProperty)
-                        .tabItem {
-                            Label("Service Requests", systemImage: "wrench.and.screwdriver")
-                        }
-                        .tag(0)
-                        .background(AppTheme.primaryBackground)
-                    
-                    // AI Handyman Tab
-                    AIHandymanView()
-                        .tabItem {
-                            Label("Ask My AI Handyman", systemImage: "person.fill.questionmark")
-                        }
-                        .tag(1)
-                        .background(AppTheme.primaryBackground)
-                }
-                .background(AppTheme.primaryBackground)
-                .accentColor(AppTheme.accentColor)
-            }
+            ServiceRequestsTabView(viewModel: viewModel, searchText: $searchText, selectedFilter: $selectedFilter, filteredRequests: filteredRequests, groupByProperty: $groupByProperty)
         }
         .background(AppTheme.primaryBackground)
-        .navigationTitle(selectedTab == 0 ? "Service Requests" : "Ask My AI Handyman")
+        .navigationTitle("Service Requests")
         .standardToolbar()
         .toolbar {
-            if selectedTab == 0 {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showingCreateRequest = true
-                    }) {
-                        Image(systemName: "plus")
-                            .foregroundColor(AppTheme.primaryText)
-                            .font(.system(size: 20, weight: .semibold))
-                    }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingCreateRequest = true
+                }) {
+                    Image(systemName: "plus")
+                        .foregroundColor(AppTheme.primaryText)
+                        .font(.system(size: 20, weight: .semibold))
                 }
             }
         }
