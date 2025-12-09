@@ -67,5 +67,5 @@ enum class BottomNavDestination(
     DASHBOARD("dashboard", "Dashboard", "dashboard"),
     PROPERTIES("properties", "Properties", "home"),
     REQUESTS("service_requests", "Requests", "list"),
-    AI_ASSISTANT("ai_chat", "AI Assistant", "smart_toy")
+    AI_ASSISTANT("ai_chat", "AI Handyman", "smart_toy")
 }

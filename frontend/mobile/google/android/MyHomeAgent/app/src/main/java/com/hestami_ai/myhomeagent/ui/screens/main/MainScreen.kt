@@ -92,7 +92,7 @@ fun MainScreen(
             unselectedIcon = Icons.Outlined.HomeRepairService
         ),
         BottomNavItem(
-            title = "AI Assistant",
+            title = "AI Handyman",
             selectedIcon = Icons.Filled.SmartToy,
             unselectedIcon = Icons.Outlined.SmartToy
         )

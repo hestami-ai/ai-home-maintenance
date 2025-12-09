@@ -215,7 +215,7 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 QuickActionCard(
-                    title = "AI Assistant",
+                    title = "AI Handyman",
                     description = "Get help with home maintenance questions",
                     onClick = onNavigateToChat
                 )

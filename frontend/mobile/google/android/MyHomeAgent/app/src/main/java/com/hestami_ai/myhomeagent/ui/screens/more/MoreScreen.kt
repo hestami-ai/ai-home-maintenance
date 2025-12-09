@@ -100,7 +100,7 @@ fun MoreScreen(
             MenuCard {
                 MenuItem(
                     icon = Icons.Filled.SmartToy,
-                    title = "AI Assistant",
+                    title = "AI Handyman",
                     onClick = onNavigateToChat
                 )
             }

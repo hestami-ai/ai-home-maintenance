@@ -72,6 +72,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,6 +84,7 @@ import com.hestami_ai.myhomeagent.data.network.ChatServiceState
 import com.hestami_ai.myhomeagent.data.network.PendingFileUpload
 import com.hestami_ai.myhomeagent.ui.theme.AppColors
 import com.hestami_ai.myhomeagent.ui.viewmodel.ChatViewModel
+import dev.jeziellago.compose.markdowntext.MarkdownText
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -389,7 +391,7 @@ private fun ChatHeader(serviceState: ChatServiceState) {
         Spacer(modifier = Modifier.width(12.dp))
         Column {
             Text(
-                text = "AI Assistant",
+                text = "AI Handyman",
                 color = AppColors.PrimaryText,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
@@ -457,7 +459,7 @@ fun ChatScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "AI Assistant",
+                                text = "AI Handyman",
                                 color = AppColors.PrimaryText,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp
@@ -608,8 +610,6 @@ private fun WelcomeMessage() {
 
 @Composable
 private fun ChatBubble(message: ChatMessage) {
-    val dateFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (message.isUser) Arrangement.End else Arrangement.Start
@@ -632,22 +632,26 @@ private fun ChatBubble(message: ChatMessage) {
             Column(
                 modifier = Modifier.padding(12.dp)
             ) {
-                Text(
-                    text = message.content,
-                    fontSize = 15.sp,
-                    color = AppColors.PrimaryText,
-                    lineHeight = 22.sp
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = dateFormat.format(Date(message.timestamp)),
-                    fontSize = 11.sp,
-                    color = if (message.isUser) 
-                        AppColors.PrimaryText.copy(alpha = 0.7f) 
-                    else 
-                        AppColors.DisabledText
-                )
+                if (message.isUser) {
+                    // User messages: plain text
+                    Text(
+                        text = message.content,
+                        fontSize = 15.sp,
+                        color = AppColors.PrimaryText,
+                        lineHeight = 22.sp
+                    )
+                } else {
+                    // AI messages: render as markdown
+                    MarkdownText(
+                        markdown = message.content,
+                        style = TextStyle(
+                            color = AppColors.PrimaryText,
+                            fontSize = 15.sp,
+                            lineHeight = 22.sp
+                        ),
+                        linkColor = AppColors.InfoColor
+                    )
+                }
             }
         }
     }
