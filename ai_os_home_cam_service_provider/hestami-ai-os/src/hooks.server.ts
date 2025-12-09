@@ -2,6 +2,12 @@ import type { Handle } from '@sveltejs/kit';
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
 import { auth } from '$server/auth';
 import { prisma } from '$server/db';
+import { initDBOS } from '$server/dbos';
+
+// Initialize DBOS workflow engine
+const dbosReady = initDBOS().catch((err) => {
+	console.error('[DBOS] Failed to initialize:', err);
+});
 
 // OpenTelemetry is initialized via --require ./telemetry.cjs in PM2 config
 const tracer = trace.getTracer('hestami-ai-os');
