@@ -534,42 +534,42 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 5.1 Violation Model
 
-- [ ] `Violation` model with:
+- [x] `Violation` model with:
   - Unit/location reference
   - Violation type/category
   - Description and evidence
-  - Status lifecycle
-- [ ] `ViolationType` configuration per association
-- [ ] CC&R/rule reference linking
+  - Status lifecycle 
+- [x] `ViolationType` configuration per association
+- [x] CC&R/rule reference linking
 
 ### 5.2 Evidence Management
 
-- [ ] `ViolationEvidence` model
-- [ ] Photo/video attachment support
-- [ ] Evidence timestamp and location metadata
-- [ ] Chain of custody tracking
+- [x] `ViolationEvidence` model
+- [x] Photo/video attachment support
+- [x] Evidence timestamp and location metadata
+- [x] Chain of custody tracking
 
 ### 5.3 Notice Sequence
 
-- [ ] `ViolationNotice` model
+- [x] `ViolationNotice` model
 - [ ] Notice templates per violation type
 - [ ] Notice sequence configuration:
   - Warning → First Notice → Second Notice → Fine → Hearing
-- [ ] Cure period tracking
-- [ ] Delivery method tracking (mail, email, posted)
+- [x] Cure period tracking
+- [x] Delivery method tracking (mail, email, posted)
 
 ### 5.4 Hearings
 
-- [ ] `ViolationHearing` model
-- [ ] Hearing scheduling
-- [ ] Hearing outcome recording
+- [x] `ViolationHearing` model
+- [x] Hearing scheduling
+- [x] Hearing outcome recording
 - [ ] Appeal process support
 
 ### 5.5 Fines & GL Integration
 
-- [ ] Fine assessment on violation
+- [x] Fine assessment on violation
 - [ ] Fine → Assessment Charge creation
-- [ ] Fine waiver/reduction workflow
+- [x] Fine waiver/reduction workflow
 - [ ] Fine → GL posting
 
 ### 5.6 DBOS Violation Workflow
@@ -581,16 +581,16 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 5.7 API Procedures
 
-- [ ] `violation/v1/create` / `get` / `list` / `update`
-- [ ] `violation/v1/addEvidence` / `sendNotice` / `scheduleHearing`
-- [ ] `violation/v1/recordOutcome` / `assessFine` / `close`
+- [x] `violation/v1/create` / `get` / `list` / `update`
+- [x] `violation/v1/addEvidence` / `sendNotice` / `scheduleHearing`
+- [x] `violation/v1/recordOutcome` / `assessFine` / `close`
 
 ### Deliverables
-- Complete violation lifecycle
-- Evidence management
-- Automated notice sequences
-- Fine integration with accounting
-- Hearing management
+- [x] Violation lifecycle (core CRUD, status transitions, cure/close)
+- [x] Evidence management
+- [ ] Automated notice sequences
+- [ ] Fine integration with accounting (assessment charge/GL posting)
+- [x] Hearing management
 
 ---
 
@@ -600,32 +600,32 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 6.1 ARC Request Model
 
-- [ ] `ARCRequest` model with:
+- [x] `ARCRequest` model with:
   - Requestor (owner)
   - Unit reference
   - Project description
   - Status lifecycle
-- [ ] Request categories (fence, roof, paint, addition, etc.)
-- [ ] Estimated project cost and timeline
+- [x] Request categories (fence, roof, paint, addition, etc.)
+- [x] Estimated project cost and timeline
 
 ### 6.2 Plans & Documents
 
-- [ ] `ARCDocument` model
-- [ ] Document type classification (plans, specs, photos, permits)
-- [ ] Version tracking for revised submissions
+- [x] `ARCDocument` model
+- [x] Document type classification (plans, specs, photos, permits)
+- [x] Version tracking for revised submissions
 
 ### 6.3 Committee Management
 
-- [ ] `ARCCommittee` model
-- [ ] Committee member assignments
-- [ ] Voting configuration (quorum, approval threshold)
+- [x] `ARCCommittee` model
+- [x] Committee member assignments
+- [x] Voting configuration (quorum, approval threshold)
 
 ### 6.4 Review Process
 
-- [ ] `ARCReview` model for committee actions
-- [ ] Review actions: Approve, Deny, Request Changes, Table
-- [ ] Conditions of approval
-- [ ] Expiration dates for approvals
+- [x] `ARCReview` model for committee actions
+- [x] Review actions: Approve, Deny, Request Changes, Table
+- [x] Conditions of approval
+- [x] Expiration dates for approvals
 
 ### 6.5 DBOS ARC Workflow
 
@@ -636,15 +636,15 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 6.6 API Procedures
 
-- [ ] `arc/request/v1/create` / `get` / `list` / `update`
-- [ ] `arc/request/v1/submit` / `addDocument` / `withdraw`
-- [ ] `arc/review/v1/assignCommittee` / `submitReview` / `recordDecision`
+- [x] `arc/request/v1/create` / `get` / `list` / `update`
+- [x] `arc/request/v1/submit` / `addDocument` / `withdraw`
+- [x] `arc/review/v1/assignCommittee` / `submitReview` / `recordDecision`
 
 ### Deliverables
-- Complete ARC request lifecycle
-- Document management for plans
-- Committee review process
-- Conditional approvals with expiration
+- [x] Complete ARC request lifecycle (submit/withdraw/assignment/decision with guards)
+- [x] Document management for plans
+- [x] Committee review process (assignment, member reviews, quorum/threshold)
+- [x] Conditional approvals with expiration
 
 ---
 
@@ -654,45 +654,45 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 7.1 Board Management
 
-- [ ] `Board` model
-- [ ] `BoardPosition` (President, VP, Secretary, Treasurer, Director)
-- [ ] `BoardMember` assignments with terms
-- [ ] Board history tracking
+- [x] `Board` model
+- [x] `BoardPosition` (President, VP, Secretary, Treasurer, Director)
+- [x] `BoardMember` assignments with terms
+- [x] Board history tracking
 
 ### 7.2 Meetings
 
-- [ ] `Meeting` model (board, annual, special)
-- [ ] Meeting scheduling and location
-- [ ] `MeetingAgenda` with agenda items
-- [ ] `MeetingMinutes` recording
-- [ ] Attendance tracking
+- [x] `Meeting` model (board, annual, special)
+- [x] Meeting scheduling and location
+- [x] `MeetingAgenda` with agenda items
+- [x] `MeetingMinutes` recording
+- [x] Attendance tracking
 
 ### 7.3 Voting
 
-- [ ] `Vote` model for formal votes
-- [ ] Voting methods (in-person, proxy, electronic)
-- [ ] Quorum calculation
-- [ ] Vote tallying and results
+- [x] `Vote` model for formal votes
+- [x] Voting methods (in-person, proxy, electronic)
+- [x] Quorum calculation
+- [x] Vote tallying and results
 
 ### 7.4 Resolutions & Policies
 
-- [ ] `Resolution` model
-- [ ] Resolution status (proposed, adopted, superseded)
-- [ ] `PolicyDocument` for rules and regulations
-- [ ] Policy version history
+- [x] `Resolution` model
+- [x] Resolution status (proposed, adopted, superseded)
+- [x] `PolicyDocument` for rules and regulations
+- [x] Policy version history
 
 ### 7.5 API Procedures
 
-- [ ] `governance/board/v1/*`
-- [ ] `governance/meeting/v1/*`
-- [ ] `governance/vote/v1/*`
-- [ ] `governance/resolution/v1/*`
+- [x] `governance/board/v1/*`
+- [x] `governance/meeting/v1/*`
+- [x] `governance/vote/v1/*`
+- [x] `governance/resolution/v1/*`
 
 ### Deliverables
-- Board composition management
-- Meeting lifecycle (schedule → agenda → minutes)
-- Voting with quorum enforcement
-- Resolution and policy tracking
+- [x] Board composition management
+- [x] Meeting lifecycle (schedule → agenda → minutes)
+- [x] Voting with quorum enforcement
+- [x] Resolution and policy tracking
 
 ---
 
@@ -702,44 +702,44 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 8.1 Communication Templates
 
-- [ ] `CommunicationTemplate` model
-- [ ] Template types (email, SMS, letter)
-- [ ] Variable substitution support
-- [ ] Template versioning
+- [x] `CommunicationTemplate` model
+- [x] Template types (email, SMS, letter)
+- [x] Variable substitution support
+- [x] Template versioning
 
 ### 8.2 Mass Communications
 
-- [ ] `MassCommunication` model
-- [ ] Recipient targeting (all owners, specific units, delinquent, etc.)
-- [ ] Scheduling for future send
-- [ ] Delivery tracking
+- [x] `MassCommunication` model
+- [x] Recipient targeting (all owners, specific units, delinquent, etc.)
+- [x] Scheduling for future send
+- [x] Delivery tracking
 
 ### 8.3 Announcements
 
-- [ ] `Announcement` model
-- [ ] Portal display configuration
-- [ ] Announcement expiration
-- [ ] Read tracking
+- [x] `Announcement` model
+- [x] Portal display configuration
+- [x] Announcement expiration
+- [x] Read tracking
 
 ### 8.4 Calendar Events
 
-- [ ] `CalendarEvent` model
-- [ ] Event types (meeting, maintenance, amenity closure)
-- [ ] Recurring event support
+- [x] `CalendarEvent` model
+- [x] Event types (meeting, maintenance, amenity closure)
+- [x] Recurring event support
 - [ ] Event notifications
 
 ### 8.5 API Procedures
 
-- [ ] `communication/template/v1/*`
-- [ ] `communication/mass/v1/*`
-- [ ] `communication/announcement/v1/*`
-- [ ] `calendar/event/v1/*`
+- [x] `communication/template/v1/*`
+- [x] `communication/mass/v1/*`
+- [x] `communication/announcement/v1/*`
+- [x] `calendar/event/v1/*`
 
 ### Deliverables
-- Template management
-- Mass email/SMS capability (integration points stubbed)
-- Announcement system
-- Calendar with events
+- [x] Template management
+- [x] Mass email/SMS capability (integration points stubbed)
+- [x] Announcement system
+- [x] Calendar with events
 
 ---
 
@@ -749,42 +749,42 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 9.1 User Account Management
 
-- [ ] Profile management
-- [ ] Contact preferences
-- [ ] Notification settings
+- [x] Profile management
+- [x] Contact preferences
+- [x] Notification settings
 - [ ] Password/security management
 
 ### 9.2 Request System
 
-- [ ] `OwnerRequest` model (general inquiries)
-- [ ] Request categorization
-- [ ] Request → Work Order conversion
-- [ ] Request tracking and history
+- [x] `OwnerRequest` model (general inquiries)
+- [x] Request categorization
+- [x] Request → Work Order conversion
+- [x] Request tracking and history
 
 ### 9.3 Payment Preferences
 
-- [ ] Stored payment methods (integration point)
-- [ ] Auto-pay configuration
+- [x] Stored payment methods (integration point)
+- [x] Auto-pay configuration
 - [ ] Payment history view
 
 ### 9.4 Document Access
 
-- [ ] Document visibility rules per role
-- [ ] Document download tracking
-- [ ] Secure document delivery
+- [x] Document visibility rules per role
+- [x] Document download tracking
+- [x] Secure document delivery
 
 ### 9.5 API Procedures
 
-- [ ] `portal/profile/v1/*`
-- [ ] `portal/request/v1/*`
-- [ ] `portal/payment/v1/*`
-- [ ] `portal/document/v1/*`
+- [x] `portal/profile/v1/*`
+- [x] `portal/request/v1/*`
+- [x] `portal/payment/v1/*`
+- [x] `portal/document/v1/*`
 
 ### Deliverables
-- Owner self-service capabilities
-- Request submission and tracking
-- Payment preference management
-- Secure document access
+- [x] Owner self-service capabilities
+- [x] Request submission and tracking
+- [x] Payment preference management
+- [x] Secure document access
 
 ---
 
@@ -794,12 +794,12 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 10.1 Document Model
 
-- [ ] `Document` model with:
+- [x] `Document` model with:
   - Type classification
   - Association/property scope
   - Version tracking
   - Access control
-- [ ] Document categories:
+- [x] Document categories:
   - CC&Rs, Bylaws, Rules
   - Financial Reports
   - Contracts
@@ -809,34 +809,34 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 10.2 Document Storage
 
-- [ ] File storage abstraction (local/S3-compatible)
-- [ ] Document metadata extraction
-- [ ] Thumbnail generation for images
-- [ ] PDF preview support
+- [x] File storage abstraction (local/S3-compatible)
+- [x] Document metadata extraction
+- [x] Thumbnail generation for images
+- [x] PDF preview support
 
 ### 10.3 Document Versioning
 
-- [ ] Version history tracking
+- [x] Version history tracking
 - [ ] Version comparison support
-- [ ] Superseded document handling
+- [x] Superseded document handling
 
 ### 10.4 Access Control
 
-- [ ] Document visibility rules
-- [ ] Role-based access
-- [ ] Audit trail for access
+- [x] Document visibility rules
+- [x] Role-based access
+- [x] Audit trail for access
 
 ### 10.5 API Procedures
 
-- [ ] `document/v1/upload` / `get` / `list` / `download`
-- [ ] `document/v1/updateMetadata` / `archive` / `restore`
-- [ ] `document/v1/getVersions` / `revert`
+- [x] `document/v1/upload` / `get` / `list` / `download`
+- [x] `document/v1/updateMetadata` / `archive` / `restore`
+- [x] `document/v1/getVersions` / `revert`
 
 ### Deliverables
-- Centralized document repository
-- Version control
-- Role-based access
-- Audit trail
+- [x] Centralized document repository
+- [x] Version control
+- [x] Role-based access
+- [x] Audit trail
 
 ---
 
@@ -846,7 +846,7 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 11.1 Reserve Component Model
 
-- [ ] `ReserveComponent` model with:
+- [x] `ReserveComponent` model with:
   - Description and category
   - Useful life / remaining life
   - Replacement cost (current and future)
@@ -854,28 +854,28 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 11.2 Reserve Study
 
-- [ ] `ReserveStudy` model
-- [ ] Study date and preparer
-- [ ] Component inventory snapshot
-- [ ] Funding plan recommendations
+- [x] `ReserveStudy` model
+- [x] Study date and preparer
+- [x] Component inventory snapshot
+- [x] Funding plan recommendations
 
 ### 11.3 Funding Analysis
 
-- [ ] Current reserve balance tracking
-- [ ] Funding plan modeling
-- [ ] Percent-funded calculation
-- [ ] Contribution schedule
+- [x] Current reserve balance tracking
+- [x] Funding plan modeling
+- [x] Percent-funded calculation
+- [x] Contribution schedule
 
 ### 11.4 API Procedures
 
-- [ ] `reserve/component/v1/*`
-- [ ] `reserve/study/v1/*`
-- [ ] `reserve/funding/v1/*`
+- [x] `reserve/component/v1/*`
+- [x] `reserve/study/v1/*`
+- [x] `reserve/funding/v1/*`
 
 ### Deliverables
-- Reserve component inventory
-- Study tracking with snapshots
-- Funding analysis tools
+- [x] Reserve component inventory
+- [x] Study tracking with snapshots
+- [x] Funding analysis tools
 
 ---
 
@@ -885,38 +885,38 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 12.1 Compliance Requirements
 
-- [ ] `ComplianceRequirement` model
-- [ ] Requirement types:
+- [x] `ComplianceRequirement` model
+- [x] Requirement types:
   - Statutory deadlines
   - Notice requirements
   - Voting rules
   - Financial audit requirements
   - Resale packet guidelines
-- [ ] Jurisdiction-based rules
+- [x] Jurisdiction-based rules
 
 ### 12.2 Compliance Calendar
 
-- [ ] Deadline tracking per association
-- [ ] Recurring compliance events
-- [ ] Compliance status dashboard
+- [x] Deadline tracking per association
+- [x] Recurring compliance events
+- [x] Compliance status dashboard
 
 ### 12.3 Compliance Checklist
 
-- [ ] `ComplianceChecklist` model
-- [ ] Checklist items with due dates
-- [ ] Completion tracking
-- [ ] Evidence/documentation linking
+- [x] `ComplianceChecklist` model
+- [x] Checklist items with due dates
+- [x] Completion tracking
+- [x] Evidence/documentation linking
 
 ### 12.4 API Procedures
 
-- [ ] `compliance/requirement/v1/*`
-- [ ] `compliance/deadline/v1/*`
-- [ ] `compliance/checklist/v1/*`
+- [x] `compliance/requirement/v1/*`
+- [x] `compliance/deadline/v1/*`
+- [x] `compliance/checklist/v1/*`
 
 ### Deliverables
-- Compliance requirement library
-- Deadline tracking and alerts
-- Checklist management
+- [x] Compliance requirement library
+- [x] Deadline tracking and alerts
+- [x] Checklist management
 
 ---
 
@@ -952,9 +952,9 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 - [ ] Minutes approval
 
 ### Deliverables
-- All domain workflows implemented in DBOS
-- Workflow versioning aligned with API versions
-- Complete audit trails
+- [ ] All domain workflows implemented in DBOS
+- [ ] Workflow versioning aligned with API versions
+- [ ] Complete audit trails
 
 ---
 
@@ -981,9 +981,9 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 - [ ] Vendor coordination for individuals
 
 ### Deliverables
-- Service providers can manage work across associations
-- Management companies have portfolio-level views
-- Individual homeowners can use platform independently
+- [ ] Service providers can manage work across associations
+- [ ] Management companies have portfolio-level views
+- [ ] Individual homeowners can use platform independently
 
 ---
 
@@ -1018,9 +1018,9 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 - [ ] `report/v1/generate` / `schedule` / `list`
 
 ### Deliverables
-- Reporting framework
-- Standard financial reports
-- Operational dashboards
+- [ ] Reporting framework
+- [ ] Standard financial reports
+- [ ] Operational dashboards
 
 ---
 
@@ -1056,10 +1056,10 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 - [ ] Operations manual
 
 ### Deliverables
-- Production-ready platform
-- Security hardened
-- Performance optimized
-- Operational documentation
+- [ ] Production-ready platform
+- [ ] Security hardened
+- [ ] Performance optimized
+- [ ] Operational documentation
 
 ---
 

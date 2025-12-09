@@ -23,6 +23,17 @@ import {
 	workOrderRouter,
 	bidRouter
 } from './routes/workOrder/index.js';
+import { arcRequestRouter, arcReviewRouter } from './routes/arc/index.js';
+import {
+	governanceBoardRouter,
+	governanceMeetingRouter,
+	governanceResolutionRouter
+} from './routes/governance/index.js';
+import { communicationRouter } from './routes/communication/index.js';
+import { ownerPortalRouter } from './routes/ownerPortal.js';
+import { documentRouter } from './routes/document.js';
+import { reserveRouter } from './routes/reserve.js';
+import { complianceRouter } from './routes/compliance.js';
 
 /**
  * Main API router combining all domain routers
@@ -56,7 +67,31 @@ export const appRouter = {
 	// Phase 4: Work Orders & Assets
 	asset: assetRouter,
 	workOrder: workOrderRouter,
-	bid: bidRouter
+	bid: bidRouter,
+
+	// Phase 6: ARC
+	arcRequest: arcRequestRouter,
+	arcReview: arcReviewRouter,
+
+	// Phase 7: Governance
+	governanceBoard: governanceBoardRouter,
+	governanceMeeting: governanceMeetingRouter,
+	governanceResolution: governanceResolutionRouter,
+
+	// Phase 8: Communications
+	communication: communicationRouter,
+
+	// Phase 9: Owner Portal / CRM
+	ownerPortal: ownerPortalRouter,
+
+	// Phase 10: Documents & Records
+	document: documentRouter,
+
+	// Phase 11: Reserve Studies
+	reserve: reserveRouter,
+
+	// Phase 12: Compliance
+	compliance: complianceRouter
 };
 
 export type AppRouter = typeof appRouter;

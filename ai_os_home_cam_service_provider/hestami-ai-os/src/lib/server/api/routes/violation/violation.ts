@@ -3,6 +3,71 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
+import { withIdempotency } from '../../middleware/idempotency.js';
+
+const FINAL_STATUSES: ViolationStatus[] = ['CLOSED', 'DISMISSED'];
+
+const allowedTransitions: Record<ViolationStatus, ViolationStatus[]> = {
+	DRAFT: ['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
+	OPEN: ['NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
+	NOTICE_SENT: ['CURE_PERIOD', 'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
+	CURE_PERIOD: ['CURED', 'ESCALATED', 'HEARING_SCHEDULED', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
+	CURED: ['CLOSED', 'DISMISSED'],
+	ESCALATED: ['HEARING_SCHEDULED', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
+	HEARING_SCHEDULED: ['HEARING_HELD', 'DISMISSED', 'ESCALATED', 'CLOSED'],
+	HEARING_HELD: ['FINE_ASSESSED', 'APPEALED', 'CLOSED', 'DISMISSED'],
+	FINE_ASSESSED: ['CLOSED', 'DISMISSED', 'APPEALED'],
+	APPEALED: ['CLOSED', 'DISMISSED'],
+	CLOSED: [],
+	DISMISSED: []
+};
+
+const assertStatusChangeAllowed = (current: ViolationStatus, next: ViolationStatus) => {
+	if (current === next) return;
+	if (FINAL_STATUSES.includes(current)) {
+		throw ApiException.badRequest(`Cannot change status from final state ${current}`);
+	}
+	if (!allowedTransitions[current]?.includes(next)) {
+		throw ApiException.badRequest(`Status change from ${current} to ${next} is not allowed`);
+	}
+};
+
+const withRequiredIdempotency = async <T>(
+	idempotencyKey: string | undefined,
+	context: Parameters<typeof withIdempotency>[1],
+	operation: () => Promise<T>
+) => {
+	if (!idempotencyKey) {
+		throw ApiException.badRequest('Idempotency key is required for mutating operations');
+	}
+	const { result } = await withIdempotency(idempotencyKey, context, operation);
+	return result;
+};
+
+const getAssociationOrThrow = async (organizationId: string) => {
+	const association = await prisma.association.findFirst({
+		where: { organizationId, deletedAt: null }
+	});
+
+	if (!association) {
+		throw ApiException.notFound('Association');
+	}
+
+	return association;
+};
+
+const getViolationOrThrow = async (id: string, associationId: string) => {
+	const violation = await prisma.violation.findFirst({
+		where: { id, associationId, deletedAt: null },
+		include: { violationType: true }
+	});
+
+	if (!violation) {
+		throw ApiException.notFound('Violation');
+	}
+
+	return violation;
+};
 
 const violationStatusEnum = z.enum([
 	'DRAFT', 'OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'CURED',
@@ -44,7 +109,8 @@ export const violationRouter = {
 				locationDetails: z.string().max(500).optional(),
 				observedDate: z.string().datetime(),
 				responsiblePartyId: z.string().optional(),
-				reporterType: z.enum(['STAFF', 'RESIDENT', 'ANONYMOUS']).default('STAFF')
+				reporterType: z.enum(['STAFF', 'RESIDENT', 'ANONYMOUS']).default('STAFF'),
+				idempotencyKey: z.string().min(1)
 			})
 		)
 		.output(
@@ -65,93 +131,91 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
 
-			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
-			});
+			const violation = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
-
-			// Validate violation type
-			const violationType = await prisma.violationType.findFirst({
-				where: { id: input.violationTypeId, associationId: association.id, isActive: true }
-			});
-
-			if (!violationType) {
-				throw ApiException.notFound('Violation Type');
-			}
-
-			// Validate unit if provided
-			if (input.unitId) {
-				const unit = await prisma.unit.findFirst({
-					where: { id: input.unitId },
-					include: { property: { include: { association: true } } }
+				// Validate violation type
+				const violationType = await prisma.violationType.findFirst({
+					where: { id: input.violationTypeId, associationId: association.id, isActive: true }
 				});
-				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-					throw ApiException.notFound('Unit');
+
+				if (!violationType) {
+					throw ApiException.notFound('Violation Type');
 				}
-			}
 
-			// Validate responsible party if provided
-			if (input.responsiblePartyId) {
-				const party = await prisma.party.findFirst({
-					where: { id: input.responsiblePartyId, organizationId: context.organization!.id }
-				});
-				if (!party) {
-					throw ApiException.notFound('Responsible Party');
+				// Validate unit if provided
+				if (input.unitId) {
+					const unit = await prisma.unit.findFirst({
+						where: { id: input.unitId },
+						include: { property: { include: { association: true } } }
+					});
+					if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+						throw ApiException.notFound('Unit');
+					}
 				}
-			}
 
-			// Generate violation number
-			const year = new Date().getFullYear();
-			const lastViolation = await prisma.violation.findFirst({
-				where: {
-					associationId: association.id,
-					violationNumber: { startsWith: `VIO-${year}-` }
-				},
-				orderBy: { createdAt: 'desc' }
-			});
+				// Validate responsible party if provided
+				if (input.responsiblePartyId) {
+					const party = await prisma.party.findFirst({
+						where: { id: input.responsiblePartyId, organizationId: context.organization!.id }
+					});
+					if (!party) {
+						throw ApiException.notFound('Responsible Party');
+					}
+				}
 
-			const sequence = lastViolation
-				? parseInt(lastViolation.violationNumber.split('-')[2] || '0') + 1
-				: 1;
-			const violationNumber = `VIO-${year}-${String(sequence).padStart(6, '0')}`;
-
-			const severity = input.severity || violationType.defaultSeverity;
-
-			const violation = await prisma.$transaction(async (tx) => {
-				const v = await tx.violation.create({
-					data: {
+				// Generate violation number
+				const year = new Date().getFullYear();
+				const lastViolation = await prisma.violation.findFirst({
+					where: {
 						associationId: association.id,
-						violationNumber,
-						violationTypeId: input.violationTypeId,
-						title: input.title,
-						description: input.description,
-						severity,
-						status: 'DRAFT',
-						unitId: input.unitId,
-						commonAreaName: input.commonAreaName,
-						locationDetails: input.locationDetails,
-						observedDate: new Date(input.observedDate),
-						responsiblePartyId: input.responsiblePartyId,
-						reportedBy: context.user!.id,
-						reporterType: input.reporterType
-					}
+						violationNumber: { startsWith: `VIO-${year}-` }
+					},
+					orderBy: { createdAt: 'desc' }
 				});
 
-				// Record initial status
-				await tx.violationStatusHistory.create({
-					data: {
-						violationId: v.id,
-						fromStatus: null,
-						toStatus: 'DRAFT',
-						changedBy: context.user!.id,
-						notes: 'Violation created'
-					}
+				const sequence = lastViolation
+					? parseInt(lastViolation.violationNumber.split('-')[2] || '0') + 1
+					: 1;
+				const violationNumber = `VIO-${year}-${String(sequence).padStart(6, '0')}`;
+
+				const severity = input.severity || violationType.defaultSeverity;
+
+				const violation = await prisma.$transaction(async (tx) => {
+					const v = await tx.violation.create({
+						data: {
+							associationId: association.id,
+							violationNumber,
+							violationTypeId: input.violationTypeId,
+							title: input.title,
+							description: input.description,
+							severity,
+							status: 'DRAFT',
+							unitId: input.unitId,
+							commonAreaName: input.commonAreaName,
+							locationDetails: input.locationDetails,
+							observedDate: new Date(input.observedDate),
+							responsiblePartyId: input.responsiblePartyId,
+							reportedBy: context.user!.id,
+							reporterType: input.reporterType
+						}
+					});
+
+					// Record initial status
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: v.id,
+							fromStatus: null,
+							toStatus: 'DRAFT',
+							changedBy: context.user!.id,
+							notes: 'Violation created'
+						}
+					});
+
+					return v;
 				});
 
-				return v;
+				return violation;
 			});
 
 			return successResponse(
@@ -166,6 +230,56 @@ export const violationRouter = {
 				},
 				context
 			);
+		}),
+
+	/**
+	 * Soft delete violation
+	 */
+	delete: orgProcedure
+		.input(z.object({ id: z.string(), reason: z.string().max(1000).optional() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					id: z.string(),
+					deletedAt: z.string()
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('delete', 'violation', input.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(input.id, association.id);
+
+			const deletedAt = new Date();
+
+			const result = await prisma.$transaction(async (tx) => {
+				const updated = await tx.violation.update({
+					where: { id: input.id },
+					data: {
+						deletedAt,
+						status: 'CLOSED',
+						closedDate: deletedAt,
+						closedBy: context.user!.id,
+						resolutionNotes: input.reason ?? violation.resolutionNotes
+					}
+				});
+
+				await tx.violationStatusHistory.create({
+					data: {
+						violationId: input.id,
+						fromStatus: violation.status,
+						toStatus: 'CLOSED',
+						changedBy: context.user!.id,
+						notes: input.reason ?? 'Violation deleted'
+					}
+				});
+
+				return updated;
+			});
+
+			return successResponse({ id: result.id, deletedAt: deletedAt.toISOString() }, context);
 		}),
 
 	/**
@@ -298,21 +412,8 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation', input.id);
 
-			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
-			});
-
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
-
-			const v = await prisma.violation.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
-			});
-
-			if (!v) {
-				throw ApiException.notFound('Violation');
-			}
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const v = await getViolationOrThrow(input.id, association.id);
 
 			return successResponse(
 				{
@@ -349,6 +450,100 @@ export const violationRouter = {
 		}),
 
 	/**
+	 * Update violation details (non-status)
+	 */
+	update: orgProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				title: z.string().min(1).max(255).optional(),
+				description: z.string().min(1).max(5000).optional(),
+				severity: violationSeverityEnum.optional(),
+				unitId: z.string().optional(),
+				commonAreaName: z.string().max(255).optional(),
+				locationDetails: z.string().max(500).optional(),
+				observedDate: z.string().datetime().optional(),
+				responsiblePartyId: z.string().optional(),
+				reporterType: z.enum(['STAFF', 'RESIDENT', 'ANONYMOUS']).optional(),
+				idempotencyKey: z.string().min(1)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					violation: z.object({
+						id: z.string(),
+						title: z.string(),
+						severity: z.string(),
+						observedDate: z.string().nullable()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.id);
+
+			const { idempotencyKey, ...rest } = input;
+
+			const result = await withRequiredIdempotency(idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
+				const violation = await getViolationOrThrow(rest.id, association.id);
+
+				// Validate unit if provided
+				if (rest.unitId) {
+					const unit = await prisma.unit.findFirst({
+						where: { id: rest.unitId },
+						include: { property: { include: { association: true } } }
+					});
+					if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+						throw ApiException.notFound('Unit');
+					}
+				}
+
+				// Validate responsible party if provided
+				if (rest.responsiblePartyId) {
+					const party = await prisma.party.findFirst({
+						where: { id: rest.responsiblePartyId, organizationId: context.organization!.id }
+					});
+					if (!party) {
+						throw ApiException.notFound('Responsible Party');
+					}
+				}
+
+				const updateData: Prisma.ViolationUncheckedUpdateInput = {};
+				if (rest.title !== undefined) updateData.title = rest.title;
+				if (rest.description !== undefined) updateData.description = rest.description;
+				if (rest.severity !== undefined) updateData.severity = rest.severity;
+				if (rest.unitId !== undefined) updateData.unitId = rest.unitId;
+				if (rest.commonAreaName !== undefined) updateData.commonAreaName = rest.commonAreaName;
+				if (rest.locationDetails !== undefined) updateData.locationDetails = rest.locationDetails;
+				if (rest.observedDate !== undefined) updateData.observedDate = new Date(rest.observedDate);
+				if (rest.responsiblePartyId !== undefined)
+					updateData.responsiblePartyId = rest.responsiblePartyId;
+				if (rest.reporterType !== undefined) updateData.reporterType = rest.reporterType;
+
+				return prisma.violation.update({
+					where: { id: rest.id },
+					data: updateData
+				});
+			});
+
+			return successResponse(
+				{
+					violation: {
+						id: result.id,
+						title: result.title,
+						severity: result.severity,
+						observedDate: result.observedDate?.toISOString() ?? null
+					}
+				},
+				context
+			);
+		}),
+
+	/**
 	 * Update violation status
 	 */
 	updateStatus: orgProcedure
@@ -356,7 +551,8 @@ export const violationRouter = {
 			z.object({
 				id: z.string(),
 				status: violationStatusEnum,
-				notes: z.string().max(1000).optional()
+				notes: z.string().max(1000).optional(),
+				idempotencyKey: z.string().min(1)
 			})
 		)
 		.output(
@@ -375,54 +571,113 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
-			});
+			const { idempotencyKey, ...rest } = input;
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
+			const updated = await withRequiredIdempotency(idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
+				const v = await getViolationOrThrow(rest.id, association.id);
 
-			const v = await prisma.violation.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
-			});
+				assertStatusChangeAllowed(v.status, rest.status);
 
-			if (!v) {
-				throw ApiException.notFound('Violation');
-			}
+				const previousStatus = v.status;
+				const now = new Date();
 
-			const previousStatus = v.status;
-			const now = new Date();
+				const updateData: Prisma.ViolationUpdateInput = {
+					status: rest.status
+				};
 
-			const updateData: Prisma.ViolationUpdateInput = {
-				status: input.status
-			};
-
-			// Handle status-specific updates
-			if (input.status === 'CURED') {
-				updateData.curedDate = now;
-			}
-			if (input.status === 'CLOSED' || input.status === 'DISMISSED') {
-				updateData.closedDate = now;
-				updateData.closedBy = context.user!.id;
-				if (input.notes) {
-					updateData.resolutionNotes = input.notes;
+				// Handle status-specific updates
+				if (rest.status === 'CURED') {
+					updateData.curedDate = now;
 				}
-			}
+				if (rest.status === 'CLOSED' || rest.status === 'DISMISSED') {
+					updateData.closedDate = now;
+					updateData.closedBy = context.user!.id;
+					if (rest.notes) {
+						updateData.resolutionNotes = rest.notes;
+					}
+				}
+
+				const result = await prisma.$transaction(async (tx) => {
+					const r = await tx.violation.update({
+						where: { id: rest.id },
+						data: updateData
+					});
+
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: rest.id,
+							fromStatus: previousStatus,
+							toStatus: rest.status,
+							changedBy: context.user!.id,
+							notes: rest.notes
+						}
+					});
+
+					return r;
+				});
+
+				return { result, previousStatus };
+			});
+
+			return successResponse(
+				{
+					violation: {
+						id: updated.result.id,
+						status: updated.result.status,
+						previousStatus: updated.previousStatus
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Cure violation (sets status CURED)
+	 */
+	cure: orgProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				notes: z.string().max(1000).optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					violation: z.object({
+						id: z.string(),
+						status: z.string(),
+						curedDate: z.string().nullable()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.id);
+
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const v = await getViolationOrThrow(input.id, association.id);
+
+			assertStatusChangeAllowed(v.status, 'CURED');
+
+			const now = new Date();
 
 			const updated = await prisma.$transaction(async (tx) => {
 				const result = await tx.violation.update({
 					where: { id: input.id },
-					data: updateData
+					data: { status: 'CURED', curedDate: now, resolutionNotes: input.notes ?? v.resolutionNotes }
 				});
 
 				await tx.violationStatusHistory.create({
 					data: {
 						violationId: input.id,
-						fromStatus: previousStatus,
-						toStatus: input.status,
+						fromStatus: v.status,
+						toStatus: 'CURED',
 						changedBy: context.user!.id,
-						notes: input.notes
+						notes: input.notes ?? 'Violation cured'
 					}
 				});
 
@@ -434,7 +689,76 @@ export const violationRouter = {
 					violation: {
 						id: updated.id,
 						status: updated.status,
-						previousStatus
+						curedDate: updated.curedDate?.toISOString() ?? null
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Close violation (sets status CLOSED)
+	 */
+	close: orgProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				notes: z.string().max(1000).optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					violation: z.object({
+						id: z.string(),
+						status: z.string(),
+						closedDate: z.string().nullable()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.id);
+
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const v = await getViolationOrThrow(input.id, association.id);
+
+			assertStatusChangeAllowed(v.status, 'CLOSED');
+
+			const now = new Date();
+
+			const updated = await prisma.$transaction(async (tx) => {
+				const result = await tx.violation.update({
+					where: { id: input.id },
+					data: {
+						status: 'CLOSED',
+						closedDate: now,
+						closedBy: context.user!.id,
+						resolutionNotes: input.notes ?? v.resolutionNotes
+					}
+				});
+
+				await tx.violationStatusHistory.create({
+					data: {
+						violationId: input.id,
+						fromStatus: v.status,
+						toStatus: 'CLOSED',
+						changedBy: context.user!.id,
+						notes: input.notes ?? 'Violation closed'
+					}
+				});
+
+				return result;
+			});
+
+			return successResponse(
+				{
+					violation: {
+						id: updated.id,
+						status: updated.status,
+						closedDate: updated.closedDate?.toISOString() ?? null
 					}
 				},
 				context
@@ -521,6 +845,52 @@ export const violationRouter = {
 		}),
 
 	/**
+	 * List evidence for a violation
+	 */
+	listEvidence: orgProcedure
+		.input(z.object({ violationId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					evidence: z.array(
+						z.object({
+							id: z.string(),
+							evidenceType: z.string(),
+							fileName: z.string(),
+							fileUrl: z.string(),
+							capturedAt: z.string().nullable()
+						})
+					)
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'violation', input.violationId);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			await getViolationOrThrow(input.violationId, association.id);
+
+			const evidence = await prisma.violationEvidence.findMany({
+				where: { violationId: input.violationId },
+				orderBy: { createdAt: 'asc' }
+			});
+
+			return successResponse(
+				{
+					evidence: evidence.map((e) => ({
+						id: e.id,
+						evidenceType: e.evidenceType,
+						fileName: e.fileName,
+						fileUrl: e.fileUrl,
+						capturedAt: e.capturedAt?.toISOString() ?? null
+					}))
+				},
+				context
+			);
+		}),
+
+	/**
 	 * Send notice for violation
 	 */
 	sendNotice: orgProcedure
@@ -571,6 +941,12 @@ export const violationRouter = {
 				throw ApiException.notFound('Violation');
 			}
 
+			const targetStatus: ViolationStatus =
+				(input.curePeriodDays ?? violation.violationType.defaultCurePeriodDays) > 0
+					? 'CURE_PERIOD'
+					: 'NOTICE_SENT';
+			assertStatusChangeAllowed(violation.status, targetStatus);
+
 			const now = new Date();
 			const curePeriodDays = input.curePeriodDays || violation.violationType.defaultCurePeriodDays;
 			const curePeriodEnds = new Date(now.getTime() + curePeriodDays * 24 * 60 * 60 * 1000);
@@ -602,17 +978,17 @@ export const violationRouter = {
 						lastNoticeDate: now,
 						lastNoticeType: input.noticeType,
 						curePeriodEnds,
-						status: 'NOTICE_SENT'
+						status: targetStatus
 					}
 				});
 
 				// Record status change if needed
-				if (violation.status !== 'NOTICE_SENT') {
+				if (violation.status !== targetStatus) {
 					await tx.violationStatusHistory.create({
 						data: {
 							violationId: input.violationId,
 							fromStatus: violation.status,
-							toStatus: 'NOTICE_SENT',
+							toStatus: targetStatus,
 							changedBy: context.user!.id,
 							notes: `${input.noticeType} sent`
 						}
@@ -630,6 +1006,52 @@ export const violationRouter = {
 						noticeNumber: result.noticeNumber,
 						sentDate: result.sentDate.toISOString()
 					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * List notices for a violation
+	 */
+	listNotices: orgProcedure
+		.input(z.object({ violationId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					notices: z.array(
+						z.object({
+							id: z.string(),
+							noticeType: z.string(),
+							noticeNumber: z.number(),
+							sentDate: z.string(),
+							curePeriodEnds: z.string().nullable()
+						})
+					)
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'violation', input.violationId);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			await getViolationOrThrow(input.violationId, association.id);
+
+			const notices = await prisma.violationNotice.findMany({
+				where: { violationId: input.violationId },
+				orderBy: [{ noticeNumber: 'asc' }]
+			});
+
+			return successResponse(
+				{
+					notices: notices.map((n) => ({
+						id: n.id,
+						noticeType: n.noticeType,
+						noticeNumber: n.noticeNumber,
+						sentDate: n.sentDate.toISOString(),
+						curePeriodEnds: n.curePeriodEnds?.toISOString() ?? null
+					}))
 				},
 				context
 			);
@@ -664,21 +1086,8 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
-			});
-
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
-
-			const violation = await prisma.violation.findFirst({
-				where: { id: input.violationId, associationId: association.id, deletedAt: null }
-			});
-
-			if (!violation) {
-				throw ApiException.notFound('Violation');
-			}
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(input.violationId, association.id);
 
 			const result = await prisma.$transaction(async (tx) => {
 				const hearing = await tx.violationHearing.create({
@@ -692,8 +1101,9 @@ export const violationRouter = {
 					}
 				});
 
-				// Update violation status
 				const previousStatus = violation.status;
+				assertStatusChangeAllowed(previousStatus, 'HEARING_SCHEDULED');
+
 				await tx.violation.update({
 					where: { id: input.violationId },
 					data: { status: 'HEARING_SCHEDULED' }
@@ -721,6 +1131,50 @@ export const violationRouter = {
 						hearingDate: result.hearingDate.toISOString(),
 						location: result.location
 					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * List hearings for a violation
+	 */
+	listHearings: orgProcedure
+		.input(z.object({ violationId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					hearings: z.array(
+						z.object({
+							id: z.string(),
+							hearingDate: z.string(),
+							location: z.string().nullable(),
+							outcome: z.string()
+						})
+					)
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'violation', input.violationId);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			await getViolationOrThrow(input.violationId, association.id);
+
+			const hearings = await prisma.violationHearing.findMany({
+				where: { violationId: input.violationId },
+				orderBy: { hearingDate: 'asc' }
+			});
+
+			return successResponse(
+				{
+					hearings: hearings.map((h) => ({
+						id: h.id,
+						hearingDate: h.hearingDate.toISOString(),
+						location: h.location,
+						outcome: h.outcome
+					}))
 				},
 				context
 			);
@@ -988,6 +1442,54 @@ export const violationRouter = {
 						waivedAmount: result.waivedAmount.toString(),
 						balanceDue: result.balanceDue.toString()
 					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * List fines for a violation
+	 */
+	listFines: orgProcedure
+		.input(z.object({ violationId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					fines: z.array(
+						z.object({
+							id: z.string(),
+							fineNumber: z.number(),
+							amount: z.string(),
+							balanceDue: z.string(),
+							assessedDate: z.string(),
+							dueDate: z.string()
+						})
+					)
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'violation', input.violationId);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			await getViolationOrThrow(input.violationId, association.id);
+
+			const fines = await prisma.violationFine.findMany({
+				where: { violationId: input.violationId },
+				orderBy: { fineNumber: 'asc' }
+			});
+
+			return successResponse(
+				{
+					fines: fines.map((f) => ({
+						id: f.id,
+						fineNumber: f.fineNumber,
+						amount: f.amount.toString(),
+						balanceDue: f.balanceDue.toString(),
+						assessedDate: f.assessedDate.toISOString(),
+						dueDate: f.dueDate.toISOString()
+					}))
 				},
 				context
 			);

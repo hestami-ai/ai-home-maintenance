@@ -194,6 +194,166 @@ enum HearingOutcome {
   CONTINUED       // Hearing continued
 }
 
+// -----------------------------------------------------------------------------
+// Phase 6: ARC (Architectural Requests)
+// -----------------------------------------------------------------------------
+
+enum ARCCategory {
+  FENCE
+  ROOF
+  PAINT
+  ADDITION
+  LANDSCAPING
+  WINDOWS
+  DOORS
+  DRIVEWAY
+  GARAGE
+  SOLAR
+  HVAC
+  OTHER
+}
+
+enum ARCRequestStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DENIED
+  CHANGES_REQUESTED
+  TABLED
+  WITHDRAWN
+  CANCELLED
+  EXPIRED
+}
+
+enum ARCReviewAction {
+  APPROVE
+  DENY
+  REQUEST_CHANGES
+  TABLE
+}
+
+enum ARCDocumentType {
+  PLANS
+  SPECS
+  PHOTO
+  PERMIT
+  RENDERING
+  SURVEY
+  OTHER
+}
+
+// =============================================================================
+// PHASE 7: Governance
+// =============================================================================
+
+enum BoardRole {
+  PRESIDENT
+  VICE_PRESIDENT
+  SECRETARY
+  TREASURER
+  DIRECTOR
+  MEMBER_AT_LARGE
+}
+
+enum MeetingType {
+  BOARD
+  ANNUAL
+  SPECIAL
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  HELD
+  CANCELLED
+}
+
+enum MeetingAttendanceStatus {
+  PRESENT
+  ABSENT
+  EXCUSED
+}
+
+enum VoteMethod {
+  IN_PERSON
+  PROXY
+  ELECTRONIC
+}
+
+enum VoteChoice {
+  YES
+  NO
+  ABSTAIN
+}
+
+enum ResolutionStatus {
+  PROPOSED
+  ADOPTED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum PolicyStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+// =============================================================================
+// PHASE 8: Communications
+// =============================================================================
+
+enum CommunicationTemplateType {
+  EMAIL
+  SMS
+  LETTER
+}
+
+enum CommunicationChannel {
+  EMAIL
+  SMS
+  LETTER
+}
+
+enum CommunicationStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  CANCELLED
+}
+
+enum AnnouncementStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CalendarEventType {
+  MEETING
+  MAINTENANCE
+  AMENITY_CLOSURE
+  OTHER
+}
+
+enum TemplateVersionStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
 // =============================================================================
 // CORE MODELS - Organization (Tenant)
 // =============================================================================
@@ -217,6 +377,9 @@ model Organization {
   associations        Association[]
   parties             Party[]
   managedAssociations ManagementContract[] // For management companies
+
+  // Phase 12: Compliance
+  complianceRequirements ComplianceRequirement[]
 
   @@map("organizations")
 }
@@ -242,6 +405,8 @@ model User {
   accounts            Account[]
   parties             Party[]   // Party records linked to this user
   managerAssignments  ManagerAssignment[]
+  // Phase 6: ARC
+  arcReviews          ARCReview[]
 
   @@map("users")
 }
@@ -403,28 +568,189 @@ enum OwnershipType {
   TRUST
 }
 
+// -----------------------------------------------------------------------------
+// Phase 9: Owner Portal / CRM
+// -----------------------------------------------------------------------------
+
+enum ContactPreferenceChannel {
+  EMAIL
+  SMS
+  PUSH
+  MAIL
+  PORTAL
+}
+
+enum NotificationCategory {
+  GENERAL
+  BILLING
+  MAINTENANCE
+  GOVERNANCE
+  ARC
+  VIOLATION
+  COMMUNICATION
+}
+
+enum OwnerRequestStatus {
+  DRAFT
+  SUBMITTED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum OwnerRequestCategory {
+  GENERAL_INQUIRY
+  MAINTENANCE
+  BILLING
+  ARCHITECTURAL
+  VIOLATION
+  GOVERNANCE
+  AMENITY
+  OTHER
+}
+
+enum PaymentMethodType {
+  BANK_ACCOUNT
+  CREDIT_CARD
+  DEBIT_CARD
+}
+
+enum AutoPayFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  ON_DUE_DATE
+}
+
+enum DocumentVisibility {
+  PUBLIC           // All association members
+  OWNERS_ONLY      // Only owners
+  BOARD_ONLY       // Only board members
+  STAFF_ONLY       // Only staff/managers
+  PRIVATE          // Specific parties only
+}
+
+enum DocumentCategory {
+  GOVERNING_DOCS   // CC&Rs, Bylaws, Rules
+  FINANCIAL        // Budgets, audits, statements
+  MEETING          // Minutes, agendas
+  LEGAL            // Contracts, legal notices
+  INSURANCE        // Policies, certificates
+  MAINTENANCE      // Maintenance records, warranties
+  ARCHITECTURAL    // ARC guidelines, approvals
+  RESERVE_STUDY    // Reserve studies
+  INSPECTION       // Inspection reports
+  CONTRACT         // Vendor contracts
+  GENERAL          // Other documents
+}
+
+enum DocumentStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum StorageProvider {
+  LOCAL
+  S3
+  AZURE_BLOB
+  GCS
+}
+
+// -----------------------------------------------------------------------------
+// Phase 11: Reserve Studies
+// -----------------------------------------------------------------------------
+
+enum ReserveComponentCategory {
+  ROOFING
+  PAVING
+  PAINTING
+  PLUMBING
+  ELECTRICAL
+  HVAC
+  POOL_SPA
+  LANDSCAPING
+  FENCING
+  STRUCTURAL
+  ELEVATOR
+  COMMON_AREA
+  EQUIPMENT
+  OTHER
+}
+
+enum ReserveStudyType {
+  FULL              // Full on-site inspection
+  UPDATE_WITH_SITE  // Update with site visit
+  UPDATE_NO_SITE    // Update without site visit
+}
+
+enum FundingPlanType {
+  BASELINE          // Maintain positive balance
+  THRESHOLD         // Maintain minimum threshold
+  FULL_FUNDING      // 100% funded target
+  STATUTORY         // State-mandated minimum
+}
+
+// -----------------------------------------------------------------------------
+// Phase 12: Compliance
+// -----------------------------------------------------------------------------
+
+enum ComplianceRequirementType {
+  STATUTORY_DEADLINE    // State/local law deadlines
+  NOTICE_REQUIREMENT    // Required notices to owners
+  VOTING_RULE           // Election/voting requirements
+  FINANCIAL_AUDIT       // Audit requirements
+  RESALE_PACKET         // Resale disclosure requirements
+  INSURANCE             // Insurance requirements
+  MEETING               // Required meetings
+  FILING                // Government filings
+  RECORD_RETENTION      // Document retention rules
+  OTHER
+}
+
+enum ComplianceStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  WAIVED
+  NOT_APPLICABLE
+}
+
+enum RecurrencePattern {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
 // =============================================================================
 // DOMAIN 1 - Association / Property Model
 // =============================================================================
 
 /// @description Community Association (HOA/COA/POA)
 model Association {
-  id               String            @id @default(cuid())
-  organizationId   String            @map("organization_id")
-  name             String
-  legalName        String?           @map("legal_name")
-  taxId            String?           @map("tax_id")
-  status           AssociationStatus @default(ONBOARDING)
-  incorporationDate DateTime?        @map("incorporation_date")
-  fiscalYearEnd    Int               @default(12) @map("fiscal_year_end") // Month (1-12)
-  settings         Json              @default("{}")
+  id                  String                 @id @default(cuid())
+  organizationId      String                 @map("organization_id")
+  name                String
+  legalName           String?                @map("legal_name")
+  taxId               String?                @map("tax_id")
+  status              AssociationStatus      @default(ONBOARDING)
+  incorporationDate   DateTime?              @map("incorporation_date")
+  fiscalYearEnd       Int                    @default(12) @map("fiscal_year_end") // Month (1-12)
+  settings            Json                   @default("{}")
+  deletedAt           DateTime?              @map("deleted_at")
   
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  deletedAt        DateTime?         @map("deleted_at")
-
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  
   // Relations
-  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   properties          Property[]
   managementContracts ManagementContract[]
   managerAssignments  ManagerAssignment[]
@@ -447,6 +773,32 @@ model Association {
   // Phase 5: Violations
   violationTypes      ViolationType[]
   violations          Violation[]
+
+  // Phase 6: ARC
+  arcCommittees       ARCCommittee[]
+  arcRequests         ARCRequest[]
+
+  // Phase 7: Governance
+  boards              Board[]
+  meetings            Meeting[]
+  resolutions         Resolution[]
+  policyDocuments     PolicyDocument[]
+  communicationTemplates CommunicationTemplate[]
+  massCommunications  MassCommunication[]
+  announcements       Announcement[]
+  calendarEvents      CalendarEvent[]
+  calendarNotifications CalendarEventNotification[]
+
+  // Phase 9: Owner Portal / CRM
+  ownerRequests       OwnerRequest[]
+  documents           AssociationDocument[]
+
+  // Phase 11: Reserve Studies
+  reserveComponents   ReserveComponent[]
+  reserveStudies      ReserveStudy[]
+
+  // Phase 12: Compliance
+  complianceDeadlines ComplianceDeadline[]
 
   @@index([organizationId])
   @@map("associations")
@@ -534,6 +886,12 @@ model Unit {
   // Phase 5: Violations
   violations        Violation[]
 
+  // Phase 6: ARC
+  arcRequests       ARCRequest[]
+
+  // Phase 9: Owner Portal / CRM
+  ownerRequests     OwnerRequest[]
+
   @@unique([propertyId, unitNumber])
   @@index([propertyId])
   @@map("units")
@@ -615,10 +973,220 @@ model Party {
   // Phase 5: Violations
   violations      Violation[]  // Violations where this party is responsible
 
+  // Phase 6: ARC
+  arcRequests     ARCRequest[] @relation("PartyARCRequests") // Requests submitted by this party
+  arcCommitteeMemberships ARCCommitteeMember[]
+  
+  // Phase 7: Governance
+  boardMemberships   BoardMember[]
+  meetingAttendance  MeetingAttendance[]
+  voteBallots        VoteBallot[]
+  announcementReads  AnnouncementRead[]
+
+  // Phase 9: Owner Portal / CRM
+  userProfile         UserProfile?
+  contactPreferences  ContactPreference[]
+  notificationSettings NotificationSetting[]
+  ownerRequests       OwnerRequest[]
+  storedPaymentMethods StoredPaymentMethod[]
+  autoPaySettings     AutoPaySetting[]
+  documentAccessGrants DocumentAccessGrant[]
+  documentDownloadLogs DocumentDownloadLog[]
+
   @@index([organizationId])
   @@index([userId])
   @@index([email])
   @@map("parties")
+
+}
+
+/// @description User profile for portal/CRM
+model UserProfile {
+  id              String    @id @default(cuid())
+  partyId         String    @map("party_id")
+  preferredName   String?   @map("preferred_name")
+  profilePhotoUrl String?   @map("profile_photo_url")
+  language        String    @default("en") @map("language")
+  timezone        String    @default("UTC") @map("timezone")
+  mailingAddress  Json?     @map("mailing_address")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  // Relations
+  party           Party     @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@unique([partyId])
+  @@map("user_profiles")
+}
+
+/// @description Contact channel preferences for a party
+model ContactPreference {
+  id                 String                   @id @default(cuid())
+  partyId            String                   @map("party_id")
+  channel            ContactPreferenceChannel
+  isEnabled          Boolean                  @default(true) @map("is_enabled")
+  allowTransactional Boolean                  @default(true) @map("allow_transactional")
+  allowMarketing     Boolean                  @default(false) @map("allow_marketing")
+  allowEmergency     Boolean                  @default(true) @map("allow_emergency")
+
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  updatedAt          DateTime                 @updatedAt @map("updated_at")
+  deletedAt          DateTime?                @map("deleted_at")
+
+  // Relations
+  party              Party                    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@unique([partyId, channel])
+  @@map("contact_preferences")
+}
+
+/// @description Notification preferences per category and channel
+model NotificationSetting {
+  id         String                   @id @default(cuid())
+  partyId    String                   @map("party_id")
+  category   NotificationCategory
+  channel    ContactPreferenceChannel
+  isEnabled  Boolean                  @default(true) @map("is_enabled")
+
+  createdAt  DateTime                 @default(now()) @map("created_at")
+  updatedAt  DateTime                 @updatedAt @map("updated_at")
+  deletedAt  DateTime?                @map("deleted_at")
+
+  // Relations
+  party      Party                    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@unique([partyId, category, channel])
+  @@map("notification_settings")
+}
+
+/// @description Owner request / inquiry submitted via portal
+model OwnerRequest {
+  id              String               @id @default(cuid())
+  associationId   String               @map("association_id")
+  unitId          String?              @map("unit_id")
+  partyId         String               @map("party_id")
+
+  requestNumber   String               @map("request_number") // e.g., REQ-2024-000001
+  category        OwnerRequestCategory
+  status          OwnerRequestStatus   @default(DRAFT)
+
+  subject         String
+  description     String               @db.Text
+  attachments     Json?                // Array of file URLs/metadata
+
+  // Tracking
+  submittedAt     DateTime?            @map("submitted_at")
+  resolvedAt      DateTime?            @map("resolved_at")
+  closedAt        DateTime?            @map("closed_at")
+
+  // Assignment
+  assignedToUserId String?             @map("assigned_to_user_id")
+
+  // Resolution
+  resolutionNotes String?              @map("resolution_notes") @db.Text
+
+  // Conversion to work order
+  workOrderId     String?              @map("work_order_id")
+
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+  deletedAt       DateTime?            @map("deleted_at")
+
+  // Relations
+  association     Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  unit            Unit?                @relation(fields: [unitId], references: [id])
+  party           Party                @relation(fields: [partyId], references: [id])
+  workOrder       WorkOrder?           @relation(fields: [workOrderId], references: [id])
+  history         OwnerRequestHistory[]
+
+  @@unique([associationId, requestNumber])
+  @@index([partyId])
+  @@index([unitId])
+  @@index([status])
+  @@index([category])
+  @@map("owner_requests")
+}
+
+/// @description History/audit trail for owner requests
+model OwnerRequestHistory {
+  id              String       @id @default(cuid())
+  requestId       String       @map("request_id")
+
+  action          String       // e.g., "CREATED", "SUBMITTED", "ASSIGNED", "RESOLVED", "CLOSED"
+  previousStatus  String?      @map("previous_status")
+  newStatus       String?      @map("new_status")
+  notes           String?      @db.Text
+  performedBy     String       @map("performed_by") // User ID
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  request         OwnerRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("owner_request_history")
+}
+
+/// @description Stored payment method for a party (tokenized reference only)
+model StoredPaymentMethod {
+  id              String            @id @default(cuid())
+  partyId         String            @map("party_id")
+
+  methodType      PaymentMethodType @map("method_type")
+  nickname        String?           // e.g., "My Checking Account"
+  lastFour        String            @map("last_four") // Last 4 digits
+  expirationMonth Int?              @map("expiration_month") // For cards
+  expirationYear  Int?              @map("expiration_year")  // For cards
+  bankName        String?           @map("bank_name")        // For bank accounts
+
+  // Tokenized reference (from payment processor)
+  processorToken  String            @map("processor_token")
+  processorType   String            @map("processor_type") // e.g., "STRIPE", "PLAID"
+
+  isDefault       Boolean           @default(false) @map("is_default")
+  isVerified      Boolean           @default(false) @map("is_verified")
+
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  deletedAt       DateTime?         @map("deleted_at")
+
+  // Relations
+  party           Party             @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  autoPaySettings AutoPaySetting[]
+
+  @@index([partyId])
+  @@map("stored_payment_methods")
+}
+
+/// @description Auto-pay configuration for a party
+model AutoPaySetting {
+  id                    String            @id @default(cuid())
+  partyId               String            @map("party_id")
+  paymentMethodId       String            @map("payment_method_id")
+
+  isEnabled             Boolean           @default(true) @map("is_enabled")
+  frequency             AutoPayFrequency
+  dayOfMonth            Int?              @map("day_of_month") // 1-28 for monthly
+  maxAmount             Decimal?          @map("max_amount") @db.Decimal(10, 2)
+
+  // Scope (optional - if null, applies to all charges)
+  associationId         String?           @map("association_id")
+  assessmentTypeId      String?           @map("assessment_type_id")
+
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  deletedAt             DateTime?         @map("deleted_at")
+
+  // Relations
+  party                 Party             @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  paymentMethod         StoredPaymentMethod @relation(fields: [paymentMethodId], references: [id])
+
+  @@unique([partyId, associationId, assessmentTypeId])
+  @@index([partyId])
+  @@index([paymentMethodId])
+  @@map("auto_pay_settings")
 }
 
 /// @description Ownership record linking party to unit
@@ -679,6 +1247,361 @@ model Tenancy {
   @@index([partyId])
   @@index([leaseEnd])
   @@map("tenancies")
+}
+
+/// @description Document stored for an association with visibility rules
+model AssociationDocument {
+  id              String             @id @default(cuid())
+  associationId   String             @map("association_id")
+
+  title           String
+  description     String?
+  category        DocumentCategory
+  visibility      DocumentVisibility @default(PUBLIC)
+  status          DocumentStatus     @default(ACTIVE)
+
+  // File storage
+  storageProvider StorageProvider    @default(LOCAL) @map("storage_provider")
+  storagePath     String             @map("storage_path") // Path/key in storage
+  fileUrl         String             @map("file_url")
+  fileName        String             @map("file_name")
+  fileSize        Int                @map("file_size") // bytes
+  mimeType        String             @map("mime_type")
+  checksum        String?            // MD5/SHA256 hash for integrity
+
+  // Extracted metadata
+  pageCount       Int?               @map("page_count")
+  thumbnailUrl    String?            @map("thumbnail_url")
+  extractedText   String?            @map("extracted_text") @db.Text
+  metadata        Json?              // Additional extracted metadata
+
+  // Versioning
+  version         Int                @default(1)
+  parentDocumentId String?           @map("parent_document_id")
+  supersededById  String?            @map("superseded_by_id")
+
+  // Effective dates (for governing docs)
+  effectiveDate   DateTime?          @map("effective_date")
+  expirationDate  DateTime?          @map("expiration_date")
+
+  // Metadata
+  uploadedBy      String             @map("uploaded_by") // User ID
+  tags            String[]           @default([])
+
+  // Archive info
+  archivedAt      DateTime?          @map("archived_at")
+  archivedBy      String?            @map("archived_by")
+  archiveReason   String?            @map("archive_reason")
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  deletedAt       DateTime?          @map("deleted_at")
+
+  // Relations
+  association     Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  parentDocument  AssociationDocument? @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  childVersions   AssociationDocument[] @relation("DocumentVersions")
+  supersededBy    AssociationDocument? @relation("SupersededDocuments", fields: [supersededById], references: [id])
+  supersedes      AssociationDocument[] @relation("SupersededDocuments")
+  accessGrants    DocumentAccessGrant[]
+  downloadLogs    DocumentDownloadLog[]
+
+  @@index([associationId])
+  @@index([category])
+  @@index([visibility])
+  @@index([status])
+  @@map("association_documents")
+}
+
+/// @description Explicit access grant for private documents
+model DocumentAccessGrant {
+  id              String              @id @default(cuid())
+  documentId      String              @map("document_id")
+  partyId         String              @map("party_id")
+
+  grantedBy       String              @map("granted_by") // User ID
+  grantedAt       DateTime            @default(now()) @map("granted_at")
+  expiresAt       DateTime?           @map("expires_at")
+  revokedAt       DateTime?           @map("revoked_at")
+
+  // Relations
+  document        AssociationDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  party           Party               @relation(fields: [partyId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, partyId])
+  @@index([partyId])
+  @@map("document_access_grants")
+}
+
+/// @description Log of document downloads for auditing
+model DocumentDownloadLog {
+  id              String              @id @default(cuid())
+  documentId      String              @map("document_id")
+  partyId         String?             @map("party_id")
+  userId          String              @map("user_id")
+
+  downloadedAt    DateTime            @default(now()) @map("downloaded_at")
+  ipAddress       String?             @map("ip_address")
+  userAgent       String?             @map("user_agent")
+
+  // Relations
+  document        AssociationDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  party           Party?              @relation(fields: [partyId], references: [id])
+
+  @@index([documentId])
+  @@index([partyId])
+  @@index([downloadedAt])
+  @@map("document_download_logs")
+}
+
+// =============================================================================
+// DOMAIN 11 - Reserve Studies
+// =============================================================================
+
+/// @description Reserve component tracked for an association
+model ReserveComponent {
+  id                  String                   @id @default(cuid())
+  associationId       String                   @map("association_id")
+
+  name                String
+  description         String?
+  category            ReserveComponentCategory
+  location            String?                  // Where in the property
+
+  // Lifecycle
+  usefulLife          Int                      @map("useful_life") // Years
+  remainingLife       Int                      @map("remaining_life") // Years
+  placedInServiceDate DateTime?                @map("placed_in_service_date")
+
+  // Costs
+  currentReplacementCost Decimal              @map("current_replacement_cost") @db.Decimal(12, 2)
+  futureReplacementCost  Decimal?             @map("future_replacement_cost") @db.Decimal(12, 2)
+  inflationRate          Decimal              @default(3.0) @map("inflation_rate") @db.Decimal(5, 2)
+
+  // Quantity
+  quantity            Int                      @default(1)
+  unitOfMeasure       String?                  @map("unit_of_measure")
+
+  // Condition
+  conditionRating     Int?                     @map("condition_rating") // 1-10 scale
+  lastInspectionDate  DateTime?                @map("last_inspection_date")
+  notes               String?                  @db.Text
+
+  createdAt           DateTime                 @default(now()) @map("created_at")
+  updatedAt           DateTime                 @updatedAt @map("updated_at")
+  deletedAt           DateTime?                @map("deleted_at")
+
+  // Relations
+  association         Association              @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  studySnapshots      ReserveStudyComponent[]
+
+  @@index([associationId])
+  @@index([category])
+  @@map("reserve_components")
+}
+
+/// @description Reserve study for an association
+model ReserveStudy {
+  id                  String           @id @default(cuid())
+  associationId       String           @map("association_id")
+
+  studyType           ReserveStudyType @map("study_type")
+  studyDate           DateTime         @map("study_date")
+  effectiveDate       DateTime         @map("effective_date")
+  expirationDate      DateTime?        @map("expiration_date")
+
+  // Preparer info
+  preparerName        String           @map("preparer_name")
+  preparerCompany     String?          @map("preparer_company")
+  preparerCredentials String?          @map("preparer_credentials")
+
+  // Financial snapshot at study time
+  reserveBalance      Decimal          @map("reserve_balance") @db.Decimal(12, 2)
+  percentFunded       Decimal          @map("percent_funded") @db.Decimal(5, 2)
+  fullyFundedBalance  Decimal          @map("fully_funded_balance") @db.Decimal(12, 2)
+
+  // Recommendations
+  recommendedContribution Decimal      @map("recommended_contribution") @db.Decimal(12, 2)
+  fundingPlanType     FundingPlanType  @map("funding_plan_type")
+
+  // Document reference
+  documentId          String?          @map("document_id")
+
+  notes               String?          @db.Text
+
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+  deletedAt           DateTime?        @map("deleted_at")
+
+  // Relations
+  association         Association      @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  components          ReserveStudyComponent[]
+  fundingSchedule     ReserveFundingSchedule[]
+
+  @@index([associationId])
+  @@index([studyDate])
+  @@map("reserve_studies")
+}
+
+/// @description Snapshot of a component at the time of a study
+model ReserveStudyComponent {
+  id                  String           @id @default(cuid())
+  studyId             String           @map("study_id")
+  componentId         String           @map("component_id")
+
+  // Snapshot values at study time
+  usefulLife          Int              @map("useful_life")
+  remainingLife       Int              @map("remaining_life")
+  currentCost         Decimal          @map("current_cost") @db.Decimal(12, 2)
+  futureCost          Decimal          @map("future_cost") @db.Decimal(12, 2)
+  conditionRating     Int?             @map("condition_rating")
+
+  // Funding allocation
+  fundedAmount        Decimal          @map("funded_amount") @db.Decimal(12, 2)
+  percentFunded       Decimal          @map("percent_funded") @db.Decimal(5, 2)
+
+  createdAt           DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  study               ReserveStudy     @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  component           ReserveComponent @relation(fields: [componentId], references: [id])
+
+  @@unique([studyId, componentId])
+  @@index([componentId])
+  @@map("reserve_study_components")
+}
+
+/// @description Projected funding schedule from a reserve study
+model ReserveFundingSchedule {
+  id                  String       @id @default(cuid())
+  studyId             String       @map("study_id")
+
+  fiscalYear          Int          @map("fiscal_year")
+  projectedBalance    Decimal      @map("projected_balance") @db.Decimal(12, 2)
+  recommendedContribution Decimal  @map("recommended_contribution") @db.Decimal(12, 2)
+  projectedExpenditures Decimal    @map("projected_expenditures") @db.Decimal(12, 2)
+  percentFunded       Decimal      @map("percent_funded") @db.Decimal(5, 2)
+
+  createdAt           DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  study               ReserveStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
+
+  @@unique([studyId, fiscalYear])
+  @@index([studyId])
+  @@map("reserve_funding_schedules")
+}
+
+// =============================================================================
+// DOMAIN 12 - Compliance
+// =============================================================================
+
+/// @description Compliance requirement template (jurisdiction-based)
+model ComplianceRequirement {
+  id                  String                    @id @default(cuid())
+  organizationId      String                    @map("organization_id")
+
+  name                String
+  description         String?                   @db.Text
+  type                ComplianceRequirementType
+  jurisdiction        String?                   // State/county/city code
+
+  // Timing
+  recurrence          RecurrencePattern         @default(ANNUAL)
+  defaultDueDayOfYear Int?                      @map("default_due_day_of_year") // 1-365
+  defaultLeadDays     Int                       @default(30) @map("default_lead_days")
+
+  // Requirements
+  requiresEvidence    Boolean                   @default(false) @map("requires_evidence")
+  evidenceTypes       String[]                  @default([]) @map("evidence_types")
+  statutoryReference  String?                   @map("statutory_reference")
+  penaltyDescription  String?                   @map("penalty_description") @db.Text
+
+  // Template checklist items
+  checklistTemplate   Json?                     @map("checklist_template")
+
+  isActive            Boolean                   @default(true) @map("is_active")
+
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  deletedAt           DateTime?                 @map("deleted_at")
+
+  // Relations
+  organization        Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deadlines           ComplianceDeadline[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([jurisdiction])
+  @@map("compliance_requirements")
+}
+
+/// @description Compliance deadline instance for an association
+model ComplianceDeadline {
+  id                  String              @id @default(cuid())
+  associationId       String              @map("association_id")
+  requirementId       String              @map("requirement_id")
+
+  // Deadline info
+  title               String
+  description         String?             @db.Text
+  dueDate             DateTime            @map("due_date")
+  reminderDate        DateTime?           @map("reminder_date")
+
+  // Status
+  status              ComplianceStatus    @default(NOT_STARTED)
+  completedAt         DateTime?           @map("completed_at")
+  completedBy         String?             @map("completed_by")
+
+  // Evidence
+  evidenceDocumentIds String[]            @default([]) @map("evidence_document_ids")
+  notes               String?             @db.Text
+
+  // Recurrence tracking
+  fiscalYear          Int?                @map("fiscal_year")
+  recurrenceIndex     Int?                @map("recurrence_index")
+
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  association         Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  requirement         ComplianceRequirement @relation(fields: [requirementId], references: [id])
+  checklistItems      ComplianceChecklistItem[]
+
+  @@index([associationId])
+  @@index([requirementId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("compliance_deadlines")
+}
+
+/// @description Checklist item for a compliance deadline
+model ComplianceChecklistItem {
+  id                  String              @id @default(cuid())
+  deadlineId          String              @map("deadline_id")
+
+  title               String
+  description         String?
+  sortOrder           Int                 @default(0) @map("sort_order")
+
+  // Status
+  isCompleted         Boolean             @default(false) @map("is_completed")
+  completedAt         DateTime?           @map("completed_at")
+  completedBy         String?             @map("completed_by")
+
+  // Evidence
+  evidenceDocumentId  String?             @map("evidence_document_id")
+  notes               String?
+
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  deadline            ComplianceDeadline  @relation(fields: [deadlineId], references: [id], onDelete: Cascade)
+
+  @@index([deadlineId])
+  @@map("compliance_checklist_items")
 }
 
 // =============================================================================
@@ -1591,6 +2514,9 @@ model WorkOrder {
   bids            WorkOrderBid[]
   maintenanceLogs AssetMaintenanceLog[]
 
+  // Phase 9: Owner Portal / CRM
+  ownerRequests   OwnerRequest[]
+
   @@unique([associationId, workOrderNumber])
   @@index([associationId])
   @@index([unitId])
@@ -2011,4 +2937,607 @@ model ViolationStatusHistory {
 
   @@index([violationId])
   @@map("violation_status_history")
+}
+
+// =============================================================================
+// PHASE 6: ARC (Architectural Requests)
+// =============================================================================
+
+/// @description Architectural change request
+model ARCRequest {
+  id              String            @id @default(cuid())
+  associationId   String            @map("association_id")
+  committeeId     String?           @map("committee_id")
+  unitId          String?           @map("unit_id")
+  requesterPartyId String           @map("requester_party_id")
+
+  // Identification
+  requestNumber   String            @map("request_number")
+
+  // Details
+  title           String
+  description     String            @db.Text
+  category        ARCCategory
+  status          ARCRequestStatus  @default(DRAFT)
+  estimatedCost   Decimal?          @db.Decimal(12, 2) @map("estimated_cost")
+  proposedStartDate DateTime?       @map("proposed_start_date")
+  proposedEndDate DateTime?         @map("proposed_end_date")
+  conditions      String?           @db.Text // Conditions of approval
+
+  // Timeline
+  submittedAt     DateTime?         @map("submitted_at")
+  reviewedAt      DateTime?         @map("reviewed_at")
+  decisionDate    DateTime?         @map("decision_date")
+  expiresAt       DateTime?         @map("expires_at")
+  withdrawnAt     DateTime?         @map("withdrawn_at")
+  cancellationReason String?        @map("cancellation_reason")
+
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  association     Association       @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  committee       ARCCommittee?     @relation(fields: [committeeId], references: [id])
+  unit            Unit?             @relation(fields: [unitId], references: [id])
+  requesterParty  Party             @relation("PartyARCRequests", fields: [requesterPartyId], references: [id])
+  documents       ARCDocument[]
+  reviews         ARCReview[]
+
+  @@unique([associationId, requestNumber])
+  @@index([associationId])
+  @@index([committeeId])
+  @@index([unitId])
+  @@index([requesterPartyId])
+  @@index([status])
+  @@map("arc_requests")
+}
+
+/// @description Documents attached to an ARC request
+model ARCDocument {
+  id              String          @id @default(cuid())
+  requestId       String          @map("request_id")
+
+  documentType    ARCDocumentType @map("document_type")
+  fileName        String          @map("file_name")
+  fileUrl         String          @map("file_url")
+  fileSize        Int?            @map("file_size")
+  mimeType        String?         @map("mime_type")
+  description     String?
+  version         String?         // Optional version label
+
+  uploadedBy      String          @map("uploaded_by") // User ID
+  uploadedAt      DateTime        @default(now()) @map("uploaded_at")
+
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  request         ARCRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@map("arc_documents")
+}
+
+/// @description ARC committee configuration
+model ARCCommittee {
+  id              String      @id @default(cuid())
+  associationId   String      @map("association_id")
+
+  name            String
+  description     String?
+  approvalThreshold Decimal   @db.Decimal(5, 2) @map("approval_threshold") // e.g., 50.00 for majority
+  quorum          Int?
+  isActive        Boolean     @default(true) @map("is_active")
+
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  members         ARCCommitteeMember[]
+  requests        ARCRequest[]
+
+  @@index([associationId])
+  @@map("arc_committees")
+}
+
+/// @description Members of an ARC committee
+model ARCCommitteeMember {
+  id              String      @id @default(cuid())
+  committeeId     String      @map("committee_id")
+  partyId         String      @map("party_id")
+
+  role            String?
+  isChair         Boolean     @default(false) @map("is_chair")
+  joinedAt        DateTime    @default(now()) @map("joined_at")
+  leftAt          DateTime?   @map("left_at")
+
+  // Relations
+  committee       ARCCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  party           Party        @relation(fields: [partyId], references: [id])
+
+  @@unique([committeeId, partyId])
+  @@index([partyId])
+  @@map("arc_committee_members")
+}
+
+/// @description Reviews/decisions recorded for an ARC request
+model ARCReview {
+  id              String          @id @default(cuid())
+  requestId       String          @map("request_id")
+  reviewerId      String          @map("reviewer_id") // User ID
+  action          ARCReviewAction
+  notes           String?         @db.Text
+  conditions      String?         @db.Text
+  expiresAt       DateTime?       @map("expires_at") // For conditional approvals
+  decidedAt       DateTime        @default(now()) @map("decided_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  request         ARCRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  reviewer        User            @relation(fields: [reviewerId], references: [id])
+
+  @@index([requestId])
+  @@index([reviewerId])
+  @@map("arc_reviews")
+}
+
+// =============================================================================
+// PHASE 7: Governance
+// =============================================================================
+
+/// @description Board for an association
+model Board {
+  id            String      @id @default(cuid())
+  associationId String      @map("association_id")
+
+  name          String
+  description   String?
+
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  members       BoardMember[]
+  meetings      Meeting[]
+  resolutions   Resolution[]
+  history       BoardHistory[]
+
+  @@index([associationId])
+  @@map("boards")
+}
+
+/// @description Board membership with roles and terms
+model BoardMember {
+  id         String      @id @default(cuid())
+  boardId    String      @map("board_id")
+  partyId    String      @map("party_id")
+
+  role       BoardRole
+  termStart  DateTime    @map("term_start")
+  termEnd    DateTime?   @map("term_end")
+  isActive   Boolean     @default(true) @map("is_active")
+
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  board      Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  party      Party       @relation(fields: [partyId], references: [id])
+
+  @@unique([boardId, partyId, termStart])
+  @@index([partyId])
+  @@map("board_members")
+}
+
+/// @description Meetings for governance (board, annual, special)
+model Meeting {
+  id              String        @id @default(cuid())
+  associationId   String        @map("association_id")
+  boardId         String?       @map("board_id")
+
+  type            MeetingType
+  status          MeetingStatus @default(SCHEDULED)
+  title           String
+  description     String?       @db.Text
+  scheduledFor    DateTime      @map("scheduled_for")
+  location        String?
+
+  createdBy       String        @map("created_by") // User ID
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  association     Association   @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  board           Board?        @relation(fields: [boardId], references: [id])
+  agendaItems     MeetingAgendaItem[]
+  minutes         MeetingMinutes?
+  attendance      MeetingAttendance[]
+  votes           Vote[]
+
+  @@index([associationId])
+  @@index([boardId])
+  @@index([scheduledFor])
+  @@map("meetings")
+}
+
+/// @description Agenda items for a meeting
+model MeetingAgendaItem {
+  id          String    @id @default(cuid())
+  meetingId   String    @map("meeting_id")
+
+  title       String
+  description String?   @db.Text
+  order       Int       @default(0)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  meeting     Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  votes       Vote[]
+
+  @@index([meetingId])
+  @@map("meeting_agenda_items")
+}
+
+/// @description Minutes recorded for a meeting
+model MeetingMinutes {
+  id           String    @id @default(cuid())
+  meetingId    String    @unique @map("meeting_id")
+  recordedBy   String    @map("recorded_by") // User ID
+  content      String    @db.Text
+
+  recordedAt   DateTime  @default(now()) @map("recorded_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  meeting      Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@map("meeting_minutes")
+}
+
+/// @description Attendance records for a meeting
+model MeetingAttendance {
+  id             String                   @id @default(cuid())
+  meetingId      String                   @map("meeting_id")
+  partyId        String                   @map("party_id")
+  status         MeetingAttendanceStatus  @default(PRESENT)
+  proxyForPartyId String?                 @map("proxy_for_party_id")
+  checkedInAt    DateTime?                @map("checked_in_at")
+
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  // Relations
+  meeting        Meeting                  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  party          Party                    @relation(fields: [partyId], references: [id])
+
+  @@unique([meetingId, partyId])
+  @@index([proxyForPartyId])
+  @@map("meeting_attendance")
+}
+
+/// @description Vote session within a meeting
+model Vote {
+  id             String       @id @default(cuid())
+  meetingId      String       @map("meeting_id")
+  agendaItemId   String?      @map("agenda_item_id")
+
+  question       String
+  method         VoteMethod   @default(IN_PERSON)
+  createdBy      String       @map("created_by") // User ID
+  quorumRequired Int?         @map("quorum_required")
+  closedAt       DateTime?    @map("closed_at")
+
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  meeting        Meeting      @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  agendaItem     MeetingAgendaItem? @relation(fields: [agendaItemId], references: [id])
+  ballots        VoteBallot[]
+
+  @@index([meetingId])
+  @@index([agendaItemId])
+  @@map("votes")
+}
+
+/// @description Ballots cast for a vote
+model VoteBallot {
+  id           String      @id @default(cuid())
+  voteId       String      @map("vote_id")
+  voterPartyId String      @map("voter_party_id")
+  choice       VoteChoice
+  castAt       DateTime    @default(now()) @map("cast_at")
+
+  // Relations
+  vote         Vote        @relation(fields: [voteId], references: [id], onDelete: Cascade)
+  voterParty   Party       @relation(fields: [voterPartyId], references: [id])
+
+  @@unique([voteId, voterPartyId])
+  @@index([voterPartyId])
+  @@map("vote_ballots")
+}
+
+/// @description Audit trail for board changes
+model BoardHistory {
+  id         String    @id @default(cuid())
+  boardId    String    @map("board_id")
+  changeType String
+  detail     Json?
+  changedBy  String?   @map("changed_by") // User ID
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  board      Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([boardId])
+  @@map("board_history")
+}
+
+/// @description Formal resolutions adopted by an association
+model Resolution {
+  id             String            @id @default(cuid())
+  associationId  String            @map("association_id")
+  boardId        String?           @map("board_id")
+  title          String
+  summary        String?           @db.Text
+  status         ResolutionStatus  @default(PROPOSED)
+  effectiveDate  DateTime?         @map("effective_date")
+  supersededById String?           @map("superseded_by_id")
+
+  adoptedAt      DateTime?         @map("adopted_at")
+  proposedBy     String?           @map("proposed_by") // User ID
+  adoptedBy      String?           @map("adopted_by")  // User ID
+
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association       @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  board          Board?            @relation(fields: [boardId], references: [id])
+  supersededBy   Resolution?       @relation("ResolutionSupersede", fields: [supersededById], references: [id])
+  supersedes     Resolution[]      @relation("ResolutionSupersede")
+
+  policyDocuments PolicyDocument[]
+
+  @@index([associationId])
+  @@index([boardId])
+  @@index([status])
+  @@map("resolutions")
+}
+
+/// @description Policy documents with version history
+model PolicyDocument {
+  id             String        @id @default(cuid())
+  associationId  String        @map("association_id")
+  resolutionId   String?       @map("resolution_id")
+  title          String
+  description    String?       @db.Text
+  currentVersion String?       @map("current_version")
+  status         PolicyStatus  @default(DRAFT)
+
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association   @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  resolution     Resolution?   @relation(fields: [resolutionId], references: [id])
+  versions       PolicyVersion[]
+
+  @@index([associationId])
+  @@index([resolutionId])
+  @@index([status])
+  @@map("policy_documents")
+}
+
+/// @description Versioned content for a policy document
+model PolicyVersion {
+  id               String       @id @default(cuid())
+  policyDocumentId String       @map("policy_document_id")
+  version          String
+  content          String       @db.Text
+  status           PolicyStatus @default(DRAFT)
+  approvedAt       DateTime?    @map("approved_at")
+  approvedBy       String?      @map("approved_by") // User ID
+
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  policyDocument   PolicyDocument @relation(fields: [policyDocumentId], references: [id], onDelete: Cascade)
+
+  @@unique([policyDocumentId, version])
+  @@index([policyDocumentId])
+  @@index([status])
+  @@map("policy_versions")
+}
+
+// =============================================================================
+// PHASE 8: Communications
+// =============================================================================
+
+/// @description Templates for communications
+model CommunicationTemplate {
+  id             String                     @id @default(cuid())
+  associationId  String                     @map("association_id")
+  name           String
+  type           CommunicationTemplateType
+  channel        CommunicationChannel
+  subject        String?
+  body           String                     @db.Text
+  variables      Json?
+  currentVersion String?                    @map("current_version")
+
+  createdBy      String?                    @map("created_by") // User ID
+  createdAt      DateTime                   @default(now()) @map("created_at")
+  updatedAt      DateTime                   @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association                @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  massCommunications MassCommunication[]
+  versions       CommunicationTemplateVersion[]
+
+  @@index([associationId])
+  @@map("communication_templates")
+}
+
+/// @description Versioned content for communication templates
+model CommunicationTemplateVersion {
+  id           String                 @id @default(cuid())
+  templateId   String                 @map("template_id")
+  version      String
+  subject      String?
+  body         String                 @db.Text
+  variables    Json?
+  status       TemplateVersionStatus  @default(DRAFT)
+  createdBy    String?                @map("created_by") // User ID
+  createdAt    DateTime               @default(now()) @map("created_at")
+
+  // Relations
+  template     CommunicationTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@index([status])
+  @@map("communication_template_versions")
+}
+
+/// @description Mass communications (scheduled or sent)
+model MassCommunication {
+  id             String                @id @default(cuid())
+  associationId  String                @map("association_id")
+  templateId     String?               @map("template_id")
+
+  subject        String?
+  body           String                @db.Text
+  channel        CommunicationChannel
+  status         CommunicationStatus   @default(DRAFT)
+  scheduledFor   DateTime?             @map("scheduled_for")
+  sentAt         DateTime?             @map("sent_at")
+  targetFilter   Json?                 @map("target_filter") // e.g., audience selection
+
+  createdBy      String?               @map("created_by") // User ID
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association           @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  template       CommunicationTemplate? @relation(fields: [templateId], references: [id])
+  deliveries     MassCommunicationDelivery[]
+
+  @@index([associationId])
+  @@index([templateId])
+  @@index([status])
+  @@map("mass_communications")
+}
+
+/// @description Delivery log entries for mass communications
+model MassCommunicationDelivery {
+  id                   String          @id @default(cuid())
+  massCommunicationId  String          @map("mass_communication_id")
+  recipient            String
+  channel              CommunicationChannel
+  status               DeliveryStatus  @default(PENDING)
+  sentAt               DateTime?       @map("sent_at")
+  errorMessage         String?         @map("error_message")
+
+  createdAt            DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  massCommunication    MassCommunication @relation(fields: [massCommunicationId], references: [id], onDelete: Cascade)
+
+  @@index([massCommunicationId])
+  @@index([status])
+  @@map("mass_communication_deliveries")
+}
+
+/// @description Announcements for portal or broadcasts
+model Announcement {
+  id             String               @id @default(cuid())
+  associationId  String               @map("association_id")
+  title          String
+  content        String               @db.Text
+  status         AnnouncementStatus   @default(DRAFT)
+  publishedAt    DateTime?            @map("published_at")
+  expiresAt      DateTime?            @map("expires_at")
+  audience       Json?
+
+  createdBy      String?              @map("created_by") // User ID
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  reads          AnnouncementRead[]
+
+  @@index([associationId])
+  @@index([status])
+  @@map("announcements")
+}
+
+/// @description Read receipts for announcements
+model AnnouncementRead {
+  id             String       @id @default(cuid())
+  announcementId String       @map("announcement_id")
+  partyId        String       @map("party_id")
+  readAt         DateTime     @default(now()) @map("read_at")
+
+  // Relations
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  party          Party        @relation(fields: [partyId], references: [id])
+
+  @@unique([announcementId, partyId])
+  @@index([partyId])
+  @@map("announcement_reads")
+}
+
+/// @description Calendar events (meetings, maintenance, closures)
+model CalendarEvent {
+  id             String             @id @default(cuid())
+  associationId  String             @map("association_id")
+  type           CalendarEventType
+  title          String
+  description    String?            @db.Text
+  startsAt       DateTime           @map("starts_at")
+  endsAt         DateTime?          @map("ends_at")
+  location       String?
+  metadata       Json?
+  recurrenceRule String?            @map("recurrence_rule")
+  notifyAt       DateTime?          @map("notify_at")
+
+  createdBy      String?            @map("created_by") // User ID
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  notifications  CalendarEventNotification[]
+
+  @@index([associationId])
+  @@index([startsAt])
+  @@map("calendar_events")
+}
+
+/// @description Notification entries for calendar events
+model CalendarEventNotification {
+  id             String             @id @default(cuid())
+  associationId  String             @map("association_id")
+  eventId        String             @map("event_id")
+  notifyAt       DateTime           @map("notify_at")
+  status         NotificationStatus @default(PENDING)
+  channel        CommunicationChannel?
+  payload        Json?
+  sentAt         DateTime?          @map("sent_at")
+  errorMessage   String?            @map("error_message")
+
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  association    Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  event          CalendarEvent      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([associationId])
+  @@index([eventId])
+  @@index([status])
+  @@map("calendar_event_notifications")
 }

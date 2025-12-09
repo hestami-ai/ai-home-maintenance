@@ -59,6 +59,7 @@
 	},
 	"dependencies": {
 		"@cerbos/grpc": "^0.23.5",
+		"@dbos-inc/dbos-sdk": "^4.5.13",
 		"@opentelemetry/api": "^1.9.0",
 		"@opentelemetry/auto-instrumentations-node": "^0.67.2",
 		"@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
