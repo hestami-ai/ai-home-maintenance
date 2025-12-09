@@ -1,0 +1,27 @@
+# Journal Entry Resource Policy
+# Controls access to journal entry operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "journal_entry"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access including posting and reversing
+    - actions: ["view", "create", "edit", "delete", "post", "reverse", "approve"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, edit, and post journal entries
+    - actions: ["view", "create", "edit", "post"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view journal entries (for financial oversight)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member

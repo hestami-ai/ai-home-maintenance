@@ -1,0 +1,27 @@
+# Cerbos PDP Configuration
+# https://docs.cerbos.dev/cerbos/latest/configuration/
+
+server:
+  httpListenAddr: ":3592"
+  grpcListenAddr: ":3593"
+
+storage:
+  driver: disk
+  disk:
+    directory: /policies
+    watchForChanges: true
+
+engine:
+  defaultPolicyVersion: "default"
+  # Enable lenient scope search - allows fallback to parent scopes
+  # when exact scope match is not found
+  lenientScopeSearch: true
+
+# Audit logging (optional, useful for debugging)
+audit:
+  enabled: true
+  backend: local
+  local:
+    storagePath: /tmp/cerbos-audit
+    retentionPeriod: 168h  # 7 days
+

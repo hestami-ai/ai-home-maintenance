@@ -1,0 +1,19 @@
+{
+  "name": "Hestami.Domain",
+  "sourceDirectory": "src",
+  "exposedModules": [
+    "Hestami.Common",
+    "Hestami.Domain.Association",
+    "Hestami.Domain.Accounting",
+    "Hestami.Domain.Workflow",
+    "Hestami.Domain.Violation",
+    "Hestami.Domain.Arc",
+    "Hestami.Domain.WorkOrder",
+    "Hestami.Domain.Communication",
+    "Hestami.Domain.Governance",
+    "Hestami.Domain.Portal",
+    "Hestami.Domain.Document",
+    "Hestami.Domain.Reserve",
+    "Hestami.Domain.Compliance"
+  ]
+}

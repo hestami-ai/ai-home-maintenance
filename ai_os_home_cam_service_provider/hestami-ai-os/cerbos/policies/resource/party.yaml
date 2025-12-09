@@ -1,0 +1,56 @@
+# Party Resource Policy
+# Controls access to party (person/entity) records
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "party"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full CRUD access
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit parties
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view parties
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view and edit their own party record
+    - actions: ["view", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          any:
+            of:
+              # User is viewing/editing their own party record
+              - expr: "has(R.attr.userId) && R.attr.userId == P.id"
+              # Or viewing parties in their association (limited)
+              - expr: "!has(R.attr.userId)"
+
+    # Tenants can view and edit their own party record
+    - actions: ["view", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+      condition:
+        match:
+          expr: "has(R.attr.userId) && R.attr.userId == P.id"
+
+    # Vendors can view parties related to their work
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor

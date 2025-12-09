@@ -1,0 +1,47 @@
+# Association Resource Policy
+# Controls access to HOA/Condo association operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "association"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full CRUD access
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit associations
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view associations
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners and tenants can view associations they are members of
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+        - org_tenant
+      condition:
+        match:
+          # Either they're a member, or we allow viewing if no memberIds restriction
+          any:
+            of:
+              - expr: "!has(R.attr.memberIds)"
+              - expr: "has(R.attr.memberIds) && P.id in R.attr.memberIds"
+
+    # Vendors can view associations they work with
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor

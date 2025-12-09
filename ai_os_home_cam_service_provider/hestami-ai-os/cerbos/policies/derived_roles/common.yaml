@@ -1,0 +1,141 @@
+# Common Derived Roles for Hestami AI OS
+# These roles are derived from the user's organization membership
+# and are used across all resource policies.
+#
+# Principal attributes expected:
+#   - orgRoles: Record<organizationId, UserRole>
+#   - vendorId?: string (for vendor users)
+#
+# Resource attributes expected:
+#   - organizationId: string
+#   - ownerIds?: string[] (for ownership-based access)
+#   - memberIds?: string[] (for membership-based access)
+
+apiVersion: api.cerbos.dev/v1
+derivedRoles:
+  name: common_roles
+  definitions:
+    # User has ADMIN role in the resource's organization
+    - name: org_admin
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "ADMIN"
+
+    # User has MANAGER role in the resource's organization
+    - name: org_manager
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "MANAGER"
+
+    # User has BOARD_MEMBER role in the resource's organization
+    - name: org_board_member
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "BOARD_MEMBER"
+
+    # User has OWNER role in the resource's organization
+    - name: org_owner
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "OWNER"
+
+    # User has TENANT role in the resource's organization
+    - name: org_tenant
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "TENANT"
+
+    # User has VENDOR role in the resource's organization
+    - name: org_vendor
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "VENDOR"
+
+    # User is listed as an owner of this specific resource
+    # Used for unit ownership, property ownership, etc.
+    - name: resource_owner
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(R.attr.ownerIds) && 
+            P.id in R.attr.ownerIds
+
+    # User is a member of this resource (e.g., association member)
+    - name: resource_member
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(R.attr.memberIds) && 
+            P.id in R.attr.memberIds
+
+    # User is the assigned vendor for this resource (e.g., work order)
+    - name: assigned_vendor
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.vendorId) && 
+            has(R.attr.assignedVendorId) && 
+            P.attr.vendorId == R.attr.assignedVendorId
+
+    # Combined: User has any management role (ADMIN or MANAGER)
+    - name: org_management
+      parentRoles: ["user"]
+      condition:
+        match:
+          any:
+            of:
+              - expr: >-
+                  has(P.attr.orgRoles) && 
+                  has(R.attr.organizationId) && 
+                  P.attr.orgRoles[R.attr.organizationId] == "ADMIN"
+              - expr: >-
+                  has(P.attr.orgRoles) && 
+                  has(R.attr.organizationId) && 
+                  P.attr.orgRoles[R.attr.organizationId] == "MANAGER"
+
+    # Combined: User has any stakeholder role (OWNER, TENANT, BOARD_MEMBER)
+    - name: org_stakeholder
+      parentRoles: ["user"]
+      condition:
+        match:
+          any:
+            of:
+              - expr: >-
+                  has(P.attr.orgRoles) && 
+                  has(R.attr.organizationId) && 
+                  P.attr.orgRoles[R.attr.organizationId] == "OWNER"
+              - expr: >-
+                  has(P.attr.orgRoles) && 
+                  has(R.attr.organizationId) && 
+                  P.attr.orgRoles[R.attr.organizationId] == "TENANT"
+              - expr: >-
+                  has(P.attr.orgRoles) && 
+                  has(R.attr.organizationId) && 
+                  P.attr.orgRoles[R.attr.organizationId] == "BOARD_MEMBER"

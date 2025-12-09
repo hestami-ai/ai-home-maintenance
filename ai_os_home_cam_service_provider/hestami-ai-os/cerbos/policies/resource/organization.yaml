@@ -1,0 +1,35 @@
+# Organization Resource Policy
+# Controls access to organization-level operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "organization"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to organization
+    - actions: ["view", "edit", "delete", "manage_members", "manage_settings"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view and edit organization, manage some settings
+    - actions: ["view", "edit", "manage_settings"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view organization
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners, tenants, and vendors can view organization
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+        - org_tenant
+        - org_vendor

@@ -1,0 +1,66 @@
+# Unit Resource Policy
+# Controls access to unit (apartment/condo/house) operations
+# Units have ownership-based access control
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "unit"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full CRUD access
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit units
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view all units in their association
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view their own units (ownership-based)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - resource_owner
+
+    # Owners with org role can view units (for list queries)
+    # The actual filtering happens via planResources
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          # Allow if ownerIds contains this user, or if no ownerIds specified (list query)
+          any:
+            of:
+              - expr: "!has(R.attr.ownerIds)"
+              - expr: "has(R.attr.ownerIds) && P.id in R.attr.ownerIds"
+
+    # Tenants can view units they rent
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+      condition:
+        match:
+          any:
+            of:
+              - expr: "!has(R.attr.tenantIds)"
+              - expr: "has(R.attr.tenantIds) && P.id in R.attr.tenantIds"
+
+    # Vendors can view units they have work orders for
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor

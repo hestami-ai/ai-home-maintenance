@@ -1,0 +1,27 @@
+# AP Invoice Resource Policy
+# Controls access to accounts payable invoice operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "ap_invoice"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to AP invoices including approval and voiding
+    - actions: ["view", "create", "edit", "delete", "approve", "void", "pay"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, edit, and approve invoices
+    - actions: ["view", "create", "edit", "approve"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view and approve invoices (for oversight)
+    - actions: ["view", "approve"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
