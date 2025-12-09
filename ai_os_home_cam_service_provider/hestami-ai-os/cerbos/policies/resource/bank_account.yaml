@@ -1,0 +1,27 @@
+# Bank Account Resource Policy
+# Controls access to bank account management
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "bank_account"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to bank accounts
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view and edit bank accounts
+    - actions: ["view", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view bank accounts (for financial oversight)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member

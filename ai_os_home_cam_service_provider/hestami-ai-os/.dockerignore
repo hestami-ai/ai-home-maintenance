@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+
+# Build output
+build
+.svelte-kit
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs
+
+# Tests
+e2e
+*.spec.ts
+*.test.ts
+coverage
+playwright-report
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# Misc
+.DS_Store
+*.log

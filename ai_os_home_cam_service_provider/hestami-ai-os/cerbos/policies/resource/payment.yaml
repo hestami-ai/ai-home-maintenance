@@ -1,0 +1,33 @@
+# Payment Resource Policy
+# Controls access to payment operations (AR)
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "payment"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to payments including voiding
+    - actions: ["view", "create", "edit", "delete", "void", "apply"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and apply payments
+    - actions: ["view", "create", "apply"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view payments
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view their own unit's payments
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner

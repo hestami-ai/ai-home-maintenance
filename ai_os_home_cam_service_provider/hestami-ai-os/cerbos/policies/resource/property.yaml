@@ -1,0 +1,45 @@
+# Property Resource Policy
+# Controls access to property (building/land) operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "property"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full CRUD access
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit properties
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view properties
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view properties (typically their association's properties)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view properties
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Vendors can view properties they work on
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor

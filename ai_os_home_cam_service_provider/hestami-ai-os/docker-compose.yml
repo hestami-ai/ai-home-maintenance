@@ -1,0 +1,202 @@
+services:
+  # Reverse Proxy
+  traefik:
+    image: traefik:v3.2.1
+    container_name: hestami-traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=hestami-ai-os_hestami-network"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--providers.file.directory=/etc/traefik/certs"
+      - "--providers.file.watch=true"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      # Optimize for large file uploads
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=180s"
+      # Increase max request body size for file uploads (100MB)
+      - "--entrypoints.websecure.http.middlewares=upload-limit@docker"
+      # HTTP/2 settings for large uploads
+      - "--entrypoints.websecure.http2.maxConcurrentStreams=250"
+    ports:
+      - "443:443"
+    volumes:
+      - "./volumes/traefik/certs:/etc/traefik/certs:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./volumes/traefik/logs:/var/log/traefik"
+    networks:
+      - hestami-network
+    #restart: unless-stopped
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5" 
+
+  # PostgreSQL with PostGIS
+  postgres:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    container_name: hestami-postgres
+    env_file:
+      - ./.env
+    ports:
+      - "5432:5432"
+    volumes:
+      # PostgreSQL 18+ stores data in /var/lib/postgresql/18/main (not /data)
+      - postgres_data:/var/lib/postgresql
+      #- ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - hestami-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    #restart: unless-stopped
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Redis for session storage and caching
+  redis:
+    image: redis:8.0-M02-alpine3.20
+    container_name: hestami-redis
+    #command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - ./.env
+    #ports:
+    #  - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hestami-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    #restart: unless-stopped
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Jaeger for distributed tracing (with Badger persistent storage)
+  jaeger:
+    image: jaegertracing/all-in-one:1.53
+    container_name: hestami-jaeger
+    user: root
+    env_file:
+      - ./.env
+    environment:
+      # Disable Jaeger's internal OTEL self-tracing
+      - OTEL_TRACES_EXPORTER=none
+      - OTEL_METRICS_EXPORTER=none
+    volumes:
+      - jaeger_badger:/badger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "6831:6831/udp" # Jaeger agent (Thrift compact) - for Cerbos
+    networks:
+      - hestami-network
+    #restart: unless-stopped
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Cerbos Policy Decision Point
+  cerbos:
+    image: cerbos/cerbos:0.48.0
+    container_name: hestami-cerbos
+    environment:
+      - OTEL_SERVICE_NAME=cerbos
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+    ports:
+      - "3593:3593"  # gRPC
+      - "3592:3592"  # HTTP (for debugging/playground)
+    volumes:
+      - ./cerbos/policies:/policies
+      - ./cerbos/config.yaml:/config.yaml
+    command: ["server", "--config=/config.yaml"]
+    networks:
+      - hestami-network
+    healthcheck:
+      test: ["CMD", "/cerbos", "healthcheck", "--config=/config.yaml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    #restart: unless-stopped
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # SvelteKit Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hestami-app
+    env_file:
+      - ./.env
+    ports:
+      - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Production: allow more concurrent uploads
+        reservations:
+          memory: 1G  # Base memory for app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+      cerbos:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`homeservices.hai`)"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      # Define upload-limit middleware (referenced by entrypoint)
+      - "traefik.http.middlewares.upload-limit.buffering.maxRequestBodyBytes=104857600"  # 100MB
+      - "traefik.http.middlewares.upload-limit.buffering.memRequestBodyBytes=104857600"  # 100MB in memory
+      # Apply middlewares to router
+      - "traefik.http.routers.frontend.middlewares=upload-limit"
+    networks:
+      - hestami-network
+    #restart: unless-stopped
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  postgres_data:
+  redis_data:
+  jaeger_badger:
+
+networks:
+  hestami-network:
+    driver: bridge

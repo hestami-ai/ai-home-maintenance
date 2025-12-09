@@ -1,0 +1,80 @@
+# Work Order Resource Policy
+# Controls access to work order/maintenance request operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "work_order"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access including delete
+    - actions: ["view", "create", "edit", "assign", "close", "delete", "reopen"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can do everything except delete
+    - actions: ["view", "create", "edit", "assign", "close", "reopen"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view and create work orders
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view and create work orders for their units
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          any:
+            of:
+              # Creating new work order (no unitOwnerIds yet)
+              - expr: "!has(R.attr.unitOwnerIds)"
+              # Viewing work order for their unit
+              - expr: "has(R.attr.unitOwnerIds) && P.id in R.attr.unitOwnerIds"
+
+    # Tenants can view and create work orders
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+      condition:
+        match:
+          any:
+            of:
+              # Creating new work order
+              - expr: "!has(R.attr.unitTenantIds)"
+              # Viewing work order for their unit
+              - expr: "has(R.attr.unitTenantIds) && P.id in R.attr.unitTenantIds"
+              # Or they created it
+              - expr: "has(R.attr.createdByUserId) && R.attr.createdByUserId == P.id"
+
+    # Vendors can view and update work orders assigned to them
+    - actions: ["view", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - assigned_vendor
+
+    # Vendors with org role can view work orders (for list queries)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor
+      condition:
+        match:
+          any:
+            of:
+              # List query (no specific assignment)
+              - expr: "!has(R.attr.assignedVendorId)"
+              # Assigned to their vendor
+              - expr: >-
+                  has(P.attr.vendorId) && 
+                  has(R.attr.assignedVendorId) && 
+                  P.attr.vendorId == R.attr.assignedVendorId
