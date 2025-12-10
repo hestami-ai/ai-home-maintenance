@@ -421,7 +421,7 @@ This roadmap is organized into **phases** (not timeboxes). Each phase builds upo
 - [x] AP invoice tracking with approval workflow
 - [x] Financial data properly isolated per association
 - [x] Bank account management with GL integration
-- [ ] Automatic charge generation (DBOS workflow - Phase 4)
+- [x] Automatic charge generation (DBOS workflow - assessmentPosting_v1)
 
 ---
 
@@ -486,18 +486,20 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 ### 4.5 DBOS Work Order Workflow
 
 #### 4.5.1 Workflow Definition
-- [ ] `workOrderLifecycle_v1` DBOS workflow
+- [x] `workOrderLifecycle_v1` DBOS workflow
 - [x] State transitions with validation (in API)
 - [x] SLA timer integration (deadline tracking)
-- [ ] Notification triggers at each state
+- [x] Notification triggers at each state (stub - queues intent)
 
-#### 4.5.2 Workflow Steps (API-based, not yet DBOS)
+#### 4.5.2 Workflow Steps (DBOS durable)
 - [x] `create` - Create work order
 - [x] `updateStatus` - Generic status update
 - [x] `assignVendor` - Assign vendor
 - [x] `schedule` - Schedule work
 - [x] `complete` - Complete work order
-- [ ] `processInvoice` step (links to AP)
+- [x] `transitionStatus` - DBOS workflow-based transition
+- [x] `getTransitionStatus` - Query workflow status
+- [x] `processInvoice` step (links to AP)
 
 ### 4.6 Work Order → AP Integration
 
@@ -524,7 +526,7 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 - [x] Full audit trail of work order state changes
 - [x] Complete bidding process
 - [x] Integration with AP for invoicing
-- [ ] DBOS durable workflow integration (future enhancement)
+- [x] DBOS durable workflow integration
 
 ---
 
@@ -552,8 +554,8 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 ### 5.3 Notice Sequence
 
 - [x] `ViolationNotice` model
-- [ ] Notice templates per violation type
-- [ ] Notice sequence configuration:
+- [x] Notice templates per violation type (`NoticeTemplate` model)
+- [x] Notice sequence configuration (`NoticeSequenceConfig`, `NoticeSequenceStep` models)
   - Warning → First Notice → Second Notice → Fine → Hearing
 - [x] Cure period tracking
 - [x] Delivery method tracking (mail, email, posted)
@@ -563,21 +565,21 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 - [x] `ViolationHearing` model
 - [x] Hearing scheduling
 - [x] Hearing outcome recording
-- [ ] Appeal process support
+- [x] Appeal process support (`ViolationAppeal` model with full lifecycle)
 
 ### 5.5 Fines & GL Integration
 
 - [x] Fine assessment on violation
-- [ ] Fine → Assessment Charge creation
+- [x] Fine → Assessment Charge creation (`fineToCharge` endpoint)
 - [x] Fine waiver/reduction workflow
-- [ ] Fine → GL posting
+- [x] Fine → GL posting (via assessment charge integration)
 
 ### 5.6 DBOS Violation Workflow
 
-- [ ] `violationLifecycle_v1` workflow
-- [ ] Automatic notice escalation based on cure period
-- [ ] SLA timers for response windows
-- [ ] Notification triggers
+- [x] `violationLifecycle_v1` workflow
+- [x] Automatic notice escalation based on cure period
+- [x] SLA timers for response windows (cure period tracking)
+- [x] Notification triggers (stub - queues intent)
 
 ### 5.7 API Procedures
 
@@ -588,9 +590,10 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 ### Deliverables
 - [x] Violation lifecycle (core CRUD, status transitions, cure/close)
 - [x] Evidence management
-- [ ] Automated notice sequences
-- [ ] Fine integration with accounting (assessment charge/GL posting)
+- [x] Automated notice sequences (templates, sequence config, steps)
+- [x] Fine integration with accounting (assessment charge/GL posting)
 - [x] Hearing management
+- [x] Appeal process (file, schedule, decide, withdraw)
 
 ---
 
@@ -629,10 +632,10 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 6.5 DBOS ARC Workflow
 
-- [ ] `arcReviewLifecycle_v1` workflow
-- [ ] Submission → Committee Review → Decision
-- [ ] Revision request loop
-- [ ] Approval expiration handling
+- [x] `arcReviewLifecycle_v1` workflow
+- [x] Submission → Committee Review → Decision
+- [x] Revision request loop
+- [x] Approval expiration handling
 
 ### 6.6 API Procedures
 
@@ -926,35 +929,35 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 13.1 Assessment Posting Workflow
 
-- [ ] `assessmentPosting_v1` workflow
-- [ ] Scheduled charge generation
-- [ ] Late fee application
-- [ ] Delinquency escalation
+- [x] `assessmentPosting_v1` workflow
+- [x] Scheduled charge generation
+- [x] Late fee application
+- [x] Delinquency escalation (notification stub)
 
 ### 13.2 AP Invoice → Payment Workflow
 
-- [ ] `apPaymentProcessing_v1` workflow
+- [ ] `apPaymentProcessing_v1` workflow (deferred - complex integration)
 - [ ] Invoice approval chain
 - [ ] Payment batch processing
 - [ ] Check/ACH generation (integration point)
 
 ### 13.3 Vendor Assignment Workflow
 
-- [ ] `vendorAssignment_v1` workflow
+- [ ] `vendorAssignment_v1` workflow (deferred - depends on ML matching)
 - [ ] Automatic vendor matching
 - [ ] Bid request automation
 
 ### 13.4 Meeting Workflow
 
-- [ ] `meetingLifecycle_v1` workflow
-- [ ] Notice generation
-- [ ] Agenda distribution
-- [ ] Minutes approval
+- [x] `meetingLifecycle_v1` workflow
+- [x] Notice generation (notification stub)
+- [x] Agenda distribution (notification stub)
+- [x] Minutes placeholder creation
 
 ### Deliverables
-- [ ] All domain workflows implemented in DBOS
-- [ ] Workflow versioning aligned with API versions
-- [ ] Complete audit trails
+- [x] Core domain workflows implemented in DBOS (workOrder, violation, ARC, assessment, meeting)
+- [x] Workflow versioning aligned with API versions
+- [x] Complete audit trails via DBOS system database
 
 ---
 
@@ -964,26 +967,27 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 14.1 Service Provider Portal
 
-- [ ] Multi-association work order view
-- [ ] Unified invoice submission
-- [ ] Service area management
+- [x] Multi-association work order view (`serviceProviderWorkOrders` router)
+- [ ] Unified invoice submission (deferred - requires AP integration)
+- [x] Service area management (`ServiceArea` model, `serviceArea` router)
+- [x] Service provider link verification (`ServiceProviderLink` model)
 
 ### 14.2 Management Company Features
 
-- [ ] Portfolio dashboard
-- [ ] Cross-association reporting
-- [ ] Manager workload balancing
+- [ ] Portfolio dashboard (deferred - requires aggregation layer)
+- [ ] Cross-association reporting (deferred - requires reporting framework)
+- [ ] Manager workload balancing (deferred)
 
 ### 14.3 Homeowner Concierge
 
-- [ ] Individual homeowner onboarding (non-HOA)
-- [ ] Personal property management
-- [ ] Vendor coordination for individuals
+- [x] Individual homeowner onboarding (`IndividualProperty` model)
+- [x] Personal property management (`IndividualAsset` model)
+- [x] Vendor coordination for individuals (`IndividualMaintenanceRequest` model)
 
 ### Deliverables
-- [ ] Service providers can manage work across associations
-- [ ] Management companies have portfolio-level views
-- [ ] Individual homeowners can use platform independently
+- [x] Service providers can manage work across associations (via linked vendors)
+- [ ] Management companies have portfolio-level views (deferred)
+- [x] Individual homeowners can use platform independently (models ready)
 
 ---
 
@@ -993,34 +997,42 @@ IN_PROGRESS → ON_HOLD → COMPLETED → INVOICED → CLOSED
 
 ### 15.1 Reporting Framework
 
-- [ ] Report definition model
-- [ ] Parameter handling
-- [ ] Output formats (PDF, Excel, CSV)
-- [ ] Report scheduling
+- [x] Report definition model (`ReportDefinition`)
+- [x] Parameter handling (JSON schema in `parametersJson`)
+- [x] Output formats (PDF, Excel, CSV, JSON, HTML)
+- [x] Report scheduling (`ReportSchedule` model)
+- [x] Report execution tracking (`ReportExecution` model)
+- [x] Dashboard widgets (`DashboardWidget` model)
 
 ### 15.2 Financial Reports
 
-- [ ] Balance Sheet
-- [ ] Income Statement
-- [ ] Aged Receivables
-- [ ] Delinquency Report
-- [ ] Budget vs. Actual
+- [x] Report categories defined (FINANCIAL, RECEIVABLES, PAYABLES)
+- [ ] Balance Sheet (report template - deferred)
+- [ ] Income Statement (report template - deferred)
+- [ ] Aged Receivables (report template - deferred)
+- [ ] Delinquency Report (report template - deferred)
+- [ ] Budget vs. Actual (report template - deferred)
 
 ### 15.3 Operational Reports
 
-- [ ] Work Order Summary
-- [ ] Violation Summary
-- [ ] ARC Request Status
-- [ ] Compliance Status
+- [x] Report categories defined (OPERATIONAL, COMPLIANCE, GOVERNANCE)
+- [x] Dashboard summary endpoint with aggregated metrics
+- [ ] Work Order Summary (report template - deferred)
+- [ ] Violation Summary (report template - deferred)
+- [ ] ARC Request Status (report template - deferred)
+- [ ] Compliance Status (report template - deferred)
 
 ### 15.4 API Procedures
 
-- [ ] `report/v1/generate` / `schedule` / `list`
+- [x] `reportDefinition/create` / `list` / `get` / `update` / `delete`
+- [x] `reportExecution/generate` / `list` / `get` / `cancel`
+- [x] `reportSchedule/create` / `list` / `get` / `update` / `delete` / `runNow`
+- [x] `dashboard/createWidget` / `listWidgets` / `updateWidget` / `deleteWidget` / `reorderWidgets` / `getSummary`
 
 ### Deliverables
-- [ ] Reporting framework
-- [ ] Standard financial reports
-- [ ] Operational dashboards
+- [x] Reporting framework (models, enums, API routes)
+- [ ] Standard financial reports (templates deferred)
+- [x] Operational dashboards (widget system + summary endpoint)
 
 ---
 

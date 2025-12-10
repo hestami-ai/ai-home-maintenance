@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "violation_appeal"
+  rules:
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      roles:
+        - admin
+        - manager
+        - staff
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      roles:
+        - owner
+        - board_member

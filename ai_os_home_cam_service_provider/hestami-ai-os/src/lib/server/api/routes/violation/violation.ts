@@ -1555,5 +1555,141 @@ export const violationRouter = {
 				},
 				context
 			);
+		}),
+
+	/**
+	 * Convert fine to assessment charge (for billing integration)
+	 */
+	fineToCharge: orgProcedure
+		.input(
+			z.object({
+				fineId: z.string(),
+				idempotencyKey: z.string().optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					charge: z.object({
+						id: z.string(),
+						amount: z.string(),
+						dueDate: z.string()
+					}),
+					fine: z.object({
+						id: z.string(),
+						assessmentChargeId: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const association = await getAssociationOrThrow(context.organization!.id);
+
+			const createCharge = async () => {
+				// Get the fine with violation details
+				const fine = await prisma.violationFine.findFirst({
+					where: { id: input.fineId },
+					include: {
+						violation: {
+							include: { unit: true }
+						}
+					}
+				});
+
+				if (!fine || fine.violation.associationId !== association.id) {
+					throw ApiException.notFound('Fine');
+				}
+
+				if (fine.assessmentChargeId) {
+					throw ApiException.conflict('Fine has already been converted to an assessment charge');
+				}
+
+				if (!fine.violation.unitId) {
+					throw ApiException.badRequest('Violation must be associated with a unit to create a charge');
+				}
+
+				// Get or create a "Violation Fine" assessment type
+				let assessmentType = await prisma.assessmentType.findFirst({
+					where: { associationId: association.id, code: 'FINE' }
+				});
+
+				if (!assessmentType) {
+					// Get a revenue account for fines
+					const fineRevenueAccount = await prisma.gLAccount.findFirst({
+						where: {
+							associationId: association.id,
+							accountType: 'REVENUE',
+							isActive: true
+						}
+					});
+
+					if (!fineRevenueAccount) {
+						throw ApiException.badRequest('No revenue account found for fine charges');
+					}
+
+					assessmentType = await prisma.assessmentType.create({
+						data: {
+							associationId: association.id,
+							name: 'Violation Fine',
+							code: 'FINE',
+							description: 'Fines assessed for violations',
+							frequency: 'ONE_TIME',
+							defaultAmount: 0,
+							revenueAccountId: fineRevenueAccount.id
+						}
+					});
+				}
+
+				// Create the assessment charge
+				const amount = parseFloat(fine.amount.toString());
+				const charge = await prisma.assessmentCharge.create({
+					data: {
+						associationId: association.id,
+						unitId: fine.violation.unitId,
+						assessmentTypeId: assessmentType.id,
+						chargeDate: fine.assessedDate,
+						dueDate: fine.dueDate,
+						amount,
+						lateFeeAmount: 0,
+						totalAmount: amount,
+						paidAmount: parseFloat(fine.paidAmount.toString()),
+						balanceDue: parseFloat(fine.balanceDue.toString()),
+						status: fine.balanceDue.equals(0) ? 'PAID' : 'PENDING',
+						description: `Violation Fine #${fine.fineNumber} - ${fine.reason || 'Violation fine'}`
+					}
+				});
+
+				// Update the fine with the charge reference
+				await prisma.violationFine.update({
+					where: { id: input.fineId },
+					data: {
+						assessmentChargeId: charge.id,
+						glPosted: true
+					}
+				});
+
+				return { charge, fine };
+			};
+
+			const result = input.idempotencyKey
+				? (await withIdempotency(input.idempotencyKey, context, createCharge)).result
+				: await createCharge();
+
+			return successResponse(
+				{
+					charge: {
+						id: result.charge.id,
+						amount: result.charge.amount.toString(),
+						dueDate: result.charge.dueDate.toISOString()
+					},
+					fine: {
+						id: input.fineId,
+						assessmentChargeId: result.charge.id
+					}
+				},
+				context
+			);
 		})
 };

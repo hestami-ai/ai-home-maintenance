@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "dashboard_widget"
+  rules:
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      roles:
+        - admin
+        - manager
+        - staff
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - board_member
+        - owner

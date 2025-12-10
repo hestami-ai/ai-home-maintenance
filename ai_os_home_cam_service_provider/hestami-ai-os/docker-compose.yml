@@ -157,7 +157,8 @@ services:
     env_file:
       - ./.env
     ports:
-      - "3000:3000"
+      - "3000:3000" #SvelteKit Hestami AI OS App
+      - "3001:3001" #DBOS Admin -- https://docs.dbos.dev/production/self-hosting/admin-api
     deploy:
       resources:
         limits:
