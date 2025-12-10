@@ -11,6 +11,164 @@ generator client {
   previewFeatures = ["postgresqlExtensions"]
 }
 
+/// @description Technician employed/contracted by a service provider org
+model Technician {
+  id              String           @id @default(cuid())
+  organizationId  String           @map("organization_id")
+
+  // Identity
+  firstName       String           @map("first_name")
+  lastName        String           @map("last_name")
+  email           String?          @db.Citext
+  phone           String?
+  employeeId      String?          @map("employee_id")
+
+  // Status & employment
+  isActive        Boolean          @default(true) @map("is_active")
+  hireDate        DateTime?        @map("hire_date")
+  terminationDate DateTime?        @map("termination_date")
+  timezone        String           @default("America/New_York")
+
+  // Location/branch
+  branchId        String?          @map("branch_id")
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch          ContractorBranch @relation(fields: [branchId], references: [id])
+  skills          TechnicianSkill[]
+  certifications  TechnicianCertification[]
+  availability    TechnicianAvailability?
+  timeOff         TechnicianTimeOff[]
+  territories     TechnicianTerritory[]
+  kpis            TechnicianKPI[]
+
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([isActive])
+  @@map("technicians")
+}
+
+/// @description Technician skill tagging
+model TechnicianSkill {
+  id            String      @id @default(cuid())
+  technicianId  String      @map("technician_id")
+  trade         ContractorTradeType @map("trade")
+  level         Int         @default(1) // 1-5 proficiency
+  notes         String?     @db.Text
+
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  technician    Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, trade])
+  @@index([technicianId])
+  @@map("technician_skills")
+}
+
+/// @description Technician certifications (licenses, safety cards)
+model TechnicianCertification {
+  id             String      @id @default(cuid())
+  technicianId   String      @map("technician_id")
+  name           String
+  authority      String?
+  certificationId String?    @map("certification_id")
+  issuedAt       DateTime?   @map("issued_at")
+  expiresAt      DateTime?   @map("expires_at")
+  documentUrl    String?     @map("document_url")
+
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  technician     Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([technicianId])
+  @@index([expiresAt])
+  @@map("technician_certifications")
+}
+
+/// @description Technician recurring weekly availability by weekday
+model TechnicianAvailability {
+  id             String     @id @default(cuid())
+  technicianId   String     @unique @map("technician_id")
+  monday         Json?
+  tuesday        Json?
+  wednesday      Json?
+  thursday       Json?
+  friday         Json?
+  saturday       Json?
+  sunday         Json?
+
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  technician     Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@map("technician_availability")
+}
+
+/// @description Technician time off / PTO
+model TechnicianTimeOff {
+  id             String     @id @default(cuid())
+  technicianId   String     @map("technician_id")
+  startsAt       DateTime   @map("starts_at")
+  endsAt         DateTime   @map("ends_at")
+  reason         String?    @db.Text
+
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  technician     Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([technicianId])
+  @@index([startsAt])
+  @@index([endsAt])
+  @@map("technician_time_off")
+}
+
+/// @description Technician territory assignment (links to service areas)
+model TechnicianTerritory {
+  id               String      @id @default(cuid())
+  technicianId     String      @map("technician_id")
+  serviceAreaId    String      @map("service_area_id")
+  isPrimary        Boolean     @default(false) @map("is_primary")
+
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  technician       Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  serviceArea      ServiceArea @relation(fields: [serviceAreaId], references: [id], onDelete: Cascade)
+
+  @@unique([technicianId, serviceAreaId])
+  @@index([technicianId])
+  @@index([serviceAreaId])
+  @@map("technician_territories")
+}
+
+/// @description Technician KPI snapshot (periodic)
+model TechnicianKPI {
+  id              String     @id @default(cuid())
+  technicianId    String     @map("technician_id")
+  periodStart     DateTime   @map("period_start")
+  periodEnd       DateTime   @map("period_end")
+  jobsCompleted   Int        @default(0) @map("jobs_completed")
+  onTimeRate      Float      @default(0) @map("on_time_rate")
+  callbackRate    Float      @default(0) @map("callback_rate")
+  revenue         Decimal    @default(0) @map("revenue") @db.Decimal(12, 2)
+  laborHours      Float      @default(0) @map("labor_hours")
+
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  technician      Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([technicianId])
+  @@index([periodStart, periodEnd])
+  @@map("technician_kpis")
+}
 generator zod {
   provider                         = "zod-prisma-types"
   output                           = "../generated/zod"
@@ -48,6 +206,7 @@ enum OrganizationType {
   COMMUNITY_ASSOCIATION
   MANAGEMENT_COMPANY
   SERVICE_PROVIDER
+  EXTERNAL_SERVICE_PROVIDER  // Phase 2: External (non-platform) service providers
   INDIVIDUAL_CONCIERGE
   COMMERCIAL_CLIENT
 }
@@ -192,6 +351,163 @@ enum HearingOutcome {
   MODIFIED        // Fine/penalty modified
   DISMISSED       // Violation dismissed
   CONTINUED       // Hearing continued
+}
+
+enum AppealStatus {
+  PENDING         // Appeal filed, awaiting review
+  SCHEDULED       // Appeal hearing scheduled
+  UPHELD          // Original decision upheld
+  MODIFIED        // Fine/penalty modified on appeal
+  REVERSED        // Original decision reversed
+  WITHDRAWN       // Appeal withdrawn by filer
+}
+
+// -----------------------------------------------------------------------------
+// Phase 14: Cross-Tenant Features
+// -----------------------------------------------------------------------------
+
+enum ServiceProviderLinkStatus {
+  PENDING         // Link requested, awaiting verification
+  VERIFIED        // Link verified and active
+  REJECTED        // Link request rejected
+  REVOKED         // Link was active but has been revoked
+}
+
+// -----------------------------------------------------------------------------
+// Phase 2: Contractor Operations
+// -----------------------------------------------------------------------------
+
+enum VendorApprovalStatus {
+  PENDING         // Awaiting approval
+  APPROVED        // Approved for work
+  CONDITIONAL     // Approved with conditions
+  SUSPENDED       // Temporarily suspended
+  REJECTED        // Rejected
+}
+
+enum ContractorTradeType {
+  PLUMBING
+  ELECTRICAL
+  HVAC
+  ROOFING
+  LANDSCAPING
+  PAINTING
+  FLOORING
+  CARPENTRY
+  MASONRY
+  GENERAL_CONTRACTOR
+  POOL_SPA
+  PEST_CONTROL
+  CLEANING
+  SECURITY
+  FIRE_SAFETY
+  ELEVATOR
+  APPLIANCE_REPAIR
+  LOCKSMITH
+  GLASS_WINDOW
+  FENCING
+  CONCRETE
+  DEMOLITION
+  EXCAVATION
+  WATERPROOFING
+  INSULATION
+  DRYWALL
+  SIDING
+  GUTTERS
+  GARAGE_DOOR
+  OTHER
+}
+
+enum LicenseStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  REVOKED
+  PENDING_RENEWAL
+}
+
+enum InsuranceType {
+  GENERAL_LIABILITY
+  WORKERS_COMPENSATION
+  PROFESSIONAL_LIABILITY
+  AUTO_LIABILITY
+  UMBRELLA
+  BONDING
+}
+
+enum InsuranceStatus {
+  ACTIVE
+  EXPIRED
+  PENDING_VERIFICATION
+  CANCELLED
+}
+
+enum IndividualRequestStatus {
+  SUBMITTED       // Request submitted by homeowner
+  REVIEWING       // Being reviewed/quoted
+  APPROVED        // Approved by homeowner
+  SCHEDULED       // Work scheduled
+  IN_PROGRESS     // Work in progress
+  COMPLETED       // Work completed
+  CANCELLED       // Request cancelled
+}
+
+// -----------------------------------------------------------------------------
+// Phase 15: Reporting & Analytics
+// -----------------------------------------------------------------------------
+
+enum ReportCategory {
+  FINANCIAL       // Balance sheet, income statement, etc.
+  RECEIVABLES     // Aged receivables, delinquency
+  PAYABLES        // AP aging, vendor payments
+  OPERATIONAL     // Work orders, violations, ARC
+  COMPLIANCE      // Compliance status, deadlines
+  GOVERNANCE      // Board reports, meeting summaries
+  CUSTOM          // User-defined reports
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+  JSON
+  HTML
+}
+
+enum ScheduleFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  CUSTOM          // Uses cronExpression
+}
+
+enum ReportDeliveryMethod {
+  EMAIL
+  PORTAL          // Available in portal for download
+  BOTH
+}
+
+enum ReportExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WidgetType {
+  CHART_BAR
+  CHART_LINE
+  CHART_PIE
+  CHART_DONUT
+  METRIC_CARD     // Single value with trend
+  TABLE           // Data table
+  LIST            // Simple list
+  CALENDAR        // Calendar view
+  MAP             // Geographic map
 }
 
 // -----------------------------------------------------------------------------
@@ -367,6 +683,11 @@ model Organization {
   status      OrganizationStatus @default(ACTIVE)
   settings    Json               @default("{}")
   
+  // Phase 2: External service provider contact info (for EXTERNAL_SERVICE_PROVIDER type)
+  externalContactName   String?   @map("external_contact_name")
+  externalContactEmail  String?   @map("external_contact_email") @db.Citext
+  externalContactPhone  String?   @map("external_contact_phone")
+  
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @updatedAt @map("updated_at")
   deletedAt   DateTime?          @map("deleted_at")
@@ -380,6 +701,16 @@ model Organization {
 
   // Phase 12: Compliance
   complianceRequirements ComplianceRequirement[]
+
+  // Phase 14: Cross-Tenant Features
+  serviceAreas            ServiceArea[]                   @relation("ServiceProviderAreas")
+  serviceProviderLinks    ServiceProviderLink[]           @relation("ServiceProviderLinks")
+  individualProperties    IndividualProperty[]            @relation("IndividualProperties")
+  vendorMaintenanceRequests IndividualMaintenanceRequest[] @relation("VendorMaintenanceRequests")
+
+  // Phase 2: Contractor Operations
+  contractorProfile       ContractorProfile?
+  contractorBranches      ContractorBranch[]
 
   @@map("organizations")
 }
@@ -799,6 +1130,15 @@ model Association {
 
   // Phase 12: Compliance
   complianceDeadlines ComplianceDeadline[]
+
+  // Phase 5: Notice Templates
+  noticeTemplates     NoticeTemplate[]
+
+  // Phase 15: Reporting
+  reportDefinitions   ReportDefinition[]
+  reportSchedules     ReportSchedule[]
+  reportExecutions    ReportExecution[]
+  dashboardWidgets    DashboardWidget[]
 
   @@index([organizationId])
   @@map("associations")
@@ -2176,6 +2516,16 @@ model Vendor {
   // Link to service provider organization (if on platform)
   serviceProviderOrgId String? @map("service_provider_org_id")
   
+  // Phase 2: Compliance fields
+  approvalStatus        VendorApprovalStatus @default(PENDING) @map("approval_status")
+  approvedAt            DateTime?   @map("approved_at")
+  approvedBy            String?     @map("approved_by")
+  insuranceVerified     Boolean     @default(false) @map("insurance_verified")
+  insuranceExpiresAt    DateTime?   @map("insurance_expires_at")
+  licenseVerified       Boolean     @default(false) @map("license_verified")
+  licenseExpiresAt      DateTime?   @map("license_expires_at")
+  complianceNotes       String?     @map("compliance_notes") @db.Text
+  
   // Status
   isActive        Boolean   @default(true) @map("is_active")
   
@@ -2191,8 +2541,12 @@ model Vendor {
   workOrders      WorkOrder[]
   bids            WorkOrderBid[]
 
+  // Phase 14: Service Provider Links
+  serviceProviderLinks ServiceProviderLink[]
+
   @@index([associationId])
   @@index([email])
+  @@index([approvalStatus])
   @@map("vendors")
 }
 
@@ -2647,6 +3001,121 @@ model WorkOrderBid {
 // PHASE 5: VIOLATIONS
 // =============================================================================
 
+/// @description Notice template for violation notices
+model NoticeTemplate {
+  id              String      @id @default(cuid())
+  associationId   String      @map("association_id")
+  
+  // Template details
+  name            String
+  noticeType      NoticeType  @map("notice_type")
+  subject         String
+  bodyTemplate    String      @map("body_template") @db.Text // Supports {{variable}} placeholders
+  
+  // Settings
+  defaultCurePeriodDays Int?  @map("default_cure_period_days")
+  isActive        Boolean     @default(true) @map("is_active")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  sequenceSteps   NoticeSequenceStep[]
+
+  @@unique([associationId, name])
+  @@index([associationId])
+  @@index([noticeType])
+  @@map("notice_templates")
+}
+
+/// @description Notice sequence configuration per violation type
+model NoticeSequenceConfig {
+  id              String      @id @default(cuid())
+  violationTypeId String      @map("violation_type_id")
+  
+  // Sequence details
+  name            String      // e.g., "Standard Escalation"
+  description     String?
+  isDefault       Boolean     @default(false) @map("is_default")
+  isActive        Boolean     @default(true) @map("is_active")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  violationType   ViolationType @relation(fields: [violationTypeId], references: [id], onDelete: Cascade)
+  steps           NoticeSequenceStep[]
+
+  @@index([violationTypeId])
+  @@map("notice_sequence_configs")
+}
+
+/// @description Steps in a notice sequence
+model NoticeSequenceStep {
+  id              String      @id @default(cuid())
+  sequenceId      String      @map("sequence_id")
+  templateId      String      @map("template_id")
+  
+  // Step configuration
+  stepOrder       Int         @map("step_order")
+  daysAfterPrevious Int       @default(0) @map("days_after_previous") // Days to wait after previous step
+  requiresCure    Boolean     @default(true) @map("requires_cure") // If true, skip if cured
+  autoSend        Boolean     @default(false) @map("auto_send") // If true, send automatically
+  
+  // Fine escalation
+  assessFine      Boolean     @default(false) @map("assess_fine")
+  fineAmount      Decimal?    @db.Decimal(10, 2) @map("fine_amount")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  sequence        NoticeSequenceConfig @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  template        NoticeTemplate @relation(fields: [templateId], references: [id])
+
+  @@unique([sequenceId, stepOrder])
+  @@index([sequenceId])
+  @@map("notice_sequence_steps")
+}
+
+/// @description Appeal filed against a hearing decision
+model ViolationAppeal {
+  id              String      @id @default(cuid())
+  hearingId       String      @map("hearing_id")
+  
+  // Appeal details
+  filedDate       DateTime    @map("filed_date")
+  filedBy         String      @map("filed_by") // Party ID
+  reason          String      @db.Text
+  
+  // Supporting documents
+  documentsJson   String?     @map("documents_json") @db.Text // JSON array of document URLs
+  
+  // Appeal hearing
+  appealHearingDate DateTime? @map("appeal_hearing_date")
+  appealHearingLocation String? @map("appeal_hearing_location")
+  
+  // Outcome
+  status          AppealStatus @default(PENDING)
+  decisionDate    DateTime?   @map("decision_date")
+  decisionBy      String?     @map("decision_by")
+  decisionNotes   String?     @map("decision_notes") @db.Text
+  
+  // If fine modified
+  originalFineAmount Decimal? @db.Decimal(10, 2) @map("original_fine_amount")
+  revisedFineAmount  Decimal? @db.Decimal(10, 2) @map("revised_fine_amount")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  hearing         ViolationHearing @relation(fields: [hearingId], references: [id], onDelete: Cascade)
+
+  @@index([hearingId])
+  @@index([status])
+  @@map("violation_appeals")
+}
+
 /// @description Violation type configuration per association
 model ViolationType {
   id              String      @id @default(cuid())
@@ -2684,6 +3153,7 @@ model ViolationType {
   // Relations
   association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   violations      Violation[]
+  noticeSequences NoticeSequenceConfig[]
 
   @@unique([associationId, code])
   @@index([associationId])
@@ -2875,6 +3345,7 @@ model ViolationHearing {
 
   // Relations
   violation       Violation   @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  appeals         ViolationAppeal[]
 
   @@index([violationId])
   @@index([hearingDate])
@@ -3540,4 +4011,571 @@ model CalendarEventNotification {
   @@index([eventId])
   @@index([status])
   @@map("calendar_event_notifications")
+}
+
+// =============================================================================
+// PHASE 14: CROSS-TENANT FEATURES
+// =============================================================================
+
+/// @description Service area coverage for service providers
+model ServiceArea {
+  id                  String      @id @default(cuid())
+  serviceProviderOrgId String     @map("service_provider_org_id")
+  
+  // Geographic coverage
+  name                String      // e.g., "Greater Denver Metro"
+  zipCodes            String[]    @map("zip_codes") // Array of covered zip codes
+  radius              Int?        // Radius in miles from center point
+  centerLat           Float?      @map("center_lat")
+  centerLng           Float?      @map("center_lng")
+  
+  // Service categories offered in this area
+  serviceCategories   String[]    @map("service_categories") // e.g., ["PLUMBING", "HVAC", "ELECTRICAL"]
+  
+  isActive            Boolean     @default(true) @map("is_active")
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  serviceProviderOrg  Organization @relation("ServiceProviderAreas", fields: [serviceProviderOrgId], references: [id], onDelete: Cascade)
+
+  @@index([serviceProviderOrgId])
+  @@map("service_areas")
+}
+
+/// @description Links service provider org to vendor records across associations
+model ServiceProviderLink {
+  id                  String      @id @default(cuid())
+  serviceProviderOrgId String     @map("service_provider_org_id")
+  vendorId            String      @map("vendor_id")
+  
+  // Link status
+  status              ServiceProviderLinkStatus @default(PENDING)
+  linkedAt            DateTime?   @map("linked_at")
+  linkedBy            String?     @map("linked_by") // User who approved the link
+  
+  // Verification
+  verificationCode    String?     @map("verification_code")
+  verificationExpires DateTime?   @map("verification_expires")
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  serviceProviderOrg  Organization @relation("ServiceProviderLinks", fields: [serviceProviderOrgId], references: [id], onDelete: Cascade)
+  vendor              Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceProviderOrgId, vendorId])
+  @@index([serviceProviderOrgId])
+  @@index([vendorId])
+  @@map("service_provider_links")
+}
+
+/// @description Individual homeowner property (non-HOA)
+model IndividualProperty {
+  id                  String      @id @default(cuid())
+  ownerOrgId          String      @map("owner_org_id") // INDIVIDUAL_CONCIERGE org
+  
+  // Property details
+  name                String      // e.g., "Main Residence", "Vacation Home"
+  propertyType        PropertyType @map("property_type")
+  
+  // Address
+  addressLine1        String      @map("address_line_1")
+  addressLine2        String?     @map("address_line_2")
+  city                String
+  state               String
+  postalCode          String      @map("postal_code")
+  country             String      @default("US")
+  
+  // Property info
+  yearBuilt           Int?        @map("year_built")
+  squareFeet          Int?        @map("square_feet")
+  lotSquareFeet       Int?        @map("lot_square_feet")
+  bedrooms            Int?
+  bathrooms           Float?
+  
+  // Status
+  isActive            Boolean     @default(true) @map("is_active")
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  ownerOrg            Organization @relation("IndividualProperties", fields: [ownerOrgId], references: [id], onDelete: Cascade)
+  maintenanceRequests IndividualMaintenanceRequest[]
+  assets              IndividualAsset[]
+
+  @@index([ownerOrgId])
+  @@map("individual_properties")
+}
+
+/// @description Assets for individual properties
+model IndividualAsset {
+  id                  String      @id @default(cuid())
+  propertyId          String      @map("property_id")
+  
+  // Asset details
+  name                String
+  category            String      // e.g., "HVAC", "Appliance", "Roof"
+  manufacturer        String?
+  model               String?
+  serialNumber        String?     @map("serial_number")
+  
+  // Dates
+  installDate         DateTime?   @map("install_date")
+  warrantyExpires     DateTime?   @map("warranty_expires")
+  lastServiceDate     DateTime?   @map("last_service_date")
+  
+  // Status
+  condition           String?     // e.g., "Good", "Fair", "Needs Attention"
+  notes               String?     @db.Text
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  property            IndividualProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@map("individual_assets")
+}
+
+/// @description Maintenance requests for individual homeowners
+model IndividualMaintenanceRequest {
+  id                  String      @id @default(cuid())
+  propertyId          String      @map("property_id")
+  
+  // Request details
+  requestNumber       String      @map("request_number")
+  title               String
+  description         String      @db.Text
+  category            String      // e.g., "PLUMBING", "HVAC", "ELECTRICAL"
+  priority            String      @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  
+  // Status
+  status              IndividualRequestStatus @default(SUBMITTED)
+  
+  // Scheduling
+  preferredDate       DateTime?   @map("preferred_date")
+  scheduledDate       DateTime?   @map("scheduled_date")
+  completedDate       DateTime?   @map("completed_date")
+  
+  // Vendor assignment
+  assignedVendorOrgId String?     @map("assigned_vendor_org_id")
+  
+  // Cost tracking
+  estimatedCost       Decimal?    @db.Decimal(10, 2) @map("estimated_cost")
+  actualCost          Decimal?    @db.Decimal(10, 2) @map("actual_cost")
+  
+  // Notes
+  notes               String?     @db.Text
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  property            IndividualProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  assignedVendorOrg   Organization?      @relation("VendorMaintenanceRequests", fields: [assignedVendorOrgId], references: [id])
+
+  @@unique([propertyId, requestNumber])
+  @@index([propertyId])
+  @@index([status])
+  @@index([assignedVendorOrgId])
+  @@map("individual_maintenance_requests")
+}
+
+// =============================================================================
+// PHASE 15: REPORTING & ANALYTICS
+// =============================================================================
+
+/// @description Report definition/template
+model ReportDefinition {
+  id              String      @id @default(cuid())
+  associationId   String?     @map("association_id") // Null for system-wide reports
+  
+  // Report identification
+  code            String      // e.g., "BALANCE_SHEET", "AGED_RECEIVABLES"
+  name            String
+  description     String?
+  category        ReportCategory
+  
+  // Report configuration
+  queryTemplate   String      @map("query_template") @db.Text // SQL or query builder JSON
+  parametersJson  String?     @map("parameters_json") @db.Text // JSON schema for parameters
+  columnsJson     String?     @map("columns_json") @db.Text // Column definitions
+  
+  // Output options
+  defaultFormat   ReportFormat @default(PDF) @map("default_format")
+  allowedFormats  ReportFormat[] @map("allowed_formats")
+  
+  // Access control
+  isSystemReport  Boolean     @default(false) @map("is_system_report")
+  isActive        Boolean     @default(true) @map("is_active")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  association     Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  executions      ReportExecution[]
+  schedules       ReportSchedule[]
+
+  @@unique([associationId, code])
+  @@index([associationId])
+  @@index([category])
+  @@map("report_definitions")
+}
+
+/// @description Scheduled report execution
+model ReportSchedule {
+  id              String      @id @default(cuid())
+  reportId        String      @map("report_id")
+  associationId   String      @map("association_id")
+  
+  // Schedule configuration
+  name            String
+  frequency       ScheduleFrequency
+  cronExpression  String?     @map("cron_expression") // For custom schedules
+  
+  // Parameters for this schedule
+  parametersJson  String?     @map("parameters_json") @db.Text
+  
+  // Output configuration
+  format          ReportFormat @default(PDF)
+  
+  // Delivery
+  deliveryMethod  ReportDeliveryMethod @default(EMAIL) @map("delivery_method")
+  recipientsJson  String?     @map("recipients_json") @db.Text // JSON array of email addresses
+  
+  // Status
+  isActive        Boolean     @default(true) @map("is_active")
+  lastRunAt       DateTime?   @map("last_run_at")
+  nextRunAt       DateTime?   @map("next_run_at")
+  
+  createdBy       String      @map("created_by")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  report          ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  executions      ReportExecution[]
+
+  @@index([reportId])
+  @@index([associationId])
+  @@index([nextRunAt])
+  @@map("report_schedules")
+}
+
+/// @description Report execution history
+model ReportExecution {
+  id              String      @id @default(cuid())
+  reportId        String      @map("report_id")
+  scheduleId      String?     @map("schedule_id") // Null if ad-hoc
+  associationId   String      @map("association_id")
+  
+  // Execution details
+  status          ReportExecutionStatus @default(PENDING)
+  parametersJson  String?     @map("parameters_json") @db.Text
+  format          ReportFormat
+  
+  // Timing
+  startedAt       DateTime?   @map("started_at")
+  completedAt     DateTime?   @map("completed_at")
+  
+  // Output
+  outputUrl       String?     @map("output_url") // S3/storage URL
+  outputSize      Int?        @map("output_size") // Bytes
+  rowCount        Int?        @map("row_count")
+  
+  // Error handling
+  errorMessage    String?     @map("error_message") @db.Text
+  
+  // Who ran it
+  executedBy      String?     @map("executed_by") // Null for scheduled
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  report          ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  schedule        ReportSchedule?  @relation(fields: [scheduleId], references: [id])
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([scheduleId])
+  @@index([associationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("report_executions")
+}
+
+/// @description Dashboard widget configuration
+model DashboardWidget {
+  id              String      @id @default(cuid())
+  associationId   String      @map("association_id")
+  userId          String?     @map("user_id") // Null for association-wide
+  
+  // Widget configuration
+  widgetType      WidgetType  @map("widget_type")
+  title           String
+  configJson      String?     @map("config_json") @db.Text // Widget-specific config
+  
+  // Layout
+  position        Int         @default(0) // Order in dashboard
+  width           Int         @default(1) // Grid units
+  height          Int         @default(1)
+  
+  isActive        Boolean     @default(true) @map("is_active")
+  
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  @@index([associationId])
+  @@index([userId])
+  @@map("dashboard_widgets")
+}
+
+// =============================================================================
+// PHASE 2: CONTRACTOR OPERATIONS
+// =============================================================================
+
+/// @description Contractor profile for SERVICE_PROVIDER organizations
+model ContractorProfile {
+  id                  String      @id @default(cuid())
+  organizationId      String      @unique @map("organization_id")
+  
+  // Business info
+  legalName           String      @map("legal_name")
+  dba                 String?     // Doing business as
+  taxId               String?     @map("tax_id") // EIN (encrypted)
+  
+  // Contact
+  primaryContactName  String?     @map("primary_contact_name")
+  primaryContactEmail String?     @map("primary_contact_email") @db.Citext
+  primaryContactPhone String?     @map("primary_contact_phone")
+  
+  // Address (headquarters)
+  addressLine1        String?     @map("address_line_1")
+  addressLine2        String?     @map("address_line_2")
+  city                String?
+  state               String?
+  postalCode          String?     @map("postal_code")
+  country             String      @default("US")
+  
+  // Operating hours (JSON: { "monday": { "open": "08:00", "close": "17:00" }, ... })
+  operatingHoursJson  String?     @map("operating_hours_json") @db.Text
+  timezone            String      @default("America/New_York")
+  
+  // Capabilities
+  maxTechnicians      Int?        @map("max_technicians")
+  maxServiceRadius    Int?        @map("max_service_radius") // Miles
+  
+  // Compliance summary (computed/cached)
+  complianceScore     Int?        @map("compliance_score") // 0-100
+  lastComplianceCheck DateTime?   @map("last_compliance_check")
+  
+  // Status
+  isActive            Boolean     @default(true) @map("is_active")
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  trades              ContractorTrade[]
+  licenses            ContractorLicense[]
+  insurances          ContractorInsurance[]
+
+  @@index([organizationId])
+  @@map("contractor_profiles")
+}
+
+/// @description Branch office for a contractor organization
+model ContractorBranch {
+  id                  String      @id @default(cuid())
+  organizationId      String      @map("organization_id")
+  
+  // Branch info
+  name                String      // e.g., "North Region Office"
+  code                String?     // Internal branch code
+  
+  // Contact
+  contactName         String?     @map("contact_name")
+  contactEmail        String?     @map("contact_email") @db.Citext
+  contactPhone        String?     @map("contact_phone")
+  
+  // Address
+  addressLine1        String      @map("address_line_1")
+  addressLine2        String?     @map("address_line_2")
+  city                String
+  state               String
+  postalCode          String      @map("postal_code")
+  country             String      @default("US")
+  
+  // Operating hours (JSON)
+  operatingHoursJson  String?     @map("operating_hours_json") @db.Text
+  timezone            String      @default("America/New_York")
+  
+  // Service area (can override org-level)
+  serviceRadiusMiles  Int?        @map("service_radius_miles")
+  
+  // Status
+  isActive            Boolean     @default(true) @map("is_active")
+  isPrimary           Boolean     @default(false) @map("is_primary")
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@map("contractor_branches")
+}
+
+/// @description Trade/service category a contractor is qualified for
+model ContractorTrade {
+  id                  String      @id @default(cuid())
+  contractorProfileId String      @map("contractor_profile_id")
+  
+  tradeType           ContractorTradeType @map("trade_type")
+  isPrimary           Boolean     @default(false) @map("is_primary")
+  yearsExperience     Int?        @map("years_experience")
+  notes               String?     @db.Text
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  contractorProfile   ContractorProfile @relation(fields: [contractorProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([contractorProfileId, tradeType])
+  @@index([contractorProfileId])
+  @@index([tradeType])
+  @@map("contractor_trades")
+}
+
+/// @description Contractor license record
+model ContractorLicense {
+  id                  String      @id @default(cuid())
+  contractorProfileId String      @map("contractor_profile_id")
+  
+  // License details
+  licenseType         String      @map("license_type") // e.g., "General Contractor", "Electrician"
+  licenseNumber       String      @map("license_number")
+  issuingAuthority    String      @map("issuing_authority") // e.g., "State of California"
+  issuingState        String?     @map("issuing_state")
+  
+  // Dates
+  issueDate           DateTime?   @map("issue_date")
+  expirationDate      DateTime?   @map("expiration_date")
+  
+  // Status
+  status              LicenseStatus @default(ACTIVE)
+  verifiedAt          DateTime?   @map("verified_at")
+  verifiedBy          String?     @map("verified_by")
+  
+  // Document reference
+  documentUrl         String?     @map("document_url")
+  
+  notes               String?     @db.Text
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  contractorProfile   ContractorProfile @relation(fields: [contractorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([contractorProfileId])
+  @@index([expirationDate])
+  @@index([status])
+  @@map("contractor_licenses")
+}
+
+/// @description Contractor insurance policy record
+model ContractorInsurance {
+  id                  String      @id @default(cuid())
+  contractorProfileId String      @map("contractor_profile_id")
+  
+  // Insurance details
+  insuranceType       InsuranceType @map("insurance_type")
+  policyNumber        String      @map("policy_number")
+  carrier             String      // Insurance company name
+  
+  // Coverage
+  coverageAmount      Decimal     @map("coverage_amount") @db.Decimal(12, 2)
+  deductible          Decimal?    @db.Decimal(10, 2)
+  
+  // Dates
+  effectiveDate       DateTime    @map("effective_date")
+  expirationDate      DateTime    @map("expiration_date")
+  
+  // Status
+  status              InsuranceStatus @default(ACTIVE)
+  verifiedAt          DateTime?   @map("verified_at")
+  verifiedBy          String?     @map("verified_by")
+  
+  // Certificate of Insurance
+  coiDocumentUrl      String?     @map("coi_document_url")
+  
+  // Additional insured (HOAs may require this)
+  additionalInsuredJson String?   @map("additional_insured_json") @db.Text
+  
+  notes               String?     @db.Text
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  contractorProfile   ContractorProfile @relation(fields: [contractorProfileId], references: [id], onDelete: Cascade)
+
+  @@index([contractorProfileId])
+  @@index([expirationDate])
+  @@index([status])
+  @@map("contractor_insurances")
+}
+
+/// @description Contractor compliance status (computed/cached per association)
+model ContractorComplianceStatus {
+  id                  String      @id @default(cuid())
+  vendorId            String      @map("vendor_id") // Links to Vendor (association-specific view)
+  
+  // Overall compliance
+  isCompliant         Boolean     @default(false) @map("is_compliant")
+  complianceScore     Int         @default(0) @map("compliance_score") // 0-100
+  
+  // Individual checks
+  hasValidLicense     Boolean     @default(false) @map("has_valid_license")
+  hasValidInsurance   Boolean     @default(false) @map("has_valid_insurance")
+  hasW9OnFile         Boolean     @default(false) @map("has_w9_on_file")
+  meetsMinCoverage    Boolean     @default(false) @map("meets_min_coverage")
+  
+  // Expiration tracking
+  earliestLicenseExpiry   DateTime? @map("earliest_license_expiry")
+  earliestInsuranceExpiry DateTime? @map("earliest_insurance_expiry")
+  
+  // Blocking
+  isBlocked           Boolean     @default(false) @map("is_blocked")
+  blockReason         String?     @map("block_reason") @db.Text
+  blockedAt           DateTime?   @map("blocked_at")
+  blockedBy           String?     @map("blocked_by")
+  
+  // Last check
+  lastCheckedAt       DateTime    @default(now()) @map("last_checked_at")
+  
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  @@unique([vendorId])
+  @@index([isCompliant])
+  @@index([isBlocked])
+  @@index([earliestLicenseExpiry])
+  @@index([earliestInsuranceExpiry])
+  @@map("contractor_compliance_statuses")
 }

@@ -23,6 +23,15 @@ import {
 	workOrderRouter,
 	bidRouter
 } from './routes/workOrder/index.js';
+
+// Phase 5: Violations
+import {
+	violationRouter,
+	violationTypeRouter,
+	noticeTemplateRouter,
+	appealRouter
+} from './routes/violation/index.js';
+
 import { arcRequestRouter, arcReviewRouter } from './routes/arc/index.js';
 import {
 	governanceBoardRouter,
@@ -34,6 +43,21 @@ import { ownerPortalRouter } from './routes/ownerPortal.js';
 import { documentRouter } from './routes/document.js';
 import { reserveRouter } from './routes/reserve.js';
 import { complianceRouter } from './routes/compliance.js';
+import { contractorRouter } from './routes/contractor/index.js';
+
+// Phase 14: Cross-Tenant Features
+import {
+	serviceAreaRouter,
+	workOrderViewRouter
+} from './routes/serviceProvider/index.js';
+
+// Phase 15: Reporting & Analytics
+import {
+	reportDefinitionRouter,
+	reportExecutionRouter,
+	reportScheduleRouter,
+	dashboardRouter
+} from './routes/report/index.js';
 
 /**
  * Main API router combining all domain routers
@@ -69,6 +93,12 @@ export const appRouter = {
 	workOrder: workOrderRouter,
 	bid: bidRouter,
 
+	// Phase 5: Violations
+	violation: violationRouter,
+	violationType: violationTypeRouter,
+	noticeTemplate: noticeTemplateRouter,
+	violationAppeal: appealRouter,
+
 	// Phase 6: ARC
 	arcRequest: arcRequestRouter,
 	arcReview: arcReviewRouter,
@@ -91,7 +121,18 @@ export const appRouter = {
 	reserve: reserveRouter,
 
 	// Phase 12: Compliance
-	compliance: complianceRouter
+	compliance: complianceRouter,
+	contractor: contractorRouter,
+
+	// Phase 14: Cross-Tenant Features (Service Provider Portal)
+	serviceArea: serviceAreaRouter,
+	serviceProviderWorkOrders: workOrderViewRouter,
+
+	// Phase 15: Reporting & Analytics
+	reportDefinition: reportDefinitionRouter,
+	reportExecution: reportExecutionRouter,
+	reportSchedule: reportScheduleRouter,
+	dashboard: dashboardRouter
 };
 
 export type AppRouter = typeof appRouter;

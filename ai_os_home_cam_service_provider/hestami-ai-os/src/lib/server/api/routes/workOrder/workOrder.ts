@@ -1,8 +1,14 @@
 import { z } from 'zod';
 import { orgProcedure, successResponse } from '../../router.js';
+import { assertContractorComplianceForScheduling } from '../contractor/utils.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma, WorkOrderStatus } from '../../../../../../generated/prisma/client.js';
+import {
+	startWorkOrderTransition,
+	getWorkOrderTransitionStatus,
+	getWorkOrderTransitionError
+} from '../../../workflows/index.js';
 
 const workOrderStatusEnum = z.enum([
 	'DRAFT', 'SUBMITTED', 'TRIAGED', 'ASSIGNED', 'SCHEDULED',
@@ -611,6 +617,9 @@ export const workOrderRouter = {
 				throw ApiException.badRequest('Work order must have a vendor assigned before scheduling');
 			}
 
+			// Compliance gate: ensure the contractor has active license/insurance before scheduling
+			await assertContractorComplianceForScheduling(context.organization.id);
+
 			const previousStatus = wo.status;
 
 			const updated = await prisma.$transaction(async (tx) => {
@@ -1057,6 +1066,108 @@ export const workOrderRouter = {
 						id: result.workOrder.id,
 						status: result.workOrder.status
 					}
+				},
+				context
+			);
+		}),
+
+	// =========================================================================
+	// DBOS Workflow-based Endpoints
+	// =========================================================================
+
+	/**
+	 * Transition work order status using DBOS durable workflow
+	 * This provides crash-resilient status transitions with automatic recovery
+	 */
+	transitionStatus: orgProcedure
+		.input(
+			z.object({
+				workOrderId: z.string(),
+				toStatus: workOrderStatusEnum,
+				notes: z.string().max(1000).optional(),
+				// Optional data for specific transitions
+				vendorId: z.string().optional(),
+				scheduledStart: z.string().datetime().optional(),
+				scheduledEnd: z.string().datetime().optional(),
+				actualCost: z.number().min(0).optional(),
+				actualHours: z.number().min(0).optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					workflowId: z.string(),
+					message: z.string()
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
+
+			// Verify work order exists and belongs to org
+			const association = await prisma.association.findFirst({
+				where: { organizationId: context.organization!.id, deletedAt: null }
+			});
+
+			if (!association) {
+				throw ApiException.notFound('Association');
+			}
+
+			const wo = await prisma.workOrder.findFirst({
+				where: { id: input.workOrderId, associationId: association.id }
+			});
+
+			if (!wo) {
+				throw ApiException.notFound('Work Order');
+			}
+
+			// Start the durable workflow
+			const { workflowId } = await startWorkOrderTransition({
+				workOrderId: input.workOrderId,
+				toStatus: input.toStatus as WorkOrderStatus,
+				userId: context.user!.id,
+				notes: input.notes,
+				vendorId: input.vendorId,
+				scheduledStart: input.scheduledStart ? new Date(input.scheduledStart) : undefined,
+				scheduledEnd: input.scheduledEnd ? new Date(input.scheduledEnd) : undefined,
+				actualCost: input.actualCost,
+				actualHours: input.actualHours
+			});
+
+			return successResponse(
+				{
+					workflowId,
+					message: `Workflow started for transitioning work order to ${input.toStatus}`
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Get the status of a work order transition workflow
+	 */
+	getTransitionStatus: orgProcedure
+		.input(z.object({ workflowId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					status: z.any().nullable(),
+					error: z.any().nullable()
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const status = await getWorkOrderTransitionStatus(input.workflowId);
+			const error = await getWorkOrderTransitionError(input.workflowId);
+
+			return successResponse(
+				{
+					status,
+					error
 				},
 				context
 			);

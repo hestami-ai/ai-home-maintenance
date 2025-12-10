@@ -8,7 +8,8 @@ export async function initDBOS(): Promise<void> {
 
 	DBOS.setConfig({
 		name: 'hestami-ai-os',
-		systemDatabaseUrl: process.env.DBOS_SYSTEM_DATABASE_URL
+		systemDatabaseUrl: process.env.DBOS_SYSTEM_DATABASE_URL,
+		adminPort: 3001
 	});
 
 	await DBOS.launch();
