@@ -1438,12 +1438,18 @@ export const ownerPortalRouter = {
 				}
 			}
 
-			const documents = await prisma.associationDocument.findMany({
+			const documents = await prisma.document.findMany({
 				where: {
-					associationId: input.associationId,
+					organizationId: context.organization.id,
 					deletedAt: null,
 					visibility: { in: visibilityFilter as any },
-					...(input.category && { category: input.category })
+					...(input.category && { category: input.category }),
+					contextBindings: {
+						some: {
+							contextType: 'ASSOCIATION',
+							contextId: input.associationId
+						}
+					}
 				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
@@ -1455,7 +1461,7 @@ export const ownerPortalRouter = {
 
 			return successResponse(
 				{
-					documents: items.map((d) => ({
+					documents: items.map((d: { id: string; title: string; description: string | null; category: string; visibility: string; fileName: string; fileSize: number; mimeType: string; version: number; effectiveDate: Date | null; tags: string[]; createdAt: Date }) => ({
 						id: d.id,
 						title: d.title,
 						description: d.description ?? null,
@@ -1507,12 +1513,12 @@ export const ownerPortalRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.id, deletedAt: null },
-				include: { association: true, accessGrants: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
+				include: { accessGrants: true }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -1535,7 +1541,7 @@ export const ownerPortalRouter = {
 					}
 					if (document.visibility === 'PRIVATE') {
 						const grant = document.accessGrants.find(
-							(g) => g.partyId === input.partyId && !g.revokedAt && (!g.expiresAt || g.expiresAt > new Date())
+							(g: { partyId: string; revokedAt: Date | null; expiresAt: Date | null }) => g.partyId === input.partyId && !g.revokedAt && (!g.expiresAt || g.expiresAt > new Date())
 						);
 						canAccess = !!grant;
 					}
@@ -1584,12 +1590,11 @@ export const ownerPortalRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -1633,12 +1638,11 @@ export const ownerPortalRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('update', 'document', input.documentId);
 
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -1700,12 +1704,12 @@ export const ownerPortalRouter = {
 				where: {
 					documentId: input.documentId,
 					partyId: input.partyId,
-					revokedAt: null
-				},
-				include: { document: { include: { association: true } } }
+					revokedAt: null,
+					document: { organizationId: context.organization.id }
+				}
 			});
 
-			if (!grant || grant.document.association.organizationId !== context.organization.id) {
+			if (!grant) {
 				throw ApiException.notFound('DocumentAccessGrant');
 			}
 

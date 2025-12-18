@@ -1,7 +1,18 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 
-import type { User, Organization, UserRole } from '../generated/prisma/client';
+import type { Organization, UserRole } from '../generated/prisma/client';
+
+/** User type from Better Auth session */
+interface SessionUser {
+	id: string;
+	name: string;
+	email: string;
+	emailVerified: boolean;
+	image?: string | null;
+	createdAt: Date;
+	updatedAt: Date;
+}
 
 declare global {
 	namespace App {
@@ -11,7 +22,7 @@ declare global {
 		}
 
 		interface Locals {
-			user: User | null;
+			user: SessionUser | null;
 			session: { id: string; expiresAt: Date } | null;
 			organization: Organization | null;
 			role: UserRole | null;
@@ -22,7 +33,7 @@ declare global {
 		}
 
 		interface PageData {
-			user: User | null;
+			user: SessionUser | null;
 			organization: Organization | null;
 		}
 

@@ -4,6 +4,7 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
 
 const FINAL_STATUSES: ViolationStatus[] = ['CLOSED', 'DISMISSED'];
 
@@ -218,6 +219,22 @@ export const violationRouter = {
 				return violation;
 			});
 
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'VIOLATION',
+				entityId: violation.id,
+				action: 'CREATE',
+				summary: `Violation created: ${violation.title}`,
+				violationId: violation.id,
+				unitId: input.unitId,
+				newState: {
+					violationNumber: violation.violationNumber,
+					title: violation.title,
+					status: violation.status,
+					severity: violation.severity
+				}
+			});
+
 			return successResponse(
 				{
 					violation: {
@@ -383,7 +400,7 @@ export const violationRouter = {
 						violationNumber: z.string(),
 						violationTypeId: z.string(),
 						title: z.string(),
-						description: z.string(),
+						description: z.string().nullable(),
 						severity: z.string(),
 						status: z.string(),
 						unitId: z.string().nullable(),
@@ -1552,6 +1569,642 @@ export const violationRouter = {
 						changedAt: h.changedAt.toISOString(),
 						notes: h.notes
 					}))
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Get prior violations for same unit or same violation type
+	 */
+	getPriorViolations: orgProcedure
+		.input(
+			z.object({
+				violationId: z.string(),
+				unitId: z.string().optional(),
+				violationTypeId: z.string().optional(),
+				limit: z.number().int().min(1).max(20).default(5)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					unitViolations: z.array(
+						z.object({
+							id: z.string(),
+							violationNumber: z.string(),
+							title: z.string(),
+							status: z.string(),
+							severity: z.string(),
+							observedDate: z.string()
+						})
+					),
+					typeViolations: z.array(
+						z.object({
+							id: z.string(),
+							violationNumber: z.string(),
+							title: z.string(),
+							status: z.string(),
+							severity: z.string(),
+							observedDate: z.string()
+						})
+					)
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'violation', input.violationId);
+			const association = await getAssociationOrThrow(context.organization!.id);
+
+			const unitViolations = input.unitId
+				? await prisma.violation.findMany({
+						where: {
+							associationId: association.id,
+							unitId: input.unitId,
+							id: { not: input.violationId },
+							deletedAt: null
+						},
+						orderBy: { observedDate: 'desc' },
+						take: input.limit
+					})
+				: [];
+
+			const typeViolations = input.violationTypeId
+				? await prisma.violation.findMany({
+						where: {
+							associationId: association.id,
+							violationTypeId: input.violationTypeId,
+							id: { not: input.violationId },
+							deletedAt: null
+						},
+						orderBy: { observedDate: 'desc' },
+						take: input.limit
+					})
+				: [];
+
+			return successResponse(
+				{
+					unitViolations: unitViolations.map((v) => ({
+						id: v.id,
+						violationNumber: v.violationNumber,
+						title: v.title,
+						status: v.status,
+						severity: v.severity,
+						observedDate: v.observedDate.toISOString()
+					})),
+					typeViolations: typeViolations.map((v) => ({
+						id: v.id,
+						violationNumber: v.violationNumber,
+						title: v.title,
+						status: v.status,
+						severity: v.severity,
+						observedDate: v.observedDate.toISOString()
+					}))
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Escalate violation
+	 */
+	escalate: orgProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				reason: z.string().min(1).max(1000),
+				idempotencyKey: z.string().min(1)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					violation: z.object({
+						id: z.string(),
+						status: z.string(),
+						previousStatus: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.id);
+
+			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
+				const violation = await getViolationOrThrow(input.id, association.id);
+
+				assertStatusChangeAllowed(violation.status, 'ESCALATED');
+				const previousStatus = violation.status;
+
+				const updated = await prisma.$transaction(async (tx) => {
+					const v = await tx.violation.update({
+						where: { id: input.id },
+						data: { status: 'ESCALATED' }
+					});
+
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: input.id,
+							fromStatus: previousStatus,
+							toStatus: 'ESCALATED',
+							changedBy: context.user!.id,
+							notes: input.reason
+						}
+					});
+
+					return v;
+				});
+
+				return { updated, previousStatus };
+			});
+
+			// Record activity event
+			await recordStatusChange(
+				context,
+				'VIOLATION',
+				input.id,
+				result.previousStatus,
+				result.updated.status,
+				`Violation escalated: ${input.reason}`
+			);
+
+			return successResponse(
+				{
+					violation: {
+						id: result.updated.id,
+						status: result.updated.status,
+						previousStatus: result.previousStatus
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Mark violation as invalid/false positive
+	 */
+	markInvalid: orgProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				reason: z.string().min(1).max(1000),
+				idempotencyKey: z.string().min(1)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					violation: z.object({
+						id: z.string(),
+						status: z.string(),
+						previousStatus: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.id);
+
+			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
+				const violation = await getViolationOrThrow(input.id, association.id);
+
+				const previousStatus = violation.status;
+				const now = new Date();
+
+				const updated = await prisma.$transaction(async (tx) => {
+					const v = await tx.violation.update({
+						where: { id: input.id },
+						data: {
+							status: 'DISMISSED',
+							closedDate: now,
+							closedBy: context.user!.id,
+							resolutionNotes: `Marked as invalid: ${input.reason}`
+						}
+					});
+
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: input.id,
+							fromStatus: previousStatus,
+							toStatus: 'DISMISSED',
+							changedBy: context.user!.id,
+							notes: `Marked as invalid: ${input.reason}`
+						}
+					});
+
+					return v;
+				});
+
+				return { updated, previousStatus };
+			});
+
+			// Record activity event
+			await recordStatusChange(
+				context,
+				'VIOLATION',
+				input.id,
+				result.previousStatus,
+				result.updated.status,
+				`Violation marked as invalid: ${input.reason}`
+			);
+
+			return successResponse(
+				{
+					violation: {
+						id: result.updated.id,
+						status: result.updated.status,
+						previousStatus: result.previousStatus
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Resolve violation
+	 */
+	resolve: orgProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				notes: z.string().min(1).max(1000),
+				idempotencyKey: z.string().min(1)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					violation: z.object({
+						id: z.string(),
+						status: z.string(),
+						previousStatus: z.string(),
+						closedDate: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.id);
+
+			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
+				const violation = await getViolationOrThrow(input.id, association.id);
+
+				assertStatusChangeAllowed(violation.status, 'CLOSED');
+				const previousStatus = violation.status;
+				const now = new Date();
+
+				const updated = await prisma.$transaction(async (tx) => {
+					const v = await tx.violation.update({
+						where: { id: input.id },
+						data: {
+							status: 'CLOSED',
+							closedDate: now,
+							closedBy: context.user!.id,
+							resolutionNotes: input.notes
+						}
+					});
+
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: input.id,
+							fromStatus: previousStatus,
+							toStatus: 'CLOSED',
+							changedBy: context.user!.id,
+							notes: input.notes
+						}
+					});
+
+					return v;
+				});
+
+				return { updated, previousStatus };
+			});
+
+			// Record activity event
+			await recordStatusChange(
+				context,
+				'VIOLATION',
+				input.id,
+				result.previousStatus,
+				result.updated.status,
+				`Violation resolved: ${input.notes}`
+			);
+
+			return successResponse(
+				{
+					violation: {
+						id: result.updated.id,
+						status: result.updated.status,
+						previousStatus: result.previousStatus,
+						closedDate: result.updated.closedDate!.toISOString()
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * File an appeal for a violation
+	 */
+	fileAppeal: orgProcedure
+		.input(
+			z.object({
+				violationId: z.string(),
+				reason: z.string().min(1).max(5000),
+				requestBoardReview: z.boolean().default(false),
+				supportingInfo: z.string().max(2000).optional(),
+				idempotencyKey: z.string().min(1)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					appeal: z.object({
+						id: z.string(),
+						status: z.string(),
+						filedDate: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'violation', input.violationId);
+
+			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
+				const association = await getAssociationOrThrow(context.organization!.id);
+				const violation = await getViolationOrThrow(input.violationId, association.id);
+
+				// Check if there's already a pending appeal
+				const existingAppeal = await prisma.violationAppeal.findFirst({
+					where: {
+						hearing: { violationId: input.violationId },
+						status: 'PENDING'
+					}
+				});
+
+				if (existingAppeal) {
+					throw ApiException.conflict('An appeal is already pending for this violation');
+				}
+
+				// Get or create a hearing to attach the appeal to
+				let hearing = await prisma.violationHearing.findFirst({
+					where: { violationId: input.violationId },
+					orderBy: { hearingDate: 'desc' }
+				});
+
+				if (!hearing) {
+					// Create a placeholder hearing for the appeal
+					hearing = await prisma.violationHearing.create({
+						data: {
+							violationId: input.violationId,
+							hearingDate: new Date(),
+							outcome: 'PENDING',
+							outcomeNotes: 'Appeal filed - hearing pending'
+						}
+					});
+				}
+
+				const now = new Date();
+				const appeal = await prisma.violationAppeal.create({
+					data: {
+						hearingId: hearing.id,
+						filedDate: now,
+						filedBy: context.user!.id,
+						reason: input.reason,
+						status: 'PENDING',
+						documentsJson: input.supportingInfo ? JSON.stringify({ supportingInfo: input.supportingInfo, requestBoardReview: input.requestBoardReview }) : null
+					}
+				});
+
+				// Update violation status to APPEALED
+				const previousStatus = violation.status;
+				await prisma.$transaction(async (tx) => {
+					await tx.violation.update({
+						where: { id: input.violationId },
+						data: { status: 'APPEALED' }
+					});
+
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: input.violationId,
+							fromStatus: previousStatus,
+							toStatus: 'APPEALED',
+							changedBy: context.user!.id,
+							notes: `Appeal filed: ${input.reason.substring(0, 100)}...`
+						}
+					});
+				});
+
+				return appeal;
+			});
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'VIOLATION',
+				entityId: input.violationId,
+				action: 'SUBMIT',
+				summary: `Appeal filed for violation`,
+				violationId: input.violationId,
+				newState: { appealId: result.id, status: 'APPEALED' }
+			});
+
+			return successResponse(
+				{
+					appeal: {
+						id: result.id,
+						status: result.status,
+						filedDate: result.filedDate.toISOString()
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Get appeal details for a violation
+	 */
+	getAppeal: orgProcedure
+		.input(z.object({ violationId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					appeal: z
+						.object({
+							id: z.string(),
+							status: z.string(),
+							filedDate: z.string(),
+							filedBy: z.string(),
+							reason: z.string(),
+							requestBoardReview: z.boolean(),
+							supportingInfo: z.string().nullable(),
+							decisionDate: z.string().nullable(),
+							decisionBy: z.string().nullable(),
+							decisionNotes: z.string().nullable()
+						})
+						.nullable()
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'violation', input.violationId);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			await getViolationOrThrow(input.violationId, association.id);
+
+			const appeal = await prisma.violationAppeal.findFirst({
+				where: {
+					hearing: { violationId: input.violationId }
+				},
+				orderBy: { filedDate: 'desc' }
+			});
+
+			if (!appeal) {
+				return successResponse({ appeal: null }, context);
+			}
+
+			let requestBoardReview = false;
+			let supportingInfo: string | null = null;
+			if (appeal.documentsJson) {
+				try {
+					const parsed = JSON.parse(appeal.documentsJson);
+					requestBoardReview = parsed.requestBoardReview || false;
+					supportingInfo = parsed.supportingInfo || null;
+				} catch {
+					// Ignore parse errors
+				}
+			}
+
+			return successResponse(
+				{
+					appeal: {
+						id: appeal.id,
+						status: appeal.status,
+						filedDate: appeal.filedDate.toISOString(),
+						filedBy: appeal.filedBy,
+						reason: appeal.reason,
+						requestBoardReview,
+						supportingInfo,
+						decisionDate: appeal.decisionDate?.toISOString() ?? null,
+						decisionBy: appeal.decisionBy,
+						decisionNotes: appeal.decisionNotes
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Record appeal decision
+	 */
+	recordAppealDecision: orgProcedure
+		.input(
+			z.object({
+				appealId: z.string(),
+				decision: z.enum(['UPHELD', 'OVERTURNED', 'MODIFIED']),
+				notes: z.string().min(1).max(2000),
+				revisedFineAmount: z.number().min(0).optional(),
+				idempotencyKey: z.string().min(1)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					appeal: z.object({
+						id: z.string(),
+						status: z.string(),
+						decisionDate: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const appeal = await prisma.violationAppeal.findFirst({
+				where: { id: input.appealId },
+				include: { hearing: { include: { violation: { include: { association: true } } } } }
+			});
+
+			if (!appeal || appeal.hearing.violation.association.organizationId !== context.organization!.id) {
+				throw ApiException.notFound('Appeal');
+			}
+
+			await context.cerbos.authorize('edit', 'violation', appeal.hearing.violationId);
+
+			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
+				const now = new Date();
+				const newStatus = input.decision === 'OVERTURNED' ? 'DISMISSED' : 'CLOSED';
+
+				const updated = await prisma.$transaction(async (tx) => {
+					const a = await tx.violationAppeal.update({
+						where: { id: input.appealId },
+						data: {
+							status: input.decision === 'OVERTURNED' ? 'REVERSED' : input.decision,
+							decisionDate: now,
+							decisionBy: context.user!.id,
+							decisionNotes: input.notes,
+							revisedFineAmount: input.revisedFineAmount
+						}
+					});
+
+					// Update violation status based on decision
+					await tx.violation.update({
+						where: { id: appeal.hearing.violationId },
+						data: {
+							status: newStatus,
+							closedDate: now,
+							closedBy: context.user!.id,
+							resolutionNotes: `Appeal ${input.decision.toLowerCase()}: ${input.notes}`
+						}
+					});
+
+					await tx.violationStatusHistory.create({
+						data: {
+							violationId: appeal.hearing.violationId,
+							fromStatus: 'APPEALED',
+							toStatus: newStatus,
+							changedBy: context.user!.id,
+							notes: `Appeal decision: ${input.decision}`
+						}
+					});
+
+					return a;
+				});
+
+				return updated;
+			});
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'VIOLATION',
+				entityId: appeal.hearing.violationId,
+				action: 'CLOSE',
+				summary: `Appeal decision: ${input.decision}`,
+				violationId: appeal.hearing.violationId,
+				newState: { appealId: result.id, decision: input.decision }
+			});
+
+			return successResponse(
+				{
+					appeal: {
+						id: result.id,
+						status: result.status,
+						decisionDate: result.decisionDate!.toISOString()
+					}
 				},
 				context
 			);

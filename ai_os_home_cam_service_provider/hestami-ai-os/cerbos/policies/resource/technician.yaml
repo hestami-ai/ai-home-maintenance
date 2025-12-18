@@ -1,0 +1,16 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  importDerivedRoles:
+    - common_roles
+  resource: technician
+  rules:
+    - actions: ["view", "edit"]
+      effect: EFFECT_ALLOW
+      roles:
+        - admin
+        - manager
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - vendor

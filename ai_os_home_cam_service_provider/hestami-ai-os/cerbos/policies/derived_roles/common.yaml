@@ -75,6 +75,32 @@ derivedRoles:
             has(R.attr.organizationId) && 
             P.attr.orgRoles[R.attr.organizationId] == "VENDOR"
 
+    # User is a technician in the resource's organization
+    # Technicians are VENDOR role users with a technicianId attribute
+    - name: org_technician
+      parentRoles: ["user"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: >-
+                  has(P.attr.orgRoles) && 
+                  has(R.attr.organizationId) && 
+                  P.attr.orgRoles[R.attr.organizationId] == "VENDOR"
+              - expr: >-
+                  has(P.attr.technicianId)
+
+    # User is a concierge staff member (MANAGER in property owner org)
+    # Used for Phase 3 Concierge pillar resources
+    - name: org_concierge
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "MANAGER"
+
     # User is listed as an owner of this specific resource
     # Used for unit ownership, property ownership, etc.
     - name: resource_owner

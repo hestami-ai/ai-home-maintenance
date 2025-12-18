@@ -1,0 +1,24 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: inventory_transfer
+  importDerivedRoles:
+    - common_roles
+  rules:
+    - actions: ["view", "create", "edit", "ship", "receive", "cancel"]
+      effect: EFFECT_ALLOW
+      roles: ["admin"]
+    - actions: ["view", "create", "edit", "ship", "receive", "cancel"]
+      effect: EFFECT_ALLOW
+      derivedRoles: ["org_admin", "org_manager"]
+      condition:
+        match:
+          expr: request.resource.attr.organizationId == request.principal.attr.organizationId
+    - actions: ["view", "create", "ship", "receive"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor
+        - org_stakeholder
+      condition:
+        match:
+          expr: request.resource.attr.organizationId == request.principal.attr.organizationId

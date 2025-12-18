@@ -3,10 +3,12 @@ import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputS
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import { withIdempotency } from '../middleware/idempotency.js';
+import { recordActivityFromContext } from '../middleware/activityEvent.js';
 import type { RequestContext } from '../context.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
 const DocumentCategoryEnum = z.enum([
+	// CAM / HOA
 	'GOVERNING_DOCS',
 	'FINANCIAL',
 	'MEETING',
@@ -17,7 +19,45 @@ const DocumentCategoryEnum = z.enum([
 	'RESERVE_STUDY',
 	'INSPECTION',
 	'CONTRACT',
+	// Property Owner / Concierge
+	'CC_AND_RS',
+	'PERMIT',
+	'APPROVAL',
+	'CORRESPONDENCE',
+	'TITLE_DEED',
+	'SURVEY',
+	'WARRANTY',
+	// Contractor / Service Provider
+	'LICENSE',
+	'CERTIFICATION',
+	'BOND',
+	'PROPOSAL',
+	'ESTIMATE',
+	'INVOICE',
+	'WORK_ORDER',
+	'JOB_PHOTO',
+	'JOB_VIDEO',
+	'VOICE_NOTE',
+	'SIGNATURE',
+	'CHECKLIST',
+	// Cross-Pillar
 	'GENERAL'
+]);
+
+const DocumentContextTypeEnum = z.enum([
+	'ASSOCIATION',
+	'PROPERTY',
+	'UNIT',
+	'JOB',
+	'CASE',
+	'WORK_ORDER',
+	'TECHNICIAN',
+	'CONTRACTOR',
+	'VENDOR',
+	'PARTY',
+	'OWNER_INTENT',
+	'VIOLATION',
+	'ARC_REQUEST'
 ]);
 
 const DocumentVisibilityEnum = z.enum([
@@ -50,7 +90,8 @@ export const documentRouter = {
 		.input(
 			z.object({
 				idempotencyKey: z.string().uuid(),
-				associationId: z.string(),
+				contextType: DocumentContextTypeEnum,
+				contextId: z.string(),
 				title: z.string().max(255),
 				description: z.string().optional(),
 				category: DocumentCategoryEnum,
@@ -74,8 +115,8 @@ export const documentRouter = {
 					document: z.object({
 						id: z.string(),
 						title: z.string(),
-						category: DocumentCategoryEnum,
-						status: DocumentStatusEnum,
+						category: z.string(),
+						status: z.string(),
 						version: z.number(),
 						createdAt: z.string()
 					})
@@ -86,15 +127,11 @@ export const documentRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'document', 'new');
 
-			const association = await prisma.association.findFirst({
-				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
-			});
-			if (!association) throw ApiException.notFound('Association');
-
 			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const document = await prisma.associationDocument.create({
+				// Create document with organization scope
+				const document = await prisma.document.create({
 					data: {
-						associationId: input.associationId,
+						organizationId: context.organization.id,
 						title: input.title,
 						description: input.description,
 						category: input.category,
@@ -110,7 +147,16 @@ export const documentRouter = {
 						effectiveDate: input.effectiveDate ? new Date(input.effectiveDate) : undefined,
 						expirationDate: input.expirationDate ? new Date(input.expirationDate) : undefined,
 						tags: input.tags ?? [],
-						uploadedBy: context.user.id
+						uploadedBy: context.user.id,
+						// Create context binding inline
+						contextBindings: {
+							create: {
+								contextType: input.contextType,
+								contextId: input.contextId,
+								isPrimary: true,
+								createdBy: context.user.id
+							}
+						}
 					}
 				});
 
@@ -144,10 +190,10 @@ export const documentRouter = {
 						id: z.string(),
 						title: z.string(),
 						description: z.string().nullable(),
-						category: DocumentCategoryEnum,
-						visibility: DocumentVisibilityEnum,
-						status: DocumentStatusEnum,
-						storageProvider: StorageProviderEnum,
+						category: z.string(),
+						visibility: z.string(),
+						status: z.string(),
+						storageProvider: z.string(),
 						storagePath: z.string(),
 						fileUrl: z.string(),
 						fileName: z.string(),
@@ -171,21 +217,32 @@ export const documentRouter = {
 							version: z.number(),
 							createdAt: z.string()
 						})
+					),
+					contextBindings: z.array(
+						z.object({
+							contextType: z.string(),
+							contextId: z.string(),
+							isPrimary: z.boolean()
+						})
 					)
 				}),
 				meta: z.any()
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.id, deletedAt: null },
+			const document = await prisma.document.findFirst({
+				where: { 
+					id: input.id, 
+					organizationId: context.organization.id,
+					deletedAt: null 
+				},
 				include: {
-					association: true,
-					childVersions: { where: { deletedAt: null }, orderBy: { version: 'desc' } }
+					childVersions: { where: { deletedAt: null }, orderBy: { version: 'desc' } },
+					contextBindings: true
 				}
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -218,10 +275,15 @@ export const documentRouter = {
 						createdAt: document.createdAt.toISOString(),
 						updatedAt: document.updatedAt.toISOString()
 					},
-					versions: document.childVersions.map((v) => ({
+					versions: document.childVersions.map((v: { id: string; version: number; createdAt: Date }) => ({
 						id: v.id,
 						version: v.version,
 						createdAt: v.createdAt.toISOString()
+					})),
+					contextBindings: document.contextBindings.map((b: { contextType: string; contextId: string; isPrimary: boolean }) => ({
+						contextType: b.contextType,
+						contextId: b.contextId,
+						isPrimary: b.isPrimary
 					}))
 				},
 				context
@@ -231,7 +293,8 @@ export const documentRouter = {
 	listDocuments: orgProcedure
 		.input(
 			PaginationInputSchema.extend({
-				associationId: z.string(),
+				contextType: DocumentContextTypeEnum.optional(),
+				contextId: z.string().optional(),
 				category: DocumentCategoryEnum.optional(),
 				status: DocumentStatusEnum.optional(),
 				search: z.string().optional()
@@ -245,9 +308,9 @@ export const documentRouter = {
 						z.object({
 							id: z.string(),
 							title: z.string(),
-							category: DocumentCategoryEnum,
-							status: DocumentStatusEnum,
-							visibility: DocumentVisibilityEnum,
+							category: z.string(),
+							status: z.string(),
+							visibility: z.string(),
 							fileName: z.string(),
 							fileSize: z.number(),
 							mimeType: z.string(),
@@ -263,16 +326,19 @@ export const documentRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'document', 'list');
 
-			const association = await prisma.association.findFirst({
-				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
-			});
-			if (!association) throw ApiException.notFound('Association');
-
-			const where: Prisma.AssociationDocumentWhereInput = {
-				associationId: input.associationId,
+			const where: Prisma.DocumentWhereInput = {
+				organizationId: context.organization.id,
 				deletedAt: null,
 				...(input.category && { category: input.category }),
 				...(input.status && { status: input.status }),
+				...(input.contextType && input.contextId && {
+					contextBindings: {
+						some: {
+							contextType: input.contextType,
+							contextId: input.contextId
+						}
+					}
+				}),
 				...(input.search && {
 					OR: [
 						{ title: { contains: input.search, mode: 'insensitive' } },
@@ -282,7 +348,7 @@ export const documentRouter = {
 				})
 			};
 
-			const documents = await prisma.associationDocument.findMany({
+			const documents = await prisma.document.findMany({
 				where,
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
@@ -347,19 +413,18 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.id, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
 			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const updated = await prisma.associationDocument.update({
+				const updated = await prisma.document.update({
 					where: { id: input.id },
 					data: {
 						...(input.title && { title: input.title }),
@@ -403,18 +468,17 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.id, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			await prisma.associationDocument.update({
+			await prisma.document.update({
 				where: { id: input.id },
 				data: {
 					...(input.pageCount && { pageCount: input.pageCount }),
@@ -458,12 +522,11 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const parent = await prisma.associationDocument.findFirst({
-				where: { id: input.parentDocumentId, deletedAt: null },
-				include: { association: true }
+			const parent = await prisma.document.findFirst({
+				where: { id: input.parentDocumentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!parent || parent.association.organizationId !== context.organization.id) {
+			if (!parent) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -471,7 +534,7 @@ export const documentRouter = {
 
 			return requireIdempotency(input.idempotencyKey, context, async () => {
 				// Get max version
-				const maxVersion = await prisma.associationDocument.aggregate({
+				const maxVersion = await prisma.document.aggregate({
 					where: {
 						OR: [{ id: input.parentDocumentId }, { parentDocumentId: input.parentDocumentId }]
 					},
@@ -480,9 +543,9 @@ export const documentRouter = {
 
 				const newVersion = (maxVersion._max.version ?? 0) + 1;
 
-				const document = await prisma.associationDocument.create({
+				const document = await prisma.document.create({
 					data: {
-						associationId: parent.associationId,
+						organizationId: parent.organizationId,
 						title: parent.title,
 						description: parent.description,
 						category: parent.category,
@@ -504,7 +567,7 @@ export const documentRouter = {
 				});
 
 				// Mark parent as superseded
-				await prisma.associationDocument.update({
+				await prisma.document.update({
 					where: { id: input.parentDocumentId },
 					data: { status: 'SUPERSEDED', supersededById: document.id }
 				});
@@ -544,12 +607,11 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -557,7 +619,7 @@ export const documentRouter = {
 
 			// Get all versions (parent and children)
 			const rootId = document.parentDocumentId ?? document.id;
-			const versions = await prisma.associationDocument.findMany({
+			const versions = await prisma.document.findMany({
 				where: {
 					OR: [{ id: rootId }, { parentDocumentId: rootId }],
 					deletedAt: null
@@ -602,16 +664,15 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const current = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const current = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!current || current.association.organizationId !== context.organization.id) {
+			if (!current) {
 				throw ApiException.notFound('Document');
 			}
 
-			const target = await prisma.associationDocument.findFirst({
+			const target = await prisma.document.findFirst({
 				where: { id: input.targetVersionId, deletedAt: null }
 			});
 
@@ -621,7 +682,7 @@ export const documentRouter = {
 
 			return requireIdempotency(input.idempotencyKey, context, async () => {
 				// Create new version from target
-				const maxVersion = await prisma.associationDocument.aggregate({
+				const maxVersion = await prisma.document.aggregate({
 					where: {
 						OR: [
 							{ id: current.parentDocumentId ?? current.id },
@@ -633,9 +694,9 @@ export const documentRouter = {
 
 				const newVersion = (maxVersion._max.version ?? 0) + 1;
 
-				const reverted = await prisma.associationDocument.create({
+				const reverted = await prisma.document.create({
 					data: {
-						associationId: target.associationId,
+						organizationId: target.organizationId,
 						title: target.title,
 						description: target.description,
 						category: target.category,
@@ -657,7 +718,7 @@ export const documentRouter = {
 				});
 
 				// Mark current as superseded
-				await prisma.associationDocument.update({
+				await prisma.document.update({
 					where: { id: input.documentId },
 					data: { status: 'SUPERSEDED', supersededById: reverted.id }
 				});
@@ -693,19 +754,18 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.id, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
 			await context.cerbos.authorize('delete', 'document', document.id);
 
 			const now = new Date();
-			await prisma.associationDocument.update({
+			await prisma.document.update({
 				where: { id: input.id },
 				data: {
 					status: 'ARCHIVED',
@@ -728,18 +788,17 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.id, status: 'ARCHIVED', deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, status: 'ARCHIVED', deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			await prisma.associationDocument.update({
+			await prisma.document.update({
 				where: { id: input.id },
 				data: {
 					status: 'ACTIVE',
@@ -773,12 +832,11 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -820,12 +878,11 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 
@@ -849,6 +906,371 @@ export const documentRouter = {
 						partyId: d.partyId ?? null,
 						downloadedAt: d.downloadedAt.toISOString(),
 						ipAddress: d.ipAddress ?? null
+					})),
+					pagination: {
+						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
+						hasMore
+					}
+				},
+				context
+			);
+		}),
+
+	// =========================================================================
+	// Document Classification (CAM-specific)
+	// =========================================================================
+
+	classifyDocument: orgProcedure
+		.input(
+			z.object({
+				idempotencyKey: z.string().uuid(),
+				id: z.string(),
+				category: DocumentCategoryEnum,
+				reason: z.string().min(1, 'Reason is required for classification changes')
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					document: z.object({
+						id: z.string(),
+						category: z.string(),
+						previousCategory: z.string(),
+						updatedAt: z.string()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
+				include: { contextBindings: true }
+			});
+
+			if (!document) {
+				throw ApiException.notFound('Document');
+			}
+
+			await context.cerbos.authorize('update', 'document', document.id);
+
+			// Check if document is referenced - referenced documents may have restrictions
+			const hasReferences = document.contextBindings.length > 0;
+			if (hasReferences && document.status === 'ACTIVE') {
+				// Allow reclassification but log it prominently
+			}
+
+			const previousCategory = document.category;
+
+			return requireIdempotency(input.idempotencyKey, context, async () => {
+				const updated = await prisma.document.update({
+					where: { id: input.id },
+					data: { category: input.category }
+				});
+
+				// Record audit event for classification change
+				await recordActivityFromContext(context, {
+					entityType: 'DOCUMENT',
+					entityId: document.id,
+					action: 'CLASSIFY',
+					eventCategory: 'EXECUTION',
+					summary: `Document reclassified from ${previousCategory} to ${input.category}: ${input.reason}`,
+					previousState: { category: previousCategory },
+					newState: { category: input.category },
+					metadata: { reason: input.reason }
+				});
+
+				return successResponse(
+					{
+						document: {
+							id: updated.id,
+							category: updated.category,
+							previousCategory,
+							updatedAt: updated.updatedAt.toISOString()
+						}
+					},
+					context
+				);
+			});
+		}),
+
+	// =========================================================================
+	// Document Context Linking
+	// =========================================================================
+
+	linkToContext: orgProcedure
+		.input(
+			z.object({
+				idempotencyKey: z.string().uuid(),
+				documentId: z.string(),
+				contextType: DocumentContextTypeEnum,
+				contextId: z.string(),
+				isPrimary: z.boolean().optional(),
+				bindingNotes: z.string().optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					binding: z.object({
+						id: z.string(),
+						documentId: z.string(),
+						contextType: z.string(),
+						contextId: z.string(),
+						isPrimary: z.boolean()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw ApiException.notFound('Document');
+			}
+
+			await context.cerbos.authorize('update', 'document', document.id);
+
+			return requireIdempotency(input.idempotencyKey, context, async () => {
+				// Check if binding already exists
+				const existing = await prisma.documentContextBinding.findUnique({
+					where: {
+						documentId_contextType_contextId: {
+							documentId: input.documentId,
+							contextType: input.contextType,
+							contextId: input.contextId
+						}
+					}
+				});
+
+				if (existing) {
+					return successResponse(
+						{
+							binding: {
+								id: existing.id,
+								documentId: existing.documentId,
+								contextType: existing.contextType,
+								contextId: existing.contextId,
+								isPrimary: existing.isPrimary
+							}
+						},
+						context
+					);
+				}
+
+				const binding = await prisma.documentContextBinding.create({
+					data: {
+						documentId: input.documentId,
+						contextType: input.contextType,
+						contextId: input.contextId,
+						isPrimary: input.isPrimary ?? false,
+						bindingNotes: input.bindingNotes,
+						createdBy: context.user.id
+					}
+				});
+
+				// Record audit event for document reference
+				await recordActivityFromContext(context, {
+					entityType: 'DOCUMENT',
+					entityId: document.id,
+					action: 'REFERENCED',
+					eventCategory: 'EXECUTION',
+					summary: `Document linked to ${input.contextType} ${input.contextId}`,
+					newState: { contextType: input.contextType, contextId: input.contextId },
+					metadata: {
+						documentsReferenced: [{ documentId: document.id, version: document.version }]
+					}
+				});
+
+				return successResponse(
+					{
+						binding: {
+							id: binding.id,
+							documentId: binding.documentId,
+							contextType: binding.contextType,
+							contextId: binding.contextId,
+							isPrimary: binding.isPrimary
+						}
+					},
+					context
+				);
+			});
+		}),
+
+	unlinkFromContext: orgProcedure
+		.input(
+			z.object({
+				documentId: z.string(),
+				contextType: DocumentContextTypeEnum,
+				contextId: z.string()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ success: z.boolean() }),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw ApiException.notFound('Document');
+			}
+
+			await context.cerbos.authorize('update', 'document', document.id);
+
+			await prisma.documentContextBinding.deleteMany({
+				where: {
+					documentId: input.documentId,
+					contextType: input.contextType,
+					contextId: input.contextId
+				}
+			});
+
+			return successResponse({ success: true }, context);
+		}),
+
+	// =========================================================================
+	// Document References Query
+	// =========================================================================
+
+	getReferences: orgProcedure
+		.input(z.object({ documentId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					references: z.array(
+						z.object({
+							contextType: z.string(),
+							contextId: z.string(),
+							isPrimary: z.boolean(),
+							bindingNotes: z.string().nullable(),
+							createdAt: z.string()
+						})
+					),
+					referenceCount: z.number(),
+					byType: z.record(z.string(), z.number())
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw ApiException.notFound('Document');
+			}
+
+			await context.cerbos.authorize('view', 'document', document.id);
+
+			const bindings = await prisma.documentContextBinding.findMany({
+				where: { documentId: input.documentId },
+				orderBy: { createdAt: 'desc' }
+			});
+
+			// Group by type for summary
+			const byType: Record<string, number> = {};
+			for (const binding of bindings) {
+				byType[binding.contextType] = (byType[binding.contextType] ?? 0) + 1;
+			}
+
+			return successResponse(
+				{
+					references: bindings.map((b) => ({
+						contextType: b.contextType,
+						contextId: b.contextId,
+						isPrimary: b.isPrimary,
+						bindingNotes: b.bindingNotes ?? null,
+						createdAt: b.createdAt.toISOString()
+					})),
+					referenceCount: bindings.length,
+					byType
+				},
+				context
+			);
+		}),
+
+	// =========================================================================
+	// Document Activity History
+	// =========================================================================
+
+	getActivityHistory: orgProcedure
+		.input(
+			PaginationInputSchema.extend({
+				documentId: z.string()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					events: z.array(
+						z.object({
+							id: z.string(),
+							action: z.string(),
+							eventCategory: z.string(),
+							summary: z.string(),
+							performedById: z.string().nullable(),
+							performedByType: z.string(),
+							performedAt: z.string(),
+							previousState: z.any(),
+							newState: z.any()
+						})
+					),
+					pagination: PaginationOutputSchema
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw ApiException.notFound('Document');
+			}
+
+			await context.cerbos.authorize('view', 'document', document.id);
+
+			const events = await prisma.activityEvent.findMany({
+				where: {
+					organizationId: context.organization.id,
+					entityType: 'DOCUMENT',
+					entityId: input.documentId
+				},
+				take: input.limit + 1,
+				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
+				orderBy: { performedAt: 'desc' }
+			});
+
+			const hasMore = events.length > input.limit;
+			const items = hasMore ? events.slice(0, -1) : events;
+
+			return successResponse(
+				{
+					events: items.map((e) => ({
+						id: e.id,
+						action: e.action,
+						eventCategory: e.eventCategory,
+						summary: e.summary,
+						performedById: e.performedById ?? null,
+						performedByType: e.performedByType,
+						performedAt: e.performedAt.toISOString(),
+						previousState: e.previousState,
+						newState: e.newState
 					})),
 					pagination: {
 						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,

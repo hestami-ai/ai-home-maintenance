@@ -4,10 +4,10 @@
  * DBOS durable workflow for managing work order state transitions.
  * Handles: state validation, SLA tracking, notifications, and AP integration.
  *
- * State Machine:
- *   DRAFT → SUBMITTED → TRIAGED → ASSIGNED → SCHEDULED → IN_PROGRESS → COMPLETED → INVOICED → CLOSED
- *                                    ↓           ↓            ↓
- *                                 ON_HOLD ←→ IN_PROGRESS   CANCELLED
+ * State Machine (Phase 9 Updated):
+ *   DRAFT → SUBMITTED → TRIAGED → AUTHORIZED → ASSIGNED → SCHEDULED → IN_PROGRESS → COMPLETED → INVOICED → CLOSED
+ *                                                  ↓           ↓            ↓              ↓
+ *                                               ON_HOLD ←→ IN_PROGRESS   CANCELLED   REVIEW_REQUIRED
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
@@ -18,16 +18,18 @@ import type { WorkOrderStatus } from '../../../../generated/prisma/client.js';
 const WORKFLOW_STATUS_EVENT = 'work_order_status';
 const WORKFLOW_ERROR_EVENT = 'work_order_error';
 
-// Valid status transitions
+// Valid status transitions (Phase 9: Added AUTHORIZED and REVIEW_REQUIRED)
 const validTransitions: Record<WorkOrderStatus, WorkOrderStatus[]> = {
 	DRAFT: ['SUBMITTED', 'CANCELLED'],
 	SUBMITTED: ['TRIAGED', 'CANCELLED'],
-	TRIAGED: ['ASSIGNED', 'CANCELLED'],
+	TRIAGED: ['AUTHORIZED', 'CANCELLED'], // Phase 9: Must go through AUTHORIZED
+	AUTHORIZED: ['ASSIGNED', 'CANCELLED'], // Phase 9: New state
 	ASSIGNED: ['SCHEDULED', 'IN_PROGRESS', 'CANCELLED'],
 	SCHEDULED: ['IN_PROGRESS', 'ON_HOLD', 'CANCELLED'],
 	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
 	ON_HOLD: ['IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: ['INVOICED', 'CLOSED'],
+	COMPLETED: ['REVIEW_REQUIRED', 'INVOICED', 'CLOSED'], // Phase 9: Added REVIEW_REQUIRED
+	REVIEW_REQUIRED: ['COMPLETED', 'CLOSED', 'CANCELLED'], // Phase 9: New state
 	INVOICED: ['CLOSED'],
 	CLOSED: [],
 	CANCELLED: []

@@ -1,0 +1,28 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "owner_intent"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins and managers can perform all actions
+    - actions: ["view", "create", "edit", "delete", "submit", "acknowledge", "convert", "decline", "withdraw", "add_note"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_manager
+
+    # Owners can create, view, edit, submit, withdraw their own intents
+    - actions: ["view", "create", "edit", "submit", "withdraw"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Owners can view intents they submitted
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          expr: request.resource.attr.partyUserId == request.principal.id

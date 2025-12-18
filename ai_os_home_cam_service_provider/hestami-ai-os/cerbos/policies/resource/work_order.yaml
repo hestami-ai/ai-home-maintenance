@@ -9,19 +9,22 @@ resourcePolicy:
     - common_roles
   rules:
     # Admins have full access including delete
-    - actions: ["view", "create", "edit", "assign", "close", "delete", "reopen"]
+    # Phase 9: Added authorize, accept, request_board_approval, record_board_decision
+    - actions: ["view", "create", "edit", "assign", "close", "delete", "reopen", "authorize", "accept", "request_board_approval", "record_board_decision"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_admin
 
     # Managers can do everything except delete
-    - actions: ["view", "create", "edit", "assign", "close", "reopen"]
+    # Phase 9: Added authorize, accept, request_board_approval, record_board_decision
+    - actions: ["view", "create", "edit", "assign", "close", "reopen", "authorize", "accept", "request_board_approval", "record_board_decision"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_manager
 
-    # Board members can view and create work orders
-    - actions: ["view", "create"]
+    # Board members can view, create, and vote on work orders requiring approval
+    # Phase 9: Added vote action for board approval workflow
+    - actions: ["view", "create", "vote"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_board_member
@@ -57,10 +60,18 @@ resourcePolicy:
               - expr: "has(R.attr.createdByUserId) && R.attr.createdByUserId == P.id"
 
     # Vendors can view and update work orders assigned to them
-    - actions: ["view", "edit"]
+    # Phase 9: Vendors can only update execution fields, not scope/budget
+    - actions: ["view", "update_execution"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - assigned_vendor
+
+    # Phase 9: Explicitly deny vendors from editing scope or budget
+    - actions: ["edit_scope", "edit_budget", "authorize", "accept"]
+      effect: EFFECT_DENY
+      derivedRoles:
+        - assigned_vendor
+        - org_vendor
 
     # Vendors with org role can view work orders (for list queries)
     - actions: ["view"]
@@ -78,3 +89,16 @@ resourcePolicy:
                   has(P.attr.vendorId) && 
                   has(R.attr.assignedVendorId) && 
                   P.attr.vendorId == R.attr.assignedVendorId
+
+    # Phase 9: Owners can only view status, not financials
+    - actions: ["view_financials"]
+      effect: EFFECT_DENY
+      derivedRoles:
+        - org_owner
+        - org_tenant
+
+    # Phase 9: Auditor read-only access
+    - actions: ["view", "view_financials", "view_audit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

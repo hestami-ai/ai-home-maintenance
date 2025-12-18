@@ -10,6 +10,7 @@ import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../accounting/index.js';
+import { recordExecution } from '../middleware/activityEvent.js';
 
 /**
  * Association management procedures
@@ -66,6 +67,16 @@ export const associationRouter = {
 			} catch (error) {
 				console.warn(`Failed to seed chart of accounts for association ${association.id}:`, error);
 			}
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'ASSOCIATION',
+				entityId: association.id,
+				action: 'CREATE',
+				summary: `Association created: ${association.name}`,
+				associationId: association.id,
+				newState: { name: association.name, status: association.status }
+			});
 
 			return successResponse(
 				{

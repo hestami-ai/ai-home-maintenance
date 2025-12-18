@@ -1,0 +1,249 @@
+/**
+ * OpenTelemetry Tracing Helpers
+ *
+ * Provides utilities for enriching spans with tenant and domain context.
+ */
+
+import type { RequestContext } from '../context.js';
+
+/**
+ * Span attribute keys for contractor operations
+ */
+export const SpanAttributes = {
+	ORG_ID: 'hestami.org_id',
+	ORG_TYPE: 'hestami.org_type',
+	USER_ID: 'hestami.user_id',
+	JOB_ID: 'hestami.job_id',
+	TECHNICIAN_ID: 'hestami.technician_id',
+	WORK_ORDER_ID: 'hestami.work_order_id',
+	WORKFLOW_ID: 'hestami.workflow_id',
+	RESOURCE_TYPE: 'hestami.resource_type',
+	RESOURCE_ID: 'hestami.resource_id',
+	ACTION: 'hestami.action'
+} as const;
+
+/**
+ * Context for enriching spans
+ */
+export interface SpanContext {
+	organizationId?: string;
+	organizationType?: string;
+	userId?: string;
+	jobId?: string;
+	technicianId?: string;
+	workOrderId?: string;
+	workflowId?: string;
+	resourceType?: string;
+	resourceId?: string;
+	action?: string;
+}
+
+/**
+ * Get the OpenTelemetry trace API (lazy loaded)
+ */
+async function getTraceApi() {
+	try {
+		const { trace } = await import('@opentelemetry/api');
+		return trace;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Set attributes on the current active span
+ */
+export async function setSpanAttributes(attributes: SpanContext): Promise<void> {
+	const trace = await getTraceApi();
+	if (!trace) return;
+
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	if (attributes.organizationId) {
+		span.setAttribute(SpanAttributes.ORG_ID, attributes.organizationId);
+	}
+	if (attributes.organizationType) {
+		span.setAttribute(SpanAttributes.ORG_TYPE, attributes.organizationType);
+	}
+	if (attributes.userId) {
+		span.setAttribute(SpanAttributes.USER_ID, attributes.userId);
+	}
+	if (attributes.jobId) {
+		span.setAttribute(SpanAttributes.JOB_ID, attributes.jobId);
+	}
+	if (attributes.technicianId) {
+		span.setAttribute(SpanAttributes.TECHNICIAN_ID, attributes.technicianId);
+	}
+	if (attributes.workOrderId) {
+		span.setAttribute(SpanAttributes.WORK_ORDER_ID, attributes.workOrderId);
+	}
+	if (attributes.workflowId) {
+		span.setAttribute(SpanAttributes.WORKFLOW_ID, attributes.workflowId);
+	}
+	if (attributes.resourceType) {
+		span.setAttribute(SpanAttributes.RESOURCE_TYPE, attributes.resourceType);
+	}
+	if (attributes.resourceId) {
+		span.setAttribute(SpanAttributes.RESOURCE_ID, attributes.resourceId);
+	}
+	if (attributes.action) {
+		span.setAttribute(SpanAttributes.ACTION, attributes.action);
+	}
+}
+
+/**
+ * Enrich the current span with request context
+ */
+export async function enrichSpanFromContext(context: RequestContext): Promise<void> {
+	await setSpanAttributes({
+		organizationId: context.organization?.id,
+		organizationType: context.organization?.type,
+		userId: context.user?.id
+	});
+}
+
+/**
+ * Enrich the current span with job context
+ */
+export async function enrichSpanWithJob(
+	jobId: string,
+	technicianId?: string,
+	workOrderId?: string
+): Promise<void> {
+	await setSpanAttributes({
+		jobId,
+		technicianId,
+		workOrderId
+	});
+}
+
+/**
+ * Enrich the current span with workflow context
+ */
+export async function enrichSpanWithWorkflow(
+	workflowId: string,
+	organizationId: string
+): Promise<void> {
+	await setSpanAttributes({
+		workflowId,
+		organizationId
+	});
+}
+
+/**
+ * Enrich the current span with resource context
+ */
+export async function enrichSpanWithResource(
+	resourceType: string,
+	resourceId: string,
+	action?: string
+): Promise<void> {
+	await setSpanAttributes({
+		resourceType,
+		resourceId,
+		action
+	});
+}
+
+/**
+ * Get the current trace ID if available
+ */
+export async function getCurrentTraceId(): Promise<string | undefined> {
+	const trace = await getTraceApi();
+	if (!trace) return undefined;
+
+	const span = trace.getActiveSpan();
+	if (!span) return undefined;
+
+	return span.spanContext().traceId;
+}
+
+/**
+ * Get the current span ID if available
+ */
+export async function getCurrentSpanId(): Promise<string | undefined> {
+	const trace = await getTraceApi();
+	if (!trace) return undefined;
+
+	const span = trace.getActiveSpan();
+	if (!span) return undefined;
+
+	return span.spanContext().spanId;
+}
+
+/**
+ * Create a child span for an operation
+ * Returns a function to end the span
+ */
+export async function startSpan(
+	name: string,
+	attributes?: SpanContext
+): Promise<{ end: () => void; setError: (error: Error) => void } | null> {
+	const trace = await getTraceApi();
+	if (!trace) return null;
+
+	const tracer = trace.getTracer('hestami-ai-os');
+	const span = tracer.startSpan(name);
+
+	if (attributes) {
+		if (attributes.organizationId) {
+			span.setAttribute(SpanAttributes.ORG_ID, attributes.organizationId);
+		}
+		if (attributes.userId) {
+			span.setAttribute(SpanAttributes.USER_ID, attributes.userId);
+		}
+		if (attributes.jobId) {
+			span.setAttribute(SpanAttributes.JOB_ID, attributes.jobId);
+		}
+		if (attributes.technicianId) {
+			span.setAttribute(SpanAttributes.TECHNICIAN_ID, attributes.technicianId);
+		}
+		if (attributes.workOrderId) {
+			span.setAttribute(SpanAttributes.WORK_ORDER_ID, attributes.workOrderId);
+		}
+		if (attributes.resourceType) {
+			span.setAttribute(SpanAttributes.RESOURCE_TYPE, attributes.resourceType);
+		}
+		if (attributes.resourceId) {
+			span.setAttribute(SpanAttributes.RESOURCE_ID, attributes.resourceId);
+		}
+		if (attributes.action) {
+			span.setAttribute(SpanAttributes.ACTION, attributes.action);
+		}
+	}
+
+	return {
+		end: () => span.end(),
+		setError: (error: Error) => {
+			span.recordException(error);
+			span.setStatus({ code: 2, message: error.message }); // SpanStatusCode.ERROR = 2
+		}
+	};
+}
+
+/**
+ * Wrap an async operation in a span
+ */
+export async function withSpan<T>(
+	name: string,
+	operation: () => Promise<T>,
+	attributes?: SpanContext
+): Promise<T> {
+	const spanHandle = await startSpan(name, attributes);
+	if (!spanHandle) {
+		return operation();
+	}
+
+	try {
+		const result = await operation();
+		spanHandle.end();
+		return result;
+	} catch (error) {
+		if (error instanceof Error) {
+			spanHandle.setError(error);
+		}
+		spanHandle.end();
+		throw error;
+	}
+}

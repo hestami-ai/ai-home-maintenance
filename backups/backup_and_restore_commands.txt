@@ -19,7 +19,13 @@ npx tsc --noEmit
 
 
 Updating Prisma Schema and generating migrations
+0) npx prisma format 
 1) npx prisma migrate dev --name add_<name_of_migration> --create-only
 2) npm run db:generate
 3) npx prisma migrate dev
 4) npm run db:generate
+5) npx prisma generate
+
+
+Atlas tool supports various Postgres features (some we use) that Prisma doesn't directly
+https://atlasgo.io/guides/orms/prisma/vector-index

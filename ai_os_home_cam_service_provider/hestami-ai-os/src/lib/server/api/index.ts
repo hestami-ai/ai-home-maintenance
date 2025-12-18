@@ -44,12 +44,60 @@ import { documentRouter } from './routes/document.js';
 import { reserveRouter } from './routes/reserve.js';
 import { complianceRouter } from './routes/compliance.js';
 import { contractorRouter } from './routes/contractor/index.js';
+import { technicianRouter } from './routes/technician/index.js';
+import { pricebookRouter } from './routes/pricebook/index.js';
+import { customerRouter, jobRouter } from './routes/job/index.js';
+import { dispatchRouter, slaRouter } from './routes/dispatch/index.js';
+import {
+	checklistRouter,
+	timeEntryRouter,
+	mediaRouter,
+	signatureRouter,
+	offlineSyncRouter
+} from './routes/fieldTech/index.js';
+import {
+	estimateRouter,
+	proposalRouter,
+	invoiceRouter,
+	jobPaymentRouter
+} from './routes/billing/index.js';
+import {
+	supplierRouter,
+	inventoryItemRouter,
+	inventoryLocationRouter,
+	stockRouter,
+	transferRouter,
+	usageRouter,
+	purchaseOrderRouter
+} from './routes/inventory/index.js';
+import {
+	serviceContractRouter,
+	contractScheduleRouter,
+	scheduledVisitRouter,
+	contractSLARouter
+} from './routes/contract/index.js';
 
 // Phase 14: Cross-Tenant Features
 import {
 	serviceAreaRouter,
 	workOrderViewRouter
 } from './routes/serviceProvider/index.js';
+
+// Phase 3: Concierge Property Owner Platform
+import {
+	propertyOwnershipRouter,
+	delegatedAuthorityRouter,
+	portfolioRouter,
+	ownerIntentRouter,
+	conciergeCaseRouter,
+	conciergeActionRouter,
+	externalHoaRouter,
+	externalVendorRouter,
+	materialDecisionRouter
+} from './routes/concierge/index.js';
+
+// Phase 4: Activity & Audit Subsystem
+import { activityEventRouter } from './routes/activityEvent.js';
 
 // Phase 15: Reporting & Analytics
 import {
@@ -123,6 +171,44 @@ export const appRouter = {
 	// Phase 12: Compliance
 	compliance: complianceRouter,
 	contractor: contractorRouter,
+	technician: technicianRouter,
+	pricebook: pricebookRouter,
+
+	// Phase 2: Job Lifecycle
+	customer: customerRouter,
+	job: jobRouter,
+
+	// Phase 2: Dispatch & Scheduling
+	dispatch: dispatchRouter,
+	sla: slaRouter,
+
+	// Phase 2: Field Technician Mobile
+	checklist: checklistRouter,
+	timeEntry: timeEntryRouter,
+	jobMedia: mediaRouter,
+	jobSignature: signatureRouter,
+	offlineSync: offlineSyncRouter,
+
+	// Phase 2: Estimates, Proposals & Invoicing
+	estimate: estimateRouter,
+	proposal: proposalRouter,
+	jobInvoice: invoiceRouter,
+	jobPayment: jobPaymentRouter,
+
+	// Phase 2: Inventory, Materials & Procurement
+	supplier: supplierRouter,
+	inventoryItem: inventoryItemRouter,
+	inventoryLocation: inventoryLocationRouter,
+	stock: stockRouter,
+	inventoryTransfer: transferRouter,
+	materialUsage: usageRouter,
+	purchaseOrder: purchaseOrderRouter,
+
+	// Phase 2: Maintenance Contracts & Recurring Services
+	serviceContract: serviceContractRouter,
+	contractSchedule: contractScheduleRouter,
+	scheduledVisit: scheduledVisitRouter,
+	contractSLA: contractSLARouter,
 
 	// Phase 14: Cross-Tenant Features (Service Provider Portal)
 	serviceArea: serviceAreaRouter,
@@ -132,7 +218,21 @@ export const appRouter = {
 	reportDefinition: reportDefinitionRouter,
 	reportExecution: reportExecutionRouter,
 	reportSchedule: reportScheduleRouter,
-	dashboard: dashboardRouter
+	dashboard: dashboardRouter,
+
+	// Phase 3: Concierge Property Owner Platform
+	propertyOwnership: propertyOwnershipRouter,
+	delegatedAuthority: delegatedAuthorityRouter,
+	portfolio: portfolioRouter,
+	ownerIntent: ownerIntentRouter,
+	conciergeCase: conciergeCaseRouter,
+	conciergeAction: conciergeActionRouter,
+	externalHoa: externalHoaRouter,
+	externalVendor: externalVendorRouter,
+	materialDecision: materialDecisionRouter,
+
+	// Phase 4: Activity & Audit Subsystem
+	activityEvent: activityEventRouter
 };
 
 export type AppRouter = typeof appRouter;

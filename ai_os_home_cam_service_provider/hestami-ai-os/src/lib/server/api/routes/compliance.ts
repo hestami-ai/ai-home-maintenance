@@ -654,11 +654,10 @@ export const complianceRouter = {
 			await context.cerbos.authorize('update', 'complianceDeadline', deadline.id);
 
 			// Verify document exists
-			const document = await prisma.associationDocument.findFirst({
-				where: { id: input.documentId, deletedAt: null },
-				include: { association: true }
+			const document = await prisma.document.findFirst({
+				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!document || document.association.organizationId !== context.organization.id) {
+			if (!document) {
 				throw ApiException.notFound('Document');
 			}
 

@@ -4,6 +4,7 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { assertContractorOrg } from './utils.js';
+import { recordExecution } from '../../middleware/activityEvent.js';
 
 const profileOutput = z.object({
 	id: z.string(),
@@ -78,6 +79,15 @@ export const profileRouter = {
 						...data
 					}
 				});
+			});
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'CONTRACTOR',
+				entityId: result.result.id,
+				action: 'UPDATE',
+				summary: `Contractor profile updated: ${result.result.legalName}`,
+				newState: { legalName: result.result.legalName, dba: result.result.dba }
 			});
 
 			return successResponse(

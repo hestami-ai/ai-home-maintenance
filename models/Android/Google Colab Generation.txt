@@ -1,0 +1,156 @@
+
+
+!ls -lh /content
+
+YoloV11 Nano to CoreML Export on Google Colab:
+
+# 1. Install the library
+!pip install ultralytics
+
+# 2. Export the model
+from ultralytics import YOLO
+
+# Load the model (it downloads automatically)
+model = YOLO('yolo11n.pt') 
+
+# Generate the TensorFlow model
+!yolo export model=yolo11n.pt format=tflite int8=True
+
+# Compress
+!zip -r yolo_model_tensorflow.zip /content/yolo11n_saved_model
+files.download("yolo_model_tensorflow.zip")
+
+
+
+MobileSAM to Android Export on Google Colab:
+
+import os
+import sys
+
+print("⚙️ FINAL SETUP: Installing missing dependencies...")
+
+# 1. Install standard dependencies
+if os.system("pip show torch > /dev/null") != 0:
+    os.system("pip install torch torchvision torchaudio")
+
+# 2. Install onnxscript (CRITICAL FIX for Opset 18 Export)
+if os.system("pip show onnxscript > /dev/null") != 0:
+    print("⬇️ Installing onnxscript...")
+    os.system("pip install onnxscript")
+
+# 3. Install Segment Anything & ONNX
+try:
+    import segment_anything
+except ImportError:
+    os.system("pip install git+https://github.com/facebookresearch/segment-anything.git")
+try:
+    import onnx
+except ImportError:
+    os.system("pip install onnx")
+
+import torch
+import torch.nn as nn
+import types
+from segment_anything import sam_model_registry
+from torch.onnx import export
+
+# --- LOAD MODEL ---
+print("\n📥 Loading SAM ViT-H...")
+checkpoint_path = "sam_vit_h_4b8939.pth"
+if not os.path.exists(checkpoint_path):
+    os.system("wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth")
+
+sam = sam_model_registry["vit_h"](checkpoint=checkpoint_path)
+
+# --- APPLY PATCHES (For Stability on Android NPU) ---
+# Patch A: Fix Boolean Indexing math
+def patched_embed_points(self, points, labels, pad):
+    points = points + 0.5
+    if pad:
+        padding_point = torch.zeros((points.shape[0], 1, 2), device=points.device)
+        padding_label = -torch.ones((labels.shape[0], 1), device=labels.device)
+        points = torch.cat([points, padding_point], dim=1)
+        labels = torch.cat([labels, padding_label], dim=1)
+    
+    point_embedding = self.pe_layer.forward_with_coords(points, self.input_image_size)
+    
+    # Static replacements
+    mask_neg = (labels == -1).unsqueeze(-1)
+    point_embedding = torch.where(mask_neg, torch.zeros_like(point_embedding), point_embedding)
+    point_embedding = torch.where(mask_neg, point_embedding + self.not_a_point_embed.weight, point_embedding)
+    
+    mask_0 = (labels == 0).unsqueeze(-1)
+    point_embedding = torch.where(mask_0, point_embedding + self.point_embeddings[0].weight, point_embedding)
+    
+    mask_1 = (labels == 1).unsqueeze(-1)
+    point_embedding = torch.where(mask_1, point_embedding + self.point_embeddings[1].weight, point_embedding)
+    
+    return point_embedding
+
+sam.prompt_encoder._embed_points = types.MethodType(patched_embed_points, sam.prompt_encoder)
+
+# Patch B: PromptEncoder Forward
+def forward_prompt_encoder_safe(self, points, boxes, masks):
+    if points is not None:
+        coords, labels = points
+        point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))
+        sparse_embeddings = point_embeddings
+    else:
+        sparse_embeddings = torch.zeros(1, 0, 256)
+    
+    dense_embeddings = self.no_mask_embed.weight.reshape(1, -1, 1, 1).expand(
+        1, -1, self.image_embedding_size[0], self.image_embedding_size[1]
+    )
+    return sparse_embeddings, dense_embeddings
+
+sam.prompt_encoder.forward = types.MethodType(forward_prompt_encoder_safe, sam.prompt_encoder)
+
+# --- EXPORT ---
+print("\n🚀 Exporting to ONNX (Opset 18)...")
+
+class DecoderWrapper(nn.Module):
+    def __init__(self, sam_model):
+        super().__init__()
+        self.model = sam_model
+
+    def forward(self, image_embeddings, point_coords, point_labels):
+        sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
+            points=(point_coords, point_labels), boxes=None, masks=None
+        )
+        return self.model.mask_decoder(
+            image_embeddings=image_embeddings,
+            image_pe=self.model.prompt_encoder.get_dense_pe(),
+            sparse_prompt_embeddings=sparse_embeddings,
+            dense_prompt_embeddings=dense_embeddings,
+            multimask_output=True,
+        )
+
+decoder = DecoderWrapper(sam)
+decoder.eval()
+
+dummy_args = (
+    torch.randn(1, 256, 64, 64), 
+    torch.randn(1, 5, 2),        
+    torch.randint(0, 2, (1, 5)).float()
+)
+
+output_file = "sam_vit_h_decoder.onnx"
+torch.onnx.export(
+    decoder,
+    dummy_args,
+    output_file,
+    input_names=["image_embeddings", "point_coords", "point_labels"],
+    output_names=["masks", "iou_predictions"],
+    opset_version=18
+)
+
+print(f"✅ SUCCESS! Generated {output_file}")
+
+# Zip and Download
+os.system(f"zip sam_onnx_android.zip {output_file}")
+try:
+    from google.colab import files
+    files.download("sam_onnx_android.zip")
+    print("⬇️ Download started automatically.")
+except:
+    print("⬇️ Please download 'sam_onnx_android.zip' from the file browser.")

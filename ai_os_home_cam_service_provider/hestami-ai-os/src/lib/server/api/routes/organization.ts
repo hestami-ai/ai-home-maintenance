@@ -3,6 +3,7 @@ import { authedProcedure, orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
+import { recordActivityEvent, recordActivityFromContext } from '../middleware/activityEvent.js';
 
 /**
  * Organization management procedures
@@ -16,7 +17,7 @@ export const organizationRouter = {
 			z.object({
 				name: z.string().min(1).max(255),
 				slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
-				type: z.enum(['COMMUNITY_ASSOCIATION', 'MANAGEMENT_COMPANY', 'SERVICE_PROVIDER', 'INDIVIDUAL_CONCIERGE', 'COMMERCIAL_CLIENT'])
+				type: z.enum(['INDIVIDUAL_PROPERTY_OWNER', 'TRUST_OR_LLC', 'COMMUNITY_ASSOCIATION', 'MANAGEMENT_COMPANY', 'SERVICE_PROVIDER', 'COMMERCIAL_CLIENT'])
 			})
 		)
 		.output(
@@ -57,6 +58,24 @@ export const organizationRouter = {
 							isDefault: true
 						}
 					}
+				}
+			});
+
+			// Record activity event for organization creation
+			await recordActivityEvent({
+				organizationId: organization.id,
+				entityType: 'ORGANIZATION',
+				entityId: organization.id,
+				action: 'CREATE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization "${organization.name}" created (${organization.type})`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				newState: {
+					name: organization.name,
+					slug: organization.slug,
+					type: organization.type,
+					status: organization.status
 				}
 			});
 
@@ -189,6 +208,12 @@ export const organizationRouter = {
 				throw ApiException.forbidden('You do not have access to this organization');
 			}
 
+			// Get current default org for activity event
+			const currentDefault = await prisma.userOrganization.findFirst({
+				where: { userId: context.user!.id, isDefault: true },
+				include: { organization: true }
+			});
+
 			// Clear existing default and set new one
 			await prisma.$transaction([
 				prisma.userOrganization.updateMany({
@@ -200,6 +225,33 @@ export const organizationRouter = {
 					data: { isDefault: true }
 				})
 			]);
+
+			// Get new org details for activity event
+			const newOrg = await prisma.organization.findUnique({
+				where: { id: input.organizationId }
+			});
+
+			// Record activity event for context switch
+			if (newOrg) {
+				await recordActivityEvent({
+					organizationId: newOrg.id,
+					entityType: 'USER',
+					entityId: context.user!.id,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: `User switched organization context to "${newOrg.name}"`,
+					performedById: context.user!.id,
+					performedByType: 'HUMAN',
+					previousState: currentDefault ? {
+						defaultOrganizationId: currentDefault.organizationId,
+						defaultOrganizationName: currentDefault.organization.name
+					} : undefined,
+					newState: {
+						defaultOrganizationId: newOrg.id,
+						defaultOrganizationName: newOrg.name
+					}
+				});
+			}
 
 			return successResponse({ success: true }, context);
 		}),
@@ -298,11 +350,31 @@ export const organizationRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'organization', context.organization!.id);
 
+			// Capture previous state for activity event
+			const previousState = {
+				name: context.organization!.name,
+				settings: context.organization!.settings
+			};
+
 			const organization = await prisma.organization.update({
 				where: { id: context.organization!.id },
 				data: {
 					...(input.name && { name: input.name }),
 					...(input.settings && { settings: input.settings as Prisma.InputJsonValue })
+				}
+			});
+
+			// Record activity event for organization update
+			await recordActivityFromContext(context, {
+				entityType: 'ORGANIZATION',
+				entityId: organization.id,
+				action: 'UPDATE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization "${organization.name}" updated`,
+				previousState: previousState as Record<string, unknown>,
+				newState: {
+					name: organization.name,
+					settings: organization.settings
 				}
 			});
 
@@ -342,6 +414,18 @@ export const organizationRouter = {
 			await prisma.organization.update({
 				where: { id: context.organization!.id },
 				data: { deletedAt: now }
+			});
+
+			// Record activity event for organization deletion
+			await recordActivityFromContext(context, {
+				entityType: 'ORGANIZATION',
+				entityId: context.organization!.id,
+				action: 'DELETE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization "${context.organization!.name}" deleted`,
+				newState: {
+					deletedAt: now.toISOString()
+				}
 			});
 
 			return successResponse(

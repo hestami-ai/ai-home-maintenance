@@ -402,5 +402,198 @@ export const arcReviewRouter = {
 			});
 
 			return successResponse({ request: { id: result.id, status: result.status } }, context);
+		}),
+
+	/**
+	 * Get all votes/reviews for a request
+	 */
+	getVotes: orgProcedure
+		.input(z.object({ requestId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					votes: z.array(
+						z.object({
+							id: z.string(),
+							reviewerId: z.string(),
+							reviewerName: z.string().nullable(),
+							action: z.string(),
+							notes: z.string().nullable(),
+							conditions: z.string().nullable(),
+							createdAt: z.string()
+						})
+					),
+					summary: z.object({
+						total: z.number(),
+						approve: z.number(),
+						deny: z.number(),
+						requestChanges: z.number(),
+						table: z.number()
+					}),
+					quorum: z.object({
+						required: z.number().nullable(),
+						met: z.boolean(),
+						activeMembers: z.number()
+					}),
+					threshold: z.object({
+						required: z.number().nullable(),
+						current: z.number(),
+						met: z.boolean()
+					})
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const request = await prisma.aRCRequest.findFirst({
+				where: { id: input.requestId },
+				include: { association: true, committee: true }
+			});
+
+			if (!request || request.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('ARC Request');
+			}
+
+			await context.cerbos.authorize('view', 'arc_request', input.requestId);
+
+			const reviews = await prisma.aRCReview.findMany({
+				where: { requestId: input.requestId },
+				orderBy: { createdAt: 'asc' }
+			});
+
+			// Calculate vote summary
+			const summary = {
+				total: reviews.length,
+				approve: reviews.filter(r => r.action === 'APPROVE').length,
+				deny: reviews.filter(r => r.action === 'DENY').length,
+				requestChanges: reviews.filter(r => r.action === 'REQUEST_CHANGES').length,
+				table: reviews.filter(r => r.action === 'TABLE').length
+			};
+
+			// Get committee info for quorum/threshold
+			let activeMembers = 0;
+			let quorumRequired: number | null = null;
+			let thresholdRequired: number | null = null;
+
+			if (request.committeeId && request.committee) {
+				activeMembers = await prisma.aRCCommitteeMember.count({
+					where: { committeeId: request.committeeId, leftAt: null }
+				});
+				quorumRequired = request.committee.quorum;
+				thresholdRequired = request.committee.approvalThreshold ? Number(request.committee.approvalThreshold) : null;
+			}
+
+			const quorumMet = quorumRequired === null || summary.total >= quorumRequired;
+			const currentApprovalPct = activeMembers > 0 ? (summary.approve / activeMembers) * 100 : 0;
+			const thresholdMet = thresholdRequired === null || currentApprovalPct >= thresholdRequired;
+
+			return successResponse(
+				{
+					votes: reviews.map(r => ({
+						id: r.id,
+						reviewerId: r.reviewerId,
+						reviewerName: null,
+						action: r.action,
+						notes: r.notes,
+						conditions: r.conditions,
+						createdAt: r.createdAt.toISOString()
+					})),
+					summary,
+					quorum: {
+						required: quorumRequired,
+						met: quorumMet,
+						activeMembers
+					},
+					threshold: {
+						required: thresholdRequired,
+						current: Math.round(currentApprovalPct),
+						met: thresholdMet
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Get committee details with members for voting panel
+	 */
+	getCommitteeForRequest: orgProcedure
+		.input(z.object({ requestId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					committee: z
+						.object({
+							id: z.string(),
+							name: z.string(),
+							quorum: z.number().nullable(),
+							approvalThreshold: z.number().nullable(),
+							members: z.array(
+								z.object({
+									id: z.string(),
+									partyId: z.string(),
+									name: z.string().nullable(),
+									role: z.string().nullable(),
+									isChair: z.boolean(),
+									hasVoted: z.boolean(),
+									vote: z.string().nullable()
+								})
+							)
+						})
+						.nullable()
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const request = await prisma.aRCRequest.findFirst({
+				where: { id: input.requestId },
+				include: { association: true, committee: true }
+			});
+
+			if (!request || request.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('ARC Request');
+			}
+
+			await context.cerbos.authorize('view', 'arc_request', input.requestId);
+
+			if (!request.committeeId || !request.committee) {
+				return successResponse({ committee: null }, context);
+			}
+
+			const members = await prisma.aRCCommitteeMember.findMany({
+				where: { committeeId: request.committeeId, leftAt: null }
+			});
+
+			// Get votes for this request
+			const votes = await prisma.aRCReview.findMany({
+				where: { requestId: input.requestId },
+				select: { reviewerId: true, action: true }
+			});
+
+			const voteMap = new Map(votes.map(v => [v.reviewerId, v.action]));
+
+			return successResponse(
+				{
+					committee: {
+						id: request.committee.id,
+						name: request.committee.name,
+						quorum: request.committee.quorum,
+						approvalThreshold: request.committee.approvalThreshold ? Number(request.committee.approvalThreshold) : null,
+						members: members.map(m => ({
+							id: m.id,
+							partyId: m.partyId,
+							name: null,
+							role: m.role,
+							isChair: m.isChair,
+							hasVoted: voteMap.has(m.partyId),
+							vote: voteMap.get(m.partyId) ?? null
+						}))
+					}
+				},
+				context
+			);
 		})
 };

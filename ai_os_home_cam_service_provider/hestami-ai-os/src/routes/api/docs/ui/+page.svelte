@@ -1,15 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import 'swagger-ui-dist/swagger-ui.css';
+	import { SwaggerUIBundle } from 'swagger-ui-dist';
 
-	onMount(async () => {
-		const SwaggerUI = (await import('swagger-ui-dist')).default;
-		SwaggerUI({
+	onMount(() => {
+		SwaggerUIBundle({
 			dom_id: '#swagger-ui',
 			url: '/api/docs',
-			deepLinking: true,
-			presets: [SwaggerUI.presets.apis, SwaggerUI.SwaggerUIStandalonePreset],
-			layout: 'StandaloneLayout'
+			deepLinking: true
 		});
 	});
 </script>

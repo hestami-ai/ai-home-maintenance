@@ -1,0 +1,27 @@
+# External HOA Approval Resource Policy
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "external_hoa_approval"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins and managers: full access
+    - actions: ["view", "create", "update", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_manager
+
+    # Concierge staff: can view, create, and update approvals
+    - actions: ["view", "create", "update"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_concierge
+
+    # Property owners: can view their approval status
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner

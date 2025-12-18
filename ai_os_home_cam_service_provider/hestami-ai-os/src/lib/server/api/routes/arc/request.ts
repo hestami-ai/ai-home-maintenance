@@ -17,6 +17,7 @@ import type {
 	ARCDocumentType
 } from '../../../../../../generated/prisma/client.js';
 import type { RequestContext } from '../../context.js';
+import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 
 const arcCategoryEnum = z.enum([
 	'FENCE',
@@ -165,6 +166,23 @@ export const arcRequestRouter = {
 				});
 
 				return created;
+			});
+
+			// Record activity event
+			await recordIntent(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: result.id,
+				action: 'CREATE',
+				summary: `ARC request created: ${result.title}`,
+				arcRequestId: result.id,
+				associationId: rest.associationId,
+				unitId: rest.unitId,
+				newState: {
+					requestNumber: result.requestNumber,
+					title: result.title,
+					status: result.status,
+					category: result.category
+				}
 			});
 
 			return successResponse(
@@ -347,6 +365,16 @@ export const arcRequestRouter = {
 				});
 			});
 
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: updated.id,
+				action: 'SUBMIT',
+				summary: `ARC request submitted for review`,
+				arcRequestId: updated.id,
+				newState: { status: updated.status }
+			});
+
 			return successResponse({ request: { id: updated.id, status: updated.status, submittedAt: updated.submittedAt?.toISOString() ?? null } }, context);
 		}),
 
@@ -378,6 +406,16 @@ export const arcRequestRouter = {
 					where: { id: input.id },
 					data: { status: 'WITHDRAWN', withdrawnAt, cancellationReason: input.reason }
 				});
+			});
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: updated.id,
+				action: 'CANCEL',
+				summary: `ARC request withdrawn${input.reason ? `: ${input.reason}` : ''}`,
+				arcRequestId: updated.id,
+				newState: { status: updated.status }
 			});
 
 			return successResponse({ request: { id: updated.id, status: updated.status, withdrawnAt: updated.withdrawnAt?.toISOString() ?? null } }, context);
@@ -431,6 +469,16 @@ export const arcRequestRouter = {
 				});
 
 				return doc;
+			});
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: rest.requestId,
+				action: 'UPDATE',
+				summary: `Document added: ${rest.fileName}`,
+				arcRequestId: rest.requestId,
+				newState: { documentId: document.id, documentType: rest.documentType }
 			});
 
 			return successResponse({ document: { id: document.id, requestId: document.requestId } }, context);
@@ -492,9 +540,262 @@ export const arcRequestRouter = {
 					return updated;
 				});
 
-				return res;
+				return { res, previousStatus: request.status };
 			});
 
-			return successResponse({ request: { id: result.id, status: result.status } }, context);
+			// Record activity event
+			const actionToEventAction: Record<string, 'APPROVE' | 'DENY' | 'STATUS_CHANGE'> = {
+				APPROVE: 'APPROVE',
+				DENY: 'DENY',
+				REQUEST_CHANGES: 'STATUS_CHANGE',
+				TABLE: 'STATUS_CHANGE'
+			};
+
+			await recordDecision(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: result.res.id,
+				action: actionToEventAction[rest.action] || 'STATUS_CHANGE',
+				summary: `ARC request ${rest.action.toLowerCase().replace('_', ' ')}: ${rest.notes?.substring(0, 100) || 'No notes'}`,
+				arcRequestId: result.res.id,
+				previousState: { status: result.previousStatus },
+				newState: { status: result.res.status, conditions: rest.conditions }
+			});
+
+			return successResponse({ request: { id: result.res.id, status: result.res.status } }, context);
+		}),
+
+	/**
+	 * Get prior precedents - similar past ARC requests for the same category or unit
+	 */
+	getPriorPrecedents: orgProcedure
+		.input(
+			z.object({
+				requestId: z.string(),
+				unitId: z.string().optional(),
+				category: arcCategoryEnum.optional(),
+				limit: z.number().int().min(1).max(20).default(5)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					unitPrecedents: z.array(
+						z.object({
+							id: z.string(),
+							requestNumber: z.string(),
+							title: z.string(),
+							status: z.string(),
+							category: z.string(),
+							decisionDate: z.string().nullable()
+						})
+					),
+					categoryPrecedents: z.array(
+						z.object({
+							id: z.string(),
+							requestNumber: z.string(),
+							title: z.string(),
+							status: z.string(),
+							category: z.string(),
+							decisionDate: z.string().nullable()
+						})
+					)
+				}),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'arc_request', input.requestId);
+
+			const request = await prisma.aRCRequest.findFirst({
+				where: { id: input.requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('ARC Request');
+			}
+
+			// Get precedents for the same unit
+			const unitPrecedents = input.unitId
+				? await prisma.aRCRequest.findMany({
+						where: {
+							associationId: request.associationId,
+							unitId: input.unitId,
+							id: { not: input.requestId },
+							status: { in: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED'] }
+						},
+						orderBy: { decisionDate: 'desc' },
+						take: input.limit
+					})
+				: [];
+
+			// Get precedents for the same category
+			const categoryPrecedents = input.category
+				? await prisma.aRCRequest.findMany({
+						where: {
+							associationId: request.associationId,
+							category: input.category as ARCCategory,
+							id: { not: input.requestId },
+							status: { in: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED'] }
+						},
+						orderBy: { decisionDate: 'desc' },
+						take: input.limit
+					})
+				: [];
+
+			return successResponse(
+				{
+					unitPrecedents: unitPrecedents.map((p) => ({
+						id: p.id,
+						requestNumber: p.requestNumber,
+						title: p.title,
+						status: p.status,
+						category: p.category,
+						decisionDate: p.decisionDate?.toISOString() ?? null
+					})),
+					categoryPrecedents: categoryPrecedents.map((p) => ({
+						id: p.id,
+						requestNumber: p.requestNumber,
+						title: p.title,
+						status: p.status,
+						category: p.category,
+						decisionDate: p.decisionDate?.toISOString() ?? null
+					}))
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Request more information from the applicant
+	 */
+	requestInfo: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					requestId: z.string(),
+					infoNeeded: z.string().min(1).max(5000),
+					dueDate: z.string().datetime().optional()
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('review', 'arc_request', input.requestId);
+			const { idempotencyKey, ...rest } = input;
+
+			const idempotencyResult = await withIdempotency(idempotencyKey, context, async () => {
+				const request = await prisma.aRCRequest.findFirst({
+					where: { id: rest.requestId },
+					include: { association: true }
+				});
+
+				if (!request || request.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('ARC Request');
+				}
+
+				if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
+					throw ApiException.badRequest('Cannot request info for a finalized ARC request');
+				}
+
+				const previousStatus = request.status;
+
+				const updated = await prisma.aRCRequest.update({
+					where: { id: rest.requestId },
+					data: {
+						status: 'CHANGES_REQUESTED'
+					}
+				});
+
+				return { updated, previousStatus, infoNeeded: rest.infoNeeded };
+			});
+
+			const { updated, previousStatus, infoNeeded } = idempotencyResult.result;
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: updated.id,
+				action: 'STATUS_CHANGE',
+				summary: `Additional information requested: ${infoNeeded.substring(0, 100)}`,
+				arcRequestId: updated.id,
+				previousState: { status: previousStatus },
+				newState: { status: updated.status }
+			});
+
+			return successResponse({ request: { id: updated.id, status: updated.status } }, context);
+		}),
+
+	/**
+	 * Applicant submits requested information
+	 */
+	submitInfo: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					requestId: z.string(),
+					response: z.string().min(1).max(10000),
+					documentIds: z.array(z.string()).optional()
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }),
+				meta: z.any()
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'arc_request', input.requestId);
+			const { idempotencyKey, ...rest } = input;
+
+			const idempotencyResult = await withIdempotency(idempotencyKey, context, async () => {
+				const request = await prisma.aRCRequest.findFirst({
+					where: { id: rest.requestId },
+					include: { association: true }
+				});
+
+				if (!request || request.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('ARC Request');
+				}
+
+				if (request.status !== 'CHANGES_REQUESTED') {
+					throw ApiException.badRequest('No information request pending for this ARC request');
+				}
+
+				const previousStatus = request.status;
+
+				const updated = await prisma.aRCRequest.update({
+					where: { id: rest.requestId },
+					data: {
+						status: 'SUBMITTED'
+					}
+				});
+
+				return { updated, previousStatus, response: rest.response };
+			});
+
+			const { updated, previousStatus, response } = idempotencyResult.result;
+
+			// Record activity event
+			await recordExecution(context, {
+				entityType: 'ARC_REQUEST',
+				entityId: updated.id,
+				action: 'SUBMIT',
+				summary: `Information submitted: ${response.substring(0, 100)}`,
+				arcRequestId: updated.id,
+				previousState: { status: previousStatus },
+				newState: { status: updated.status }
+			});
+
+			return successResponse({ request: { id: updated.id, status: updated.status } }, context);
 		})
 };
