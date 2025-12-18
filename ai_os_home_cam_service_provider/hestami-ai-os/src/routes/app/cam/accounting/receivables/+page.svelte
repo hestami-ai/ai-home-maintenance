@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { accountingApi } from '$lib/api/cam';
 
 	interface AgedReceivable {
 		unitId: string;
@@ -36,16 +37,10 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams({ associationId: $currentAssociation.id });
-			if (searchQuery) params.append('search', searchQuery);
-
-			const response = await fetch(`/api/accounting/receivables?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					receivables = data.data.items || [];
-					summary = data.data.summary || null;
-				}
+			const response = await accountingApi.receivables.list({});
+			if (response.ok && response.data) {
+				receivables = response.data.receivables || [];
+				summary = response.data.summary || null;
 			}
 		} catch (e) {
 			console.error('Failed to load receivables:', e);

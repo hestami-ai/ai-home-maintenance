@@ -4,21 +4,7 @@
 	import { ArrowLeft, FileText, Clock, Download, Eye, Edit } from 'lucide-svelte';
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-
-	interface Document {
-		id: string;
-		name: string;
-		category: string;
-		visibility: string;
-		mimeType: string;
-		size: number;
-		contextType?: string;
-		contextId?: string;
-		contextName?: string;
-		uploadedBy: string;
-		createdAt: string;
-		updatedAt: string;
-	}
+	import { documentApi, activityEventApi, type Document } from '$lib/api/cam';
 
 	interface DocumentHistoryEvent {
 		id: string;
@@ -42,16 +28,11 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/document/${documentId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					document = data.data;
-				} else {
-					error = 'Document not found';
-				}
+			const response = await documentApi.get(documentId);
+			if (response.ok && response.data?.document) {
+				document = response.data.document;
 			} else {
-				error = 'Failed to load document';
+				error = 'Document not found';
 			}
 		} catch (e) {
 			error = 'Failed to load document';
@@ -64,12 +45,15 @@
 	async function loadHistory() {
 		if (!documentId) return;
 		try {
-			const response = await fetch(`/api/activity-event?resourceType=DOCUMENT&resourceId=${documentId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					history = data.data.items;
-				}
+			const response = await activityEventApi.list({ entityType: 'DOCUMENT', entityId: documentId });
+			if (response.ok && response.data?.events) {
+				history = response.data.events.map(e => ({
+					id: e.id,
+					action: e.action,
+					description: e.summary,
+					performedBy: e.performedBy,
+					createdAt: e.createdAt
+				}));
 			}
 		} catch (e) {
 			console.error('Failed to load history:', e);
@@ -84,7 +68,8 @@
 		});
 	}
 
-	function formatDateTime(dateString: string): string {
+	function formatDateTime(dateString: string | undefined): string {
+		if (!dateString) return '—';
 		return new Date(dateString).toLocaleString('en-US', {
 			month: 'short',
 			day: 'numeric',
@@ -94,13 +79,15 @@
 		});
 	}
 
-	function formatFileSize(bytes: number): string {
+	function formatFileSize(bytes: number | undefined): string {
+		if (bytes === undefined) return '—';
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 	}
 
-	function getVisibilityLabel(visibility: string): string {
+	function getVisibilityLabel(visibility: string | undefined): string {
+		if (!visibility) return '—';
 		switch (visibility) {
 			case 'OWNER_ONLY': return 'Owner Only';
 			case 'BOARD_ONLY': return 'Board Only';
@@ -110,7 +97,8 @@
 		}
 	}
 
-	function isPreviewable(mimeType: string): boolean {
+	function isPreviewable(mimeType: string | undefined): boolean {
+		if (!mimeType) return false;
 		return mimeType.startsWith('image/') || mimeType === 'application/pdf';
 	}
 
@@ -250,7 +238,7 @@
 	<Card variant="outlined" padding="lg">
 		<h3 class="mb-4 font-semibold">Document Preview</h3>
 
-		{#if document && isPreviewable(document.mimeType)}
+		{#if document && document.mimeType && isPreviewable(document.mimeType)}
 			{#if document.mimeType.startsWith('image/')}
 				<div class="flex justify-center">
 					<img

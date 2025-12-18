@@ -3,20 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-		unitType: string;
-		status: string;
-		address?: string;
-		squareFootage?: number;
-		bedrooms?: number;
-		bathrooms?: number;
-		propertyId: string;
-		ownerId?: string;
-		tenantId?: string;
-	}
+	import { unitApi, type Unit } from '$lib/api/cam';
 
 	let unit = $state<Unit | null>(null);
 	let isLoading = $state(true);
@@ -54,25 +41,21 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/unit/${unitId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					unit = data.data;
-					formData = {
-						unitNumber: data.data.unitNumber || '',
-						unitType: data.data.unitType || 'RESIDENTIAL',
-						status: data.data.status || 'OCCUPIED',
-						address: data.data.address || '',
-						squareFootage: data.data.squareFootage?.toString() || '',
-						bedrooms: data.data.bedrooms?.toString() || '',
-						bathrooms: data.data.bathrooms?.toString() || ''
-					};
-				} else {
-					error = 'Unit not found';
-				}
+			const response = await unitApi.get(unitId);
+			if (response.ok && response.data?.unit) {
+				const u = response.data.unit;
+				unit = u;
+				formData = {
+					unitNumber: u.unitNumber || '',
+					unitType: u.unitType || 'RESIDENTIAL',
+					status: u.status || 'OCCUPIED',
+					address: u.address || '',
+					squareFootage: u.squareFootage?.toString() || '',
+					bedrooms: u.bedrooms?.toString() || '',
+					bathrooms: u.bathrooms?.toString() || ''
+				};
 			} else {
-				error = 'Failed to load unit';
+				error = 'Unit not found';
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -96,25 +79,20 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/unit/${unit.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					unitNumber: formData.unitNumber,
-					unitType: formData.unitType,
-					status: formData.status,
-					address: formData.address || undefined,
-					squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
-					bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
-					bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined
-				})
+			const response = await unitApi.update(unit.id, {
+				unitNumber: formData.unitNumber,
+				unitType: formData.unitType,
+				status: formData.status,
+				address: formData.address || undefined,
+				squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
+				bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
+				bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined
 			});
 
 			if (response.ok) {
 				goto(`/app/cam/units/${unit.id}`);
 			} else {
-				const data = await response.json();
-				error = data.error?.message || 'Failed to update unit';
+				error = response.error?.message || 'Failed to update unit';
 			}
 		} catch (e) {
 			error = 'Failed to update unit';

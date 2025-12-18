@@ -1,11 +1,12 @@
 import { OpenAPIGenerator } from '@orpc/openapi';
+import { ZodToJsonSchemaConverter } from '@orpc/zod/zod4';
 import { appRouter } from './index.js';
 
 /**
  * OpenAPI specification generator for the Hestami API
  */
 export const openAPIGenerator = new OpenAPIGenerator({
-	schemaConverters: []
+	schemaConverters: [new ZodToJsonSchemaConverter()]
 });
 
 /**

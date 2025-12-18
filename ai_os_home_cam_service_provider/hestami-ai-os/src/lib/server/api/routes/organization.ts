@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../schemas.js';
 import { authedProcedure, orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
@@ -32,7 +33,7 @@ export const organizationRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -112,7 +113,7 @@ export const organizationRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ context }) => {
@@ -156,7 +157,7 @@ export const organizationRouter = {
 					}),
 					role: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ context }) => {
@@ -190,7 +191,7 @@ export const organizationRouter = {
 				data: z.object({
 					success: z.boolean()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -283,7 +284,7 @@ export const organizationRouter = {
 						joinedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -343,7 +344,7 @@ export const organizationRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -403,7 +404,7 @@ export const organizationRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ context }) => {

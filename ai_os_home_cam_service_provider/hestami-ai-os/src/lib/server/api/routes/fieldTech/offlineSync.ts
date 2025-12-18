@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -67,7 +68,7 @@ export const offlineSyncRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ queueItem: syncQueueItemOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -126,7 +127,7 @@ export const offlineSyncRouter = {
 					queuedCount: z.number(),
 					queueItems: z.array(syncQueueItemOutput)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -189,7 +190,7 @@ export const offlineSyncRouter = {
 					queueItems: z.array(syncQueueItemOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -243,7 +244,7 @@ export const offlineSyncRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ queueItem: syncQueueItemOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -289,7 +290,7 @@ export const offlineSyncRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ queueItem: syncQueueItemOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -334,7 +335,7 @@ export const offlineSyncRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deletedCount: z.number() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

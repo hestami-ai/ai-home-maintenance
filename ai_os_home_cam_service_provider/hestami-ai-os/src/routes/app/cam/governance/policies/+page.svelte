@@ -4,13 +4,14 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { governanceApi } from '$lib/api/cam';
 
 	interface Policy {
 		id: string;
 		title: string;
 		category: string;
 		version: string;
-		status: 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
+		status: string;
 		effectiveDate: string;
 		lastReviewedDate?: string;
 		nextReviewDate?: string;
@@ -39,16 +40,11 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams({ associationId: $currentAssociation.id });
-			if (categoryFilter !== 'all') params.append('category', categoryFilter);
-			if (searchQuery) params.append('search', searchQuery);
-
-			const response = await fetch(`/api/governance/policy?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					policies = data.data.items;
-				}
+			const response = await governanceApi.policies.list({
+				category: categoryFilter !== 'all' ? categoryFilter : undefined
+			});
+			if (response.ok && response.data?.policies) {
+				policies = response.data.policies;
 			}
 		} catch (e) {
 			console.error('Failed to load policies:', e);

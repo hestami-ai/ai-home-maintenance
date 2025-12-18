@@ -3,19 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-
-	interface Vendor {
-		id: string;
-		name: string;
-		contactName?: string;
-		email?: string;
-		phone?: string;
-		address?: string;
-		licenseNumber?: string;
-		insuranceExpiry?: string;
-		trades: string[];
-		status: string;
-	}
+	import { vendorApi, type Vendor } from '$lib/api/cam';
 
 	let vendor = $state<Vendor | null>(null);
 	let isLoading = $state(true);
@@ -79,27 +67,23 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/vendor/${vendorId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					vendor = data.data;
-					formData = {
-						name: data.data.name || '',
-						contactName: data.data.contactName || '',
-						email: data.data.email || '',
-						phone: data.data.phone || '',
-						address: data.data.address || '',
-						licenseNumber: data.data.licenseNumber || '',
-						insuranceExpiry: data.data.insuranceExpiry?.split('T')[0] || '',
-						trades: data.data.trades || [],
-						status: data.data.status || 'PENDING'
-					};
-				} else {
-					error = 'Vendor not found';
-				}
+			const response = await vendorApi.get(vendorId);
+			if (response.ok && response.data?.vendor) {
+				const v = response.data.vendor;
+				vendor = v;
+				formData = {
+					name: v.name || '',
+					contactName: v.contactName || '',
+					email: v.email || '',
+					phone: v.phone || '',
+					address: v.address || '',
+					licenseNumber: v.licenseNumber || '',
+					insuranceExpiry: v.insuranceExpiry?.split('T')[0] || '',
+					trades: v.trades || [],
+					status: v.status || 'PENDING'
+				};
 			} else {
-				error = 'Failed to load vendor';
+				error = 'Vendor not found';
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -128,27 +112,22 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/vendor/${vendor.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: formData.name,
-					contactName: formData.contactName || undefined,
-					email: formData.email || undefined,
-					phone: formData.phone || undefined,
-					address: formData.address || undefined,
-					licenseNumber: formData.licenseNumber || undefined,
-					insuranceExpiry: formData.insuranceExpiry || undefined,
-					trades: formData.trades,
-					status: formData.status
-				})
+			const response = await vendorApi.update(vendor.id, {
+				name: formData.name,
+				contactName: formData.contactName || undefined,
+				email: formData.email || undefined,
+				phone: formData.phone || undefined,
+				address: formData.address || undefined,
+				licenseNumber: formData.licenseNumber || undefined,
+				insuranceExpiry: formData.insuranceExpiry || undefined,
+				trades: formData.trades,
+				status: formData.status
 			});
 
 			if (response.ok) {
 				goto(`/app/cam/vendors/${vendor.id}`);
 			} else {
-				const data = await response.json();
-				error = data.error?.message || 'Failed to update vendor';
+				error = response.error?.message || 'Failed to update vendor';
 			}
 		} catch (e) {
 			error = 'Failed to update vendor';

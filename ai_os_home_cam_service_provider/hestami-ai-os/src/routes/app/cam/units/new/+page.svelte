@@ -4,6 +4,7 @@
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { unitApi, propertyApi } from '$lib/api/cam';
 
 	interface Property {
 		id: string;
@@ -47,12 +48,9 @@
 
 		isLoadingData = true;
 		try {
-			const response = await fetch(`/api/property?associationId=${$currentAssociation.id}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					properties = data.data.items;
-				}
+			const response = await propertyApi.list({});
+			if (response.ok && response.data?.properties) {
+				properties = response.data.properties;
 			}
 
 			if (preselectedPropertyId) {
@@ -77,32 +75,23 @@
 		error = null;
 
 		try {
-			const response = await fetch('/api/unit', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					propertyId: formData.propertyId,
-					unitNumber: formData.unitNumber,
-					unitType: formData.unitType,
-					status: formData.status,
-					address: formData.address || undefined,
-					squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
-					bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
-					bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined,
-					floor: formData.floor ? parseInt(formData.floor) : undefined,
-					notes: formData.notes || undefined
-				})
+			const response = await unitApi.create({
+				propertyId: formData.propertyId,
+				unitNumber: formData.unitNumber,
+				unitType: formData.unitType,
+				status: formData.status,
+				address: formData.address || undefined,
+				squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
+				bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
+				bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined,
+				floor: formData.floor ? parseInt(formData.floor) : undefined,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.id) {
-					goto(`/app/cam/units/${data.data.id}`);
-				} else {
-					error = data.error?.message || 'Failed to create unit';
-				}
+			if (response.ok && response.data?.unit) {
+				goto(`/app/cam/units/${response.data.unit.id}`);
 			} else {
-				error = 'Failed to create unit';
+				error = response.error?.message || 'Failed to create unit';
 			}
 		} catch (e) {
 			error = 'Failed to create unit';

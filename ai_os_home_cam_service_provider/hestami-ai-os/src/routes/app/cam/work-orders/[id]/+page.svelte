@@ -4,38 +4,8 @@
 	import { ArrowLeft, Wrench, FileText, Clock, UserPlus, CheckCircle, XCircle, Calendar, Pencil } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, AssignVendorModal, ScheduleWorkModal, CompleteWorkOrderModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { workOrderApi, documentApi, activityEventApi } from '$lib/api/cam';
+	import { workOrderApi, vendorApi, documentApi, activityEventApi, type WorkOrder, type Vendor, type Document } from '$lib/api/cam';
 	import { refreshBadgeCounts } from '$lib/stores';
-
-	interface WorkOrder {
-		id: string;
-		workOrderNumber: string;
-		title: string;
-		description: string;
-		status: string;
-		priority: string;
-		category: string;
-		unitId?: string;
-		unitNumber?: string;
-		commonAreaId?: string;
-		commonAreaName?: string;
-		vendorId?: string;
-		vendorName?: string;
-		estimatedCost?: number;
-		actualCost?: number;
-		dueDate?: string;
-		scheduledDate?: string;
-		completedDate?: string;
-		createdAt: string;
-		updatedAt: string;
-	}
-
-	interface WorkOrderDocument {
-		id: string;
-		name: string;
-		category: string;
-		createdAt: string;
-	}
 
 	interface WorkOrderHistoryEvent {
 		id: string;
@@ -45,15 +15,8 @@
 		createdAt: string;
 	}
 
-	interface Vendor {
-		id: string;
-		name: string;
-		trades: string[];
-		status: string;
-	}
-
 	let workOrder = $state<WorkOrder | null>(null);
-	let documents = $state<WorkOrderDocument[]>([]);
+	let documents = $state<Document[]>([]);
 	let history = $state<WorkOrderHistoryEvent[]>([]);
 	let vendors = $state<Vendor[]>([]);
 	let isLoading = $state(true);
@@ -162,8 +125,9 @@
 		});
 	}
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+	function formatCurrency(amount: string | number | undefined): string {
+		if (amount === undefined) return '$0.00';
+		return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(amount));
 	}
 
 	function isOverdue(dueDate?: string, status?: string): boolean {
@@ -174,12 +138,9 @@
 
 	async function loadVendors() {
 		try {
-			const response = await fetch('/api/vendor?status=APPROVED');
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					vendors = data.data.items;
-				}
+			const response = await vendorApi.list({ status: 'APPROVED' });
+			if (response.ok && response.data?.vendors) {
+				vendors = response.data.vendors;
 			}
 		} catch (e) {
 			console.error('Failed to load vendors:', e);
@@ -191,10 +152,10 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/work-order/${workOrder.id}/assign`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await workOrderApi.assign(workOrder.id, {
+				vendorId: data.vendorId,
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -215,10 +176,12 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/work-order/${workOrder.id}/schedule`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await workOrderApi.schedule(workOrder.id, {
+				scheduledDate: data.scheduledDate,
+				scheduledTime: data.scheduledTime,
+				estimatedDuration: data.estimatedDuration,
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -239,10 +202,11 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/work-order/${workOrder.id}/complete`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await workOrderApi.complete(workOrder.id, {
+				completedDate: data.completedDate,
+				actualCost: data.actualCost,
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -269,16 +233,12 @@
 		isLinkingDocument = true;
 		try {
 			for (const doc of selectedDocs) {
-				const response = await fetch('/api/v1/rpc/document.linkToContext', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						idempotencyKey: crypto.randomUUID(),
-						documentId: doc.documentId,
-						contextType: 'WORK_ORDER',
-						contextId: workOrderId,
-						bindingNotes: `Linked as authorization/supporting document`
-					})
+				const response = await documentApi.linkToContext({
+					documentId: doc.documentId,
+					contextType: 'WORK_ORDER',
+					contextId: workOrderId,
+					bindingNotes: `Linked as authorization/supporting document`,
+					idempotencyKey: crypto.randomUUID()
 				});
 
 				if (!response.ok) {
@@ -479,7 +439,7 @@
 					{#if workOrder.actualCost}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Actual Cost</h4>
-							<p class="mt-1">{formatCurrency(workOrder.actualCost)}</p>
+							<p class="mt-1">{formatCurrency(Number(workOrder.actualCost))}</p>
 						</div>
 					{/if}
 				</div>

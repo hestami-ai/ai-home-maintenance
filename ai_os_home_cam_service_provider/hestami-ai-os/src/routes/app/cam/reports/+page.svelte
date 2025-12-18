@@ -3,14 +3,16 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { reportApi } from '$lib/api/cam';
 
 	interface ReportDefinition {
 		id: string;
 		name: string;
-		description: string;
+		description?: string;
 		category: string;
-		outputFormat: string;
-		createdAt: string;
+		outputFormat?: string;
+		isSystem?: boolean;
+		createdAt?: string;
 	}
 
 	let reports = $state<ReportDefinition[]>([]);
@@ -32,15 +34,11 @@
 
 		isLoading = true;
 		try {
-			let url = `/api/report/definition?associationId=${$currentAssociation.id}`;
-			if (categoryFilter) url += `&category=${categoryFilter}`;
-
-			const response = await fetch(url);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					reports = data.data.items;
-				}
+			const response = await reportApi.definitions.list({
+				category: categoryFilter || undefined
+			});
+			if (response.ok && response.data?.reports) {
+				reports = response.data.reports;
 			}
 		} catch (error) {
 			console.error('Failed to load reports:', error);
@@ -64,7 +62,7 @@
 	const filteredReports = $derived(
 		reports.filter((r) =>
 			r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			r.description.toLowerCase().includes(searchQuery.toLowerCase())
+			(r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
 		)
 	);
 
@@ -198,7 +196,7 @@
 								</div>
 								<div>
 									<h3 class="text-sm font-medium text-surface-500">Created</h3>
-									<p class="mt-1">{formatDate(rpt.createdAt)}</p>
+									<p class="mt-1">{rpt.createdAt ? formatDate(rpt.createdAt) : '—'}</p>
 								</div>
 							</div>
 

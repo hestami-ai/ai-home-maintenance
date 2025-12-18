@@ -304,22 +304,26 @@ Phase 1 (Schema & Backend) ──┬──> Phase 2 (Documents UI)
 - [x] `cerbos/policies/document.yaml`
 
 ### Modified Files
-- [x] `prisma/schema.prisma`
+- [x] `prisma/schema.prisma` - Added DocumentContextType enums, BoardMotion model
 - [x] `src/lib/server/api/routes/document.ts`
 - [x] `src/lib/server/api/middleware/activityEvent.ts`
 - [x] `src/routes/app/cam/documents/+page.svelte`
 - [x] `src/routes/app/cam/documents/upload/+page.svelte`
 - [x] `src/lib/components/cam/index.ts`
+- [x] `src/lib/api/cam.ts` - Added document API methods (classify, link, unlink, getReferences, getActivityHistory, getVersions) and BoardMotion API
+- [x] `src/routes/app/cam/violations/[id]/+page.svelte` - DocumentPicker integration complete
+- [x] `src/routes/app/cam/arc/[id]/+page.svelte` - DocumentPicker integration complete
+- [x] `src/routes/app/cam/work-orders/[id]/+page.svelte` - DocumentPicker integration complete
 - [ ] `src/routes/app/cam/documents/[id]/+page.svelte` *(not modified - detail view in main page)*
-- [ ] `src/routes/app/cam/violations/[id]/+page.svelte` *(ready for DocumentPicker integration)*
-- [ ] `src/routes/app/cam/arc/[id]/+page.svelte` *(ready for DocumentPicker integration)*
-- [ ] `src/routes/app/cam/work-orders/[id]/+page.svelte` *(ready for DocumentPicker integration)*
+
+### Additional Files Created
+- [x] `src/lib/server/api/routes/governance/boardMotion.ts` - Board Motion API endpoints
 
 ---
 
 ## Resolved Questions
 
-1. **Board Motion Entity**: No `BoardMotion` model exists. Document linking for board decisions will be deferred until governance module is implemented (Phase 11).
+1. **Board Motion Entity**: ✅ `BoardMotion` model now implemented with full API. Document linking for board decisions is ready for Phase 11 UI integration.
 
 2. **Effective Date Enforcement**: Documents with future effective dates will be displayed with a "not yet effective" indicator, not hidden.
 

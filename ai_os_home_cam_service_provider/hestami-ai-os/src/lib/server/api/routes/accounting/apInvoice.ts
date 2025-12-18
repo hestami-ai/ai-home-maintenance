@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -43,7 +44,7 @@ export const apInvoiceRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -167,7 +168,7 @@ export const apInvoiceRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -255,7 +256,7 @@ export const apInvoiceRouter = {
 						)
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -329,7 +330,7 @@ export const apInvoiceRouter = {
 						approvedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -387,7 +388,7 @@ export const apInvoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -48,7 +49,7 @@ export const delegatedAuthorityRouter = {
 						grantedBy: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -176,7 +177,7 @@ export const delegatedAuthorityRouter = {
 						name: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -286,7 +287,7 @@ export const delegatedAuthorityRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -376,7 +377,7 @@ export const delegatedAuthorityRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -464,7 +465,7 @@ export const delegatedAuthorityRouter = {
 						acceptedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -534,7 +535,7 @@ export const delegatedAuthorityRouter = {
 						revokedBy: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -605,7 +606,7 @@ export const delegatedAuthorityRouter = {
 					monetaryLimit: z.number().nullable(),
 					withinLimit: z.boolean().nullable()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

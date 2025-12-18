@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -48,7 +49,7 @@ export const propertyOwnershipRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -184,7 +185,7 @@ export const propertyOwnershipRouter = {
 						partyType: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -279,7 +280,7 @@ export const propertyOwnershipRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -371,7 +372,7 @@ export const propertyOwnershipRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -455,7 +456,7 @@ export const propertyOwnershipRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -531,7 +532,7 @@ export const propertyOwnershipRouter = {
 						verifiedBy: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -590,7 +591,7 @@ export const propertyOwnershipRouter = {
 						effectiveTo: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -675,7 +676,7 @@ export const propertyOwnershipRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

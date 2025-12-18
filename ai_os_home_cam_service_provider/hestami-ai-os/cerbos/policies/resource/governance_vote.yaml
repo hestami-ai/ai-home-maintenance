@@ -1,0 +1,61 @@
+# Governance Vote Resource Policy
+# Controls access to vote sessions and ballot casting
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_vote"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all vote operations
+    - actions: ["view", "create", "cast_ballot", "close", "tally", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers have full access to vote operations
+    - actions: ["view", "create", "cast_ballot", "close", "tally", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view, create votes, cast ballots, and tally
+    - actions: ["view", "create", "cast_ballot", "tally"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Board chair can close votes
+    - actions: ["close"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+      condition:
+        match:
+          expr: "has(R.attr.isChair) && R.attr.isChair == true"
+
+    # Owners can view votes (read-only access to governance)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Owners can cast ballots if they are eligible voters
+    # Eligibility is determined by meeting attendance and voter list
+    - actions: ["cast_ballot"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          all:
+            of:
+              - expr: "has(R.attr.eligibleVoterIds)"
+              - expr: "P.id in R.attr.eligibleVoterIds"
+
+    # Auditors can view votes for audit purposes
+    - actions: ["view", "tally"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

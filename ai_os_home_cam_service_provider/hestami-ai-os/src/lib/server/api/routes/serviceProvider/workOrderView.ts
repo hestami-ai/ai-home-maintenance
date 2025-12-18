@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -55,7 +56,7 @@ export const workOrderViewRouter = {
 					nextCursor: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'work_order', '*');
@@ -175,7 +176,7 @@ export const workOrderViewRouter = {
 					createdAt: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'work_order', input.id);
@@ -253,7 +254,7 @@ export const workOrderViewRouter = {
 					overdueCount: z.number()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ context }) => {
 			await context.cerbos.authorize('view', 'work_order', '*');

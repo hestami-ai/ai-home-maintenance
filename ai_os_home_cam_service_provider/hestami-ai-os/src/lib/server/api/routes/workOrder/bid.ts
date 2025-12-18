@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -36,7 +37,7 @@ export const bidRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -143,7 +144,7 @@ export const bidRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -237,7 +238,7 @@ export const bidRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -311,7 +312,7 @@ export const bidRouter = {
 						assignedVendorId: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -426,7 +427,7 @@ export const bidRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -494,7 +495,7 @@ export const bidRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

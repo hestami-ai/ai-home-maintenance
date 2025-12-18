@@ -142,13 +142,10 @@
 			if (bulkAction && selectedIds.size > 0) {
 				// Bulk action
 				const promises = Array.from(selectedIds).map(id =>
-					fetch(`/api/violation/${id}/action`, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							action: rationaleAction!.type,
-							rationale
-						})
+					violationApi.recordAction(id, {
+						action: rationaleAction!.type,
+						notes: rationale,
+						idempotencyKey: crypto.randomUUID()
 					})
 				);
 				await Promise.all(promises);
@@ -156,13 +153,10 @@
 				bulkAction = null;
 			} else if (selectedViolation) {
 				// Single action
-				await fetch(`/api/violation/${selectedViolation.id}/action`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						action: rationaleAction.type,
-						rationale
-					})
+				await violationApi.recordAction(selectedViolation.id, {
+					action: rationaleAction.type,
+					notes: rationale,
+					idempotencyKey: crypto.randomUUID()
 				});
 			}
 

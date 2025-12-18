@@ -4,17 +4,19 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { governanceApi } from '$lib/api/cam';
 
 	interface Resolution {
 		id: string;
 		resolutionNumber: string;
 		title: string;
-		type: 'BOARD' | 'MEMBER';
-		status: 'DRAFT' | 'PROPOSED' | 'PASSED' | 'FAILED' | 'TABLED';
-		proposedDate: string;
+		type?: 'BOARD' | 'MEMBER';
+		status: string;
+		proposedDate?: string;
+		adoptedDate?: string;
 		votedDate?: string;
 		effectiveDate?: string;
-		description: string;
+		description?: string;
 		votesFor?: number;
 		votesAgainst?: number;
 		votesAbstain?: number;
@@ -40,16 +42,11 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams({ associationId: $currentAssociation.id });
-			if (statusFilter !== 'all') params.append('status', statusFilter);
-			if (searchQuery) params.append('search', searchQuery);
-
-			const response = await fetch(`/api/governance/resolution?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					resolutions = data.data.items;
-				}
+			const response = await governanceApi.resolutions.list({
+				status: statusFilter !== 'all' ? statusFilter : undefined
+			});
+			if (response.ok && response.data?.resolutions) {
+				resolutions = response.data.resolutions;
 			}
 		} catch (e) {
 			console.error('Failed to load resolutions:', e);
@@ -172,7 +169,7 @@
 										</span>
 									</div>
 									<p class="mt-1 text-xs text-surface-400">
-										{resolution.type} · {formatDate(resolution.proposedDate)}
+										{resolution.type || 'Resolution'} · {resolution.proposedDate ? formatDate(resolution.proposedDate) : '—'}
 									</p>
 								</button>
 							{/each}
@@ -244,7 +241,7 @@
 									<div class="grid gap-4 sm:grid-cols-3">
 										<div>
 											<h4 class="text-sm font-medium text-surface-500">Proposed</h4>
-											<p class="mt-1">{formatDate(r.proposedDate)}</p>
+											<p class="mt-1">{r.proposedDate ? formatDate(r.proposedDate) : '—'}</p>
 										</div>
 										{#if r.votedDate}
 											<div>

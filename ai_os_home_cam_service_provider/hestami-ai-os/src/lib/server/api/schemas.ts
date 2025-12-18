@@ -1,0 +1,795 @@
+/**
+ * Shared API response schemas
+ * 
+ * This file provides typed Zod schemas for API responses.
+ * 
+ * NOTE: Due to Prisma 7.x compatibility issues with zod-prisma-types,
+ * we define schemas manually here rather than importing from generated files.
+ * These schemas should match the Prisma model definitions.
+ * 
+ * These schemas are used in route `.output()` definitions to ensure:
+ * 1. Runtime validation of responses
+ * 2. Accurate OpenAPI specification generation
+ * 3. Type-safe frontend code generation
+ */
+
+import { z } from 'zod';
+import { ResponseMetaSchema } from './errors.js';
+
+// Re-export for convenience
+export { ResponseMetaSchema };
+
+// =============================================================================
+// Base Response Helpers
+// =============================================================================
+
+/**
+ * Creates a standard success response schema with typed data
+ */
+export function successResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
+	return z.object({
+		ok: z.literal(true),
+		data: dataSchema,
+		meta: ResponseMetaSchema
+	});
+}
+
+/**
+ * Creates a paginated list response schema
+ */
+export function paginatedResponseSchema<T extends z.ZodTypeAny>(itemSchema: T, itemsKey: string) {
+	return successResponseSchema(
+		z.object({
+			[itemsKey]: z.array(itemSchema),
+			pagination: z.object({
+				nextCursor: z.string().nullable(),
+				hasMore: z.boolean()
+			})
+		})
+	);
+}
+
+// =============================================================================
+// Enum Schemas
+// =============================================================================
+
+export const ARCCategorySchema = z.enum([
+	'FENCE', 'ROOF', 'PAINT', 'ADDITION', 'LANDSCAPING', 'WINDOWS',
+	'DOORS', 'DRIVEWAY', 'GARAGE', 'SOLAR', 'HVAC', 'OTHER'
+]);
+export type ARCCategory = z.infer<typeof ARCCategorySchema>;
+
+export const ARCRequestStatusSchema = z.enum([
+	'DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'DENIED',
+	'CHANGES_REQUESTED', 'TABLED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'
+]);
+export type ARCRequestStatus = z.infer<typeof ARCRequestStatusSchema>;
+
+export const ARCReviewActionSchema = z.enum([
+	'APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE'
+]);
+export type ARCReviewAction = z.infer<typeof ARCReviewActionSchema>;
+
+export const ARCDocumentTypeSchema = z.enum([
+	'PLANS', 'SPECS', 'PHOTO', 'PERMIT', 'RENDERING', 'SURVEY', 'OTHER'
+]);
+export type ARCDocumentType = z.infer<typeof ARCDocumentTypeSchema>;
+
+// =============================================================================
+// ARC Domain Schemas
+// =============================================================================
+
+/**
+ * ARC Request base schema (matches Prisma ARCRequest model)
+ * Note: estimatedCost is Decimal in Prisma, we use z.any() to accept it
+ */
+export const ARCRequestSchema = z.object({
+	id: z.string(),
+	associationId: z.string(),
+	committeeId: z.string().nullish(),
+	unitId: z.string().nullish(),
+	requesterPartyId: z.string(),
+	requestNumber: z.string(),
+	title: z.string(),
+	description: z.string(),
+	category: ARCCategorySchema,
+	status: ARCRequestStatusSchema,
+	estimatedCost: z.any().nullish(), // Prisma Decimal type
+	proposedStartDate: z.coerce.date().nullish(),
+	proposedEndDate: z.coerce.date().nullish(),
+	conditions: z.string().nullish(),
+	submittedAt: z.coerce.date().nullish(),
+	reviewedAt: z.coerce.date().nullish(),
+	decisionDate: z.coerce.date().nullish(),
+	expiresAt: z.coerce.date().nullish(),
+	withdrawnAt: z.coerce.date().nullish(),
+	cancellationReason: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ARCRequest = z.infer<typeof ARCRequestSchema>;
+
+/**
+ * ARC Document schema (matches Prisma ARCDocument model)
+ */
+export const ARCDocumentSchema = z.object({
+	id: z.string(),
+	requestId: z.string(),
+	documentType: ARCDocumentTypeSchema,
+	fileName: z.string(),
+	fileUrl: z.string(),
+	fileSize: z.number().nullish(),
+	mimeType: z.string().nullish(),
+	description: z.string().nullish(),
+	version: z.string().nullish(),
+	uploadedBy: z.string(),
+	uploadedAt: z.coerce.date(),
+	createdAt: z.coerce.date()
+});
+export type ARCDocument = z.infer<typeof ARCDocumentSchema>;
+
+/**
+ * ARC Review schema
+ */
+export const ARCReviewSchema = z.object({
+	id: z.string(),
+	requestId: z.string(),
+	reviewerId: z.string(),
+	action: ARCReviewActionSchema,
+	notes: z.string().nullish(),
+	conditions: z.string().nullish(),
+	createdAt: z.coerce.date()
+});
+export type ARCReview = z.infer<typeof ARCReviewSchema>;
+
+/**
+ * ARC Committee schema
+ */
+export const ARCCommitteeSchema = z.object({
+	id: z.string(),
+	associationId: z.string(),
+	name: z.string(),
+	description: z.string().nullish(),
+	isActive: z.boolean(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ARCCommittee = z.infer<typeof ARCCommitteeSchema>;
+
+// =============================================================================
+// Association Domain Schemas
+// =============================================================================
+
+export const AssociationSchema = z.object({
+	id: z.string(),
+	organizationId: z.string(),
+	name: z.string(),
+	legalName: z.string().nullish(),
+	status: z.string(),
+	fiscalYearEnd: z.number(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type Association = z.infer<typeof AssociationSchema>;
+
+export const UnitSchema = z.object({
+	id: z.string(),
+	propertyId: z.string(),
+	unitNumber: z.string(),
+	unitType: z.string().nullish(),
+	bedrooms: z.number().nullish(),
+	bathrooms: z.number().nullish(),
+	squareFeet: z.number().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type Unit = z.infer<typeof UnitSchema>;
+
+export const PartySchema = z.object({
+	id: z.string(),
+	organizationId: z.string(),
+	partyType: z.string(),
+	firstName: z.string().nullish(),
+	lastName: z.string().nullish(),
+	companyName: z.string().nullish(),
+	email: z.string().nullish(),
+	phone: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type Party = z.infer<typeof PartySchema>;
+
+// =============================================================================
+// ARC Domain Response Schemas
+// =============================================================================
+
+/**
+ * ARC Request with related entities for detail views
+ */
+export const ARCRequestDetailSchema = ARCRequestSchema.extend({
+	association: AssociationSchema.optional(),
+	unit: UnitSchema.nullish(),
+	committee: ARCCommitteeSchema.nullish(),
+	requesterParty: PartySchema.optional(),
+	documents: z.array(ARCDocumentSchema).optional(),
+	reviews: z.array(ARCReviewSchema).optional()
+});
+export type ARCRequestDetail = z.infer<typeof ARCRequestDetailSchema>;
+
+/**
+ * ARC Request summary for list views
+ */
+export const ARCRequestSummarySchema = z.object({
+	id: z.string(),
+	requestNumber: z.string(),
+	title: z.string(),
+	status: z.string(),
+	category: z.string(),
+	unitNumber: z.string().nullish(),
+	submitterName: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+
+export type ARCRequestSummary = z.infer<typeof ARCRequestSummarySchema>;
+
+/**
+ * ARC Precedent for similar request lookups
+ */
+export const ARCPrecedentSchema = z.object({
+	id: z.string(),
+	requestNumber: z.string(),
+	title: z.string(),
+	status: z.string(),
+	category: z.string(),
+	decisionDate: z.coerce.date().nullable(),
+	similarity: z.number().optional()
+});
+
+export type ARCPrecedent = z.infer<typeof ARCPrecedentSchema>;
+
+// =============================================================================
+// ARC Route Response Schemas
+// =============================================================================
+
+export const ARCRequestCreateResponseSchema = successResponseSchema(
+	z.object({
+		request: z.object({
+			id: z.string(),
+			requestNumber: z.string(),
+			title: z.string(),
+			status: z.string(),
+			category: z.string()
+		})
+	})
+);
+
+export const ARCRequestGetResponseSchema = successResponseSchema(
+	z.object({
+		request: ARCRequestDetailSchema
+	})
+);
+
+export const ARCRequestListResponseSchema = successResponseSchema(
+	z.object({
+		requests: z.array(ARCRequestSummarySchema),
+		pagination: z.object({
+			nextCursor: z.string().nullable(),
+			hasMore: z.boolean()
+		})
+	})
+);
+
+export const ARCRequestUpdateResponseSchema = successResponseSchema(
+	z.object({
+		request: z.object({
+			id: z.string(),
+			status: z.string()
+		})
+	})
+);
+
+export const ARCRequestSubmitResponseSchema = successResponseSchema(
+	z.object({
+		request: z.object({
+			id: z.string(),
+			status: z.string(),
+			submittedAt: z.string().nullable()
+		})
+	})
+);
+
+export const ARCRequestWithdrawResponseSchema = successResponseSchema(
+	z.object({
+		request: z.object({
+			id: z.string(),
+			status: z.string(),
+			withdrawnAt: z.string().nullable()
+		})
+	})
+);
+
+export const ARCDocumentAddResponseSchema = successResponseSchema(
+	z.object({
+		document: z.object({
+			id: z.string(),
+			requestId: z.string()
+		})
+	})
+);
+
+export const ARCReviewSubmitResponseSchema = successResponseSchema(
+	z.object({
+		request: z.object({
+			id: z.string(),
+			status: z.string()
+		})
+	})
+);
+
+export const ARCPrecedentsResponseSchema = successResponseSchema(
+	z.object({
+		precedents: z.array(ARCPrecedentSchema),
+		total: z.number()
+	})
+);
+
+export const ARCRequestFinalizeResponseSchema = successResponseSchema(
+	z.object({
+		request: z.object({
+			id: z.string(),
+			status: z.string()
+		})
+	})
+);
+
+// =============================================================================
+// Violation Domain Enum Schemas
+// =============================================================================
+
+export const ViolationStatusSchema = z.enum([
+	'DRAFT', 'OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'CURED', 'ESCALATED',
+	'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'APPEALED',
+	'CLOSED', 'DISMISSED'
+]);
+export type ViolationStatus = z.infer<typeof ViolationStatusSchema>;
+
+export const ViolationSeveritySchema = z.enum([
+	'MINOR', 'MODERATE', 'MAJOR', 'CRITICAL'
+]);
+export type ViolationSeverity = z.infer<typeof ViolationSeveritySchema>;
+
+export const NoticeTypeSchema = z.enum([
+	'WARNING', 'FIRST_NOTICE', 'SECOND_NOTICE', 'FINAL_NOTICE',
+	'FINE_NOTICE', 'HEARING_NOTICE', 'CURE_CONFIRMATION'
+]);
+export type NoticeType = z.infer<typeof NoticeTypeSchema>;
+
+export const NoticeDeliveryMethodSchema = z.enum([
+	'EMAIL', 'MAIL', 'CERTIFIED_MAIL', 'POSTED', 'HAND_DELIVERED', 'PORTAL'
+]);
+export type NoticeDeliveryMethod = z.infer<typeof NoticeDeliveryMethodSchema>;
+
+export const HearingOutcomeSchema = z.enum([
+	'PENDING', 'UPHELD', 'MODIFIED', 'DISMISSED', 'CONTINUED'
+]);
+export type HearingOutcome = z.infer<typeof HearingOutcomeSchema>;
+
+export const AppealStatusSchema = z.enum([
+	'PENDING', 'GRANTED', 'DENIED', 'WITHDRAWN'
+]);
+export type AppealStatus = z.infer<typeof AppealStatusSchema>;
+
+// =============================================================================
+// Violation Domain Schemas
+// =============================================================================
+
+/**
+ * ViolationType schema (matches Prisma ViolationType model)
+ */
+export const ViolationTypeSchema = z.object({
+	id: z.string(),
+	associationId: z.string(),
+	code: z.string(),
+	name: z.string(),
+	description: z.string().nullish(),
+	category: z.string(),
+	ccnrSection: z.string().nullish(),
+	ruleReference: z.string().nullish(),
+	defaultSeverity: ViolationSeveritySchema,
+	defaultCurePeriodDays: z.number(),
+	firstFineAmount: z.any().nullish(), // Prisma Decimal
+	secondFineAmount: z.any().nullish(), // Prisma Decimal
+	subsequentFineAmount: z.any().nullish(), // Prisma Decimal
+	maxFineAmount: z.any().nullish(), // Prisma Decimal
+	warningTemplateId: z.string().nullish(),
+	noticeTemplateId: z.string().nullish(),
+	isActive: z.boolean(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ViolationType = z.infer<typeof ViolationTypeSchema>;
+
+/**
+ * Violation schema (matches Prisma Violation model)
+ */
+export const ViolationSchema = z.object({
+	id: z.string(),
+	associationId: z.string(),
+	violationNumber: z.string(),
+	violationTypeId: z.string(),
+	unitId: z.string().nullish(),
+	commonAreaName: z.string().nullish(),
+	locationDetails: z.string().nullish(),
+	title: z.string(),
+	description: z.string().nullish(),
+	severity: ViolationSeveritySchema,
+	status: ViolationStatusSchema,
+	observedDate: z.coerce.date(),
+	reportedDate: z.coerce.date(),
+	curePeriodEnds: z.coerce.date().nullish(),
+	curedDate: z.coerce.date().nullish(),
+	closedDate: z.coerce.date().nullish(),
+	responsiblePartyId: z.string().nullish(),
+	reportedBy: z.string(),
+	reporterType: z.string().nullish(),
+	totalFinesAssessed: z.any(), // Prisma Decimal
+	totalFinesPaid: z.any(), // Prisma Decimal
+	totalFinesWaived: z.any(), // Prisma Decimal
+	noticeCount: z.number(),
+	lastNoticeDate: z.coerce.date().nullish(),
+	lastNoticeType: NoticeTypeSchema.nullish(),
+	resolutionNotes: z.string().nullish(),
+	closedBy: z.string().nullish(),
+	deletedAt: z.coerce.date().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type Violation = z.infer<typeof ViolationSchema>;
+
+/**
+ * ViolationEvidence schema
+ */
+export const ViolationEvidenceSchema = z.object({
+	id: z.string(),
+	violationId: z.string(),
+	evidenceType: z.string(),
+	fileName: z.string(),
+	fileUrl: z.string(),
+	fileSize: z.number().nullish(),
+	mimeType: z.string().nullish(),
+	description: z.string().nullish(),
+	capturedAt: z.coerce.date().nullish(),
+	capturedBy: z.string().nullish(),
+	gpsLatitude: z.any().nullish(), // Prisma Decimal
+	gpsLongitude: z.any().nullish(), // Prisma Decimal
+	uploadedBy: z.string(),
+	uploadedAt: z.coerce.date(),
+	createdAt: z.coerce.date()
+});
+export type ViolationEvidence = z.infer<typeof ViolationEvidenceSchema>;
+
+/**
+ * ViolationNotice schema
+ */
+export const ViolationNoticeSchema = z.object({
+	id: z.string(),
+	violationId: z.string(),
+	noticeType: NoticeTypeSchema,
+	noticeNumber: z.number(),
+	templateId: z.string().nullish(),
+	subject: z.string(),
+	body: z.string(),
+	recipientPartyId: z.string().nullish(),
+	recipientName: z.string().nullish(),
+	recipientEmail: z.string().nullish(),
+	recipientAddress: z.string().nullish(),
+	deliveryMethod: NoticeDeliveryMethodSchema,
+	sentAt: z.coerce.date().nullish(),
+	deliveredAt: z.coerce.date().nullish(),
+	curePeriodDays: z.number().nullish(),
+	curePeriodEnds: z.coerce.date().nullish(),
+	fineAmount: z.any().nullish(), // Prisma Decimal
+	createdBy: z.string(),
+	createdAt: z.coerce.date()
+});
+export type ViolationNotice = z.infer<typeof ViolationNoticeSchema>;
+
+/**
+ * ViolationHearing schema
+ */
+export const ViolationHearingSchema = z.object({
+	id: z.string(),
+	violationId: z.string(),
+	hearingDate: z.coerce.date(),
+	location: z.string().nullish(),
+	virtualMeetingUrl: z.string().nullish(),
+	scheduledBy: z.string(),
+	outcome: HearingOutcomeSchema.nullish(),
+	outcomeNotes: z.string().nullish(),
+	fineAmount: z.any().nullish(), // Prisma Decimal
+	reducedFineAmount: z.any().nullish(), // Prisma Decimal
+	decidedAt: z.coerce.date().nullish(),
+	decidedBy: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ViolationHearing = z.infer<typeof ViolationHearingSchema>;
+
+/**
+ * ViolationFine schema
+ */
+export const ViolationFineSchema = z.object({
+	id: z.string(),
+	violationId: z.string(),
+	fineNumber: z.number(),
+	amount: z.any(), // Prisma Decimal
+	reason: z.string(),
+	dueDate: z.coerce.date(),
+	paidAmount: z.any(), // Prisma Decimal
+	paidDate: z.coerce.date().nullish(),
+	waivedAmount: z.any(), // Prisma Decimal
+	waivedReason: z.string().nullish(),
+	waivedBy: z.string().nullish(),
+	waivedAt: z.coerce.date().nullish(),
+	assessedBy: z.string(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ViolationFine = z.infer<typeof ViolationFineSchema>;
+
+/**
+ * ViolationAppeal schema
+ */
+export const ViolationAppealSchema = z.object({
+	id: z.string(),
+	hearingId: z.string(),
+	filedDate: z.coerce.date(),
+	filedBy: z.string(),
+	reason: z.string(),
+	status: AppealStatusSchema,
+	reviewDate: z.coerce.date().nullish(),
+	reviewedBy: z.string().nullish(),
+	decision: z.string().nullish(),
+	decisionNotes: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ViolationAppeal = z.infer<typeof ViolationAppealSchema>;
+
+// =============================================================================
+// Violation Domain Response Schemas
+// =============================================================================
+
+/**
+ * Violation with related entities for detail views
+ */
+export const ViolationDetailSchema = ViolationSchema.extend({
+	association: AssociationSchema.optional(),
+	violationType: ViolationTypeSchema.optional(),
+	unit: UnitSchema.nullish(),
+	responsibleParty: PartySchema.nullish(),
+	evidence: z.array(ViolationEvidenceSchema).optional(),
+	notices: z.array(ViolationNoticeSchema).optional(),
+	hearings: z.array(ViolationHearingSchema).optional(),
+	fines: z.array(ViolationFineSchema).optional()
+});
+export type ViolationDetail = z.infer<typeof ViolationDetailSchema>;
+
+/**
+ * Violation summary for list views
+ */
+export const ViolationSummarySchema = z.object({
+	id: z.string(),
+	violationNumber: z.string(),
+	title: z.string(),
+	status: ViolationStatusSchema,
+	severity: ViolationSeveritySchema,
+	observedDate: z.coerce.date(),
+	unitNumber: z.string().nullish(),
+	responsiblePartyName: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type ViolationSummary = z.infer<typeof ViolationSummarySchema>;
+
+// =============================================================================
+// Document Domain Enum Schemas
+// =============================================================================
+
+export const DocumentCategorySchema = z.enum([
+	'GOVERNING_DOCS', 'FINANCIAL', 'MEETING', 'LEGAL', 'INSURANCE',
+	'MAINTENANCE', 'ARCHITECTURAL', 'RESERVE_STUDY', 'INSPECTION', 'CONTRACT',
+	'CC_AND_RS', 'PERMIT', 'APPROVAL', 'CORRESPONDENCE', 'TITLE_DEED',
+	'SURVEY', 'WARRANTY', 'LICENSE', 'CERTIFICATION', 'BOND',
+	'PROPOSAL', 'ESTIMATE', 'INVOICE', 'WORK_ORDER', 'JOB_PHOTO',
+	'JOB_VIDEO', 'VOICE_NOTE', 'SIGNATURE', 'CHECKLIST', 'GENERAL'
+]);
+export type DocumentCategory = z.infer<typeof DocumentCategorySchema>;
+
+export const DocumentContextTypeSchema = z.enum([
+	'ASSOCIATION', 'PROPERTY', 'UNIT', 'JOB', 'CASE', 'WORK_ORDER',
+	'TECHNICIAN', 'CONTRACTOR', 'VENDOR', 'PARTY', 'OWNER_INTENT',
+	'VIOLATION', 'ARC_REQUEST'
+]);
+export type DocumentContextType = z.infer<typeof DocumentContextTypeSchema>;
+
+export const DocumentVisibilitySchema = z.enum([
+	'PUBLIC', 'OWNERS_ONLY', 'BOARD_ONLY', 'STAFF_ONLY', 'PRIVATE'
+]);
+export type DocumentVisibility = z.infer<typeof DocumentVisibilitySchema>;
+
+export const DocumentStatusSchema = z.enum([
+	'DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'
+]);
+export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
+
+export const StorageProviderSchema = z.enum([
+	'LOCAL', 'S3', 'AZURE_BLOB', 'GCS'
+]);
+export type StorageProvider = z.infer<typeof StorageProviderSchema>;
+
+// =============================================================================
+// Document Domain Schemas
+// =============================================================================
+
+/**
+ * Document schema (matches Prisma Document model)
+ */
+export const DocumentSchema = z.object({
+	id: z.string(),
+	organizationId: z.string(),
+	title: z.string(),
+	description: z.string().nullish(),
+	category: DocumentCategorySchema,
+	visibility: DocumentVisibilitySchema,
+	status: DocumentStatusSchema,
+	storageProvider: StorageProviderSchema,
+	storagePath: z.string(),
+	fileUrl: z.string(),
+	fileName: z.string(),
+	fileSize: z.number(),
+	mimeType: z.string(),
+	checksum: z.string().nullish(),
+	pageCount: z.number().nullish(),
+	thumbnailUrl: z.string().nullish(),
+	extractedText: z.string().nullish(),
+	metadata: z.any().nullish(),
+	version: z.number(),
+	parentDocumentId: z.string().nullish(),
+	supersededById: z.string().nullish(),
+	effectiveDate: z.coerce.date().nullish(),
+	expirationDate: z.coerce.date().nullish(),
+	uploadedBy: z.string(),
+	tags: z.array(z.string()),
+	archivedAt: z.coerce.date().nullish(),
+	archivedBy: z.string().nullish(),
+	archiveReason: z.string().nullish(),
+	malwareScanStatus: z.string().nullish(),
+	contentModerationStatus: z.string().nullish(),
+	processingCompletedAt: z.coerce.date().nullish(),
+	latitude: z.any().nullish(),
+	longitude: z.any().nullish(),
+	capturedAt: z.coerce.date().nullish(),
+	transcription: z.string().nullish(),
+	isTranscribed: z.boolean(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date(),
+	deletedAt: z.coerce.date().nullish()
+});
+export type Document = z.infer<typeof DocumentSchema>;
+
+/**
+ * DocumentContextBinding schema
+ */
+export const DocumentContextBindingSchema = z.object({
+	id: z.string(),
+	documentId: z.string(),
+	contextType: DocumentContextTypeSchema,
+	contextId: z.string(),
+	isPrimary: z.boolean(),
+	bindingNotes: z.string().nullish(),
+	createdAt: z.coerce.date(),
+	createdBy: z.string()
+});
+export type DocumentContextBinding = z.infer<typeof DocumentContextBindingSchema>;
+
+/**
+ * Document summary for list views
+ */
+export const DocumentSummarySchema = z.object({
+	id: z.string(),
+	title: z.string(),
+	category: DocumentCategorySchema,
+	status: DocumentStatusSchema,
+	visibility: DocumentVisibilitySchema,
+	fileName: z.string(),
+	fileSize: z.number(),
+	mimeType: z.string(),
+	version: z.number(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type DocumentSummary = z.infer<typeof DocumentSummarySchema>;
+
+// =============================================================================
+// WorkOrder Domain Enum Schemas
+// =============================================================================
+
+export const WorkOrderStatusSchema = z.enum([
+	'DRAFT', 'SUBMITTED', 'TRIAGED', 'AUTHORIZED', 'ASSIGNED', 'SCHEDULED',
+	'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'REVIEW_REQUIRED', 'INVOICED', 'CLOSED', 'CANCELLED'
+]);
+export type WorkOrderStatus = z.infer<typeof WorkOrderStatusSchema>;
+
+export const WorkOrderPrioritySchema = z.enum([
+	'EMERGENCY', 'HIGH', 'MEDIUM', 'LOW', 'SCHEDULED'
+]);
+export type WorkOrderPriority = z.infer<typeof WorkOrderPrioritySchema>;
+
+export const WorkOrderCategorySchema = z.enum([
+	'MAINTENANCE', 'REPAIR', 'INSPECTION', 'INSTALLATION', 'REPLACEMENT',
+	'EMERGENCY', 'PREVENTIVE', 'LANDSCAPING', 'CLEANING', 'SECURITY', 'OTHER'
+]);
+export type WorkOrderCategory = z.infer<typeof WorkOrderCategorySchema>;
+
+export const WorkOrderOriginTypeSchema = z.enum([
+	'VIOLATION_REMEDIATION', 'ARC_APPROVAL', 'PREVENTIVE_MAINTENANCE',
+	'BOARD_DIRECTIVE', 'EMERGENCY_ACTION', 'MANUAL'
+]);
+export type WorkOrderOriginType = z.infer<typeof WorkOrderOriginTypeSchema>;
+
+export const BidStatusSchema = z.enum([
+	'REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW',
+	'ACCEPTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED'
+]);
+export type BidStatus = z.infer<typeof BidStatusSchema>;
+
+export const FundTypeSchema = z.enum(['OPERATING', 'RESERVE', 'SPECIAL']);
+export type FundType = z.infer<typeof FundTypeSchema>;
+
+// =============================================================================
+// WorkOrder Domain Schemas
+// =============================================================================
+
+/**
+ * WorkOrder schema (matches Prisma WorkOrder model - simplified)
+ */
+export const WorkOrderSchema = z.object({
+	id: z.string(),
+	organizationId: z.string(),
+	associationId: z.string().nullish(),
+	workOrderNumber: z.string(),
+	title: z.string(),
+	description: z.string().nullish(),
+	category: WorkOrderCategorySchema,
+	priority: WorkOrderPrioritySchema,
+	status: WorkOrderStatusSchema,
+	originType: WorkOrderOriginTypeSchema.nullish(),
+	originId: z.string().nullish(),
+	estimatedCost: z.any().nullish(),
+	actualCost: z.any().nullish(),
+	scheduledStart: z.coerce.date().nullish(),
+	scheduledEnd: z.coerce.date().nullish(),
+	actualStart: z.coerce.date().nullish(),
+	actualEnd: z.coerce.date().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type WorkOrder = z.infer<typeof WorkOrderSchema>;
+
+/**
+ * WorkOrder summary for list views
+ */
+export const WorkOrderSummarySchema = z.object({
+	id: z.string(),
+	workOrderNumber: z.string(),
+	title: z.string(),
+	category: WorkOrderCategorySchema,
+	priority: WorkOrderPrioritySchema,
+	status: WorkOrderStatusSchema,
+	scheduledStart: z.coerce.date().nullish(),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date()
+});
+export type WorkOrderSummary = z.infer<typeof WorkOrderSummarySchema>;

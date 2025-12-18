@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -43,7 +44,7 @@ export const journalEntryRouter = {
 						totalCredits: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -165,7 +166,7 @@ export const journalEntryRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -242,7 +243,7 @@ export const journalEntryRouter = {
 						)
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -311,7 +312,7 @@ export const journalEntryRouter = {
 						postedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -403,7 +404,7 @@ export const journalEntryRouter = {
 						entryNumber: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

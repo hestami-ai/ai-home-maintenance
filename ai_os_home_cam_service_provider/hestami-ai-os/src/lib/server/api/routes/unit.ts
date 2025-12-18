@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
@@ -40,7 +41,7 @@ export const unitRouter = {
 						unitType: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -103,7 +104,7 @@ export const unitRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -171,7 +172,7 @@ export const unitRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -257,7 +258,7 @@ export const unitRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -307,7 +308,7 @@ export const unitRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

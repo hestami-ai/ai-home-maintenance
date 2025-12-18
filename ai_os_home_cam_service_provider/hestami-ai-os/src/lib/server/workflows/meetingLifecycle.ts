@@ -13,10 +13,14 @@ import type { MeetingStatus } from '../../../../generated/prisma/client.js';
 const WORKFLOW_STATUS_EVENT = 'meeting_status';
 const WORKFLOW_ERROR_EVENT = 'meeting_error';
 
-// Valid status transitions
+// Valid status transitions (Phase 11: Full governance lifecycle)
 const validTransitions: Record<MeetingStatus, MeetingStatus[]> = {
-	SCHEDULED: ['HELD', 'CANCELLED'],
-	HELD: [],
+	SCHEDULED: ['IN_SESSION', 'CANCELLED'],
+	IN_SESSION: ['ADJOURNED', 'CANCELLED'],
+	ADJOURNED: ['MINUTES_DRAFT'],
+	MINUTES_DRAFT: ['MINUTES_APPROVED', 'ADJOURNED'], // Can go back to ADJOURNED for revisions
+	MINUTES_APPROVED: ['ARCHIVED'],
+	ARCHIVED: [],
 	CANCELLED: []
 };
 
@@ -73,8 +77,8 @@ async function validateTransition(input: TransitionInput): Promise<{
 		};
 	}
 
-	// Additional validation for HELD transition
-	if (input.toStatus === 'HELD') {
+	// Additional validation for IN_SESSION transition
+	if (input.toStatus === 'IN_SESSION') {
 		// Check if meeting has agenda items
 		const agendaCount = await prisma.meetingAgendaItem.count({
 			where: { meetingId: input.meetingId }
@@ -83,7 +87,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 			return {
 				valid: false,
 				currentStatus,
-				error: 'Meeting must have at least one agenda item before being marked as held'
+				error: 'Meeting must have at least one agenda item before starting session'
 			};
 		}
 	}
@@ -196,8 +200,8 @@ async function meetingTransitionWorkflow(input: TransitionInput): Promise<Transi
 		);
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'notifications_queued' });
 
-		// Step 4: Create minutes placeholder if meeting was held
-		if (input.toStatus === 'HELD') {
+		// Step 4: Create minutes placeholder if meeting was adjourned
+		if (input.toStatus === 'ADJOURNED') {
 			await DBOS.runStep(
 				() => createMinutesPlaceholder(input.meetingId, input.userId),
 				{ name: 'createMinutesPlaceholder' }

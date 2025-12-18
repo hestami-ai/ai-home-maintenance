@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -56,7 +57,7 @@ export const governanceBoardRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ board: z.object({ id: z.string(), name: z.string(), associationId: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -88,7 +89,7 @@ export const governanceBoardRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ board: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -112,7 +113,7 @@ export const governanceBoardRouter = {
 					boards: z.array(z.any()),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -155,7 +156,7 @@ export const governanceBoardRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ member: z.object({ id: z.string(), boardId: z.string(), partyId: z.string(), role: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -209,7 +210,7 @@ export const governanceBoardRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ member: z.object({ id: z.string(), boardId: z.string(), isActive: z.boolean() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -253,7 +254,7 @@ export const governanceBoardRouter = {
 					entries: z.array(z.any()),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

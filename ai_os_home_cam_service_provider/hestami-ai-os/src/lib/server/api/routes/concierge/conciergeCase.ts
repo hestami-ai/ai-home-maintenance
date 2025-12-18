@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -76,7 +77,7 @@ export const conciergeCaseRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -203,7 +204,7 @@ export const conciergeCaseRouter = {
 						addressLine1: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -289,7 +290,7 @@ export const conciergeCaseRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -365,7 +366,7 @@ export const conciergeCaseRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -467,7 +468,7 @@ export const conciergeCaseRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -549,7 +550,7 @@ export const conciergeCaseRouter = {
 						resolutionSummary: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -643,7 +644,7 @@ export const conciergeCaseRouter = {
 						closedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -732,7 +733,7 @@ export const conciergeCaseRouter = {
 						cancelledAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -825,7 +826,7 @@ export const conciergeCaseRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -888,7 +889,7 @@ export const conciergeCaseRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -955,7 +956,7 @@ export const conciergeCaseRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1024,7 +1025,7 @@ export const conciergeCaseRouter = {
 						addedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1111,7 +1112,7 @@ export const conciergeCaseRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1177,7 +1178,7 @@ export const conciergeCaseRouter = {
 					success: z.boolean(),
 					removedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1225,7 +1226,7 @@ export const conciergeCaseRouter = {
 					caseId: z.string(),
 					linkedUnitId: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1276,7 +1277,7 @@ export const conciergeCaseRouter = {
 					caseId: z.string(),
 					linkedJobId: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1327,7 +1328,7 @@ export const conciergeCaseRouter = {
 					caseId: z.string(),
 					unlinked: z.array(z.string())
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

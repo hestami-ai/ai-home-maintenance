@@ -3,19 +3,7 @@
 	import { ArrowLeft, AlertTriangle, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-
-	interface ViolationType {
-		id: string;
-		name: string;
-		description?: string;
-		defaultSeverity: string;
-	}
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-		ownerName?: string;
-	}
+	import { violationApi, violationTypeApi, unitApi, type ViolationType, type Unit } from '$lib/api/cam';
 
 	let violationTypes = $state<ViolationType[]>([]);
 	let units = $state<Unit[]>([]);
@@ -45,22 +33,16 @@
 		isLoadingData = true;
 		try {
 			const [typesRes, unitsRes] = await Promise.all([
-				fetch(`/api/violation-type?associationId=${$currentAssociation.id}`).catch(() => null),
-				fetch(`/api/unit?associationId=${$currentAssociation.id}`).catch(() => null)
+				violationTypeApi.list().catch(() => null),
+				unitApi.list({}).catch(() => null)
 			]);
 
-			if (typesRes?.ok) {
-				const data = await typesRes.json();
-				if (data.ok && data.data?.items) {
-					violationTypes = data.data.items;
-				}
+			if (typesRes?.ok && typesRes.data?.violationTypes) {
+				violationTypes = typesRes.data.violationTypes;
 			}
 
-			if (unitsRes?.ok) {
-				const data = await unitsRes.json();
-				if (data.ok && data.data?.items) {
-					units = data.data.items;
-				}
+			if (unitsRes?.ok && unitsRes.data?.units) {
+				units = unitsRes.data.units;
 			}
 		} catch (e) {
 			console.error('Failed to load form data:', e);
@@ -93,29 +75,20 @@
 		error = null;
 
 		try {
-			const response = await fetch('/api/violation', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					associationId: $currentAssociation.id,
-					unitId: formData.unitId,
-					violationTypeId: formData.violationTypeId || undefined,
-					title: formData.title,
-					description: formData.description || undefined,
-					severity: formData.severity,
-					reportedDate: formData.reportedDate
-				})
+			const response = await violationApi.create({
+				violationTypeId: formData.violationTypeId,
+				title: formData.title,
+				description: formData.description || '',
+				severity: formData.severity,
+				unitId: formData.unitId,
+				observedDate: formData.reportedDate,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.id) {
-					goto(`/app/cam/violations/${data.data.id}`);
-				} else {
-					error = data.error?.message || 'Failed to create violation';
-				}
+			if (response.ok && response.data?.violation) {
+				goto(`/app/cam/violations/${response.data.violation.id}`);
 			} else {
-				error = 'Failed to create violation';
+				error = response.error?.message || 'Failed to create violation';
 			}
 		} catch (e) {
 			error = 'Failed to create violation';

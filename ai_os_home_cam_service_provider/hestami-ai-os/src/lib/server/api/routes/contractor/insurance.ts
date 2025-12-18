@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -63,7 +64,7 @@ type InsuranceInput = z.infer<typeof upsertInput>;
 export const insuranceRouter = {
 	createOrUpdate: orgProcedure
 		.input(upsertInput)
-		.output(z.object({ ok: z.literal(true), data: z.object({ insurance: insuranceOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ insurance: insuranceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertContractorOrg(context.organization.id);
 			await context.cerbos.authorize('edit', 'contractor_insurance', input.id ?? 'new');
@@ -101,7 +102,7 @@ export const insuranceRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ insurance: insuranceOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ insurance: insuranceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const insurance = await prisma.contractorInsurance.findFirst({
 				where: { id: input.id, contractorProfile: { organizationId: context.organization.id } },
@@ -124,7 +125,7 @@ export const insuranceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ insurances: z.array(insuranceOutput), pagination: PaginationOutputSchema }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

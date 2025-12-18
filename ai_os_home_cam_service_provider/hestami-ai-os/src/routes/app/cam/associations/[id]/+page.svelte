@@ -5,13 +5,14 @@
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { camStore } from '$lib/stores';
+	import { associationApi, documentApi, activityEventApi } from '$lib/api/cam';
 
 	interface Association {
 		id: string;
 		name: string;
 		legalName?: string;
 		status: string;
-		fiscalYearEnd?: string;
+		fiscalYearEnd?: number;
 		unitCount?: number;
 		propertyCount?: number;
 		address?: string;
@@ -20,8 +21,8 @@
 		website?: string;
 		taxId?: string;
 		incorporationDate?: string;
-		createdAt: string;
-		updatedAt: string;
+		createdAt?: string;
+		updatedAt?: string;
 	}
 
 	interface AssociationDocument {
@@ -54,16 +55,11 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/association/${associationId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					association = data.data;
-				} else {
-					error = 'Association not found';
-				}
+			const response = await associationApi.get(associationId);
+			if (response.ok && response.data?.association) {
+				association = response.data.association;
 			} else {
-				error = 'Failed to load association';
+				error = 'Association not found';
 			}
 		} catch (e) {
 			error = 'Failed to load association';
@@ -76,12 +72,9 @@
 	async function loadDocuments() {
 		if (!associationId) return;
 		try {
-			const response = await fetch(`/api/document?contextType=ASSOCIATION&contextId=${associationId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					documents = data.data.items;
-				}
+			const response = await documentApi.list({ contextType: 'ASSOCIATION', contextId: associationId });
+			if (response.ok && response.data?.documents) {
+				documents = response.data.documents;
 			}
 		} catch (e) {
 			console.error('Failed to load documents:', e);
@@ -91,12 +84,15 @@
 	async function loadHistory() {
 		if (!associationId) return;
 		try {
-			const response = await fetch(`/api/activity-event?resourceType=ASSOCIATION&resourceId=${associationId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					history = data.data.items;
-				}
+			const response = await activityEventApi.list({ entityType: 'ASSOCIATION', entityId: associationId });
+			if (response.ok && response.data?.events) {
+				history = response.data.events.map(e => ({
+					id: e.id,
+					action: e.action,
+					description: e.summary,
+					performedBy: e.performedBy,
+					createdAt: e.createdAt
+				}));
 			}
 		} catch (e) {
 			console.error('Failed to load history:', e);
@@ -110,7 +106,7 @@
 			name: association.name,
 			legalName: association.legalName,
 			status: association.status,
-			fiscalYearEnd: association.fiscalYearEnd ? parseInt(association.fiscalYearEnd) : 12
+			fiscalYearEnd: association.fiscalYearEnd || 12
 		});
 	}
 

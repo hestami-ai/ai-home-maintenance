@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -280,7 +281,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ job: jobOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -378,7 +379,7 @@ export const jobRouter = {
 					jobs: z.array(jobOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -433,7 +434,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ job: jobOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -473,7 +474,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ job: jobOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -514,7 +515,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ job: jobOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -594,7 +595,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ job: jobOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -667,7 +668,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ job: jobOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -735,7 +736,7 @@ export const jobRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -781,7 +782,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ note: jobNoteOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -817,7 +818,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ notes: z.array(jobNoteOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -857,7 +858,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ attachment: jobAttachmentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -896,7 +897,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ attachments: z.array(jobAttachmentOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -922,7 +923,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -967,7 +968,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ checkpoint: jobCheckpointOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1013,7 +1014,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ checkpoint: jobCheckpointOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1055,7 +1056,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ checkpoints: z.array(jobCheckpointOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1091,7 +1092,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: jobVisitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1159,7 +1160,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: jobVisitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1201,7 +1202,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visits: z.array(jobVisitOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1227,7 +1228,7 @@ export const jobRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

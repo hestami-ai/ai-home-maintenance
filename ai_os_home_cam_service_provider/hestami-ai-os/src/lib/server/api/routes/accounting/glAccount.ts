@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -45,7 +46,7 @@ export const glAccountRouter = {
 						isActive: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -150,7 +151,7 @@ export const glAccountRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -228,7 +229,7 @@ export const glAccountRouter = {
 						}))
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -302,7 +303,7 @@ export const glAccountRouter = {
 						isActive: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -373,7 +374,7 @@ export const glAccountRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -438,7 +439,7 @@ export const glAccountRouter = {
 					seeded: z.boolean(),
 					accountCount: z.number()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ context }) => {

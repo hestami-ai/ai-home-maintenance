@@ -2,75 +2,26 @@ import { z } from 'zod';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
+import {
+	successResponseSchema,
+	ResponseMetaSchema,
+	DocumentCategorySchema,
+	DocumentContextTypeSchema,
+	DocumentVisibilitySchema,
+	DocumentStatusSchema,
+	StorageProviderSchema
+} from '../schemas.js';
 import { withIdempotency } from '../middleware/idempotency.js';
 import { recordActivityFromContext } from '../middleware/activityEvent.js';
 import type { RequestContext } from '../context.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
-const DocumentCategoryEnum = z.enum([
-	// CAM / HOA
-	'GOVERNING_DOCS',
-	'FINANCIAL',
-	'MEETING',
-	'LEGAL',
-	'INSURANCE',
-	'MAINTENANCE',
-	'ARCHITECTURAL',
-	'RESERVE_STUDY',
-	'INSPECTION',
-	'CONTRACT',
-	// Property Owner / Concierge
-	'CC_AND_RS',
-	'PERMIT',
-	'APPROVAL',
-	'CORRESPONDENCE',
-	'TITLE_DEED',
-	'SURVEY',
-	'WARRANTY',
-	// Contractor / Service Provider
-	'LICENSE',
-	'CERTIFICATION',
-	'BOND',
-	'PROPOSAL',
-	'ESTIMATE',
-	'INVOICE',
-	'WORK_ORDER',
-	'JOB_PHOTO',
-	'JOB_VIDEO',
-	'VOICE_NOTE',
-	'SIGNATURE',
-	'CHECKLIST',
-	// Cross-Pillar
-	'GENERAL'
-]);
-
-const DocumentContextTypeEnum = z.enum([
-	'ASSOCIATION',
-	'PROPERTY',
-	'UNIT',
-	'JOB',
-	'CASE',
-	'WORK_ORDER',
-	'TECHNICIAN',
-	'CONTRACTOR',
-	'VENDOR',
-	'PARTY',
-	'OWNER_INTENT',
-	'VIOLATION',
-	'ARC_REQUEST'
-]);
-
-const DocumentVisibilityEnum = z.enum([
-	'PUBLIC',
-	'OWNERS_ONLY',
-	'BOARD_ONLY',
-	'STAFF_ONLY',
-	'PRIVATE'
-]);
-
-const DocumentStatusEnum = z.enum(['DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED']);
-
-const StorageProviderEnum = z.enum(['LOCAL', 'S3', 'AZURE_BLOB', 'GCS']);
+// Use shared enum schemas from schemas.ts
+const DocumentCategoryEnum = DocumentCategorySchema;
+const DocumentContextTypeEnum = DocumentContextTypeSchema;
+const DocumentVisibilityEnum = DocumentVisibilitySchema;
+const DocumentStatusEnum = DocumentStatusSchema;
+const StorageProviderEnum = StorageProviderSchema;
 
 const requireIdempotency = async <T>(
 	key: string,
@@ -109,20 +60,18 @@ export const documentRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					document: z.object({
 						id: z.string(),
 						title: z.string(),
-						category: z.string(),
-						status: z.string(),
+						category: DocumentCategorySchema,
+						status: DocumentStatusSchema,
 						version: z.number(),
 						createdAt: z.string()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'document', 'new');
@@ -226,7 +175,7 @@ export const documentRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -320,7 +269,7 @@ export const documentRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -409,7 +358,7 @@ export const documentRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -464,7 +413,7 @@ export const documentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -518,7 +467,7 @@ export const documentRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -603,7 +552,7 @@ export const documentRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -660,7 +609,7 @@ export const documentRouter = {
 						version: z.number()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -750,7 +699,7 @@ export const documentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean(), archivedAt: z.string() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -784,7 +733,7 @@ export const documentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -828,7 +777,7 @@ export const documentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ logged: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -874,7 +823,7 @@ export const documentRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -940,7 +889,7 @@ export const documentRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1022,7 +971,7 @@ export const documentRouter = {
 						isPrimary: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1114,7 +1063,7 @@ export const documentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1161,7 +1110,7 @@ export const documentRouter = {
 					referenceCount: z.number(),
 					byType: z.record(z.string(), z.number())
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1231,7 +1180,7 @@ export const documentRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

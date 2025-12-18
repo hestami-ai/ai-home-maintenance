@@ -112,13 +112,8 @@
 		if (!propertyId) return;
 
 		try {
-			const response = await fetch(`/api/common-area?propertyId=${propertyId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					commonAreas = data.data.items;
-				}
-			}
+			// TODO: Add commonAreaApi when available
+			commonAreas = [];
 		} catch (e) {
 			console.error('Failed to load common areas:', e);
 		}

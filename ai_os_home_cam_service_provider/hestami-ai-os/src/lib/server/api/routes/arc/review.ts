@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -64,7 +65,7 @@ export const arcReviewRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ member: z.object({ id: z.string(), committeeId: z.string(), partyId: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -115,7 +116,7 @@ export const arcReviewRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ member: z.object({ committeeId: z.string(), partyId: z.string(), leftAt: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -161,7 +162,7 @@ export const arcReviewRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -206,7 +207,7 @@ export const arcReviewRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ request: z.object({ id: z.string(), status: z.string(), committeeId: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -257,7 +258,7 @@ export const arcReviewRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ review: z.object({ id: z.string(), requestId: z.string(), action: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -328,7 +329,7 @@ export const arcReviewRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -442,7 +443,7 @@ export const arcReviewRouter = {
 						met: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -544,7 +545,7 @@ export const arcReviewRouter = {
 						})
 						.nullable()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

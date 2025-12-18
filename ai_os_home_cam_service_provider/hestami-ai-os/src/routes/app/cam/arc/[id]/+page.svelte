@@ -4,43 +4,16 @@
 	import { ArrowLeft, ClipboardCheck, FileText, Clock, CheckCircle, XCircle, Pause, MessageSquare, Pencil, User, Bot, Image, FileImage, History, Scale, Users, Vote, AlertCircle } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, ARCDecisionModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { arcRequestApi, arcReviewApi, documentApi, activityEventApi } from '$lib/api/cam';
+	import { arcRequestApi, arcReviewApi, documentApi, activityEventApi, type ARCRequest, type Document } from '$lib/api/cam';
 	import { nanoid } from 'nanoid';
 	import { refreshBadgeCounts } from '$lib/stores';
-
-	interface ARCRequest {
-		id: string;
-		requestNumber: string;
-		title: string;
-		description?: string;
-		status: string;
-		category: string;
-		unitId?: string | null;
-		unitNumber?: string;
-		submitterId?: string;
-		submitterName?: string;
-		projectScope?: string;
-		estimatedCost?: number | string;
-		startDate?: string;
-		completionDate?: string;
-		conditions?: string;
-		createdAt?: string;
-		updatedAt?: string;
-	}
-
-	interface ARCDocument {
-		id: string;
-		name: string;
-		category: string;
-		createdAt: string;
-	}
 
 	interface ARCHistoryEvent {
 		id: string;
 		action: string;
 		description: string;
 		performedBy: string;
-		actorType?: 'HUMAN' | 'SYSTEM' | 'AI';
+		actorType?: string;
 		rationale?: string;
 		relatedDocuments?: string[];
 		createdAt: string;
@@ -86,7 +59,7 @@
 	}
 
 	let request = $state<ARCRequest | null>(null);
-	let documents = $state<ARCDocument[]>([]);
+	let documents = $state<Document[]>([]);
 	let unitPrecedents = $state<ARCPrecedent[]>([]);
 	let categoryPrecedents = $state<ARCPrecedent[]>([]);
 	let history = $state<ARCHistoryEvent[]>([]);
@@ -274,16 +247,12 @@
 		isLinkingDocument = true;
 		try {
 			for (const doc of selectedDocs) {
-				const response = await fetch('/api/v1/rpc/document.linkToContext', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						idempotencyKey: crypto.randomUUID(),
-						documentId: doc.documentId,
-						contextType: 'ARC_REQUEST',
-						contextId: requestId,
-						bindingNotes: `Linked as referenced guideline/submission document`
-					})
+				const response = await documentApi.linkToContext({
+					documentId: doc.documentId,
+					contextType: 'ARC_REQUEST',
+					contextId: requestId,
+					bindingNotes: `Linked as referenced guideline/submission document`,
+					idempotencyKey: crypto.randomUUID()
 				});
 
 				if (!response.ok) {
@@ -776,10 +745,10 @@
 		<Card variant="outlined" padding="lg">
 			<h3 class="mb-4 font-semibold">Vote Summary</h3>
 			{#if voteSummary && voteSummary.total > 0}
+				{@const total = voteSummary.total || 1}
 				<div class="space-y-3">
 					<div class="flex items-center gap-3">
 						<div class="h-3 flex-1 overflow-hidden rounded-full bg-surface-200-800">
-							{@const total = voteSummary.total || 1}
 							<div class="flex h-full">
 								{#if voteSummary.approve > 0}
 									<div class="bg-success-500" style="width: {(voteSummary.approve / total) * 100}%"></div>

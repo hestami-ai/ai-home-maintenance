@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { vendorApi } from '$lib/api/cam';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
@@ -64,31 +65,22 @@
 		error = null;
 
 		try {
-			const response = await fetch('/api/vendor', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: formData.name,
-					contactName: formData.contactName || undefined,
-					email: formData.email || undefined,
-					phone: formData.phone || undefined,
-					address: formData.address || undefined,
-					licenseNumber: formData.licenseNumber || undefined,
-					insuranceExpiry: formData.insuranceExpiry || undefined,
-					trades: formData.trades,
-					notes: formData.notes || undefined
-				})
+			const response = await vendorApi.create({
+				name: formData.name,
+				contactName: formData.contactName || undefined,
+				email: formData.email || undefined,
+				phone: formData.phone || undefined,
+				address: formData.address || undefined,
+				licenseNumber: formData.licenseNumber || undefined,
+				insuranceExpiry: formData.insuranceExpiry || undefined,
+				trades: formData.trades,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.id) {
-					goto(`/app/cam/vendors/${data.data.id}`);
-				} else {
-					error = data.error?.message || 'Failed to create vendor';
-				}
+			if (response.ok && response.data?.vendor) {
+				goto(`/app/cam/vendors/${response.data.vendor.id}`);
 			} else {
-				error = 'Failed to create vendor';
+				error = response.error?.message || 'Failed to create vendor';
 			}
 		} catch (e) {
 			error = 'Failed to create vendor';

@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { associationApi } from '$lib/api/cam';
 
 	interface Association {
 		id: string;
@@ -64,27 +65,23 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/association/${associationId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					association = data.data;
-					formData = {
-						name: data.data.name || '',
-						legalName: data.data.legalName || '',
-						status: data.data.status || 'ACTIVE',
-						fiscalYearEnd: data.data.fiscalYearEnd?.toString() || '12',
-						address: data.data.address || '',
-						phone: data.data.phone || '',
-						email: data.data.email || '',
-						website: data.data.website || '',
-						taxId: data.data.taxId || ''
-					};
-				} else {
-					error = 'Association not found';
-				}
+			const response = await associationApi.get(associationId);
+			if (response.ok && response.data?.association) {
+				const a = response.data.association;
+				association = a;
+				formData = {
+					name: a.name || '',
+					legalName: a.legalName || '',
+					status: a.status || 'ACTIVE',
+					fiscalYearEnd: a.fiscalYearEnd?.toString() || '12',
+					address: a.address || '',
+					phone: a.phone || '',
+					email: a.email || '',
+					website: a.website || '',
+					taxId: a.taxId || ''
+				};
 			} else {
-				error = 'Failed to load association';
+				error = 'Association not found';
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -108,27 +105,22 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/association/${association.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: formData.name,
-					legalName: formData.legalName || undefined,
-					status: formData.status,
-					fiscalYearEnd: parseInt(formData.fiscalYearEnd),
-					address: formData.address || undefined,
-					phone: formData.phone || undefined,
-					email: formData.email || undefined,
-					website: formData.website || undefined,
-					taxId: formData.taxId || undefined
-				})
+			const response = await associationApi.update(association.id, {
+				name: formData.name,
+				legalName: formData.legalName || undefined,
+				status: formData.status,
+				fiscalYearEnd: parseInt(formData.fiscalYearEnd),
+				address: formData.address || undefined,
+				phone: formData.phone || undefined,
+				email: formData.email || undefined,
+				website: formData.website || undefined,
+				taxId: formData.taxId || undefined
 			});
 
 			if (response.ok) {
 				goto(`/app/cam/associations/${association.id}`);
 			} else {
-				const data = await response.json();
-				error = data.error?.message || 'Failed to update association';
+				error = response.error?.message || 'Failed to update association';
 			}
 		} catch (e) {
 			error = 'Failed to update association';

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -25,7 +26,7 @@ const complianceOutput = z.object({
 export const complianceRouter = {
 	getStatus: orgProcedure
 		.input(z.object({ vendorId: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const status = await computeCompliance(input.vendorId, context.organization.id);
 			await context.cerbos.authorize('view', 'contractor_compliance', input.vendorId);
@@ -35,7 +36,7 @@ export const complianceRouter = {
 
 	refresh: orgProcedure
 		.input(z.object({ vendorId: z.string() }).merge(IdempotencyKeySchema))
-		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			const result = await withIdempotency(input.idempotencyKey, context, () =>
@@ -54,7 +55,7 @@ export const complianceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			const result = await withIdempotency(input.idempotencyKey, context, async () => {
@@ -86,7 +87,7 @@ export const complianceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			const { idempotencyKey, ...payload } = input;

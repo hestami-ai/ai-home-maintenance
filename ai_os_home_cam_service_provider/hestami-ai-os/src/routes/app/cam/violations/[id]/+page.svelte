@@ -5,38 +5,14 @@
 	import { TabbedContent, DecisionButton, RationaleModal, SendNoticeModal, ScheduleHearingModal, AssessFineModal, AppealModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation, refreshBadgeCounts } from '$lib/stores';
-	import { violationApi, documentApi, activityEventApi, type ViolationDetail } from '$lib/api/cam';
+	import { violationApi, documentApi, activityEventApi, type ViolationDetail, type Document } from '$lib/api/cam';
 
-	interface Violation {
+	interface PriorViolation {
 		id: string;
 		violationNumber: string;
 		title: string;
-		description?: string;
 		status: string;
 		severity: string;
-		unitId?: string;
-		unitNumber?: string;
-		responsiblePartyId?: string;
-		responsiblePartyName?: string;
-		violationTypeId?: string;
-		violationTypeName?: string;
-		violationTypeRuleText?: string;
-		reportedDate?: string;
-		dueDate?: string;
-		curePeriodDays?: number;
-		resolvedDate?: string;
-		createdAt?: string;
-		updatedAt?: string;
-		hasHoaConflict?: boolean;
-		hoaConflictNotes?: string;
-		hasAppeal?: boolean;
-		appealStatus?: string;
-	}
-
-	interface ViolationDocument {
-		id: string;
-		name: string;
-		category: string;
 		createdAt: string;
 	}
 
@@ -69,17 +45,8 @@
 		acknowledged: boolean;
 	}
 
-	interface PriorViolation {
-		id: string;
-		violationNumber: string;
-		title: string;
-		status: string;
-		severity: string;
-		createdAt: string;
-	}
-
-	let violation = $state<Violation | null>(null);
-	let documents = $state<ViolationDocument[]>([]);
+	let violation = $state<ViolationDetail | null>(null);
+	let documents = $state<Document[]>([]);
 	let history = $state<ViolationHistoryEvent[]>([]);
 	let notices = $state<ViolationNotice[]>([]);
 	let ownerResponses = $state<OwnerResponse[]>([]);
@@ -110,7 +77,7 @@
 		try {
 			const response = await violationApi.get(violationId);
 			if (response.ok && response.data?.violation) {
-				violation = response.data.violation as Violation;
+				violation = response.data.violation;
 			} else {
 				error = 'Violation not found';
 			}
@@ -155,12 +122,15 @@
 	async function loadNotices() {
 		if (!violationId) return;
 		try {
-			const response = await fetch(`/api/violation/${violationId}/notices`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.notices) {
-					notices = data.data.notices;
-				}
+			const response = await violationApi.getNotices(violationId);
+			if (response.ok && response.data?.notices) {
+				notices = response.data.notices.map(n => ({
+					id: n.id,
+					noticeType: n.noticeType,
+					sentDate: n.sentAt,
+					recipient: '',
+					deliveryStatus: n.deliveryMethod
+				}));
 			}
 		} catch (e) {
 			console.error('Failed to load notices:', e);
@@ -170,12 +140,16 @@
 	async function loadOwnerResponses() {
 		if (!violationId) return;
 		try {
-			const response = await fetch(`/api/violation/${violationId}/responses`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.responses) {
-					ownerResponses = data.data.responses;
-				}
+			const response = await violationApi.getResponses(violationId);
+			if (response.ok && response.data?.responses) {
+				ownerResponses = response.data.responses.map(r => ({
+					id: r.id,
+					submittedDate: r.submittedAt,
+					content: r.content,
+					submittedBy: r.responseType,
+					hasAttachments: false,
+					acknowledged: false
+				}));
 			}
 		} catch (e) {
 			console.error('Failed to load owner responses:', e);
@@ -186,26 +160,36 @@
 		if (!violation?.unitId) return;
 		try {
 			// Load violations for the same unit (excluding current)
-			const unitRes = await fetch(`/api/violation?unitId=${violation.unitId}`);
-			if (unitRes.ok) {
-				const data = await unitRes.json();
-				if (data.ok && data.data?.items) {
-					priorUnitViolations = data.data.items
-						.filter((v: PriorViolation) => v.id !== violation?.id)
-						.slice(0, 5);
-				}
+			const unitRes = await violationApi.list({ unitId: violation.unitId });
+			if (unitRes.ok && unitRes.data?.violations) {
+				priorUnitViolations = unitRes.data.violations
+					.filter((v) => v.id !== violation?.id)
+					.slice(0, 5)
+					.map(v => ({
+						id: v.id,
+						violationNumber: v.violationNumber,
+						title: v.title,
+						status: v.status,
+						severity: v.severity,
+						createdAt: v.createdAt || ''
+					}));
 			}
 
 			// Load violations of the same type (excluding current)
 			if (violation.violationTypeId) {
-				const typeRes = await fetch(`/api/violation?violationTypeId=${violation.violationTypeId}`);
-				if (typeRes.ok) {
-					const data = await typeRes.json();
-					if (data.ok && data.data?.items) {
-						priorTypeViolations = data.data.items
-							.filter((v: PriorViolation) => v.id !== violation?.id)
-							.slice(0, 5);
-					}
+				const typeRes = await violationApi.list({ violationTypeId: violation.violationTypeId });
+				if (typeRes.ok && typeRes.data?.violations) {
+					priorTypeViolations = typeRes.data.violations
+						.filter((v) => v.id !== violation?.id)
+						.slice(0, 5)
+						.map(v => ({
+							id: v.id,
+							violationNumber: v.violationNumber,
+							title: v.title,
+							status: v.status,
+							severity: v.severity,
+							createdAt: v.createdAt || ''
+						}));
 				}
 			}
 		} catch (e) {
@@ -323,13 +307,10 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/violation/${violation.id}/action`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					action: rationaleAction.type,
-					rationale
-				})
+			const response = await violationApi.recordAction(violation.id, {
+				action: rationaleAction.type,
+				notes: rationale,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -351,10 +332,13 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/violation/${violation.id}/notice`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await violationApi.sendNotice(violation.id, {
+				noticeType: data.noticeType,
+				templateId: data.templateId,
+				curePeriodDays: data.curePeriodDays,
+				deliveryMethod: 'EMAIL',
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -375,10 +359,12 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/violation/${violation.id}/hearing`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const hearingDateTime = `${data.hearingDate}T${data.hearingTime}:00`;
+			const response = await violationApi.scheduleHearing(violation.id, {
+				hearingDate: hearingDateTime,
+				location: data.location,
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -399,10 +385,12 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/violation/${violation.id}/fine`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await violationApi.assessFine(violation.id, {
+				amount: data.amount,
+				fineType: data.fineType,
+				dueDate: data.dueDate,
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -423,10 +411,9 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/violation/${violation.id}/appeal`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await violationApi.fileAppeal(violation.id, {
+				appealReason: data.reason,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -448,16 +435,12 @@
 		isLinkingDocument = true;
 		try {
 			for (const doc of selectedDocs) {
-				const response = await fetch('/api/v1/rpc/document.linkToContext', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						idempotencyKey: crypto.randomUUID(),
-						documentId: doc.documentId,
-						contextType: 'VIOLATION',
-						contextId: violationId,
-						bindingNotes: `Linked to violation as supporting evidence`
-					})
+				const response = await documentApi.linkToContext({
+					documentId: doc.documentId,
+					contextType: 'VIOLATION',
+					contextId: violationId,
+					bindingNotes: `Linked to violation as supporting evidence`,
+					idempotencyKey: crypto.randomUUID()
 				});
 
 				if (!response.ok) {

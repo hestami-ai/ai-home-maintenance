@@ -3,6 +3,7 @@
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { propertyApi } from '$lib/api/cam';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
@@ -77,32 +78,22 @@
 		error = null;
 
 		try {
-			const response = await fetch('/api/property', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					associationId: $currentAssociation.id,
-					name: formData.name,
-					address: formData.address,
-					propertyType: formData.propertyType,
-					status: formData.status,
-					yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : undefined,
-					totalSquareFootage: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) : undefined,
-					parkingSpaces: formData.parkingSpaces ? parseInt(formData.parkingSpaces) : undefined,
-					amenities: formData.amenities.length > 0 ? formData.amenities : undefined,
-					notes: formData.notes || undefined
-				})
+			const response = await propertyApi.create({
+				name: formData.name,
+				address: formData.address,
+				propertyType: formData.propertyType,
+				status: formData.status,
+				yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : undefined,
+				totalSquareFootage: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) : undefined,
+				parkingSpaces: formData.parkingSpaces ? parseInt(formData.parkingSpaces) : undefined,
+				amenities: formData.amenities.length > 0 ? formData.amenities : undefined,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.id) {
-					goto(`/app/cam/properties/${data.data.id}`);
-				} else {
-					error = data.error?.message || 'Failed to create property';
-				}
+			if (response.ok && response.data?.property) {
+				goto(`/app/cam/properties/${response.data.property.id}`);
 			} else {
-				error = 'Failed to create property';
+				error = response.error?.message || 'Failed to create property';
 			}
 		} catch (e) {
 			error = 'Failed to create property';

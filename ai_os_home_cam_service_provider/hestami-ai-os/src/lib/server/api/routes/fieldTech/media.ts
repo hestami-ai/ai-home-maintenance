@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -86,7 +87,7 @@ export const mediaRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ media: jobMediaOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -143,7 +144,7 @@ export const mediaRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ media: jobMediaOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -196,7 +197,7 @@ export const mediaRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ media: jobMediaOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -255,7 +256,7 @@ export const mediaRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ media: jobMediaOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -307,7 +308,7 @@ export const mediaRouter = {
 					media: z.array(jobMediaOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -354,7 +355,7 @@ export const mediaRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ media: jobMediaOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -379,7 +380,7 @@ export const mediaRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

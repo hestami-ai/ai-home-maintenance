@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -36,7 +37,7 @@ export const reportExecutionRouter = {
 					format: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'report_execution', 'new');
@@ -146,7 +147,7 @@ export const reportExecutionRouter = {
 					nextCursor: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'report_execution', '*');
@@ -214,7 +215,7 @@ export const reportExecutionRouter = {
 					createdAt: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'report_execution', input.id);
@@ -263,7 +264,7 @@ export const reportExecutionRouter = {
 					status: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'report_execution', input.id);

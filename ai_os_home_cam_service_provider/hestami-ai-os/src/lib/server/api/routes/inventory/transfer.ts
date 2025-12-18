@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -105,7 +106,7 @@ export const transferRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ transfer: transferOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -173,7 +174,7 @@ export const transferRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ transfer: transferOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -208,7 +209,7 @@ export const transferRouter = {
 					transfers: z.array(transferOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -264,7 +265,7 @@ export const transferRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ transfer: transferOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -352,7 +353,7 @@ export const transferRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ transfer: transferOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -436,7 +437,7 @@ export const transferRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ transfer: transferOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

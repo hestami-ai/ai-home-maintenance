@@ -2,6 +2,15 @@ import { z } from 'zod';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
+import {
+	successResponseSchema,
+	ResponseMetaSchema,
+	ViolationStatusSchema,
+	ViolationSeveritySchema,
+	NoticeTypeSchema,
+	NoticeDeliveryMethodSchema,
+	HearingOutcomeSchema
+} from '../../schemas.js';
 import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
@@ -70,26 +79,12 @@ const getViolationOrThrow = async (id: string, associationId: string) => {
 	return violation;
 };
 
-const violationStatusEnum = z.enum([
-	'DRAFT', 'OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'CURED',
-	'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED',
-	'APPEALED', 'CLOSED', 'DISMISSED'
-]);
-
-const violationSeverityEnum = z.enum(['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL']);
-
-const noticeTypeEnum = z.enum([
-	'WARNING', 'FIRST_NOTICE', 'SECOND_NOTICE', 'FINAL_NOTICE',
-	'FINE_NOTICE', 'HEARING_NOTICE', 'CURE_CONFIRMATION'
-]);
-
-const deliveryMethodEnum = z.enum([
-	'EMAIL', 'MAIL', 'CERTIFIED_MAIL', 'POSTED', 'HAND_DELIVERED', 'PORTAL'
-]);
-
-const hearingOutcomeEnum = z.enum([
-	'PENDING', 'UPHELD', 'MODIFIED', 'DISMISSED', 'CONTINUED'
-]);
+// Use shared enum schemas from schemas.ts
+const violationStatusEnum = ViolationStatusSchema;
+const violationSeverityEnum = ViolationSeveritySchema;
+const noticeTypeEnum = NoticeTypeSchema;
+const deliveryMethodEnum = NoticeDeliveryMethodSchema;
+const hearingOutcomeEnum = HearingOutcomeSchema;
 
 /**
  * Violation management procedures
@@ -115,19 +110,17 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					violation: z.object({
 						id: z.string(),
 						violationNumber: z.string(),
 						title: z.string(),
-						status: z.string(),
-						severity: z.string()
+						status: ViolationStatusSchema,
+						severity: ViolationSeveritySchema
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
@@ -255,14 +248,12 @@ export const violationRouter = {
 	delete: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().max(1000).optional() }))
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					id: z.string(),
 					deletedAt: z.string()
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('delete', 'violation', input.id);
@@ -314,25 +305,23 @@ export const violationRouter = {
 			}).optional()
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					violations: z.array(
 						z.object({
 							id: z.string(),
 							violationNumber: z.string(),
 							title: z.string(),
-							status: z.string(),
-							severity: z.string(),
+							status: ViolationStatusSchema,
+							severity: ViolationSeveritySchema,
 							observedDate: z.string(),
 							unitId: z.string().nullable(),
 							noticeCount: z.number(),
 							totalFinesAssessed: z.string()
 						})
 					)
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation', '*');
@@ -392,17 +381,16 @@ export const violationRouter = {
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					violation: z.object({
 						id: z.string(),
 						violationNumber: z.string(),
 						violationTypeId: z.string(),
 						title: z.string(),
 						description: z.string().nullable(),
-						severity: z.string(),
-						status: z.string(),
+						severity: ViolationSeveritySchema,
+						status: ViolationStatusSchema,
 						unitId: z.string().nullable(),
 						commonAreaName: z.string().nullable(),
 						locationDetails: z.string().nullable(),
@@ -419,12 +407,11 @@ export const violationRouter = {
 						totalFinesWaived: z.string(),
 						noticeCount: z.number(),
 						lastNoticeDate: z.string().nullable(),
-						lastNoticeType: z.string().nullable(),
+						lastNoticeType: NoticeTypeSchema.nullable(),
 						resolutionNotes: z.string().nullable()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation', input.id);
@@ -486,18 +473,16 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					violation: z.object({
 						id: z.string(),
 						title: z.string(),
-						severity: z.string(),
+						severity: ViolationSeveritySchema,
 						observedDate: z.string().nullable()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
@@ -582,7 +567,7 @@ export const violationRouter = {
 						previousStatus: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -660,17 +645,15 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					violation: z.object({
 						id: z.string(),
-						status: z.string(),
+						status: ViolationStatusSchema,
 						curedDate: z.string().nullable()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
@@ -724,17 +707,15 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					violation: z.object({
 						id: z.string(),
-						status: z.string(),
+						status: ViolationStatusSchema,
 						closedDate: z.string().nullable()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
@@ -801,17 +782,15 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					evidence: z.object({
 						id: z.string(),
 						evidenceType: z.string(),
 						fileName: z.string()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
@@ -867,9 +846,8 @@ export const violationRouter = {
 	listEvidence: orgProcedure
 		.input(z.object({ violationId: z.string() }))
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					evidence: z.array(
 						z.object({
 							id: z.string(),
@@ -879,9 +857,8 @@ export const violationRouter = {
 							capturedAt: z.string().nullable()
 						})
 					)
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
@@ -925,18 +902,16 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					notice: z.object({
 						id: z.string(),
-						noticeType: z.string(),
+						noticeType: NoticeTypeSchema,
 						noticeNumber: z.number(),
 						sentDate: z.string()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
@@ -1034,21 +1009,19 @@ export const violationRouter = {
 	listNotices: orgProcedure
 		.input(z.object({ violationId: z.string() }))
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					notices: z.array(
 						z.object({
 							id: z.string(),
-							noticeType: z.string(),
+							noticeType: NoticeTypeSchema,
 							noticeNumber: z.number(),
 							sentDate: z.string(),
 							curePeriodEnds: z.string().nullable()
 						})
 					)
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
@@ -1088,17 +1061,15 @@ export const violationRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					hearing: z.object({
 						id: z.string(),
 						hearingDate: z.string(),
 						location: z.string().nullable()
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
@@ -1171,7 +1142,7 @@ export const violationRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1221,7 +1192,7 @@ export const violationRouter = {
 						fineAssessed: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1308,7 +1279,7 @@ export const violationRouter = {
 						dueDate: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1407,7 +1378,7 @@ export const violationRouter = {
 						balanceDue: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1484,7 +1455,7 @@ export const violationRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1532,7 +1503,7 @@ export const violationRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1611,7 +1582,7 @@ export const violationRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1688,7 +1659,7 @@ export const violationRouter = {
 						previousStatus: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1766,7 +1737,7 @@ export const violationRouter = {
 						previousStatus: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1850,7 +1821,7 @@ export const violationRouter = {
 						closedDate: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1937,7 +1908,7 @@ export const violationRouter = {
 						filedDate: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2057,7 +2028,7 @@ export const violationRouter = {
 						})
 						.nullable()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2130,7 +2101,7 @@ export const violationRouter = {
 						decisionDate: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2234,7 +2205,7 @@ export const violationRouter = {
 						assessmentChargeId: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

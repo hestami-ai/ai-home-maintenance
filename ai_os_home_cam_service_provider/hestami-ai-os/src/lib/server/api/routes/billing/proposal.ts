@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -96,7 +97,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -151,7 +152,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -188,7 +189,7 @@ export const proposalRouter = {
 					proposals: z.array(proposalOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -245,7 +246,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -289,7 +290,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -331,7 +332,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -376,7 +377,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -451,7 +452,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ proposal: proposalOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -508,7 +509,7 @@ export const proposalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

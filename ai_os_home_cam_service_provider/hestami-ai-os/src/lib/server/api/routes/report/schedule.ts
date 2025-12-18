@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -70,7 +71,7 @@ export const reportScheduleRouter = {
 					nextRunAt: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'report_schedule', 'new');
@@ -154,7 +155,7 @@ export const reportScheduleRouter = {
 					nextCursor: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'report_schedule', '*');
@@ -223,7 +224,7 @@ export const reportScheduleRouter = {
 					createdBy: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'report_schedule', input.id);
@@ -282,7 +283,7 @@ export const reportScheduleRouter = {
 					nextRunAt: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'report_schedule', input.id);
@@ -341,7 +342,7 @@ export const reportScheduleRouter = {
 		.output(z.object({
 			ok: z.literal(true),
 			data: z.object({ deleted: z.boolean() }),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('delete', 'report_schedule', input.id);
@@ -380,7 +381,7 @@ export const reportScheduleRouter = {
 					status: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'report_schedule', input.id);

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -72,7 +73,7 @@ export const usageRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ usage: materialUsageOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -160,7 +161,7 @@ export const usageRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ usage: materialUsageOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -200,7 +201,7 @@ export const usageRouter = {
 					usages: z.array(materialUsageOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -258,7 +259,7 @@ export const usageRouter = {
 					totalCost: z.string(),
 					itemCount: z.number()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -297,7 +298,7 @@ export const usageRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ reversed: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

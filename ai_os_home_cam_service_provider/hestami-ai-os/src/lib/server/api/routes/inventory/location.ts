@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -73,7 +74,7 @@ export const inventoryLocationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ location: inventoryLocationOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -128,7 +129,7 @@ export const inventoryLocationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ location: inventoryLocationOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -163,7 +164,7 @@ export const inventoryLocationRouter = {
 					locations: z.array(inventoryLocationOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -226,7 +227,7 @@ export const inventoryLocationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ location: inventoryLocationOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -259,7 +260,7 @@ export const inventoryLocationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -107,7 +108,7 @@ export const checklistRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ checklist: jobChecklistOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -167,7 +168,7 @@ export const checklistRouter = {
 					checklists: z.array(jobChecklistOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -218,7 +219,7 @@ export const checklistRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ checklist: jobChecklistOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -295,7 +296,7 @@ export const checklistRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ checklists: z.array(jobChecklistOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -341,7 +342,7 @@ export const checklistRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ step: jobStepOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -432,7 +433,7 @@ export const checklistRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

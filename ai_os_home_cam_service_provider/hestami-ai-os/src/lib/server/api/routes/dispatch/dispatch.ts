@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -271,7 +272,7 @@ export const dispatchRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ assignment: dispatchAssignmentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -365,7 +366,7 @@ export const dispatchRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ assignment: dispatchAssignmentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -483,7 +484,7 @@ export const dispatchRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ assignment: dispatchAssignmentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -577,7 +578,7 @@ export const dispatchRouter = {
 					assignments: z.array(dispatchAssignmentOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -645,7 +646,7 @@ export const dispatchRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -721,7 +722,7 @@ export const dispatchRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ assignment: dispatchAssignmentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -800,7 +801,7 @@ export const dispatchRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ routePlan: routePlanOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -855,7 +856,7 @@ export const dispatchRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ routePlan: routePlanOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

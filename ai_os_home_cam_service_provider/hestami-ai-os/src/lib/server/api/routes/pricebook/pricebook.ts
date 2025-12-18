@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -149,7 +150,7 @@ export const pricebookRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ pricebook: pricebookOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ pricebook: pricebookOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertContractorOrg(context.organization.id);
 			await context.cerbos.authorize('edit', 'pricebook', input.id ?? 'new');
@@ -176,7 +177,7 @@ export const pricebookRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ pricebook: pricebookOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ pricebook: pricebookOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const pb = await prisma.pricebook.findFirst({
 				where: { id: input.id, organizationId: context.organization.id }
@@ -195,7 +196,7 @@ export const pricebookRouter = {
 					pricebooks: z.array(pricebookOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -250,7 +251,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ version: pricebookVersionOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -299,7 +300,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ version: pricebookVersionOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -339,7 +340,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ version: pricebookVersionOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -372,7 +373,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ versions: z.array(pricebookVersionOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -424,7 +425,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ item: pricebookItemOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -466,7 +467,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ items: z.array(pricebookItemOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -516,7 +517,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ rule: priceRuleOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -572,7 +573,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ rules: z.array(priceRuleOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -625,7 +626,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ jobTemplate: jobTemplateOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -719,7 +720,7 @@ export const pricebookRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ jobTemplates: z.array(jobTemplateOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

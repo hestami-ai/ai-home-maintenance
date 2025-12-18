@@ -2,6 +2,14 @@ import { z } from 'zod';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { assertContractorComplianceForScheduling } from '../contractor/utils.js';
 import { ApiException } from '../../errors.js';
+import {
+	ResponseMetaSchema,
+	WorkOrderStatusSchema,
+	WorkOrderPrioritySchema,
+	WorkOrderCategorySchema,
+	WorkOrderOriginTypeSchema,
+	FundTypeSchema
+} from '../../schemas.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import type { Prisma, TechnicianAvailability, WorkOrderStatus } from '../../../../../../generated/prisma/client.js';
 import { ContractorTradeType, PricebookItemType } from '../../../../../../generated/prisma/client.js';
@@ -14,26 +22,12 @@ import {
 } from '../../../workflows/workOrderLifecycle.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
 
-const workOrderStatusEnum = z.enum([
-	'DRAFT', 'SUBMITTED', 'TRIAGED', 'AUTHORIZED', 'ASSIGNED', 'SCHEDULED',
-	'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'REVIEW_REQUIRED', 'INVOICED', 'CLOSED', 'CANCELLED'
-]);
-
-// Phase 9: Work Order Origin Types
-const workOrderOriginTypeEnum = z.enum([
-	'VIOLATION_REMEDIATION', 'ARC_APPROVAL', 'PREVENTIVE_MAINTENANCE',
-	'BOARD_DIRECTIVE', 'EMERGENCY_ACTION', 'MANUAL'
-]);
-
-// Phase 9: Fund Types for budget source
-const fundTypeEnum = z.enum(['OPERATING', 'RESERVE', 'SPECIAL']);
-
-const workOrderPriorityEnum = z.enum(['EMERGENCY', 'HIGH', 'MEDIUM', 'LOW', 'SCHEDULED']);
-
-const workOrderCategoryEnum = z.enum([
-	'MAINTENANCE', 'REPAIR', 'INSPECTION', 'INSTALLATION', 'REPLACEMENT',
-	'EMERGENCY', 'PREVENTIVE', 'LANDSCAPING', 'CLEANING', 'SECURITY', 'OTHER'
-]);
+// Use shared enum schemas from schemas.ts
+const workOrderStatusEnum = WorkOrderStatusSchema;
+const workOrderOriginTypeEnum = WorkOrderOriginTypeSchema;
+const fundTypeEnum = FundTypeSchema;
+const workOrderPriorityEnum = WorkOrderPrioritySchema;
+const workOrderCategoryEnum = WorkOrderCategorySchema;
 
 // Valid status transitions (Phase 9: Added AUTHORIZED and REVIEW_REQUIRED)
 const validTransitions: Record<WorkOrderStatus, WorkOrderStatus[]> = {
@@ -237,7 +231,7 @@ export const workOrderRouter = {
 						priority: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -432,7 +426,7 @@ export const workOrderRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -528,7 +522,7 @@ export const workOrderRouter = {
 						slaMet: z.boolean().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -607,7 +601,7 @@ export const workOrderRouter = {
 						previousStatus: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -718,7 +712,7 @@ export const workOrderRouter = {
 						assignedVendorId: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -821,7 +815,7 @@ export const workOrderRouter = {
 						assignedTechnicianId: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -921,7 +915,7 @@ export const workOrderRouter = {
 						scheduledStart: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1027,7 +1021,7 @@ export const workOrderRouter = {
 						slaMet: z.boolean().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1151,7 +1145,7 @@ export const workOrderRouter = {
 						requiresBoardApproval: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1285,7 +1279,7 @@ export const workOrderRouter = {
 						closedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1394,7 +1388,7 @@ export const workOrderRouter = {
 						question: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1509,7 +1503,7 @@ export const workOrderRouter = {
 						authorizedAt: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1630,7 +1624,7 @@ export const workOrderRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1693,7 +1687,7 @@ export const workOrderRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1767,7 +1761,7 @@ export const workOrderRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1928,7 +1922,7 @@ export const workOrderRouter = {
 					workflowId: z.string(),
 					message: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1985,7 +1979,7 @@ export const workOrderRouter = {
 					status: z.any().nullable(),
 					error: z.any().nullable()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2028,7 +2022,7 @@ export const workOrderRouter = {
 						jobTemplateId: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2117,7 +2111,7 @@ export const workOrderRouter = {
 						total: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2229,7 +2223,7 @@ export const workOrderRouter = {
 						grandTotal: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2292,7 +2286,7 @@ export const workOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -2343,7 +2337,7 @@ export const workOrderRouter = {
 						jobTemplateId: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

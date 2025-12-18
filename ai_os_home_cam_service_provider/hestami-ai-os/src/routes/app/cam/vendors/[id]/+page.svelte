@@ -4,30 +4,7 @@
 	import { ArrowLeft, Users, FileText, Clock, Phone, Mail, MapPin } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, VendorApprovalModal, UploadComplianceDocModal } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { vendorApi, documentApi, activityEventApi } from '$lib/api/cam';
-
-	interface Vendor {
-		id: string;
-		name: string;
-		status: string;
-		trades: string[];
-		contactName?: string;
-		email?: string;
-		phone?: string;
-		address?: string;
-		licenseNumber?: string;
-		insuranceExpiry?: string;
-		rating?: number;
-		createdAt: string;
-		updatedAt: string;
-	}
-
-	interface VendorDocument {
-		id: string;
-		name: string;
-		category: string;
-		createdAt: string;
-	}
+	import { vendorApi, documentApi, activityEventApi, type Vendor, type Document } from '$lib/api/cam';
 
 	interface VendorHistoryEvent {
 		id: string;
@@ -38,7 +15,7 @@
 	}
 
 	let vendor = $state<Vendor | null>(null);
-	let documents = $state<VendorDocument[]>([]);
+	let documents = $state<Document[]>([]);
 	let history = $state<VendorHistoryEvent[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
@@ -140,10 +117,10 @@
 
 		isActionLoading = true;
 		try {
-			const response = await fetch(`/api/vendor/${vendor.id}/status`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(data)
+			const response = await vendorApi.updateStatus(vendor.id, {
+				status: data.action,
+				notes: data.notes,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
@@ -164,6 +141,7 @@
 
 		isUploadingDoc = true;
 		try {
+			// TODO: Document upload requires FormData - keep as fetch for now
 			const formData = new FormData();
 			formData.append('file', data.file);
 			formData.append('documentType', data.documentType);

@@ -3,12 +3,13 @@
 	import { goto } from '$app/navigation';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { accountingApi } from '$lib/api/cam';
 
 	interface GLAccount {
 		id: string;
 		accountNumber: string;
 		name: string;
-		type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+		type: string;
 		balance: number;
 		isActive: boolean;
 	}
@@ -20,7 +21,7 @@
 		description: string;
 		debitTotal: number;
 		creditTotal: number;
-		status: 'DRAFT' | 'POSTED' | 'VOIDED';
+		status: string;
 		createdBy: string;
 	}
 
@@ -36,22 +37,16 @@
 		isLoading = true;
 		try {
 			const [accountsRes, journalRes] = await Promise.all([
-				fetch(`/api/accounting/gl/accounts?associationId=${$currentAssociation.id}`).catch(() => null),
-				fetch(`/api/accounting/gl/journal?associationId=${$currentAssociation.id}&limit=20`).catch(() => null)
+				accountingApi.gl.accounts({}),
+				accountingApi.gl.journal({ limit: 20 })
 			]);
 
-			if (accountsRes?.ok) {
-				const data = await accountsRes.json();
-				if (data.ok && data.data?.items) {
-					accounts = data.data.items;
-				}
+			if (accountsRes.ok && accountsRes.data?.accounts) {
+				accounts = accountsRes.data.accounts;
 			}
 
-			if (journalRes?.ok) {
-				const data = await journalRes.json();
-				if (data.ok && data.data?.items) {
-					journalEntries = data.data.items;
-				}
+			if (journalRes.ok && journalRes.data?.entries) {
+				journalEntries = journalRes.data.entries;
 			}
 		} catch (e) {
 			console.error('Failed to load GL data:', e);

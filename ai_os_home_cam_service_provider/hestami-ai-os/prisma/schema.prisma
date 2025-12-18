@@ -621,7 +621,11 @@ enum MeetingType {
 
 enum MeetingStatus {
   SCHEDULED
-  HELD
+  IN_SESSION
+  ADJOURNED
+  MINUTES_DRAFT
+  MINUTES_APPROVED
+  ARCHIVED
   CANCELLED
 }
 
@@ -1041,6 +1045,12 @@ enum ActivityEntityType {
   EXTERNAL_VENDOR
   CONCIERGE_ACTION
 
+  // Phase 11 - Governance
+  MEETING
+  MOTION
+  VOTE
+  RESOLUTION
+
   // Cross-cutting
   USER
   USER_ROLE
@@ -1081,6 +1091,19 @@ enum ActivityActionType {
   VERSION // New document version created
   SUPERSEDE // Document superseded by newer version
   REFERENCED // Document referenced in a decision
+  // Phase 11 - Governance actions
+  START_SESSION // Meeting started
+  ADJOURN // Meeting adjourned
+  APPROVE_MINUTES // Minutes approved
+  ARCHIVE // Meeting/resolution archived
+  PROPOSE // Motion proposed
+  SECOND // Motion seconded
+  OPEN_VOTING // Voting opened on motion
+  CLOSE_VOTING // Voting closed
+  TABLE // Motion tabled
+  WITHDRAW // Motion withdrawn
+  CAST_BALLOT // Vote cast
+  ADOPT // Resolution adopted
 }
 
 /// @description Actor types for activity events
@@ -1273,6 +1296,9 @@ enum DocumentContextType {
   OWNER_INTENT // Owner intent/request
   VIOLATION // Violation record
   ARC_REQUEST // Architectural review request
+  BOARD_MOTION // Board motion/decision
+  RESOLUTION // Formal resolution
+  MEETING // Board/association meeting
 }
 
 enum DocumentStatus {
@@ -1412,6 +1438,7 @@ model Association {
   boards                 Board[]
   meetings               Meeting[]
   resolutions            Resolution[]
+  boardMotions           BoardMotion[]
   policyDocuments        PolicyDocument[]
   communicationTemplates CommunicationTemplate[]
   massCommunications     MassCommunication[]
@@ -1745,6 +1772,9 @@ model Violation {
 
   // Phase 9: Work Orders created from this violation
   workOrders WorkOrder[]
+
+  // Phase 11: Governance - agenda items linked to this violation
+  agendaItems MeetingAgendaItem[]
 
   @@index([associationId])
   @@index([violationTypeId])
@@ -3591,6 +3621,9 @@ model WorkOrder {
   // Phase 2: Job Lifecycle
   jobs Job[]
 
+  // Phase 11: Governance - agenda items linked to this work order
+  agendaItems MeetingAgendaItem[]
+
   @@unique([associationId, workOrderNumber])
   @@index([associationId])
   @@index([unitId])
@@ -3777,6 +3810,9 @@ model ARCRequest {
   // Phase 9: Work Orders created from this ARC approval
   workOrders WorkOrder[]
 
+  // Phase 11: Governance - agenda items linked to this ARC request
+  agendaItems MeetingAgendaItem[]
+
   @@unique([associationId, requestNumber])
   @@index([associationId])
   @@index([committeeId])
@@ -3936,18 +3972,23 @@ model Meeting {
   description  String?       @db.Text
   scheduledFor DateTime      @map("scheduled_for")
   location     String?
+  virtualLink  String?       @map("virtual_link") // Video conference URL
+
+  // Quorum tracking
+  quorumRequired Int? @map("quorum_required") // Minimum attendees for quorum
 
   createdBy String   @map("created_by") // User ID
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  association Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  board       Board?              @relation(fields: [boardId], references: [id])
-  agendaItems MeetingAgendaItem[]
-  minutes     MeetingMinutes?
-  attendance  MeetingAttendance[]
-  votes       Vote[]
+  association  Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  board        Board?              @relation(fields: [boardId], references: [id])
+  agendaItems  MeetingAgendaItem[]
+  minutes      MeetingMinutes?
+  attendance   MeetingAttendance[]
+  votes        Vote[]
+  boardMotions BoardMotion[]
 
   @@index([associationId])
   @@index([boardId])
@@ -3960,17 +4001,32 @@ model MeetingAgendaItem {
   id        String @id @default(cuid())
   meetingId String @map("meeting_id")
 
-  title       String
-  description String? @db.Text
-  order       Int     @default(0)
+  title          String
+  description    String? @db.Text
+  order          Int     @default(0)
+  timeAllotment  Int?    @map("time_allotment") // Minutes allocated for this item
+
+  // Cross-domain links (Phase 11: Governance)
+  arcRequestId     String? @map("arc_request_id")
+  violationId      String? @map("violation_id")
+  workOrderId      String? @map("work_order_id")
+  policyDocumentId String? @map("policy_document_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
-  votes   Vote[]
+  meeting        Meeting         @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  votes          Vote[]
+  arcRequest     ARCRequest?     @relation(fields: [arcRequestId], references: [id])
+  violation      Violation?      @relation(fields: [violationId], references: [id])
+  workOrder      WorkOrder?      @relation(fields: [workOrderId], references: [id])
+  policyDocument PolicyDocument? @relation(fields: [policyDocumentId], references: [id])
 
   @@index([meetingId])
+  @@index([arcRequestId])
+  @@index([violationId])
+  @@index([workOrderId])
+  @@index([policyDocumentId])
   @@map("meeting_agenda_items")
 }
 
@@ -4015,6 +4071,7 @@ model Vote {
   id           String  @id @default(cuid())
   meetingId    String  @map("meeting_id")
   agendaItemId String? @map("agenda_item_id")
+  motionId     String? @map("motion_id") // Phase 11: Link vote to motion
 
   question       String
   method         VoteMethod @default(IN_PERSON)
@@ -4027,6 +4084,7 @@ model Vote {
   // Relations
   meeting    Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   agendaItem MeetingAgendaItem? @relation(fields: [agendaItemId], references: [id])
+  motion     BoardMotion?       @relation(fields: [motionId], references: [id])
   ballots    VoteBallot[]
 
   // Phase 9: Work Orders requiring board approval via this vote
@@ -4034,6 +4092,7 @@ model Vote {
 
   @@index([meetingId])
   @@index([agendaItemId])
+  @@index([motionId])
   @@map("votes")
 }
 
@@ -4045,6 +4104,10 @@ model VoteBallot {
   choice       VoteChoice
   castAt       DateTime   @default(now()) @map("cast_at")
 
+  // Phase 11: Conflict of interest tracking
+  hasConflictOfInterest Boolean @default(false) @map("has_conflict_of_interest")
+  conflictNotes         String? @map("conflict_notes") @db.Text
+
   // Relations
   vote       Vote  @relation(fields: [voteId], references: [id], onDelete: Cascade)
   voterParty Party @relation(fields: [voterPartyId], references: [id])
@@ -4052,6 +4115,86 @@ model VoteBallot {
   @@unique([voteId, voterPartyId])
   @@index([voterPartyId])
   @@map("vote_ballots")
+}
+
+/// @description Board motion - formal proposal made during a meeting
+model BoardMotion {
+  id            String            @id @default(cuid())
+  associationId String            @map("association_id")
+  meetingId     String?           @map("meeting_id")
+  voteId        String?           @map("vote_id")
+
+  motionNumber String            @map("motion_number")
+  title        String
+  description  String?           @db.Text
+  category     BoardMotionCategory
+  status       BoardMotionStatus @default(PROPOSED)
+
+  // Motion details
+  movedById    String?  @map("moved_by_id") // Party ID of person who made the motion
+  secondedById String?  @map("seconded_by_id") // Party ID of person who seconded
+  rationale    String?  @db.Text
+
+  // Outcome
+  outcome       BoardMotionOutcome?
+  outcomeNotes  String?            @db.Text @map("outcome_notes")
+  decidedAt     DateTime?          @map("decided_at")
+
+  // Effective dates for policies/rules
+  effectiveDate DateTime? @map("effective_date")
+  expiresAt     DateTime? @map("expires_at")
+
+  createdBy String   @map("created_by") // User ID
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  meeting     Meeting?    @relation(fields: [meetingId], references: [id])
+
+  // Phase 11: Votes linked to this motion
+  votes Vote[]
+
+  // Phase 11: Resolutions created from this motion
+  resolutions Resolution[]
+
+  @@unique([associationId, motionNumber])
+  @@index([associationId])
+  @@index([meetingId])
+  @@index([status])
+  @@index([category])
+  @@map("board_motions")
+}
+
+enum BoardMotionCategory {
+  POLICY // Policy adoption/amendment
+  BUDGET // Budget approval/amendment
+  ASSESSMENT // Assessment/fee changes
+  ENFORCEMENT // Enforcement action
+  CONTRACT // Contract approval
+  CAPITAL_PROJECT // Capital improvement project
+  RULE_CHANGE // Rule change
+  ELECTION // Election/appointment
+  OTHER // Other business
+}
+
+enum BoardMotionStatus {
+  PROPOSED // Motion has been proposed
+  SECONDED // Motion has been seconded
+  UNDER_DISCUSSION // Being discussed
+  UNDER_VOTE // Vote in progress (alias for VOTING)
+  TABLED // Postponed for later
+  APPROVED // Motion passed
+  DENIED // Motion failed
+  WITHDRAWN // Motion withdrawn
+}
+
+enum BoardMotionOutcome {
+  PASSED // Motion passed
+  FAILED // Motion failed
+  TABLED // Motion tabled for future meeting
+  WITHDRAWN // Motion withdrawn by mover
+  AMENDED // Motion amended and re-voted
 }
 
 /// @description Audit trail for board changes
@@ -4076,6 +4219,7 @@ model Resolution {
   id             String           @id @default(cuid())
   associationId  String           @map("association_id")
   boardId        String?          @map("board_id")
+  motionId       String?          @map("motion_id") // Phase 11: Link to originating motion
   title          String
   summary        String?          @db.Text
   status         ResolutionStatus @default(PROPOSED)
@@ -4092,6 +4236,7 @@ model Resolution {
   // Relations
   association  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
   board        Board?       @relation(fields: [boardId], references: [id])
+  motion       BoardMotion? @relation(fields: [motionId], references: [id])
   supersededBy Resolution?  @relation("ResolutionSupersede", fields: [supersededById], references: [id])
   supersedes   Resolution[] @relation("ResolutionSupersede")
 
@@ -4102,6 +4247,7 @@ model Resolution {
 
   @@index([associationId])
   @@index([boardId])
+  @@index([motionId])
   @@index([status])
   @@map("resolutions")
 }
@@ -4123,6 +4269,9 @@ model PolicyDocument {
   association Association     @relation(fields: [associationId], references: [id], onDelete: Cascade)
   resolution  Resolution?     @relation(fields: [resolutionId], references: [id])
   versions    PolicyVersion[]
+
+  // Phase 11: Governance - agenda items linked to this policy document
+  agendaItems MeetingAgendaItem[]
 
   @@index([associationId])
   @@index([resolutionId])

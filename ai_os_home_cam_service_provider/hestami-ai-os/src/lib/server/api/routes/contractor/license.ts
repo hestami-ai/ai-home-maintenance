@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -49,7 +50,7 @@ type LicenseInput = z.infer<typeof upsertInput>;
 export const licenseRouter = {
 	createOrUpdate: orgProcedure
 		.input(upsertInput)
-		.output(z.object({ ok: z.literal(true), data: z.object({ license: licenseOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ license: licenseOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertContractorOrg(context.organization.id);
 			await context.cerbos.authorize('edit', 'contractor_license', input.id ?? 'new');
@@ -91,7 +92,7 @@ export const licenseRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ license: licenseOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ license: licenseOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const license = await prisma.contractorLicense.findFirst({
 				where: { id: input.id, contractorProfile: { organizationId: context.organization.id } },
@@ -114,7 +115,7 @@ export const licenseRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ licenses: z.array(licenseOutput), pagination: PaginationOutputSchema }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

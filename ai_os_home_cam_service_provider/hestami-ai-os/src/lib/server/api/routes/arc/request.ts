@@ -7,7 +7,17 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
+import { ApiException, ResponseMetaSchema } from '../../errors.js';
+import {
+	successResponseSchema,
+	ARCRequestDetailSchema,
+	ARCRequestSummarySchema,
+	ARCPrecedentSchema,
+	ARCCategorySchema,
+	ARCRequestStatusSchema,
+	ARCDocumentTypeSchema,
+	ARCReviewActionSchema
+} from '../../schemas.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import type {
 	Prisma,
@@ -19,37 +29,11 @@ import type {
 import type { RequestContext } from '../../context.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 
-const arcCategoryEnum = z.enum([
-	'FENCE',
-	'ROOF',
-	'PAINT',
-	'ADDITION',
-	'LANDSCAPING',
-	'WINDOWS',
-	'DOORS',
-	'DRIVEWAY',
-	'GARAGE',
-	'SOLAR',
-	'HVAC',
-	'OTHER'
-]);
-
-const arcRequestStatusEnum = z.enum([
-	'DRAFT',
-	'SUBMITTED',
-	'UNDER_REVIEW',
-	'APPROVED',
-	'DENIED',
-	'CHANGES_REQUESTED',
-	'TABLED',
-	'WITHDRAWN',
-	'CANCELLED',
-	'EXPIRED'
-]);
-
-const arcDocumentTypeEnum = z.enum(['PLANS', 'SPECS', 'PHOTO', 'PERMIT', 'RENDERING', 'SURVEY', 'OTHER']);
-
-const arcReviewActionEnum = z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']);
+// Use shared enum schemas from schemas.ts
+const arcCategoryEnum = ARCCategorySchema;
+const arcRequestStatusEnum = ARCRequestStatusSchema;
+const arcDocumentTypeEnum = ARCDocumentTypeSchema;
+const arcReviewActionEnum = ARCReviewActionSchema;
 const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
 const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
 
@@ -122,19 +106,17 @@ export const arcRequestRouter = {
 				.merge(IdempotencyKeySchema)
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
+			successResponseSchema(
+				z.object({
 					request: z.object({
 						id: z.string(),
 						requestNumber: z.string(),
 						title: z.string(),
-						status: z.string(),
-						category: z.string()
+						status: ARCRequestStatusSchema,
+						category: ARCCategorySchema
 					})
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'arc_request', 'new');
@@ -202,11 +184,9 @@ export const arcRequestRouter = {
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({ request: z.any() }),
-				meta: z.any()
-			})
+			successResponseSchema(
+				z.object({ request: ARCRequestDetailSchema })
+			)
 		)
 		.handler(async ({ input, context }) => {
 			const request = await prisma.aRCRequest.findFirst({
@@ -238,14 +218,12 @@ export const arcRequestRouter = {
 			})
 		)
 		.output(
-			z.object({
-				ok: z.literal(true),
-				data: z.object({
-					requests: z.array(z.any()),
+			successResponseSchema(
+				z.object({
+					requests: z.array(ARCRequestSummarySchema),
 					pagination: PaginationOutputSchema
-				}),
-				meta: z.any()
-			})
+				})
+			)
 		)
 		.handler(async ({ input, context }) => {
 			const take = input.limit ?? 20;
@@ -298,7 +276,7 @@ export const arcRequestRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -339,7 +317,7 @@ export const arcRequestRouter = {
 
 	submit: orgProcedure
 		.input(IdempotencyKeySchema.merge(z.object({ id: z.string() })))
-		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string(), submittedAt: z.string().nullable() }) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string(), submittedAt: z.string().nullable() }) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const updated = await requireIdempotency(input.idempotencyKey, context, async () => {
@@ -384,7 +362,7 @@ export const arcRequestRouter = {
 				z.object({ id: z.string(), reason: z.string().max(1000).optional() })
 			)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string(), withdrawnAt: z.string().nullable() }) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string(), withdrawnAt: z.string().nullable() }) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const updated = await requireIdempotency(input.idempotencyKey, context, async () => {
@@ -436,7 +414,7 @@ export const arcRequestRouter = {
 				})
 			)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ document: z.object({ id: z.string(), requestId: z.string() }) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ document: z.object({ id: z.string(), requestId: z.string() }) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
@@ -496,7 +474,7 @@ export const arcRequestRouter = {
 				})
 			)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
@@ -601,7 +579,7 @@ export const arcRequestRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -684,7 +662,7 @@ export const arcRequestRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -750,7 +728,7 @@ export const arcRequestRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

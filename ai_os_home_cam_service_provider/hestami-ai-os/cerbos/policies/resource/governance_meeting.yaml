@@ -1,0 +1,51 @@
+# Governance Meeting Resource Policy
+# Controls access to board meetings, annual meetings, and special meetings
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_meeting"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all meeting operations
+    - actions: ["view", "create", "edit", "delete", "start_session", "adjourn", "approve_minutes", "archive"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers have full access to meeting operations
+    - actions: ["view", "create", "edit", "delete", "start_session", "adjourn", "approve_minutes", "archive"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view, create, edit meetings and participate in session management
+    - actions: ["view", "create", "edit", "start_session", "adjourn", "approve_minutes"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view meetings (read-only access to governance)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view meetings if they are association members
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+      condition:
+        match:
+          any:
+            of:
+              - expr: "!has(R.attr.memberIds)"
+              - expr: "has(R.attr.memberIds) && P.id in R.attr.memberIds"
+
+    # Auditors can view meetings for audit purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

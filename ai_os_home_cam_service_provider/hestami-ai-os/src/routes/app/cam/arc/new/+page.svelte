@@ -3,12 +3,7 @@
 	import { ArrowLeft, ClipboardCheck, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-		ownerName?: string;
-	}
+	import { arcRequestApi, unitApi, type Unit } from '$lib/api/cam';
 
 	let units = $state<Unit[]>([]);
 	let isLoadingData = $state(true);
@@ -44,12 +39,9 @@
 
 		isLoadingData = true;
 		try {
-			const response = await fetch(`/api/unit?associationId=${$currentAssociation.id}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					units = data.data.items;
-				}
+			const response = await unitApi.list({});
+			if (response.ok && response.data?.units) {
+				units = response.data.units;
 			}
 		} catch (e) {
 			console.error('Failed to load units:', e);
@@ -75,31 +67,22 @@
 		error = null;
 
 		try {
-			const response = await fetch('/api/arc/request', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					associationId: $currentAssociation.id,
-					unitId: formData.unitId,
-					title: formData.title,
-					description: formData.description || undefined,
-					category: formData.category,
-					projectScope: formData.projectScope || undefined,
-					estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
-					startDate: formData.startDate || undefined,
-					completionDate: formData.completionDate || undefined
-				})
+			const response = await arcRequestApi.create({
+				unitId: formData.unitId,
+				title: formData.title,
+				description: formData.description || '',
+				category: formData.category,
+				projectScope: formData.projectScope || undefined,
+				estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
+				plannedStartDate: formData.startDate || undefined,
+				plannedCompletionDate: formData.completionDate || undefined,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.id) {
-					goto(`/app/cam/arc/${data.data.id}`);
-				} else {
-					error = data.error?.message || 'Failed to submit ARC request';
-				}
+			if (response.ok && response.data?.request) {
+				goto(`/app/cam/arc/${response.data.request.id}`);
 			} else {
-				error = 'Failed to submit ARC request';
+				error = response.error?.message || 'Failed to submit ARC request';
 			}
 		} catch (e) {
 			error = 'Failed to submit ARC request';

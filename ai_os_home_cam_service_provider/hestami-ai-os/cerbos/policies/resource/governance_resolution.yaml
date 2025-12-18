@@ -1,0 +1,51 @@
+# Governance Resolution Resource Policy
+# Controls access to formal resolutions adopted by an association
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_resolution"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all resolution operations
+    - actions: ["view", "create", "edit", "adopt", "supersede", "archive", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers have full access to resolution operations
+    - actions: ["view", "create", "edit", "adopt", "supersede", "archive", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view, create, edit, and adopt resolutions
+    - actions: ["view", "create", "edit", "adopt"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view resolutions (read-only access to governance)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view resolutions if they are association members
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+      condition:
+        match:
+          any:
+            of:
+              - expr: "!has(R.attr.memberIds)"
+              - expr: "has(R.attr.memberIds) && P.id in R.attr.memberIds"
+
+    # Auditors can view resolutions for audit purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

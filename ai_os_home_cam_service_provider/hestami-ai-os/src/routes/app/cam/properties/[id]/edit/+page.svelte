@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { propertyApi } from '$lib/api/cam';
 
 	interface Property {
 		id: string;
@@ -82,26 +83,22 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/property/${propertyId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					property = data.data;
-					formData = {
-						name: data.data.name || '',
-						address: data.data.address || '',
-						propertyType: data.data.propertyType || 'CONDO',
-						status: data.data.status || 'ACTIVE',
-						yearBuilt: data.data.yearBuilt?.toString() || '',
-						totalSquareFootage: data.data.totalSquareFootage?.toString() || '',
-						parkingSpaces: data.data.parkingSpaces?.toString() || '',
-						amenities: data.data.amenities || []
-					};
-				} else {
-					error = 'Property not found';
-				}
+			const response = await propertyApi.get(propertyId);
+			if (response.ok && response.data?.property) {
+				const p = response.data.property;
+				property = p;
+				formData = {
+					name: p.name || '',
+					address: p.address || '',
+					propertyType: p.propertyType || 'CONDO',
+					status: p.status || 'ACTIVE',
+					yearBuilt: p.yearBuilt?.toString() || '',
+					totalSquareFootage: p.totalSquareFootage?.toString() || '',
+					parkingSpaces: p.parkingSpaces?.toString() || '',
+					amenities: p.amenities || []
+				};
 			} else {
-				error = 'Failed to load property';
+				error = 'Property not found';
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -125,26 +122,21 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/property/${property.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					name: formData.name,
-					address: formData.address,
-					propertyType: formData.propertyType,
-					status: formData.status,
-					yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : undefined,
-					totalSquareFootage: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) : undefined,
-					parkingSpaces: formData.parkingSpaces ? parseInt(formData.parkingSpaces) : undefined,
-					amenities: formData.amenities.length > 0 ? formData.amenities : undefined
-				})
+			const response = await propertyApi.update(property.id, {
+				name: formData.name,
+				address: formData.address,
+				propertyType: formData.propertyType,
+				status: formData.status,
+				yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : undefined,
+				totalSquareFootage: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) : undefined,
+				parkingSpaces: formData.parkingSpaces ? parseInt(formData.parkingSpaces) : undefined,
+				amenities: formData.amenities.length > 0 ? formData.amenities : undefined
 			});
 
 			if (response.ok) {
 				goto(`/app/cam/properties/${property.id}`);
 			} else {
-				const data = await response.json();
-				error = data.error?.message || 'Failed to update property';
+				error = response.error?.message || 'Failed to update property';
 			}
 		} catch (e) {
 			error = 'Failed to update property';

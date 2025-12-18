@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -81,7 +82,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -127,7 +128,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -166,7 +167,7 @@ export const scheduledVisitRouter = {
 					visits: z.array(visitOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -223,7 +224,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -267,7 +268,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -309,7 +310,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -359,7 +360,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -442,7 +443,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -496,7 +497,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visit: visitOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -569,7 +570,7 @@ export const scheduledVisitRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visits: z.array(visitOutput) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

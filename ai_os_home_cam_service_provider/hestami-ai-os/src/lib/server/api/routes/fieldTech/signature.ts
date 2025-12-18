@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -79,7 +80,7 @@ export const signatureRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ signature: jobSignatureOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -141,7 +142,7 @@ export const signatureRouter = {
 					signatures: z.array(jobSignatureOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -188,7 +189,7 @@ export const signatureRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ signature: jobSignatureOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -213,7 +214,7 @@ export const signatureRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

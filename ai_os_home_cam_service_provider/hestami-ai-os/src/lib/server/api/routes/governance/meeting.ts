@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -13,7 +14,7 @@ import type {
 import type { RequestContext } from '../../context.js';
 
 const meetingTypeEnum = z.enum(['BOARD', 'ANNUAL', 'SPECIAL']);
-const meetingStatusEnum = z.enum(['SCHEDULED', 'HELD', 'CANCELLED']);
+const meetingStatusEnum = z.enum(['SCHEDULED', 'IN_SESSION', 'ADJOURNED', 'MINUTES_DRAFT', 'MINUTES_APPROVED', 'ARCHIVED', 'CANCELLED']);
 const attendanceStatusEnum = z.enum(['PRESENT', 'ABSENT', 'EXCUSED']);
 const voteMethodEnum = z.enum(['IN_PERSON', 'PROXY', 'ELECTRONIC']);
 const voteChoiceEnum = z.enum(['YES', 'NO', 'ABSTAIN']);
@@ -104,7 +105,7 @@ export const governanceMeetingRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ meeting: z.object({ id: z.string(), associationId: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -142,7 +143,7 @@ export const governanceMeetingRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ meeting: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -175,7 +176,7 @@ export const governanceMeetingRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ meetings: z.array(z.any()), pagination: PaginationOutputSchema }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -228,7 +229,7 @@ export const governanceMeetingRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ agendaItem: z.object({ id: z.string(), meetingId: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -270,7 +271,7 @@ export const governanceMeetingRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ minutes: z.object({ id: z.string(), meetingId: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -317,7 +318,7 @@ export const governanceMeetingRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ attendance: z.object({ id: z.string(), meetingId: z.string(), partyId: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -391,7 +392,7 @@ export const governanceMeetingRouter = {
 						quorumRequired: z.number().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -444,15 +445,25 @@ export const governanceMeetingRouter = {
 				z.object({
 					voteId: z.string(),
 					voterPartyId: z.string(),
-					choice: voteChoiceEnum
+					choice: voteChoiceEnum,
+					hasConflictOfInterest: z.boolean().optional(),
+					conflictNotes: z.string().optional()
 				})
 			)
 		)
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ ballot: z.object({ id: z.string(), voteId: z.string(), voterPartyId: z.string(), choice: z.string() }) }),
-				meta: z.any()
+				data: z.object({
+					ballot: z.object({
+						id: z.string(),
+						voteId: z.string(),
+						voterPartyId: z.string(),
+						choice: z.string(),
+						hasConflictOfInterest: z.boolean()
+					})
+				}),
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -473,16 +484,21 @@ export const governanceMeetingRouter = {
 
 				await ensurePartyBelongs(rest.voterPartyId, vote.meeting.association.organizationId);
 
+				// Enforce vote immutability - once cast, cannot be changed
 				const existing = await prisma.voteBallot.findFirst({
 					where: { voteId: rest.voteId, voterPartyId: rest.voterPartyId }
 				});
-				if (existing) return existing;
+				if (existing) {
+					throw ApiException.badRequest('Ballot already cast and cannot be changed');
+				}
 
 				return prisma.voteBallot.create({
 					data: {
 						voteId: rest.voteId,
 						voterPartyId: rest.voterPartyId,
-						choice: rest.choice as VoteChoice
+						choice: rest.choice as VoteChoice,
+						hasConflictOfInterest: rest.hasConflictOfInterest ?? false,
+						conflictNotes: rest.conflictNotes
 					}
 				});
 			});
@@ -493,8 +509,68 @@ export const governanceMeetingRouter = {
 						id: ballot.id,
 						voteId: ballot.voteId,
 						voterPartyId: ballot.voterPartyId,
-						choice: ballot.choice
+						choice: ballot.choice,
+						hasConflictOfInterest: ballot.hasConflictOfInterest
 					}
+				},
+				context
+			);
+		}),
+
+	getEligibleVoters: orgProcedure
+		.input(z.object({ voteId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					eligibleVoters: z.array(z.object({
+						partyId: z.string(),
+						name: z.string().nullable(),
+						hasVoted: z.boolean(),
+						attendanceStatus: z.string()
+					})),
+					totalEligible: z.number(),
+					totalVoted: z.number()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_vote', input.voteId);
+
+			const vote = await prisma.vote.findFirst({
+				where: { id: input.voteId },
+				include: {
+					meeting: {
+						include: {
+							association: true,
+							attendance: {
+								where: { status: { not: 'ABSENT' } },
+								include: { party: { select: { id: true, firstName: true, lastName: true, entityName: true } } }
+							}
+						}
+					},
+					ballots: { select: { voterPartyId: true } }
+				}
+			});
+
+			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Vote');
+			}
+
+			const votedPartyIds = new Set(vote.ballots.map((b: { voterPartyId: string }) => b.voterPartyId));
+			const eligibleVoters = vote.meeting.attendance.map((a: { party: { id: string; firstName: string | null; lastName: string | null; entityName: string | null }; status: string }) => ({
+				partyId: a.party.id,
+				name: a.party.entityName || [a.party.firstName, a.party.lastName].filter(Boolean).join(' ') || null,
+				hasVoted: votedPartyIds.has(a.party.id),
+				attendanceStatus: a.status
+			}));
+
+			return successResponse(
+				{
+					eligibleVoters,
+					totalEligible: eligibleVoters.length,
+					totalVoted: votedPartyIds.size
 				},
 				context
 			);
@@ -517,7 +593,7 @@ export const governanceMeetingRouter = {
 						quorumMet: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -564,7 +640,7 @@ export const governanceMeetingRouter = {
 						})
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -609,5 +685,346 @@ export const governanceMeetingRouter = {
 				},
 				context
 			);
+		}),
+
+	// Phase 11: Meeting State Transition Endpoints
+
+	startSession: orgProcedure
+		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string() })))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					meeting: z.object({ id: z.string(), status: z.string() }),
+					quorumStatus: z.object({ required: z.number().nullable(), present: z.number(), met: z.boolean() })
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('start_session', 'governance_meeting', input.meetingId);
+			const { idempotencyKey, meetingId } = input;
+
+			const result = await requireIdempotency(idempotencyKey, context, async () => {
+				const meeting = await prisma.meeting.findFirst({
+					where: { id: meetingId },
+					include: {
+						association: true,
+						agendaItems: true,
+						attendance: { where: { status: { not: 'ABSENT' } } }
+					}
+				});
+
+				if (!meeting || meeting.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Meeting');
+				}
+
+				if (meeting.status !== 'SCHEDULED') {
+					throw ApiException.badRequest(`Cannot start session from status ${meeting.status}`);
+				}
+
+				if (meeting.agendaItems.length === 0) {
+					throw ApiException.badRequest('Meeting must have at least one agenda item before starting session');
+				}
+
+				const presentCount = meeting.attendance.length;
+				const quorumRequired = meeting.quorumRequired;
+				const quorumMet = quorumRequired === null || presentCount >= quorumRequired;
+
+				if (!quorumMet) {
+					throw ApiException.badRequest(`Quorum not met: ${presentCount} present, ${quorumRequired} required`);
+				}
+
+				const updated = await prisma.meeting.update({
+					where: { id: meetingId },
+					data: { status: 'IN_SESSION' }
+				});
+
+				return {
+					meeting: updated,
+					quorumStatus: { required: quorumRequired, present: presentCount, met: quorumMet }
+				};
+			});
+
+			return successResponse(
+				{
+					meeting: { id: result.meeting.id, status: result.meeting.status },
+					quorumStatus: result.quorumStatus
+				},
+				context
+			);
+		}),
+
+	adjourn: orgProcedure
+		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string(), notes: z.string().optional() })))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ meeting: z.object({ id: z.string(), status: z.string() }) }),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('adjourn', 'governance_meeting', input.meetingId);
+			const { idempotencyKey, meetingId } = input;
+
+			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
+				const existing = await prisma.meeting.findFirst({
+					where: { id: meetingId },
+					include: { association: true }
+				});
+
+				if (!existing || existing.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Meeting');
+				}
+
+				if (existing.status !== 'IN_SESSION') {
+					throw ApiException.badRequest(`Cannot adjourn from status ${existing.status}`);
+				}
+
+				const updated = await prisma.meeting.update({
+					where: { id: meetingId },
+					data: { status: 'ADJOURNED' }
+				});
+
+				// Create minutes placeholder if not exists
+				const existingMinutes = await prisma.meetingMinutes.findUnique({ where: { meetingId } });
+				if (!existingMinutes) {
+					await prisma.meetingMinutes.create({
+						data: { meetingId, recordedBy: context.user!.id, content: '' }
+					});
+				}
+
+				return updated;
+			});
+
+			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
+		}),
+
+	submitMinutesDraft: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					meetingId: z.string(),
+					content: z.string().min(1)
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ meeting: z.object({ id: z.string(), status: z.string() }) }),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
+			const { idempotencyKey, meetingId, content } = input;
+
+			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
+				const existing = await prisma.meeting.findFirst({
+					where: { id: meetingId },
+					include: { association: true, minutes: true }
+				});
+
+				if (!existing || existing.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Meeting');
+				}
+
+				if (existing.status !== 'ADJOURNED') {
+					throw ApiException.badRequest(`Cannot submit minutes draft from status ${existing.status}`);
+				}
+
+				// Update or create minutes
+				if (existing.minutes) {
+					await prisma.meetingMinutes.update({
+						where: { meetingId },
+						data: { content, recordedBy: context.user!.id }
+					});
+				} else {
+					await prisma.meetingMinutes.create({
+						data: { meetingId, recordedBy: context.user!.id, content }
+					});
+				}
+
+				return prisma.meeting.update({
+					where: { id: meetingId },
+					data: { status: 'MINUTES_DRAFT' }
+				});
+			});
+
+			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
+		}),
+
+	approveMinutes: orgProcedure
+		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string() })))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ meeting: z.object({ id: z.string(), status: z.string() }) }),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('approve_minutes', 'governance_meeting', input.meetingId);
+			const { idempotencyKey, meetingId } = input;
+
+			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
+				const existing = await prisma.meeting.findFirst({
+					where: { id: meetingId },
+					include: { association: true, minutes: true }
+				});
+
+				if (!existing || existing.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Meeting');
+				}
+
+				if (existing.status !== 'MINUTES_DRAFT') {
+					throw ApiException.badRequest(`Cannot approve minutes from status ${existing.status}`);
+				}
+
+				if (!existing.minutes || !existing.minutes.content) {
+					throw ApiException.badRequest('Minutes content is required before approval');
+				}
+
+				return prisma.meeting.update({
+					where: { id: meetingId },
+					data: { status: 'MINUTES_APPROVED' }
+				});
+			});
+
+			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
+		}),
+
+	archive: orgProcedure
+		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string() })))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ meeting: z.object({ id: z.string(), status: z.string() }) }),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('archive', 'governance_meeting', input.meetingId);
+			const { idempotencyKey, meetingId } = input;
+
+			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
+				const existing = await prisma.meeting.findFirst({
+					where: { id: meetingId },
+					include: { association: true }
+				});
+
+				if (!existing || existing.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Meeting');
+				}
+
+				if (existing.status !== 'MINUTES_APPROVED') {
+					throw ApiException.badRequest(`Cannot archive from status ${existing.status}`);
+				}
+
+				return prisma.meeting.update({
+					where: { id: meetingId },
+					data: { status: 'ARCHIVED' }
+				});
+			});
+
+			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
+		}),
+
+	getQuorumStatus: orgProcedure
+		.input(z.object({ meetingId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					quorumRequired: z.number().nullable(),
+					presentCount: z.number(),
+					quorumMet: z.boolean(),
+					attendees: z.array(z.object({ partyId: z.string(), status: z.string() }))
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_meeting', input.meetingId);
+
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: input.meetingId },
+				include: {
+					association: true,
+					attendance: { select: { partyId: true, status: true } }
+				}
+			});
+
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			const presentCount = meeting.attendance.filter(a => a.status !== 'ABSENT').length;
+			const quorumRequired = meeting.quorumRequired;
+			const quorumMet = quorumRequired === null || presentCount >= quorumRequired;
+
+			return successResponse(
+				{
+					quorumRequired,
+					presentCount,
+					quorumMet,
+					attendees: meeting.attendance
+				},
+				context
+			);
+		}),
+
+	// Phase 11.9: Generate minutes draft from meeting data
+	generateMinutesDraft: orgProcedure
+		.input(
+			z.object({
+				meetingId: z.string(),
+				includeAttendance: z.boolean().optional().default(true),
+				includeMotions: z.boolean().optional().default(true),
+				includeVotes: z.boolean().optional().default(true)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					meetingId: z.string(),
+					fullText: z.string(),
+					sections: z.array(z.object({
+						title: z.string(),
+						content: z.string(),
+						order: z.number()
+					})),
+					generatedAt: z.string(),
+					method: z.enum(['template', 'ai'])
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
+
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: input.meetingId },
+				include: { association: true }
+			});
+
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			// Import and use the minutes generation service
+			const { generateMinutesDraft } = await import('../../../services/minutesGenerationService.js');
+			
+			const result = await generateMinutesDraft({
+				meetingId: input.meetingId,
+				includeAttendance: input.includeAttendance,
+				includeMotions: input.includeMotions,
+				includeVotes: input.includeVotes
+			});
+
+			return successResponse(result, context);
 		})
 };

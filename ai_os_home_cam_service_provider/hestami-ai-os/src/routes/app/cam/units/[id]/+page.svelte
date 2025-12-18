@@ -4,33 +4,7 @@
 	import { ArrowLeft, Home, FileText, Clock, AlertTriangle, ClipboardCheck, Wrench } from 'lucide-svelte';
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { unitApi, documentApi, activityEventApi } from '$lib/api/cam';
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-		unitType: string;
-		status: string;
-		propertyId: string;
-		propertyName: string;
-		address?: string;
-		squareFootage?: number;
-		bedrooms?: number;
-		bathrooms?: number;
-		ownerName?: string;
-		ownerId?: string;
-		tenantName?: string;
-		tenantId?: string;
-		createdAt: string;
-		updatedAt: string;
-	}
-
-	interface UnitDocument {
-		id: string;
-		name: string;
-		category: string;
-		createdAt: string;
-	}
+	import { unitApi, documentApi, activityEventApi, violationApi, arcRequestApi, workOrderApi, type Unit, type Document } from '$lib/api/cam';
 
 	interface UnitHistoryEvent {
 		id: string;
@@ -47,7 +21,7 @@
 	}
 
 	let unit = $state<Unit | null>(null);
-	let documents = $state<UnitDocument[]>([]);
+	let documents = $state<Document[]>([]);
 	let history = $state<UnitHistoryEvent[]>([]);
 	let relatedCounts = $state<RelatedCount>({ violations: 0, arcRequests: 0, workOrders: 0 });
 	let isLoading = $state(true);
@@ -110,22 +84,19 @@
 		if (!unitId) return;
 		try {
 			const [violationsRes, arcRes, workOrdersRes] = await Promise.all([
-				fetch(`/api/violation?unitId=${unitId}&limit=0`).catch(() => null),
-				fetch(`/api/arc/request?unitId=${unitId}&limit=0`).catch(() => null),
-				fetch(`/api/work-order?unitId=${unitId}&limit=0`).catch(() => null)
+				violationApi.list({ unitId }),
+				arcRequestApi.list({ unitId }),
+				workOrderApi.list({ unitId })
 			]);
 
-			if (violationsRes?.ok) {
-				const data = await violationsRes.json();
-				if (data.ok) relatedCounts.violations = data.data?.total || 0;
+			if (violationsRes.ok) {
+				relatedCounts.violations = violationsRes.data?.violations?.length || 0;
 			}
-			if (arcRes?.ok) {
-				const data = await arcRes.json();
-				if (data.ok) relatedCounts.arcRequests = data.data?.total || 0;
+			if (arcRes.ok) {
+				relatedCounts.arcRequests = arcRes.data?.requests?.length || 0;
 			}
-			if (workOrdersRes?.ok) {
-				const data = await workOrdersRes.json();
-				if (data.ok) relatedCounts.workOrders = data.data?.total || 0;
+			if (workOrdersRes.ok) {
+				relatedCounts.workOrders = workOrdersRes.data?.workOrders?.length || 0;
 			}
 		} catch (e) {
 			console.error('Failed to load related counts:', e);

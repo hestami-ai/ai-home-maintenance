@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -122,7 +123,7 @@ export const activityEventRouter = {
 					events: z.array(activityEventOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -176,7 +177,7 @@ export const activityEventRouter = {
 					events: z.array(activityEventOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -237,7 +238,7 @@ export const activityEventRouter = {
 					events: z.array(activityEventOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -285,7 +286,7 @@ export const activityEventRouter = {
 					events: z.array(activityEventOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -334,7 +335,7 @@ export const activityEventRouter = {
 					events: z.array(activityEventOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -402,7 +403,7 @@ export const activityEventRouter = {
 					pagination: PaginationOutputSchema,
 					totalCount: z.number().optional()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -482,7 +483,7 @@ export const activityEventRouter = {
 					exportedAt: z.string(),
 					recordCount: z.number()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

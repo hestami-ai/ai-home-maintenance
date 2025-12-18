@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
@@ -52,7 +53,7 @@ const upsertInput = z
 export const branchRouter = {
 	createOrUpdate: orgProcedure
 		.input(upsertInput)
-		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertContractorOrg(context.organization.id);
 			await context.cerbos.authorize('edit', 'contractor_branch', input.id ?? 'new');
@@ -101,7 +102,7 @@ export const branchRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const branch = await prisma.contractorBranch.findFirst({
 				where: { id: input.id, organizationId: context.organization.id }
@@ -126,7 +127,7 @@ export const branchRouter = {
 					branches: z.array(branchOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -172,7 +173,7 @@ export const branchRouter = {
 
 	archive: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
-		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const { id, idempotencyKey } = input;
 			await assertContractorOrg(context.organization.id);

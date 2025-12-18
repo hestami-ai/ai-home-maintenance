@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -40,7 +41,7 @@ export const noticeTemplateRouter = {
 					subject: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'notice_template', 'new');
@@ -101,7 +102,7 @@ export const noticeTemplateRouter = {
 					isActive: z.boolean()
 				}))
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'notice_template', '*');
@@ -148,7 +149,7 @@ export const noticeTemplateRouter = {
 					updatedAt: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'notice_template', input.id);
@@ -197,7 +198,7 @@ export const noticeTemplateRouter = {
 					isActive: z.boolean()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'notice_template', input.id);
@@ -255,7 +256,7 @@ export const noticeTemplateRouter = {
 		.output(z.object({
 			ok: z.literal(true),
 			data: z.object({ deleted: z.boolean() }),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('delete', 'notice_template', input.id);

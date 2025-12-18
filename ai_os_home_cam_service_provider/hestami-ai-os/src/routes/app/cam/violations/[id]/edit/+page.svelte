@@ -4,33 +4,9 @@
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { violationApi, violationTypeApi, unitApi, type ViolationDetail, type ViolationType, type Unit } from '$lib/api/cam';
 
-	interface ViolationType {
-		id: string;
-		name: string;
-		defaultSeverity: string;
-	}
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-		ownerName?: string;
-	}
-
-	interface Violation {
-		id: string;
-		violationNumber: string;
-		title: string;
-		description: string;
-		status: string;
-		severity: string;
-		unitId: string;
-		violationTypeId?: string;
-		reportedDate: string;
-		dueDate?: string;
-	}
-
-	let violation = $state<Violation | null>(null);
+	let violation = $state<ViolationDetail | null>(null);
 	let violationTypes = $state<ViolationType[]>([]);
 	let units = $state<Unit[]>([]);
 	let isLoading = $state(true);
@@ -64,43 +40,33 @@
 
 		try {
 			const [violationRes, typesRes, unitsRes] = await Promise.all([
-				fetch(`/api/violation/${violationId}`),
-				fetch(`/api/violation-type?associationId=${$currentAssociation.id}`).catch(() => null),
-				fetch(`/api/unit?associationId=${$currentAssociation.id}`).catch(() => null)
+				violationApi.get(violationId),
+				violationTypeApi.list().catch(() => null),
+				unitApi.list({}).catch(() => null)
 			]);
 
-			if (violationRes.ok) {
-				const data = await violationRes.json();
-				if (data.ok && data.data) {
-					violation = data.data;
-					formData = {
-						unitId: data.data.unitId || '',
-						violationTypeId: data.data.violationTypeId || '',
-						title: data.data.title || '',
-						description: data.data.description || '',
-						severity: data.data.severity || 'MODERATE',
-						reportedDate: data.data.reportedDate?.split('T')[0] || '',
-						dueDate: data.data.dueDate?.split('T')[0] || ''
-					};
-				} else {
-					error = 'Violation not found';
-				}
+			if (violationRes.ok && violationRes.data?.violation) {
+				const v = violationRes.data.violation;
+				violation = v;
+				formData = {
+					unitId: v.unitId || '',
+					violationTypeId: v.violationTypeId || '',
+					title: v.title || '',
+					description: v.description || '',
+					severity: v.severity || 'MODERATE',
+					reportedDate: v.reportedDate?.split('T')[0] || '',
+					dueDate: v.curePeriodEnds?.split('T')[0] || ''
+				};
 			} else {
-				error = 'Failed to load violation';
+				error = 'Violation not found';
 			}
 
-			if (typesRes?.ok) {
-				const data = await typesRes.json();
-				if (data.ok && data.data?.items) {
-					violationTypes = data.data.items;
-				}
+			if (typesRes?.ok && typesRes.data?.violationTypes) {
+				violationTypes = typesRes.data.violationTypes;
 			}
 
-			if (unitsRes?.ok) {
-				const data = await unitsRes.json();
-				if (data.ok && data.data?.items) {
-					units = data.data.items;
-				}
+			if (unitsRes?.ok && unitsRes.data?.units) {
+				units = unitsRes.data.units;
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -124,25 +90,17 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/violation/${violation.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					unitId: formData.unitId,
-					violationTypeId: formData.violationTypeId || undefined,
-					title: formData.title,
-					description: formData.description || undefined,
-					severity: formData.severity,
-					reportedDate: formData.reportedDate || undefined,
-					dueDate: formData.dueDate || undefined
-				})
+			const response = await violationApi.update(violation.id, {
+				unitId: formData.unitId,
+				title: formData.title,
+				description: formData.description || undefined,
+				severity: formData.severity
 			});
 
 			if (response.ok) {
 				goto(`/app/cam/violations/${violation.id}`);
 			} else {
-				const data = await response.json();
-				error = data.error?.message || 'Failed to update violation';
+				error = response.error?.message || 'Failed to update violation';
 			}
 		} catch (e) {
 			error = 'Failed to update violation';

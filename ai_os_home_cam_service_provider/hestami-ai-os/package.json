@@ -22,7 +22,9 @@
 		"db:seed": "tsx prisma/seed.ts",
 		"db:studio": "prisma studio",
 		"db:reset": "prisma migrate reset",
-		"openapi:generate": "tsx scripts/generate-openapi.ts"
+		"openapi:generate": "tsx scripts/generate-openapi.ts",
+		"types:generate": "openapi-typescript ./openapi.json -o ./src/lib/api/types.generated.ts",
+		"prebuild": "npm run openapi:generate && npm run types:generate"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^1.4.0",
@@ -45,6 +47,7 @@
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.0",
 		"globals": "^16.5.0",
+		"openapi-typescript": "^7.10.1",
 		"playwright": "^1.56.1",
 		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",

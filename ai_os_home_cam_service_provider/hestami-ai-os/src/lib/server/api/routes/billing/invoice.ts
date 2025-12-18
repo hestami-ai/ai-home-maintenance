@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -135,7 +136,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -241,7 +242,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -332,7 +333,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -371,7 +372,7 @@ export const invoiceRouter = {
 					invoices: z.array(invoiceOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -433,7 +434,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -489,7 +490,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -532,7 +533,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -577,7 +578,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -629,7 +630,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ invoice: invoiceOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -674,7 +675,7 @@ export const invoiceRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

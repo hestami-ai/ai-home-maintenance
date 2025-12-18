@@ -4,6 +4,7 @@
 	import { ArrowLeft, User, Calendar, Paperclip, CheckCircle, MessageSquare, FileText } from 'lucide-svelte';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation, refreshBadgeCounts } from '$lib/stores';
+	import { violationApi, type Violation } from '$lib/api/cam';
 
 	interface OwnerResponse {
 		id: string;
@@ -25,13 +26,6 @@
 		}>;
 	}
 
-	interface Violation {
-		id: string;
-		violationNumber: string;
-		title: string;
-		status: string;
-	}
-
 	let response = $state<OwnerResponse | null>(null);
 	let violation = $state<Violation | null>(null);
 	let isLoading = $state(true);
@@ -49,26 +43,18 @@
 
 		try {
 			const [violationRes, responseRes] = await Promise.all([
-				fetch(`/api/violation/${violationId}`),
-				fetch(`/api/violation/${violationId}/response/${responseId}`)
+				violationApi.get(violationId),
+				violationApi.getResponse(violationId, responseId)
 			]);
 
-			if (violationRes.ok) {
-				const data = await violationRes.json();
-				if (data.ok && data.data) {
-					violation = data.data;
-				}
+			if (violationRes.ok && violationRes.data?.violation) {
+				violation = violationRes.data.violation;
 			}
 
-			if (responseRes.ok) {
-				const data = await responseRes.json();
-				if (data.ok && data.data) {
-					response = data.data;
-				} else {
-					error = 'Response not found';
-				}
+			if (responseRes.ok && responseRes.data?.response) {
+				response = responseRes.data.response;
 			} else {
-				error = 'Failed to load response';
+				error = 'Response not found';
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -83,9 +69,8 @@
 
 		isAcknowledging = true;
 		try {
-			const res = await fetch(`/api/violation/${violationId}/response/${response.id}/acknowledge`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' }
+			const res = await violationApi.acknowledgeResponse(violationId, response.id, {
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (res.ok) {

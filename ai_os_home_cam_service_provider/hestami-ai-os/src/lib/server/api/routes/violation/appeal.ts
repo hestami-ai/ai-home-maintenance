@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -38,7 +39,7 @@ export const appealRouter = {
 					filedDate: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'violation_appeal', 'new');
@@ -138,7 +139,7 @@ export const appealRouter = {
 					revisedFineAmount: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation_appeal', input.id);
@@ -191,7 +192,7 @@ export const appealRouter = {
 					decisionDate: z.string().nullable()
 				}))
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'violation_appeal', '*');
@@ -247,7 +248,7 @@ export const appealRouter = {
 					appealHearingDate: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
@@ -311,7 +312,7 @@ export const appealRouter = {
 					revisedFineAmount: z.string().nullable()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
@@ -385,7 +386,7 @@ export const appealRouter = {
 					status: z.string()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);

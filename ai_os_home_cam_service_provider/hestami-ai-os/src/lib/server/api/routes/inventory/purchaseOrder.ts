@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -131,7 +132,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -210,7 +211,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -244,7 +245,7 @@ export const purchaseOrderRouter = {
 					purchaseOrders: z.array(poOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -299,7 +300,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -360,7 +361,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -418,7 +419,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -479,7 +480,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -524,7 +525,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -581,7 +582,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -720,7 +721,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ purchaseOrder: poOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -762,7 +763,7 @@ export const purchaseOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -7,15 +7,17 @@
 		getCamCategory,
 		type CamDocumentCategory
 	} from '$lib/utils/documentCategories';
+	import { documentApi } from '$lib/api/cam';
 
 	interface Document {
 		id: string;
-		title: string;
+		name: string;
+		title?: string;
 		category: string;
-		status: string;
-		version: number;
-		fileName: string;
-		fileSize: number;
+		status?: string;
+		version?: number;
+		fileName?: string;
+		fileSize?: number;
 		createdAt: string;
 	}
 
@@ -83,19 +85,13 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams();
-			params.set('contextType', 'ASSOCIATION');
-			params.set('contextId', $currentAssociation.id);
-			if (localCategoryFilter) params.set('category', localCategoryFilter);
-			if (statusFilter) params.set('status', statusFilter);
-			if (searchQuery) params.set('search', searchQuery);
-
-			const response = await fetch(`/api/v1/rpc/document.listDocuments?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.documents) {
-					documents = data.data.documents;
-				}
+			const response = await documentApi.list({
+				category: localCategoryFilter || undefined,
+				status: statusFilter || undefined,
+				search: searchQuery || undefined
+			});
+			if (response.ok && response.data?.documents) {
+				documents = response.data.documents;
 			}
 		} catch (error) {
 			console.error('Failed to load documents:', error);
@@ -116,8 +112,8 @@
 		} else {
 			const newSelection: SelectedDocument = {
 				documentId: doc.id,
-				version: doc.version,
-				title: doc.title
+				version: doc.version || 1,
+				title: doc.title || doc.name
 			};
 
 			if (multiSelect) {
@@ -138,7 +134,8 @@
 		onClose();
 	}
 
-	function formatFileSize(bytes: number): string {
+	function formatFileSize(bytes: number | undefined): string {
+		if (bytes === undefined) return '—';
 		if (bytes < 1024) return `${bytes} B`;
 		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

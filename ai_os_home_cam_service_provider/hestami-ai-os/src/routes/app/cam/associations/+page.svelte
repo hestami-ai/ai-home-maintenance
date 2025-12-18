@@ -3,6 +3,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { camStore, currentAssociation, organizationStore } from '$lib/stores';
+	import { associationApi } from '$lib/api/cam';
 
 	interface Association {
 		id: string;
@@ -11,7 +12,7 @@
 		status: string;
 		fiscalYearEnd: number;
 		unitCount?: number;
-		createdAt: string;
+		createdAt?: string;
 	}
 
 	let associations = $state<Association[]>([]);
@@ -25,12 +26,9 @@
 
 		isLoading = true;
 		try {
-			const response = await fetch(`/api/association?organizationId=${orgId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					associations = data.data.items;
-				}
+			const response = await associationApi.list({ organizationId: orgId });
+			if (response.ok && response.data?.associations) {
+				associations = response.data.associations;
 			}
 		} catch (error) {
 			console.error('Failed to load associations:', error);
@@ -43,7 +41,8 @@
 		selectedAssociation = association;
 	}
 
-	function formatDate(dateString: string): string {
+	function formatDate(dateString: string | undefined): string {
+		if (!dateString) return '—';
 		return new Date(dateString).toLocaleDateString('en-US', {
 			month: 'short',
 			day: 'numeric',

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -80,7 +81,7 @@ export const contractSLARouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ slaRecord: slaRecordOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -139,7 +140,7 @@ export const contractSLARouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ slaRecord: slaRecordOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -176,7 +177,7 @@ export const contractSLARouter = {
 					slaRecords: z.array(slaRecordOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -240,7 +241,7 @@ export const contractSLARouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ slaRecord: slaRecordOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -305,7 +306,7 @@ export const contractSLARouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ slaRecord: slaRecordOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

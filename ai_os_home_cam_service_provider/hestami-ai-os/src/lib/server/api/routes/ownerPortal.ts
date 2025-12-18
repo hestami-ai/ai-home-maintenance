@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
@@ -85,7 +86,7 @@ export const ownerPortalRouter = {
 						mailingAddress: JsonRecord.nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -142,7 +143,7 @@ export const ownerPortalRouter = {
 						mailingAddress: JsonRecord.nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -180,7 +181,7 @@ export const ownerPortalRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -223,7 +224,7 @@ export const ownerPortalRouter = {
 						allowEmergency: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -276,7 +277,7 @@ export const ownerPortalRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -318,7 +319,7 @@ export const ownerPortalRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -361,7 +362,7 @@ export const ownerPortalRouter = {
 						isEnabled: z.boolean()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -409,7 +410,7 @@ export const ownerPortalRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -448,7 +449,7 @@ export const ownerPortalRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -501,7 +502,7 @@ export const ownerPortalRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -597,7 +598,7 @@ export const ownerPortalRouter = {
 					party: z.object({ id: z.string(), displayName: z.string() }),
 					unit: z.object({ id: z.string(), unitNumber: z.string() }).nullable()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -674,7 +675,7 @@ export const ownerPortalRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -738,7 +739,7 @@ export const ownerPortalRouter = {
 						submittedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -808,7 +809,7 @@ export const ownerPortalRouter = {
 						closedAt: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -878,7 +879,7 @@ export const ownerPortalRouter = {
 						workOrderId: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -947,7 +948,7 @@ export const ownerPortalRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1016,7 +1017,7 @@ export const ownerPortalRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1084,7 +1085,7 @@ export const ownerPortalRouter = {
 						})
 					)
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1127,7 +1128,7 @@ export const ownerPortalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1166,7 +1167,7 @@ export const ownerPortalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean(), deletedAt: z.string() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1213,7 +1214,7 @@ export const ownerPortalRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1298,7 +1299,7 @@ export const ownerPortalRouter = {
 						})
 						.nullable()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1343,7 +1344,7 @@ export const ownerPortalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean(), deletedAt: z.string() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1409,7 +1410,7 @@ export const ownerPortalRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1509,7 +1510,7 @@ export const ownerPortalRouter = {
 					}),
 					canAccess: z.boolean()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1586,7 +1587,7 @@ export const ownerPortalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ logged: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1632,7 +1633,7 @@ export const ownerPortalRouter = {
 						expiresAt: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -1694,7 +1695,7 @@ export const ownerPortalRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ success: z.boolean(), revokedAt: z.string() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -180,7 +181,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -259,7 +260,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -296,7 +297,7 @@ export const serviceContractRouter = {
 					contracts: z.array(contractOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -367,7 +368,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -405,7 +406,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -442,7 +443,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -484,7 +485,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -546,7 +547,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ contract: contractOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -617,7 +618,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -669,7 +670,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ serviceItem: serviceItemOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -716,7 +717,7 @@ export const serviceContractRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -4,31 +4,7 @@
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-	}
-
-	interface Vendor {
-		id: string;
-		name: string;
-		trades: string[];
-	}
-
-	interface WorkOrder {
-		id: string;
-		workOrderNumber: string;
-		title: string;
-		description: string;
-		status: string;
-		priority: string;
-		category: string;
-		unitId?: string;
-		commonAreaDescription?: string;
-		vendorId?: string;
-		dueDate?: string;
-	}
+	import { workOrderApi, unitApi, vendorApi, type Unit, type Vendor, type WorkOrder } from '$lib/api/cam';
 
 	let workOrder = $state<WorkOrder | null>(null);
 	let units = $state<Unit[]>([]);
@@ -78,45 +54,35 @@
 
 		try {
 			const [workOrderRes, unitsRes, vendorsRes] = await Promise.all([
-				fetch(`/api/work-order/${workOrderId}`),
-				fetch(`/api/unit?associationId=${$currentAssociation.id}`).catch(() => null),
-				fetch(`/api/vendor?status=APPROVED`).catch(() => null)
+				workOrderApi.get(workOrderId),
+				unitApi.list({}).catch(() => null),
+				vendorApi.list({ status: 'APPROVED' }).catch(() => null)
 			]);
 
-			if (workOrderRes.ok) {
-				const data = await workOrderRes.json();
-				if (data.ok && data.data) {
-					workOrder = data.data;
-					formData = {
-						locationType: data.data.unitId ? 'unit' : 'common_area',
-						unitId: data.data.unitId || '',
-						commonAreaDescription: data.data.commonAreaDescription || '',
-						title: data.data.title || '',
-						description: data.data.description || '',
-						category: data.data.category || 'MAINTENANCE',
-						priority: data.data.priority || 'NORMAL',
-						vendorId: data.data.vendorId || '',
-						dueDate: data.data.dueDate?.split('T')[0] || ''
-					};
-				} else {
-					error = 'Work order not found';
-				}
+			if (workOrderRes.ok && workOrderRes.data?.workOrder) {
+				const wo = workOrderRes.data.workOrder;
+				workOrder = wo;
+				formData = {
+					locationType: wo.unitId ? 'unit' : 'common_area',
+					unitId: wo.unitId || '',
+					commonAreaDescription: wo.commonAreaDescription || '',
+					title: wo.title || '',
+					description: wo.description || '',
+					category: wo.category || 'MAINTENANCE',
+					priority: wo.priority || 'NORMAL',
+					vendorId: wo.vendorId || '',
+					dueDate: wo.dueDate?.split('T')[0] || ''
+				};
 			} else {
-				error = 'Failed to load work order';
+				error = 'Work order not found';
 			}
 
-			if (unitsRes?.ok) {
-				const data = await unitsRes.json();
-				if (data.ok && data.data?.items) {
-					units = data.data.items;
-				}
+			if (unitsRes?.ok && unitsRes.data?.units) {
+				units = unitsRes.data.units;
 			}
 
-			if (vendorsRes?.ok) {
-				const data = await vendorsRes.json();
-				if (data.ok && data.data?.items) {
-					vendors = data.data.items;
-				}
+			if (vendorsRes?.ok && vendorsRes.data?.vendors) {
+				vendors = vendorsRes.data.vendors;
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -150,26 +116,21 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/work-order/${workOrder.id}`, {
-				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					unitId: formData.locationType === 'unit' ? formData.unitId : null,
-					commonAreaDescription: formData.locationType === 'common_area' ? formData.commonAreaDescription : null,
-					title: formData.title,
-					description: formData.description || undefined,
-					category: formData.category,
-					priority: formData.priority,
-					vendorId: formData.vendorId || undefined,
-					dueDate: formData.dueDate || undefined
-				})
+			const response = await workOrderApi.update(workOrder.id, {
+				unitId: formData.locationType === 'unit' ? formData.unitId : undefined,
+				commonAreaDescription: formData.locationType === 'common_area' ? formData.commonAreaDescription : undefined,
+				title: formData.title,
+				description: formData.description || undefined,
+				category: formData.category,
+				priority: formData.priority,
+				vendorId: formData.vendorId || undefined,
+				dueDate: formData.dueDate || undefined
 			});
 
 			if (response.ok) {
 				goto(`/app/cam/work-orders/${workOrder.id}`);
 			} else {
-				const data = await response.json();
-				error = data.error?.message || 'Failed to update work order';
+				error = response.error?.message || 'Failed to update work order';
 			}
 		} catch (e) {
 			error = 'Failed to update work order';

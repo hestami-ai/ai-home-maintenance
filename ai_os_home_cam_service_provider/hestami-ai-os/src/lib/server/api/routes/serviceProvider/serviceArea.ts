@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -38,7 +39,7 @@ export const serviceAreaRouter = {
 					serviceCategories: z.array(z.string())
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'service_area', 'new');
@@ -91,7 +92,7 @@ export const serviceAreaRouter = {
 					isActive: z.boolean()
 				}))
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'service_area', '*');
@@ -141,7 +142,7 @@ export const serviceAreaRouter = {
 					isActive: z.boolean()
 				})
 			}),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'service_area', input.id);
@@ -191,7 +192,7 @@ export const serviceAreaRouter = {
 		.output(z.object({
 			ok: z.literal(true),
 			data: z.object({ deleted: z.boolean() }),
-			meta: z.any()
+			meta: ResponseMetaSchema
 		}))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('delete', 'service_area', input.id);

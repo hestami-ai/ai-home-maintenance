@@ -4,20 +4,21 @@
 	import { ArrowLeft, Play, Download, FileText, Table, FileSpreadsheet, Loader2 } from 'lucide-svelte';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { reportApi } from '$lib/api/cam';
 
 	interface ReportDefinition {
 		id: string;
 		name: string;
-		description: string;
+		description?: string;
 		category: string;
-		outputFormat: string;
+		outputFormat?: string;
 		parameters?: ReportParameter[];
 	}
 
 	interface ReportParameter {
 		name: string;
 		label: string;
-		type: 'date' | 'select' | 'text' | 'number' | 'dateRange';
+		type: string;
 		required: boolean;
 		options?: { value: string; label: string }[];
 		defaultValue?: string;
@@ -25,7 +26,7 @@
 
 	interface ReportResult {
 		id: string;
-		status: 'COMPLETED' | 'FAILED';
+		status: string;
 		generatedAt: string;
 		rowCount?: number;
 		data?: Record<string, unknown>[];
@@ -49,24 +50,19 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/report/definition/${reportId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					report = data.data;
-					// Initialize parameter values with defaults
-					if (report?.parameters) {
-						for (const param of report.parameters) {
-							if (param.defaultValue) {
-								parameterValues[param.name] = param.defaultValue;
-							}
+			const response = await reportApi.definitions.get(reportId);
+			if (response.ok && response.data?.report) {
+				report = response.data.report;
+				// Initialize parameter values with defaults
+				if (report?.parameters) {
+					for (const param of report.parameters) {
+						if (param.defaultValue) {
+							parameterValues[param.name] = param.defaultValue;
 						}
 					}
-				} else {
-					error = 'Report not found';
 				}
 			} else {
-				error = 'Failed to load report';
+				error = 'Report not found';
 			}
 		} catch (e) {
 			error = 'Failed to load report';
@@ -84,24 +80,15 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/report/${report.id}/execute`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					associationId: $currentAssociation.id,
-					parameters: parameterValues
-				})
+			const response = await reportApi.execute(report.id, {
+				parameters: parameterValues,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					result = data.data;
-				} else {
-					error = 'Failed to generate report';
-				}
+			if (response.ok && response.data?.result) {
+				result = response.data.result;
 			} else {
-				error = 'Failed to execute report';
+				error = 'Failed to generate report';
 			}
 		} catch (e) {
 			error = 'Failed to execute report';

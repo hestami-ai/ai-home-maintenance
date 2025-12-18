@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
@@ -55,7 +56,7 @@ export const profileRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ profile: profileOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ profile: profileOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertContractorOrg(context.organization.id);
 			await context.cerbos.authorize('edit', 'contractor_profile', context.organization.id);
@@ -123,7 +124,7 @@ export const profileRouter = {
 
 	get: orgProcedure
 		.input(z.object({ organizationId: z.string().optional() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ profile: profileOutput.nullable() }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ profile: profileOutput.nullable() }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const organizationId = input.organizationId ?? context.organization.id;
 			await assertContractorOrg(organizationId);

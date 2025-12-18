@@ -12,6 +12,7 @@
 | Authentication | Better Auth (self-hosted) |
 | API | oRPC (existing backend) |
 | Authorization | Cerbos |
+| Observability | OpenTelemetry |
 
 ## **1\. Purpose & Scope**
 

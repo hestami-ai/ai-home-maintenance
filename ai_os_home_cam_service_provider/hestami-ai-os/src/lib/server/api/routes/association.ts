@@ -8,6 +8,7 @@ import {
 } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
+import { ResponseMetaSchema } from '../schemas.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../accounting/index.js';
 import { recordExecution } from '../middleware/activityEvent.js';
@@ -42,7 +43,7 @@ export const associationRouter = {
 						createdAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -114,7 +115,7 @@ export const associationRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -174,7 +175,7 @@ export const associationRouter = {
 					),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -258,7 +259,7 @@ export const associationRouter = {
 						updatedAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -311,7 +312,7 @@ export const associationRouter = {
 					success: z.boolean(),
 					deletedAt: z.string()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

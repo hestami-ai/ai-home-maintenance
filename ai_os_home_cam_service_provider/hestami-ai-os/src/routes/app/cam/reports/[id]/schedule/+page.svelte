@@ -4,11 +4,12 @@
 	import { ArrowLeft, Calendar, Clock, Mail, Loader2 } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { reportApi } from '$lib/api/cam';
 
 	interface ReportDefinition {
 		id: string;
 		name: string;
-		description: string;
+		description?: string;
 		category: string;
 	}
 
@@ -59,16 +60,11 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/report/definition/${reportId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					report = data.data;
-				} else {
-					error = 'Report not found';
-				}
+			const response = await reportApi.definitions.get(reportId);
+			if (response.ok && response.data?.report) {
+				report = response.data.report;
 			} else {
-				error = 'Failed to load report';
+				error = 'Report not found';
 			}
 		} catch (e) {
 			error = 'Failed to load report';
@@ -86,19 +82,15 @@
 		successMessage = null;
 
 		try {
-			const response = await fetch(`/api/report/${report.id}/schedule`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					associationId: $currentAssociation.id,
-					frequency,
-					dayOfWeek: frequency === 'WEEKLY' ? parseInt(dayOfWeek) : undefined,
-					dayOfMonth: frequency === 'MONTHLY' || frequency === 'QUARTERLY' ? parseInt(dayOfMonth) : undefined,
-					time,
-					outputFormat,
-					recipients: recipients.split(',').map(r => r.trim()).filter(r => r),
-					isActive
-				})
+			const response = await reportApi.schedule(report.id, {
+				frequency,
+				dayOfWeek: frequency === 'WEEKLY' ? parseInt(dayOfWeek) : undefined,
+				dayOfMonth: frequency === 'MONTHLY' || frequency === 'QUARTERLY' ? parseInt(dayOfMonth) : undefined,
+				time,
+				outputFormat,
+				recipients: recipients.split(',').map(r => r.trim()).filter(r => r),
+				isActive,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {

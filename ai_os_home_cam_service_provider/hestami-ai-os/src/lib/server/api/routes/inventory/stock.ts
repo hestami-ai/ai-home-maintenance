@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -56,7 +57,7 @@ export const stockRouter = {
 					totalReserved: z.number(),
 					totalAvailable: z.number()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -111,7 +112,7 @@ export const stockRouter = {
 					levels: z.array(inventoryLevelOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -169,7 +170,7 @@ export const stockRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ level: inventoryLevelOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -263,7 +264,7 @@ export const stockRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ level: inventoryLevelOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -325,7 +326,7 @@ export const stockRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ level: inventoryLevelOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -390,7 +391,7 @@ export const stockRouter = {
 					level: inventoryLevelOutput,
 					variance: z.number()
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

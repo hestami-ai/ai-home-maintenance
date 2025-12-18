@@ -22,63 +22,23 @@
 		getCamCategory,
 		type CamDocumentCategory
 	} from '$lib/utils/documentCategories';
+	import { documentApi, type Document as ApiDocument, type DocumentDetail as ApiDocumentDetail, type DocumentReference as ApiDocumentReference, type DocumentVersion as ApiDocumentVersion } from '$lib/api/cam';
 
-	interface Document {
-		id: string;
-		title: string;
-		category: string;
-		visibility: string;
-		status: string;
-		mimeType: string;
-		fileSize: number;
-		fileName: string;
-		fileUrl: string;
-		version: number;
-		effectiveDate: string | null;
-		uploadedBy: string;
-		createdAt: string;
-		updatedAt: string;
-	}
-
-	interface DocumentDetail extends Document {
-		description: string | null;
-		storagePath: string;
-		checksum: string | null;
-		pageCount: number | null;
-		thumbnailUrl: string | null;
-		expirationDate: string | null;
-		tags: string[];
-		archivedAt: string | null;
-	}
-
-	interface DocumentReference {
-		contextType: string;
-		contextId: string;
-		isPrimary: boolean;
-		bindingNotes: string | null;
-		createdAt: string;
-	}
-
-	interface DocumentVersion {
-		id: string;
-		version: number;
-		status: string;
-		fileName: string;
-		fileSize: number;
-		uploadedBy: string;
-		createdAt: string;
-	}
+	// Use API types with local aliases for compatibility
+	type Document = ApiDocument;
+	type DocumentDetail = ApiDocumentDetail;
+	type DocumentReference = ApiDocumentReference;
+	type DocumentVersion = ApiDocumentVersion;
 
 	interface ActivityEvent {
 		id: string;
 		action: string;
-		eventCategory: string;
 		summary: string;
-		performedById: string | null;
-		performedByType: string;
-		performedAt: string;
-		previousState: unknown;
-		newState: unknown;
+		performedBy?: string;
+		actorType?: string;
+		createdAt?: string;
+		previousState?: unknown;
+		newState?: unknown;
 	}
 
 	let documents = $state<Document[]>([]);
@@ -123,19 +83,13 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams();
-			params.set('contextType', 'ASSOCIATION');
-			params.set('contextId', $currentAssociation.id);
-			if (categoryFilter) params.set('category', categoryFilter);
-			if (statusFilter) params.set('status', statusFilter);
-			if (searchQuery) params.set('search', searchQuery);
-
-			const response = await fetch(`/api/v1/rpc/document.listDocuments?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.documents) {
-					documents = data.data.documents;
-				}
+			const response = await documentApi.list({
+				category: categoryFilter || undefined,
+				status: statusFilter || undefined,
+				search: searchQuery || undefined
+			});
+			if (response.ok && response.data?.documents) {
+				documents = response.data.documents;
 			}
 		} catch (error) {
 			console.error('Failed to load documents:', error);
@@ -148,39 +102,41 @@
 		isLoadingDetail = true;
 		try {
 			const [detailRes, refsRes, versionsRes, historyRes] = await Promise.all([
-				fetch(`/api/v1/rpc/document.getDocument?id=${docId}`),
-				fetch(`/api/v1/rpc/document.getReferences?documentId=${docId}`),
-				fetch(`/api/v1/rpc/document.getVersions?documentId=${docId}`),
-				fetch(`/api/v1/rpc/document.getActivityHistory?documentId=${docId}&limit=50`)
+				documentApi.get(docId),
+				documentApi.getReferences(docId),
+				documentApi.getVersions(docId),
+				documentApi.getActivityHistory(docId)
 			]);
 
-			if (detailRes.ok) {
-				const data = await detailRes.json();
-				if (data.ok && data.data?.document) {
-					documentDetail = data.data.document;
-				}
+			if (detailRes.ok && detailRes.data?.document) {
+				documentDetail = detailRes.data.document;
 			}
 
-			if (refsRes.ok) {
-				const data = await refsRes.json();
-				if (data.ok && data.data) {
-					documentReferences = data.data.references;
-					referenceCount = data.data.referenceCount;
-				}
+			if (refsRes.ok && refsRes.data) {
+				documentReferences = refsRes.data.references;
+				referenceCount = refsRes.data.referenceCount;
 			}
 
-			if (versionsRes.ok) {
-				const data = await versionsRes.json();
-				if (data.ok && data.data?.versions) {
-					documentVersions = data.data.versions;
-				}
+			if (versionsRes.ok && versionsRes.data?.versions) {
+				documentVersions = versionsRes.data.versions.map(v => ({
+					id: v.id,
+					version: v.version,
+					status: v.status,
+					createdAt: v.createdAt
+				}));
 			}
 
-			if (historyRes.ok) {
-				const data = await historyRes.json();
-				if (data.ok && data.data?.events) {
-					activityHistory = data.data.events;
-				}
+			if (historyRes.ok && historyRes.data?.events) {
+				activityHistory = historyRes.data.events.map(e => ({
+					id: e.id,
+					action: e.action,
+					summary: e.summary,
+					performedBy: e.performedBy,
+					actorType: e.actorType,
+					createdAt: e.createdAt,
+					previousState: null,
+					newState: null
+				}));
 			}
 		} catch (error) {
 			console.error('Failed to load document detail:', error);
@@ -194,7 +150,7 @@
 		loadDocumentDetail(doc.id);
 	}
 
-	function formatDate(dateString: string | null): string {
+	function formatDate(dateString: string | null | undefined): string {
 		if (!dateString) return '—';
 		return new Date(dateString).toLocaleDateString('en-US', {
 			month: 'short',
@@ -203,7 +159,8 @@
 		});
 	}
 
-	function formatDateTime(dateString: string): string {
+	function formatDateTime(dateString: string | undefined): string {
+		if (!dateString) return '—';
 		return new Date(dateString).toLocaleString('en-US', {
 			month: 'short',
 			day: 'numeric',
@@ -213,7 +170,8 @@
 		});
 	}
 
-	function formatFileSize(bytes: number): string {
+	function formatFileSize(bytes: number | undefined): string {
+		if (bytes === undefined) return '—';
 		if (bytes < 1024) return bytes + ' B';
 		if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
 		return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
@@ -224,7 +182,8 @@
 		return CAM_CATEGORY_LABELS[camCat] || category.replace(/_/g, ' ');
 	}
 
-	function getStatusBadgeClass(status: string): string {
+	function getStatusBadgeClass(status: string | undefined): string {
+		if (!status) return 'bg-surface-500/10 text-surface-500';
 		switch (status) {
 			case 'ACTIVE':
 				return 'bg-success-500/10 text-success-600';
@@ -239,7 +198,7 @@
 		}
 	}
 
-	function isNotYetEffective(effectiveDate: string | null): boolean {
+	function isNotYetEffective(effectiveDate: string | null | undefined): boolean {
 		if (!effectiveDate) return false;
 		return new Date(effectiveDate) > new Date();
 	}
@@ -279,7 +238,7 @@
 
 		if (searchQuery) {
 			const query = searchQuery.toLowerCase();
-			filtered = filtered.filter((d) => d.title.toLowerCase().includes(query));
+			filtered = filtered.filter((d) => (d.title || d.name || '').toLowerCase().includes(query));
 		}
 
 		if (referencedFilter === 'referenced') {
@@ -684,12 +643,12 @@
 										<span class="rounded bg-surface-200-800 px-1.5 py-0.5 text-xs">
 											{event.action}
 										</span>
-										<span>by {event.performedByType}</span>
+										<span>by {event.performedBy || 'System'}</span>
 									</div>
 								</div>
 							</div>
 							<div class="text-sm text-surface-500">
-								{formatDateTime(event.performedAt)}
+								{event.createdAt ? formatDateTime(event.createdAt) : '—'}
 							</div>
 						</div>
 					</div>

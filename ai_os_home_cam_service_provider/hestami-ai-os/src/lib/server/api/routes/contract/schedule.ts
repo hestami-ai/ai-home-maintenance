@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -121,7 +122,7 @@ export const contractScheduleRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ schedule: scheduleOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -179,7 +180,7 @@ export const contractScheduleRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ schedule: scheduleOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -215,7 +216,7 @@ export const contractScheduleRouter = {
 					schedules: z.array(scheduleOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -274,7 +275,7 @@ export const contractScheduleRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ schedule: scheduleOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -313,7 +314,7 @@ export const contractScheduleRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ deleted: z.boolean() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -353,7 +354,7 @@ export const contractScheduleRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ visitsCreated: z.number() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -3,6 +3,7 @@
 	import { Loader2 } from 'lucide-svelte';
 	import { CamSidebar, AssociationSelector } from '$lib/components/cam';
 	import { camStore, isCamLoading, currentAssociation, organizationStore, registerBadgeCountRefresh } from '$lib/stores';
+	import { associationApi, violationApi, arcRequestApi, workOrderApi } from '$lib/api/cam';
 
 	interface Props {
 		children: import('svelte').Snippet;
@@ -22,12 +23,9 @@
 			const orgId = $organizationStore.current?.organization.id;
 			if (!orgId) return;
 
-			const response = await fetch(`/api/association?organizationId=${orgId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data) {
-					camStore.setAssociations(data.data.items || []);
-				}
+			const response = await associationApi.list({ organizationId: orgId });
+			if (response.ok && response.data?.associations) {
+				camStore.setAssociations(response.data.associations);
 			}
 		} catch (error) {
 			console.error('Failed to load associations:', error);
@@ -44,24 +42,21 @@
 			if (!associationId) return;
 
 			const [violationsRes, arcRes, workOrdersRes] = await Promise.all([
-				fetch(`/api/violation?associationId=${associationId}&status=OPEN&limit=0`),
-				fetch(`/api/arc/request?associationId=${associationId}&status=SUBMITTED&limit=0`),
-				fetch(`/api/work-order?associationId=${associationId}&status=IN_PROGRESS&limit=0`)
+				violationApi.list({ status: 'OPEN' }),
+				arcRequestApi.list({ status: 'SUBMITTED' }),
+				workOrderApi.list({ status: 'IN_PROGRESS' })
 			]);
 
 			const counts = { violations: 0, arcRequests: 0, workOrders: 0 };
 
-			if (violationsRes.ok) {
-				const data = await violationsRes.json();
-				counts.violations = data.data?.total || 0;
+			if (violationsRes.ok && violationsRes.data?.violations) {
+				counts.violations = violationsRes.data.violations.length;
 			}
-			if (arcRes.ok) {
-				const data = await arcRes.json();
-				counts.arcRequests = data.data?.total || 0;
+			if (arcRes.ok && arcRes.data?.requests) {
+				counts.arcRequests = arcRes.data.requests.length;
 			}
-			if (workOrdersRes.ok) {
-				const data = await workOrdersRes.json();
-				counts.workOrders = data.data?.total || 0;
+			if (workOrdersRes.ok && workOrdersRes.data?.workOrders) {
+				counts.workOrders = workOrdersRes.data.workOrders.length;
 			}
 
 			camStore.setBadgeCounts(counts);

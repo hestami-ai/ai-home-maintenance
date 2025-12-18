@@ -4,6 +4,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { accountingApi } from '$lib/api/cam';
 
 	interface Assessment {
 		id: string;
@@ -13,7 +14,7 @@
 		type: string;
 		amount: number;
 		dueDate: string;
-		status: 'DUE' | 'OVERDUE' | 'PAID' | 'PARTIAL';
+		status: string;
 		paidAmount: number;
 		createdAt: string;
 	}
@@ -37,16 +38,11 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams({ associationId: $currentAssociation.id });
-			if (statusFilter !== 'all') params.append('status', statusFilter);
-			if (searchQuery) params.append('search', searchQuery);
-
-			const response = await fetch(`/api/accounting/assessment?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					assessments = data.data.items;
-				}
+			const response = await accountingApi.assessments.list({
+				status: statusFilter !== 'all' ? statusFilter : undefined
+			});
+			if (response.ok && response.data?.assessments) {
+				assessments = response.data.assessments;
 			}
 		} catch (e) {
 			console.error('Failed to load assessments:', e);

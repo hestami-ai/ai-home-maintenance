@@ -165,3 +165,14 @@ derivedRoles:
                   has(P.attr.orgRoles) && 
                   has(R.attr.organizationId) && 
                   P.attr.orgRoles[R.attr.organizationId] == "BOARD_MEMBER"
+
+    # User has AUDITOR role in the resource's organization
+    # Auditors have read-only access to financial and audit data
+    - name: org_auditor
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.orgRoles) && 
+            has(R.attr.organizationId) && 
+            P.attr.orgRoles[R.attr.organizationId] == "AUDITOR"

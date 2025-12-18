@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -77,7 +78,7 @@ export const communicationRouter = {
 						channel: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -122,7 +123,7 @@ export const communicationRouter = {
 					templates: z.array(z.any()),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -152,7 +153,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ template: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -195,7 +196,7 @@ export const communicationRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -260,7 +261,7 @@ export const communicationRouter = {
 						currentVersion: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -337,7 +338,7 @@ export const communicationRouter = {
 						channel: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -394,7 +395,7 @@ export const communicationRouter = {
 					communications: z.array(z.any()),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -428,7 +429,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ communication: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -471,7 +472,7 @@ export const communicationRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -532,7 +533,7 @@ export const communicationRouter = {
 						sentAt: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -595,7 +596,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ announcement: z.object({ id: z.string(), associationId: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -635,7 +636,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ announcements: z.array(z.any()), pagination: PaginationOutputSchema }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -669,7 +670,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ announcement: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -704,7 +705,7 @@ export const communicationRouter = {
 						readAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -769,7 +770,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ event: z.object({ id: z.string(), associationId: z.string(), type: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -812,7 +813,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ events: z.array(z.any()), pagination: PaginationOutputSchema }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -846,7 +847,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ event: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -884,7 +885,7 @@ export const communicationRouter = {
 						notifyAt: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -946,7 +947,7 @@ export const communicationRouter = {
 						sentAt: z.string().nullable()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -996,7 +997,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ notifications: z.array(z.any()), pagination: PaginationOutputSchema }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

@@ -3,17 +3,7 @@
 	import { ArrowLeft, Wrench, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-
-	interface Unit {
-		id: string;
-		unitNumber: string;
-	}
-
-	interface Vendor {
-		id: string;
-		name: string;
-		trades: string[];
-	}
+	import { workOrderApi, unitApi, vendorApi, type Unit, type Vendor } from '$lib/api/cam';
 
 	let units = $state<Unit[]>([]);
 	let vendors = $state<Vendor[]>([]);
@@ -87,22 +77,16 @@
 		isLoadingData = true;
 		try {
 			const [unitsRes, vendorsRes] = await Promise.all([
-				fetch(`/api/unit?associationId=${$currentAssociation.id}`).catch(() => null),
-				fetch(`/api/vendor?status=APPROVED`).catch(() => null)
+				unitApi.list({}).catch(() => null),
+				vendorApi.list({ status: 'APPROVED' }).catch(() => null)
 			]);
 
-			if (unitsRes?.ok) {
-				const data = await unitsRes.json();
-				if (data.ok && data.data?.items) {
-					units = data.data.items;
-				}
+			if (unitsRes?.ok && unitsRes.data?.units) {
+				units = unitsRes.data.units;
 			}
 
-			if (vendorsRes?.ok) {
-				const data = await vendorsRes.json();
-				if (data.ok && data.data?.items) {
-					vendors = data.data.items;
-				}
+			if (vendorsRes?.ok && vendorsRes.data?.vendors) {
+				vendors = vendorsRes.data.vendors;
 			}
 		} catch (e) {
 			console.error('Failed to load form data:', e);
@@ -138,42 +122,22 @@
 		error = null;
 
 		try {
-			const response = await fetch('/api/work-order', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					associationId: $currentAssociation.id,
-					unitId: formData.locationType === 'unit' ? formData.unitId : undefined,
-					commonAreaName: formData.locationType === 'common_area' ? formData.commonAreaDescription : undefined,
-					title: formData.title,
-					description: formData.description || undefined,
-					category: formData.category,
-					priority: formData.priority,
-					vendorId: formData.vendorId || undefined,
-					dueDate: formData.dueDate || undefined,
-					// Phase 9: Origin tracking
-					originType: formData.originType || undefined,
-					violationId: formData.violationId || undefined,
-					arcRequestId: formData.arcRequestId || undefined,
-					resolutionId: formData.resolutionId || undefined,
-					originNotes: formData.originNotes || undefined,
-					// Phase 9: Budget
-					budgetSource: formData.budgetSource || undefined,
-					approvedAmount: formData.approvedAmount ? parseFloat(formData.approvedAmount) : undefined,
-					// Phase 9: Constraints
-					constraints: formData.constraints || undefined
-				})
+			const response = await workOrderApi.create({
+				title: formData.title,
+				description: formData.description || '',
+				category: formData.category,
+				priority: formData.priority,
+				unitId: formData.locationType === 'unit' ? formData.unitId : undefined,
+				commonAreaDescription: formData.locationType === 'common_area' ? formData.commonAreaDescription : undefined,
+				vendorId: formData.vendorId || undefined,
+				dueDate: formData.dueDate || undefined,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.id) {
-					goto(`/app/cam/work-orders/${data.data.id}`);
-				} else {
-					error = data.error?.message || 'Failed to create work order';
-				}
+			if (response.ok && response.data?.workOrder) {
+				goto(`/app/cam/work-orders/${response.data.workOrder.id}`);
 			} else {
-				error = 'Failed to create work order';
+				error = response.error?.message || 'Failed to create work order';
 			}
 		} catch (e) {
 			error = 'Failed to create work order';

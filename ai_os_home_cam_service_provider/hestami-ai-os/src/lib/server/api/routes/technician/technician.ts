@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import { ContractorTradeType } from '../../../../../../generated/prisma/client.js';
 import {
 	orgProcedure,
@@ -240,7 +241,7 @@ export const technicianRouter = {
 	// Technician CRUD
 	upsert: orgProcedure
 		.input(technicianUpsertInput)
-		.output(z.object({ ok: z.literal(true), data: z.object({ technician: technicianOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ technician: technicianOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertServiceProviderOrg(context.organization.id);
 			await context.cerbos.authorize('edit', 'technician', input.id ?? 'new');
@@ -302,7 +303,7 @@ export const technicianRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ technician: technicianOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ technician: technicianOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.id, organizationId: context.organization.id }
@@ -320,7 +321,7 @@ export const technicianRouter = {
 				branchId: z.string().optional()
 			}).optional()
 		)
-		.output(z.object({ ok: z.literal(true), data: technicianListOutput, meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: technicianListOutput, meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await assertServiceProviderOrg(context.organization.id);
 			await context.cerbos.authorize('view', 'technician', '*');
@@ -369,7 +370,7 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ skill: skillOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ skill: skillOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -413,7 +414,7 @@ export const technicianRouter = {
 
 	listSkills: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ skills: z.array(skillOutput) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ skills: z.array(skillOutput) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -442,7 +443,7 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ certification: certificationOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ certification: certificationOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -482,7 +483,7 @@ export const technicianRouter = {
 
 	listCertifications: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ certifications: z.array(certificationOutput) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ certifications: z.array(certificationOutput) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -511,7 +512,7 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ availability: availabilityOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ availability: availabilityOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -579,7 +580,7 @@ export const technicianRouter = {
 
 	getAvailability: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ availability: availabilityOutput.nullable() }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ availability: availabilityOutput.nullable() }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -604,7 +605,7 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ timeOff: timeOffOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ timeOff: timeOffOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -646,7 +647,7 @@ export const technicianRouter = {
 
 	listTimeOff: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ timeOff: z.array(timeOffOutput) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ timeOff: z.array(timeOffOutput) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -673,7 +674,7 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ territory: territoryOutput }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ territory: territoryOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -708,7 +709,7 @@ export const technicianRouter = {
 
 	listTerritories: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
-		.output(z.object({ ok: z.literal(true), data: z.object({ territories: z.array(territoryOutput) }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ territories: z.array(territoryOutput) }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
@@ -731,7 +732,7 @@ export const technicianRouter = {
 				technicianId: z.string()
 			})
 		)
-		.output(z.object({ ok: z.literal(true), data: z.object({ kpis: z.array(kpiOutput), pagination: PaginationOutputSchema }), meta: z.any() }))
+		.output(z.object({ ok: z.literal(true), data: z.object({ kpis: z.array(kpiOutput), pagination: PaginationOutputSchema }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }

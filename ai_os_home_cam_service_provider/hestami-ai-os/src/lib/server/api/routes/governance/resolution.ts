@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -58,7 +59,7 @@ export const governanceResolutionRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -100,7 +101,7 @@ export const governanceResolutionRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ resolution: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -129,7 +130,7 @@ export const governanceResolutionRouter = {
 					resolutions: z.array(z.any()),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -172,7 +173,7 @@ export const governanceResolutionRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ resolution: z.object({ id: z.string(), status: z.string() }) }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -231,7 +232,7 @@ export const governanceResolutionRouter = {
 						status: z.string()
 					})
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -277,7 +278,7 @@ export const governanceResolutionRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ policy: z.any() }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -306,7 +307,7 @@ export const governanceResolutionRouter = {
 					policies: z.array(z.any()),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -351,7 +352,7 @@ export const governanceResolutionRouter = {
 				data: z.object({
 					version: z.object({ id: z.string(), policyDocumentId: z.string(), version: z.string(), status: z.string() })
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -410,7 +411,7 @@ export const governanceResolutionRouter = {
 				data: z.object({
 					policy: z.object({ id: z.string(), currentVersion: z.string().nullable(), status: z.string() })
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -456,6 +457,123 @@ export const governanceResolutionRouter = {
 						currentVersion: result.currentVersion ?? null,
 						status: result.status
 					}
+				},
+				context
+			);
+		}),
+
+	// Phase 11: Resolution Linking Endpoints
+
+	linkToMotion: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					resolutionId: z.string(),
+					motionId: z.string()
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					resolution: z.object({
+						id: z.string(),
+						title: z.string(),
+						motionId: z.string()
+					})
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'governance_resolution', input.resolutionId);
+			const { idempotencyKey, resolutionId, motionId } = input;
+
+			const resolution = await requireIdempotency(idempotencyKey, context, async () => {
+				const existing = await prisma.resolution.findFirst({
+					where: { id: resolutionId },
+					include: { association: true }
+				});
+				if (!existing || existing.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Resolution');
+				}
+
+				const motion = await prisma.boardMotion.findFirst({
+					where: { id: motionId },
+					include: { association: true }
+				});
+				if (!motion || motion.association.organizationId !== context.organization.id) {
+					throw ApiException.notFound('Motion');
+				}
+
+				return prisma.resolution.update({
+					where: { id: resolutionId },
+					data: { motionId }
+				});
+			});
+
+			return successResponse(
+				{
+					resolution: {
+						id: resolution.id,
+						title: resolution.title,
+						motionId: resolution.motionId!
+					}
+				},
+				context
+			);
+		}),
+
+	getLinkedActions: orgProcedure
+		.input(z.object({ resolutionId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					resolution: z.object({ id: z.string(), title: z.string() }),
+					linkedMotion: z.object({ id: z.string(), title: z.string(), status: z.string() }).nullable(),
+					linkedWorkOrders: z.array(z.object({ id: z.string(), workOrderNumber: z.string(), status: z.string() })),
+					linkedPolicies: z.array(z.object({ id: z.string(), title: z.string(), status: z.string() }))
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_resolution', input.resolutionId);
+
+			const resolution = await prisma.resolution.findFirst({
+				where: { id: input.resolutionId },
+				include: {
+					association: true,
+					motion: { select: { id: true, title: true, status: true } },
+					workOrders: { select: { id: true, workOrderNumber: true, status: true } },
+					policyDocuments: { select: { id: true, title: true, status: true } }
+				}
+			});
+
+			if (!resolution || resolution.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Resolution');
+			}
+
+			return successResponse(
+				{
+					resolution: { id: resolution.id, title: resolution.title },
+					linkedMotion: resolution.motion ? {
+						id: resolution.motion.id,
+						title: resolution.motion.title,
+						status: resolution.motion.status
+					} : null,
+					linkedWorkOrders: resolution.workOrders.map(wo => ({
+						id: wo.id,
+						workOrderNumber: wo.workOrderNumber,
+						status: wo.status
+					})),
+					linkedPolicies: resolution.policyDocuments.map(p => ({
+						id: p.id,
+						title: p.title,
+						status: p.status
+					}))
 				},
 				context
 			);

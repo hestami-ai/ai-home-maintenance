@@ -4,20 +4,7 @@
 	import { ArrowLeft, Wrench, Building2, DollarSign, FileText } from 'lucide-svelte';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation, refreshBadgeCounts } from '$lib/stores';
-
-	interface Vendor {
-		id: string;
-		name: string;
-		trades: string[];
-		status: string;
-	}
-
-	interface Violation {
-		id: string;
-		violationNumber: string;
-		title: string;
-		status: string;
-	}
+	import { violationApi, vendorApi, type Violation, type Vendor } from '$lib/api/cam';
 
 	let violation = $state<Violation | null>(null);
 	let vendors = $state<Vendor[]>([]);
@@ -50,24 +37,18 @@
 
 		try {
 			const [violationRes, vendorsRes] = await Promise.all([
-				fetch(`/api/violation/${violationId}`).catch(() => null),
-				fetch(`/api/vendor?associationId=${$currentAssociation.id}&status=APPROVED`).catch(() => null)
+				violationApi.get(violationId),
+				vendorApi.list({ status: 'APPROVED' })
 			]);
 
-			if (violationRes?.ok) {
-				const data = await violationRes.json();
-				if (data.ok && data.data) {
-					violation = data.data;
-				} else {
-					error = 'Violation not found';
-				}
+			if (violationRes.ok && violationRes.data?.violation) {
+				violation = violationRes.data.violation;
+			} else {
+				error = 'Violation not found';
 			}
 
-			if (vendorsRes?.ok) {
-				const data = await vendorsRes.json();
-				if (data.ok && data.data?.items) {
-					vendors = data.data.items;
-				}
+			if (vendorsRes.ok && vendorsRes.data?.vendors) {
+				vendors = vendorsRes.data.vendors;
 			}
 		} catch (e) {
 			error = 'Failed to load data';
@@ -89,23 +70,19 @@
 		error = null;
 
 		try {
-			const response = await fetch(`/api/violation/${violation.id}/remediation`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					vendorId: formData.vendorId,
-					budgetSource: formData.budgetSource,
-					estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
-					scope: formData.scope,
-					notes: formData.notes || undefined
-				})
+			const response = await violationApi.authorizeRemediation(violation.id, {
+				vendorId: formData.vendorId,
+				budgetSource: formData.budgetSource,
+				estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
+				scope: formData.scope,
+				notes: formData.notes || undefined,
+				idempotencyKey: crypto.randomUUID()
 			});
 
 			if (response.ok) {
-				const data = await response.json();
 				await refreshBadgeCounts();
-				if (data.ok && data.data?.workOrderId) {
-					goto(`/app/cam/work-orders/${data.data.workOrderId}`);
+				if (response.data?.workOrderId) {
+					goto(`/app/cam/work-orders/${response.data.workOrderId}`);
 				} else {
 					goto(`/app/cam/violations/${violation.id}`);
 				}

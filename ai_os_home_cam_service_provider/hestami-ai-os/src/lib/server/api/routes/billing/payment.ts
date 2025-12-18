@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ResponseMetaSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -76,7 +77,7 @@ export const paymentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ paymentIntent: paymentIntentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -131,7 +132,7 @@ export const paymentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ paymentIntent: paymentIntentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -168,7 +169,7 @@ export const paymentRouter = {
 					paymentIntents: z.array(paymentIntentOutput),
 					pagination: PaginationOutputSchema
 				}),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -215,7 +216,7 @@ export const paymentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ paymentIntent: paymentIntentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -292,7 +293,7 @@ export const paymentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ paymentIntent: paymentIntentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -343,7 +344,7 @@ export const paymentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ paymentIntent: paymentIntentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {
@@ -420,7 +421,7 @@ export const paymentRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({ paymentIntent: paymentIntentOutput }),
-				meta: z.any()
+				meta: ResponseMetaSchema
 			})
 		)
 		.handler(async ({ input, context }) => {

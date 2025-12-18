@@ -4,6 +4,7 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { accountingApi } from '$lib/api/cam';
 
 	interface Payable {
 		id: string;
@@ -13,7 +14,7 @@
 		description: string;
 		amount: number;
 		dueDate: string;
-		status: 'PENDING' | 'APPROVED' | 'PAID' | 'OVERDUE';
+		status: string;
 		createdAt: string;
 	}
 
@@ -36,16 +37,11 @@
 
 		isLoading = true;
 		try {
-			const params = new URLSearchParams({ associationId: $currentAssociation.id });
-			if (statusFilter !== 'all') params.append('status', statusFilter);
-			if (searchQuery) params.append('search', searchQuery);
-
-			const response = await fetch(`/api/accounting/payable?${params}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.items) {
-					payables = data.data.items;
-				}
+			const response = await accountingApi.payables.list({
+				status: statusFilter !== 'all' ? statusFilter : undefined
+			});
+			if (response.ok && response.data?.payables) {
+				payables = response.data.payables;
 			}
 		} catch (e) {
 			console.error('Failed to load payables:', e);
