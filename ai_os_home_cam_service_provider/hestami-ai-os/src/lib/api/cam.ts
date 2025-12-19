@@ -1662,6 +1662,707 @@ export const badgeCountApi = {
 		apiCall<{ counts: BadgeCounts }>('cam/getBadgeCounts', { body: { associationId } })
 };
 
+// ============================================================================
+// Phase 13: Concierge Case API
+// ============================================================================
+
+export type ConciergeCaseStatus =
+	| 'INTAKE'
+	| 'ASSESSMENT'
+	| 'IN_PROGRESS'
+	| 'PENDING_EXTERNAL'
+	| 'PENDING_OWNER'
+	| 'ON_HOLD'
+	| 'RESOLVED'
+	| 'CLOSED'
+	| 'CANCELLED';
+
+export type ConciergeCasePriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'EMERGENCY';
+
+export type CaseNoteType =
+	| 'GENERAL'
+	| 'CLARIFICATION_REQUEST'
+	| 'CLARIFICATION_RESPONSE'
+	| 'DECISION_RATIONALE';
+
+export interface ConciergeCase {
+	id: string;
+	caseNumber: string;
+	propertyId: string;
+	title: string;
+	description: string;
+	status: ConciergeCaseStatus;
+	priority: ConciergeCasePriority;
+	originIntentId?: string | null;
+	assignedConciergeUserId?: string | null;
+	assignedConciergeName?: string | null;
+	linkedUnitId?: string | null;
+	linkedJobId?: string | null;
+	linkedArcRequestId?: string | null;
+	linkedWorkOrderId?: string | null;
+	resolvedAt?: string | null;
+	resolutionSummary?: string | null;
+	closedAt?: string | null;
+	cancelledAt?: string | null;
+	cancelReason?: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface CaseNote {
+	id: string;
+	caseId?: string;
+	content: string;
+	noteType: CaseNoteType;
+	isInternal: boolean;
+	createdBy: string;
+	createdAt: string;
+}
+
+export interface CaseStatusHistoryItem {
+	id: string;
+	fromStatus: string | null;
+	toStatus: string;
+	reason: string | null;
+	changedBy: string;
+	createdAt: string;
+}
+
+export interface CaseParticipant {
+	id: string;
+	partyId: string | null;
+	partyName: string | null;
+	externalContactName: string | null;
+	externalContactEmail: string | null;
+	role: string;
+	addedAt: string;
+}
+
+export interface CaseAction {
+	id: string;
+	actionType: string;
+	status: string;
+	description: string;
+	plannedAt: string | null;
+	completedAt: string | null;
+	createdAt: string;
+}
+
+export interface CaseDecision {
+	id: string;
+	category: string;
+	title: string;
+	rationale: string;
+	decidedAt: string;
+	hasOutcome: boolean;
+}
+
+export interface CaseAttachment {
+	id: string;
+	fileName: string;
+	fileSize: number;
+	mimeType: string;
+	fileUrl: string;
+	uploadedBy: string;
+	createdAt: string;
+}
+
+export interface CaseDetailProperty {
+	id: string;
+	name: string;
+	addressLine1: string;
+	city: string | null;
+	state: string | null;
+	postalCode: string | null;
+}
+
+export interface CaseOriginIntent {
+	id: string;
+	title: string;
+	description: string;
+	status: string;
+	createdAt: string;
+}
+
+export interface ConciergeCaseDetail {
+	case: ConciergeCase;
+	property: CaseDetailProperty;
+	originIntent: CaseOriginIntent | null;
+	statusHistory: CaseStatusHistoryItem[];
+	notes: CaseNote[];
+	participants: CaseParticipant[];
+	actions: CaseAction[];
+	decisions: CaseDecision[];
+	attachments: CaseAttachment[];
+}
+
+export const conciergeCaseApi = {
+	list: (params: {
+		status?: ConciergeCaseStatus;
+		priority?: ConciergeCasePriority;
+		propertyId?: string;
+		assignedConciergeUserId?: string;
+		page?: number;
+		pageSize?: number;
+	}) =>
+		apiCall<{ items: ConciergeCase[]; total: number; page: number; pageSize: number }>(
+			'concierge/case/list',
+			{ body: params }
+		),
+
+	get: (id: string) => apiCall<{ case: ConciergeCase }>('concierge/case/get', { body: { id } }),
+
+	getDetail: (id: string) =>
+		apiCall<ConciergeCaseDetail>('concierge/case/getDetail', { body: { id } }),
+
+	create: (data: {
+		propertyId: string;
+		title: string;
+		description: string;
+		priority?: ConciergeCasePriority;
+		originIntentId?: string;
+		idempotencyKey: string;
+	}) => apiCall<{ case: ConciergeCase }>('concierge/case/create', { body: data }),
+
+	updateStatus: (data: {
+		caseId: string;
+		status: ConciergeCaseStatus;
+		reason?: string;
+		idempotencyKey: string;
+	}) => apiCall<{ case: ConciergeCase }>('concierge/case/updateStatus', { body: data }),
+
+	assign: (data: { caseId: string; conciergeUserId: string; idempotencyKey: string }) =>
+		apiCall<{ case: ConciergeCase }>('concierge/case/assign', { body: data }),
+
+	resolve: (data: { caseId: string; resolutionSummary: string; idempotencyKey: string }) =>
+		apiCall<{ case: ConciergeCase }>('concierge/case/resolve', { body: data }),
+
+	close: (data: { caseId: string; idempotencyKey: string }) =>
+		apiCall<{ case: ConciergeCase }>('concierge/case/close', { body: data }),
+
+	cancel: (data: { caseId: string; reason: string; idempotencyKey: string }) =>
+		apiCall<{ case: ConciergeCase }>('concierge/case/cancel', { body: data }),
+
+	addNote: (data: {
+		caseId: string;
+		content: string;
+		noteType?: CaseNoteType;
+		isInternal?: boolean;
+		idempotencyKey: string;
+	}) => apiCall<{ note: CaseNote }>('concierge/case/addNote', { body: data }),
+
+	listNotes: (params: { caseId: string; noteType?: CaseNoteType; includeInternal?: boolean }) =>
+		apiCall<{ notes: CaseNote[] }>('concierge/case/listNotes', { body: params }),
+
+	requestClarification: (data: { caseId: string; question: string; idempotencyKey: string }) =>
+		apiCall<{ note: CaseNote; case: { id: string; status: string } }>(
+			'concierge/case/requestClarification',
+			{ body: data }
+		),
+
+	respondToClarification: (data: { caseId: string; response: string; idempotencyKey: string }) =>
+		apiCall<{ note: CaseNote }>('concierge/case/respondToClarification', { body: data }),
+
+	linkToArc: (data: { caseId: string; arcRequestId: string; idempotencyKey: string }) =>
+		apiCall<{ caseId: string; linkedArcRequestId: string }>('concierge/case/linkToArc', {
+			body: data
+		}),
+
+	linkToWorkOrder: (data: { caseId: string; workOrderId: string; idempotencyKey: string }) =>
+		apiCall<{ caseId: string; linkedWorkOrderId: string }>('concierge/case/linkToWorkOrder', {
+			body: data
+		}),
+
+	linkToUnit: (data: { caseId: string; unitId: string; idempotencyKey: string }) =>
+		apiCall<{ caseId: string; linkedUnitId: string }>('concierge/case/linkToUnit', { body: data }),
+
+	linkToJob: (data: { caseId: string; jobId: string; idempotencyKey: string }) =>
+		apiCall<{ caseId: string; linkedJobId: string }>('concierge/case/linkToJob', { body: data }),
+
+	getStatusHistory: (caseId: string) =>
+		apiCall<{ history: CaseStatusHistoryItem[] }>('concierge/case/getStatusHistory', {
+			body: { caseId }
+		}),
+
+	addParticipant: (data: {
+		caseId: string;
+		partyId?: string;
+		externalContactName?: string;
+		externalContactEmail?: string;
+		externalContactPhone?: string;
+		role: string;
+		notes?: string;
+		idempotencyKey: string;
+	}) =>
+		apiCall<{ participant: CaseParticipant }>('concierge/case/addParticipant', { body: data }),
+
+	listParticipants: (caseId: string) =>
+		apiCall<{ participants: CaseParticipant[] }>('concierge/case/listParticipants', {
+			body: { caseId }
+		}),
+
+	removeParticipant: (data: { caseId: string; participantId: string; idempotencyKey: string }) =>
+		apiCall<{ removed: boolean }>('concierge/case/removeParticipant', { body: data }),
+
+	listConcierges: () =>
+		apiCall<{ concierges: Array<{ id: string; name: string; email: string }> }>(
+			'concierge/case/listConcierges',
+			{ body: {} }
+		)
+};
+
+// ============================================================================
+// Job API (Phase 15 - Contractor Job Lifecycle)
+// ============================================================================
+
+export type JobStatus =
+	| 'LEAD'
+	| 'TICKET'
+	| 'ESTIMATE_REQUIRED'
+	| 'ESTIMATE_SENT'
+	| 'ESTIMATE_APPROVED'
+	| 'JOB_CREATED'
+	| 'SCHEDULED'
+	| 'DISPATCHED'
+	| 'IN_PROGRESS'
+	| 'ON_HOLD'
+	| 'COMPLETED'
+	| 'INVOICED'
+	| 'PAID'
+	| 'WARRANTY'
+	| 'CLOSED'
+	| 'CANCELLED';
+
+export type JobSourceType =
+	| 'WORK_ORDER'
+	| 'VIOLATION'
+	| 'ARC_REQUEST'
+	| 'DIRECT_CUSTOMER'
+	| 'LEAD'
+	| 'RECURRING';
+
+export interface Job {
+	id: string;
+	organizationId: string;
+	jobNumber: string;
+	status: JobStatus;
+	sourceType: JobSourceType;
+	workOrderId: string | null;
+	violationId: string | null;
+	arcRequestId: string | null;
+	customerId: string | null;
+	unitId: string | null;
+	propertyId: string | null;
+	associationId: string | null;
+	addressLine1: string | null;
+	addressLine2: string | null;
+	city: string | null;
+	state: string | null;
+	postalCode: string | null;
+	locationNotes: string | null;
+	title: string;
+	description: string | null;
+	category: string | null;
+	priority: string;
+	assignedTechnicianId: string | null;
+	assignedBranchId: string | null;
+	assignedAt: string | null;
+	assignedBy: string | null;
+	scheduledStart: string | null;
+	scheduledEnd: string | null;
+	estimatedHours: string | null;
+	dispatchedAt: string | null;
+	startedAt: string | null;
+	completedAt: string | null;
+	invoicedAt: string | null;
+	paidAt: string | null;
+	closedAt: string | null;
+	closedBy: string | null;
+	cancelledAt: string | null;
+	estimatedCost: string | null;
+	actualCost: string | null;
+	actualHours: string | null;
+	warrantyEnds: string | null;
+	warrantyNotes: string | null;
+	resolutionNotes: string | null;
+	customerRating: number | null;
+	customerFeedback: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface JobNote {
+	id: string;
+	jobId: string;
+	authorId: string;
+	content: string;
+	isInternal: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface JobStatusHistoryItem {
+	id: string;
+	fromStatus: JobStatus | null;
+	toStatus: JobStatus;
+	changedBy: string;
+	changedAt: string;
+	notes: string | null;
+}
+
+export const jobApi = {
+	list: (params?: {
+		status?: JobStatus;
+		sourceType?: JobSourceType;
+		customerId?: string;
+		assignedTechnicianId?: string;
+		search?: string;
+		cursor?: string;
+		limit?: number;
+	}) => apiCall<{ jobs: Job[]; pagination: { nextCursor: string | null; hasMore: boolean } }>('job/list', { body: params || {} }),
+
+	get: (id: string) => apiCall<{ job: Job }>('job/get', { body: { id } }),
+
+	create: (data: {
+		sourceType: JobSourceType;
+		title: string;
+		description?: string;
+		category?: string;
+		priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW';
+		workOrderId?: string;
+		violationId?: string;
+		arcRequestId?: string;
+		customerId?: string;
+		unitId?: string;
+		propertyId?: string;
+		associationId?: string;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
+		locationNotes?: string;
+		estimatedHours?: number;
+		estimatedCost?: number;
+		idempotencyKey: string;
+	}) => apiCall<{ job: Job }>('job/create', { body: data }),
+
+	update: (data: {
+		id: string;
+		title?: string;
+		description?: string | null;
+		category?: string | null;
+		priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW';
+		addressLine1?: string | null;
+		addressLine2?: string | null;
+		city?: string | null;
+		state?: string | null;
+		postalCode?: string | null;
+		locationNotes?: string | null;
+		estimatedHours?: number | null;
+		estimatedCost?: number | null;
+		warrantyNotes?: string | null;
+		resolutionNotes?: string | null;
+		idempotencyKey?: string;
+	}) => apiCall<{ job: Job }>('job/update', { body: data }),
+
+	transitionStatus: (data: {
+		id: string;
+		toStatus: JobStatus;
+		notes?: string;
+		idempotencyKey?: string;
+	}) => apiCall<{ job: Job }>('job/transitionStatus', { body: data }),
+
+	assignTechnician: (data: {
+		id: string;
+		technicianId: string | null;
+		branchId?: string | null;
+		idempotencyKey?: string;
+	}) => apiCall<{ job: Job }>('job/assignTechnician', { body: data }),
+
+	schedule: (data: {
+		id: string;
+		scheduledStart: string;
+		scheduledEnd: string;
+		idempotencyKey?: string;
+	}) => apiCall<{ job: Job }>('job/schedule', { body: data }),
+
+	getStatusHistory: (jobId: string) =>
+		apiCall<{ history: JobStatusHistoryItem[] }>('job/getStatusHistory', { body: { jobId } }),
+
+	addNote: (data: {
+		jobId: string;
+		content: string;
+		isInternal?: boolean;
+		idempotencyKey: string;
+	}) => apiCall<{ note: JobNote }>('job/addNote', { body: data }),
+
+	listNotes: (params: { jobId: string; includeInternal?: boolean }) =>
+		apiCall<{ notes: JobNote[] }>('job/listNotes', { body: params }),
+
+	delete: (data: { id: string; idempotencyKey?: string }) =>
+		apiCall<{ deleted: boolean }>('job/delete', { body: data })
+};
+
+// ============================================================================
+// Estimate API (Phase 15 - Contractor Job Lifecycle)
+// ============================================================================
+
+export type EstimateStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'REVISED';
+
+export interface EstimateLine {
+	id: string;
+	lineNumber: number;
+	description: string;
+	quantity: string;
+	unitPrice: string;
+	lineTotal: string;
+	pricebookItemId: string | null;
+	isTaxable: boolean;
+	taxRate: string | null;
+}
+
+export interface Estimate {
+	id: string;
+	organizationId: string;
+	jobId: string;
+	customerId: string | null;
+	estimateNumber: string;
+	status: EstimateStatus;
+	version: number;
+	subtotal: string;
+	taxAmount: string;
+	discount: string;
+	totalAmount: string;
+	notes: string | null;
+	terms: string | null;
+	validUntil: string | null;
+	sentAt: string | null;
+	viewedAt: string | null;
+	acceptedAt: string | null;
+	declinedAt: string | null;
+	declineReason: string | null;
+	createdAt: string;
+	updatedAt: string;
+	lines?: EstimateLine[];
+}
+
+export const estimateApi = {
+	list: (params: { jobId: string }) =>
+		apiCall<{ estimates: Estimate[] }>('billing/estimate/list', { body: params }),
+
+	get: (id: string) =>
+		apiCall<{ estimate: Estimate }>('billing/estimate/get', { body: { id } }),
+
+	create: (data: {
+		jobId: string;
+		customerId?: string;
+		notes?: string;
+		terms?: string;
+		validUntil?: string;
+		idempotencyKey: string;
+	}) => apiCall<{ estimate: Estimate }>('billing/estimate/create', { body: data }),
+
+	update: (data: {
+		id: string;
+		notes?: string;
+		terms?: string;
+		validUntil?: string;
+		discount?: number;
+		idempotencyKey?: string;
+	}) => apiCall<{ estimate: Estimate }>('billing/estimate/update', { body: data }),
+
+	addLine: (data: {
+		estimateId: string;
+		description: string;
+		quantity: number;
+		unitPrice: number;
+		isTaxable?: boolean;
+		taxRate?: number;
+		pricebookItemId?: string;
+		idempotencyKey: string;
+	}) => apiCall<{ estimate: Estimate }>('billing/estimate/addLine', { body: data }),
+
+	removeLine: (data: {
+		estimateId: string;
+		lineId: string;
+		idempotencyKey: string;
+	}) => apiCall<{ estimate: Estimate }>('billing/estimate/removeLine', { body: data }),
+
+	send: (data: { id: string; idempotencyKey?: string }) =>
+		apiCall<{ estimate: Estimate }>('billing/estimate/send', { body: data }),
+
+	accept: (data: { id: string; selectedOptionId?: string; idempotencyKey?: string }) =>
+		apiCall<{ estimate: Estimate }>('billing/estimate/accept', { body: data }),
+
+	decline: (data: { id: string; reason?: string; idempotencyKey?: string }) =>
+		apiCall<{ estimate: Estimate }>('billing/estimate/decline', { body: data }),
+
+	revise: (data: { id: string; idempotencyKey?: string }) =>
+		apiCall<{ estimate: Estimate }>('billing/estimate/revise', { body: data })
+};
+
+// ============================================================================
+// Invoice API (Phase 15 - Contractor Job Lifecycle)
+// ============================================================================
+
+export type InvoiceStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'VOID' | 'REFUNDED';
+
+export interface InvoiceLine {
+	id: string;
+	lineNumber: number;
+	description: string;
+	quantity: string;
+	unitPrice: string;
+	lineTotal: string;
+	pricebookItemId: string | null;
+	isTaxable: boolean;
+	taxRate: string | null;
+}
+
+export interface JobInvoice {
+	id: string;
+	organizationId: string;
+	jobId: string;
+	customerId: string | null;
+	estimateId: string | null;
+	invoiceNumber: string;
+	status: InvoiceStatus;
+	dueDate: string | null;
+	subtotal: string;
+	taxAmount: string;
+	discount: string;
+	totalAmount: string;
+	amountPaid: string;
+	balanceDue: string;
+	notes: string | null;
+	terms: string | null;
+	sentAt: string | null;
+	viewedAt: string | null;
+	paidAt: string | null;
+	createdAt: string;
+	updatedAt: string;
+	lines?: InvoiceLine[];
+}
+
+export const invoiceApi = {
+	list: (params: { jobId: string }) =>
+		apiCall<{ invoices: JobInvoice[] }>('billing/invoice/list', { body: params }),
+
+	get: (id: string) =>
+		apiCall<{ invoice: JobInvoice }>('billing/invoice/get', { body: { id } }),
+
+	createFromEstimate: (data: {
+		estimateId: string;
+		dueDate?: string;
+		notes?: string;
+		terms?: string;
+		idempotencyKey: string;
+	}) => apiCall<{ invoice: JobInvoice }>('billing/invoice/createFromEstimate', { body: data }),
+
+	create: (data: {
+		jobId: string;
+		customerId?: string;
+		dueDate?: string;
+		notes?: string;
+		terms?: string;
+		idempotencyKey: string;
+	}) => apiCall<{ invoice: JobInvoice }>('billing/invoice/create', { body: data }),
+
+	send: (data: { id: string; idempotencyKey?: string }) =>
+		apiCall<{ invoice: JobInvoice }>('billing/invoice/send', { body: data }),
+
+	recordPayment: (data: {
+		id: string;
+		amount: number;
+		paymentMethod?: string;
+		referenceNumber?: string;
+		notes?: string;
+		idempotencyKey?: string;
+	}) => apiCall<{ invoice: JobInvoice }>('billing/invoice/recordPayment', { body: data }),
+
+	void: (data: { id: string; reason?: string; idempotencyKey?: string }) =>
+		apiCall<{ invoice: JobInvoice }>('billing/invoice/void', { body: data }),
+
+	getPayments: (invoiceId: string) =>
+		apiCall<{ payments: InvoicePayment[] }>('billing/invoice/getPayments', { body: { invoiceId } })
+};
+
+export interface InvoicePayment {
+	id: string;
+	invoiceId: string;
+	amount: string;
+	paymentMethod: string | null;
+	referenceNumber: string | null;
+	notes: string | null;
+	paidAt: string;
+	recordedBy: string;
+	createdAt: string;
+}
+
+// ============================================================================
+// Technician API (Phase 15 - Contractor Job Lifecycle)
+// ============================================================================
+
+export interface Technician {
+	id: string;
+	organizationId: string;
+	userId: string | null;
+	firstName: string;
+	lastName: string;
+	email: string | null;
+	phone: string | null;
+	employeeId: string | null;
+	isActive: boolean;
+	skills: string[];
+	certifications: string[];
+	createdAt: string;
+}
+
+export const technicianApi = {
+	list: (params?: { isActive?: boolean; limit?: number }) =>
+		apiCall<{ technicians: Technician[] }>('contractor/technician/list', { body: params || {} }),
+
+	get: (id: string) =>
+		apiCall<{ technician: Technician }>('contractor/technician/get', { body: { id } })
+};
+
+// ============================================================================
+// Job Document API (Phase 15 - Job Documents)
+// ============================================================================
+
+export interface JobDocument {
+	id: string;
+	jobId: string;
+	name: string;
+	description: string | null;
+	fileUrl: string;
+	fileType: string;
+	fileSize: number;
+	category: string;
+	uploadedBy: string;
+	createdAt: string;
+}
+
+export const jobDocumentApi = {
+	listForJob: (jobId: string) =>
+		apiCall<{ documents: JobDocument[] }>('job/listDocuments', { body: { jobId } }),
+
+	upload: (data: {
+		jobId: string;
+		name: string;
+		description?: string;
+		fileUrl: string;
+		fileType: string;
+		fileSize: number;
+		category: string;
+		idempotencyKey: string;
+	}) => apiCall<{ document: JobDocument }>('job/uploadDocument', { body: data }),
+
+	delete: (data: { id: string; idempotencyKey?: string }) =>
+		apiCall<{ deleted: boolean }>('job/deleteDocument', { body: data })
+};
+
 /**
  * Fetch badge counts using direct API calls (fallback when oRPC endpoint not available)
  */

@@ -14,17 +14,101 @@ import { assertContractorOrg } from '../contractor/utils.js';
 import { JobStatus, JobSourceType, CheckpointType } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
 
-// Valid state transitions for jobs
+// Phase 15.7: CAM & Concierge Integration - Propagate job status to linked entities
+async function propagateJobStatusToLinkedEntities(
+	job: { id: string; workOrderId: string | null; status: JobStatus },
+	toStatus: JobStatus,
+	context: { user?: { id: string } | null }
+): Promise<void> {
+	try {
+		// Map job status to work order status
+		const jobToWorkOrderStatus: Partial<Record<JobStatus, string>> = {
+			SCHEDULED: 'SCHEDULED',
+			DISPATCHED: 'SCHEDULED',
+			IN_PROGRESS: 'IN_PROGRESS',
+			COMPLETED: 'COMPLETED',
+			CLOSED: 'CLOSED',
+			CANCELLED: 'CANCELLED'
+		};
+
+		const workOrderStatus = jobToWorkOrderStatus[toStatus];
+
+		// Update linked work order if exists
+		if (job.workOrderId && workOrderStatus) {
+			await prisma.workOrder.update({
+				where: { id: job.workOrderId },
+				data: {
+					status: workOrderStatus as any,
+					...(toStatus === 'COMPLETED' ? { completedAt: new Date() } : {}),
+					...(toStatus === 'CLOSED' ? { closedAt: new Date(), closedBy: context.user?.id } : {})
+				}
+			}).catch((err) => {
+				console.error(`Failed to update linked work order ${job.workOrderId}:`, err);
+			});
+		}
+
+		// Concierge Case Integration - Find and update linked cases
+		// Cases are linked to jobs via the linkedJobId field
+		const linkedCases = await prisma.conciergeCase.findMany({
+			where: { linkedJobId: job.id }
+		}).catch(() => []);
+
+		if (linkedCases.length > 0) {
+			// Map job status to case status
+			const jobToCaseStatus: Partial<Record<JobStatus, string>> = {
+				SCHEDULED: 'IN_PROGRESS',
+				IN_PROGRESS: 'IN_PROGRESS',
+				COMPLETED: 'RESOLVED',
+				CLOSED: 'CLOSED',
+				CANCELLED: 'CLOSED'
+			};
+
+			const caseStatus = jobToCaseStatus[toStatus];
+			if (caseStatus) {
+				for (const linkedCase of linkedCases) {
+					await prisma.conciergeCase.update({
+						where: { id: linkedCase.id },
+						data: {
+							status: caseStatus as any,
+							...(toStatus === 'COMPLETED' || toStatus === 'CLOSED' ? { resolvedAt: new Date() } : {}),
+							...(toStatus === 'CLOSED' ? { closedAt: new Date() } : {})
+						}
+					}).catch((err) => {
+						console.error(`Failed to update linked case ${linkedCase.id}:`, err);
+					});
+				}
+			}
+		}
+	} catch (err) {
+		console.error('Failed to propagate job status to linked entities:', err);
+	}
+}
+
+// Valid state transitions for jobs (Phase 15 - Contractor Job Lifecycle)
 const JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
+	// Initial states
 	LEAD: ['TICKET', 'CANCELLED'],
 	TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
-	ESTIMATE_REQUIRED: ['JOB_CREATED', 'CANCELLED'],
+	
+	// Estimate workflow
+	ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
+	ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'],
+	ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
+	
+	// Job execution
 	JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
-	SCHEDULED: ['IN_PROGRESS', 'ON_HOLD', 'CANCELLED'],
+	SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
+	DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'],
 	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-	ON_HOLD: ['SCHEDULED', 'IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: ['WARRANTY', 'CLOSED'],
+	ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
+	
+	// Completion & payment
+	COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
+	INVOICED: ['PAID', 'CANCELLED'],
+	PAID: ['WARRANTY', 'CLOSED'],
 	WARRANTY: ['CLOSED', 'IN_PROGRESS'],
+	
+	// Terminal states
 	CLOSED: [],
 	CANCELLED: []
 };
@@ -59,10 +143,14 @@ const jobOutput = z.object({
 	scheduledStart: z.string().nullable(),
 	scheduledEnd: z.string().nullable(),
 	estimatedHours: z.string().nullable(),
+	dispatchedAt: z.string().nullable(),
 	startedAt: z.string().nullable(),
 	completedAt: z.string().nullable(),
+	invoicedAt: z.string().nullable(),
+	paidAt: z.string().nullable(),
 	closedAt: z.string().nullable(),
 	closedBy: z.string().nullable(),
+	cancelledAt: z.string().nullable(),
 	estimatedCost: z.string().nullable(),
 	actualCost: z.string().nullable(),
 	actualHours: z.string().nullable(),
@@ -158,10 +246,14 @@ const formatJob = (j: any) => ({
 	scheduledStart: j.scheduledStart?.toISOString() ?? null,
 	scheduledEnd: j.scheduledEnd?.toISOString() ?? null,
 	estimatedHours: j.estimatedHours?.toString() ?? null,
+	dispatchedAt: j.dispatchedAt?.toISOString() ?? null,
 	startedAt: j.startedAt?.toISOString() ?? null,
 	completedAt: j.completedAt?.toISOString() ?? null,
+	invoicedAt: j.invoicedAt?.toISOString() ?? null,
+	paidAt: j.paidAt?.toISOString() ?? null,
 	closedAt: j.closedAt?.toISOString() ?? null,
 	closedBy: j.closedBy,
+	cancelledAt: j.cancelledAt?.toISOString() ?? null,
 	estimatedCost: j.estimatedCost?.toString() ?? null,
 	actualCost: j.actualCost?.toString() ?? null,
 	actualHours: j.actualHours?.toString() ?? null,
@@ -532,18 +624,78 @@ export const jobRouter = {
 				);
 			}
 
+			// Phase 15: Additional validation guards for specific transitions
+			if (input.toStatus === 'ESTIMATE_SENT') {
+				// Validate at least one estimate exists for this job
+				const estimateCount = await prisma.estimate.count({
+					where: { jobId: input.id, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } }
+				});
+				if (estimateCount === 0) {
+					throw ApiException.badRequest('Cannot send estimate: no estimate exists for this job');
+				}
+			}
+
+			if (input.toStatus === 'DISPATCHED') {
+				// Validate technician is assigned
+				if (!job.assignedTechnicianId) {
+					throw ApiException.badRequest('Cannot dispatch: no technician assigned to this job');
+				}
+			}
+
+			if (input.toStatus === 'INVOICED') {
+				// Validate at least one invoice exists for this job
+				const invoiceCount = await prisma.jobInvoice.count({
+					where: { jobId: input.id, status: { not: 'VOID' } }
+				});
+				if (invoiceCount === 0) {
+					throw ApiException.badRequest('Cannot mark as invoiced: no invoice exists for this job');
+				}
+			}
+
+			if (input.toStatus === 'PAID') {
+				// Validate all invoices are paid (balance due = 0)
+				const unpaidInvoices = await prisma.jobInvoice.findFirst({
+					where: { 
+						jobId: input.id, 
+						status: { notIn: ['PAID', 'VOID'] },
+						balanceDue: { gt: 0 }
+					}
+				});
+				if (unpaidInvoices) {
+					throw ApiException.badRequest('Cannot mark as paid: outstanding invoice balance exists');
+				}
+			}
+
 			const transitionJob = async () => {
 				return prisma.$transaction(async (tx) => {
 					const updateData: any = { status: input.toStatus };
 
-					// Set timestamps based on status
-					if (input.toStatus === 'IN_PROGRESS' && !job.startedAt) {
-						updateData.startedAt = new Date();
-					} else if (input.toStatus === 'COMPLETED') {
-						updateData.completedAt = new Date();
-					} else if (input.toStatus === 'CLOSED') {
-						updateData.closedAt = new Date();
-						updateData.closedBy = context.user!.id;
+					// Set timestamps based on status (Phase 15 - Contractor Job Lifecycle)
+					switch (input.toStatus) {
+						case 'DISPATCHED':
+							updateData.dispatchedAt = new Date();
+							break;
+						case 'IN_PROGRESS':
+							if (!job.startedAt) {
+								updateData.startedAt = new Date();
+							}
+							break;
+						case 'COMPLETED':
+							updateData.completedAt = new Date();
+							break;
+						case 'INVOICED':
+							updateData.invoicedAt = new Date();
+							break;
+						case 'PAID':
+							updateData.paidAt = new Date();
+							break;
+						case 'CLOSED':
+							updateData.closedAt = new Date();
+							updateData.closedBy = context.user!.id;
+							break;
+						case 'CANCELLED':
+							updateData.cancelledAt = new Date();
+							break;
 					}
 
 					const updated = await tx.job.update({
@@ -574,6 +726,9 @@ export const jobRouter = {
 				`Job status changed from ${job.status} to ${input.toStatus}${input.notes ? `: ${input.notes}` : ''}`,
 				{ jobId: updatedJob.id }
 			);
+
+			// Phase 15.7: CAM & Concierge Integration - Propagate status to linked entities
+			await propagateJobStatusToLinkedEntities(updatedJob, input.toStatus, context);
 
 			return successResponse({ job: formatJob(updatedJob) }, context);
 		}),

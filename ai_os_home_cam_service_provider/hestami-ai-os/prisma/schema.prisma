@@ -249,6 +249,33 @@ enum UserRole {
 }
 
 // -----------------------------------------------------------------------------
+// Phase 16: Hestami Staff Management
+// -----------------------------------------------------------------------------
+
+enum StaffStatus {
+  PENDING    // Invitation sent, awaiting activation
+  ACTIVE     // Active staff member
+  SUSPENDED  // Emergency suspension (security/policy)
+  DEACTIVATED // Normal deactivation (left company, role change)
+}
+
+enum StaffRole {
+  CONCIERGE_OPERATOR     // Manages property issue resolution, vendor discovery
+  OPERATIONS_COORDINATOR // Oversees case queues, escalations, SLA risks
+  CAM_SPECIALIST         // Manages HOA governance workflows, compliance
+  VENDOR_LIAISON         // Manages vendor entities, credentials, performance
+  PLATFORM_ADMIN         // System configuration, permissions, access control
+}
+
+enum PillarAccess {
+  CONCIERGE   // Concierge Operations pillar
+  CAM         // CAM / Governance pillar
+  CONTRACTOR  // Contractor Operations pillar
+  VENDOR      // Vendor Management pillar
+  ADMIN       // System Administration pillar
+}
+
+// -----------------------------------------------------------------------------
 // Phase 4: Work Orders & Assets
 // -----------------------------------------------------------------------------
 
@@ -810,6 +837,9 @@ model Organization {
   linkedVendorContexts   ExternalVendorContext[] @relation("LinkedServiceProvider")
   materialDecisions      MaterialDecision[]
 
+  // Phase 16.5: Vendor Discovery
+  vendorCandidates       VendorCandidate[]
+
   @@map("organizations")
 }
 
@@ -842,7 +872,94 @@ model User {
   performedActions       ConciergeAction[] @relation("ActionPerformer")
   materialDecisions      MaterialDecision[] @relation("DecisionMaker")
 
+  // Phase 16: Staff Management
+  staffProfile Staff?
+
+  // Phase 16.7: Communications
+  sentCommunications CaseCommunication[] @relation("CommunicationSender")
+
+  // Phase 16.11: Case Reviews
+  caseReviews        CaseReview[] @relation("CaseReviewer")
+
+  // Phase 16.10: Milestones & Issues
+  completedMilestones CaseMilestone[] @relation("MilestoneCompleter")
+  reportedIssues      CaseIssue[]     @relation("IssueReporter")
+  resolvedIssues      CaseIssue[]     @relation("IssueResolver")
+  assignedIssues      CaseIssue[]     @relation("IssueAssignee")
+
   @@map("users")
+}
+
+// =============================================================================
+// PHASE 16: Hestami Staff Management
+// =============================================================================
+
+/// @description Hestami internal staff member entity
+/// Staff entities persist indefinitely for audit purposes
+model Staff {
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+
+  // Identity
+  displayName String  @map("display_name")
+  title       String?
+
+  // Status & lifecycle
+  status       StaffStatus @default(PENDING)
+  activatedAt  DateTime?   @map("activated_at")
+  suspendedAt  DateTime?   @map("suspended_at")
+  deactivatedAt DateTime?  @map("deactivated_at")
+  suspensionReason String? @map("suspension_reason") @db.Text
+  deactivationReason String? @map("deactivation_reason") @db.Text
+
+  // Roles (staff can have multiple roles)
+  roles StaffRole[]
+
+  // Pillar access permissions
+  pillarAccess PillarAccess[]  @map("pillar_access")
+
+  // Case assignment eligibility
+  canBeAssignedCases Boolean @default(true) @map("can_be_assigned_cases")
+
+  // Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Case assignments (staff as primary owner)
+  assignedCases StaffCaseAssignment[]
+
+  @@index([status])
+  @@index([userId])
+  @@map("staff")
+}
+
+/// @description Staff case assignment tracking
+/// Tracks assignment history with timestamps and justification
+model StaffCaseAssignment {
+  id        String @id @default(cuid())
+  staffId   String @map("staff_id")
+  caseId    String @map("case_id")
+  
+  // Assignment details
+  isPrimary     Boolean @default(false) @map("is_primary")
+  assignedAt    DateTime @default(now()) @map("assigned_at")
+  unassignedAt  DateTime? @map("unassigned_at")
+  justification String?   @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  staff Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  case  ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([staffId])
+  @@index([caseId])
+  @@index([isPrimary])
+  @@map("staff_case_assignments")
 }
 
 /// @description Junction table for user-organization membership with roles
@@ -1057,6 +1174,14 @@ enum ActivityEntityType {
   ORGANIZATION
   DOCUMENT
 
+  // Phase 16: Staff Management
+  STAFF
+  STAFF_ASSIGNMENT
+
+  // Phase 16.5: Vendor Discovery
+  VENDOR_CANDIDATE
+  VENDOR_BID
+
   // Escape hatch
   OTHER
 }
@@ -1104,6 +1229,10 @@ enum ActivityActionType {
   WITHDRAW // Motion withdrawn
   CAST_BALLOT // Vote cast
   ADOPT // Resolution adopted
+  // Phase 13 - Concierge Case actions
+  REQUEST_INFO // Clarification requested
+  RESPOND // Response provided
+  LINK // Entity linked
 }
 
 /// @description Actor types for activity events
@@ -5309,11 +5438,16 @@ enum JobStatus {
   LEAD
   TICKET
   ESTIMATE_REQUIRED
+  ESTIMATE_SENT       // Estimate sent to customer, awaiting response
+  ESTIMATE_APPROVED   // Customer approved estimate
   JOB_CREATED
   SCHEDULED
+  DISPATCHED          // Technician notified/en route
   IN_PROGRESS
   ON_HOLD
   COMPLETED
+  INVOICED            // Invoice created and sent
+  PAID                // Full payment received
   WARRANTY
   CLOSED
   CANCELLED
@@ -5433,10 +5567,14 @@ model Job {
   estimatedHours Decimal?  @map("estimated_hours") @db.Decimal(5, 2)
 
   // Execution
-  startedAt   DateTime? @map("started_at")
-  completedAt DateTime? @map("completed_at")
-  closedAt    DateTime? @map("closed_at")
-  closedBy    String?   @map("closed_by")
+  dispatchedAt DateTime? @map("dispatched_at")
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  invoicedAt   DateTime? @map("invoiced_at")
+  paidAt       DateTime? @map("paid_at")
+  closedAt     DateTime? @map("closed_at")
+  closedBy     String?   @map("closed_by")
+  cancelledAt  DateTime? @map("cancelled_at")
 
   // Financials
   estimatedCost Decimal? @map("estimated_cost") @db.Decimal(12, 2)
@@ -7560,6 +7698,10 @@ model ConciergeCase {
   linkedUnitId String? @map("linked_unit_id")
   // Link to Phase 2 Job when case requires contractor work
   linkedJobId  String? @map("linked_job_id")
+  // Link to CAM ARC Request
+  linkedArcRequestId String? @map("linked_arc_request_id")
+  // Link to CAM Work Order
+  linkedWorkOrderId  String? @map("linked_work_order_id")
 
   // Assignment
   assignedConciergeUserId String? @map("assigned_concierge_user_id")
@@ -7593,6 +7735,23 @@ model ConciergeCase {
   vendorInteractions ExternalVendorInteraction[]
   decisions          MaterialDecision[]
 
+  // Phase 16: Staff assignments
+  staffAssignments   StaffCaseAssignment[]
+
+  // Phase 16.5: Vendor Discovery
+  vendorCandidates   VendorCandidate[]
+  vendorBids         VendorBid[]
+
+  // Phase 16.7: Communications
+  communications     CaseCommunication[]
+
+  // Phase 16.11: Case Review
+  review             CaseReview?
+
+  // Phase 16.10: Milestones & Issues
+  milestones         CaseMilestone[]
+  issues             CaseIssue[]
+
   @@index([organizationId])
   @@index([propertyId])
   @@index([status])
@@ -7622,14 +7781,23 @@ model CaseStatusHistory {
   @@map("case_status_history")
 }
 
+/// @description Type of case note
+enum CaseNoteType {
+  GENERAL                // Default internal/external note
+  CLARIFICATION_REQUEST  // Concierge asking owner for info
+  CLARIFICATION_RESPONSE // Owner's response to request
+  DECISION_RATIONALE     // Decision explanation
+}
+
 /// @description Internal notes on concierge cases
 model CaseNote {
   id     String @id @default(cuid())
   caseId String @map("case_id")
 
-  content    String  @db.Text
-  createdBy  String  @map("created_by") // User ID
-  isInternal Boolean @default(true) @map("is_internal") // Internal vs. visible to owner
+  content    String       @db.Text
+  noteType   CaseNoteType @default(GENERAL) @map("note_type")
+  createdBy  String       @map("created_by") // User ID
+  isInternal Boolean      @default(true) @map("is_internal") // Internal vs. visible to owner
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -7640,7 +7808,103 @@ model CaseNote {
   @@map("case_notes")
 }
 
-/// @description File attachments for concierge cases
+// -----------------------------------------------------------------------------
+// Phase 16.7: Case Communications
+// -----------------------------------------------------------------------------
+
+/// @description Direction of communication
+enum CommunicationDirection {
+  INBOUND   // From external party to staff
+  OUTBOUND  // From staff to external party
+  INTERNAL  // Staff-to-staff
+}
+
+/// @description Communication record for case correspondence
+model CaseCommunication {
+  id     String @id @default(cuid())
+  caseId String @map("case_id")
+
+  // Communication details
+  channel     CommunicationChannel
+  direction   CommunicationDirection
+  subject     String?
+  content     String  @db.Text
+  
+  // Participants
+  fromUserId  String? @map("from_user_id") // Staff user who sent/logged
+  toRecipient String? @map("to_recipient") // Email, phone, or name
+  ccRecipients String? @map("cc_recipients") // Comma-separated
+
+  // External references
+  externalMessageId String? @map("external_message_id") // Email message ID, SMS ID, etc.
+  threadId          String? @map("thread_id") // For grouping related messages
+
+  // Status
+  sentAt     DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  readAt     DateTime? @map("read_at")
+  failedAt   DateTime? @map("failed_at")
+  failureReason String? @map("failure_reason")
+
+  // Attachments
+  attachmentIds Json? @map("attachment_ids") // Array of CaseAttachment IDs
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  case     ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  fromUser User?         @relation("CommunicationSender", fields: [fromUserId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([channel])
+  @@index([direction])
+  @@index([threadId])
+  @@map("case_communications")
+}
+
+// -----------------------------------------------------------------------------
+// Phase 16.11: Case Review & Completion
+// -----------------------------------------------------------------------------
+
+/// @description Post-completion review for institutional knowledge
+model CaseReview {
+  id     String @id @default(cuid())
+  caseId String @unique @map("case_id")
+
+  // Review content
+  outcomeSummary        String  @map("outcome_summary") @db.Text
+  vendorPerformanceNotes String? @map("vendor_performance_notes") @db.Text
+  issuesEncountered     String? @map("issues_encountered") @db.Text
+  lessonsLearned        String? @map("lessons_learned") @db.Text
+  
+  // Ratings (1-5 scale)
+  vendorRating          Int?    @map("vendor_rating")
+  communicationRating   Int?    @map("communication_rating")
+  timelinessRating      Int?    @map("timeliness_rating")
+  overallSatisfaction   Int?    @map("overall_satisfaction")
+
+  // Reusability flags
+  reusableVendor        Boolean @default(false) @map("reusable_vendor")
+  reusableScope         Boolean @default(false) @map("reusable_scope")
+  reusableProcess       Boolean @default(false) @map("reusable_process")
+
+  // Metadata
+  reviewedByUserId      String  @map("reviewed_by_user_id")
+  reviewedAt            DateTime @map("reviewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  case       ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reviewedBy User          @relation("CaseReviewer", fields: [reviewedByUserId], references: [id])
+
+  @@index([reviewedByUserId])
+  @@map("case_reviews")
+}
+
+/// @description File attachments for concierge cases with versioning (Sub-Phase 9)
 model CaseAttachment {
   id     String @id @default(cuid())
   caseId String @map("case_id")
@@ -7655,14 +7919,128 @@ model CaseAttachment {
   // Metadata
   description String? @db.Text
   uploadedBy  String  @map("uploaded_by") // User ID
+  category    String? // e.g., "contract", "invoice", "photo", "report"
+
+  // Versioning (Sub-Phase 9.3)
+  version         Int     @default(1)
+  previousVersionId String? @map("previous_version_id")
+  isLatest        Boolean @default(true) @map("is_latest")
+  versionNotes    String? @map("version_notes") @db.Text
+
+  // Immutability
+  lockedAt        DateTime? @map("locked_at") // Set when case is closed
+  lockedByUserId  String?   @map("locked_by_user_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
   case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  previousVersion CaseAttachment? @relation("AttachmentVersions", fields: [previousVersionId], references: [id])
+  newerVersions   CaseAttachment[] @relation("AttachmentVersions")
 
   @@index([caseId])
+  @@index([previousVersionId])
+  @@index([isLatest])
   @@map("case_attachments")
+}
+
+// -----------------------------------------------------------------------------
+// Phase 16.10: Case Milestones & Execution Tracking
+// -----------------------------------------------------------------------------
+
+/// @description Milestone type for case execution tracking
+enum MilestoneType {
+  INTAKE_COMPLETE
+  ASSESSMENT_COMPLETE
+  SCOPE_DEFINED
+  VENDOR_SELECTED
+  WORK_STARTED
+  WORK_COMPLETE
+  INSPECTION_PASSED
+  PAYMENT_PROCESSED
+  CASE_CLOSED
+  CUSTOM
+}
+
+/// @description Milestone status
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  BLOCKED
+}
+
+/// @description Case milestone for execution tracking (Sub-Phase 10)
+model CaseMilestone {
+  id     String @id @default(cuid())
+  caseId String @map("case_id")
+
+  // Milestone details
+  milestoneType   MilestoneType
+  customName      String?       @map("custom_name") // For CUSTOM type
+  description     String?       @db.Text
+  status          MilestoneStatus @default(PENDING)
+  
+  // Timeline
+  targetDate      DateTime?     @map("target_date")
+  completedAt     DateTime?     @map("completed_at")
+  completedByUserId String?     @map("completed_by_user_id")
+
+  // Ordering
+  sequenceOrder   Int           @map("sequence_order")
+
+  // Notes
+  notes           String?       @db.Text
+  blockerReason   String?       @map("blocker_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  case        ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  completedBy User?         @relation("MilestoneCompleter", fields: [completedByUserId], references: [id])
+
+  @@index([caseId])
+  @@index([status])
+  @@index([milestoneType])
+  @@map("case_milestones")
+}
+
+/// @description Case issue for tracking problems during execution
+model CaseIssue {
+  id     String @id @default(cuid())
+  caseId String @map("case_id")
+
+  // Issue details
+  title           String
+  description     String        @db.Text
+  severity        String        @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  category        String?       // e.g., "vendor", "timeline", "budget", "quality"
+  
+  // Status
+  status          String        @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  resolution      String?       @db.Text
+  resolvedAt      DateTime?     @map("resolved_at")
+  resolvedByUserId String?      @map("resolved_by_user_id")
+
+  // Assignment
+  reportedByUserId String       @map("reported_by_user_id")
+  assignedToUserId String?      @map("assigned_to_user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  case        ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reportedBy  User          @relation("IssueReporter", fields: [reportedByUserId], references: [id])
+  resolvedBy  User?         @relation("IssueResolver", fields: [resolvedByUserId], references: [id])
+  assignedTo  User?         @relation("IssueAssignee", fields: [assignedToUserId], references: [id])
+
+  @@index([caseId])
+  @@index([status])
+  @@index([severity])
+  @@map("case_issues")
 }
 
 /// @description Participants involved in a concierge case
@@ -7920,6 +8298,9 @@ model ExternalVendorContext {
   linkedServiceProvider Organization?       @relation("LinkedServiceProvider", fields: [linkedServiceProviderOrgId], references: [id], onDelete: SetNull)
   interactions          ExternalVendorInteraction[]
 
+  // Phase 16.5: Vendor Discovery
+  linkedVendorCandidates VendorCandidate[]
+
   @@index([organizationId])
   @@index([propertyId])
   @@index([linkedServiceProviderOrgId])
@@ -8011,4 +8392,126 @@ model MaterialDecision {
   @@index([category])
   @@index([decidedByUserId])
   @@map("material_decisions")
+}
+
+// -----------------------------------------------------------------------------
+// Phase 16.5: Vendor Discovery & Management
+// -----------------------------------------------------------------------------
+
+/// @description Status of a vendor candidate in the discovery workflow
+enum VendorCandidateStatus {
+  IDENTIFIED      // Initial capture from research
+  CONTACTED       // Outreach initiated
+  RESPONDED       // Vendor has responded
+  QUOTED          // Bid/quote received
+  SELECTED        // Chosen for the job
+  REJECTED        // Not selected
+  ARCHIVED        // No longer active
+}
+
+/// @description Vendor candidate discovered during case research
+model VendorCandidate {
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  caseId         String @map("case_id") // Required link to concierge case
+
+  // Vendor details (extracted or manually entered)
+  vendorName         String  @map("vendor_name")
+  vendorContactName  String? @map("vendor_contact_name")
+  vendorContactEmail String? @map("vendor_contact_email")
+  vendorContactPhone String? @map("vendor_contact_phone")
+  vendorAddress      String? @map("vendor_address") @db.Text
+  vendorWebsite      String? @map("vendor_website")
+
+  // Service details
+  serviceCategories  Json?   @map("service_categories") // Array of service categories
+  coverageArea       String? @map("coverage_area")
+  licensesAndCerts   Json?   @map("licenses_and_certs") // Array of credentials
+
+  // Status tracking
+  status             VendorCandidateStatus @default(IDENTIFIED)
+  statusChangedAt    DateTime? @map("status_changed_at")
+
+  // Provenance (where this vendor was found)
+  sourceUrl          String? @map("source_url") @db.Text
+  sourceHtml         String? @map("source_html") @db.Text
+  sourcePlainText    String? @map("source_plain_text") @db.Text
+  extractedAt        DateTime? @map("extracted_at")
+  extractionConfidence Float? @map("extraction_confidence") // 0.0 to 1.0
+
+  // Extraction metadata (field-level confidence)
+  extractionMetadata Json? @map("extraction_metadata")
+
+  // Staff notes
+  notes              String? @db.Text
+  riskFlags          Json?   @map("risk_flags") // Array of risk flag strings
+
+  // Link to platform vendor (if they join)
+  linkedExternalVendorId String? @map("linked_external_vendor_id")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  case                ConciergeCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  linkedExternalVendor ExternalVendorContext? @relation(fields: [linkedExternalVendorId], references: [id], onDelete: SetNull)
+  bids                VendorBid[]
+
+  @@index([organizationId])
+  @@index([caseId])
+  @@index([status])
+  @@index([linkedExternalVendorId])
+  @@map("vendor_candidates")
+}
+
+/// @description Bid/quote from a vendor candidate
+model VendorBid {
+  id                String @id @default(cuid())
+  vendorCandidateId String @map("vendor_candidate_id")
+  caseId            String @map("case_id")
+
+  // Bid details
+  scopeVersion      String? @map("scope_version") // Which scope version this bid is for
+  amount            Decimal? @db.Decimal(12, 2)
+  currency          String  @default("USD")
+  validUntil        DateTime? @map("valid_until")
+
+  // Bid breakdown
+  laborCost         Decimal? @map("labor_cost") @db.Decimal(12, 2)
+  materialsCost     Decimal? @map("materials_cost") @db.Decimal(12, 2)
+  otherCosts        Decimal? @map("other_costs") @db.Decimal(12, 2)
+
+  // Timeline
+  estimatedStartDate DateTime? @map("estimated_start_date")
+  estimatedDuration  Int?      @map("estimated_duration") // Days
+  estimatedEndDate   DateTime? @map("estimated_end_date")
+
+  // Status
+  status            String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  receivedAt        DateTime  @map("received_at")
+  respondedAt       DateTime? @map("responded_at")
+
+  // Notes and attachments
+  notes             String?   @db.Text
+  attachmentIds     Json?     @map("attachment_ids") // Array of document IDs
+
+  // Recommendation (Sub-Phase 6.2)
+  recommendation        String?   @db.Text // Staff recommendation text
+  recommendationRationale String? @map("recommendation_rationale") @db.Text
+  isRecommended         Boolean?  @map("is_recommended") // Staff recommendation flag
+  isCustomerFacing      Boolean   @default(false) @map("is_customer_facing") // Mark as customer-facing artifact
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  vendorCandidate VendorCandidate @relation(fields: [vendorCandidateId], references: [id], onDelete: Cascade)
+  case            ConciergeCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([vendorCandidateId])
+  @@index([caseId])
+  @@index([status])
+  @@map("vendor_bids")
 }

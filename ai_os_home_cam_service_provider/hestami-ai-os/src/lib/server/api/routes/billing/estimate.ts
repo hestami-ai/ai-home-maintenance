@@ -736,16 +736,38 @@ export const estimateRouter = {
 
 			const sendEstimate = async () => {
 				// Note: Actual email sending would be handled by a separate service
-				return prisma.estimate.update({
-					where: { id: input.id },
-					data: {
-						status: 'SENT',
-						sentAt: new Date()
-					},
-					include: {
-						lines: { orderBy: { lineNumber: 'asc' } },
-						options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				return prisma.$transaction(async (tx) => {
+					const estimate = await tx.estimate.update({
+						where: { id: input.id },
+						data: {
+							status: 'SENT',
+							sentAt: new Date()
+						},
+						include: {
+							lines: { orderBy: { lineNumber: 'asc' } },
+							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+						}
+					});
+
+					// Phase 15: Auto-transition job to ESTIMATE_SENT if in ESTIMATE_REQUIRED
+					const job = await tx.job.findUnique({ where: { id: existing.jobId } });
+					if (job && job.status === 'ESTIMATE_REQUIRED') {
+						await tx.job.update({
+							where: { id: existing.jobId },
+							data: { status: 'ESTIMATE_SENT' }
+						});
+						await tx.jobStatusHistory.create({
+							data: {
+								jobId: existing.jobId,
+								fromStatus: 'ESTIMATE_REQUIRED',
+								toStatus: 'ESTIMATE_SENT',
+								changedBy: context.user!.id,
+								notes: `Auto-transitioned: Estimate ${estimate.estimateNumber} sent`
+							}
+						});
 					}
+
+					return estimate;
 				});
 			};
 
@@ -834,7 +856,7 @@ export const estimateRouter = {
 						});
 					}
 
-					return tx.estimate.update({
+					const estimate = await tx.estimate.update({
 						where: { id: input.id },
 						data: {
 							status: 'ACCEPTED',
@@ -845,6 +867,26 @@ export const estimateRouter = {
 							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
 						}
 					});
+
+					// Phase 15: Auto-transition job to ESTIMATE_APPROVED if in ESTIMATE_SENT
+					const job = await tx.job.findUnique({ where: { id: existing.jobId } });
+					if (job && job.status === 'ESTIMATE_SENT') {
+						await tx.job.update({
+							where: { id: existing.jobId },
+							data: { status: 'ESTIMATE_APPROVED' }
+						});
+						await tx.jobStatusHistory.create({
+							data: {
+								jobId: existing.jobId,
+								fromStatus: 'ESTIMATE_SENT',
+								toStatus: 'ESTIMATE_APPROVED',
+								changedBy: context.user!.id,
+								notes: `Auto-transitioned: Estimate ${estimate.estimateNumber} accepted`
+							}
+						});
+					}
+
+					return estimate;
 				});
 			};
 

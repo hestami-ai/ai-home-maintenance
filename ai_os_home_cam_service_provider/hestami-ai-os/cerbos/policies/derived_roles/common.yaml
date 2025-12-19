@@ -176,3 +176,31 @@ derivedRoles:
             has(P.attr.orgRoles) && 
             has(R.attr.organizationId) && 
             P.attr.orgRoles[R.attr.organizationId] == "AUDITOR"
+
+    # Phase 16: Hestami Staff roles
+    # User is a Hestami platform staff member with PLATFORM_ADMIN role
+    - name: hestami_platform_admin
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.staffRoles) && 
+            "PLATFORM_ADMIN" in P.attr.staffRoles
+
+    # User is a Hestami staff member (any staff role)
+    - name: hestami_staff
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(P.attr.staffRoles) && 
+            size(P.attr.staffRoles) > 0
+
+    # User is viewing their own staff profile
+    - name: own_staff_profile
+      parentRoles: ["user"]
+      condition:
+        match:
+          expr: >-
+            has(R.attr.userId) && 
+            P.id == R.attr.userId

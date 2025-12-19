@@ -4,9 +4,10 @@
 	import { auth, organizationStore } from '$lib/stores';
 
 	const quickActions = [
+		{ label: 'View All Jobs', icon: Wrench, href: '/app/contractor/jobs' },
 		{ label: 'Create Job', icon: ClipboardList, href: '/app/contractor/jobs/new' },
+		{ label: 'Dispatch Board', icon: Calendar, href: '/app/contractor/dispatch' },
 		{ label: 'Manage Technicians', icon: Users, href: '/app/contractor/technicians' },
-		{ label: 'View Schedule', icon: Calendar, href: '/app/contractor/schedule' },
 		{ label: 'Invoices', icon: DollarSign, href: '/app/contractor/invoices' }
 	];
 

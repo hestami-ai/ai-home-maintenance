@@ -10,32 +10,7 @@
 
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db';
-
-// Event types for meeting updates
-type MeetingEventType = 
-	| 'attendance_update'
-	| 'vote_update'
-	| 'motion_update'
-	| 'meeting_state'
-	| 'quorum_update'
-	| 'heartbeat';
-
-interface MeetingEvent {
-	type: MeetingEventType;
-	data: unknown;
-	timestamp: string;
-}
-
-// In-memory event emitter for meeting updates
-// In production, this would be backed by Redis pub/sub or similar
-const meetingSubscribers = new Map<string, Set<(event: MeetingEvent) => void>>();
-
-export function emitMeetingEvent(meetingId: string, event: MeetingEvent): void {
-	const subscribers = meetingSubscribers.get(meetingId);
-	if (subscribers) {
-		subscribers.forEach(callback => callback(event));
-	}
-}
+import { meetingSubscribers, type MeetingEvent } from '$lib/server/meeting-events';
 
 export const GET: RequestHandler = async ({ params, request }) => {
 	const meetingId = params.id;
@@ -111,68 +86,3 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		}
 	});
 };
-
-// Helper functions to emit specific event types
-export function emitAttendanceUpdate(meetingId: string, data: {
-	partyId: string;
-	status: string;
-	presentCount: number;
-	quorumMet: boolean;
-}): void {
-	emitMeetingEvent(meetingId, {
-		type: 'attendance_update',
-		data,
-		timestamp: new Date().toISOString()
-	});
-}
-
-export function emitVoteUpdate(meetingId: string, data: {
-	voteId: string;
-	yes: number;
-	no: number;
-	abstain: number;
-	totalBallots: number;
-	quorumMet: boolean;
-}): void {
-	emitMeetingEvent(meetingId, {
-		type: 'vote_update',
-		data,
-		timestamp: new Date().toISOString()
-	});
-}
-
-export function emitMotionUpdate(meetingId: string, data: {
-	motionId: string;
-	motionNumber: string;
-	status: string;
-	outcome?: string;
-}): void {
-	emitMeetingEvent(meetingId, {
-		type: 'motion_update',
-		data,
-		timestamp: new Date().toISOString()
-	});
-}
-
-export function emitMeetingStateChange(meetingId: string, data: {
-	fromStatus: string;
-	toStatus: string;
-}): void {
-	emitMeetingEvent(meetingId, {
-		type: 'meeting_state',
-		data,
-		timestamp: new Date().toISOString()
-	});
-}
-
-export function emitQuorumUpdate(meetingId: string, data: {
-	required: number | null;
-	present: number;
-	met: boolean;
-}): void {
-	emitMeetingEvent(meetingId, {
-		type: 'quorum_update',
-		data,
-		timestamp: new Date().toISOString()
-	});
-}

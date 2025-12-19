@@ -1,0 +1,19 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: case_review
+  importDerivedRoles:
+    - common
+  rules:
+    - actions: ["view", "create", "update"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+        - hestami_staff
+
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_member

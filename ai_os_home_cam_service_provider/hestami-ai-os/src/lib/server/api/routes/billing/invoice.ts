@@ -198,6 +198,24 @@ export const invoiceRouter = {
 						});
 					}
 
+					// Phase 15: Auto-transition job to INVOICED if in COMPLETED
+					const job = await tx.job.findUnique({ where: { id: estimate.jobId } });
+					if (job && job.status === 'COMPLETED') {
+						await tx.job.update({
+							where: { id: estimate.jobId },
+							data: { status: 'INVOICED', invoicedAt: new Date() }
+						});
+						await tx.jobStatusHistory.create({
+							data: {
+								jobId: estimate.jobId,
+								fromStatus: 'COMPLETED',
+								toStatus: 'INVOICED',
+								changedBy: context.user!.id,
+								notes: `Auto-transitioned: Invoice ${invoice.invoiceNumber} created`
+							}
+						});
+					}
+
 					return tx.jobInvoice.findUnique({
 						where: { id: invoice.id },
 						include: { lines: { orderBy: { lineNumber: 'asc' } } }
@@ -599,18 +617,53 @@ export const invoiceRouter = {
 				const newBalanceDue = Number(existing.totalAmount) - newAmountPaid;
 				const isPaid = newBalanceDue <= 0;
 
-				return prisma.jobInvoice.update({
-					where: { id: input.id },
-					data: {
-						amountPaid: newAmountPaid,
-						balanceDue: Math.max(0, newBalanceDue),
-						status: isPaid ? 'PAID' : 'PARTIAL',
-						paidAt: isPaid ? new Date() : null,
-						notes: input.notes
-							? `${existing.notes ?? ''}\nPayment: $${input.amount} via ${input.paymentMethod ?? 'unknown'}`.trim()
-							: existing.notes
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
+				return prisma.$transaction(async (tx) => {
+					const invoice = await tx.jobInvoice.update({
+						where: { id: input.id },
+						data: {
+							amountPaid: newAmountPaid,
+							balanceDue: Math.max(0, newBalanceDue),
+							status: isPaid ? 'PAID' : 'PARTIAL',
+							paidAt: isPaid ? new Date() : null,
+							notes: input.notes
+								? `${existing.notes ?? ''}\nPayment: $${input.amount} via ${input.paymentMethod ?? 'unknown'}`.trim()
+								: existing.notes
+						},
+						include: { lines: { orderBy: { lineNumber: 'asc' } } }
+					});
+
+					// Phase 15: Auto-transition job to PAID if fully paid and job is INVOICED
+					if (isPaid) {
+						const job = await tx.job.findUnique({ where: { id: existing.jobId } });
+						if (job && job.status === 'INVOICED') {
+							// Check if all invoices for this job are paid
+							const unpaidInvoices = await tx.jobInvoice.findFirst({
+								where: {
+									jobId: existing.jobId,
+									id: { not: input.id },
+									status: { notIn: ['PAID', 'VOID'] },
+									balanceDue: { gt: 0 }
+								}
+							});
+							if (!unpaidInvoices) {
+								await tx.job.update({
+									where: { id: existing.jobId },
+									data: { status: 'PAID', paidAt: new Date() }
+								});
+								await tx.jobStatusHistory.create({
+									data: {
+										jobId: existing.jobId,
+										fromStatus: 'INVOICED',
+										toStatus: 'PAID',
+										changedBy: context.user!.id,
+										notes: `Auto-transitioned: Invoice ${invoice.invoiceNumber} fully paid`
+									}
+								});
+							}
+						}
+					}
+
+					return invoice;
 				});
 			};
 

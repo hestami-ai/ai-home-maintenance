@@ -22,9 +22,13 @@
 		readonly = false
 	}: Props = $props();
 
-	let content = $state(initialContent);
+	let content = $state('');
 	let isSaving = $state(false);
 	let hasChanges = $derived(content !== initialContent);
+
+	$effect(() => {
+		content = initialContent;
+	});
 
 	async function handleSave() {
 		if (!onSave || isSaving) return;

@@ -46,7 +46,7 @@
 			<div class="flex items-center justify-between py-2 gap-2">
 				<div class="flex items-center gap-2 min-w-0">
 					<span class="{config.color}">
-						<svelte:component this={StatusIcon} size={16} />
+						<StatusIcon size={16} />
 					</span>
 					<span class="text-sm truncate">{attendee.name || 'Unknown'}</span>
 					{#if attendee.proxyFor}

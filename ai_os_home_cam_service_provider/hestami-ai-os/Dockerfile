@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
+COPY 3rdParty/zod-prisma-types-3.5.8/packages/generator/zod-prisma-types-3.5.8.tgz ./
 RUN npm ci
 
 # Copy Prisma schema and config, generate client

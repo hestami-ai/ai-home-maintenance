@@ -151,6 +151,7 @@
 				</div>
 
 				<div>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label class="block text-sm font-medium">
 						File <span class="text-error-500">*</span>
 					</label>

@@ -396,5 +396,5 @@ You now have:
 
 * Audit UX ✔
 
-**The full Hestami AI OS UX surface is now defined.**
+
 

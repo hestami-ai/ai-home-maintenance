@@ -4,10 +4,17 @@
  * DBOS durable workflow for managing contractor job state transitions.
  * Handles: state validation, SLA tracking, notifications, and integration with HOA work orders.
  *
- * State Machine:
- *   PENDING → SCHEDULED → EN_ROUTE → IN_PROGRESS → COMPLETED → INVOICED → CLOSED
- *                ↓            ↓           ↓
- *             ON_HOLD ←→ IN_PROGRESS   CANCELLED
+ * State Machine (Phase 15 - Contractor Job Lifecycle):
+ *   LEAD → TICKET → ESTIMATE_REQUIRED → ESTIMATE_SENT → ESTIMATE_APPROVED → JOB_CREATED
+ *                                                                              ↓
+ *   LEAD → TICKET → JOB_CREATED (direct, no estimate required) ────────────────┘
+ *                                                                              ↓
+ *   JOB_CREATED → SCHEDULED → DISPATCHED → IN_PROGRESS → COMPLETED → INVOICED → PAID → CLOSED
+ *                    ↓            ↓            ↓
+ *                 ON_HOLD ←───────────────────┘
+ *                    ↓
+ *   Any state → CANCELLED (except CLOSED)
+ *   COMPLETED → WARRANTY → CLOSED (optional warranty period)
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
@@ -18,15 +25,29 @@ const WORKFLOW_STATUS_EVENT = 'job_status';
 const WORKFLOW_ERROR_EVENT = 'job_error';
 
 const validTransitions: Record<JobStatus, JobStatus[]> = {
+	// Initial states
 	LEAD: ['TICKET', 'CANCELLED'],
 	TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
-	ESTIMATE_REQUIRED: ['JOB_CREATED', 'CANCELLED'],
+	
+	// Estimate workflow
+	ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
+	ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'], // Can revise estimate
+	ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
+	
+	// Job execution
 	JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
-	SCHEDULED: ['IN_PROGRESS', 'ON_HOLD', 'CANCELLED'],
+	SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
+	DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'], // Can reschedule
 	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-	ON_HOLD: ['SCHEDULED', 'IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: ['WARRANTY', 'CLOSED'],
-	WARRANTY: ['CLOSED'],
+	ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
+	
+	// Completion & payment
+	COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
+	INVOICED: ['PAID', 'CANCELLED'],
+	PAID: ['WARRANTY', 'CLOSED'],
+	WARRANTY: ['CLOSED', 'IN_PROGRESS'], // Can reopen for warranty work
+	
+	// Terminal states
 	CLOSED: [],
 	CANCELLED: []
 };
@@ -107,26 +128,59 @@ async function updateJobStatus(
 		};
 
 		switch (input.toStatus) {
-			case 'SCHEDULED':
-				if (input.technicianId) {
-					updateData.assignedTechnicianId = input.technicianId;
-				}
-				if (input.scheduledStart) updateData.scheduledStart = input.scheduledStart;
-				if (input.scheduledEnd) updateData.scheduledEnd = input.scheduledEnd;
+			case 'ESTIMATE_SENT':
+				// Estimate sent to customer - no additional fields needed
+				break;
+
+			case 'ESTIMATE_APPROVED':
+				// Customer approved estimate - no additional fields needed
 				break;
 
 			case 'JOB_CREATED':
 				// Job created from estimate or ticket
 				break;
 
+			case 'SCHEDULED':
+				if (input.technicianId) {
+					updateData.assignedTechnicianId = input.technicianId;
+					updateData.assignedAt = new Date();
+					updateData.assignedBy = input.userId;
+				}
+				if (input.scheduledStart) updateData.scheduledStart = input.scheduledStart;
+				if (input.scheduledEnd) updateData.scheduledEnd = input.scheduledEnd;
+				break;
+
+			case 'DISPATCHED':
+				updateData.dispatchedAt = new Date();
+				break;
+
 			case 'IN_PROGRESS':
-				updateData.startedAt = new Date();
+				if (!input.scheduledStart) {
+					// Only set startedAt if not already set
+					const job = await tx.job.findUnique({ where: { id: input.jobId }, select: { startedAt: true } });
+					if (!job?.startedAt) {
+						updateData.startedAt = new Date();
+					}
+				}
 				break;
 
 			case 'COMPLETED':
 				updateData.completedAt = new Date();
 				if (input.actualCost !== undefined) updateData.actualCost = input.actualCost;
 				if (input.actualHours !== undefined) updateData.actualHours = input.actualHours;
+				break;
+
+			case 'INVOICED':
+				updateData.invoicedAt = new Date();
+				break;
+
+			case 'PAID':
+				updateData.paidAt = new Date();
+				break;
+
+			case 'CLOSED':
+				updateData.closedAt = new Date();
+				updateData.closedBy = input.userId;
 				break;
 
 			case 'CANCELLED':

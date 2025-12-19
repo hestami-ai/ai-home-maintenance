@@ -9636,6 +9636,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conciergeCase/requestClarification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conciergeCase.requestClarification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conciergeCase/respondToClarification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conciergeCase.respondToClarification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conciergeCase/getDetail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conciergeCase.getDetail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conciergeCase/linkToArc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conciergeCase.linkToArc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conciergeCase/linkToWorkOrder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conciergeCase.linkToWorkOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conciergeCase/listConcierges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conciergeCase.listConcierges"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conciergeAction/create": {
         parameters: {
             query?: never;
@@ -10222,6 +10318,582 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["activityEvent.exportJson"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.get"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.me"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.activate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.suspend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.reactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/updateRoles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.updateRoles"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/updatePillarAccess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.updatePillarAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/getAssignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.getAssignments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workQueue/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["workQueue.list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workQueue/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["workQueue.summary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.get"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/listByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.listByCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/updateStatus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.updateStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorCandidate/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorCandidate.extract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.get"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/listByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.listByCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vendorBid/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["vendorBid.compare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseCommunication/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseCommunication.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseCommunication/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseCommunication.get"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseCommunication/listByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseCommunication.listByCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseCommunication/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseCommunication.update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseCommunication/getThreads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseCommunication.getThreads"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseReview/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseReview.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseReview/getByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseReview.getByCase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/caseReview/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["caseReview.update"];
         delete?: never;
         options?: never;
         head?: never;
@@ -28270,7 +28942,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28297,10 +28969,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28337,7 +29013,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {unknown} */
-                    status?: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                    status?: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                     /** @enum {unknown} */
                     sourceType?: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                     customerId?: string;
@@ -28365,7 +29041,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28392,10 +29068,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28455,7 +29135,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28482,10 +29162,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28558,7 +29242,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28585,10 +29269,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28626,7 +29314,7 @@ export interface operations {
                 "application/json": {
                     id: string;
                     /** @enum {unknown} */
-                    toStatus: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                    toStatus: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                     notes?: string;
                     /** Format: uuid */
                     idempotencyKey: string;
@@ -28649,7 +29337,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28676,10 +29364,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28739,7 +29431,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28766,10 +29458,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28831,7 +29527,7 @@ export interface operations {
                                 organizationId: string;
                                 jobNumber: string;
                                 /** @enum {unknown} */
-                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                status: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 /** @enum {unknown} */
                                 sourceType: "WORK_ORDER" | "VIOLATION" | "ARC_REQUEST" | "DIRECT_CUSTOMER" | "LEAD" | "RECURRING";
                                 workOrderId: string | null;
@@ -28858,10 +29554,14 @@ export interface operations {
                                 scheduledStart: string | null;
                                 scheduledEnd: string | null;
                                 estimatedHours: string | null;
+                                dispatchedAt: string | null;
                                 startedAt: string | null;
                                 completedAt: string | null;
+                                invoicedAt: string | null;
+                                paidAt: string | null;
                                 closedAt: string | null;
                                 closedBy: string | null;
+                                cancelledAt: string | null;
                                 estimatedCost: string | null;
                                 actualCost: string | null;
                                 actualHours: string | null;
@@ -28914,9 +29614,9 @@ export interface operations {
                         data: {
                             history: {
                                 id: string;
-                                fromStatus: ("LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED") | null;
+                                fromStatus: ("LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED") | null;
                                 /** @enum {unknown} */
-                                toStatus: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "JOB_CREATED" | "SCHEDULED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "WARRANTY" | "CLOSED" | "CANCELLED";
+                                toStatus: "LEAD" | "TICKET" | "ESTIMATE_REQUIRED" | "ESTIMATE_SENT" | "ESTIMATE_APPROVED" | "JOB_CREATED" | "SCHEDULED" | "DISPATCHED" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "INVOICED" | "PAID" | "WARRANTY" | "CLOSED" | "CANCELLED";
                                 changedBy: string;
                                 changedAt: string;
                                 notes: string | null;
@@ -45314,6 +46014,8 @@ export interface operations {
                     idempotencyKey: string;
                     caseId: string;
                     content: string;
+                    /** @enum {unknown} */
+                    noteType?: "GENERAL" | "CLARIFICATION_REQUEST" | "CLARIFICATION_RESPONSE" | "DECISION_RATIONALE";
                     /** @default true */
                     isInternal?: boolean;
                 };
@@ -45334,6 +46036,7 @@ export interface operations {
                                 id: string;
                                 caseId: string;
                                 content: string;
+                                noteType: string;
                                 isInternal: boolean;
                                 createdBy: string;
                                 createdAt: string;
@@ -45363,6 +46066,8 @@ export interface operations {
             content: {
                 "application/json": {
                     caseId: string;
+                    /** @enum {unknown} */
+                    noteType?: "GENERAL" | "CLARIFICATION_REQUEST" | "CLARIFICATION_RESPONSE" | "DECISION_RATIONALE";
                     /** @default true */
                     includeInternal?: boolean;
                 };
@@ -45382,6 +46087,7 @@ export interface operations {
                             notes: {
                                 id: string;
                                 content: string;
+                                noteType: string;
                                 isInternal: boolean;
                                 createdBy: string;
                                 createdAt: string;
@@ -45668,6 +46374,362 @@ export interface operations {
                         data: {
                             caseId: string;
                             unlinked: string[];
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "conciergeCase.requestClarification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    question: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            note: {
+                                id: string;
+                                caseId: string;
+                                content: string;
+                                noteType: string;
+                                createdAt: string;
+                            };
+                            case: {
+                                id: string;
+                                status: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "conciergeCase.respondToClarification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    response: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            note: {
+                                id: string;
+                                caseId: string;
+                                content: string;
+                                noteType: string;
+                                createdAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "conciergeCase.getDetail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            case: {
+                                id: string;
+                                caseNumber: string;
+                                propertyId: string;
+                                title: string;
+                                description: string;
+                                status: string;
+                                priority: string;
+                                originIntentId: string | null;
+                                assignedConciergeUserId: string | null;
+                                assignedConciergeName: string | null;
+                                linkedUnitId: string | null;
+                                linkedJobId: string | null;
+                                linkedArcRequestId: string | null;
+                                linkedWorkOrderId: string | null;
+                                resolvedAt: string | null;
+                                resolutionSummary: string | null;
+                                closedAt: string | null;
+                                cancelledAt: string | null;
+                                cancelReason: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                            property: {
+                                id: string;
+                                name: string;
+                                addressLine1: string;
+                                city: string | null;
+                                state: string | null;
+                                postalCode: string | null;
+                            };
+                            originIntent: {
+                                id: string;
+                                title: string;
+                                description: string;
+                                status: string;
+                                createdAt: string;
+                            } | null;
+                            statusHistory: {
+                                id: string;
+                                fromStatus: string | null;
+                                toStatus: string;
+                                reason: string | null;
+                                changedBy: string;
+                                createdAt: string;
+                            }[];
+                            notes: {
+                                id: string;
+                                content: string;
+                                noteType: string;
+                                isInternal: boolean;
+                                createdBy: string;
+                                createdAt: string;
+                            }[];
+                            participants: {
+                                id: string;
+                                partyId: string | null;
+                                partyName: string | null;
+                                externalContactName: string | null;
+                                externalContactEmail: string | null;
+                                role: string;
+                                addedAt: string;
+                            }[];
+                            actions: {
+                                id: string;
+                                actionType: string;
+                                status: string;
+                                description: string;
+                                plannedAt: string | null;
+                                completedAt: string | null;
+                                createdAt: string;
+                            }[];
+                            decisions: {
+                                id: string;
+                                category: string;
+                                title: string;
+                                rationale: string;
+                                decidedAt: string;
+                                hasOutcome: boolean;
+                            }[];
+                            attachments: {
+                                id: string;
+                                fileName: string;
+                                fileSize: number;
+                                mimeType: string;
+                                fileUrl: string;
+                                uploadedBy: string;
+                                createdAt: string;
+                            }[];
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "conciergeCase.linkToArc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    arcRequestId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            caseId: string;
+                            linkedArcRequestId: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "conciergeCase.linkToWorkOrder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    workOrderId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            caseId: string;
+                            linkedWorkOrderId: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "conciergeCase.listConcierges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            concierges: {
+                                id: string;
+                                name: string;
+                                email: string;
+                            }[];
                         };
                         meta: {
                             requestId: string;
@@ -47797,6 +48859,2319 @@ export interface operations {
                             }[];
                             exportedAt: string;
                             recordCount: number;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description User ID to link as staff */
+                    userId: string;
+                    displayName: string;
+                    title?: string;
+                    /** @description At least one role required */
+                    roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                    /** @description At least one pillar access required */
+                    pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                    /** @default true */
+                    canBeAssignedCases?: boolean;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            } | null;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @enum {unknown} */
+                    status?: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                    /** @enum {unknown} */
+                    role?: "CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN";
+                    /** @enum {unknown} */
+                    pillar?: "CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN";
+                    /** @default 50 */
+                    limit?: number;
+                    cursor?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                createdAt: string;
+                                user: {
+                                    email: string;
+                                    name: string | null;
+                                };
+                            }[];
+                            nextCursor: string | null;
+                            hasMore: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    displayName?: string;
+                    title?: string | null;
+                    canBeAssignedCases?: boolean;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    reason: string;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                            escalatedCaseCount: number;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    reason: string;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                            activeCaseCount: number;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.updateRoles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.updatePillarAccess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            staff: {
+                                id: string;
+                                userId: string;
+                                displayName: string;
+                                title: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACTIVE" | "SUSPENDED" | "DEACTIVATED";
+                                roles: ("CONCIERGE_OPERATOR" | "OPERATIONS_COORDINATOR" | "CAM_SPECIALIST" | "VENDOR_LIAISON" | "PLATFORM_ADMIN")[];
+                                pillarAccess: ("CONCIERGE" | "CAM" | "CONTRACTOR" | "VENDOR" | "ADMIN")[];
+                                canBeAssignedCases: boolean;
+                                activatedAt: string | null;
+                                suspendedAt: string | null;
+                                deactivatedAt: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                user?: {
+                                    id: string;
+                                    email: string;
+                                    name: string | null;
+                                };
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.getAssignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    /** @default false */
+                    includeUnassigned?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            assignments: {
+                                id: string;
+                                caseId: string;
+                                isPrimary: boolean;
+                                assignedAt: string;
+                                unassignedAt: string | null;
+                                justification: string | null;
+                            }[];
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "workQueue.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    /**
+                     * @default ALL
+                     * @enum {unknown}
+                     */
+                    pillar?: "CONCIERGE" | "CAM" | "CONTRACTOR" | "ALL";
+                    /** @enum {unknown} */
+                    urgency?: "CRITICAL" | "HIGH" | "NORMAL" | "LOW";
+                    /** @default false */
+                    assignedToMe?: boolean;
+                    /** @default false */
+                    unassignedOnly?: boolean;
+                    state?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            items: {
+                                id: string;
+                                pillar: string;
+                                itemType: string;
+                                itemId: string;
+                                itemNumber: string;
+                                organizationId: string;
+                                title: string;
+                                currentState: string;
+                                timeInState: number;
+                                timeInStateFormatted: string;
+                                requiredAction: string;
+                                priority: string;
+                                urgency: string;
+                                slaStatus: ("ON_TRACK" | "AT_RISK" | "BREACHED") | null;
+                                slaDeadline: string | null;
+                                assignedToId: string | null;
+                                assignedToName: string | null;
+                                propertyName: string | null;
+                                associationName: string | null;
+                                organizationName: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            }[];
+                            summary: {
+                                total: number;
+                                critical: number;
+                                high: number;
+                                normal: number;
+                                low: number;
+                                unassigned: number;
+                            };
+                            pagination: {
+                                nextCursor: string | null;
+                                hasMore: boolean;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "workQueue.summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            concierge: {
+                                total: number;
+                                intake: number;
+                                inProgress: number;
+                                pendingExternal: number;
+                                pendingOwner: number;
+                            };
+                            cam: {
+                                workOrders: number;
+                                violations: number;
+                                arcRequests: number;
+                            };
+                            urgency: {
+                                critical: number;
+                                high: number;
+                                normal: number;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    vendorName: string;
+                    vendorContactName?: string;
+                    /** Format: email */
+                    vendorContactEmail?: string;
+                    vendorContactPhone?: string;
+                    vendorAddress?: string;
+                    /** Format: uri */
+                    vendorWebsite?: string;
+                    serviceCategories?: string[];
+                    coverageArea?: string;
+                    licensesAndCerts?: string[];
+                    notes?: string;
+                    /** Format: uri */
+                    sourceUrl?: string;
+                    sourceHtml?: string;
+                    sourcePlainText?: string;
+                    extractionConfidence?: number;
+                    extractionMetadata?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            vendorCandidate: {
+                                id: string;
+                                caseId: string;
+                                vendorName: string;
+                                vendorContactName: string | null;
+                                vendorContactEmail: string | null;
+                                vendorContactPhone: string | null;
+                                vendorAddress: string | null;
+                                vendorWebsite: string | null;
+                                serviceCategories: string[] | null;
+                                coverageArea: string | null;
+                                licensesAndCerts: string[] | null;
+                                /** @enum {unknown} */
+                                status: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                                statusChangedAt: string | null;
+                                sourceUrl: string | null;
+                                extractedAt: string | null;
+                                extractionConfidence: number | null;
+                                notes: string | null;
+                                riskFlags: string[] | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            vendorCandidate: {
+                                id: string;
+                                caseId: string;
+                                vendorName: string;
+                                vendorContactName: string | null;
+                                vendorContactEmail: string | null;
+                                vendorContactPhone: string | null;
+                                vendorAddress: string | null;
+                                vendorWebsite: string | null;
+                                serviceCategories: string[] | null;
+                                coverageArea: string | null;
+                                licensesAndCerts: string[] | null;
+                                /** @enum {unknown} */
+                                status: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                                statusChangedAt: string | null;
+                                sourceUrl: string | null;
+                                extractedAt: string | null;
+                                extractionConfidence: number | null;
+                                notes: string | null;
+                                riskFlags: string[] | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.listByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    caseId: string;
+                    /** @enum {unknown} */
+                    status?: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            vendorCandidates: {
+                                id: string;
+                                caseId: string;
+                                vendorName: string;
+                                vendorContactEmail: string | null;
+                                vendorContactPhone: string | null;
+                                serviceCategories: string[] | null;
+                                /** @enum {unknown} */
+                                status: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                                extractionConfidence: number | null;
+                                createdAt: string;
+                            }[];
+                            pagination: {
+                                nextCursor: string | null;
+                                hasMore: boolean;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                    vendorName?: string;
+                    vendorContactName?: string | null;
+                    vendorContactEmail?: string | null;
+                    vendorContactPhone?: string | null;
+                    vendorAddress?: string | null;
+                    vendorWebsite?: string | null;
+                    serviceCategories?: string[];
+                    coverageArea?: string | null;
+                    licensesAndCerts?: string[];
+                    notes?: string | null;
+                    riskFlags?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            vendorCandidate: {
+                                id: string;
+                                caseId: string;
+                                vendorName: string;
+                                vendorContactName: string | null;
+                                vendorContactEmail: string | null;
+                                vendorContactPhone: string | null;
+                                vendorAddress: string | null;
+                                vendorWebsite: string | null;
+                                serviceCategories: string[] | null;
+                                coverageArea: string | null;
+                                licensesAndCerts: string[] | null;
+                                /** @enum {unknown} */
+                                status: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                                statusChangedAt: string | null;
+                                sourceUrl: string | null;
+                                extractedAt: string | null;
+                                extractionConfidence: number | null;
+                                notes: string | null;
+                                riskFlags: string[] | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.updateStatus": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                    /** @enum {unknown} */
+                    status: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            vendorCandidate: {
+                                id: string;
+                                caseId: string;
+                                vendorName: string;
+                                vendorContactName: string | null;
+                                vendorContactEmail: string | null;
+                                vendorContactPhone: string | null;
+                                vendorAddress: string | null;
+                                vendorWebsite: string | null;
+                                serviceCategories: string[] | null;
+                                coverageArea: string | null;
+                                licensesAndCerts: string[] | null;
+                                /** @enum {unknown} */
+                                status: "IDENTIFIED" | "CONTACTED" | "RESPONDED" | "QUOTED" | "SELECTED" | "REJECTED" | "ARCHIVED";
+                                statusChangedAt: string | null;
+                                sourceUrl: string | null;
+                                extractedAt: string | null;
+                                extractionConfidence: number | null;
+                                notes: string | null;
+                                riskFlags: string[] | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            success: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorCandidate.extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    caseId: string;
+                    /** Format: uri */
+                    sourceUrl?: string;
+                    sourceHtml?: string;
+                    sourcePlainText?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            extracted: {
+                                vendorName: string | null;
+                                vendorContactName: string | null;
+                                vendorContactEmail: string | null;
+                                vendorContactPhone: string | null;
+                                vendorAddress: string | null;
+                                vendorWebsite: string | null;
+                                serviceCategories: string[];
+                                coverageArea: string | null;
+                                licensesAndCerts: string[];
+                                confidence: number;
+                                fieldConfidences: {
+                                    [key: string]: number;
+                                };
+                            };
+                            multipleVendorsDetected: boolean;
+                            rawSource: string | null;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    vendorCandidateId: string;
+                    caseId: string;
+                    scopeVersion?: string;
+                    amount?: number;
+                    /** @default USD */
+                    currency?: string;
+                    /** Format: date-time */
+                    validUntil?: string;
+                    laborCost?: number;
+                    materialsCost?: number;
+                    otherCosts?: number;
+                    /** Format: date-time */
+                    estimatedStartDate?: string;
+                    estimatedDuration?: number;
+                    /** Format: date-time */
+                    estimatedEndDate?: string;
+                    notes?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            bid: {
+                                id: string;
+                                vendorCandidateId: string;
+                                caseId: string;
+                                vendorName: string;
+                                scopeVersion: string | null;
+                                amount: string | null;
+                                currency: string;
+                                validUntil: string | null;
+                                laborCost: string | null;
+                                materialsCost: string | null;
+                                otherCosts: string | null;
+                                estimatedStartDate: string | null;
+                                estimatedDuration: number | null;
+                                estimatedEndDate: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                receivedAt: string;
+                                respondedAt: string | null;
+                                notes: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            bid: {
+                                id: string;
+                                vendorCandidateId: string;
+                                caseId: string;
+                                vendorName: string;
+                                scopeVersion: string | null;
+                                amount: string | null;
+                                currency: string;
+                                validUntil: string | null;
+                                laborCost: string | null;
+                                materialsCost: string | null;
+                                otherCosts: string | null;
+                                estimatedStartDate: string | null;
+                                estimatedDuration: number | null;
+                                estimatedEndDate: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                receivedAt: string;
+                                respondedAt: string | null;
+                                notes: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.listByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    caseId: string;
+                    /** @enum {unknown} */
+                    status?: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            bids: {
+                                id: string;
+                                vendorCandidateId: string;
+                                vendorName: string;
+                                amount: string | null;
+                                currency: string;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                validUntil: string | null;
+                                estimatedDuration: number | null;
+                                receivedAt: string;
+                            }[];
+                            pagination: {
+                                nextCursor: string | null;
+                                hasMore: boolean;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                    scopeVersion?: string | null;
+                    amount?: number | null;
+                    validUntil?: string | null;
+                    laborCost?: number | null;
+                    materialsCost?: number | null;
+                    otherCosts?: number | null;
+                    estimatedStartDate?: string | null;
+                    estimatedDuration?: number | null;
+                    estimatedEndDate?: string | null;
+                    notes?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            bid: {
+                                id: string;
+                                vendorCandidateId: string;
+                                caseId: string;
+                                vendorName: string;
+                                scopeVersion: string | null;
+                                amount: string | null;
+                                currency: string;
+                                validUntil: string | null;
+                                laborCost: string | null;
+                                materialsCost: string | null;
+                                otherCosts: string | null;
+                                estimatedStartDate: string | null;
+                                estimatedDuration: number | null;
+                                estimatedEndDate: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                receivedAt: string;
+                                respondedAt: string | null;
+                                notes: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            bid: {
+                                id: string;
+                                vendorCandidateId: string;
+                                caseId: string;
+                                vendorName: string;
+                                scopeVersion: string | null;
+                                amount: string | null;
+                                currency: string;
+                                validUntil: string | null;
+                                laborCost: string | null;
+                                materialsCost: string | null;
+                                otherCosts: string | null;
+                                estimatedStartDate: string | null;
+                                estimatedDuration: number | null;
+                                estimatedEndDate: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                receivedAt: string;
+                                respondedAt: string | null;
+                                notes: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            bid: {
+                                id: string;
+                                vendorCandidateId: string;
+                                caseId: string;
+                                vendorName: string;
+                                scopeVersion: string | null;
+                                amount: string | null;
+                                currency: string;
+                                validUntil: string | null;
+                                laborCost: string | null;
+                                materialsCost: string | null;
+                                otherCosts: string | null;
+                                estimatedStartDate: string | null;
+                                estimatedDuration: number | null;
+                                estimatedEndDate: string | null;
+                                /** @enum {unknown} */
+                                status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                receivedAt: string;
+                                respondedAt: string | null;
+                                notes: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "vendorBid.compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    caseId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            comparison: {
+                                caseId: string;
+                                bids: {
+                                    id: string;
+                                    vendorName: string;
+                                    amount: string | null;
+                                    laborCost: string | null;
+                                    materialsCost: string | null;
+                                    otherCosts: string | null;
+                                    estimatedDuration: number | null;
+                                    /** @enum {unknown} */
+                                    status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                                    validUntil: string | null;
+                                    isLowest: boolean;
+                                    isFastest: boolean;
+                                }[];
+                                lowestBidId: string | null;
+                                fastestBidId: string | null;
+                                averageAmount: string | null;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseCommunication.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    /** @enum {unknown} */
+                    channel: "EMAIL" | "SMS" | "LETTER";
+                    /** @enum {unknown} */
+                    direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
+                    subject?: string;
+                    content: string;
+                    toRecipient?: string;
+                    ccRecipients?: string;
+                    threadId?: string;
+                    /** Format: date-time */
+                    sentAt?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            communication: {
+                                id: string;
+                                caseId: string;
+                                /** @enum {unknown} */
+                                channel: "EMAIL" | "SMS" | "LETTER";
+                                /** @enum {unknown} */
+                                direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
+                                subject: string | null;
+                                content: string;
+                                fromUserId: string | null;
+                                fromUserName: string | null;
+                                toRecipient: string | null;
+                                ccRecipients: string | null;
+                                externalMessageId: string | null;
+                                threadId: string | null;
+                                sentAt: string | null;
+                                deliveredAt: string | null;
+                                readAt: string | null;
+                                failedAt: string | null;
+                                failureReason: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseCommunication.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            communication: {
+                                id: string;
+                                caseId: string;
+                                /** @enum {unknown} */
+                                channel: "EMAIL" | "SMS" | "LETTER";
+                                /** @enum {unknown} */
+                                direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
+                                subject: string | null;
+                                content: string;
+                                fromUserId: string | null;
+                                fromUserName: string | null;
+                                toRecipient: string | null;
+                                ccRecipients: string | null;
+                                externalMessageId: string | null;
+                                threadId: string | null;
+                                sentAt: string | null;
+                                deliveredAt: string | null;
+                                readAt: string | null;
+                                failedAt: string | null;
+                                failureReason: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseCommunication.listByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    caseId: string;
+                    /** @enum {unknown} */
+                    channel?: "EMAIL" | "SMS" | "LETTER";
+                    /** @enum {unknown} */
+                    direction?: "INBOUND" | "OUTBOUND" | "INTERNAL";
+                    threadId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            communications: {
+                                id: string;
+                                /** @enum {unknown} */
+                                channel: "EMAIL" | "SMS" | "LETTER";
+                                /** @enum {unknown} */
+                                direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
+                                subject: string | null;
+                                contentPreview: string;
+                                fromUserName: string | null;
+                                toRecipient: string | null;
+                                sentAt: string | null;
+                                createdAt: string;
+                            }[];
+                            pagination: {
+                                nextCursor: string | null;
+                                hasMore: boolean;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseCommunication.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    id: string;
+                    deliveredAt?: string | null;
+                    readAt?: string | null;
+                    failedAt?: string | null;
+                    failureReason?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            communication: {
+                                id: string;
+                                caseId: string;
+                                /** @enum {unknown} */
+                                channel: "EMAIL" | "SMS" | "LETTER";
+                                /** @enum {unknown} */
+                                direction: "INBOUND" | "OUTBOUND" | "INTERNAL";
+                                subject: string | null;
+                                content: string;
+                                fromUserId: string | null;
+                                fromUserName: string | null;
+                                toRecipient: string | null;
+                                ccRecipients: string | null;
+                                externalMessageId: string | null;
+                                threadId: string | null;
+                                sentAt: string | null;
+                                deliveredAt: string | null;
+                                readAt: string | null;
+                                failedAt: string | null;
+                                failureReason: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseCommunication.getThreads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    caseId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            threads: {
+                                threadId: string | null;
+                                messageCount: number;
+                                lastMessageAt: string;
+                                subject: string | null;
+                            }[];
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseReview.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    outcomeSummary: string;
+                    vendorPerformanceNotes?: string;
+                    issuesEncountered?: string;
+                    lessonsLearned?: string;
+                    vendorRating?: number;
+                    communicationRating?: number;
+                    timelinessRating?: number;
+                    overallSatisfaction?: number;
+                    reusableVendor?: boolean;
+                    reusableScope?: boolean;
+                    reusableProcess?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            review: {
+                                id: string;
+                                caseId: string;
+                                outcomeSummary: string;
+                                vendorPerformanceNotes: string | null;
+                                issuesEncountered: string | null;
+                                lessonsLearned: string | null;
+                                vendorRating: number | null;
+                                communicationRating: number | null;
+                                timelinessRating: number | null;
+                                overallSatisfaction: number | null;
+                                reusableVendor: boolean;
+                                reusableScope: boolean;
+                                reusableProcess: boolean;
+                                reviewedByUserId: string;
+                                reviewedByUserName: string | null;
+                                reviewedAt: string;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseReview.getByCase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    caseId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            review: {
+                                id: string;
+                                caseId: string;
+                                outcomeSummary: string;
+                                vendorPerformanceNotes: string | null;
+                                issuesEncountered: string | null;
+                                lessonsLearned: string | null;
+                                vendorRating: number | null;
+                                communicationRating: number | null;
+                                timelinessRating: number | null;
+                                overallSatisfaction: number | null;
+                                reusableVendor: boolean;
+                                reusableScope: boolean;
+                                reusableProcess: boolean;
+                                reviewedByUserId: string;
+                                reviewedByUserName: string | null;
+                                reviewedAt: string;
+                                createdAt: string;
+                                updatedAt: string;
+                            } | null;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "caseReview.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    caseId: string;
+                    outcomeSummary?: string;
+                    vendorPerformanceNotes?: string | null;
+                    issuesEncountered?: string | null;
+                    lessonsLearned?: string | null;
+                    vendorRating?: number | null;
+                    communicationRating?: number | null;
+                    timelinessRating?: number | null;
+                    overallSatisfaction?: number | null;
+                    reusableVendor?: boolean;
+                    reusableScope?: boolean;
+                    reusableProcess?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            review: {
+                                id: string;
+                                caseId: string;
+                                outcomeSummary: string;
+                                vendorPerformanceNotes: string | null;
+                                issuesEncountered: string | null;
+                                lessonsLearned: string | null;
+                                vendorRating: number | null;
+                                communicationRating: number | null;
+                                timelinessRating: number | null;
+                                overallSatisfaction: number | null;
+                                reusableVendor: boolean;
+                                reusableScope: boolean;
+                                reusableProcess: boolean;
+                                reviewedByUserId: string;
+                                reviewedByUserName: string | null;
+                                reviewedAt: string;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
                         };
                         meta: {
                             requestId: string;

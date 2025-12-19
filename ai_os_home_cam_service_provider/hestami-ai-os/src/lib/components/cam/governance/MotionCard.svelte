@@ -82,7 +82,7 @@
 
 		<div class="shrink-0">
 			<span class="badge {config.color} flex items-center gap-1">
-				<svelte:component this={StatusIcon} size={14} />
+				<StatusIcon size={14} />
 				{config.label}
 			</span>
 		</div>

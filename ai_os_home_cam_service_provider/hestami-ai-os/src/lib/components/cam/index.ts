@@ -20,3 +20,6 @@ export { default as UploadComplianceDocModal } from './UploadComplianceDocModal.
 export { default as AppealModal } from './AppealModal.svelte';
 export { default as BoardApprovalPanel } from './BoardApprovalPanel.svelte';
 export { default as DocumentPicker } from './DocumentPicker.svelte';
+
+// Concierge Case components
+export * from './concierge';

@@ -99,6 +99,20 @@ import {
 // Phase 4: Activity & Audit Subsystem
 import { activityEventRouter } from './routes/activityEvent.js';
 
+// Phase 16: Staff Management
+import { staffRouter } from './routes/staff.js';
+import { workQueueRouter } from './routes/workQueue.js';
+
+// Phase 16.5: Vendor Discovery
+import { vendorCandidateRouter } from './routes/vendorCandidate.js';
+import { vendorBidRouter } from './routes/vendorBid.js';
+
+// Phase 16.7: Communications
+import { caseCommunicationRouter } from './routes/caseCommunication.js';
+
+// Phase 16.11: Case Review
+import { caseReviewRouter } from './routes/caseReview.js';
+
 // Phase 15: Reporting & Analytics
 import {
 	reportDefinitionRouter,
@@ -232,7 +246,21 @@ export const appRouter = {
 	materialDecision: materialDecisionRouter,
 
 	// Phase 4: Activity & Audit Subsystem
-	activityEvent: activityEventRouter
+	activityEvent: activityEventRouter,
+
+	// Phase 16: Staff Management
+	staff: staffRouter,
+	workQueue: workQueueRouter,
+
+	// Phase 16.5: Vendor Discovery
+	vendorCandidate: vendorCandidateRouter,
+	vendorBid: vendorBidRouter,
+
+	// Phase 16.7: Communications
+	caseCommunication: caseCommunicationRouter,
+
+	// Phase 16.11: Case Review
+	caseReview: caseReviewRouter
 };
 
 export type AppRouter = typeof appRouter;
