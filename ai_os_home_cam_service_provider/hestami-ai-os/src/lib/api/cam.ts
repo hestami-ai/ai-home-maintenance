@@ -4,6 +4,7 @@
  */
 
 import { apiCall } from './client';
+import { orpc } from './index';
 
 // ============================================================================
 // Types
@@ -2364,7 +2365,7 @@ export const jobDocumentApi = {
 };
 
 /**
- * Fetch badge counts using direct API calls (fallback when oRPC endpoint not available)
+ * Fetch badge counts using oRPC endpoints
  */
 export async function fetchBadgeCounts(associationId: string): Promise<BadgeCounts> {
 	const counts: BadgeCounts = {
@@ -2376,49 +2377,41 @@ export async function fetchBadgeCounts(associationId: string): Promise<BadgeCoun
 	};
 
 	try {
+		// Note: oRPC endpoints use organization context from headers, not associationId parameter
+		// The association is derived from the organization on the server side
 		const [violationsRes, arcRes, workOrdersRes, vendorsRes] = await Promise.all([
-			fetch(`/api/violation?associationId=${associationId}`).catch(() => null),
-			fetch(`/api/arc/request?associationId=${associationId}&status=SUBMITTED`).catch(() => null),
-			fetch(`/api/work-order?associationId=${associationId}`).catch(() => null),
-			fetch(`/api/vendor?associationId=${associationId}&status=PENDING`).catch(() => null)
+			orpc.violation.list({}).catch(() => null),
+			orpc.arcRequest.list({ status: 'SUBMITTED' }).catch(() => null),
+			orpc.workOrder.list({}).catch(() => null),
+			orpc.vendor.list({ isActive: true }).catch(() => null)
 		]);
 
-		if (violationsRes?.ok) {
-			const data = await violationsRes.json();
-			if (data.ok && data.data?.items) {
-				counts.openViolations = data.data.items.filter((v: { status: string }) =>
-					['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED'].includes(v.status)
-				).length;
-			}
+		if (violationsRes?.ok && violationsRes.data?.violations) {
+			counts.openViolations = violationsRes.data.violations.filter((v: { status: string }) =>
+				['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED'].includes(v.status)
+			).length;
 		}
 
-		if (arcRes?.ok) {
-			const data = await arcRes.json();
-			if (data.ok && data.data) {
-				counts.pendingArcRequests = data.data.total || data.data.items?.length || 0;
-			}
+		if (arcRes?.ok && arcRes.data?.requests) {
+			counts.pendingArcRequests = arcRes.data.requests.length;
 		}
 
-		if (workOrdersRes?.ok) {
-			const data = await workOrdersRes.json();
-			if (data.ok && data.data?.items) {
-				const now = new Date();
-				const workOrders = data.data.items;
-				counts.activeWorkOrders = workOrders.filter((wo: { status: string }) =>
-					['SUBMITTED', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS'].includes(wo.status)
-				).length;
-				counts.overdueWorkOrders = workOrders.filter((wo: { dueDate?: string; status: string }) => {
-					if (!wo.dueDate) return false;
-					return new Date(wo.dueDate) < now && !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(wo.status);
-				}).length;
-			}
+		if (workOrdersRes?.ok && workOrdersRes.data?.workOrders) {
+			const now = new Date();
+			const workOrders = workOrdersRes.data.workOrders;
+			counts.activeWorkOrders = workOrders.filter((wo: { status: string }) =>
+				['SUBMITTED', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS'].includes(wo.status)
+			).length;
+			counts.overdueWorkOrders = workOrders.filter((wo: { slaDeadline?: string | null; status: string }) => {
+				if (!wo.slaDeadline) return false;
+				return new Date(wo.slaDeadline) < now && !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(wo.status);
+			}).length;
 		}
 
-		if (vendorsRes?.ok) {
-			const data = await vendorsRes.json();
-			if (data.ok && data.data) {
-				counts.pendingVendors = data.data.total || data.data.items?.length || 0;
-			}
+		if (vendorsRes?.ok && vendorsRes.data?.vendors) {
+			// Filter for vendors that need approval (this would need a proper status field in the vendor model)
+			// For now, count all active vendors as a placeholder
+			counts.pendingVendors = 0; // TODO: Add proper vendor approval status tracking
 		}
 	} catch (e) {
 		console.error('Failed to fetch badge counts:', e);

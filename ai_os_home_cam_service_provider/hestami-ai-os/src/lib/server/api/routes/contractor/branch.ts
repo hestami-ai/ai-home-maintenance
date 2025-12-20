@@ -3,6 +3,7 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startContractorBranchWorkflow } from '../../../workflows/contractorBranchWorkflow.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from './utils.js';
 
@@ -59,42 +60,27 @@ export const branchRouter = {
 			await context.cerbos.authorize('edit', 'contractor_branch', input.id ?? 'new');
 			const { id, idempotencyKey, ...data } = input;
 
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				if (id) {
-					const existing = await prisma.contractorBranch.findFirst({
-						where: { id, organizationId: context.organization.id }
-					});
-					if (!existing) throw ApiException.notFound('ContractorBranch');
-					if (data.isPrimary) {
-						await prisma.contractorBranch.updateMany({
-							where: { organizationId: context.organization.id, isPrimary: true, NOT: { id } },
-							data: { isPrimary: false }
-						});
-					}
-					return prisma.contractorBranch.update({
-						where: { id },
-						data
-					});
-				}
+			// Use DBOS workflow for durable execution
+			const result = await startContractorBranchWorkflow(
+				{
+					action: 'CREATE_OR_UPDATE_BRANCH',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					branchId: id,
+					data
+				},
+				idempotencyKey
+			);
 
-				if (data.isPrimary) {
-					await prisma.contractorBranch.updateMany({
-						where: { organizationId: context.organization.id, isPrimary: true },
-						data: { isPrimary: false }
-					});
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create/update branch');
+			}
 
-				return prisma.contractorBranch.create({
-					data: {
-						organizationId: context.organization.id,
-						...data
-					}
-				});
-			});
+			const branch = await prisma.contractorBranch.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
-					branch: serializeBranch(result.result)
+					branch: serializeBranch(branch)
 				},
 				context
 			);
@@ -179,22 +165,25 @@ export const branchRouter = {
 			await assertContractorOrg(context.organization.id);
 			await context.cerbos.authorize('delete', 'contractor_branch', id);
 
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.contractorBranch.findFirst({
-					where: { id, organizationId: context.organization.id }
-				});
-				if (!existing) throw ApiException.notFound('ContractorBranch');
+			// Use DBOS workflow for durable execution
+			const result = await startContractorBranchWorkflow(
+				{
+					action: 'ARCHIVE_BRANCH',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					branchId: id,
+					data: {}
+				},
+				idempotencyKey
+			);
 
-				return prisma.contractorBranch.update({
-					where: { id },
-					data: {
-						isActive: false,
-						code: existing.code ? `${existing.code}-archived` : existing.code
-					}
-				});
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to archive branch');
+			}
 
-			return successResponse({ branch: serializeBranch(result.result) }, context);
+			const branch = await prisma.contractorBranch.findUniqueOrThrow({ where: { id: result.entityId } });
+
+			return successResponse({ branch: serializeBranch(branch) }, context);
 		})
 };
 

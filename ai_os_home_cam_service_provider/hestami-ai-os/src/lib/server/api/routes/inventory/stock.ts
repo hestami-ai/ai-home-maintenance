@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startStockWorkflow } from '../../../workflows/stockWorkflow.js';
 
 const inventoryLevelOutput = z.object({
 	id: z.string(),
@@ -189,57 +190,32 @@ export const stockRouter = {
 			if (!item) throw ApiException.notFound('Inventory item');
 			if (!location) throw ApiException.notFound('Inventory location');
 
-			const adjustStock = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Find or create inventory level
-					let level = await tx.inventoryLevel.findFirst({
-						where: {
-							itemId: input.itemId,
-							locationId: input.locationId,
-							lotNumber: input.lotNumber ?? null,
-							serialNumber: input.serialNumber ?? null
-						}
-					});
-
-					if (level) {
-						const newOnHand = level.quantityOnHand + input.adjustment;
-						if (newOnHand < 0) {
-							throw ApiException.badRequest('Adjustment would result in negative stock');
-						}
-
-						level = await tx.inventoryLevel.update({
-							where: { id: level.id },
-							data: {
-								quantityOnHand: newOnHand,
-								quantityAvailable: newOnHand - level.quantityReserved,
-								expirationDate: input.expirationDate ? new Date(input.expirationDate) : level.expirationDate
-							}
-						});
-					} else {
-						if (input.adjustment < 0) {
-							throw ApiException.badRequest('Cannot remove stock that does not exist');
-						}
-
-						level = await tx.inventoryLevel.create({
-							data: {
-								itemId: input.itemId,
-								locationId: input.locationId,
-								quantityOnHand: input.adjustment,
-								quantityAvailable: input.adjustment,
-								lotNumber: input.lotNumber,
-								serialNumber: input.serialNumber,
-								expirationDate: input.expirationDate ? new Date(input.expirationDate) : null
-							}
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startStockWorkflow(
+				{
+					action: 'ADJUST_STOCK',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					itemId: input.itemId,
+					data: {
+						itemId: input.itemId,
+						locationId: input.locationId,
+						adjustment: input.adjustment,
+						lotNumber: input.lotNumber,
+						serialNumber: input.serialNumber,
+						expirationDate: input.expirationDate
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return level;
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to adjust stock');
+			}
 
-			const level = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, adjustStock)).result
-				: await adjustStock();
+			const level = await prisma.inventoryLevel.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ level: formatInventoryLevel(level) }, context);
 		}),
@@ -271,38 +247,31 @@ export const stockRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
-			const reserveStock = async () => {
-				return prisma.$transaction(async (tx) => {
-					const level = await tx.inventoryLevel.findFirst({
-						where: {
-							itemId: input.itemId,
-							locationId: input.locationId,
-							lotNumber: input.lotNumber ?? null,
-							serialNumber: input.serialNumber ?? null
-						}
-					});
-
-					if (!level) {
-						throw ApiException.notFound('Inventory level');
+			// Use DBOS workflow for durable execution
+			const result = await startStockWorkflow(
+				{
+					action: 'RESERVE_STOCK',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					itemId: input.itemId,
+					data: {
+						itemId: input.itemId,
+						locationId: input.locationId,
+						quantity: input.quantity,
+						lotNumber: input.lotNumber,
+						serialNumber: input.serialNumber
 					}
+				},
+				input.idempotencyKey
+			);
 
-					if (level.quantityAvailable < input.quantity) {
-						throw ApiException.badRequest('Insufficient available stock');
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to reserve stock');
+			}
 
-					return tx.inventoryLevel.update({
-						where: { id: level.id },
-						data: {
-							quantityReserved: level.quantityReserved + input.quantity,
-							quantityAvailable: level.quantityAvailable - input.quantity
-						}
-					});
-				});
-			};
-
-			const level = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, reserveStock)).result
-				: await reserveStock();
+			const level = await prisma.inventoryLevel.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ level: formatInventoryLevel(level) }, context);
 		}),
@@ -333,38 +302,31 @@ export const stockRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
-			const releaseStock = async () => {
-				return prisma.$transaction(async (tx) => {
-					const level = await tx.inventoryLevel.findFirst({
-						where: {
-							itemId: input.itemId,
-							locationId: input.locationId,
-							lotNumber: input.lotNumber ?? null,
-							serialNumber: input.serialNumber ?? null
-						}
-					});
-
-					if (!level) {
-						throw ApiException.notFound('Inventory level');
+			// Use DBOS workflow for durable execution
+			const result = await startStockWorkflow(
+				{
+					action: 'RELEASE_STOCK',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					itemId: input.itemId,
+					data: {
+						itemId: input.itemId,
+						locationId: input.locationId,
+						quantity: input.quantity,
+						lotNumber: input.lotNumber,
+						serialNumber: input.serialNumber
 					}
+				},
+				input.idempotencyKey
+			);
 
-					if (level.quantityReserved < input.quantity) {
-						throw ApiException.badRequest('Cannot release more than reserved');
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to release stock');
+			}
 
-					return tx.inventoryLevel.update({
-						where: { id: level.id },
-						data: {
-							quantityReserved: level.quantityReserved - input.quantity,
-							quantityAvailable: level.quantityAvailable + input.quantity
-						}
-					});
-				});
-			};
-
-			const level = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, releaseStock)).result
-				: await releaseStock();
+			const level = await prisma.inventoryLevel.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ level: formatInventoryLevel(level) }, context);
 		}),
@@ -398,55 +360,49 @@ export const stockRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
-			const recordCount = async () => {
-				return prisma.$transaction(async (tx) => {
-					let level = await tx.inventoryLevel.findFirst({
-						where: {
-							itemId: input.itemId,
-							locationId: input.locationId,
-							lotNumber: input.lotNumber ?? null,
-							serialNumber: input.serialNumber ?? null
-						}
-					});
+			// Get existing level to calculate variance
+			const existingLevel = await prisma.inventoryLevel.findFirst({
+				where: {
+					itemId: input.itemId,
+					locationId: input.locationId,
+					lotNumber: input.lotNumber ?? null,
+					serialNumber: input.serialNumber ?? null
+				}
+			});
+			const previousOnHand = existingLevel?.quantityOnHand ?? 0;
+			const variance = input.countedQuantity - previousOnHand;
 
-					const previousOnHand = level?.quantityOnHand ?? 0;
-					const variance = input.countedQuantity - previousOnHand;
-
-					if (level) {
-						level = await tx.inventoryLevel.update({
-							where: { id: level.id },
-							data: {
-								quantityOnHand: input.countedQuantity,
-								quantityAvailable: input.countedQuantity - level.quantityReserved,
-								lastCountedAt: new Date()
-							}
-						});
-					} else {
-						level = await tx.inventoryLevel.create({
-							data: {
-								itemId: input.itemId,
-								locationId: input.locationId,
-								quantityOnHand: input.countedQuantity,
-								quantityAvailable: input.countedQuantity,
-								lotNumber: input.lotNumber,
-								serialNumber: input.serialNumber,
-								lastCountedAt: new Date()
-							}
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startStockWorkflow(
+				{
+					action: 'RECORD_COUNT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					itemId: input.itemId,
+					levelId: existingLevel?.id,
+					data: {
+						itemId: input.itemId,
+						locationId: input.locationId,
+						countedQuantity: input.countedQuantity,
+						lotNumber: input.lotNumber,
+						serialNumber: input.serialNumber
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return { level, variance };
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record count');
+			}
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, recordCount)).result
-				: await recordCount();
+			const level = await prisma.inventoryLevel.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse(
 				{
-					level: formatInventoryLevel(result.level),
-					variance: result.variance
+					level: formatInventoryLevel(level),
+					variance
 				},
 				context
 			);

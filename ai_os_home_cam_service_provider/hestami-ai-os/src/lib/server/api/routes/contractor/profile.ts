@@ -4,6 +4,7 @@ import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../route
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
 
@@ -62,60 +63,57 @@ export const profileRouter = {
 			await context.cerbos.authorize('edit', 'contractor_profile', context.organization.id);
 			const { idempotencyKey, ...data } = input;
 
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.contractorProfile.findUnique({
-					where: { organizationId: context.organization.id }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startContractorProfileWorkflow(
+				{
+					action: 'CREATE_OR_UPDATE_PROFILE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					data
+				},
+				idempotencyKey
+			);
 
-				if (existing) {
-					return prisma.contractorProfile.update({
-						where: { organizationId: context.organization.id },
-						data
-					});
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create/update profile');
+			}
 
-				return prisma.contractorProfile.create({
-					data: {
-						organizationId: context.organization.id,
-						...data
-					}
-				});
-			});
+			const profile = await prisma.contractorProfile.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			// Record activity event
 			await recordExecution(context, {
 				entityType: 'CONTRACTOR',
-				entityId: result.result.id,
+				entityId: profile.id,
 				action: 'UPDATE',
-				summary: `Contractor profile updated: ${result.result.legalName}`,
-				newState: { legalName: result.result.legalName, dba: result.result.dba }
+				summary: `Contractor profile updated: ${profile.legalName}`,
+				newState: { legalName: profile.legalName, dba: profile.dba }
 			});
 
 			return successResponse(
 				{
 					profile: {
-						id: result.result.id,
-						organizationId: result.result.organizationId,
-						legalName: result.result.legalName,
-						dba: result.result.dba,
-						primaryContactName: result.result.primaryContactName,
-						primaryContactEmail: result.result.primaryContactEmail,
-						primaryContactPhone: result.result.primaryContactPhone,
-						addressLine1: result.result.addressLine1,
-						addressLine2: result.result.addressLine2,
-						city: result.result.city,
-						state: result.result.state,
-						postalCode: result.result.postalCode,
-						country: result.result.country,
-						operatingHoursJson: result.result.operatingHoursJson,
-						timezone: result.result.timezone,
-						maxTechnicians: result.result.maxTechnicians,
-						maxServiceRadius: result.result.maxServiceRadius,
-						complianceScore: result.result.complianceScore,
-						lastComplianceCheck: result.result.lastComplianceCheck?.toISOString() ?? null,
-						isActive: result.result.isActive,
-						createdAt: result.result.createdAt.toISOString(),
-						updatedAt: result.result.updatedAt.toISOString()
+						id: profile.id,
+						organizationId: profile.organizationId,
+						legalName: profile.legalName,
+						dba: profile.dba,
+						primaryContactName: profile.primaryContactName,
+						primaryContactEmail: profile.primaryContactEmail,
+						primaryContactPhone: profile.primaryContactPhone,
+						addressLine1: profile.addressLine1,
+						addressLine2: profile.addressLine2,
+						city: profile.city,
+						state: profile.state,
+						postalCode: profile.postalCode,
+						country: profile.country,
+						operatingHoursJson: profile.operatingHoursJson,
+						timezone: profile.timezone,
+						maxTechnicians: profile.maxTechnicians,
+						maxServiceRadius: profile.maxServiceRadius,
+						complianceScore: profile.complianceScore,
+						lastComplianceCheck: profile.lastComplianceCheck?.toISOString() ?? null,
+						isActive: profile.isActive,
+						createdAt: profile.createdAt.toISOString(),
+						updatedAt: profile.updatedAt.toISOString()
 					}
 				},
 				context

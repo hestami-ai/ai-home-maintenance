@@ -4,6 +4,7 @@
 	import { ArrowLeft, Upload, FileText, X, AlertCircle } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { orpc } from '$lib/api';
 
 	interface ParentDocument {
 		id: string;
@@ -33,19 +34,16 @@
 	async function loadParentDocument() {
 		isLoading = true;
 		try {
-			const response = await fetch(`/api/v1/rpc/document.getDocument?id=${documentId}`);
-			if (response.ok) {
-				const data = await response.json();
-				if (data.ok && data.data?.document) {
-					parentDocument = {
-						id: data.data.document.id,
-						title: data.data.document.title,
-						category: data.data.document.category,
-						version: data.data.document.version,
-						fileName: data.data.document.fileName,
-						fileSize: data.data.document.fileSize
-					};
-				}
+			const result = await orpc.document.getDocument({ id: documentId! });
+			if (result.ok && result.data?.document) {
+				parentDocument = {
+					id: result.data.document.id,
+					title: result.data.document.title,
+					category: result.data.document.category,
+					version: result.data.document.version,
+					fileName: result.data.document.fileName,
+					fileSize: result.data.document.fileSize
+				};
 			}
 		} catch (e) {
 			error = 'Failed to load document';
@@ -122,20 +120,18 @@
 		error = null;
 
 		try {
-			const formData = new FormData();
-			formData.append('file', file);
-			formData.append('parentDocumentId', parentDocument.id);
-
-			const response = await fetch('/api/document/upload-version', {
-				method: 'POST',
-				body: formData
+			// Use oRPC's native file upload support
+			const result = await orpc.document.uploadVersionWithFile({
+				idempotencyKey: crypto.randomUUID(),
+				file,
+				parentDocumentId: parentDocument.id
 			});
 
-			if (!response.ok) {
+			if (!result.ok) {
 				throw new Error('Failed to upload new version');
 			}
 
-			goto(`/app/cam/documents`);
+			goto(`/app/cam/documents/${result.data.document.id}`);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to upload new version';
 			console.error(e);

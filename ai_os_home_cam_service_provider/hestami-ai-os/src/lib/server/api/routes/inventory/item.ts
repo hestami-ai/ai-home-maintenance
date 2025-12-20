@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { UnitOfMeasure } from '../../../../../../generated/prisma/client.js';
+import { startInventoryItemWorkflow } from '../../../workflows/inventoryItemWorkflow.js';
 
 const inventoryItemOutput = z.object({
 	id: z.string(),
@@ -90,10 +91,13 @@ export const inventoryItemRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'inventory_item', 'new');
 
-			const createItem = async () => {
-				return prisma.inventoryItem.create({
+			// Use DBOS workflow for durable execution
+			const result = await startInventoryItemWorkflow(
+				{
+					action: 'CREATE_ITEM',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						sku: input.sku,
 						name: input.name,
 						description: input.description,
@@ -109,12 +113,17 @@ export const inventoryItemRouter = {
 						preferredSupplierId: input.preferredSupplierId,
 						pricebookItemId: input.pricebookItemId
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const item = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createItem)).result
-				: await createItem();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create item');
+			}
+
+			const item = await prisma.inventoryItem.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ item: formatInventoryItem(item) }, context);
 		}),
@@ -243,17 +252,27 @@ export const inventoryItemRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Inventory item');
 
-			const updateItem = async () => {
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.inventoryItem.update({
-					where: { id: input.id },
-					data
-				});
-			};
+			const { id, idempotencyKey, ...data } = input;
 
-			const item = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateItem)).result
-				: await updateItem();
+			// Use DBOS workflow for durable execution
+			const result = await startInventoryItemWorkflow(
+				{
+					action: 'UPDATE_ITEM',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					itemId: input.id,
+					data
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update item');
+			}
+
+			const item = await prisma.inventoryItem.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ item: formatInventoryItem(item) }, context);
 		}),
@@ -276,19 +295,23 @@ export const inventoryItemRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Inventory item');
 
-			const deleteItem = async () => {
-				await prisma.inventoryItem.update({
-					where: { id: input.id },
-					data: { deletedAt: new Date() }
-				});
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startInventoryItemWorkflow(
+				{
+					action: 'DELETE_ITEM',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					itemId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteItem)).result
-				: await deleteItem();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete item');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		}),
 
 	getLowStock: orgProcedure

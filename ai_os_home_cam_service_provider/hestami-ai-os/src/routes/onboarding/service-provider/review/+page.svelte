@@ -2,7 +2,7 @@
 	import { ArrowLeft, Check, Loader2, Wrench, Shield, MapPin, Clock } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { serviceProviderOnboarding, organizationStore } from '$lib/stores';
-	import { organizationApi } from '$lib/api';
+	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
@@ -18,20 +18,15 @@
 		error = null;
 
 		try {
-			const orgResult = await organizationApi.create({
+			// Type-safe oRPC call
+			const result = await orpc.organization.create({
 				name: $serviceProviderOnboarding.businessDetails.name,
 				slug: $serviceProviderOnboarding.businessDetails.slug,
 				type: 'SERVICE_PROVIDER'
 			});
 
-			if (!orgResult.ok || !orgResult.data) {
-				error = orgResult.error?.message || 'Failed to create organization';
-				isSubmitting = false;
-				return;
-			}
-
-			const org = orgResult.data.organization;
-			await organizationApi.setDefault(org.id);
+			const org = result.data.organization;
+			await orpc.organization.setDefault({ organizationId: org.id });
 
 			organizationStore.addMembership({
 				organization: {

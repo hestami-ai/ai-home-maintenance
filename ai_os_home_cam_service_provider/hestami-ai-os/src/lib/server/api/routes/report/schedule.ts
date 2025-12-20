@@ -4,6 +4,7 @@ import { orgProcedure, successResponse, PaginationInputSchema } from '../../rout
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startReportScheduleWorkflow } from '../../../workflows/reportScheduleWorkflow.js';
 
 const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 const scheduleFrequencyEnum = z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY', 'CUSTOM']);
@@ -77,44 +78,34 @@ export const reportScheduleRouter = {
 			await context.cerbos.authorize('create', 'report_schedule', 'new');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const createSchedule = async () => {
-				// Verify report exists
-				const report = await prisma.reportDefinition.findFirst({
-					where: {
-						id: input.reportId,
-						isActive: true,
-						OR: [
-							{ associationId: association.id },
-							{ isSystemReport: true, associationId: null }
-						]
-					}
-				});
-
-				if (!report) throw ApiException.notFound('Report definition');
-
-				const format = input.format || report.defaultFormat;
-				const nextRunAt = calculateNextRun(input.frequency, input.cronExpression);
-
-				return prisma.reportSchedule.create({
+			// Use DBOS workflow for durable execution
+			const result = await startReportScheduleWorkflow(
+				{
+					action: 'CREATE_SCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
 					data: {
 						reportId: input.reportId,
-						associationId: association.id,
 						name: input.name,
 						frequency: input.frequency,
 						cronExpression: input.cronExpression,
 						parametersJson: input.parametersJson,
-						format,
-						deliveryMethod: input.deliveryMethod || 'EMAIL',
-						recipientsJson: input.recipientsJson,
-						nextRunAt,
-						createdBy: context.user!.id
+						format: input.format,
+						deliveryMethod: input.deliveryMethod,
+						recipientsJson: input.recipientsJson
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const schedule = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createSchedule)).result
-				: await createSchedule();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create schedule');
+			}
+
+			const schedule = await prisma.reportSchedule.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				schedule: {
@@ -289,20 +280,14 @@ export const reportScheduleRouter = {
 			await context.cerbos.authorize('edit', 'report_schedule', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const updateSchedule = async () => {
-				const existing = await prisma.reportSchedule.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Report schedule');
-
-				// Recalculate next run if frequency changed
-				let nextRunAt = existing.nextRunAt;
-				if (input.frequency && input.frequency !== existing.frequency) {
-					nextRunAt = calculateNextRun(input.frequency, input.cronExpression);
-				}
-
-				return prisma.reportSchedule.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startReportScheduleWorkflow(
+				{
+					action: 'UPDATE_SCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					scheduleId: input.id,
 					data: {
 						name: input.name,
 						frequency: input.frequency,
@@ -311,15 +296,19 @@ export const reportScheduleRouter = {
 						format: input.format,
 						deliveryMethod: input.deliveryMethod,
 						recipientsJson: input.recipientsJson,
-						isActive: input.isActive,
-						nextRunAt
+						isActive: input.isActive
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const schedule = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateSchedule)).result
-				: await updateSchedule();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update schedule');
+			}
+
+			const schedule = await prisma.reportSchedule.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				schedule: {
@@ -348,19 +337,22 @@ export const reportScheduleRouter = {
 			await context.cerbos.authorize('delete', 'report_schedule', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const deleteSchedule = async () => {
-				const existing = await prisma.reportSchedule.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Report schedule');
+			// Use DBOS workflow for durable execution
+			const result = await startReportScheduleWorkflow(
+				{
+					action: 'DELETE_SCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					scheduleId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				await prisma.reportSchedule.delete({ where: { id: input.id } });
-				return true;
-			};
-
-			input.idempotencyKey
-				? await withIdempotency(input.idempotencyKey, context, deleteSchedule)
-				: await deleteSchedule();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete schedule');
+			}
 
 			return successResponse({ deleted: true }, context);
 		}),
@@ -387,40 +379,26 @@ export const reportScheduleRouter = {
 			await context.cerbos.authorize('edit', 'report_schedule', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const runSchedule = async () => {
-				const schedule = await prisma.reportSchedule.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!schedule) throw ApiException.notFound('Report schedule');
+			// Use DBOS workflow for durable execution
+			const result = await startReportScheduleWorkflow(
+				{
+					action: 'RUN_NOW',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					scheduleId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				// Create execution from schedule
-				const execution = await prisma.reportExecution.create({
-					data: {
-						reportId: schedule.reportId,
-						scheduleId: schedule.id,
-						associationId: association.id,
-						status: 'PENDING',
-						parametersJson: schedule.parametersJson,
-						format: schedule.format,
-						executedBy: context.user!.id
-					}
-				});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to run schedule');
+			}
 
-				// Update schedule last run
-				await prisma.reportSchedule.update({
-					where: { id: input.id },
-					data: {
-						lastRunAt: new Date(),
-						nextRunAt: calculateNextRun(schedule.frequency, schedule.cronExpression)
-					}
-				});
-
-				return execution;
-			};
-
-			const execution = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, runSchedule)).result
-				: await runSchedule();
+			const execution = await prisma.reportExecution.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				execution: {

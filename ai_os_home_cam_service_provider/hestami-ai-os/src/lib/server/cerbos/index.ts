@@ -122,11 +122,23 @@ export function buildPrincipal(
 	user: User,
 	orgRoles: Record<string, UserRole>,
 	currentOrgSlug?: string,
-	vendorId?: string
+	vendorId?: string,
+	currentOrgId?: string
 ): CerbosPrincipal {
+	// Build roles array - always include 'user', plus org-specific role if in org context
+	const roles: string[] = ['user'];
+	
+	// Add the current organization's role if we have org context
+	if (currentOrgId && orgRoles[currentOrgId]) {
+		const orgRole = orgRoles[currentOrgId];
+		// Map UserRole enum to Cerbos role format (e.g., ADMIN -> org_admin)
+		const cerbosRole = `org_${orgRole.toLowerCase()}`;
+		roles.push(cerbosRole);
+	}
+
 	return {
 		id: user.id,
-		roles: ['user'],
+		roles,
 		attr: {
 			orgRoles,
 			...(vendorId && { vendorId })

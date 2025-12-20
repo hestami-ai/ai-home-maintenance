@@ -4,6 +4,7 @@ import { orgProcedure, successResponse, PaginationInputSchema } from '../../rout
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startReportExecutionWorkflow } from '../../../workflows/reportExecutionWorkflow.js';
 
 const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 const executionStatusEnum = z.enum(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);
@@ -43,71 +44,29 @@ export const reportExecutionRouter = {
 			await context.cerbos.authorize('create', 'report_execution', 'new');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const generateReport = async () => {
-				// Verify report exists and is accessible
-				const report = await prisma.reportDefinition.findFirst({
-					where: {
-						id: input.reportId,
-						isActive: true,
-						OR: [
-							{ associationId: association.id },
-							{ isSystemReport: true, associationId: null }
-						]
-					}
-				});
-
-				if (!report) throw ApiException.notFound('Report definition');
-
-				const format = input.format || report.defaultFormat;
-				if (!report.allowedFormats.includes(format)) {
-					throw ApiException.badRequest(`Format ${format} is not allowed for this report`);
-				}
-
-				// Create execution record
-				const execution = await prisma.reportExecution.create({
+			// Use DBOS workflow for durable execution
+			const result = await startReportExecutionWorkflow(
+				{
+					action: 'GENERATE_REPORT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
 					data: {
 						reportId: input.reportId,
-						associationId: association.id,
-						status: 'PENDING',
 						parametersJson: input.parametersJson,
-						format,
-						executedBy: context.user!.id
+						format: input.format
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// In a full implementation, this would trigger async report generation
-				// For now, we'll simulate immediate completion with stub data
-				await prisma.reportExecution.update({
-					where: { id: execution.id },
-					data: {
-						status: 'RUNNING',
-						startedAt: new Date()
-					}
-				});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to generate report');
+			}
 
-				// Stub: Mark as completed (real implementation would be async)
-				setTimeout(async () => {
-					try {
-						await prisma.reportExecution.update({
-							where: { id: execution.id },
-							data: {
-								status: 'COMPLETED',
-								completedAt: new Date(),
-								outputUrl: `/reports/${execution.id}.${format.toLowerCase()}`,
-								rowCount: 0
-							}
-						});
-					} catch {
-						// Ignore errors in stub
-					}
-				}, 1000);
-
-				return execution;
-			};
-
-			const execution = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, generateReport)).result
-				: await generateReport();
+			const execution = await prisma.reportExecution.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				execution: {
@@ -270,25 +229,26 @@ export const reportExecutionRouter = {
 			await context.cerbos.authorize('edit', 'report_execution', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const cancelExecution = async () => {
-				const execution = await prisma.reportExecution.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startReportExecutionWorkflow(
+				{
+					action: 'CANCEL_EXECUTION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					executionId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				if (!execution) throw ApiException.notFound('Report execution');
-				if (!['PENDING', 'RUNNING'].includes(execution.status)) {
-					throw ApiException.badRequest('Can only cancel pending or running executions');
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cancel execution');
+			}
 
-				return prisma.reportExecution.update({
-					where: { id: input.id },
-					data: { status: 'CANCELLED' }
-				});
-			};
-
-			const execution = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, cancelExecution)).result
-				: await cancelExecution();
+			const execution = await prisma.reportExecution.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				execution: {

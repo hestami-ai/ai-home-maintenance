@@ -14,6 +14,12 @@ import { recordWorkflowEvent, recordWorkflowLifecycleEvent } from '../api/middle
 const WORKFLOW_STATUS_EVENT = 'case_lifecycle_status';
 const WORKFLOW_ERROR_EVENT = 'case_lifecycle_error';
 
+interface AvailabilitySlot {
+	startTime: string;
+	endTime: string;
+	notes?: string;
+}
+
 interface CaseLifecycleWorkflowInput {
 	action:
 		| 'CREATE_CASE'
@@ -36,6 +42,10 @@ interface CaseLifecycleWorkflowInput {
 	resolutionSummary?: string;
 	cancelReason?: string;
 	statusChangeReason?: string;
+	// Owner availability fields
+	availabilityType?: 'FLEXIBLE' | 'SPECIFIC';
+	availabilityNotes?: string;
+	availabilitySlots?: AvailabilitySlot[];
 }
 
 interface CaseLifecycleWorkflowResult {
@@ -76,31 +86,67 @@ async function createCase(
 	description: string,
 	priority: ConciergeCasePriority,
 	userId: string,
-	originIntentId?: string
+	originIntentId?: string,
+	assignedConciergeUserId?: string,
+	availabilityType?: 'FLEXIBLE' | 'SPECIFIC',
+	availabilityNotes?: string,
+	availabilitySlots?: AvailabilitySlot[]
 ): Promise<{ id: string; caseNumber: string; status: string }> {
 	const caseNumber = await generateCaseNumber(organizationId);
 
-	const newCase = await prisma.conciergeCase.create({
-		data: {
-			organizationId,
-			propertyId,
-			caseNumber,
-			title,
-			description,
-			priority,
-			status: 'INTAKE',
-			...(originIntentId && { originIntentId })
-		}
-	});
+	// Use transaction to ensure atomicity of case creation with availability slots
+	const newCase = await prisma.$transaction(async (tx) => {
+		const createdCase = await tx.conciergeCase.create({
+			data: {
+				organizationId,
+				propertyId,
+				caseNumber,
+				title,
+				description,
+				priority,
+				status: 'INTAKE',
+				...(originIntentId && { originIntentId }),
+				...(assignedConciergeUserId && { assignedConciergeUserId }),
+				availabilityType: availabilityType ?? 'FLEXIBLE',
+				availabilityNotes
+			}
+		});
 
-	// Log initial status
-	await prisma.caseStatusHistory.create({
-		data: {
-			caseId: newCase.id,
-			toStatus: 'INTAKE',
-			reason: 'Case created',
-			changedBy: userId
+		// Create availability slots if provided
+		if (availabilitySlots && availabilitySlots.length > 0) {
+			await tx.caseAvailabilitySlot.createMany({
+				data: availabilitySlots.map((slot) => ({
+					caseId: createdCase.id,
+					startTime: new Date(slot.startTime),
+					endTime: new Date(slot.endTime),
+					notes: slot.notes
+				}))
+			});
 		}
+
+		// Log initial status
+		await tx.caseStatusHistory.create({
+			data: {
+				caseId: createdCase.id,
+				toStatus: 'INTAKE',
+				reason: 'Case created',
+				changedBy: userId
+			}
+		});
+
+		// If created from an intent, update the intent
+		if (originIntentId) {
+			await tx.ownerIntent.update({
+				where: { id: originIntentId },
+				data: {
+					status: 'CONVERTED_TO_CASE',
+					convertedCaseId: createdCase.id,
+					convertedAt: new Date()
+				}
+			});
+		}
+
+		return createdCase;
 	});
 
 	// Record activity event for case creation
@@ -487,7 +533,12 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 							input.title!,
 							input.description!,
 							input.priority || 'NORMAL',
-							input.userId
+							input.userId,
+							input.intentId,
+							input.assigneeUserId,
+							input.availabilityType,
+							input.availabilityNotes,
+							input.availabilitySlots
 						),
 					{ name: 'createCase' }
 				);

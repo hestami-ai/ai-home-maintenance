@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { RecurrenceFrequency } from '../../../../../../generated/prisma/client.js';
+import { startScheduleWorkflow } from '../../../workflows/scheduleWorkflow.js';
 
 const scheduleOutput = z.object({
 	id: z.string(),
@@ -148,27 +149,40 @@ export const contractScheduleRouter = {
 					input.preferredDayOfMonth
 				);
 
-				return prisma.contractSchedule.create({
-					data: {
-						contractId: input.contractId,
-						name: input.name,
-						description: input.description,
-						frequency: input.frequency,
-						startDate,
-						endDate: input.endDate ? new Date(input.endDate) : null,
-						preferredDayOfWeek: input.preferredDayOfWeek,
-						preferredDayOfMonth: input.preferredDayOfMonth,
-						preferredTimeStart: input.preferredTimeStart,
-						preferredTimeEnd: input.preferredTimeEnd,
-						technicianId: input.technicianId,
-						notes: input.notes,
-						nextGenerateAt
-					}
+				// Use DBOS workflow for durable execution
+				const result = await startScheduleWorkflow(
+					{
+						action: 'CREATE_SCHEDULE',
+						organizationId: context.organization!.id,
+						userId: context.user!.id,
+						data: {
+							contractId: input.contractId,
+							name: input.name,
+							description: input.description,
+							frequency: input.frequency,
+							startDate: startDate.toISOString(),
+							endDate: input.endDate,
+							dayOfWeek: input.preferredDayOfWeek,
+							dayOfMonth: input.preferredDayOfMonth,
+							preferredStartTime: input.preferredTimeStart,
+							preferredEndTime: input.preferredTimeEnd,
+							isActive: true
+						}
+					},
+					input.idempotencyKey
+				);
+
+				if (!result.success) {
+					throw ApiException.internal(result.error || 'Failed to create schedule');
+				}
+
+				return prisma.contractSchedule.findUniqueOrThrow({
+					where: { id: result.entityId }
 				});
 			};
 
 			const schedule = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createSchedule)).result
+				? await createSchedule()
 				: await createSchedule();
 
 			return successResponse({ schedule: formatSchedule(schedule) }, context);
@@ -290,20 +304,34 @@ export const contractScheduleRouter = {
 				throw ApiException.notFound('Contract schedule');
 			}
 
-			const updateSchedule = async () => {
-				const { id, idempotencyKey, endDate, ...data } = input;
-				return prisma.contractSchedule.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startScheduleWorkflow(
+				{
+					action: 'UPDATE_SCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					scheduleId: input.id,
 					data: {
-						...data,
-						endDate: endDate === null ? null : endDate ? new Date(endDate) : existing.endDate
+						name: input.name,
+						description: input.description,
+						endDate: input.endDate,
+						dayOfWeek: input.preferredDayOfWeek,
+						dayOfMonth: input.preferredDayOfMonth,
+						preferredStartTime: input.preferredTimeStart,
+						preferredEndTime: input.preferredTimeEnd,
+						isActive: input.isActive
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const schedule = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateSchedule)).result
-				: await updateSchedule();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update schedule');
+			}
+
+			const schedule = await prisma.contractSchedule.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ schedule: formatSchedule(schedule) }, context);
 		}),
@@ -329,16 +357,23 @@ export const contractScheduleRouter = {
 				throw ApiException.notFound('Contract schedule');
 			}
 
-			const deleteSchedule = async () => {
-				await prisma.contractSchedule.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startScheduleWorkflow(
+				{
+					action: 'DELETE_SCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					scheduleId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteSchedule)).result
-				: await deleteSchedule();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete schedule');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		}),
 
 	generateVisits: orgProcedure
@@ -373,63 +408,32 @@ export const contractScheduleRouter = {
 				throw ApiException.badRequest('Schedule is not active');
 			}
 
-			const generateVisits = async () => {
-				const throughDate = new Date(input.throughDate);
-				const visits: any[] = [];
+			// Get current max visit number
+			const maxVisit = await prisma.scheduledVisit.findFirst({
+				where: { contractId: schedule.contractId },
+				orderBy: { visitNumber: 'desc' }
+			});
 
-				let currentDate = schedule.nextGenerateAt ?? schedule.startDate;
-				const endDate = schedule.endDate ? new Date(Math.min(throughDate.getTime(), schedule.endDate.getTime())) : throughDate;
+			// Use DBOS workflow for durable execution
+			const result = await startScheduleWorkflow(
+				{
+					action: 'GENERATE_VISITS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					scheduleId: input.scheduleId,
+					data: {
+						startDate: (schedule.nextGenerateAt ?? schedule.startDate).toISOString(),
+						endDate: input.throughDate,
+						startingVisitNumber: (maxVisit?.visitNumber ?? 0) + 1
+					}
+				},
+				input.idempotencyKey
+			);
 
-				// Get current max visit number
-				const maxVisit = await prisma.scheduledVisit.findFirst({
-					where: { contractId: schedule.contractId },
-					orderBy: { visitNumber: 'desc' }
-				});
-				let visitNumber = (maxVisit?.visitNumber ?? 0) + 1;
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to generate visits');
+			}
 
-				while (currentDate <= endDate) {
-					visits.push({
-						contractId: schedule.contractId,
-						scheduleId: schedule.id,
-						visitNumber: visitNumber++,
-						scheduledDate: new Date(currentDate),
-						scheduledStart: schedule.preferredTimeStart
-							? new Date(`${currentDate.toISOString().split('T')[0]}T${schedule.preferredTimeStart}:00`)
-							: null,
-						scheduledEnd: schedule.preferredTimeEnd
-							? new Date(`${currentDate.toISOString().split('T')[0]}T${schedule.preferredTimeEnd}:00`)
-							: null,
-						technicianId: schedule.technicianId
-					});
-
-					currentDate = calculateNextGenerateDate(
-						schedule.frequency,
-						currentDate,
-						schedule.preferredDayOfWeek,
-						schedule.preferredDayOfMonth
-					);
-				}
-
-				if (visits.length > 0) {
-					await prisma.$transaction([
-						prisma.scheduledVisit.createMany({ data: visits }),
-						prisma.contractSchedule.update({
-							where: { id: schedule.id },
-							data: {
-								lastGeneratedAt: new Date(),
-								nextGenerateAt: currentDate
-							}
-						})
-					]);
-				}
-
-				return { visitsCreated: visits.length };
-			};
-
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, generateVisits)).result
-				: await generateVisits();
-
-			return successResponse(result, context);
+			return successResponse({ visitsCreated: result.generatedCount ?? 0 }, context);
 		})
 };

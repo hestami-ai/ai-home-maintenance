@@ -9,31 +9,42 @@ const dbosReady = initDBOS().catch((err) => {
 	console.error('[DBOS] Failed to initialize:', err);
 });
 
-// OpenTelemetry is initialized via --require ./telemetry.cjs in PM2 config
+// Get tracer for creating spans
 const tracer = trace.getTracer('hestami-ai-os');
 
 /**
  * SvelteKit server hooks
- * Handles session validation, organization context, and OpenTelemetry tracing
+ * Handles session validation, organization context, and OpenTelemetry tracing.
+ * 
+ * IMPORTANT: We use context.with() to ensure DBOS workflows started within
+ * HTTP request handlers are attached to the same trace. This is critical for
+ * correlating workflow spans with their originating HTTP requests.
  */
 export const handle: Handle = async ({ event, resolve }) => {
-	// Create a span for this request
-	const span = tracer.startSpan(`${event.request.method} ${event.url.pathname}`, {
-		attributes: {
-			'http.method': event.request.method,
-			'http.url': event.url.href,
-			'http.target': event.url.pathname
-		}
-	});
+	// Check if auto-instrumentation already created a span (from HTTP instrumentation)
+	let span = trace.getActiveSpan();
+	const isAutoInstrumented = !!span;
 
-	// Store span context in locals for route handlers
+	// If no active span, create one manually (SvelteKit may not be auto-instrumented)
+	if (!span) {
+		span = tracer.startSpan(`${event.request.method} ${event.url.pathname}`, {
+			attributes: {
+				'http.method': event.request.method,
+				'http.url': event.url.href,
+				'http.target': event.url.pathname
+			}
+		});
+	}
+
+	// Store span context in locals for route handlers to access
 	const spanContext = span.spanContext();
 	event.locals.traceId = spanContext.traceId;
 	event.locals.spanId = spanContext.spanId;
 
-	try {
-		// Run the rest of the request within this span's context
-		return await otelContext.with(trace.setSpan(otelContext.active(), span), async () => {
+	// Run the request within the span's context using context.with()
+	// This ensures DBOS workflows and Prisma queries inherit this trace context
+	return otelContext.with(trace.setSpan(otelContext.active(), span), async () => {
+		try {
 			// Get session from Better-Auth
 			const session = await auth.api.getSession({
 				headers: event.request.headers
@@ -76,11 +87,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 			const response = await resolve(event);
 			span.setAttribute('http.status_code', response.status);
 			return response;
-		});
-	} catch (error) {
-		span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
-		throw error;
-	} finally {
-		span.end();
-	}
+		} catch (error) {
+			span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+			throw error;
+		} finally {
+			// Only end the span if we created it (not auto-instrumented)
+			if (!isAutoInstrumented) {
+				span.end();
+			}
+		}
+	});
 };

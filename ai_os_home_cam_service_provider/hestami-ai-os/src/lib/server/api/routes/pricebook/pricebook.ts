@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ContractorTradeType, PricebookItemType, PricebookVersionStatus, PriceRuleType } from '../../../../../../generated/prisma/client.js';
+import { startPricebookWorkflow } from '../../../workflows/pricebookWorkflow.js';
 
 const pricebookOutput = z.object({
 	id: z.string(),
@@ -156,23 +157,36 @@ export const pricebookRouter = {
 			await context.cerbos.authorize('edit', 'pricebook', input.id ?? 'new');
 
 			const { id, idempotencyKey, ...data } = input;
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				if (id) {
-					const existing = await prisma.pricebook.findFirst({
-						where: { id, organizationId: context.organization.id }
-					});
-					if (!existing) throw ApiException.notFound('Pricebook');
-					return prisma.pricebook.update({
-						where: { id },
-						data
-					});
-				}
-				return prisma.pricebook.create({
-					data: { organizationId: context.organization.id, ...data }
+
+			// Validate existing pricebook if updating
+			if (id) {
+				const existing = await prisma.pricebook.findFirst({
+					where: { id, organizationId: context.organization.id }
 				});
+				if (!existing) throw ApiException.notFound('Pricebook');
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startPricebookWorkflow(
+				{
+					action: 'UPSERT_PRICEBOOK',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					pricebookId: id,
+					data
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to upsert pricebook');
+			}
+
+			const pricebook = await prisma.pricebook.findUniqueOrThrow({
+				where: { id: result.entityId }
 			});
 
-			return successResponse({ pricebook: serializePricebook(result.result) }, context);
+			return successResponse({ pricebook: serializePricebook(pricebook) }, context);
 		}),
 
 	get: orgProcedure
@@ -269,21 +283,33 @@ export const pricebookRouter = {
 					_max: { versionNumber: true }
 				}))._max?.versionNumber ?? 0) + 1;
 
-			const result = await withIdempotency(input.idempotencyKey, context, async () =>
-				prisma.pricebookVersion.create({
+			// Use DBOS workflow for durable execution
+			const result = await startPricebookWorkflow(
+				{
+					action: 'CREATE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					pricebookId: pb.id,
 					data: {
-						pricebookId: pb.id,
 						versionNumber: nextNumber,
-						status: 'DRAFT',
-						effectiveStart: input.effectiveStart ? new Date(input.effectiveStart) : null,
-						effectiveEnd: input.effectiveEnd ? new Date(input.effectiveEnd) : null,
+						effectiveStart: input.effectiveStart,
+						effectiveEnd: input.effectiveEnd,
 						notes: input.notes,
-						metadata: input.metadata ?? null
+						metadata: input.metadata
 					}
-				})
+				},
+				input.idempotencyKey
 			);
 
-			return successResponse({ version: serializeVersion(result.result) }, context);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create version');
+			}
+
+			const version = await prisma.pricebookVersion.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+
+			return successResponse({ version: serializeVersion(version) }, context);
 		}),
 
 	publishVersion: orgProcedure
@@ -318,20 +344,30 @@ export const pricebookRouter = {
 				throw ApiException.badRequest('Cannot publish a version without items');
 			}
 
-			const result = await withIdempotency(input.idempotencyKey, context, async () =>
-				prisma.pricebookVersion.update({
-					where: { id: version.id },
+			// Use DBOS workflow for durable execution
+			const result = await startPricebookWorkflow(
+				{
+					action: 'PUBLISH_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					versionId: version.id,
 					data: {
-						status: 'PUBLISHED',
-						effectiveStart: input.effectiveStart ? new Date(input.effectiveStart) : version.effectiveStart,
-						effectiveEnd: input.effectiveEnd ? new Date(input.effectiveEnd) : version.effectiveEnd,
-						publishedAt: new Date(),
-						publishedBy: context.user?.id ?? null
+						effectiveStart: input.effectiveStart,
+						effectiveEnd: input.effectiveEnd
 					}
-				})
+				},
+				input.idempotencyKey
 			);
 
-			return successResponse({ version: serializeVersion(result.result) }, context);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to publish version');
+			}
+
+			const updatedVersion = await prisma.pricebookVersion.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+
+			return successResponse({ version: serializeVersion(updatedVersion) }, context);
 		}),
 
 	activateVersion: orgProcedure
@@ -351,20 +387,28 @@ export const pricebookRouter = {
 				throw ApiException.conflict('Only published versions can be activated');
 			}
 
-			const result = await withIdempotency(input.idempotencyKey, context, async () => {
-				// Deactivate other active versions for this pricebook
-				await prisma.pricebookVersion.updateMany({
-					where: { pricebookId: version.pricebookId, status: 'ACTIVE', NOT: { id: version.id } },
-					data: { status: 'ARCHIVED' }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startPricebookWorkflow(
+				{
+					action: 'ACTIVATE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					versionId: version.id,
+					pricebookId: version.pricebookId,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				return prisma.pricebookVersion.update({
-					where: { id: version.id },
-					data: { status: 'ACTIVE', activatedAt: new Date() }
-				});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to activate version');
+			}
+
+			const updatedVersion = await prisma.pricebookVersion.findUniqueOrThrow({
+				where: { id: result.entityId }
 			});
 
-			return successResponse({ version: serializeVersion(result.result) }, context);
+			return successResponse({ version: serializeVersion(updatedVersion) }, context);
 		}),
 
 	listVersions: orgProcedure
@@ -435,30 +479,42 @@ export const pricebookRouter = {
 			await ensureServiceAreaOwned(input.serviceAreaId, context.organization.id);
 
 			const { id, idempotencyKey, pricebookVersionId: _versionId, ...data } = input;
-			const payload = {
-				...data,
-				trade: data.trade ?? null,
-				serviceAreaId: data.serviceAreaId ?? null,
-				metadata: data.metadata ?? null
-			};
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				if (id) {
-					const existing = await prisma.pricebookItem.findFirst({
-						where: { id, pricebookVersionId: version.id }
-					});
-					if (!existing) throw ApiException.notFound('PricebookItem');
-					return prisma.pricebookItem.update({ where: { id }, data: payload });
-				}
 
-				return prisma.pricebookItem.create({
-					data: {
-						pricebookVersionId: version.id,
-						...payload
-					}
+			// Validate existing item if updating
+			if (id) {
+				const existing = await prisma.pricebookItem.findFirst({
+					where: { id, pricebookVersionId: version.id }
 				});
+				if (!existing) throw ApiException.notFound('PricebookItem');
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startPricebookWorkflow(
+				{
+					action: 'UPSERT_ITEM',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					versionId: version.id,
+					itemId: id,
+					data: {
+						...data,
+						trade: data.trade ?? null,
+						serviceAreaId: data.serviceAreaId ?? null,
+						metadata: data.metadata ?? null
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to upsert item');
+			}
+
+			const item = await prisma.pricebookItem.findUniqueOrThrow({
+				where: { id: result.entityId }
 			});
 
-			return successResponse({ item: serializeItem(result.result) }, context);
+			return successResponse({ item: serializeItem(item) }, context);
 		}),
 
 	listItems: orgProcedure
@@ -534,37 +590,49 @@ export const pricebookRouter = {
 			}
 
 			const { id, idempotencyKey, pricebookVersionId: _versionId, ...data } = input;
-			const payload = {
-				...data,
-				pricebookItemId: data.pricebookItemId ?? null,
-				associationId: data.associationId ?? null,
-				serviceAreaId: data.serviceAreaId ?? null,
-				minQuantity: data.minQuantity ?? null,
-				startsAt: data.startsAt ? new Date(data.startsAt) : null,
-				endsAt: data.endsAt ? new Date(data.endsAt) : null,
-				conditionJson: data.conditionJson ?? null,
-				percentageAdjustment: data.percentageAdjustment ?? null,
-				amountAdjustment: data.amountAdjustment ?? null,
-				adjustmentJson: data.adjustmentJson ?? null
-			};
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				if (id) {
-					const existing = await prisma.priceRule.findFirst({
-						where: { id, pricebookVersionId: version.id }
-					});
-					if (!existing) throw ApiException.notFound('PriceRule');
-					return prisma.priceRule.update({ where: { id }, data: payload });
-				}
 
-				return prisma.priceRule.create({
-					data: {
-						pricebookVersionId: version.id,
-						...payload
-					}
+			// Validate existing rule if updating
+			if (id) {
+				const existing = await prisma.priceRule.findFirst({
+					where: { id, pricebookVersionId: version.id }
 				});
+				if (!existing) throw ApiException.notFound('PriceRule');
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startPricebookWorkflow(
+				{
+					action: 'UPSERT_RULE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					versionId: version.id,
+					ruleId: id,
+					data: {
+						...data,
+						pricebookItemId: data.pricebookItemId ?? null,
+						associationId: data.associationId ?? null,
+						serviceAreaId: data.serviceAreaId ?? null,
+						minQuantity: data.minQuantity ?? null,
+						startsAt: data.startsAt,
+						endsAt: data.endsAt,
+						conditionJson: data.conditionJson ?? null,
+						percentageAdjustment: data.percentageAdjustment ?? null,
+						amountAdjustment: data.amountAdjustment ?? null,
+						adjustmentJson: data.adjustmentJson ?? null
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to upsert rule');
+			}
+
+			const rule = await prisma.priceRule.findUniqueOrThrow({
+				where: { id: result.entityId }
 			});
 
-			return successResponse({ rule: serializeRule(result.result) }, context);
+			return successResponse({ rule: serializeRule(rule) }, context);
 		}),
 
 	listRules: orgProcedure

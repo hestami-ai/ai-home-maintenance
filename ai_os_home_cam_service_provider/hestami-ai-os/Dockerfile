@@ -1,28 +1,41 @@
+# syntax=docker/dockerfile:1.4
+
 # Build stage
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies first (better layer caching)
+# Only copy files needed for npm ci
 COPY package*.json ./
 COPY 3rdParty/zod-prisma-types-3.5.8/packages/generator/zod-prisma-types-3.5.8.tgz ./
-RUN npm ci
 
-# Copy Prisma schema and config, generate client
-# Note: prisma.config.ts uses dotenv, so we need a placeholder DATABASE_URL
+# Use BuildKit cache mount for npm cache - dramatically speeds up rebuilds
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+# Copy Prisma schema and generate client (separate layer for caching)
 COPY prisma ./prisma
-RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" npx prisma generate
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+    npx prisma generate
 
-# Copy source and build
-COPY . .
+# Copy config files needed for build (separate from source for better caching)
+COPY tsconfig.json svelte.config.js vite.config.ts ./
+
+# Copy source files
+COPY src ./src
+COPY static ./static
+COPY scripts ./scripts
+
+# Sync and build
 RUN npx svelte-kit sync
-# Provide placeholder env vars for build (actual values come at runtime)
 RUN BETTER_AUTH_SECRET="build-placeholder-secret-min-32-chars" \
     DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
     npm run build
 
-# Prune dev dependencies
-RUN npm prune --production
+# Prune dev dependencies in a separate layer
+RUN --mount=type=cache,target=/root/.npm \
+    npm prune --production
 
 # Production stage
 FROM node:22-alpine AS production

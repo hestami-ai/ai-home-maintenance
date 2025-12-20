@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startTransferWorkflow } from '../../../workflows/transferWorkflow.js';
 
 const transferLineOutput = z.object({
 	id: z.string(),
@@ -129,41 +130,30 @@ export const transferRouter = {
 				throw ApiException.badRequest('Cannot transfer to same location');
 			}
 
-			const createTransfer = async () => {
-				const transferNumber = await generateTransferNumber(context.organization!.id);
+			// Use DBOS workflow for durable execution
+			const result = await startTransferWorkflow(
+				{
+					action: 'CREATE_TRANSFER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						fromLocationId: input.fromLocationId,
+						toLocationId: input.toLocationId,
+						notes: input.notes,
+						lines: input.lines
+					}
+				},
+				input.idempotencyKey
+			);
 
-				return prisma.$transaction(async (tx) => {
-					const transfer = await tx.inventoryTransfer.create({
-						data: {
-							organizationId: context.organization!.id,
-							transferNumber,
-							fromLocationId: input.fromLocationId,
-							toLocationId: input.toLocationId,
-							notes: input.notes,
-							requestedBy: context.user!.id
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create transfer');
+			}
 
-					await tx.inventoryTransferLine.createMany({
-						data: input.lines.map((line) => ({
-							transferId: transfer.id,
-							itemId: line.itemId,
-							quantityRequested: line.quantity,
-							lotNumber: line.lotNumber,
-							serialNumber: line.serialNumber
-						}))
-					});
-
-					return tx.inventoryTransfer.findUnique({
-						where: { id: transfer.id },
-						include: { lines: true }
-					});
-				});
-			};
-
-			const transfer = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createTransfer)).result
-				: await createTransfer();
+			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: true }
+			});
 
 			return successResponse({ transfer: formatTransfer(transfer, true) }, context);
 		}),
@@ -282,55 +272,36 @@ export const transferRouter = {
 				throw ApiException.badRequest('Transfer is not pending');
 			}
 
-			const shipTransfer = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Update line quantities if provided, otherwise ship all requested
-					for (const line of existing.lines) {
-						const shipLine = input.lines?.find((l) => l.lineId === line.id);
-						const qtyToShip = shipLine?.quantityShipped ?? line.quantityRequested;
-
-						// Deduct from source location
-						const level = await tx.inventoryLevel.findFirst({
-							where: {
-								itemId: line.itemId,
-								locationId: existing.fromLocationId,
-								lotNumber: line.lotNumber ?? null,
-								serialNumber: line.serialNumber ?? null
-							}
-						});
-
-						if (!level || level.quantityAvailable < qtyToShip) {
-							throw ApiException.badRequest(`Insufficient stock for item ${line.itemId}`);
-						}
-
-						await tx.inventoryLevel.update({
-							where: { id: level.id },
-							data: {
-								quantityOnHand: level.quantityOnHand - qtyToShip,
-								quantityAvailable: level.quantityAvailable - qtyToShip
-							}
-						});
-
-						await tx.inventoryTransferLine.update({
-							where: { id: line.id },
-							data: { quantityShipped: qtyToShip }
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startTransferWorkflow(
+				{
+					action: 'SHIP_TRANSFER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					transferId: input.id,
+					data: {
+						fromLocationId: existing.fromLocationId,
+						existingLines: existing.lines.map((l) => ({
+							id: l.id,
+							itemId: l.itemId,
+							quantityRequested: l.quantityRequested,
+							lotNumber: l.lotNumber,
+							serialNumber: l.serialNumber
+						})),
+						lines: input.lines
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.inventoryTransfer.update({
-						where: { id: input.id },
-						data: {
-							status: 'IN_TRANSIT',
-							shippedAt: new Date()
-						},
-						include: { lines: true }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to ship transfer');
+			}
 
-			const transfer = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, shipTransfer)).result
-				: await shipTransfer();
+			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: true }
+			});
 
 			return successResponse({ transfer: formatTransfer(transfer, true) }, context);
 		}),
@@ -370,63 +341,36 @@ export const transferRouter = {
 				throw ApiException.badRequest('Transfer is not in transit');
 			}
 
-			const receiveTransfer = async () => {
-				return prisma.$transaction(async (tx) => {
-					for (const line of existing.lines) {
-						const recvLine = input.lines?.find((l) => l.lineId === line.id);
-						const qtyToReceive = recvLine?.quantityReceived ?? line.quantityShipped;
-
-						// Add to destination location
-						let level = await tx.inventoryLevel.findFirst({
-							where: {
-								itemId: line.itemId,
-								locationId: existing.toLocationId,
-								lotNumber: line.lotNumber ?? null,
-								serialNumber: line.serialNumber ?? null
-							}
-						});
-
-						if (level) {
-							await tx.inventoryLevel.update({
-								where: { id: level.id },
-								data: {
-									quantityOnHand: level.quantityOnHand + qtyToReceive,
-									quantityAvailable: level.quantityAvailable + qtyToReceive
-								}
-							});
-						} else {
-							await tx.inventoryLevel.create({
-								data: {
-									itemId: line.itemId,
-									locationId: existing.toLocationId,
-									quantityOnHand: qtyToReceive,
-									quantityAvailable: qtyToReceive,
-									lotNumber: line.lotNumber,
-									serialNumber: line.serialNumber
-								}
-							});
-						}
-
-						await tx.inventoryTransferLine.update({
-							where: { id: line.id },
-							data: { quantityReceived: qtyToReceive }
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startTransferWorkflow(
+				{
+					action: 'RECEIVE_TRANSFER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					transferId: input.id,
+					data: {
+						toLocationId: existing.toLocationId,
+						existingLines: existing.lines.map((l) => ({
+							id: l.id,
+							itemId: l.itemId,
+							quantityShipped: l.quantityShipped,
+							lotNumber: l.lotNumber,
+							serialNumber: l.serialNumber
+						})),
+						lines: input.lines
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.inventoryTransfer.update({
-						where: { id: input.id },
-						data: {
-							status: 'COMPLETED',
-							receivedAt: new Date()
-						},
-						include: { lines: true }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to receive transfer');
+			}
 
-			const transfer = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, receiveTransfer)).result
-				: await receiveTransfer();
+			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: true }
+			});
 
 			return successResponse({ transfer: formatTransfer(transfer, true) }, context);
 		}),
@@ -453,65 +397,43 @@ export const transferRouter = {
 				throw ApiException.badRequest('Cannot cancel completed or already cancelled transfer');
 			}
 
-			const cancelTransfer = async () => {
-				return prisma.$transaction(async (tx) => {
-					// If in transit, return stock to source
-					if (existing.status === 'IN_TRANSIT') {
-						const lines = await tx.inventoryTransferLine.findMany({
-							where: { transferId: input.id }
-						});
+			// Get lines if in transit (needed for stock return)
+			const lines = existing.status === 'IN_TRANSIT'
+				? await prisma.inventoryTransferLine.findMany({ where: { transferId: input.id } })
+				: [];
 
-						for (const line of lines) {
-							if (line.quantityShipped > 0) {
-								let level = await tx.inventoryLevel.findFirst({
-									where: {
-										itemId: line.itemId,
-										locationId: existing.fromLocationId,
-										lotNumber: line.lotNumber ?? null,
-										serialNumber: line.serialNumber ?? null
-									}
-								});
-
-								if (level) {
-									await tx.inventoryLevel.update({
-										where: { id: level.id },
-										data: {
-											quantityOnHand: level.quantityOnHand + line.quantityShipped,
-											quantityAvailable: level.quantityAvailable + line.quantityShipped
-										}
-									});
-								} else {
-									await tx.inventoryLevel.create({
-										data: {
-											itemId: line.itemId,
-											locationId: existing.fromLocationId,
-											quantityOnHand: line.quantityShipped,
-											quantityAvailable: line.quantityShipped,
-											lotNumber: line.lotNumber,
-											serialNumber: line.serialNumber
-										}
-									});
-								}
-							}
-						}
+			// Use DBOS workflow for durable execution
+			const result = await startTransferWorkflow(
+				{
+					action: 'CANCEL_TRANSFER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					transferId: input.id,
+					data: {
+						existingStatus: existing.status,
+						fromLocationId: existing.fromLocationId,
+						existingLines: lines.map((l) => ({
+							id: l.id,
+							itemId: l.itemId,
+							quantityShipped: l.quantityShipped,
+							lotNumber: l.lotNumber,
+							serialNumber: l.serialNumber
+						})),
+						reason: input.reason,
+						existingNotes: existing.notes
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.inventoryTransfer.update({
-						where: { id: input.id },
-						data: {
-							status: 'CANCELLED',
-							notes: input.reason
-								? `${existing.notes ?? ''}\nCancelled: ${input.reason}`.trim()
-								: existing.notes
-						},
-						include: { lines: true }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cancel transfer');
+			}
 
-			const transfer = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, cancelTransfer)).result
-				: await cancelTransfer();
+			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: true }
+			});
 
 			return successResponse({ transfer: formatTransfer(transfer, true) }, context);
 		})

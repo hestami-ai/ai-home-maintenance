@@ -7,8 +7,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
-import type { RequestContext } from '../../context.js';
+import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 
 const boardMotionCategoryEnum = z.enum([
 	'POLICY',
@@ -40,16 +39,6 @@ const boardMotionOutcomeEnum = z.enum([
 	'WITHDRAWN',
 	'AMENDED'
 ]);
-
-const requireIdempotency = async <T>(
-	key: string | undefined,
-	ctx: RequestContext,
-	fn: () => Promise<T>
-) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
 	const association = await prisma.association.findFirst({
@@ -203,27 +192,25 @@ export const boardMotionRouter = {
 
 			await getAssociationOrThrow(associationId, context.organization.id);
 
-			const motion = await requireIdempotency(idempotencyKey, context, async () => {
-				const motionNumber = await generateMotionNumber(associationId);
-
-				return prisma.boardMotion.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						associationId,
-						motionNumber,
-						title: data.title,
-						description: data.description,
-						category: data.category,
-						status: data.secondedById ? 'SECONDED' : 'PROPOSED',
-						meetingId: data.meetingId,
-						movedById: data.movedById,
-						secondedById: data.secondedById,
-						rationale: data.rationale,
-						effectiveDate: data.effectiveDate ? new Date(data.effectiveDate) : null,
-						expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
-						createdBy: context.user.id
+						...data
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create motion');
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({
 				motion: {
@@ -327,15 +314,23 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Motion must be in PROPOSED status to be seconded');
 			}
 
-			const motion = await requireIdempotency(idempotencyKey, context, async () => {
-				return prisma.boardMotion.update({
-					where: { id },
-					data: {
-						secondedById,
-						status: 'SECONDED'
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'SECOND_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { secondedById }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to second motion');
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
 
 			return successResponse({
 				motion: {
@@ -384,15 +379,23 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Cannot change status of a decided motion');
 			}
 
-			const motion = await requireIdempotency(idempotencyKey, context, async () => {
-				return prisma.boardMotion.update({
-					where: { id },
-					data: {
-						status,
-						...(notes && { outcomeNotes: notes })
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'UPDATE_MOTION_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { status, notes }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update motion status');
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
 
 			return successResponse({
 				motion: {
@@ -442,17 +445,23 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Motion outcome already recorded');
 			}
 
-			const motion = await requireIdempotency(idempotencyKey, context, async () => {
-				return prisma.boardMotion.update({
-					where: { id },
-					data: {
-						status: outcome === 'PASSED' ? 'APPROVED' : outcome === 'FAILED' ? 'DENIED' : 'WITHDRAWN',
-						outcome,
-						outcomeNotes,
-						decidedAt: new Date()
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'RECORD_MOTION_OUTCOME',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { outcome, notes: outcomeNotes }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record motion outcome');
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
 
 			return successResponse({
 				motion: {
@@ -502,17 +511,23 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Cannot withdraw a decided motion');
 			}
 
-			const motion = await requireIdempotency(idempotencyKey, context, async () => {
-				return prisma.boardMotion.update({
-					where: { id },
-					data: {
-						status: 'WITHDRAWN',
-						outcome: 'WITHDRAWN',
-						outcomeNotes: reason,
-						decidedAt: new Date()
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'WITHDRAW_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { reason }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to withdraw motion');
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
 
 			return successResponse({
 				motion: {
@@ -568,35 +583,34 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Motion must be SECONDED or UNDER_DISCUSSION to open voting');
 			}
 
-			const result = await requireIdempotency(idempotencyKey, context, async () => {
-				// Create a vote for this motion
-				const vote = await prisma.vote.create({
-					data: {
-						meetingId,
-						motionId: id,
-						question: voteQuestion || `Vote on motion: ${existing.title}`,
-						method: 'IN_PERSON',
-						createdBy: context.user!.id
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'OPEN_VOTING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { meetingId, question: voteQuestion || `Vote on motion: ${existing.title}` }
+				},
+				idempotencyKey
+			);
 
-				const motion = await prisma.boardMotion.update({
-					where: { id },
-					data: { status: 'UNDER_VOTE', voteId: vote.id }
-				});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to open voting');
+			}
 
-				return { motion, vote };
-			});
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const vote = await prisma.vote.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({
 				motion: {
-					id: result.motion.id,
-					motionNumber: result.motion.motionNumber,
-					status: result.motion.status
+					id: motion.id,
+					motionNumber: motion.motionNumber,
+					status: motion.status
 				},
 				vote: {
-					id: result.vote.id,
-					question: result.vote.question
+					id: vote.id,
+					question: vote.question
 				}
 			}, context);
 		}),
@@ -647,41 +661,40 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Motion must be UNDER_VOTE to close voting');
 			}
 
-			const result = await requireIdempotency(idempotencyKey, context, async () => {
-				// Tally votes from all votes linked to this motion
-				const allBallots = existing.votes.flatMap(v => v.ballots);
-				const yes = allBallots.filter(b => b.choice === 'YES').length;
-				const no = allBallots.filter(b => b.choice === 'NO').length;
-				const abstain = allBallots.filter(b => b.choice === 'ABSTAIN').length;
-				const passed = yes > no;
+			// Tally votes from all votes linked to this motion
+			const allBallots = existing.votes.flatMap(v => v.ballots);
+			const yes = allBallots.filter(b => b.choice === 'YES').length;
+			const no = allBallots.filter(b => b.choice === 'NO').length;
+			const abstain = allBallots.filter(b => b.choice === 'ABSTAIN').length;
+			const passed = yes > no;
+			const outcome = passed ? 'PASSED' : 'FAILED';
 
-				// Close all votes
-				await prisma.vote.updateMany({
-					where: { motionId: id, closedAt: null },
-					data: { closedAt: new Date() }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CLOSE_VOTING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { outcome }
+				},
+				idempotencyKey
+			);
 
-				// Update motion status based on vote outcome
-				const motion = await prisma.boardMotion.update({
-					where: { id },
-					data: {
-						status: passed ? 'APPROVED' : 'DENIED',
-						outcome: passed ? 'PASSED' : 'FAILED',
-						decidedAt: new Date()
-					}
-				});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to close voting');
+			}
 
-				return { motion, voteResults: { yes, no, abstain, passed } };
-			});
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
 
 			return successResponse({
 				motion: {
-					id: result.motion.id,
-					motionNumber: result.motion.motionNumber,
-					status: result.motion.status,
-					outcome: result.motion.outcome
+					id: motion.id,
+					motionNumber: motion.motionNumber,
+					status: motion.status,
+					outcome: motion.outcome
 				},
-				voteResults: result.voteResults
+				voteResults: { yes, no, abstain, passed }
 			}, context);
 		}),
 
@@ -724,16 +737,23 @@ export const boardMotionRouter = {
 				throw ApiException.badRequest('Cannot table a motion that has already been decided');
 			}
 
-			const motion = await requireIdempotency(idempotencyKey, context, async () => {
-				return prisma.boardMotion.update({
-					where: { id },
-					data: {
-						status: 'TABLED',
-						outcome: 'TABLED',
-						outcomeNotes: reason
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'TABLE_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: id,
+					data: { reason }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to table motion');
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
 
 			return successResponse({
 				motion: {
@@ -804,16 +824,23 @@ export const boardMotionRouter = {
 			// Map motion outcome to ARC status
 			const newArcStatus = motion.status === 'APPROVED' ? 'APPROVED' : 'DENIED';
 
-			const updatedArc = await requireIdempotency(idempotencyKey, context, async () => {
-				return prisma.aRCRequest.update({
-					where: { id: arcRequestId },
-					data: {
-						status: newArcStatus,
-						reviewedAt: new Date(),
-						conditions: `Decision applied from board motion ${motion.motionNumber}`
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'LINK_ARC_TO_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: motionId,
+					data: { arcRequestId, motionStatus: motion.status }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to apply motion to ARC request');
+			}
+
+			const updatedArc = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: arcRequestId } });
 
 			return successResponse({
 				arcRequest: {

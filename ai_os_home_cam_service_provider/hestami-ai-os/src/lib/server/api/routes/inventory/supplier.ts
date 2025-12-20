@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startSupplierWorkflow } from '../../../workflows/supplierWorkflow.js';
 
 const supplierOutput = z.object({
 	id: z.string(),
@@ -95,10 +96,13 @@ export const supplierRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'supplier', 'new');
 
-			const createSupplier = async () => {
-				return prisma.supplier.create({
+			// Use DBOS workflow for durable execution
+			const result = await startSupplierWorkflow(
+				{
+					action: 'CREATE_SUPPLIER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						name: input.name,
 						code: input.code,
 						contactName: input.contactName,
@@ -116,12 +120,17 @@ export const supplierRouter = {
 						vendorId: input.vendorId,
 						notes: input.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const supplier = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createSupplier)).result
-				: await createSupplier();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create supplier');
+			}
+
+			const supplier = await prisma.supplier.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ supplier: formatSupplier(supplier) }, context);
 		}),
@@ -250,17 +259,27 @@ export const supplierRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Supplier');
 
-			const updateSupplier = async () => {
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.supplier.update({
-					where: { id: input.id },
-					data
-				});
-			};
+			const { id, idempotencyKey, ...data } = input;
 
-			const supplier = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateSupplier)).result
-				: await updateSupplier();
+			// Use DBOS workflow for durable execution
+			const result = await startSupplierWorkflow(
+				{
+					action: 'UPDATE_SUPPLIER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					supplierId: input.id,
+					data
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update supplier');
+			}
+
+			const supplier = await prisma.supplier.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ supplier: formatSupplier(supplier) }, context);
 		}),
@@ -283,18 +302,22 @@ export const supplierRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Supplier');
 
-			const deleteSupplier = async () => {
-				await prisma.supplier.update({
-					where: { id: input.id },
-					data: { deletedAt: new Date() }
-				});
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startSupplierWorkflow(
+				{
+					action: 'DELETE_SUPPLIER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					supplierId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteSupplier)).result
-				: await deleteSupplier();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete supplier');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

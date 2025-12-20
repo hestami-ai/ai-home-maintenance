@@ -12,8 +12,18 @@ import { ApiException } from '../../errors.js';
 import { ConciergeCaseStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCaseStatusSchema.js';
 import { ConciergeCasePrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCasePrioritySchema.js';
 import { CaseNoteTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/CaseNoteTypeSchema.js';
+import { AvailabilityTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/AvailabilityTypeSchema.js';
 import type { ConciergeCaseStatus } from '../../../../../../generated/prisma/client.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
+import { DBOS } from '../../../dbos.js';
+import { caseLifecycleWorkflow_v1 } from '../../../workflows/caseLifecycleWorkflow.js';
+
+// Schema for availability time slots
+const AvailabilitySlotSchema = z.object({
+	startTime: z.string().datetime(),
+	endTime: z.string().datetime(),
+	notes: z.string().optional()
+});
 
 // Valid status transitions for the case state machine
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -27,24 +37,6 @@ const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
 	CLOSED: [], // Terminal state
 	CANCELLED: [] // Terminal state
 };
-
-/**
- * Generate a unique case number
- */
-async function generateCaseNumber(organizationId: string): Promise<string> {
-	const year = new Date().getFullYear();
-	const prefix = `CASE-${year}`;
-
-	// Get the count of cases for this org this year
-	const count = await prisma.conciergeCase.count({
-		where: {
-			organizationId,
-			caseNumber: { startsWith: prefix }
-		}
-	});
-
-	return `${prefix}-${String(count + 1).padStart(5, '0')}`;
-}
 
 /**
  * Concierge Case management procedures for Phase 3 Concierge Platform
@@ -61,7 +53,11 @@ export const conciergeCaseRouter = {
 				description: z.string().min(1),
 				priority: ConciergeCasePrioritySchema.optional(),
 				originIntentId: z.string().optional(),
-				assignedConciergeUserId: z.string().optional()
+				assignedConciergeUserId: z.string().optional(),
+				// Owner availability for service visits
+				availabilityType: AvailabilityTypeSchema.optional(),
+				availabilityNotes: z.string().optional(),
+				availabilitySlots: z.array(AvailabilitySlotSchema).optional()
 			})
 		)
 		.output(
@@ -94,65 +90,38 @@ export const conciergeCaseRouter = {
 				throw ApiException.notFound('IndividualProperty');
 			}
 
-			// Generate case number
-			const caseNumber = await generateCaseNumber(context.organization.id);
-
-			// Create case in transaction with initial status history
-			const conciergeCase = await prisma.$transaction(async (tx) => {
-				const newCase = await tx.conciergeCase.create({
-					data: {
-						organizationId: context.organization.id,
-						propertyId: input.propertyId,
-						caseNumber,
-						title: input.title,
-						description: input.description,
-						status: 'INTAKE',
-						priority: input.priority ?? 'NORMAL',
-						originIntentId: input.originIntentId,
-						assignedConciergeUserId: input.assignedConciergeUserId
-					}
-				});
-
-				// Create initial status history entry
-				await tx.caseStatusHistory.create({
-					data: {
-						caseId: newCase.id,
-						fromStatus: null,
-						toStatus: 'INTAKE',
-						changedBy: context.user.id
-					}
-				});
-
-				// If created from an intent, update the intent
-				if (input.originIntentId) {
-					await tx.ownerIntent.update({
-						where: { id: input.originIntentId },
-						data: {
-							status: 'CONVERTED_TO_CASE',
-							convertedCaseId: newCase.id,
-							convertedAt: new Date()
-						}
-					});
-				}
-
-				return newCase;
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			// This ensures:
+			// 1. Idempotency - same key returns same result
+			// 2. Durability - workflow survives crashes
+			// 3. Trace correlation - all DB operations are in same trace
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE_CASE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				propertyId: input.propertyId,
+				title: input.title,
+				description: input.description,
+				priority: input.priority,
+				intentId: input.originIntentId,
+				assigneeUserId: input.assignedConciergeUserId,
+				availabilityType: input.availabilityType,
+				availabilityNotes: input.availabilityNotes,
+				availabilitySlots: input.availabilitySlots
 			});
 
-			// Record activity event
-			await recordIntent(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'CREATE',
-				summary: `Case opened: ${conciergeCase.title}`,
-				caseId: conciergeCase.id,
-				propertyId: input.propertyId,
-				intentId: input.originIntentId,
-				newState: {
-					caseNumber: conciergeCase.caseNumber,
-					title: conciergeCase.title,
-					status: conciergeCase.status,
-					priority: conciergeCase.priority
-				}
+			// Wait for the workflow to complete and get the result
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create case');
+			}
+
+			// Fetch the created case for the response
+			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: result.caseId }
 			});
 
 			return successResponse(

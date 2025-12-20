@@ -3,7 +3,7 @@ import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
-import { withIdempotency } from '../middleware/idempotency.js';
+import { startComplianceWorkflow } from '../../workflows/complianceWorkflow.js';
 import type { RequestContext } from '../context.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
@@ -39,14 +39,6 @@ const RecurrencePatternEnum = z.enum([
 	'ANNUAL'
 ]);
 
-const requireIdempotency = async <T>(
-	key: string,
-	ctx: RequestContext,
-	fn: () => Promise<T>
-) => {
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 export const complianceRouter = {
 	// =========================================================================
@@ -91,37 +83,47 @@ export const complianceRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'complianceRequirement', 'new');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const requirement = await prisma.complianceRequirement.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startComplianceWorkflow(
+				{
+					action: 'CREATE_REQUIREMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
-						organizationId: context.organization.id,
 						name: input.name,
 						description: input.description,
 						type: input.type,
 						jurisdiction: input.jurisdiction,
-						recurrence: input.recurrence ?? 'ANNUAL',
+						recurrence: input.recurrence,
 						defaultDueDayOfYear: input.defaultDueDayOfYear,
-						defaultLeadDays: input.defaultLeadDays ?? 30,
-						requiresEvidence: input.requiresEvidence ?? false,
-						evidenceTypes: input.evidenceTypes ?? [],
+						defaultLeadDays: input.defaultLeadDays,
+						requiresEvidence: input.requiresEvidence,
+						evidenceTypes: input.evidenceTypes,
 						statutoryReference: input.statutoryReference,
 						penaltyDescription: input.penaltyDescription,
-						checklistTemplate: input.checklistTemplate as Prisma.InputJsonValue
+						checklistTemplate: input.checklistTemplate
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						requirement: {
-							id: requirement.id,
-							name: requirement.name,
-							type: requirement.type,
-							createdAt: requirement.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create requirement');
+			}
+
+			const requirement = await prisma.complianceRequirement.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					requirement: {
+						id: requirement.id,
+						name: requirement.name,
+						type: requirement.type,
+						createdAt: requirement.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getRequirement: orgProcedure
@@ -289,35 +291,46 @@ export const complianceRouter = {
 
 			await context.cerbos.authorize('update', 'complianceRequirement', requirement.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const updated = await prisma.complianceRequirement.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startComplianceWorkflow(
+				{
+					action: 'UPDATE_REQUIREMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
-						...(input.name && { name: input.name }),
-						...(input.description !== undefined && { description: input.description }),
-						...(input.type && { type: input.type }),
-						...(input.jurisdiction !== undefined && { jurisdiction: input.jurisdiction }),
-						...(input.recurrence && { recurrence: input.recurrence }),
-						...(input.defaultDueDayOfYear !== undefined && { defaultDueDayOfYear: input.defaultDueDayOfYear }),
-						...(input.defaultLeadDays !== undefined && { defaultLeadDays: input.defaultLeadDays }),
-						...(input.requiresEvidence !== undefined && { requiresEvidence: input.requiresEvidence }),
-						...(input.evidenceTypes && { evidenceTypes: input.evidenceTypes }),
-						...(input.statutoryReference !== undefined && { statutoryReference: input.statutoryReference }),
-						...(input.penaltyDescription !== undefined && { penaltyDescription: input.penaltyDescription }),
-						...(input.isActive !== undefined && { isActive: input.isActive })
+						id: input.id,
+						name: input.name,
+						description: input.description,
+						type: input.type,
+						jurisdiction: input.jurisdiction,
+						recurrence: input.recurrence,
+						defaultDueDayOfYear: input.defaultDueDayOfYear,
+						defaultLeadDays: input.defaultLeadDays,
+						requiresEvidence: input.requiresEvidence,
+						evidenceTypes: input.evidenceTypes,
+						statutoryReference: input.statutoryReference,
+						penaltyDescription: input.penaltyDescription,
+						isActive: input.isActive
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						requirement: {
-							id: updated.id,
-							updatedAt: updated.updatedAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update requirement');
+			}
+
+			const updated = await prisma.complianceRequirement.findUniqueOrThrow({ where: { id: input.id } });
+
+			return successResponse(
+				{
+					requirement: {
+						id: updated.id,
+						updatedAt: updated.updatedAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	// =========================================================================
@@ -366,46 +379,44 @@ export const complianceRouter = {
 			});
 			if (!requirement) throw ApiException.notFound('ComplianceRequirement');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const deadline = await prisma.complianceDeadline.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startComplianceWorkflow(
+				{
+					action: 'CREATE_DEADLINE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						associationId: input.associationId,
 						requirementId: input.requirementId,
 						title: input.title,
 						description: input.description,
-						dueDate: new Date(input.dueDate),
-						reminderDate: input.reminderDate ? new Date(input.reminderDate) : undefined,
+						dueDate: input.dueDate,
+						reminderDate: input.reminderDate,
 						fiscalYear: input.fiscalYear,
 						notes: input.notes
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Create checklist items from template if available
-				if (requirement.checklistTemplate && Array.isArray(requirement.checklistTemplate)) {
-					const template = requirement.checklistTemplate as Array<{ title: string; description?: string }>;
-					await prisma.complianceChecklistItem.createMany({
-						data: template.map((item, index) => ({
-							deadlineId: deadline.id,
-							title: item.title,
-							description: item.description,
-							sortOrder: index
-						}))
-					});
-				}
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create deadline');
+			}
 
-				return successResponse(
-					{
-						deadline: {
-							id: deadline.id,
-							title: deadline.title,
-							dueDate: deadline.dueDate.toISOString(),
-							status: deadline.status,
-							createdAt: deadline.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			const deadline = await prisma.complianceDeadline.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					deadline: {
+						id: deadline.id,
+						title: deadline.title,
+						dueDate: deadline.dueDate.toISOString(),
+						status: deadline.status,
+						createdAt: deadline.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getDeadline: orgProcedure

@@ -6,7 +6,7 @@ import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
 import { PaginationInputSchema, PaginationOutputSchema, IdempotencyKeySchema } from '../router.js';
-import { withIdempotency } from '../middleware/idempotency.js';
+import { startOwnerPortalWorkflow } from '../../workflows/ownerPortalWorkflow.js';
 import type { RequestContext } from '../context.js';
 
 const ContactPreferenceChannelEnum = z.enum(['EMAIL', 'SMS', 'PUSH', 'MAIL', 'PORTAL']);
@@ -42,15 +42,6 @@ const OwnerRequestCategoryEnum = z.enum([
 
 const JsonRecord = z.record(z.string(), z.any());
 
-const requireIdempotency = async <T>(
-	key: string | undefined,
-	ctx: RequestContext,
-	fn: () => Promise<T>
-) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const ensureParty = async (partyId: string, organizationId: string) => {
 	const party = await prisma.party.findFirst({
@@ -524,53 +515,53 @@ export const ownerPortalRouter = {
 				}
 			}
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const year = new Date().getFullYear();
-				const count = await prisma.ownerRequest.count({
-					where: {
-						associationId: input.associationId,
-						requestNumber: { startsWith: `REQ-${year}-` }
-					}
-				});
-				const requestNumber = `REQ-${year}-${String(count + 1).padStart(6, '0')}`;
-
-				const request = await prisma.ownerRequest.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'CREATE_OWNER_REQUEST',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						associationId: input.associationId,
 						unitId: input.unitId,
-						partyId: input.partyId,
-						requestNumber,
+						requesterPartyId: input.partyId,
 						category: input.category,
-						status: 'DRAFT',
 						subject: input.subject,
 						description: input.description,
-						attachments: input.attachments as Prisma.InputJsonValue | undefined
+						metadata: input.attachments
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				await prisma.ownerRequestHistory.create({
-					data: {
-						requestId: request.id,
-						action: 'CREATED',
-						newStatus: 'DRAFT',
-						performedBy: context.user.id
-					}
-				});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create owner request');
+			}
 
-				return successResponse(
-					{
-						request: {
-							id: request.id,
-							requestNumber: request.requestNumber,
-							status: request.status,
-							category: request.category,
-							subject: request.subject,
-							createdAt: request.createdAt.toISOString()
-						}
-					},
-					context
-				);
+			const request = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			await prisma.ownerRequestHistory.create({
+				data: {
+					requestId: request.id,
+					action: 'CREATED',
+					newStatus: 'DRAFT',
+					performedBy: context.user.id
+				}
 			});
+
+			return successResponse(
+				{
+					request: {
+						id: request.id,
+						requestNumber: request.requestNumber,
+						status: request.status,
+						category: request.category,
+						subject: request.subject,
+						createdAt: request.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getRequest: orgProcedure
@@ -758,34 +749,44 @@ export const ownerPortalRouter = {
 
 			await context.cerbos.authorize('submit', 'ownerRequest', request.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const now = new Date();
-				const updated = await prisma.ownerRequest.update({
-					where: { id: input.id },
-					data: { status: 'SUBMITTED', submittedAt: now }
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'SUBMIT_OWNER_REQUEST',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				await prisma.ownerRequestHistory.create({
-					data: {
-						requestId: request.id,
-						action: 'SUBMITTED',
-						previousStatus: 'DRAFT',
-						newStatus: 'SUBMITTED',
-						performedBy: context.user.id
-					}
-				});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to submit owner request');
+			}
 
-				return successResponse(
-					{
-						request: {
-							id: updated.id,
-							status: updated.status,
-							submittedAt: updated.submittedAt!.toISOString()
-						}
-					},
-					context
-				);
+			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
+
+			await prisma.ownerRequestHistory.create({
+				data: {
+					requestId: request.id,
+					action: 'SUBMITTED',
+					previousStatus: 'DRAFT',
+					newStatus: 'SUBMITTED',
+					performedBy: context.user.id
+				}
 			});
+
+			return successResponse(
+				{
+					request: {
+						id: updated.id,
+						status: updated.status,
+						submittedAt: updated.submittedAt!.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	updateRequestStatus: orgProcedure
@@ -824,42 +825,49 @@ export const ownerPortalRouter = {
 
 			await context.cerbos.authorize('update', 'ownerRequest', request.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const now = new Date();
-				const data: Prisma.OwnerRequestUpdateInput = { status: input.status };
-
-				if (input.status === 'RESOLVED') data.resolvedAt = now;
-				if (input.status === 'CLOSED') data.closedAt = now;
-				if (input.resolutionNotes) data.resolutionNotes = input.resolutionNotes;
-
-				const updated = await prisma.ownerRequest.update({
-					where: { id: input.id },
-					data
-				});
-
-				await prisma.ownerRequestHistory.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'UPDATE_REQUEST_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: input.id,
 					data: {
-						requestId: request.id,
-						action: input.status,
-						previousStatus: request.status,
-						newStatus: input.status,
-						notes: input.notes,
-						performedBy: context.user.id
+						status: input.status,
+						resolution: input.resolutionNotes
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						request: {
-							id: updated.id,
-							status: updated.status,
-							resolvedAt: updated.resolvedAt?.toISOString() ?? null,
-							closedAt: updated.closedAt?.toISOString() ?? null
-						}
-					},
-					context
-				);
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update request status');
+			}
+
+			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
+
+			await prisma.ownerRequestHistory.create({
+				data: {
+					requestId: request.id,
+					action: input.status,
+					previousStatus: request.status,
+					newStatus: input.status,
+					notes: input.notes,
+					performedBy: context.user.id
+				}
 			});
+
+			return successResponse(
+				{
+					request: {
+						id: updated.id,
+						status: updated.status,
+						resolvedAt: updated.resolvedAt?.toISOString() ?? null,
+						closedAt: updated.closedAt?.toISOString() ?? null
+					}
+				},
+				context
+			);
 		}),
 
 	convertToWorkOrder: orgProcedure
@@ -903,31 +911,44 @@ export const ownerPortalRouter = {
 				throw ApiException.notFound('WorkOrder');
 			}
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const updated = await prisma.ownerRequest.update({
-					where: { id: input.id },
-					data: { workOrderId: input.workOrderId }
-				});
-
-				await prisma.ownerRequestHistory.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'LINK_WORK_ORDER',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: input.id,
 					data: {
-						requestId: request.id,
-						action: 'LINKED_TO_WORK_ORDER',
-						notes: `Linked to work order ${workOrder.workOrderNumber}`,
-						performedBy: context.user.id
+						workOrderId: input.workOrderId
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						request: {
-							id: updated.id,
-							workOrderId: updated.workOrderId!
-						}
-					},
-					context
-				);
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to link work order');
+			}
+
+			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
+
+			await prisma.ownerRequestHistory.create({
+				data: {
+					requestId: request.id,
+					action: 'LINKED_TO_WORK_ORDER',
+					notes: `Linked to work order ${workOrder.workOrderNumber}`,
+					performedBy: context.user.id
+				}
 			});
+
+			return successResponse(
+				{
+					request: {
+						id: updated.id,
+						workOrderId: updated.workOrderId!
+					}
+				},
+				context
+			);
 		}),
 
 	getRequestHistory: orgProcedure
@@ -1024,44 +1045,45 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id);
 			await context.cerbos.authorize('create', 'paymentMethod', 'new');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// If setting as default, unset other defaults
-				if (input.isDefault) {
-					await prisma.storedPaymentMethod.updateMany({
-						where: { partyId: input.partyId, isDefault: true, deletedAt: null },
-						data: { isDefault: false }
-					});
-				}
-
-				const method = await prisma.storedPaymentMethod.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'ADD_PAYMENT_METHOD',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						partyId: input.partyId,
 						methodType: input.methodType,
-						nickname: input.nickname,
-						lastFour: input.lastFour,
+						last4: input.lastFour,
 						expirationMonth: input.expirationMonth,
 						expirationYear: input.expirationYear,
 						bankName: input.bankName,
-						processorToken: input.processorToken,
-						processorType: input.processorType,
+						providerToken: input.processorToken,
 						isDefault: input.isDefault ?? false
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						paymentMethod: {
-							id: method.id,
-							methodType: method.methodType,
-							nickname: method.nickname ?? null,
-							lastFour: method.lastFour,
-							isDefault: method.isDefault,
-							createdAt: method.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to add payment method');
+			}
+
+			const method = await prisma.storedPaymentMethod.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					paymentMethod: {
+						id: method.id,
+						methodType: method.methodType,
+						nickname: method.nickname ?? null,
+						lastFour: method.lastFour,
+						isDefault: method.isDefault,
+						createdAt: method.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	listPaymentMethods: orgProcedure
@@ -1140,20 +1162,25 @@ export const ownerPortalRouter = {
 			});
 			if (!method) throw ApiException.notFound('PaymentMethod');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				await prisma.$transaction([
-					prisma.storedPaymentMethod.updateMany({
-						where: { partyId: input.partyId, isDefault: true, deletedAt: null },
-						data: { isDefault: false }
-					}),
-					prisma.storedPaymentMethod.update({
-						where: { id: input.paymentMethodId },
-						data: { isDefault: true }
-					})
-				]);
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'SET_DEFAULT_PAYMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						partyId: input.partyId,
+						methodId: input.paymentMethodId
+					}
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse({ success: true }, context);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to set default payment method');
+			}
+
+			return successResponse({ success: true }, context);
 		}),
 
 	deletePaymentMethod: orgProcedure
@@ -1226,54 +1253,43 @@ export const ownerPortalRouter = {
 			});
 			if (!method) throw ApiException.notFound('PaymentMethod');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// Find existing auto-pay setting
-				const existing = await prisma.autoPaySetting.findFirst({
-					where: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'CONFIGURE_AUTO_PAY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
 						partyId: input.partyId,
-						associationId: input.associationId ?? null,
-						assessmentTypeId: null,
-						deletedAt: null
+						methodId: input.paymentMethodId,
+						associationId: input.associationId,
+						isEnabled: input.isEnabled,
+						maxAmount: input.maxAmount,
+						paymentDayOfMonth: input.dayOfMonth
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				const autoPay = existing
-					? await prisma.autoPaySetting.update({
-							where: { id: existing.id },
-							data: {
-								paymentMethodId: input.paymentMethodId,
-								isEnabled: input.isEnabled,
-								frequency: input.frequency,
-								dayOfMonth: input.dayOfMonth,
-								maxAmount: input.maxAmount
-							}
-						})
-					: await prisma.autoPaySetting.create({
-							data: {
-								partyId: input.partyId,
-								paymentMethodId: input.paymentMethodId,
-								isEnabled: input.isEnabled,
-								frequency: input.frequency,
-								dayOfMonth: input.dayOfMonth,
-								maxAmount: input.maxAmount,
-								associationId: input.associationId
-							}
-						});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to configure auto-pay');
+			}
 
-				return successResponse(
-					{
-						autoPay: {
-							id: autoPay.id,
-							isEnabled: autoPay.isEnabled,
-							frequency: autoPay.frequency,
-							dayOfMonth: autoPay.dayOfMonth ?? null,
-							maxAmount: autoPay.maxAmount?.toString() ?? null,
-							createdAt: autoPay.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			const autoPay = await prisma.autoPaySetting.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					autoPay: {
+						id: autoPay.id,
+						isEnabled: autoPay.isEnabled,
+						frequency: autoPay.frequency,
+						dayOfMonth: autoPay.dayOfMonth ?? null,
+						maxAmount: autoPay.maxAmount?.toString() ?? null,
+						createdAt: autoPay.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getAutoPay: orgProcedure
@@ -1649,39 +1665,40 @@ export const ownerPortalRouter = {
 
 			await ensureParty(input.partyId, context.organization.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const grant = await prisma.documentAccessGrant.upsert({
-					where: {
-						documentId_partyId: {
-							documentId: input.documentId,
-							partyId: input.partyId
-						}
-					},
-					create: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'GRANT_DOCUMENT_ACCESS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
 						documentId: input.documentId,
 						partyId: input.partyId,
-						grantedBy: context.user.id,
-						expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined
-					},
-					update: {
-						revokedAt: null,
-						expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined
+						accessLevel: 'VIEW',
+						expiresAt: input.expiresAt
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						grant: {
-							id: grant.id,
-							documentId: grant.documentId,
-							partyId: grant.partyId,
-							grantedAt: grant.grantedAt.toISOString(),
-							expiresAt: grant.expiresAt?.toISOString() ?? null
-						}
-					},
-					context
-				);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to grant document access');
+			}
+
+			const grant = await prisma.documentAccessGrant.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					grant: {
+						id: grant.id,
+						documentId: grant.documentId,
+						partyId: grant.partyId,
+						grantedAt: grant.grantedAt.toISOString(),
+						expiresAt: grant.expiresAt?.toISOString() ?? null
+					}
+				},
+				context
+			);
 		}),
 
 	revokeDocumentAccess: orgProcedure

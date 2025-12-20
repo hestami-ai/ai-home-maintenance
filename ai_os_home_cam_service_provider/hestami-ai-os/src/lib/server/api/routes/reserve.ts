@@ -3,8 +3,7 @@ import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
-import { withIdempotency } from '../middleware/idempotency.js';
-import type { RequestContext } from '../context.js';
+import { startReserveWorkflow } from '../../workflows/reserveWorkflow.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
 const ComponentCategoryEnum = z.enum([
@@ -27,15 +26,6 @@ const ComponentCategoryEnum = z.enum([
 const StudyTypeEnum = z.enum(['FULL', 'UPDATE_WITH_SITE', 'UPDATE_NO_SITE']);
 
 const FundingPlanTypeEnum = z.enum(['BASELINE', 'THRESHOLD', 'FULL_FUNDING', 'STATUTORY']);
-
-const requireIdempotency = async <T>(
-	key: string,
-	ctx: RequestContext,
-	fn: () => Promise<T>
-) => {
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 export const reserveRouter = {
 	// =========================================================================
@@ -87,8 +77,12 @@ export const reserveRouter = {
 			});
 			if (!association) throw ApiException.notFound('Association');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const component = await prisma.reserveComponent.create({
+			// Use DBOS workflow for durable execution
+			const result = await startReserveWorkflow(
+				{
+					action: 'CREATE_COMPONENT',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					data: {
 						associationId: input.associationId,
 						name: input.name,
@@ -97,33 +91,38 @@ export const reserveRouter = {
 						location: input.location,
 						usefulLife: input.usefulLife,
 						remainingLife: input.remainingLife,
-						placedInServiceDate: input.placedInServiceDate
-							? new Date(input.placedInServiceDate)
-							: undefined,
+						placedInServiceDate: input.placedInServiceDate,
 						currentReplacementCost: input.currentReplacementCost,
-						inflationRate: input.inflationRate ?? 3.0,
-						quantity: input.quantity ?? 1,
+						inflationRate: input.inflationRate,
+						quantity: input.quantity,
 						unitOfMeasure: input.unitOfMeasure,
 						conditionRating: input.conditionRating,
 						notes: input.notes
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						component: {
-							id: component.id,
-							name: component.name,
-							category: component.category,
-							usefulLife: component.usefulLife,
-							remainingLife: component.remainingLife,
-							currentReplacementCost: component.currentReplacementCost.toString(),
-							createdAt: component.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create component');
+			}
+
+			const component = await prisma.reserveComponent.findUniqueOrThrow({ where: { id: result.entityId } });
+
+			return successResponse(
+				{
+					component: {
+						id: component.id,
+						name: component.name,
+						category: component.category,
+						usefulLife: component.usefulLife,
+						remainingLife: component.remainingLife,
+						currentReplacementCost: component.currentReplacementCost.toString(),
+						createdAt: component.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getComponent: orgProcedure
@@ -308,36 +307,47 @@ export const reserveRouter = {
 
 			await context.cerbos.authorize('update', 'reserveComponent', component.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const updated = await prisma.reserveComponent.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startReserveWorkflow(
+				{
+					action: 'UPDATE_COMPONENT',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					entityId: input.id,
 					data: {
-						...(input.name && { name: input.name }),
-						...(input.description !== undefined && { description: input.description }),
-						...(input.category && { category: input.category }),
-						...(input.location !== undefined && { location: input.location }),
-						...(input.usefulLife && { usefulLife: input.usefulLife }),
-						...(input.remainingLife !== undefined && { remainingLife: input.remainingLife }),
-						...(input.currentReplacementCost && { currentReplacementCost: input.currentReplacementCost }),
-						...(input.inflationRate !== undefined && { inflationRate: input.inflationRate }),
-						...(input.quantity && { quantity: input.quantity }),
-						...(input.unitOfMeasure !== undefined && { unitOfMeasure: input.unitOfMeasure }),
-						...(input.conditionRating !== undefined && { conditionRating: input.conditionRating }),
-						...(input.lastInspectionDate && { lastInspectionDate: new Date(input.lastInspectionDate) }),
-						...(input.notes !== undefined && { notes: input.notes })
+						name: input.name,
+						description: input.description,
+						category: input.category,
+						location: input.location,
+						usefulLife: input.usefulLife,
+						remainingLife: input.remainingLife,
+						currentReplacementCost: input.currentReplacementCost,
+						inflationRate: input.inflationRate,
+						quantity: input.quantity,
+						unitOfMeasure: input.unitOfMeasure,
+						conditionRating: input.conditionRating,
+						lastInspectionDate: input.lastInspectionDate,
+						notes: input.notes
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						component: {
-							id: updated.id,
-							updatedAt: updated.updatedAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update component');
+			}
+
+			const updated = await prisma.reserveComponent.findUniqueOrThrow({ where: { id: result.entityId } });
+
+			return successResponse(
+				{
+					component: {
+						id: updated.id,
+						updatedAt: updated.updatedAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	deleteComponent: orgProcedure
@@ -418,14 +428,17 @@ export const reserveRouter = {
 			});
 			if (!association) throw ApiException.notFound('Association');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const study = await prisma.reserveStudy.create({
+			// Use DBOS workflow for durable execution
+			const result = await startReserveWorkflow(
+				{
+					action: 'CREATE_STUDY',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					data: {
 						associationId: input.associationId,
 						studyType: input.studyType,
-						studyDate: new Date(input.studyDate),
-						effectiveDate: new Date(input.effectiveDate),
-						expirationDate: input.expirationDate ? new Date(input.expirationDate) : undefined,
+						studyDate: input.studyDate,
+						effectiveDate: input.effectiveDate,
 						preparerName: input.preparerName,
 						preparerCompany: input.preparerCompany,
 						preparerCredentials: input.preparerCredentials,
@@ -434,24 +447,30 @@ export const reserveRouter = {
 						fullyFundedBalance: input.fullyFundedBalance,
 						recommendedContribution: input.recommendedContribution,
 						fundingPlanType: input.fundingPlanType,
-						documentId: input.documentId,
 						notes: input.notes
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						study: {
-							id: study.id,
-							studyType: study.studyType,
-							studyDate: study.studyDate.toISOString(),
-							percentFunded: study.percentFunded.toString(),
-							createdAt: study.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create study');
+			}
+
+			const study = await prisma.reserveStudy.findUniqueOrThrow({ where: { id: result.entityId } });
+
+			return successResponse(
+				{
+					study: {
+						id: study.id,
+						studyType: study.studyType,
+						studyDate: study.studyDate.toISOString(),
+						percentFunded: study.percentFunded.toString(),
+						createdAt: study.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getStudy: orgProcedure
@@ -634,31 +653,38 @@ export const reserveRouter = {
 			});
 			if (!component) throw ApiException.notFound('ReserveComponent');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const snapshot = await prisma.reserveStudyComponent.create({
+			// Use DBOS workflow for durable execution
+			const result = await startReserveWorkflow(
+				{
+					action: 'ADD_STUDY_COMPONENT',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					data: {
 						studyId: input.studyId,
 						componentId: input.componentId,
-						usefulLife: input.usefulLife,
-						remainingLife: input.remainingLife,
-						currentCost: input.currentCost,
 						futureCost: input.futureCost,
-						conditionRating: input.conditionRating,
 						fundedAmount: input.fundedAmount,
 						percentFunded: input.percentFunded
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						snapshot: {
-							id: snapshot.id,
-							createdAt: snapshot.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add study component');
+			}
+
+			const snapshot = await prisma.reserveStudyComponent.findUniqueOrThrow({ where: { id: result.entityId } });
+
+			return successResponse(
+				{
+					snapshot: {
+						id: snapshot.id,
+						createdAt: snapshot.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getStudyComponents: orgProcedure
@@ -761,26 +787,26 @@ export const reserveRouter = {
 
 			await context.cerbos.authorize('update', 'reserveStudy', study.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// Delete existing schedule
-				await prisma.reserveFundingSchedule.deleteMany({
-					where: { studyId: input.studyId }
-				});
-
-				// Create new schedule
-				await prisma.reserveFundingSchedule.createMany({
-					data: input.schedule.map((s) => ({
+			// Use DBOS workflow for durable execution
+			const result = await startReserveWorkflow(
+				{
+					action: 'GENERATE_FUNDING_SCHEDULE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					data: {
 						studyId: input.studyId,
-						fiscalYear: s.fiscalYear,
-						projectedBalance: s.projectedBalance,
-						recommendedContribution: s.recommendedContribution,
-						projectedExpenditures: s.projectedExpenditures,
-						percentFunded: s.percentFunded
-					}))
-				});
+						planType: study.fundingPlanType,
+						yearlyContributions: input.schedule
+					}
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse({ count: input.schedule.length }, context);
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to generate funding schedule');
+			}
+
+			return successResponse({ count: input.schedule.length }, context);
 		}),
 
 	getFundingSchedule: orgProcedure

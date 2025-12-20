@@ -9,6 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startContractSLAWorkflow } from '../../../workflows/contractSLAWorkflow.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 
@@ -93,43 +94,36 @@ export const contractSLARouter = {
 			});
 			if (!contract) throw ApiException.notFound('Service contract');
 
-			const createRecord = async () => {
-				// Calculate compliance percentages
-				const responseCompliancePercent = input.totalRequests > 0
-					? (input.onTimeResponses / input.totalRequests) * 100
-					: null;
-				const resolutionCompliancePercent = input.totalRequests > 0
-					? (input.onTimeResolutions / input.totalRequests) * 100
-					: null;
-				const visitCompliancePercent = input.scheduledVisits > 0
-					? (input.completedVisits / input.scheduledVisits) * 100
-					: null;
-
-				return prisma.contractSLARecord.create({
+			// Use DBOS workflow for durable execution
+			const result = await startContractSLAWorkflow(
+				{
+					action: 'CREATE_SLA',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
 						contractId: input.contractId,
-						periodStart: new Date(input.periodStart),
-						periodEnd: new Date(input.periodEnd),
+						periodStart: input.periodStart,
+						periodEnd: input.periodEnd,
 						totalRequests: input.totalRequests,
 						onTimeResponses: input.onTimeResponses,
 						onTimeResolutions: input.onTimeResolutions,
 						missedSLAs: input.missedSLAs,
-						responseCompliancePercent,
-						resolutionCompliancePercent,
 						avgResponseTimeMinutes: input.avgResponseTimeMinutes,
 						avgResolutionTimeMinutes: input.avgResolutionTimeMinutes,
 						scheduledVisits: input.scheduledVisits,
 						completedVisits: input.completedVisits,
 						missedVisits: input.missedVisits,
-						visitCompliancePercent,
 						notes: input.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const slaRecord = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createRecord)).result
-				: await createRecord();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create SLA record');
+			}
+
+			const slaRecord = await prisma.contractSLARecord.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
 		}),
@@ -256,38 +250,34 @@ export const contractSLARouter = {
 				throw ApiException.notFound('SLA record');
 			}
 
-			const updateRecord = async () => {
-				const totalRequests = input.totalRequests ?? existing.totalRequests;
-				const onTimeResponses = input.onTimeResponses ?? existing.onTimeResponses;
-				const onTimeResolutions = input.onTimeResolutions ?? existing.onTimeResolutions;
-				const scheduledVisits = input.scheduledVisits ?? existing.scheduledVisits;
-				const completedVisits = input.completedVisits ?? existing.completedVisits;
-
-				const responseCompliancePercent = totalRequests > 0
-					? (onTimeResponses / totalRequests) * 100
-					: null;
-				const resolutionCompliancePercent = totalRequests > 0
-					? (onTimeResolutions / totalRequests) * 100
-					: null;
-				const visitCompliancePercent = scheduledVisits > 0
-					? (completedVisits / scheduledVisits) * 100
-					: null;
-
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.contractSLARecord.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startContractSLAWorkflow(
+				{
+					action: 'UPDATE_SLA',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					slaRecordId: input.id,
 					data: {
-						...data,
-						responseCompliancePercent,
-						resolutionCompliancePercent,
-						visitCompliancePercent
+						totalRequests: input.totalRequests,
+						onTimeResponses: input.onTimeResponses,
+						onTimeResolutions: input.onTimeResolutions,
+						missedSLAs: input.missedSLAs,
+						avgResponseTimeMinutes: input.avgResponseTimeMinutes,
+						avgResolutionTimeMinutes: input.avgResolutionTimeMinutes,
+						scheduledVisits: input.scheduledVisits,
+						completedVisits: input.completedVisits,
+						missedVisits: input.missedVisits,
+						notes: input.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const slaRecord = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateRecord)).result
-				: await updateRecord();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update SLA record');
+			}
+
+			const slaRecord = await prisma.contractSLARecord.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
 		}),
@@ -318,56 +308,26 @@ export const contractSLARouter = {
 			});
 			if (!contract) throw ApiException.notFound('Service contract');
 
-			const calculateSLA = async () => {
-				const periodStart = new Date(input.periodStart);
-				const periodEnd = new Date(input.periodEnd);
-
-				// Get visits in period
-				const visits = await prisma.scheduledVisit.findMany({
-					where: {
+			// Use DBOS workflow for durable execution
+			const result = await startContractSLAWorkflow(
+				{
+					action: 'CALCULATE_SLA',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
 						contractId: input.contractId,
-						scheduledDate: { gte: periodStart, lte: periodEnd }
+						periodStart: input.periodStart,
+						periodEnd: input.periodEnd
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				const scheduledVisits = visits.length;
-				const completedVisits = visits.filter(v => v.status === 'COMPLETED').length;
-				const missedVisits = visits.filter(v => v.status === 'MISSED').length;
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to calculate SLA');
+			}
 
-				const visitCompliancePercent = scheduledVisits > 0
-					? (completedVisits / scheduledVisits) * 100
-					: null;
-
-				// Upsert the record
-				return prisma.contractSLARecord.upsert({
-					where: {
-						contractId_periodStart_periodEnd: {
-							contractId: input.contractId,
-							periodStart,
-							periodEnd
-						}
-					},
-					create: {
-						contractId: input.contractId,
-						periodStart,
-						periodEnd,
-						scheduledVisits,
-						completedVisits,
-						missedVisits,
-						visitCompliancePercent
-					},
-					update: {
-						scheduledVisits,
-						completedVisits,
-						missedVisits,
-						visitCompliancePercent
-					}
-				});
-			};
-
-			const slaRecord = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, calculateSLA)).result
-				: await calculateSLA();
+			const slaRecord = await prisma.contractSLARecord.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
 		})

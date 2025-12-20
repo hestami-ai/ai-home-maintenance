@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { SLAPriority } from '../../../../../../generated/prisma/client.js';
+import { startSLAWorkflow } from '../../../workflows/slaWorkflow.js';
 
 const slaWindowOutput = z.object({
 	id: z.string(),
@@ -107,39 +108,33 @@ export const slaRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'sla_window', 'new');
 
-			const createWindow = async () => {
-				return prisma.$transaction(async (tx) => {
-					// If this is default, unset other defaults for same priority
-					if (input.isDefault) {
-						await tx.sLAWindow.updateMany({
-							where: {
-								organizationId: context.organization!.id,
-								priority: input.priority,
-								isDefault: true
-							},
-							data: { isDefault: false }
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startSLAWorkflow(
+				{
+					action: 'CREATE_WINDOW',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						name: input.name,
+						description: input.description,
+						priority: input.priority,
+						responseMinutes: input.responseTimeMinutes,
+						resolutionMinutes: input.resolutionTimeMinutes,
+						businessHoursOnly: input.businessHoursOnly,
+						jobCategory: input.jobCategory,
+						isDefault: input.isDefault
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.sLAWindow.create({
-						data: {
-							organizationId: context.organization!.id,
-							name: input.name,
-							description: input.description,
-							priority: input.priority,
-							responseTimeMinutes: input.responseTimeMinutes,
-							resolutionTimeMinutes: input.resolutionTimeMinutes,
-							businessHoursOnly: input.businessHoursOnly,
-							jobCategory: input.jobCategory,
-							isDefault: input.isDefault
-						}
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create SLA window');
+			}
 
-			const slaWindow = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createWindow)).result
-				: await createWindow();
+			const slaWindow = await prisma.sLAWindow.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ slaWindow: formatSLAWindow(slaWindow) }, context);
 		}),
@@ -261,33 +256,27 @@ export const slaRouter = {
 			});
 			if (!existing) throw ApiException.notFound('SLA Window');
 
-			const updateWindow = async () => {
-				const { id, idempotencyKey, ...data } = input;
+			const { id, idempotencyKey, ...data } = input;
 
-				return prisma.$transaction(async (tx) => {
-					// If setting as default, unset other defaults
-					if (data.isDefault) {
-						await tx.sLAWindow.updateMany({
-							where: {
-								organizationId: context.organization!.id,
-								priority: existing.priority,
-								isDefault: true,
-								id: { not: id }
-							},
-							data: { isDefault: false }
-						});
-					}
+			// Use DBOS workflow for durable execution
+			const result = await startSLAWorkflow(
+				{
+					action: 'UPDATE_WINDOW',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					windowId: id,
+					data
+				},
+				idempotencyKey
+			);
 
-					return tx.sLAWindow.update({
-						where: { id },
-						data
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update SLA window');
+			}
 
-			const slaWindow = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateWindow)).result
-				: await updateWindow();
+			const slaWindow = await prisma.sLAWindow.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ slaWindow: formatSLAWindow(slaWindow) }, context);
 		}),
@@ -313,16 +302,23 @@ export const slaRouter = {
 			});
 			if (!existing) throw ApiException.notFound('SLA Window');
 
-			const deleteWindow = async () => {
-				await prisma.sLAWindow.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startSLAWorkflow(
+				{
+					action: 'DELETE_WINDOW',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					windowId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteWindow)).result
-				: await deleteWindow();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete SLA window');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		}),
 
 	/**
@@ -395,22 +391,30 @@ export const slaRouter = {
 			const responseDue = new Date(now.getTime() + slaWindow.responseTimeMinutes * 60000);
 			const resolutionDue = new Date(now.getTime() + slaWindow.resolutionTimeMinutes * 60000);
 
-			const createRecord = async () => {
-				return prisma.sLARecord.create({
+			// Use DBOS workflow for durable execution
+			const result = await startSLAWorkflow(
+				{
+					action: 'CREATE_RECORD',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						jobId: input.jobId,
 						slaWindowId: slaWindow!.id,
-						responseDue,
-						resolutionDue,
+						responseDue: responseDue.toISOString(),
+						resolutionDue: resolutionDue.toISOString(),
 						notes: input.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const slaRecord = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createRecord)).result
-				: await createRecord();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create SLA record');
+			}
+
+			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
 		}),
@@ -469,19 +473,25 @@ export const slaRouter = {
 			const now = new Date();
 			const responseBreached = now > existing.responseDue;
 
-			const markResponse = async () => {
-				return prisma.sLARecord.update({
-					where: { id: existing.id },
-					data: {
-						respondedAt: now,
-						responseBreached
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startSLAWorkflow(
+				{
+					action: 'MARK_RESPONSE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					recordId: existing.id,
+					data: { responseBreached }
+				},
+				input.idempotencyKey
+			);
 
-			const slaRecord = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, markResponse)).result
-				: await markResponse();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to mark SLA response');
+			}
+
+			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
 		}),
@@ -514,21 +524,29 @@ export const slaRouter = {
 			const now = new Date();
 			const resolutionBreached = now > existing.resolutionDue;
 
-			const markResolution = async () => {
-				return prisma.sLARecord.update({
-					where: { id: existing.id },
+			// Use DBOS workflow for durable execution
+			const result = await startSLAWorkflow(
+				{
+					action: 'MARK_RESOLUTION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					recordId: existing.id,
 					data: {
-						resolvedAt: now,
 						resolutionBreached,
-						// Also mark response if not already done
-						...(existing.respondedAt ? {} : { respondedAt: now, responseBreached: now > existing.responseDue })
+						alsoMarkResponse: !existing.respondedAt,
+						responseBreached: now > existing.responseDue
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const slaRecord = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, markResolution)).result
-				: await markResolution();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to mark SLA resolution');
+			}
+
+			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
 		}),

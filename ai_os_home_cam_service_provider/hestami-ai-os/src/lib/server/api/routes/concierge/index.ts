@@ -12,3 +12,5 @@ export { conciergeActionRouter } from './conciergeAction.js';
 export { externalHoaRouter } from './externalHoa.js';
 export { externalVendorRouter } from './externalVendor.js';
 export { materialDecisionRouter } from './materialDecision.js';
+export { propertyPortfolioRouter } from './propertyPortfolio.js';
+export { individualPropertyRouter } from './individualProperty.js';

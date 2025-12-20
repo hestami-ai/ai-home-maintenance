@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startCustomerWorkflow } from '../../../workflows/customerWorkflow.js';
 
 const customerOutput = z.object({
 	id: z.string(),
@@ -116,15 +117,18 @@ export const customerRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'customer', 'new');
 
-			const createCustomer = async () => {
-				return prisma.customer.create({
+			// Use DBOS workflow for durable execution
+			const result = await startCustomerWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
-						name: input.name,
+						displayName: input.name,
 						companyName: input.companyName,
 						email: input.email,
 						phone: input.phone,
-						altPhone: input.altPhone,
+						alternatePhone: input.altPhone,
 						addressLine1: input.addressLine1,
 						addressLine2: input.addressLine2,
 						city: input.city,
@@ -132,16 +136,19 @@ export const customerRouter = {
 						postalCode: input.postalCode,
 						country: input.country,
 						notes: input.notes,
-						tags: input.tags,
-						source: input.source,
-						referredBy: input.referredBy
+						tags: input.tags
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const customer = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createCustomer)).result
-				: await createCustomer();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create customer');
+			}
+
+			const customer = await prisma.customer.findUniqueOrThrow({
+				where: { id: result.customerId }
+			});
 
 			return successResponse({ customer: formatCustomer(customer) }, context);
 		}),
@@ -297,17 +304,41 @@ export const customerRouter = {
 				throw ApiException.notFound('Customer');
 			}
 
-			const updateCustomer = async () => {
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.customer.update({
-					where: { id },
-					data
-				});
-			};
+			const { id, idempotencyKey, ...data } = input;
 
-			const customer = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateCustomer)).result
-				: await updateCustomer();
+			// Use DBOS workflow for durable execution
+			const result = await startCustomerWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					customerId: id,
+					data: {
+						displayName: data.name,
+						companyName: data.companyName,
+						email: data.email,
+						phone: data.phone,
+						alternatePhone: data.altPhone,
+						addressLine1: data.addressLine1,
+						addressLine2: data.addressLine2,
+						city: data.city,
+						state: data.state,
+						postalCode: data.postalCode,
+						country: data.country,
+						notes: data.notes,
+						tags: data.tags
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update customer');
+			}
+
+			const customer = await prisma.customer.findUniqueOrThrow({
+				where: { id: result.customerId }
+			});
 
 			return successResponse({ customer: formatCustomer(customer) }, context);
 		}),
@@ -340,18 +371,22 @@ export const customerRouter = {
 				throw ApiException.notFound('Customer');
 			}
 
-			const deleteCustomer = async () => {
-				await prisma.customer.update({
-					where: { id: input.id },
-					data: { deletedAt: new Date() }
-				});
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startCustomerWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					customerId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteCustomer)).result
-				: await deleteCustomer();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete customer');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

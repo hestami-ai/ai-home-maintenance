@@ -3,19 +3,12 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
+import { startARCReviewWorkflow } from '../../../workflows/arcReviewWorkflow.js';
 import type { Prisma, ARCReviewAction, ARCRequestStatus } from '../../../../../../generated/prisma/client.js';
-import type { RequestContext } from '../../context.js';
 
 const arcReviewActionEnum = z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']);
 const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
 const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
-
-const requireIdempotency = async <T>(key: string | undefined, ctx: RequestContext, fn: () => Promise<T>) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const ensureCommitteeBelongs = async (committeeId: string, associationId: string) => {
 	const committee = await prisma.aRCCommittee.findFirst({ where: { id: committeeId, associationId, isActive: true } });
@@ -72,30 +65,23 @@ export const arcReviewRouter = {
 			await context.cerbos.authorize('edit', 'arc_request', input.committeeId);
 			const { idempotencyKey, ...rest } = input;
 
-			const member = await requireIdempotency(idempotencyKey, context, async () => {
-				const committee = await prisma.aRCCommittee.findFirst({
-					where: { id: rest.committeeId },
-					include: { association: true }
-				});
-				if (!committee || committee.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('ARC Committee');
-				}
-				await ensurePartyBelongs(rest.partyId, committee.association.organizationId);
+			// Use DBOS workflow for durable execution
+			const result = await startARCReviewWorkflow(
+				{
+					action: 'ADD_MEMBER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					committeeId: rest.committeeId,
+					data: { partyId: rest.partyId, role: rest.role, isChair: rest.isChair }
+				},
+				idempotencyKey
+			);
 
-				const existing = await prisma.aRCCommitteeMember.findFirst({
-					where: { committeeId: rest.committeeId, partyId: rest.partyId, leftAt: null }
-				});
-				if (existing) return existing;
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add member');
+			}
 
-				return prisma.aRCCommitteeMember.create({
-					data: {
-						committeeId: rest.committeeId,
-						partyId: rest.partyId,
-						role: rest.role,
-						isChair: rest.isChair ?? false
-					}
-				});
-			});
+			const member = await prisma.aRCCommitteeMember.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{ member: { id: member.id, committeeId: member.committeeId, partyId: member.partyId } },
@@ -123,25 +109,24 @@ export const arcReviewRouter = {
 			await context.cerbos.authorize('edit', 'arc_request', input.committeeId);
 			const { idempotencyKey, ...rest } = input;
 
-			const leftAtIso = await requireIdempotency(idempotencyKey, context, async () => {
-				const committee = await prisma.aRCCommittee.findFirst({
-					where: { id: rest.committeeId },
-					include: { association: true }
-				});
-				if (!committee || committee.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('ARC Committee');
-				}
+			// Use DBOS workflow for durable execution
+			const result = await startARCReviewWorkflow(
+				{
+					action: 'REMOVE_MEMBER',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					committeeId: rest.committeeId,
+					data: { partyId: rest.partyId }
+				},
+				idempotencyKey
+			);
 
-				const leftAt = new Date();
-				await prisma.aRCCommitteeMember.updateMany({
-					where: { committeeId: rest.committeeId, partyId: rest.partyId, leftAt: null },
-					data: { leftAt }
-				});
-				return leftAt.toISOString();
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to remove member');
+			}
 
 			return successResponse(
-				{ member: { committeeId: input.committeeId, partyId: input.partyId, leftAt: leftAtIso } },
+				{ member: { committeeId: input.committeeId, partyId: input.partyId, leftAt: result.leftAt! } },
 				context
 			);
 		}),
@@ -214,29 +199,24 @@ export const arcReviewRouter = {
 			await context.cerbos.authorize('edit', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
-			const updated = await requireIdempotency(idempotencyKey, context, async () => {
-				const request = await prisma.aRCRequest.findFirst({
-					where: { id: rest.requestId },
-					include: { association: true }
-				});
-				if (!request || request.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('ARC Request');
-				}
+			// Use DBOS workflow for durable execution
+			const result = await startARCReviewWorkflow(
+				{
+					action: 'ASSIGN_COMMITTEE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					requestId: rest.requestId,
+					data: { committeeId: rest.committeeId }
+				},
+				idempotencyKey
+			);
 
-				if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
-					throw ApiException.badRequest('Cannot assign committee after final decision or closure');
-				}
-
-				await ensureCommitteeBelongs(rest.committeeId, request.associationId);
-
-				return prisma.aRCRequest.update({
-					where: { id: rest.requestId },
-					data: { committeeId: rest.committeeId, status: 'UNDER_REVIEW', reviewedAt: null, decisionDate: null }
-				});
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to assign committee');
+			}
 
 			return successResponse(
-				{ request: { id: updated.id, status: updated.status, committeeId: updated.committeeId! } },
+				{ request: { id: result.entityId!, status: result.status!, committeeId: rest.committeeId } },
 				context
 			);
 		}),
@@ -265,46 +245,28 @@ export const arcReviewRouter = {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
-			const review = await requireIdempotency(idempotencyKey, context, async () => {
-				const request = await prisma.aRCRequest.findFirst({
-					where: { id: rest.requestId },
-					include: { association: true }
-				});
-				if (!request || request.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('ARC Request');
-				}
-				if (!request.committeeId) {
-					throw ApiException.badRequest('Request is not assigned to a committee');
-				}
-
-				if (!reviewableStatuses.includes(request.status as ARCRequestStatus)) {
-					throw ApiException.badRequest('Request is not in a reviewable state');
-				}
-
-				await ensureCommitteeMember(request.committeeId, context.user!.id);
-
-				if (request.status === 'SUBMITTED') {
-					await prisma.aRCRequest.update({ where: { id: request.id }, data: { status: 'UNDER_REVIEW' } });
-				}
-
-				const existing = await prisma.aRCReview.findFirst({
-					where: { requestId: rest.requestId, reviewerId: context.user!.id }
-				});
-				if (existing) return existing;
-
-				const created = await prisma.aRCReview.create({
+			// Use DBOS workflow for durable execution
+			const result = await startARCReviewWorkflow(
+				{
+					action: 'SUBMIT_REVIEW',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					requestId: rest.requestId,
 					data: {
-						requestId: rest.requestId,
-						reviewerId: context.user!.id,
-						action: rest.action as ARCReviewAction,
+						action: rest.action,
 						notes: rest.notes,
 						conditions: rest.conditions,
-						expiresAt: rest.expiresAt ? new Date(rest.expiresAt) : undefined
+						expiresAt: rest.expiresAt
 					}
-				});
+				},
+				idempotencyKey
+			);
 
-				return created;
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to submit review');
+			}
+
+			const review = await prisma.aRCReview.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{ review: { id: review.id, requestId: review.requestId, action: review.action } },
@@ -336,73 +298,28 @@ export const arcReviewRouter = {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
-			const result = await requireIdempotency(idempotencyKey, context, async () => {
-				const request = await prisma.aRCRequest.findFirst({
-					where: { id: rest.requestId },
-					include: { association: true }
-				});
-				if (!request || request.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('ARC Request');
-				}
-
-				if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
-					throw ApiException.badRequest('Request already has a final decision');
-				}
-
-				const actionToStatus: Record<ARCReviewAction, ARCRequestStatus> = {
-					APPROVE: 'APPROVED',
-					DENY: 'DENIED',
-					REQUEST_CHANGES: 'CHANGES_REQUESTED',
-					TABLE: 'TABLED'
-				};
-
-				const status = actionToStatus[rest.action as ARCReviewAction];
-				const decisionDate = new Date();
-
-				if (request.committeeId) {
-					const committee = await ensureCommitteeBelongs(request.committeeId, request.associationId);
-					const activeMembers = await prisma.aRCCommitteeMember.count({
-						where: { committeeId: committee.id, leftAt: null }
-					});
-					const { total, approvals } = await getReviewStats(request.id);
-
-					if (committee.quorum && total < committee.quorum) {
-						throw ApiException.badRequest('Quorum not met for committee decision');
+			// Use DBOS workflow for durable execution
+			const result = await startARCReviewWorkflow(
+				{
+					action: 'RECORD_DECISION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					requestId: rest.requestId,
+					data: {
+						action: rest.action,
+						notes: rest.notes,
+						conditions: rest.conditions,
+						expiresAt: rest.expiresAt
 					}
+				},
+				idempotencyKey
+			);
 
-					if (rest.action === 'APPROVE' && committee.approvalThreshold !== null) {
-						const threshold = Number(committee.approvalThreshold);
-						const approvalPct = activeMembers > 0 ? (approvals / activeMembers) * 100 : 0;
-						if (approvalPct < threshold) {
-							throw ApiException.badRequest('Approval threshold not met');
-						}
-					}
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record decision');
+			}
 
-				const res = await prisma.$transaction(async (tx) => {
-					await tx.aRCReview.create({
-						data: {
-							requestId: rest.requestId,
-							reviewerId: context.user!.id,
-							action: rest.action as ARCReviewAction,
-							notes: rest.notes,
-							conditions: rest.conditions,
-							expiresAt: rest.expiresAt ? new Date(rest.expiresAt) : undefined
-						}
-					});
-
-					const updated = await tx.aRCRequest.update({
-						where: { id: rest.requestId },
-						data: { status, reviewedAt: decisionDate, decisionDate, conditions: rest.conditions, expiresAt: rest.expiresAt ? new Date(rest.expiresAt) : request.expiresAt }
-					});
-
-					return updated;
-				});
-
-				return res;
-			});
-
-			return successResponse({ request: { id: result.id, status: result.status } }, context);
+			return successResponse({ request: { id: result.entityId!, status: result.status! } }, context);
 		}),
 
 	/**

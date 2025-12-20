@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startOfflineSyncWorkflow } from '../../../workflows/offlineSyncWorkflow.js';
 
 const syncQueueItemOutput = z.object({
 	id: z.string(),
@@ -81,22 +82,30 @@ export const offlineSyncRouter = {
 			});
 			if (!tech) throw ApiException.notFound('Technician');
 
-			const queueItem = async () => {
-				return prisma.offlineSyncQueue.create({
+			// Use DBOS workflow for durable execution
+			const result = await startOfflineSyncWorkflow(
+				{
+					action: 'QUEUE_ITEM',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						technicianId: input.technicianId,
 						entityType: input.entityType,
 						entityId: input.entityId,
 						action: input.action,
 						payload: input.payload
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const item = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, queueItem)).result
-				: await queueItem();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to queue item');
+			}
+
+			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ queueItem: formatSyncQueueItem(item) }, context);
 		}),
@@ -140,27 +149,27 @@ export const offlineSyncRouter = {
 			});
 			if (!tech) throw ApiException.notFound('Technician');
 
-			const batchQueue = async () => {
-				const created = await prisma.$transaction(
-					input.items.map((item) =>
-						prisma.offlineSyncQueue.create({
-							data: {
-								organizationId: context.organization!.id,
-								technicianId: input.technicianId,
-								entityType: item.entityType,
-								entityId: item.entityId,
-								action: item.action,
-								payload: item.payload
-							}
-						})
-					)
-				);
-				return created;
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startOfflineSyncWorkflow(
+				{
+					action: 'BATCH_QUEUE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						technicianId: input.technicianId,
+						items: input.items
+					}
+				},
+				input.idempotencyKey
+			);
 
-			const items = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, batchQueue)).result
-				: await batchQueue();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to batch queue items');
+			}
+
+			const items = await prisma.offlineSyncQueue.findMany({
+				where: { id: { in: result.entityIds } }
+			});
 
 			return successResponse(
 				{
@@ -256,20 +265,25 @@ export const offlineSyncRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Queue item');
 
-			const markSynced = async () => {
-				return prisma.offlineSyncQueue.update({
-					where: { id: input.queueItemId },
-					data: {
-						isSynced: true,
-						syncedAt: new Date(),
-						syncedId: input.syncedId
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startOfflineSyncWorkflow(
+				{
+					action: 'MARK_SYNCED',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					queueItemId: input.queueItemId,
+					data: { syncedId: input.syncedId }
+				},
+				input.idempotencyKey
+			);
 
-			const item = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, markSynced)).result
-				: await markSynced();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to mark item as synced');
+			}
+
+			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ queueItem: formatSyncQueueItem(item) }, context);
 		}),
@@ -301,20 +315,28 @@ export const offlineSyncRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Queue item');
 
-			const markFailed = async () => {
-				return prisma.offlineSyncQueue.update({
-					where: { id: input.queueItemId },
+			// Use DBOS workflow for durable execution
+			const result = await startOfflineSyncWorkflow(
+				{
+					action: 'MARK_FAILED',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					queueItemId: input.queueItemId,
 					data: {
-						attempts: existing.attempts + 1,
-						lastAttemptAt: new Date(),
+						existingAttempts: existing.attempts,
 						errorMessage: input.errorMessage
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const item = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, markFailed)).result
-				: await markFailed();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to mark item as failed');
+			}
+
+			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ queueItem: formatSyncQueueItem(item) }, context);
 		}),
@@ -345,22 +367,24 @@ export const offlineSyncRouter = {
 			const cutoffDate = new Date();
 			cutoffDate.setDate(cutoffDate.getDate() - input.olderThanDays);
 
-			const clearSynced = async () => {
-				const result = await prisma.offlineSyncQueue.deleteMany({
-					where: {
-						organizationId: context.organization!.id,
+			// Use DBOS workflow for durable execution
+			const result = await startOfflineSyncWorkflow(
+				{
+					action: 'CLEAR_SYNCED',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
 						technicianId: input.technicianId,
-						isSynced: true,
-						syncedAt: { lt: cutoffDate }
+						cutoffDate: cutoffDate.toISOString()
 					}
-				});
-				return { deletedCount: result.count };
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, clearSynced)).result
-				: await clearSynced();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to clear synced items');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deletedCount: result.deletedCount ?? 0 }, context);
 		})
 };

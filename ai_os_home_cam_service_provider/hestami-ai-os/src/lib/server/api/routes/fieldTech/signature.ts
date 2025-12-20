@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startSignatureWorkflow } from '../../../workflows/signatureWorkflow.js';
 
 const jobSignatureOutput = z.object({
 	id: z.string(),
@@ -93,31 +94,38 @@ export const signatureRouter = {
 			});
 			if (!job) throw ApiException.notFound('Job');
 
-			const captureSignature = async () => {
-				return prisma.jobSignature.create({
+			// Use DBOS workflow for durable execution
+			const result = await startSignatureWorkflow(
+				{
+					action: 'CAPTURE_SIGNATURE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						jobId: input.jobId,
 						jobVisitId: input.jobVisitId,
 						signerName: input.signerName,
 						signerEmail: input.signerEmail,
 						signerRole: input.signerRole,
 						signatureData: input.signatureData,
-						signedAt: input.signedAt ? new Date(input.signedAt) : new Date(),
+						signedAt: input.signedAt,
 						latitude: input.latitude,
 						longitude: input.longitude,
 						documentType: input.documentType,
 						documentId: input.documentId,
 						ipAddress: input.ipAddress,
-						deviceInfo: input.deviceInfo,
-						capturedBy: context.user!.id
+						deviceInfo: input.deviceInfo
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const signature = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, captureSignature)).result
-				: await captureSignature();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to capture signature');
+			}
+
+			const signature = await prisma.jobSignature.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ signature: formatJobSignature(signature) }, context);
 		}),
@@ -226,15 +234,22 @@ export const signatureRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Signature');
 
-			const deleteSignature = async () => {
-				await prisma.jobSignature.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startSignatureWorkflow(
+				{
+					action: 'DELETE_SIGNATURE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					signatureId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteSignature)).result
-				: await deleteSignature();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete signature');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

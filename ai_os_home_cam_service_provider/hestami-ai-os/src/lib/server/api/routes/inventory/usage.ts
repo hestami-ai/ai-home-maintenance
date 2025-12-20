@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
+import { startUsageWorkflow } from '../../../workflows/usageWorkflow.js';
 
 const materialUsageOutput = z.object({
 	id: z.string(),
@@ -98,56 +99,34 @@ export const usageRouter = {
 			});
 			if (!location) throw ApiException.notFound('Inventory location');
 
-			const recordUsage = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Check and deduct stock
-					const level = await tx.inventoryLevel.findFirst({
-						where: {
-							itemId: input.itemId,
-							locationId: input.locationId,
-							lotNumber: input.lotNumber ?? null,
-							serialNumber: input.serialNumber ?? null
-						}
-					});
-
-					if (!level || level.quantityAvailable < input.quantity) {
-						throw ApiException.badRequest('Insufficient stock at location');
+			// Use DBOS workflow for durable execution
+			const result = await startUsageWorkflow(
+				{
+					action: 'RECORD_USAGE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						itemId: input.itemId,
+						locationId: input.locationId,
+						quantity: input.quantity,
+						jobId: input.jobId,
+						jobVisitId: input.jobVisitId,
+						lotNumber: input.lotNumber,
+						serialNumber: input.serialNumber,
+						unitCost: Number(item.unitCost),
+						notes: input.notes
 					}
+				},
+				input.idempotencyKey
+			);
 
-					// Deduct from inventory
-					await tx.inventoryLevel.update({
-						where: { id: level.id },
-						data: {
-							quantityOnHand: level.quantityOnHand - input.quantity,
-							quantityAvailable: level.quantityAvailable - input.quantity
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record usage');
+			}
 
-					// Record usage
-					const totalCost = Number(item.unitCost) * input.quantity;
-
-					return tx.materialUsage.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobId: input.jobId,
-							jobVisitId: input.jobVisitId,
-							itemId: input.itemId,
-							locationId: input.locationId,
-							quantity: input.quantity,
-							unitCost: item.unitCost,
-							totalCost,
-							lotNumber: input.lotNumber,
-							serialNumber: input.serialNumber,
-							usedBy: context.user!.id,
-							notes: input.notes
-						}
-					});
-				});
-			};
-
-			const usage = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, recordUsage)).result
-				: await recordUsage();
+			const usage = await prisma.materialUsage.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ usage: formatMaterialUsage(usage) }, context);
 		}),
@@ -310,50 +289,22 @@ export const usageRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Material usage');
 
-			const reverseUsage = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Return stock to location
-					let level = await tx.inventoryLevel.findFirst({
-						where: {
-							itemId: existing.itemId,
-							locationId: existing.locationId,
-							lotNumber: existing.lotNumber ?? null,
-							serialNumber: existing.serialNumber ?? null
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startUsageWorkflow(
+				{
+					action: 'REVERSE_USAGE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					usageId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					if (level) {
-						await tx.inventoryLevel.update({
-							where: { id: level.id },
-							data: {
-								quantityOnHand: level.quantityOnHand + existing.quantity,
-								quantityAvailable: level.quantityAvailable + existing.quantity
-							}
-						});
-					} else {
-						await tx.inventoryLevel.create({
-							data: {
-								itemId: existing.itemId,
-								locationId: existing.locationId,
-								quantityOnHand: existing.quantity,
-								quantityAvailable: existing.quantity,
-								lotNumber: existing.lotNumber,
-								serialNumber: existing.serialNumber
-							}
-						});
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to reverse usage');
+			}
 
-					// Delete usage record
-					await tx.materialUsage.delete({ where: { id: input.id } });
-
-					return { reversed: true };
-				});
-			};
-
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, reverseUsage)).result
-				: await reverseUsage();
-
-			return successResponse(result, context);
+			return successResponse({ reversed: true }, context);
 		})
 };

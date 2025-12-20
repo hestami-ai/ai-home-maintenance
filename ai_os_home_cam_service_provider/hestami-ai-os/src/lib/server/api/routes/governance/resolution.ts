@@ -9,18 +9,11 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
+import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type { ResolutionStatus, PolicyStatus } from '../../../../../../generated/prisma/client.js';
-import type { RequestContext } from '../../context.js';
 
 const resolutionStatusEnum = z.enum(['PROPOSED', 'ADOPTED', 'SUPERSEDED', 'ARCHIVED']);
 const policyStatusEnum = z.enum(['DRAFT', 'ACTIVE', 'RETIRED']);
-
-const requireIdempotency = async <T>(key: string | undefined, ctx: RequestContext, fn: () => Promise<T>) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const ensureAssociation = async (associationId: string, organizationId: string) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
@@ -66,21 +59,30 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('create', 'governance_resolution', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			const resolution = await requireIdempotency(idempotencyKey, context, async () => {
-				await ensureAssociation(rest.associationId, context.organization.id);
-				await ensureBoardBelongs(rest.boardId, rest.associationId);
+			await ensureAssociation(rest.associationId, context.organization.id);
+			await ensureBoardBelongs(rest.boardId, rest.associationId);
 
-				return prisma.resolution.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_RESOLUTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						associationId: rest.associationId,
-						boardId: rest.boardId,
 						title: rest.title,
-						summary: rest.summary,
-						effectiveDate: rest.effectiveDate ? new Date(rest.effectiveDate) : undefined,
-						status: 'PROPOSED'
+						content: rest.summary,
+						effectiveDate: rest.effectiveDate
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create resolution');
+			}
+
+			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
@@ -180,31 +182,38 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('edit', 'governance_resolution', input.id);
 			const { idempotencyKey, ...rest } = input;
 
-			const resolution = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.resolution.findFirst({
-					where: { id: rest.id },
-					include: { association: true }
-				});
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Resolution');
-				}
-
-				if (rest.supersededById) {
-					const sup = await prisma.resolution.findFirst({
-						where: { id: rest.supersededById, associationId: existing.associationId }
-					});
-					if (!sup) throw ApiException.notFound('Superseding resolution');
-				}
-
-				return prisma.resolution.update({
-					where: { id: rest.id },
-					data: {
-						status: rest.status as ResolutionStatus,
-						effectiveDate: rest.effectiveDate ? new Date(rest.effectiveDate) : existing.effectiveDate,
-						supersededById: rest.supersededById
-					}
-				});
+			const existing = await prisma.resolution.findFirst({
+				where: { id: rest.id },
+				include: { association: true }
 			});
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Resolution');
+			}
+
+			if (rest.supersededById) {
+				const sup = await prisma.resolution.findFirst({
+					where: { id: rest.supersededById, associationId: existing.associationId }
+				});
+				if (!sup) throw ApiException.notFound('Superseding resolution');
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'UPDATE_RESOLUTION_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: rest.id,
+					data: { status: rest.status }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update resolution status');
+			}
+
+			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: rest.id } });
 
 			return successResponse({ resolution: { id: resolution.id, status: resolution.status } }, context);
 		}),
@@ -239,25 +248,35 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('create', 'governance_policy', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			const policy = await requireIdempotency(idempotencyKey, context, async () => {
-				await ensureAssociation(rest.associationId, context.organization.id);
-				if (rest.resolutionId) {
-					const res = await prisma.resolution.findFirst({
-						where: { id: rest.resolutionId, associationId: rest.associationId }
-					});
-					if (!res) throw ApiException.notFound('Resolution');
-				}
+			await ensureAssociation(rest.associationId, context.organization.id);
+			if (rest.resolutionId) {
+				const res = await prisma.resolution.findFirst({
+					where: { id: rest.resolutionId, associationId: rest.associationId }
+				});
+				if (!res) throw ApiException.notFound('Resolution');
+			}
 
-				return prisma.policyDocument.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_POLICY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						associationId: rest.associationId,
 						resolutionId: rest.resolutionId,
 						title: rest.title,
-						description: rest.description,
-						status: 'DRAFT'
+						description: rest.description
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create policy document');
+			}
+
+			const policy = await prisma.policyDocument.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
@@ -359,29 +378,51 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('edit', 'governance_policy', input.policyDocumentId);
 			const { idempotencyKey, ...rest } = input;
 
-			const version = await requireIdempotency(idempotencyKey, context, async () => {
-				const policy = await prisma.policyDocument.findFirst({
-					where: { id: rest.policyDocumentId },
-					include: { association: true }
-				});
-				if (!policy || policy.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Policy');
-				}
+			const policy = await prisma.policyDocument.findFirst({
+				where: { id: rest.policyDocumentId },
+				include: { association: true }
+			});
+			if (!policy || policy.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Policy');
+			}
 
-				const existing = await prisma.policyVersion.findFirst({
-					where: { policyDocumentId: rest.policyDocumentId, version: rest.version }
-				});
-				if (existing) return existing;
+			// Check if version already exists
+			const existing = await prisma.policyVersion.findFirst({
+				where: { policyDocumentId: rest.policyDocumentId, version: rest.version }
+			});
+			if (existing) {
+				return successResponse(
+					{
+						version: {
+							id: existing.id,
+							policyDocumentId: existing.policyDocumentId,
+							version: existing.version,
+							status: existing.status
+						}
+					},
+					context
+				);
+			}
 
-				return prisma.policyVersion.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_POLICY_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						policyDocumentId: rest.policyDocumentId,
-						version: rest.version,
-						content: rest.content,
-						status: rest.status as PolicyStatus
+						content: rest.content
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create policy version');
+			}
+
+			const version = await prisma.policyVersion.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
@@ -418,44 +459,45 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('edit', 'governance_policy', input.policyDocumentId);
 			const { idempotencyKey, ...rest } = input;
 
-			const result = await requireIdempotency(idempotencyKey, context, async () => {
-				const policy = await prisma.policyDocument.findFirst({
-					where: { id: rest.policyDocumentId },
-					include: { association: true }
-				});
-				if (!policy || policy.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Policy');
-				}
-
-				const version = await prisma.policyVersion.findFirst({
-					where: { policyDocumentId: rest.policyDocumentId, version: rest.version }
-				});
-				if (!version) throw ApiException.notFound('Policy version');
-
-				await prisma.policyVersion.updateMany({
-					where: { policyDocumentId: rest.policyDocumentId, status: 'ACTIVE' },
-					data: { status: 'RETIRED' }
-				});
-
-				await prisma.policyVersion.update({
-					where: { id: version.id },
-					data: { status: 'ACTIVE', approvedAt: new Date(), approvedBy: context.user?.id }
-				});
-
-				const updatedPolicy = await prisma.policyDocument.update({
-					where: { id: rest.policyDocumentId },
-					data: { currentVersion: rest.version, status: 'ACTIVE' }
-				});
-
-				return updatedPolicy;
+			const policy = await prisma.policyDocument.findFirst({
+				where: { id: rest.policyDocumentId },
+				include: { association: true }
 			});
+			if (!policy || policy.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Policy');
+			}
+
+			const version = await prisma.policyVersion.findFirst({
+				where: { policyDocumentId: rest.policyDocumentId, version: rest.version }
+			});
+			if (!version) throw ApiException.notFound('Policy version');
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'SET_ACTIVE_POLICY_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						policyDocumentId: rest.policyDocumentId,
+						versionId: version.id
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to activate policy version');
+			}
+
+			const updatedPolicy = await prisma.policyDocument.findUniqueOrThrow({ where: { id: rest.policyDocumentId } });
 
 			return successResponse(
 				{
 					policy: {
-						id: result.id,
-						currentVersion: result.currentVersion ?? null,
-						status: result.status
+						id: updatedPolicy.id,
+						currentVersion: updatedPolicy.currentVersion ?? null,
+						status: updatedPolicy.status
 					}
 				},
 				context
@@ -490,28 +532,39 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('edit', 'governance_resolution', input.resolutionId);
 			const { idempotencyKey, resolutionId, motionId } = input;
 
-			const resolution = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.resolution.findFirst({
-					where: { id: resolutionId },
-					include: { association: true }
-				});
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Resolution');
-				}
-
-				const motion = await prisma.boardMotion.findFirst({
-					where: { id: motionId },
-					include: { association: true }
-				});
-				if (!motion || motion.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Motion');
-				}
-
-				return prisma.resolution.update({
-					where: { id: resolutionId },
-					data: { motionId }
-				});
+			const existing = await prisma.resolution.findFirst({
+				where: { id: resolutionId },
+				include: { association: true }
 			});
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Resolution');
+			}
+
+			const motion = await prisma.boardMotion.findFirst({
+				where: { id: motionId },
+				include: { association: true }
+			});
+			if (!motion || motion.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Motion');
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'LINK_RESOLUTION_TO_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: resolutionId,
+					data: { motionId }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to link resolution to motion');
+			}
+
+			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: resolutionId } });
 
 			return successResponse(
 				{

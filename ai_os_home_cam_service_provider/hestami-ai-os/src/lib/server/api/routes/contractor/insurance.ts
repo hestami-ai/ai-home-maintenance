@@ -10,6 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { Prisma } from '../../../../../../generated/prisma/client.js';
 
@@ -75,29 +76,27 @@ export const insuranceRouter = {
 			});
 			if (!profile) throw ApiException.notFound('ContractorProfile');
 
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				const normalized = normalizeInsuranceInput(data);
-				if (id) {
-					const existing = await prisma.contractorInsurance.findFirst({
-						where: { id, contractorProfileId: profile.id }
-					});
-					if (!existing) throw ApiException.notFound('ContractorInsurance');
+			const normalized = normalizeInsuranceInput(data);
 
-					return prisma.contractorInsurance.update({
-						where: { id },
-						data: normalized
-					});
-				}
+			// Use DBOS workflow for durable execution
+			const result = await startContractorProfileWorkflow(
+				{
+					action: 'CREATE_OR_UPDATE_INSURANCE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					entityId: id,
+					data: { profileId: profile.id, ...normalized }
+				},
+				idempotencyKey
+			);
 
-				return prisma.contractorInsurance.create({
-					data: {
-						contractorProfileId: profile.id,
-						...normalized
-					}
-				});
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create/update insurance');
+			}
 
-			return successResponse({ insurance: serializeInsurance(result.result) }, context);
+			const insurance = await prisma.contractorInsurance.findUniqueOrThrow({ where: { id: result.entityId } });
+
+			return successResponse({ insurance: serializeInsurance(insurance) }, context);
 		}),
 
 	get: orgProcedure

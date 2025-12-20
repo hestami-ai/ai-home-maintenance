@@ -2,7 +2,7 @@
 	import { ArrowLeft, Check, Loader2, Home, User, Building2, Sparkles, Wrench } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { propertyOwnerOnboarding, organizationStore } from '$lib/stores';
-	import { organizationApi } from '$lib/api';
+	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 
@@ -18,23 +18,17 @@
 		error = null;
 
 		try {
-			// 1. Create Organization
-			const orgResult = await organizationApi.create({
+			// 1. Create Organization (type-safe oRPC call)
+			const orgResult = await orpc.organization.create({
 				name: $propertyOwnerOnboarding.organizationDetails.name,
 				slug: $propertyOwnerOnboarding.organizationDetails.slug,
 				type: $propertyOwnerOnboarding.organizationType!
 			});
 
-			if (!orgResult.ok || !orgResult.data) {
-				error = orgResult.error?.message || 'Failed to create organization';
-				isSubmitting = false;
-				return;
-			}
-
 			const org = orgResult.data.organization;
 
 			// 2. Set as default organization
-			await organizationApi.setDefault(org.id);
+			await orpc.organization.setDefault({ organizationId: org.id });
 
 			// 3. Update local store
 			organizationStore.addMembership({
@@ -49,15 +43,57 @@
 				isDefault: true
 			});
 
-			// TODO: Create PropertyPortfolio via API
-			// TODO: Create IndividualProperty via API
-			// TODO: Create ExternalHOAContext if applicable
+			// 4. Create default PropertyPortfolio
+			const portfolioResult = await orpc.propertyPortfolio.getOrCreateDefault({
+				idempotencyKey: crypto.randomUUID()
+			});
 
-			// 4. Reset wizard and redirect
+			const portfolio = portfolioResult.data.portfolio;
+
+			// 5. Create IndividualProperty from onboarding data
+			const propertyData = $propertyOwnerOnboarding.property;
+			const hoaData = $propertyOwnerOnboarding.hoa;
+
+			// Map property type from onboarding to enum
+			const propertyTypeMap: Record<string, string> = {
+				single_family: 'SINGLE_FAMILY',
+				condo: 'CONDOMINIUM',
+				townhouse: 'TOWNHOUSE',
+				cooperative: 'COOPERATIVE',
+				mixed_use: 'MIXED_USE',
+				commercial: 'COMMERCIAL'
+			};
+
+			const propertyType = propertyTypeMap[propertyData.propertyType] || 'SINGLE_FAMILY';
+
+			await orpc.individualProperty.create({
+				idempotencyKey: crypto.randomUUID(),
+				name: propertyData.name || 'Primary Property',
+				propertyType: propertyType as any,
+				addressLine1: propertyData.addressLine1,
+				addressLine2: propertyData.addressLine2 || undefined,
+				city: propertyData.city,
+				state: propertyData.state,
+				postalCode: propertyData.zipCode,
+				yearBuilt: propertyData.yearBuilt ? parseInt(propertyData.yearBuilt, 10) : undefined,
+				squareFeet: propertyData.squareFootage ? parseInt(propertyData.squareFootage, 10) : undefined,
+				portfolioId: portfolio.id,
+				// Include external HOA info if applicable
+				externalHoa:
+					hoaData.hasHoa === 'external' && hoaData.hoaName
+						? {
+								hoaName: hoaData.hoaName,
+								hoaContactName: hoaData.hoaContact || undefined
+							}
+						: undefined
+			});
+
+			// 6. Reset wizard and redirect
 			propertyOwnerOnboarding.reset();
 			goto('/app/concierge');
 		} catch (err) {
-			error = 'An unexpected error occurred. Please try again.';
+			console.error('Onboarding error:', err);
+			error = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
 			isSubmitting = false;
 		}
 	}

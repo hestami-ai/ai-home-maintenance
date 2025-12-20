@@ -4,6 +4,7 @@ import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../route
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startContractorComplianceWorkflow } from '../../../workflows/contractorComplianceWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 
 const vendorApprovalEnum = z.enum(['PENDING', 'APPROVED', 'CONDITIONAL', 'SUSPENDED', 'REJECTED']);
@@ -39,10 +40,23 @@ export const complianceRouter = {
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
-			const result = await withIdempotency(input.idempotencyKey, context, () =>
-				computeCompliance(input.vendorId, context.organization.id, true)
+			// Use DBOS workflow for durable execution
+			const result = await startContractorComplianceWorkflow(
+				{
+					action: 'REFRESH',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					vendorId: input.vendorId,
+					data: {}
+				},
+				input.idempotencyKey
 			);
-			return successResponse({ status: serializeCompliance(result.result) }, context);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to refresh compliance');
+			}
+
+			return successResponse({ status: serializeCompliance(result.complianceData) }, context);
 		}),
 
 	setBlock: orgProcedure
@@ -58,21 +72,23 @@ export const complianceRouter = {
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
-			const result = await withIdempotency(input.idempotencyKey, context, async () => {
-				const existing = await ensureComplianceRecord(input.vendorId, context.organization.id);
-				return prisma.contractorComplianceStatus.update({
-					where: { id: existing.id },
-					data: {
-						isBlocked: input.isBlocked,
-						blockReason: input.isBlocked ? input.blockReason ?? 'Blocked by admin' : null,
-						blockedAt: input.isBlocked ? new Date() : null,
-						blockedBy: input.isBlocked ? context.user?.id : null,
-						lastCheckedAt: new Date()
-					}
-				});
-			});
+			// Use DBOS workflow for durable execution
+			const result = await startContractorComplianceWorkflow(
+				{
+					action: 'SET_BLOCK',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					vendorId: input.vendorId,
+					data: { isBlocked: input.isBlocked, blockReason: input.blockReason }
+				},
+				input.idempotencyKey
+			);
 
-			return successResponse({ status: serializeCompliance(result.result) }, context);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to set block status');
+			}
+
+			return successResponse({ status: serializeCompliance(result.complianceData) }, context);
 		}),
 
 	linkHoaApproval: orgProcedure
@@ -92,34 +108,28 @@ export const complianceRouter = {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			const { idempotencyKey, ...payload } = input;
 
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				const { link } = await getLinkAndProfile(payload.vendorId, context.organization.id);
-
-				await prisma.vendor.update({
-					where: { id: payload.vendorId },
+			// Use DBOS workflow for durable execution
+			const result = await startContractorComplianceWorkflow(
+				{
+					action: 'LINK_HOA_APPROVAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					vendorId: payload.vendorId,
 					data: {
 						approvalStatus: payload.approvalStatus,
-						insuranceVerified: payload.insuranceVerified ?? undefined,
-						licenseVerified: payload.licenseVerified ?? undefined,
-						complianceNotes: payload.complianceNotes ?? undefined,
-						approvedBy: context.user?.id,
-						approvedAt: new Date()
+						insuranceVerified: payload.insuranceVerified,
+						licenseVerified: payload.licenseVerified,
+						complianceNotes: payload.complianceNotes
 					}
-				});
+				},
+				idempotencyKey
+			);
 
-				await prisma.serviceProviderLink.update({
-					where: { id: link.id },
-					data: {
-						status: payload.approvalStatus === 'REJECTED' ? 'REVOKED' : 'VERIFIED',
-						linkedAt: new Date(),
-						linkedBy: context.user?.id
-					}
-				});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to link HOA approval');
+			}
 
-				return computeCompliance(payload.vendorId, context.organization.id, true);
-			});
-
-			return successResponse({ status: serializeCompliance(result.result) }, context);
+			return successResponse({ status: serializeCompliance(result.complianceData) }, context);
 		})
 };
 

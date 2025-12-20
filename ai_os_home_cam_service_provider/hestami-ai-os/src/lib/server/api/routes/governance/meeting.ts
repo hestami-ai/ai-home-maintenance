@@ -3,7 +3,7 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
+import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type {
 	MeetingType,
 	MeetingStatus,
@@ -11,19 +11,12 @@ import type {
 	VoteMethod,
 	VoteChoice
 } from '../../../../../../generated/prisma/client.js';
-import type { RequestContext } from '../../context.js';
 
 const meetingTypeEnum = z.enum(['BOARD', 'ANNUAL', 'SPECIAL']);
 const meetingStatusEnum = z.enum(['SCHEDULED', 'IN_SESSION', 'ADJOURNED', 'MINUTES_DRAFT', 'MINUTES_APPROVED', 'ARCHIVED', 'CANCELLED']);
 const attendanceStatusEnum = z.enum(['PRESENT', 'ABSENT', 'EXCUSED']);
 const voteMethodEnum = z.enum(['IN_PERSON', 'PROXY', 'ELECTRONIC']);
 const voteChoiceEnum = z.enum(['YES', 'NO', 'ABSTAIN']);
-
-const requireIdempotency = async <T>(key: string | undefined, ctx: RequestContext, fn: () => Promise<T>) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
@@ -112,27 +105,35 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('create', 'governance_meeting', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
-				await getAssociationOrThrow(rest.associationId, context.organization.id);
-				await ensureBoardBelongs(rest.boardId, rest.associationId);
+			await getAssociationOrThrow(rest.associationId, context.organization.id);
+			await ensureBoardBelongs(rest.boardId, rest.associationId);
 
-				return prisma.meeting.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_MEETING',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					data: {
-						associationId: rest.associationId,
 						boardId: rest.boardId,
-						type: rest.type as MeetingType,
-						status: 'SCHEDULED',
 						title: rest.title,
-						description: rest.description,
-						scheduledFor: new Date(rest.scheduledFor),
+						meetingType: rest.type,
+						scheduledAt: rest.scheduledFor,
 						location: rest.location,
-						createdBy: context.user!.id
+						description: rest.description
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create meeting');
+			}
+
+			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
-				{ meeting: { id: meeting.id, associationId: meeting.associationId, status: meeting.status } },
+				{ meeting: { id: meeting.id, associationId: rest.associationId, status: meeting.status } },
 				context
 			);
 		}),
@@ -236,24 +237,35 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
-			const agendaItem = await requireIdempotency(idempotencyKey, context, async () => {
-				const meeting = await prisma.meeting.findFirst({
-					where: { id: rest.meetingId },
-					include: { association: true }
-				});
-				if (!meeting || meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: rest.meetingId },
+				include: { association: true }
+			});
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
 
-				return prisma.meetingAgendaItem.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'ADD_AGENDA_ITEM',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						meetingId: rest.meetingId,
 						title: rest.title,
 						description: rest.description,
-						order: rest.order ?? 0
+						duration: rest.order
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add agenda item');
+			}
+
+			const agendaItem = await prisma.meetingAgendaItem.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ agendaItem: { id: agendaItem.id, meetingId: agendaItem.meetingId } }, context);
 		}),
@@ -278,26 +290,39 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
-			const minutes = await requireIdempotency(idempotencyKey, context, async () => {
-				const meeting = await prisma.meeting.findFirst({
-					where: { id: rest.meetingId },
-					include: { association: true }
-				});
-				if (!meeting || meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: rest.meetingId },
+				include: { association: true }
+			});
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
 
-				const existing = await prisma.meetingMinutes.findFirst({ where: { meetingId: rest.meetingId } });
-				if (existing) return existing;
+			// Check if minutes already exist
+			const existing = await prisma.meetingMinutes.findFirst({ where: { meetingId: rest.meetingId } });
+			if (existing) {
+				return successResponse({ minutes: { id: existing.id, meetingId: existing.meetingId } }, context);
+			}
 
-				return prisma.meetingMinutes.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'ADD_MEETING_MINUTES',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						meetingId: rest.meetingId,
-						recordedBy: context.user!.id,
 						content: rest.content
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record minutes');
+			}
+
+			const minutes = await prisma.meetingMinutes.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ minutes: { id: minutes.id, meetingId: minutes.meetingId } }, context);
 		}),
@@ -325,43 +350,38 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
-			const attendance = await requireIdempotency(idempotencyKey, context, async () => {
-				const meeting = await prisma.meeting.findFirst({
-					where: { id: rest.meetingId },
-					include: { association: true }
-				});
-				if (!meeting || meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
-				await ensurePartyBelongs(rest.partyId, meeting.association.organizationId);
-				if (rest.proxyForPartyId) {
-					await ensurePartyBelongs(rest.proxyForPartyId, meeting.association.organizationId);
-				}
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: rest.meetingId },
+				include: { association: true }
+			});
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+			await ensurePartyBelongs(rest.partyId, meeting.association.organizationId);
+			if (rest.proxyForPartyId) {
+				await ensurePartyBelongs(rest.proxyForPartyId, meeting.association.organizationId);
+			}
 
-				const existing = await prisma.meetingAttendance.findFirst({
-					where: { meetingId: rest.meetingId, partyId: rest.partyId }
-				});
-				if (existing) {
-					return prisma.meetingAttendance.update({
-						where: { id: existing.id },
-						data: {
-							status: rest.status as MeetingAttendanceStatus,
-							proxyForPartyId: rest.proxyForPartyId,
-							checkedInAt: rest.checkedInAt ? new Date(rest.checkedInAt) : existing.checkedInAt
-						}
-					});
-				}
-
-				return prisma.meetingAttendance.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'RECORD_ATTENDANCE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						meetingId: rest.meetingId,
 						partyId: rest.partyId,
-						status: rest.status as MeetingAttendanceStatus,
-						proxyForPartyId: rest.proxyForPartyId,
-						checkedInAt: rest.checkedInAt ? new Date(rest.checkedInAt) : null
+						status: rest.status
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record attendance');
+			}
+
+			const attendance = await prisma.meetingAttendance.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{ attendance: { id: attendance.id, meetingId: attendance.meetingId, partyId: attendance.partyId } },
@@ -399,32 +419,42 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
-			const vote = await requireIdempotency(idempotencyKey, context, async () => {
-				const meeting = await prisma.meeting.findFirst({
-					where: { id: rest.meetingId },
-					include: { association: true }
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: rest.meetingId },
+				include: { association: true }
+			});
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+			if (rest.agendaItemId) {
+				const agendaItem = await prisma.meetingAgendaItem.findFirst({
+					where: { id: rest.agendaItemId, meetingId: rest.meetingId }
 				});
-				if (!meeting || meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
-				if (rest.agendaItemId) {
-					const agendaItem = await prisma.meetingAgendaItem.findFirst({
-						where: { id: rest.agendaItemId, meetingId: rest.meetingId }
-					});
-					if (!agendaItem) throw ApiException.notFound('Agenda item');
-				}
+				if (!agendaItem) throw ApiException.notFound('Agenda item');
+			}
 
-				return prisma.vote.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_VOTE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						meetingId: rest.meetingId,
 						agendaItemId: rest.agendaItemId,
 						question: rest.question,
-						method: rest.method as VoteMethod,
-						quorumRequired: rest.quorumRequired,
-						createdBy: context.user!.id
+						method: rest.method,
+						quorumRequired: rest.quorumRequired
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to open vote');
+			}
+
+			const vote = await prisma.vote.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
@@ -470,38 +500,47 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('vote', 'governance_vote', input.voteId);
 			const { idempotencyKey, ...rest } = input;
 
-			const ballot = await requireIdempotency(idempotencyKey, context, async () => {
-				const vote = await prisma.vote.findFirst({
-					where: { id: rest.voteId },
-					include: { meeting: { include: { association: true } } }
-				});
-				if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Vote');
-				}
-				if (vote.closedAt) {
-					throw ApiException.badRequest('Vote is closed');
-				}
+			const vote = await prisma.vote.findFirst({
+				where: { id: rest.voteId },
+				include: { meeting: { include: { association: true } } }
+			});
+			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Vote');
+			}
+			if (vote.closedAt) {
+				throw ApiException.badRequest('Vote is closed');
+			}
 
-				await ensurePartyBelongs(rest.voterPartyId, vote.meeting.association.organizationId);
+			await ensurePartyBelongs(rest.voterPartyId, vote.meeting.association.organizationId);
 
-				// Enforce vote immutability - once cast, cannot be changed
-				const existing = await prisma.voteBallot.findFirst({
-					where: { voteId: rest.voteId, voterPartyId: rest.voterPartyId }
-				});
-				if (existing) {
-					throw ApiException.badRequest('Ballot already cast and cannot be changed');
-				}
+			// Enforce vote immutability - once cast, cannot be changed
+			const existing = await prisma.voteBallot.findFirst({
+				where: { voteId: rest.voteId, voterPartyId: rest.voterPartyId }
+			});
+			if (existing) {
+				throw ApiException.badRequest('Ballot already cast and cannot be changed');
+			}
 
-				return prisma.voteBallot.create({
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CAST_BALLOT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						voteId: rest.voteId,
 						voterPartyId: rest.voterPartyId,
-						choice: rest.choice as VoteChoice,
-						hasConflictOfInterest: rest.hasConflictOfInterest ?? false,
-						conflictNotes: rest.conflictNotes
+						choice: rest.choice
 					}
-				});
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cast ballot');
+			}
+
+			const ballot = await prisma.voteBallot.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
@@ -647,40 +686,57 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_vote', input.voteId);
 			const { idempotencyKey, voteId } = input;
 
-			const result = await requireIdempotency(idempotencyKey, context, async () => {
-				const vote = await prisma.vote.findFirst({
-					where: { id: voteId },
-					include: { meeting: { include: { association: true } } }
-				});
-				if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Vote');
-				}
-				if (vote.closedAt) {
-					const results = await getVoteResults(vote.id);
-					return { vote, results };
-				}
-
-				const results = await getVoteResults(vote.id);
-				if (!results) throw ApiException.notFound('Vote');
-				if (results.quorumRequired !== null && !results.quorumMet) {
-					throw ApiException.badRequest('Quorum not met');
-				}
-
-				const closedAt = new Date();
-				const updated = await prisma.vote.update({
-					where: { id: voteId },
-					data: { closedAt }
-				});
-
-				return { vote: updated, results };
+			const vote = await prisma.vote.findFirst({
+				where: { id: voteId },
+				include: { meeting: { include: { association: true } } }
 			});
+			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Vote');
+			}
+			if (vote.closedAt) {
+				const results = await getVoteResults(vote.id);
+				return successResponse(
+					{
+						vote: {
+							id: vote.id,
+							closedAt: vote.closedAt.toISOString(),
+							results: results!
+						}
+					},
+					context
+				);
+			}
+
+			const results = await getVoteResults(vote.id);
+			if (!results) throw ApiException.notFound('Vote');
+			if (results.quorumRequired !== null && !results.quorumMet) {
+				throw ApiException.badRequest('Quorum not met');
+			}
+
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startGovernanceWorkflow(
+				{
+					action: 'CLOSE_VOTE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: voteId,
+					data: {}
+				},
+				idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to close vote');
+			}
+
+			const updatedVote = await prisma.vote.findUniqueOrThrow({ where: { id: voteId } });
 
 			return successResponse(
 				{
 					vote: {
-						id: result.vote.id,
-						closedAt: result.vote.closedAt!.toISOString(),
-						results: result.results!
+						id: updatedVote.id,
+						closedAt: updatedVote.closedAt!.toISOString(),
+						results: results!
 					}
 				},
 				context
@@ -705,51 +761,57 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('start_session', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
-			const result = await requireIdempotency(idempotencyKey, context, async () => {
-				const meeting = await prisma.meeting.findFirst({
-					where: { id: meetingId },
-					include: {
-						association: true,
-						agendaItems: true,
-						attendance: { where: { status: { not: 'ABSENT' } } }
-					}
-				});
-
-				if (!meeting || meeting.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
+			const meeting = await prisma.meeting.findFirst({
+				where: { id: meetingId },
+				include: {
+					association: true,
+					agendaItems: true,
+					attendance: { where: { status: { not: 'ABSENT' } } }
 				}
-
-				if (meeting.status !== 'SCHEDULED') {
-					throw ApiException.badRequest(`Cannot start session from status ${meeting.status}`);
-				}
-
-				if (meeting.agendaItems.length === 0) {
-					throw ApiException.badRequest('Meeting must have at least one agenda item before starting session');
-				}
-
-				const presentCount = meeting.attendance.length;
-				const quorumRequired = meeting.quorumRequired;
-				const quorumMet = quorumRequired === null || presentCount >= quorumRequired;
-
-				if (!quorumMet) {
-					throw ApiException.badRequest(`Quorum not met: ${presentCount} present, ${quorumRequired} required`);
-				}
-
-				const updated = await prisma.meeting.update({
-					where: { id: meetingId },
-					data: { status: 'IN_SESSION' }
-				});
-
-				return {
-					meeting: updated,
-					quorumStatus: { required: quorumRequired, present: presentCount, met: quorumMet }
-				};
 			});
+
+			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			if (meeting.status !== 'SCHEDULED') {
+				throw ApiException.badRequest(`Cannot start session from status ${meeting.status}`);
+			}
+
+			if (meeting.agendaItems.length === 0) {
+				throw ApiException.badRequest('Meeting must have at least one agenda item before starting session');
+			}
+
+			const presentCount = meeting.attendance.length;
+			const quorumRequired = meeting.quorumRequired;
+			const quorumMet = quorumRequired === null || presentCount >= quorumRequired;
+
+			if (!quorumMet) {
+				throw ApiException.badRequest(`Quorum not met: ${presentCount} present, ${quorumRequired} required`);
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'START_MEETING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: meetingId,
+					data: {}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to start meeting session');
+			}
+
+			const updated = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
 
 			return successResponse(
 				{
-					meeting: { id: result.meeting.id, status: result.meeting.status },
-					quorumStatus: result.quorumStatus
+					meeting: { id: updated.id, status: updated.status },
+					quorumStatus: { required: quorumRequired, present: presentCount, met: quorumMet }
 				},
 				context
 			);
@@ -768,35 +830,44 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('adjourn', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
-			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.meeting.findFirst({
-					where: { id: meetingId },
-					include: { association: true }
-				});
-
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
-
-				if (existing.status !== 'IN_SESSION') {
-					throw ApiException.badRequest(`Cannot adjourn from status ${existing.status}`);
-				}
-
-				const updated = await prisma.meeting.update({
-					where: { id: meetingId },
-					data: { status: 'ADJOURNED' }
-				});
-
-				// Create minutes placeholder if not exists
-				const existingMinutes = await prisma.meetingMinutes.findUnique({ where: { meetingId } });
-				if (!existingMinutes) {
-					await prisma.meetingMinutes.create({
-						data: { meetingId, recordedBy: context.user!.id, content: '' }
-					});
-				}
-
-				return updated;
+			const existing = await prisma.meeting.findFirst({
+				where: { id: meetingId },
+				include: { association: true }
 			});
+
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			if (existing.status !== 'IN_SESSION') {
+				throw ApiException.badRequest(`Cannot adjourn from status ${existing.status}`);
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'ADJOURN_MEETING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: meetingId,
+					data: {}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to adjourn meeting');
+			}
+
+			// Create minutes placeholder if not exists
+			const existingMinutes = await prisma.meetingMinutes.findUnique({ where: { meetingId } });
+			if (!existingMinutes) {
+				await prisma.meetingMinutes.create({
+					data: { meetingId, recordedBy: context.user!.id, content: '' }
+				});
+			}
+
+			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -821,37 +892,36 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId, content } = input;
 
-			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.meeting.findFirst({
-					where: { id: meetingId },
-					include: { association: true, minutes: true }
-				});
-
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
-
-				if (existing.status !== 'ADJOURNED') {
-					throw ApiException.badRequest(`Cannot submit minutes draft from status ${existing.status}`);
-				}
-
-				// Update or create minutes
-				if (existing.minutes) {
-					await prisma.meetingMinutes.update({
-						where: { meetingId },
-						data: { content, recordedBy: context.user!.id }
-					});
-				} else {
-					await prisma.meetingMinutes.create({
-						data: { meetingId, recordedBy: context.user!.id, content }
-					});
-				}
-
-				return prisma.meeting.update({
-					where: { id: meetingId },
-					data: { status: 'MINUTES_DRAFT' }
-				});
+			const existing = await prisma.meeting.findFirst({
+				where: { id: meetingId },
+				include: { association: true, minutes: true }
 			});
+
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			if (existing.status !== 'ADJOURNED') {
+				throw ApiException.badRequest(`Cannot submit minutes draft from status ${existing.status}`);
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'UPDATE_MINUTES',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: meetingId,
+					data: { content }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to submit minutes draft');
+			}
+
+			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -869,29 +939,40 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('approve_minutes', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
-			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.meeting.findFirst({
-					where: { id: meetingId },
-					include: { association: true, minutes: true }
-				});
-
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
-
-				if (existing.status !== 'MINUTES_DRAFT') {
-					throw ApiException.badRequest(`Cannot approve minutes from status ${existing.status}`);
-				}
-
-				if (!existing.minutes || !existing.minutes.content) {
-					throw ApiException.badRequest('Minutes content is required before approval');
-				}
-
-				return prisma.meeting.update({
-					where: { id: meetingId },
-					data: { status: 'MINUTES_APPROVED' }
-				});
+			const existing = await prisma.meeting.findFirst({
+				where: { id: meetingId },
+				include: { association: true, minutes: true }
 			});
+
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			if (existing.status !== 'MINUTES_DRAFT') {
+				throw ApiException.badRequest(`Cannot approve minutes from status ${existing.status}`);
+			}
+
+			if (!existing.minutes || !existing.minutes.content) {
+				throw ApiException.badRequest('Minutes content is required before approval');
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'APPROVE_MINUTES',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: meetingId,
+					data: {}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to approve minutes');
+			}
+
+			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -909,25 +990,36 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('archive', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
-			const meeting = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.meeting.findFirst({
-					where: { id: meetingId },
-					include: { association: true }
-				});
-
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Meeting');
-				}
-
-				if (existing.status !== 'MINUTES_APPROVED') {
-					throw ApiException.badRequest(`Cannot archive from status ${existing.status}`);
-				}
-
-				return prisma.meeting.update({
-					where: { id: meetingId },
-					data: { status: 'ARCHIVED' }
-				});
+			const existing = await prisma.meeting.findFirst({
+				where: { id: meetingId },
+				include: { association: true }
 			});
+
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Meeting');
+			}
+
+			if (existing.status !== 'MINUTES_APPROVED') {
+				throw ApiException.badRequest(`Cannot archive from status ${existing.status}`);
+			}
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'ARCHIVE_MEETING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: meetingId,
+					data: {}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to archive meeting');
+			}
+
+			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),

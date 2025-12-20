@@ -3,17 +3,10 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
+import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type { BoardRole, Prisma } from '../../../../../../generated/prisma/client.js';
-import type { RequestContext } from '../../context.js';
 
 const boardRoleEnum = z.enum(['PRESIDENT', 'VICE_PRESIDENT', 'SECRETARY', 'TREASURER', 'DIRECTOR', 'MEMBER_AT_LARGE']);
-
-const requireIdempotency = async <T>(key: string | undefined, ctx: RequestContext, fn: () => Promise<T>) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
@@ -64,18 +57,24 @@ export const governanceBoardRouter = {
 			await context.cerbos.authorize('create', 'governance_board', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			const board = await requireIdempotency(idempotencyKey, context, async () => {
-				await getAssociationOrThrow(rest.associationId, context.organization.id);
-				const created = await prisma.board.create({
-					data: {
-						associationId: rest.associationId,
-						name: rest.name,
-						description: rest.description
-					}
-				});
-				await recordBoardHistory(created.id, 'BOARD_CREATED', { name: rest.name }, context.user?.id);
-				return created;
-			});
+			await getAssociationOrThrow(rest.associationId, context.organization.id);
+
+			// Use DBOS workflow for durable execution
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'CREATE_BOARD',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					data: rest
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create board');
+			}
+
+			const board = await prisma.board.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{ board: { id: board.id, name: board.name, associationId: board.associationId } },
@@ -163,33 +162,37 @@ export const governanceBoardRouter = {
 			await context.cerbos.authorize('edit', 'governance_board', input.boardId);
 			const { idempotencyKey, ...rest } = input;
 
-			const member = await requireIdempotency(idempotencyKey, context, async () => {
-				const board = await prisma.board.findFirst({
-					where: { id: rest.boardId },
-					include: { association: true }
-				});
-				if (!board || board.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Board');
-				}
-				await ensurePartyBelongs(rest.partyId, board.association.organizationId);
+			const board = await prisma.board.findFirst({
+				where: { id: rest.boardId },
+				include: { association: true }
+			});
+			if (!board || board.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Board');
+			}
+			await ensurePartyBelongs(rest.partyId, board.association.organizationId);
 
-				const existing = await prisma.boardMember.findFirst({
-					where: { boardId: rest.boardId, partyId: rest.partyId, termStart: new Date(rest.termStart) }
-				});
-				if (existing) return existing;
-
-				const created = await prisma.boardMember.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startGovernanceWorkflow(
+				{
+					action: 'ADD_BOARD_MEMBER',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						boardId: rest.boardId,
 						partyId: rest.partyId,
-						role: rest.role as BoardRole,
-						termStart: new Date(rest.termStart),
-						termEnd: rest.termEnd ? new Date(rest.termEnd) : undefined
+						role: rest.role,
+						termStart: rest.termStart,
+						termEnd: rest.termEnd
 					}
-				});
-				await recordBoardHistory(rest.boardId, 'MEMBER_ADDED', { memberId: created.id, partyId: created.partyId, role: created.role }, context.user?.id);
-				return created;
-			});
+				},
+				idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to add board member');
+			}
+
+			const member = await prisma.boardMember.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{ member: { id: member.id, boardId: member.boardId, partyId: member.partyId, role: member.role } },
@@ -217,22 +220,33 @@ export const governanceBoardRouter = {
 			await context.cerbos.authorize('edit', 'governance_board', input.boardId);
 			const { idempotencyKey, ...rest } = input;
 
-			const member = await requireIdempotency(idempotencyKey, context, async () => {
-				const board = await prisma.board.findFirst({
-					where: { id: rest.boardId },
-					include: { association: true }
-				});
-				if (!board || board.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Board');
-				}
-
-				const updated = await prisma.boardMember.update({
-					where: { id: rest.memberId },
-					data: { isActive: false, termEnd: new Date() }
-				});
-				await recordBoardHistory(rest.boardId, 'MEMBER_REMOVED', { memberId: rest.memberId, reason: 'removed' }, context.user?.id);
-				return updated;
+			const board = await prisma.board.findFirst({
+				where: { id: rest.boardId },
+				include: { association: true }
 			});
+			if (!board || board.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Board');
+			}
+
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startGovernanceWorkflow(
+				{
+					action: 'REMOVE_BOARD_MEMBER',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						boardId: rest.boardId,
+						memberId: rest.memberId
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to remove board member');
+			}
+
+			const member = await prisma.boardMember.findUniqueOrThrow({ where: { id: rest.memberId } });
 
 			return successResponse(
 				{ member: { id: member.id, boardId: member.boardId, isActive: member.isActive } },

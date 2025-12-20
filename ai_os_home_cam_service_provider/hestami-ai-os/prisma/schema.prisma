@@ -7675,6 +7675,12 @@ enum ConciergeCasePriority {
   EMERGENCY
 }
 
+/// @description Owner availability preference for service visits
+enum AvailabilityType {
+  FLEXIBLE      // Any time works, ASAP preferred
+  SPECIFIC      // Specific time slots provided
+}
+
 /// @description Durable case container for concierge operations
 model ConciergeCase {
   id             String @id @default(cuid())
@@ -7722,7 +7728,12 @@ model ConciergeCase {
   cancelReason String? @map("cancel_reason") @db.Text
   cancelledBy  String? @map("cancelled_by") // User ID
 
+  // Owner availability for service visits
+  availabilityType  AvailabilityType @default(FLEXIBLE) @map("availability_type")
+  availabilityNotes String?          @map("availability_notes") @db.Text
+
   // Relations
+  availabilitySlots CaseAvailabilitySlot[]
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   property           IndividualProperty  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   assignedConcierge  User?               @relation("AssignedConciergeCases", fields: [assignedConciergeUserId], references: [id], onDelete: SetNull)
@@ -7759,6 +7770,28 @@ model ConciergeCase {
   @@index([assignedConciergeUserId])
   @@index([caseNumber])
   @@map("concierge_cases")
+}
+
+/// @description Time slot when owner is available for service visits
+model CaseAvailabilitySlot {
+  id     String @id @default(cuid())
+  caseId String @map("case_id")
+
+  // Time window
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+
+  // Optional notes for this specific slot
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([startTime])
+  @@map("case_availability_slots")
 }
 
 /// @description Audit trail for case status transitions

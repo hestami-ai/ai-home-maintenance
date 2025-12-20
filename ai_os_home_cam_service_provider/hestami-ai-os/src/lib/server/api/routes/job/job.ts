@@ -13,6 +13,8 @@ import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobStatus, JobSourceType, CheckpointType } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
+import { startJobCreateWorkflow } from '../../../workflows/jobCreateWorkflow.js';
+import { startJobWorkflow } from '../../../workflows/jobWorkflow.js';
 
 // Phase 15.7: CAM & Concierge Integration - Propagate job status to linked entities
 async function propagateJobStatusToLinkedEntities(
@@ -319,17 +321,6 @@ const formatVisit = (v: any) => ({
 	updatedAt: v.updatedAt.toISOString()
 });
 
-async function generateJobNumber(organizationId: string): Promise<string> {
-	const year = new Date().getFullYear();
-	const count = await prisma.job.count({
-		where: {
-			organizationId,
-			jobNumber: { startsWith: `JOB-${year}-` }
-		}
-	});
-	return `JOB-${year}-${String(count + 1).padStart(6, '0')}`;
-}
-
 async function getJobOrThrow(jobId: string, organizationId: string) {
 	const job = await prisma.job.findFirst({
 		where: { id: jobId, organizationId, deletedAt: null }
@@ -380,69 +371,46 @@ export const jobRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'job', 'new');
 
-			const createJob = async () => {
-				const jobNumber = await generateJobNumber(context.organization!.id);
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			// This ensures:
+			// 1. Idempotency - same key returns same result
+			// 2. Durability - workflow survives crashes
+			// 3. Trace correlation - all DB operations are in same trace
+			const result = await startJobCreateWorkflow(
+				{
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					sourceType: input.sourceType,
+					title: input.title,
+					description: input.description,
+					category: input.category,
+					priority: input.priority,
+					workOrderId: input.workOrderId,
+					violationId: input.violationId,
+					arcRequestId: input.arcRequestId,
+					customerId: input.customerId,
+					unitId: input.unitId,
+					propertyId: input.propertyId,
+					associationId: input.associationId,
+					addressLine1: input.addressLine1,
+					addressLine2: input.addressLine2,
+					city: input.city,
+					state: input.state,
+					postalCode: input.postalCode,
+					locationNotes: input.locationNotes,
+					estimatedHours: input.estimatedHours,
+					estimatedCost: input.estimatedCost
+				},
+				input.idempotencyKey
+			);
 
-				return prisma.$transaction(async (tx) => {
-					const job = await tx.job.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobNumber,
-							status: input.sourceType === 'LEAD' ? 'LEAD' : 'TICKET',
-							sourceType: input.sourceType,
-							workOrderId: input.workOrderId,
-							violationId: input.violationId,
-							arcRequestId: input.arcRequestId,
-							customerId: input.customerId,
-							unitId: input.unitId,
-							propertyId: input.propertyId,
-							associationId: input.associationId,
-							addressLine1: input.addressLine1,
-							addressLine2: input.addressLine2,
-							city: input.city,
-							state: input.state,
-							postalCode: input.postalCode,
-							locationNotes: input.locationNotes,
-							title: input.title,
-							description: input.description,
-							category: input.category,
-							priority: input.priority,
-							estimatedHours: input.estimatedHours,
-							estimatedCost: input.estimatedCost
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create job');
+			}
 
-					// Record initial status
-					await tx.jobStatusHistory.create({
-						data: {
-							jobId: job.id,
-							toStatus: job.status,
-							changedBy: context.user!.id
-						}
-					});
-
-					return job;
-				});
-			};
-
-			const job = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createJob)).result
-				: await createJob();
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'JOB',
-				entityId: job.id,
-				action: 'CREATE',
-				summary: `Job created: ${job.title}`,
-				jobId: job.id,
-				newState: {
-					jobNumber: job.jobNumber,
-					title: job.title,
-					status: job.status,
-					sourceType: job.sourceType,
-					priority: job.priority
-				}
+			// Fetch the created job for the response
+			const job = await prisma.job.findUniqueOrThrow({
+				where: { id: result.jobId }
 			});
 
 			return successResponse({ job: formatJob(job) }, context);
@@ -575,17 +543,25 @@ export const jobRouter = {
 
 			await getJobOrThrow(input.id, context.organization!.id);
 
-			const updateJob = async () => {
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.job.update({
-					where: { id },
-					data
-				});
-			};
+			const { id, idempotencyKey, ...data } = input;
 
-			const job = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateJob)).result
-				: await updateJob();
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'UPDATE_JOB',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.id,
+					data
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update job');
+			}
+
+			const job = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ job: formatJob(job) }, context);
 		}),
@@ -666,60 +642,23 @@ export const jobRouter = {
 				}
 			}
 
-			const transitionJob = async () => {
-				return prisma.$transaction(async (tx) => {
-					const updateData: any = { status: input.toStatus };
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'TRANSITION_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.id,
+					data: { toStatus: input.toStatus, notes: input.notes }
+				},
+				input.idempotencyKey
+			);
 
-					// Set timestamps based on status (Phase 15 - Contractor Job Lifecycle)
-					switch (input.toStatus) {
-						case 'DISPATCHED':
-							updateData.dispatchedAt = new Date();
-							break;
-						case 'IN_PROGRESS':
-							if (!job.startedAt) {
-								updateData.startedAt = new Date();
-							}
-							break;
-						case 'COMPLETED':
-							updateData.completedAt = new Date();
-							break;
-						case 'INVOICED':
-							updateData.invoicedAt = new Date();
-							break;
-						case 'PAID':
-							updateData.paidAt = new Date();
-							break;
-						case 'CLOSED':
-							updateData.closedAt = new Date();
-							updateData.closedBy = context.user!.id;
-							break;
-						case 'CANCELLED':
-							updateData.cancelledAt = new Date();
-							break;
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to transition job status');
+			}
 
-					const updated = await tx.job.update({
-						where: { id: input.id },
-						data: updateData
-					});
-
-					await tx.jobStatusHistory.create({
-						data: {
-							jobId: input.id,
-							fromStatus: job.status,
-							toStatus: input.toStatus,
-							changedBy: context.user!.id,
-							notes: input.notes
-						}
-					});
-
-					return updated;
-				});
-			};
-
-			const updatedJob = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, transitionJob)).result
-				: await transitionJob();
+			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			// Record activity event
 			await recordStatusChange(context, 'JOB', updatedJob.id, job.status, input.toStatus, 
@@ -771,21 +710,23 @@ export const jobRouter = {
 				if (!tech) throw ApiException.notFound('Technician');
 			}
 
-			const assignJob = async () => {
-				return prisma.job.update({
-					where: { id: input.id },
-					data: {
-						assignedTechnicianId: input.technicianId,
-						assignedBranchId: input.branchId ?? null,
-						assignedAt: input.technicianId ? new Date() : null,
-						assignedBy: input.technicianId ? context.user!.id : null
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'ASSIGN_TECHNICIAN',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.id,
+					data: { technicianId: input.technicianId, branchId: input.branchId }
+				},
+				input.idempotencyKey
+			);
 
-			const updatedJob = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, assignJob)).result
-				: await assignJob();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to assign technician');
+			}
+
+			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			// Record activity event
 			if (input.technicianId) {
@@ -837,36 +778,23 @@ export const jobRouter = {
 				throw ApiException.badRequest(`Cannot schedule job in ${job.status} status`);
 			}
 
-			const scheduleJob = async () => {
-				return prisma.$transaction(async (tx) => {
-					const updated = await tx.job.update({
-						where: { id: input.id },
-						data: {
-							scheduledStart: new Date(input.scheduledStart),
-							scheduledEnd: new Date(input.scheduledEnd),
-							status: 'SCHEDULED'
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'SCHEDULE_JOB',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.id,
+					data: { scheduledStart: input.scheduledStart, scheduledEnd: input.scheduledEnd }
+				},
+				input.idempotencyKey
+			);
 
-					if (job.status !== 'SCHEDULED') {
-						await tx.jobStatusHistory.create({
-							data: {
-								jobId: input.id,
-								fromStatus: job.status,
-								toStatus: 'SCHEDULED',
-								changedBy: context.user!.id,
-								notes: 'Job scheduled'
-							}
-						});
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to schedule job');
+			}
 
-					return updated;
-				});
-			};
-
-			const updatedJob = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, scheduleJob)).result
-				: await scheduleJob();
+			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ job: formatJob(updatedJob) }, context);
 		}),
@@ -946,20 +874,23 @@ export const jobRouter = {
 
 			await getJobOrThrow(input.jobId, context.organization!.id);
 
-			const createNote = async () => {
-				return prisma.jobNote.create({
-					data: {
-						jobId: input.jobId,
-						authorId: context.user!.id,
-						content: input.content,
-						isInternal: input.isInternal
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'ADD_NOTE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.jobId,
+					data: { content: input.content, isInternal: input.isInternal }
+				},
+				input.idempotencyKey
+			);
 
-			const note = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createNote)).result
-				: await createNote();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add note');
+			}
+
+			const note = await prisma.jobNote.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ note: formatNote(note) }, context);
 		}),
@@ -1022,23 +953,29 @@ export const jobRouter = {
 
 			await getJobOrThrow(input.jobId, context.organization!.id);
 
-			const createAttachment = async () => {
-				return prisma.jobAttachment.create({
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'ADD_ATTACHMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.jobId,
 					data: {
-						jobId: input.jobId,
 						fileName: input.fileName,
-						fileUrl: input.fileUrl,
+						storageUrl: input.fileUrl,
 						fileSize: input.fileSize,
-						mimeType: input.mimeType,
-						description: input.description,
-						uploadedBy: context.user!.id
+						fileType: input.mimeType,
+						description: input.description
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const attachment = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createAttachment)).result
-				: await createAttachment();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add attachment');
+			}
+
+			const attachment = await prisma.jobAttachment.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ attachment: formatAttachment(attachment) }, context);
 		}),
@@ -1092,16 +1029,23 @@ export const jobRouter = {
 			});
 			if (!attachment) throw ApiException.notFound('Attachment');
 
-			const deleteAttachment = async () => {
-				await prisma.jobAttachment.delete({ where: { id: input.attachmentId } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'DELETE_ATTACHMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.attachmentId,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteAttachment)).result
-				: await deleteAttachment();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete attachment');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		}),
 
 	/**
@@ -1132,21 +1076,23 @@ export const jobRouter = {
 
 			await getJobOrThrow(input.jobId, context.organization!.id);
 
-			const createCheckpoint = async () => {
-				return prisma.jobCheckpoint.create({
-					data: {
-						jobId: input.jobId,
-						type: input.type,
-						name: input.name,
-						description: input.description,
-						isRequired: input.isRequired
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'ADD_CHECKPOINT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.jobId,
+					data: { type: input.type, description: input.description, isRequired: input.isRequired }
+				},
+				input.idempotencyKey
+			);
 
-			const checkpoint = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createCheckpoint)).result
-				: await createCheckpoint();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add checkpoint');
+			}
+
+			const checkpoint = await prisma.jobCheckpoint.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ checkpoint: formatCheckpoint(checkpoint) }, context);
 		}),
@@ -1183,21 +1129,23 @@ export const jobRouter = {
 			});
 			if (!checkpoint) throw ApiException.notFound('Checkpoint');
 
-			const completeCheckpoint = async () => {
-				return prisma.jobCheckpoint.update({
-					where: { id: input.checkpointId },
-					data: {
-						completedAt: new Date(),
-						completedBy: context.user!.id,
-						passed: input.passed,
-						notes: input.notes
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'COMPLETE_CHECKPOINT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.checkpointId,
+					data: { notes: input.notes }
+				},
+				input.idempotencyKey
+			);
 
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, completeCheckpoint)).result
-				: await completeCheckpoint();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to complete checkpoint');
+			}
+
+			const updated = await prisma.jobCheckpoint.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ checkpoint: formatCheckpoint(updated) }, context);
 		}),
@@ -1268,29 +1216,36 @@ export const jobRouter = {
 				if (!tech) throw ApiException.notFound('Technician');
 			}
 
-			const createVisit = async () => {
-				// Get next visit number
-				const lastVisit = await prisma.jobVisit.findFirst({
-					where: { jobId: input.jobId },
-					orderBy: { visitNumber: 'desc' }
-				});
-				const visitNumber = (lastVisit?.visitNumber ?? 0) + 1;
+			// Get next visit number
+			const lastVisit = await prisma.jobVisit.findFirst({
+				where: { jobId: input.jobId },
+				orderBy: { visitNumber: 'desc' }
+			});
+			const visitNumber = (lastVisit?.visitNumber ?? 0) + 1;
 
-				return prisma.jobVisit.create({
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'ADD_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.jobId,
 					data: {
-						jobId: input.jobId,
 						visitNumber,
-						scheduledStart: new Date(input.scheduledStart),
-						scheduledEnd: new Date(input.scheduledEnd),
+						scheduledStart: input.scheduledStart,
+						scheduledEnd: input.scheduledEnd,
 						technicianId: input.technicianId,
 						notes: input.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const visit = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createVisit)).result
-				: await createVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add visit');
+			}
+
+			const visit = await prisma.jobVisit.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ visit: formatVisit(visit) }, context);
 		}),
@@ -1329,21 +1284,28 @@ export const jobRouter = {
 			});
 			if (!visit) throw ApiException.notFound('Visit');
 
-			const updateVisit = async () => {
-				return prisma.jobVisit.update({
-					where: { id: input.visitId },
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'UPDATE_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.visitId,
 					data: {
 						status: input.status,
-						...(input.actualStart && { actualStart: new Date(input.actualStart) }),
-						...(input.actualEnd && { actualEnd: new Date(input.actualEnd) }),
-						...(input.workPerformed && { workPerformed: input.workPerformed })
+						actualStart: input.actualStart,
+						actualEnd: input.actualEnd,
+						notes: input.workPerformed
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateVisit)).result
-				: await updateVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update visit');
+			}
+
+			const updated = await prisma.jobVisit.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),
@@ -1397,18 +1359,22 @@ export const jobRouter = {
 				throw ApiException.badRequest(`Cannot delete job in ${job.status} status`);
 			}
 
-			const deleteJob = async () => {
-				await prisma.job.update({
-					where: { id: input.id },
-					data: { deletedAt: new Date() }
-				});
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startJobWorkflow(
+				{
+					action: 'DELETE_JOB',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteJob)).result
-				: await deleteJob();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete job');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

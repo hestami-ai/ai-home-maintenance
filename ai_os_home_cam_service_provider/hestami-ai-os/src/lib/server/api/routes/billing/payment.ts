@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobPaymentStatus } from '../../../../../../generated/prisma/client.js';
+import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
 
 const paymentIntentOutput = z.object({
 	id: z.string(),
@@ -99,26 +100,29 @@ export const paymentRouter = {
 				throw ApiException.badRequest('Payment amount exceeds balance due');
 			}
 
-			const createIntent = async () => {
-				// In production, this would call Stripe/Square API
-				// For now, create a pending payment intent record
-				return prisma.paymentIntent.create({
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'CREATE_PAYMENT_INTENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						invoiceId: input.invoiceId,
 						customerId: invoice.customerId,
 						amount: input.amount,
-						currency: input.currency,
-						paymentMethod: input.paymentMethod,
-						metadata: input.metadata
-						// externalId would be set after calling payment processor
+						paymentMethod: input.paymentMethod
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const paymentIntent = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createIntent)).result
-				: await createIntent();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create payment intent');
+			}
+
+			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
 		}),
@@ -232,46 +236,25 @@ export const paymentRouter = {
 				throw ApiException.badRequest('Payment intent is not pending');
 			}
 
-			const processPayment = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Update payment intent
-					const paymentIntent = await tx.paymentIntent.update({
-						where: { id: input.id },
-						data: {
-							status: 'SUCCEEDED',
-							processedAt: new Date(),
-							externalId: `sim_${Date.now()}` // Simulated external ID
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'PROCESS_PAYMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					// Update invoice
-					const invoice = await tx.jobInvoice.findUnique({
-						where: { id: existing.invoiceId }
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to process payment');
+			}
 
-					if (invoice) {
-						const newAmountPaid = Number(invoice.amountPaid) + Number(existing.amount);
-						const newBalanceDue = Number(invoice.totalAmount) - newAmountPaid;
-						const isPaid = newBalanceDue <= 0;
-
-						await tx.jobInvoice.update({
-							where: { id: invoice.id },
-							data: {
-								amountPaid: newAmountPaid,
-								balanceDue: Math.max(0, newBalanceDue),
-								status: isPaid ? 'PAID' : 'PARTIAL',
-								paidAt: isPaid ? new Date() : null
-							}
-						});
-					}
-
-					return paymentIntent;
-				});
-			};
-
-			const paymentIntent = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, processPayment)).result
-				: await processPayment();
+			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
 		}),
@@ -308,21 +291,25 @@ export const paymentRouter = {
 				throw ApiException.badRequest('Payment intent cannot be marked as failed');
 			}
 
-			const markFailed = async () => {
-				return prisma.paymentIntent.update({
-					where: { id: input.id },
-					data: {
-						status: 'FAILED',
-						failedAt: new Date(),
-						errorCode: input.errorCode,
-						errorMessage: input.errorMessage
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'MARK_PAYMENT_FAILED',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: { reason: input.errorMessage }
+				},
+				input.idempotencyKey
+			);
 
-			const paymentIntent = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, markFailed)).result
-				: await markFailed();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to mark payment as failed');
+			}
+
+			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
 		}),
@@ -365,49 +352,25 @@ export const paymentRouter = {
 				throw ApiException.badRequest('Refund amount exceeds payment amount');
 			}
 
-			const refundPayment = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Update payment intent
-					const paymentIntent = await tx.paymentIntent.update({
-						where: { id: input.id },
-						data: {
-							status: 'REFUNDED',
-							refundedAt: new Date(),
-							metadata: {
-								...(existing.metadata as object ?? {}),
-								refundAmount,
-								refundReason: input.reason
-							}
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'REFUND_PAYMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: { refundAmount }
+				},
+				input.idempotencyKey
+			);
 
-					// Update invoice
-					const invoice = await tx.jobInvoice.findUnique({
-						where: { id: existing.invoiceId }
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to refund payment');
+			}
 
-					if (invoice) {
-						const newAmountPaid = Math.max(0, Number(invoice.amountPaid) - refundAmount);
-						const newBalanceDue = Number(invoice.totalAmount) - newAmountPaid;
-
-						await tx.jobInvoice.update({
-							where: { id: invoice.id },
-							data: {
-								amountPaid: newAmountPaid,
-								balanceDue: newBalanceDue,
-								status: newAmountPaid === 0 ? 'REFUNDED' : 'PARTIAL',
-								paidAt: null
-							}
-						});
-					}
-
-					return paymentIntent;
-				});
-			};
-
-			const paymentIntent = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, refundPayment)).result
-				: await refundPayment();
+			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
 		}),
@@ -436,16 +399,25 @@ export const paymentRouter = {
 				throw ApiException.badRequest('Can only cancel pending payments');
 			}
 
-			const cancelPayment = async () => {
-				return prisma.paymentIntent.update({
-					where: { id: input.id },
-					data: { status: 'CANCELLED' }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'CANCEL_PAYMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const paymentIntent = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, cancelPayment)).result
-				: await cancelPayment();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cancel payment');
+			}
+
+			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
 		})

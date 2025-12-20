@@ -11,10 +11,13 @@ import {
 	DocumentStatusSchema,
 	StorageProviderSchema
 } from '../schemas.js';
-import { withIdempotency } from '../middleware/idempotency.js';
+import { startDocumentWorkflow } from '../../workflows/documentWorkflow.js';
 import { recordActivityFromContext } from '../middleware/activityEvent.js';
 import type { RequestContext } from '../context.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
+import { writeFile, mkdir } from 'fs/promises';
+import { join } from 'path';
+import { createHash } from 'crypto';
 
 // Use shared enum schemas from schemas.ts
 const DocumentCategoryEnum = DocumentCategorySchema;
@@ -23,18 +26,258 @@ const DocumentVisibilityEnum = DocumentVisibilitySchema;
 const DocumentStatusEnum = DocumentStatusSchema;
 const StorageProviderEnum = StorageProviderSchema;
 
-const requireIdempotency = async <T>(
-	key: string,
-	ctx: RequestContext,
-	fn: () => Promise<T>
-) => {
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
+
+// Helper to get upload directory path
+const getUploadDir = () => {
+	return process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
+};
+
+// Helper to compute file checksum
+const computeChecksum = async (buffer: ArrayBuffer): Promise<string> => {
+	const hash = createHash('sha256');
+	hash.update(Buffer.from(buffer));
+	return hash.digest('hex');
+};
+
+// Helper to save file to local storage
+const saveFileToLocal = async (
+	file: File,
+	organizationId: string,
+	contextType: string,
+	contextId: string
+): Promise<{ storagePath: string; fileUrl: string; checksum: string }> => {
+	const uploadDir = getUploadDir();
+	const orgDir = join(uploadDir, organizationId, contextType.toLowerCase(), contextId);
+	
+	// Ensure directory exists
+	await mkdir(orgDir, { recursive: true });
+	
+	// Generate unique filename
+	const timestamp = Date.now();
+	const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+	const fileName = `${timestamp}-${safeFileName}`;
+	const filePath = join(orgDir, fileName);
+	
+	// Read file content and compute checksum
+	const buffer = await file.arrayBuffer();
+	const checksum = await computeChecksum(buffer);
+	
+	// Write file to disk
+	await writeFile(filePath, Buffer.from(buffer));
+	
+	// Return relative path for storage
+	const storagePath = join(organizationId, contextType.toLowerCase(), contextId, fileName);
+	const fileUrl = `/uploads/${storagePath.replace(/\\/g, '/')}`;
+	
+	return { storagePath, fileUrl, checksum };
 };
 
 export const documentRouter = {
 	// =========================================================================
-	// Document Upload & Creation
+	// Document Upload & Creation (with actual file)
+	// =========================================================================
+
+	/**
+	 * Upload a document with the actual file content.
+	 * Uses oRPC's native File/Blob support.
+	 */
+	uploadWithFile: orgProcedure
+		.input(
+			z.object({
+				idempotencyKey: z.string().uuid(),
+				file: z.instanceof(File),
+				contextType: DocumentContextTypeEnum,
+				contextId: z.string(),
+				title: z.string().max(255),
+				description: z.string().optional(),
+				category: DocumentCategoryEnum,
+				visibility: DocumentVisibilityEnum.optional(),
+				effectiveDate: z.string().datetime().optional(),
+				expirationDate: z.string().datetime().optional(),
+				tags: z.array(z.string()).optional()
+			})
+		)
+		.output(
+			successResponseSchema(
+				z.object({
+					document: z.object({
+						id: z.string(),
+						title: z.string(),
+						fileName: z.string(),
+						fileSize: z.number(),
+						mimeType: z.string(),
+						category: DocumentCategorySchema,
+						status: DocumentStatusSchema,
+						version: z.number(),
+						fileUrl: z.string(),
+						createdAt: z.string()
+					})
+				})
+			)
+		)
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('create', 'document', 'new');
+
+			// Save file to local storage first (non-idempotent file operation)
+			const { storagePath, fileUrl, checksum } = await saveFileToLocal(
+				input.file,
+				context.organization.id,
+				input.contextType,
+				input.contextId
+			);
+
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'CREATE_DOCUMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						title: input.title,
+						description: input.description,
+						category: input.category,
+						visibility: input.visibility ?? 'PUBLIC',
+						storagePath,
+						fileUrl,
+						fileName: input.file.name,
+						fileSize: input.file.size,
+						mimeType: input.file.type || 'application/octet-stream',
+						checksum,
+						contextType: input.contextType,
+						contextId: input.contextId
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create document');
+			}
+
+			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					document: {
+						id: document.id,
+						title: document.title,
+						fileName: document.fileName,
+						fileSize: document.fileSize,
+						mimeType: document.mimeType,
+						category: document.category,
+						status: document.status,
+						version: document.version,
+						fileUrl: document.fileUrl,
+						createdAt: document.createdAt.toISOString()
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Upload a new version of an existing document with the actual file content.
+	 */
+	uploadVersionWithFile: orgProcedure
+		.input(
+			z.object({
+				idempotencyKey: z.string().uuid(),
+				file: z.instanceof(File),
+				parentDocumentId: z.string()
+			})
+		)
+		.output(
+			successResponseSchema(
+				z.object({
+					document: z.object({
+						id: z.string(),
+						title: z.string(),
+						fileName: z.string(),
+						fileSize: z.number(),
+						mimeType: z.string(),
+						version: z.number(),
+						fileUrl: z.string(),
+						createdAt: z.string()
+					})
+				})
+			)
+		)
+		.handler(async ({ input, context }) => {
+			// Get parent document
+			const parent = await prisma.document.findFirst({
+				where: {
+					id: input.parentDocumentId,
+					organizationId: context.organization.id
+				},
+				include: {
+					contextBindings: true
+				}
+			});
+
+			if (!parent) {
+				throw ApiException.notFound('Document');
+			}
+
+			await context.cerbos.authorize('update', 'document', parent.id);
+
+			// Get primary context binding
+			const primaryBinding = parent.contextBindings.find(b => b.isPrimary);
+			if (!primaryBinding) {
+				throw ApiException.badRequest('Document has no primary context binding');
+			}
+
+			// Save file to local storage first (non-idempotent file operation)
+			const { storagePath, fileUrl, checksum } = await saveFileToLocal(
+				input.file,
+				context.organization.id,
+				primaryBinding.contextType,
+				primaryBinding.contextId
+			);
+
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'CREATE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: parent.parentDocumentId ?? parent.id,
+					data: {
+						fileName: input.file.name,
+						fileSize: input.file.size,
+						mimeType: input.file.type || 'application/octet-stream',
+						storagePath,
+						fileUrl,
+						checksum
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create document version');
+			}
+
+			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					document: {
+						id: document.id,
+						title: document.title,
+						fileName: document.fileName,
+						fileSize: document.fileSize,
+						mimeType: document.mimeType,
+						version: document.version,
+						fileUrl: document.fileUrl,
+						createdAt: document.createdAt.toISOString()
+					}
+				},
+				context
+			);
+		}),
+
+	// =========================================================================
+	// Document Upload & Creation (metadata only - for pre-uploaded files)
 	// =========================================================================
 
 	uploadDocument: orgProcedure
@@ -76,16 +319,17 @@ export const documentRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'document', 'new');
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// Create document with organization scope
-				const document = await prisma.document.create({
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'CREATE_DOCUMENT_METADATA',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
-						organizationId: context.organization.id,
 						title: input.title,
 						description: input.description,
 						category: input.category,
 						visibility: input.visibility ?? 'PUBLIC',
-						status: 'ACTIVE',
 						storageProvider: input.storageProvider ?? 'LOCAL',
 						storagePath: input.storagePath,
 						fileUrl: input.fileUrl,
@@ -93,36 +337,32 @@ export const documentRouter = {
 						fileSize: input.fileSize,
 						mimeType: input.mimeType,
 						checksum: input.checksum,
-						effectiveDate: input.effectiveDate ? new Date(input.effectiveDate) : undefined,
-						expirationDate: input.expirationDate ? new Date(input.expirationDate) : undefined,
-						tags: input.tags ?? [],
-						uploadedBy: context.user.id,
-						// Create context binding inline
-						contextBindings: {
-							create: {
-								contextType: input.contextType,
-								contextId: input.contextId,
-								isPrimary: true,
-								createdBy: context.user.id
-							}
-						}
+						contextType: input.contextType,
+						contextId: input.contextId
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						document: {
-							id: document.id,
-							title: document.title,
-							category: document.category,
-							status: document.status,
-							version: document.version,
-							createdAt: document.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create document');
+			}
+
+			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					document: {
+						id: document.id,
+						title: document.title,
+						category: document.category,
+						status: document.status,
+						version: document.version,
+						createdAt: document.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	// =========================================================================
@@ -273,61 +513,66 @@ export const documentRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			await context.cerbos.authorize('view', 'document', 'list');
+			try {
+				await context.cerbos.authorize('view', 'document', 'list');
 
-			const where: Prisma.DocumentWhereInput = {
-				organizationId: context.organization.id,
-				deletedAt: null,
-				...(input.category && { category: input.category }),
-				...(input.status && { status: input.status }),
-				...(input.contextType && input.contextId && {
-					contextBindings: {
-						some: {
-							contextType: input.contextType,
-							contextId: input.contextId
+				const where: Prisma.DocumentWhereInput = {
+					organizationId: context.organization.id,
+					deletedAt: null,
+					...(input.category && { category: input.category }),
+					...(input.status && { status: input.status }),
+					...(input.contextType && input.contextId && {
+						contextBindings: {
+							some: {
+								contextType: input.contextType,
+								contextId: input.contextId
+							}
 						}
-					}
-				}),
-				...(input.search && {
-					OR: [
-						{ title: { contains: input.search, mode: 'insensitive' } },
-						{ description: { contains: input.search, mode: 'insensitive' } },
-						{ tags: { has: input.search } }
-					]
-				})
-			};
+					}),
+					...(input.search && {
+						OR: [
+							{ title: { contains: input.search, mode: 'insensitive' as const } },
+							{ description: { contains: input.search, mode: 'insensitive' as const } },
+							{ tags: { has: input.search } }
+						]
+					})
+				};
 
-			const documents = await prisma.document.findMany({
-				where,
-				take: input.limit + 1,
-				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
-				orderBy: { createdAt: 'desc' }
-			});
+				const documents = await prisma.document.findMany({
+					where,
+					take: input.limit + 1,
+					...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
+					orderBy: { createdAt: 'desc' }
+				});
 
-			const hasMore = documents.length > input.limit;
-			const items = hasMore ? documents.slice(0, -1) : documents;
+				const hasMore = documents.length > input.limit;
+				const items = hasMore ? documents.slice(0, -1) : documents;
 
-			return successResponse(
-				{
-					documents: items.map((d) => ({
-						id: d.id,
-						title: d.title,
-						category: d.category,
-						status: d.status,
-						visibility: d.visibility,
-						fileName: d.fileName,
-						fileSize: d.fileSize,
-						mimeType: d.mimeType,
-						version: d.version,
-						createdAt: d.createdAt.toISOString()
-					})),
-					pagination: {
-						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
-						hasMore
-					}
-				},
-				context
-			);
+				return successResponse(
+					{
+						documents: items.map((d) => ({
+							id: d.id,
+							title: d.title,
+							category: d.category,
+							status: d.status,
+							visibility: d.visibility,
+							fileName: d.fileName,
+							fileSize: d.fileSize,
+							mimeType: d.mimeType,
+							version: d.version,
+							createdAt: d.createdAt.toISOString()
+						})),
+						pagination: {
+							nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
+							hasMore
+						}
+					},
+					context
+				);
+			} catch (error) {
+				console.error('[document.listDocuments] Error:', error);
+				throw error;
+			}
 		}),
 
 	// =========================================================================
@@ -372,31 +617,39 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const updated = await prisma.document.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'UPDATE_DOCUMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.id,
 					data: {
-						...(input.title && { title: input.title }),
-						...(input.description !== undefined && { description: input.description }),
-						...(input.category && { category: input.category }),
-						...(input.visibility && { visibility: input.visibility }),
-						...(input.effectiveDate && { effectiveDate: new Date(input.effectiveDate) }),
-						...(input.expirationDate && { expirationDate: new Date(input.expirationDate) }),
-						...(input.tags && { tags: input.tags })
+						title: input.title,
+						description: input.description,
+						category: input.category,
+						visibility: input.visibility
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return successResponse(
-					{
-						document: {
-							id: updated.id,
-							title: updated.title,
-							updatedAt: updated.updatedAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update document');
+			}
+
+			const updated = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
+
+			return successResponse(
+				{
+					document: {
+						id: updated.id,
+						title: updated.title,
+						updatedAt: updated.updatedAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	updateExtractedMetadata: orgProcedure
@@ -481,57 +734,41 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', parent.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// Get max version
-				const maxVersion = await prisma.document.aggregate({
-					where: {
-						OR: [{ id: input.parentDocumentId }, { parentDocumentId: input.parentDocumentId }]
-					},
-					_max: { version: true }
-				});
-
-				const newVersion = (maxVersion._max.version ?? 0) + 1;
-
-				const document = await prisma.document.create({
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'CREATE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.parentDocumentId,
 					data: {
-						organizationId: parent.organizationId,
-						title: parent.title,
-						description: parent.description,
-						category: parent.category,
-						visibility: parent.visibility,
-						status: 'ACTIVE',
-						storageProvider: parent.storageProvider,
 						storagePath: input.storagePath,
 						fileUrl: input.fileUrl,
 						fileName: input.fileName,
 						fileSize: input.fileSize,
 						mimeType: input.mimeType,
-						checksum: input.checksum,
-						version: newVersion,
-						parentDocumentId: input.parentDocumentId,
-						effectiveDate: parent.effectiveDate,
-						tags: parent.tags,
-						uploadedBy: context.user.id
+						checksum: input.checksum
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Mark parent as superseded
-				await prisma.document.update({
-					where: { id: input.parentDocumentId },
-					data: { status: 'SUPERSEDED', supersededById: document.id }
-				});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create document version');
+			}
 
-				return successResponse(
-					{
-						document: {
-							id: document.id,
-							version: document.version,
-							createdAt: document.createdAt.toISOString()
-						}
-					},
-					context
-				);
-			});
+			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					document: {
+						id: document.id,
+						version: document.version,
+						createdAt: document.createdAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	getVersions: orgProcedure
@@ -629,59 +866,35 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', current.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// Create new version from target
-				const maxVersion = await prisma.document.aggregate({
-					where: {
-						OR: [
-							{ id: current.parentDocumentId ?? current.id },
-							{ parentDocumentId: current.parentDocumentId ?? current.id }
-						]
-					},
-					_max: { version: true }
-				});
-
-				const newVersion = (maxVersion._max.version ?? 0) + 1;
-
-				const reverted = await prisma.document.create({
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'RESTORE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.documentId,
 					data: {
-						organizationId: target.organizationId,
-						title: target.title,
-						description: target.description,
-						category: target.category,
-						visibility: target.visibility,
-						status: 'ACTIVE',
-						storageProvider: target.storageProvider,
-						storagePath: target.storagePath,
-						fileUrl: target.fileUrl,
-						fileName: target.fileName,
-						fileSize: target.fileSize,
-						mimeType: target.mimeType,
-						checksum: target.checksum,
-						version: newVersion,
-						parentDocumentId: current.parentDocumentId ?? current.id,
-						effectiveDate: target.effectiveDate,
-						tags: target.tags,
-						uploadedBy: context.user.id
+						targetVersionId: input.targetVersionId
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Mark current as superseded
-				await prisma.document.update({
-					where: { id: input.documentId },
-					data: { status: 'SUPERSEDED', supersededById: reverted.id }
-				});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to restore document version');
+			}
 
-				return successResponse(
-					{
-						document: {
-							id: reverted.id,
-							version: reverted.version
-						}
-					},
-					context
-				);
-			});
+			const reverted = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			return successResponse(
+				{
+					document: {
+						id: reverted.id,
+						version: reverted.version
+					}
+				},
+				context
+			);
 		}),
 
 	// =========================================================================
@@ -912,36 +1125,49 @@ export const documentRouter = {
 
 			const previousCategory = document.category;
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				const updated = await prisma.document.update({
-					where: { id: input.id },
-					data: { category: input.category }
-				});
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'CHANGE_CATEGORY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.id,
+					data: {
+						category: input.category
+					}
+				},
+				input.idempotencyKey
+			);
 
-				// Record audit event for classification change
-				await recordActivityFromContext(context, {
-					entityType: 'DOCUMENT',
-					entityId: document.id,
-					action: 'CLASSIFY',
-					eventCategory: 'EXECUTION',
-					summary: `Document reclassified from ${previousCategory} to ${input.category}: ${input.reason}`,
-					previousState: { category: previousCategory },
-					newState: { category: input.category },
-					metadata: { reason: input.reason }
-				});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to change document category');
+			}
 
-				return successResponse(
-					{
-						document: {
-							id: updated.id,
-							category: updated.category,
-							previousCategory,
-							updatedAt: updated.updatedAt.toISOString()
-						}
-					},
-					context
-				);
+			const updated = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
+
+			// Record audit event for classification change
+			await recordActivityFromContext(context, {
+				entityType: 'DOCUMENT',
+				entityId: document.id,
+				action: 'CLASSIFY',
+				eventCategory: 'EXECUTION',
+				summary: `Document reclassified from ${previousCategory} to ${input.category}: ${input.reason}`,
+				previousState: { category: previousCategory },
+				newState: { category: input.category },
+				metadata: { reason: input.reason }
 			});
+
+			return successResponse(
+				{
+					document: {
+						id: updated.id,
+						category: updated.category,
+						previousCategory,
+						updatedAt: updated.updatedAt.toISOString()
+					}
+				},
+				context
+			);
 		}),
 
 	// =========================================================================
@@ -985,70 +1211,53 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			return requireIdempotency(input.idempotencyKey, context, async () => {
-				// Check if binding already exists
-				const existing = await prisma.documentContextBinding.findUnique({
-					where: {
-						documentId_contextType_contextId: {
-							documentId: input.documentId,
-							contextType: input.contextType,
-							contextId: input.contextId
-						}
-					}
-				});
-
-				if (existing) {
-					return successResponse(
-						{
-							binding: {
-								id: existing.id,
-								documentId: existing.documentId,
-								contextType: existing.contextType,
-								contextId: existing.contextId,
-								isPrimary: existing.isPrimary
-							}
-						},
-						context
-					);
-				}
-
-				const binding = await prisma.documentContextBinding.create({
+			// Use DBOS workflow for durable database execution
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'ADD_CONTEXT_BINDING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.documentId,
 					data: {
-						documentId: input.documentId,
 						contextType: input.contextType,
 						contextId: input.contextId,
-						isPrimary: input.isPrimary ?? false,
-						bindingNotes: input.bindingNotes,
-						createdBy: context.user.id
+						isPrimary: input.isPrimary ?? false
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Record audit event for document reference
-				await recordActivityFromContext(context, {
-					entityType: 'DOCUMENT',
-					entityId: document.id,
-					action: 'REFERENCED',
-					eventCategory: 'EXECUTION',
-					summary: `Document linked to ${input.contextType} ${input.contextId}`,
-					newState: { contextType: input.contextType, contextId: input.contextId },
-					metadata: {
-						documentsReferenced: [{ documentId: document.id, version: document.version }]
-					}
-				});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to link document to context');
+			}
 
-				return successResponse(
-					{
-						binding: {
-							id: binding.id,
-							documentId: binding.documentId,
-							contextType: binding.contextType,
-							contextId: binding.contextId,
-							isPrimary: binding.isPrimary
-						}
-					},
-					context
-				);
+			const binding = await prisma.documentContextBinding.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+			// Record audit event for document reference
+			await recordActivityFromContext(context, {
+				entityType: 'DOCUMENT',
+				entityId: document.id,
+				action: 'REFERENCED',
+				eventCategory: 'EXECUTION',
+				summary: `Document linked to ${input.contextType} ${input.contextId}`,
+				newState: { contextType: input.contextType, contextId: input.contextId },
+				metadata: {
+					documentsReferenced: [{ documentId: document.id, version: document.version }]
+				}
 			});
+
+			return successResponse(
+				{
+					binding: {
+						id: binding.id,
+						documentId: binding.documentId,
+						contextType: binding.contextType,
+						contextId: binding.contextId,
+						isPrimary: binding.isPrimary
+					}
+				},
+				context
+			);
 		}),
 
 	unlinkFromContext: orgProcedure

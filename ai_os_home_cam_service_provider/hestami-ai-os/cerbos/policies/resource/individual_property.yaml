@@ -13,7 +13,7 @@ resourcePolicy:
         - org_manager
 
     # Owners can view and manage properties in their organization
-    - actions: ["view", "edit"]
+    - actions: ["view", "create", "edit", "delete"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_owner

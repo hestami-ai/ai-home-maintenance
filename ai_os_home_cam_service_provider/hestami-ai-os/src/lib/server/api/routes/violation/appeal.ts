@@ -5,6 +5,7 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import type { AppealStatus } from '../../../../../../generated/prisma/client.js';
+import { startAppealWorkflow } from '../../../workflows/appealWorkflow.js';
 
 const appealStatusEnum = z.enum([
 	'PENDING', 'SCHEDULED', 'UPHELD', 'MODIFIED', 'REVERSED', 'WITHDRAWN'
@@ -45,66 +46,29 @@ export const appealRouter = {
 			await context.cerbos.authorize('create', 'violation_appeal', 'new');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const fileAppeal = async () => {
-				// Verify hearing exists and belongs to this association
-				const hearing = await prisma.violationHearing.findFirst({
-					where: { id: input.hearingId },
-					include: { violation: true }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startAppealWorkflow(
+				{
+					action: 'FILE_APPEAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					data: {
+						hearingId: input.hearingId,
+						reason: input.reason,
+						documentsJson: input.documentsJson
+					}
+				},
+				input.idempotencyKey
+			);
 
-				if (!hearing || hearing.violation.associationId !== association.id) {
-					throw ApiException.notFound('Hearing');
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to file appeal');
+			}
 
-				// Check if hearing has a decision
-				if (hearing.outcome === 'PENDING') {
-					throw ApiException.badRequest('Cannot appeal a hearing that has not been held');
-				}
-
-				// Check appeal deadline
-				if (hearing.appealDeadline && new Date() > hearing.appealDeadline) {
-					throw ApiException.badRequest('Appeal deadline has passed');
-				}
-
-				// Check if appeal already filed
-				const existingAppeal = await prisma.violationAppeal.findFirst({
-					where: { hearingId: input.hearingId, status: { notIn: ['WITHDRAWN'] } }
-				});
-				if (existingAppeal) {
-					throw ApiException.conflict('An appeal has already been filed for this hearing');
-				}
-
-				// Create appeal and update hearing
-				const [appeal] = await prisma.$transaction([
-					prisma.violationAppeal.create({
-						data: {
-							hearingId: input.hearingId,
-							filedDate: new Date(),
-							filedBy: context.user!.id,
-							reason: input.reason,
-							documentsJson: input.documentsJson,
-							originalFineAmount: hearing.fineAssessed
-						}
-					}),
-					prisma.violationHearing.update({
-						where: { id: input.hearingId },
-						data: {
-							appealFiled: true,
-							appealDate: new Date()
-						}
-					}),
-					prisma.violation.update({
-						where: { id: hearing.violationId },
-						data: { status: 'APPEALED' }
-					})
-				]);
-
-				return appeal;
-			};
-
-			const appeal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, fileAppeal)).result
-				: await fileAppeal();
+			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				appeal: {
@@ -254,33 +218,29 @@ export const appealRouter = {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const scheduleHearing = async () => {
-				const appeal = await prisma.violationAppeal.findFirst({
-					where: { id: input.id },
-					include: { hearing: { include: { violation: true } } }
-				});
-
-				if (!appeal || appeal.hearing.violation.associationId !== association.id) {
-					throw ApiException.notFound('Appeal');
-				}
-
-				if (appeal.status !== 'PENDING') {
-					throw ApiException.badRequest('Can only schedule hearing for pending appeals');
-				}
-
-				return prisma.violationAppeal.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startAppealWorkflow(
+				{
+					action: 'SCHEDULE_HEARING',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					appealId: input.id,
 					data: {
-						status: 'SCHEDULED',
-						appealHearingDate: new Date(input.appealHearingDate),
+						appealHearingDate: input.appealHearingDate,
 						appealHearingLocation: input.appealHearingLocation
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const appeal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, scheduleHearing)).result
-				: await scheduleHearing();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to schedule hearing');
+			}
+
+			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				appeal: {
@@ -318,47 +278,30 @@ export const appealRouter = {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const recordDecision = async () => {
-				const appeal = await prisma.violationAppeal.findFirst({
-					where: { id: input.id },
-					include: { hearing: { include: { violation: true } } }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startAppealWorkflow(
+				{
+					action: 'RECORD_DECISION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					appealId: input.id,
+					data: {
+						status: input.status,
+						decisionNotes: input.decisionNotes,
+						revisedFineAmount: input.revisedFineAmount
+					}
+				},
+				input.idempotencyKey
+			);
 
-				if (!appeal || appeal.hearing.violation.associationId !== association.id) {
-					throw ApiException.notFound('Appeal');
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record decision');
+			}
 
-				if (!['PENDING', 'SCHEDULED'].includes(appeal.status)) {
-					throw ApiException.badRequest('Appeal decision has already been recorded');
-				}
-
-				// Update appeal and violation status
-				const [updatedAppeal] = await prisma.$transaction([
-					prisma.violationAppeal.update({
-						where: { id: input.id },
-						data: {
-							status: input.status,
-							decisionDate: new Date(),
-							decisionBy: context.user!.id,
-							decisionNotes: input.decisionNotes,
-							revisedFineAmount: input.revisedFineAmount
-						}
-					}),
-					// Update violation status based on appeal outcome
-					prisma.violation.update({
-						where: { id: appeal.hearing.violationId },
-						data: {
-							status: input.status === 'REVERSED' ? 'DISMISSED' : 'CLOSED'
-						}
-					})
-				]);
-
-				return updatedAppeal;
-			};
-
-			const appeal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, recordDecision)).result
-				: await recordDecision();
+			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				appeal: {
@@ -392,38 +335,26 @@ export const appealRouter = {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const withdrawAppeal = async () => {
-				const appeal = await prisma.violationAppeal.findFirst({
-					where: { id: input.id },
-					include: { hearing: { include: { violation: true } } }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startAppealWorkflow(
+				{
+					action: 'WITHDRAW_APPEAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					appealId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				if (!appeal || appeal.hearing.violation.associationId !== association.id) {
-					throw ApiException.notFound('Appeal');
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to withdraw appeal');
+			}
 
-				if (!['PENDING', 'SCHEDULED'].includes(appeal.status)) {
-					throw ApiException.badRequest('Cannot withdraw appeal after decision');
-				}
-
-				// Update appeal and revert violation status
-				const [updatedAppeal] = await prisma.$transaction([
-					prisma.violationAppeal.update({
-						where: { id: input.id },
-						data: { status: 'WITHDRAWN' }
-					}),
-					prisma.violation.update({
-						where: { id: appeal.hearing.violationId },
-						data: { status: 'FINE_ASSESSED' }
-					})
-				]);
-
-				return updatedAppeal;
-			};
-
-			const appeal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, withdrawAppeal)).result
-				: await withdrawAppeal();
+			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				appeal: {

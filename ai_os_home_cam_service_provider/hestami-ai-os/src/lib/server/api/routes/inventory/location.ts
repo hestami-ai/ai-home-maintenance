@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { InventoryLocationType } from '../../../../../../generated/prisma/client.js';
+import { startInventoryLocationWorkflow } from '../../../workflows/inventoryLocationWorkflow.js';
 
 const inventoryLocationOutput = z.object({
 	id: z.string(),
@@ -97,10 +98,13 @@ export const inventoryLocationRouter = {
 				if (!branch) throw ApiException.notFound('Branch');
 			}
 
-			const createLocation = async () => {
-				return prisma.inventoryLocation.create({
+			// Use DBOS workflow for durable execution
+			const result = await startInventoryLocationWorkflow(
+				{
+					action: 'CREATE_LOCATION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						name: input.name,
 						code: input.code,
 						type: input.type,
@@ -113,12 +117,17 @@ export const inventoryLocationRouter = {
 						technicianId: input.technicianId,
 						branchId: input.branchId
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const location = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createLocation)).result
-				: await createLocation();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create location');
+			}
+
+			const location = await prisma.inventoryLocation.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ location: formatLocation(location) }, context);
 		}),
@@ -239,17 +248,27 @@ export const inventoryLocationRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Inventory location');
 
-			const updateLocation = async () => {
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.inventoryLocation.update({
-					where: { id: input.id },
-					data
-				});
-			};
+			const { id, idempotencyKey, ...data } = input;
 
-			const location = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateLocation)).result
-				: await updateLocation();
+			// Use DBOS workflow for durable execution
+			const result = await startInventoryLocationWorkflow(
+				{
+					action: 'UPDATE_LOCATION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					locationId: input.id,
+					data
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update location');
+			}
+
+			const location = await prisma.inventoryLocation.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ location: formatLocation(location) }, context);
 		}),
@@ -280,18 +299,22 @@ export const inventoryLocationRouter = {
 				throw ApiException.badRequest('Cannot delete location with inventory. Transfer stock first.');
 			}
 
-			const deleteLocation = async () => {
-				await prisma.inventoryLocation.update({
-					where: { id: input.id },
-					data: { deletedAt: new Date() }
-				});
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startInventoryLocationWorkflow(
+				{
+					action: 'DELETE_LOCATION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					locationId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteLocation)).result
-				: await deleteLocation();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete location');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

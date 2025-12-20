@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ProposalStatus } from '../../../../../../generated/prisma/client.js';
+import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
 
 const proposalOutput = z.object({
 	id: z.string(),
@@ -118,27 +119,34 @@ export const proposalRouter = {
 				if (!estimate) throw ApiException.notFound('Estimate');
 			}
 
-			const createProposal = async () => {
-				const proposalNumber = await generateProposalNumber(context.organization!.id);
+			const proposalNumber = await generateProposalNumber(context.organization!.id);
 
-				return prisma.proposal.create({
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'CREATE_PROPOSAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						customerId: input.customerId,
 						estimateId: input.estimateId,
 						proposalNumber,
 						title: input.title,
 						coverLetter: input.coverLetter,
 						terms: input.terms,
-						validUntil: input.validUntil ? new Date(input.validUntil) : null,
-						createdBy: context.user!.id
+						validUntil: input.validUntil
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const proposal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createProposal)).result
-				: await createProposal();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create proposal');
+			}
+
+			const proposal = await prisma.proposal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
 		}),
@@ -262,21 +270,25 @@ export const proposalRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT proposals');
 			}
 
-			const updateProposal = async () => {
-				return prisma.proposal.update({
-					where: { id: input.id },
-					data: {
-						title: input.title ?? existing.title,
-						coverLetter: input.coverLetter ?? existing.coverLetter,
-						terms: input.terms ?? existing.terms,
-						validUntil: input.validUntil === null ? null : input.validUntil ? new Date(input.validUntil) : existing.validUntil
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'UPDATE_PROPOSAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: { status: existing.status }
+				},
+				input.idempotencyKey
+			);
 
-			const proposal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateProposal)).result
-				: await updateProposal();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update proposal');
+			}
+
+			const proposal = await prisma.proposal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
 		}),
@@ -306,19 +318,25 @@ export const proposalRouter = {
 				throw ApiException.badRequest('Can only send DRAFT proposals');
 			}
 
-			const sendProposal = async () => {
-				return prisma.proposal.update({
-					where: { id: input.id },
-					data: {
-						status: 'SENT',
-						sentAt: new Date()
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'SEND_PROPOSAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const proposal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, sendProposal)).result
-				: await sendProposal();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to send proposal');
+			}
+
+			const proposal = await prisma.proposal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
 		}),
@@ -393,52 +411,25 @@ export const proposalRouter = {
 				throw ApiException.badRequest('Can only accept SENT or VIEWED proposals');
 			}
 
-			const acceptProposal = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Update proposal
-					const proposal = await tx.proposal.update({
-						where: { id: input.id },
-						data: {
-							status: 'ACCEPTED',
-							acceptedAt: new Date(),
-							signatureData: input.signatureData,
-							signedAt: new Date(),
-							signedByName: input.signedByName,
-							signedByEmail: input.signedByEmail,
-							selectedOptionId: input.selectedOptionId
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'ACCEPT_PROPOSAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					// Also accept the linked estimate if exists
-					if (existing.estimateId) {
-						await tx.estimate.update({
-							where: { id: existing.estimateId },
-							data: {
-								status: 'ACCEPTED',
-								acceptedAt: new Date()
-							}
-						});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to accept proposal');
+			}
 
-						// Mark selected option if provided
-						if (input.selectedOptionId) {
-							await tx.estimateOption.updateMany({
-								where: { estimateId: existing.estimateId },
-								data: { isSelected: false }
-							});
-							await tx.estimateOption.update({
-								where: { id: input.selectedOptionId },
-								data: { isSelected: true }
-							});
-						}
-					}
-
-					return proposal;
-				});
-			};
-
-			const proposal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, acceptProposal)).result
-				: await acceptProposal();
+			const proposal = await prisma.proposal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
 		}),
@@ -468,34 +459,25 @@ export const proposalRouter = {
 				throw ApiException.badRequest('Can only decline SENT or VIEWED proposals');
 			}
 
-			const declineProposal = async () => {
-				return prisma.$transaction(async (tx) => {
-					const proposal = await tx.proposal.update({
-						where: { id: input.id },
-						data: {
-							status: 'DECLINED',
-							declinedAt: new Date()
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'DECLINE_PROPOSAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					// Also decline the linked estimate if exists
-					if (existing.estimateId) {
-						await tx.estimate.update({
-							where: { id: existing.estimateId },
-							data: {
-								status: 'DECLINED',
-								declinedAt: new Date()
-							}
-						});
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to decline proposal');
+			}
 
-					return proposal;
-				});
-			};
-
-			const proposal = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, declineProposal)).result
-				: await declineProposal();
+			const proposal = await prisma.proposal.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
 		}),
@@ -525,15 +507,22 @@ export const proposalRouter = {
 				throw ApiException.badRequest('Can only delete DRAFT proposals');
 			}
 
-			const deleteProposal = async () => {
-				await prisma.proposal.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'DELETE_PROPOSAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteProposal)).result
-				: await deleteProposal();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete proposal');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

@@ -4,6 +4,7 @@ import { orgProcedure, successResponse, PaginationInputSchema } from '../../rout
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';
 
 const reportCategoryEnum = z.enum([
 	'FINANCIAL', 'RECEIVABLES', 'PAYABLES', 'OPERATIONAL', 'COMPLIANCE', 'GOVERNANCE', 'CUSTOM'
@@ -52,18 +53,14 @@ export const reportDefinitionRouter = {
 			await context.cerbos.authorize('create', 'report_definition', 'new');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const createReport = async () => {
-				// Check for duplicate code
-				const existing = await prisma.reportDefinition.findFirst({
-					where: { associationId: association.id, code: input.code }
-				});
-				if (existing) {
-					throw ApiException.conflict('Report with this code already exists');
-				}
-
-				return prisma.reportDefinition.create({
+			// Use DBOS workflow for durable execution
+			const result = await startReportDefinitionWorkflow(
+				{
+					action: 'CREATE_REPORT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
 					data: {
-						associationId: association.id,
 						code: input.code,
 						name: input.name,
 						description: input.description,
@@ -71,16 +68,20 @@ export const reportDefinitionRouter = {
 						queryTemplate: input.queryTemplate,
 						parametersJson: input.parametersJson,
 						columnsJson: input.columnsJson,
-						defaultFormat: input.defaultFormat || 'PDF',
-						allowedFormats: input.allowedFormats || ['PDF', 'EXCEL', 'CSV'],
-						isSystemReport: false
+						defaultFormat: input.defaultFormat,
+						allowedFormats: input.allowedFormats
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const report = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createReport)).result
-				: await createReport();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create report');
+			}
+
+			const report = await prisma.reportDefinition.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				report: {
@@ -255,17 +256,14 @@ export const reportDefinitionRouter = {
 			await context.cerbos.authorize('edit', 'report_definition', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const updateReport = async () => {
-				const existing = await prisma.reportDefinition.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Report definition');
-				if (existing.isSystemReport) {
-					throw ApiException.forbidden('Cannot modify system reports');
-				}
-
-				return prisma.reportDefinition.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startReportDefinitionWorkflow(
+				{
+					action: 'UPDATE_REPORT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					reportId: input.id,
 					data: {
 						name: input.name,
 						description: input.description,
@@ -276,12 +274,17 @@ export const reportDefinitionRouter = {
 						allowedFormats: input.allowedFormats,
 						isActive: input.isActive
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const report = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateReport)).result
-				: await updateReport();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update report');
+			}
+
+			const report = await prisma.reportDefinition.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				report: {
@@ -309,22 +312,22 @@ export const reportDefinitionRouter = {
 			await context.cerbos.authorize('delete', 'report_definition', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const deleteReport = async () => {
-				const existing = await prisma.reportDefinition.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Report definition');
-				if (existing.isSystemReport) {
-					throw ApiException.forbidden('Cannot delete system reports');
-				}
+			// Use DBOS workflow for durable execution
+			const result = await startReportDefinitionWorkflow(
+				{
+					action: 'DELETE_REPORT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					reportId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				await prisma.reportDefinition.delete({ where: { id: input.id } });
-				return true;
-			};
-
-			input.idempotencyKey
-				? await withIdempotency(input.idempotencyKey, context, deleteReport)
-				: await deleteReport();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete report');
+			}
 
 			return successResponse({ deleted: true }, context);
 		})

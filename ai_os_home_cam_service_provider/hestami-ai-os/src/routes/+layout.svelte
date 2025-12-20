@@ -3,8 +3,11 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import { Header } from '$lib/components/layout';
 	import { theme, auth, organizationStore } from '$lib/stores';
-	import { organizationApi } from '$lib/api';
+	import { orpc } from '$lib/api';
+	import { logger } from '$lib/logger';
 	import { onMount } from 'svelte';
+
+	const log = logger.child({ component: 'Layout' });
 
 	interface Props {
 		data: {
@@ -23,9 +26,10 @@
 		}
 
 		organizationStore.setLoading(true);
-		const result = await organizationApi.list();
-
-		if (result.ok && result.data) {
+		try {
+			log.debug('Loading organizations');
+			const result = await orpc.organization.list();
+			log.debug('Organizations loaded', { count: result.data.organizations.length });
 			const memberships = result.data.organizations.map((org) => ({
 				organization: {
 					id: org.id,
@@ -38,7 +42,8 @@
 				isDefault: org.isDefault
 			}));
 			organizationStore.setMemberships(memberships);
-		} else {
+		} catch (err) {
+			log.error('Failed to load organizations', { error: err instanceof Error ? err.message : String(err) });
 			organizationStore.setLoading(false);
 		}
 	}

@@ -5,6 +5,7 @@
 	import { TabbedContent, DecisionButton, VendorApprovalModal, UploadComplianceDocModal } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { vendorApi, documentApi, activityEventApi, type Vendor, type Document } from '$lib/api/cam';
+	import { orpc } from '$lib/api';
 
 	interface VendorHistoryEvent {
 		id: string;
@@ -141,20 +142,20 @@
 
 		isUploadingDoc = true;
 		try {
-			// TODO: Document upload requires FormData - keep as fetch for now
-			const formData = new FormData();
-			formData.append('file', data.file);
-			formData.append('documentType', data.documentType);
-			formData.append('vendorId', vendor.id);
-			if (data.expirationDate) formData.append('expirationDate', data.expirationDate);
-			if (data.notes) formData.append('notes', data.notes);
-
-			const response = await fetch(`/api/vendor/${vendor.id}/document`, {
-				method: 'POST',
-				body: formData
+			// Use oRPC's native file upload support
+			const result = await orpc.document.uploadWithFile({
+				idempotencyKey: crypto.randomUUID(),
+				file: data.file,
+				contextType: 'VENDOR',
+				contextId: vendor.id,
+				title: data.file.name.replace(/\.[^/.]+$/, ''),
+				description: data.notes,
+				category: mapDocumentTypeToCategory(data.documentType),
+				visibility: 'STAFF_ONLY',
+				expirationDate: data.expirationDate ? new Date(data.expirationDate).toISOString() : undefined
 			});
 
-			if (response.ok) {
+			if (result.ok) {
 				await loadDocuments();
 				showUploadDocModal = false;
 			}
@@ -163,6 +164,18 @@
 		} finally {
 			isUploadingDoc = false;
 		}
+	}
+
+	// Map vendor document types to document categories
+	function mapDocumentTypeToCategory(docType: string): any {
+		const mapping: Record<string, string> = {
+			'W9': 'CONTRACT',
+			'INSURANCE_COI': 'INSURANCE',
+			'LICENSE': 'CONTRACT',
+			'CONTRACT': 'CONTRACT',
+			'OTHER': 'OTHER'
+		};
+		return mapping[docType] || 'OTHER';
 	}
 
 	$effect(() => {

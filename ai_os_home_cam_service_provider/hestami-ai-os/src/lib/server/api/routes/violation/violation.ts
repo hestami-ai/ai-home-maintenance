@@ -14,6 +14,9 @@ import {
 import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
+import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';
+import { startViolationFineWorkflow } from '../../../workflows/violationFineWorkflow.js';
+import { startViolationWorkflow } from '../../../workflows/violationWorkflow.js';
 
 const FINAL_STATUSES: ViolationStatus[] = ['CLOSED', 'DISMISSED'];
 
@@ -125,117 +128,77 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
 
-			const violation = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
+			// Get association for this organization
+			const association = await getAssociationOrThrow(context.organization!.id);
 
-				// Validate violation type
-				const violationType = await prisma.violationType.findFirst({
-					where: { id: input.violationTypeId, associationId: association.id, isActive: true }
-				});
-
-				if (!violationType) {
-					throw ApiException.notFound('Violation Type');
-				}
-
-				// Validate unit if provided
-				if (input.unitId) {
-					const unit = await prisma.unit.findFirst({
-						where: { id: input.unitId },
-						include: { property: { include: { association: true } } }
-					});
-					if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-						throw ApiException.notFound('Unit');
-					}
-				}
-
-				// Validate responsible party if provided
-				if (input.responsiblePartyId) {
-					const party = await prisma.party.findFirst({
-						where: { id: input.responsiblePartyId, organizationId: context.organization!.id }
-					});
-					if (!party) {
-						throw ApiException.notFound('Responsible Party');
-					}
-				}
-
-				// Generate violation number
-				const year = new Date().getFullYear();
-				const lastViolation = await prisma.violation.findFirst({
-					where: {
-						associationId: association.id,
-						violationNumber: { startsWith: `VIO-${year}-` }
-					},
-					orderBy: { createdAt: 'desc' }
-				});
-
-				const sequence = lastViolation
-					? parseInt(lastViolation.violationNumber.split('-')[2] || '0') + 1
-					: 1;
-				const violationNumber = `VIO-${year}-${String(sequence).padStart(6, '0')}`;
-
-				const severity = input.severity || violationType.defaultSeverity;
-
-				const violation = await prisma.$transaction(async (tx) => {
-					const v = await tx.violation.create({
-						data: {
-							associationId: association.id,
-							violationNumber,
-							violationTypeId: input.violationTypeId,
-							title: input.title,
-							description: input.description,
-							severity,
-							status: 'DRAFT',
-							unitId: input.unitId,
-							commonAreaName: input.commonAreaName,
-							locationDetails: input.locationDetails,
-							observedDate: new Date(input.observedDate),
-							responsiblePartyId: input.responsiblePartyId,
-							reportedBy: context.user!.id,
-							reporterType: input.reporterType
-						}
-					});
-
-					// Record initial status
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: v.id,
-							fromStatus: null,
-							toStatus: 'DRAFT',
-							changedBy: context.user!.id,
-							notes: 'Violation created'
-						}
-					});
-
-					return v;
-				});
-
-				return violation;
+			// Validate violation type before starting workflow
+			const violationType = await prisma.violationType.findFirst({
+				where: { id: input.violationTypeId, associationId: association.id, isActive: true }
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'VIOLATION',
-				entityId: violation.id,
-				action: 'CREATE',
-				summary: `Violation created: ${violation.title}`,
-				violationId: violation.id,
-				unitId: input.unitId,
-				newState: {
-					violationNumber: violation.violationNumber,
-					title: violation.title,
-					status: violation.status,
-					severity: violation.severity
+			if (!violationType) {
+				throw ApiException.notFound('Violation Type');
+			}
+
+			// Validate unit if provided
+			if (input.unitId) {
+				const unit = await prisma.unit.findFirst({
+					where: { id: input.unitId },
+					include: { property: { include: { association: true } } }
+				});
+				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+					throw ApiException.notFound('Unit');
 				}
-			});
+			}
+
+			// Validate responsible party if provided
+			if (input.responsiblePartyId) {
+				const party = await prisma.party.findFirst({
+					where: { id: input.responsiblePartyId, organizationId: context.organization!.id }
+				});
+				if (!party) {
+					throw ApiException.notFound('Responsible Party');
+				}
+			}
+
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			// This ensures:
+			// 1. Idempotency - same key returns same result
+			// 2. Durability - workflow survives crashes
+			// 3. Trace correlation - all DB operations are in same trace
+			const severity = input.severity || violationType.defaultSeverity;
+
+			const result = await startViolationCreateWorkflow(
+				{
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					violationTypeId: input.violationTypeId,
+					title: input.title,
+					description: input.description,
+					severity,
+					unitId: input.unitId,
+					commonAreaName: input.commonAreaName,
+					locationDetails: input.locationDetails,
+					observedDate: input.observedDate,
+					responsiblePartyId: input.responsiblePartyId,
+					reporterType: input.reporterType
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create violation');
+			}
 
 			return successResponse(
 				{
 					violation: {
-						id: violation.id,
-						violationNumber: violation.violationNumber,
-						title: violation.title,
-						status: violation.status,
-						severity: violation.severity
+						id: result.violationId!,
+						violationNumber: result.violationNumber!,
+						title: input.title,
+						status: result.status!,
+						severity: result.severity!
 					}
 				},
 				context
@@ -489,48 +452,47 @@ export const violationRouter = {
 
 			const { idempotencyKey, ...rest } = input;
 
-			const result = await withRequiredIdempotency(idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
-				const violation = await getViolationOrThrow(rest.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(rest.id, association.id);
 
-				// Validate unit if provided
-				if (rest.unitId) {
-					const unit = await prisma.unit.findFirst({
-						where: { id: rest.unitId },
-						include: { property: { include: { association: true } } }
-					});
-					if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-						throw ApiException.notFound('Unit');
-					}
-				}
-
-				// Validate responsible party if provided
-				if (rest.responsiblePartyId) {
-					const party = await prisma.party.findFirst({
-						where: { id: rest.responsiblePartyId, organizationId: context.organization!.id }
-					});
-					if (!party) {
-						throw ApiException.notFound('Responsible Party');
-					}
-				}
-
-				const updateData: Prisma.ViolationUncheckedUpdateInput = {};
-				if (rest.title !== undefined) updateData.title = rest.title;
-				if (rest.description !== undefined) updateData.description = rest.description;
-				if (rest.severity !== undefined) updateData.severity = rest.severity;
-				if (rest.unitId !== undefined) updateData.unitId = rest.unitId;
-				if (rest.commonAreaName !== undefined) updateData.commonAreaName = rest.commonAreaName;
-				if (rest.locationDetails !== undefined) updateData.locationDetails = rest.locationDetails;
-				if (rest.observedDate !== undefined) updateData.observedDate = new Date(rest.observedDate);
-				if (rest.responsiblePartyId !== undefined)
-					updateData.responsiblePartyId = rest.responsiblePartyId;
-				if (rest.reporterType !== undefined) updateData.reporterType = rest.reporterType;
-
-				return prisma.violation.update({
-					where: { id: rest.id },
-					data: updateData
+			// Validate unit if provided
+			if (rest.unitId) {
+				const unit = await prisma.unit.findFirst({
+					where: { id: rest.unitId },
+					include: { property: { include: { association: true } } }
 				});
-			});
+				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+					throw ApiException.notFound('Unit');
+				}
+			}
+
+			// Validate responsible party if provided
+			if (rest.responsiblePartyId) {
+				const party = await prisma.party.findFirst({
+					where: { id: rest.responsiblePartyId, organizationId: context.organization!.id }
+				});
+				if (!party) {
+					throw ApiException.notFound('Responsible Party');
+				}
+			}
+
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'UPDATE_VIOLATION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: rest.id,
+					data: rest
+				},
+				idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update violation');
+			}
+
+			const result = await prisma.violation.findUniqueOrThrow({ where: { id: rest.id } });
 
 			return successResponse(
 				{
@@ -575,59 +537,36 @@ export const violationRouter = {
 
 			const { idempotencyKey, ...rest } = input;
 
-			const updated = await withRequiredIdempotency(idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
-				const v = await getViolationOrThrow(rest.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const v = await getViolationOrThrow(rest.id, association.id);
 
-				assertStatusChangeAllowed(v.status, rest.status);
+			assertStatusChangeAllowed(v.status, rest.status);
+			const previousStatus = v.status;
 
-				const previousStatus = v.status;
-				const now = new Date();
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: rest.id,
+					data: { status: rest.status, notes: rest.notes }
+				},
+				idempotencyKey
+			);
 
-				const updateData: Prisma.ViolationUpdateInput = {
-					status: rest.status
-				};
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update violation status');
+			}
 
-				// Handle status-specific updates
-				if (rest.status === 'CURED') {
-					updateData.curedDate = now;
-				}
-				if (rest.status === 'CLOSED' || rest.status === 'DISMISSED') {
-					updateData.closedDate = now;
-					updateData.closedBy = context.user!.id;
-					if (rest.notes) {
-						updateData.resolutionNotes = rest.notes;
-					}
-				}
-
-				const result = await prisma.$transaction(async (tx) => {
-					const r = await tx.violation.update({
-						where: { id: rest.id },
-						data: updateData
-					});
-
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: rest.id,
-							fromStatus: previousStatus,
-							toStatus: rest.status,
-							changedBy: context.user!.id,
-							notes: rest.notes
-						}
-					});
-
-					return r;
-				});
-
-				return { result, previousStatus };
-			});
+			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: rest.id } });
 
 			return successResponse(
 				{
 					violation: {
-						id: updated.result.id,
-						status: updated.result.status,
-						previousStatus: updated.previousStatus
+						id: updated.id,
+						status: updated.status,
+						previousStatus
 					}
 				},
 				context
@@ -1665,51 +1604,46 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
-				const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(input.id, association.id);
 
-				assertStatusChangeAllowed(violation.status, 'ESCALATED');
-				const previousStatus = violation.status;
+			assertStatusChangeAllowed(violation.status, 'ESCALATED');
+			const previousStatus = violation.status;
 
-				const updated = await prisma.$transaction(async (tx) => {
-					const v = await tx.violation.update({
-						where: { id: input.id },
-						data: { status: 'ESCALATED' }
-					});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.id,
+					data: { status: 'ESCALATED', notes: input.reason }
+				},
+				input.idempotencyKey
+			);
 
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.id,
-							fromStatus: previousStatus,
-							toStatus: 'ESCALATED',
-							changedBy: context.user!.id,
-							notes: input.reason
-						}
-					});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to escalate violation');
+			}
 
-					return v;
-				});
-
-				return { updated, previousStatus };
-			});
+			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
 
 			// Record activity event
 			await recordStatusChange(
 				context,
 				'VIOLATION',
 				input.id,
-				result.previousStatus,
-				result.updated.status,
+				previousStatus,
+				updated.status,
 				`Violation escalated: ${input.reason}`
 			);
 
 			return successResponse(
 				{
 					violation: {
-						id: result.updated.id,
-						status: result.updated.status,
-						previousStatus: result.previousStatus
+						id: updated.id,
+						status: updated.status,
+						previousStatus
 					}
 				},
 				context
@@ -1743,56 +1677,44 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
-				const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(input.id, association.id);
+			const previousStatus = violation.status;
 
-				const previousStatus = violation.status;
-				const now = new Date();
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.id,
+					data: { status: 'DISMISSED', notes: `Marked as invalid: ${input.reason}` }
+				},
+				input.idempotencyKey
+			);
 
-				const updated = await prisma.$transaction(async (tx) => {
-					const v = await tx.violation.update({
-						where: { id: input.id },
-						data: {
-							status: 'DISMISSED',
-							closedDate: now,
-							closedBy: context.user!.id,
-							resolutionNotes: `Marked as invalid: ${input.reason}`
-						}
-					});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to mark violation as invalid');
+			}
 
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.id,
-							fromStatus: previousStatus,
-							toStatus: 'DISMISSED',
-							changedBy: context.user!.id,
-							notes: `Marked as invalid: ${input.reason}`
-						}
-					});
-
-					return v;
-				});
-
-				return { updated, previousStatus };
-			});
+			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
 
 			// Record activity event
 			await recordStatusChange(
 				context,
 				'VIOLATION',
 				input.id,
-				result.previousStatus,
-				result.updated.status,
+				previousStatus,
+				updated.status,
 				`Violation marked as invalid: ${input.reason}`
 			);
 
 			return successResponse(
 				{
 					violation: {
-						id: result.updated.id,
-						status: result.updated.status,
-						previousStatus: result.previousStatus
+						id: updated.id,
+						status: updated.status,
+						previousStatus
 					}
 				},
 				context
@@ -1827,58 +1749,47 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
-				const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(input.id, association.id);
 
-				assertStatusChangeAllowed(violation.status, 'CLOSED');
-				const previousStatus = violation.status;
-				const now = new Date();
+			assertStatusChangeAllowed(violation.status, 'CLOSED');
+			const previousStatus = violation.status;
 
-				const updated = await prisma.$transaction(async (tx) => {
-					const v = await tx.violation.update({
-						where: { id: input.id },
-						data: {
-							status: 'CLOSED',
-							closedDate: now,
-							closedBy: context.user!.id,
-							resolutionNotes: input.notes
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.id,
+					data: { status: 'CLOSED', notes: input.notes }
+				},
+				input.idempotencyKey
+			);
 
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.id,
-							fromStatus: previousStatus,
-							toStatus: 'CLOSED',
-							changedBy: context.user!.id,
-							notes: input.notes
-						}
-					});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to resolve violation');
+			}
 
-					return v;
-				});
-
-				return { updated, previousStatus };
-			});
+			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
 
 			// Record activity event
 			await recordStatusChange(
 				context,
 				'VIOLATION',
 				input.id,
-				result.previousStatus,
-				result.updated.status,
+				previousStatus,
+				updated.status,
 				`Violation resolved: ${input.notes}`
 			);
 
 			return successResponse(
 				{
 					violation: {
-						id: result.updated.id,
-						status: result.updated.status,
-						previousStatus: result.previousStatus,
-						closedDate: result.updated.closedDate!.toISOString()
+						id: updated.id,
+						status: updated.status,
+						previousStatus,
+						closedDate: updated.closedDate!.toISOString()
 					}
 				},
 				context
@@ -1914,73 +1825,61 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
-				const association = await getAssociationOrThrow(context.organization!.id);
-				const violation = await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id);
+			const violation = await getViolationOrThrow(input.violationId, association.id);
 
-				// Check if there's already a pending appeal
-				const existingAppeal = await prisma.violationAppeal.findFirst({
-					where: {
-						hearing: { violationId: input.violationId },
-						status: 'PENDING'
+			// Check if there's already a pending appeal
+			const existingAppeal = await prisma.violationAppeal.findFirst({
+				where: {
+					hearing: { violationId: input.violationId },
+					status: 'PENDING'
+				}
+			});
+
+			if (existingAppeal) {
+				throw ApiException.conflict('An appeal is already pending for this violation');
+			}
+
+			// Get or create a hearing to attach the appeal to
+			let hearing = await prisma.violationHearing.findFirst({
+				where: { violationId: input.violationId },
+				orderBy: { hearingDate: 'desc' }
+			});
+
+			if (!hearing) {
+				// Create a placeholder hearing for the appeal
+				hearing = await prisma.violationHearing.create({
+					data: {
+						violationId: input.violationId,
+						hearingDate: new Date(),
+						outcome: 'PENDING',
+						outcomeNotes: 'Appeal filed - hearing pending'
 					}
 				});
+			}
 
-				if (existingAppeal) {
-					throw ApiException.conflict('An appeal is already pending for this violation');
-				}
-
-				// Get or create a hearing to attach the appeal to
-				let hearing = await prisma.violationHearing.findFirst({
-					where: { violationId: input.violationId },
-					orderBy: { hearingDate: 'desc' }
-				});
-
-				if (!hearing) {
-					// Create a placeholder hearing for the appeal
-					hearing = await prisma.violationHearing.create({
-						data: {
-							violationId: input.violationId,
-							hearingDate: new Date(),
-							outcome: 'PENDING',
-							outcomeNotes: 'Appeal filed - hearing pending'
-						}
-					});
-				}
-
-				const now = new Date();
-				const appeal = await prisma.violationAppeal.create({
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'RECORD_APPEAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.violationId,
 					data: {
 						hearingId: hearing.id,
-						filedDate: now,
-						filedBy: context.user!.id,
 						reason: input.reason,
-						status: 'PENDING',
+						filedBy: context.user!.id,
 						documentsJson: input.supportingInfo ? JSON.stringify({ supportingInfo: input.supportingInfo, requestBoardReview: input.requestBoardReview }) : null
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update violation status to APPEALED
-				const previousStatus = violation.status;
-				await prisma.$transaction(async (tx) => {
-					await tx.violation.update({
-						where: { id: input.violationId },
-						data: { status: 'APPEALED' }
-					});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to file appeal');
+			}
 
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.violationId,
-							fromStatus: previousStatus,
-							toStatus: 'APPEALED',
-							changedBy: context.user!.id,
-							notes: `Appeal filed: ${input.reason.substring(0, 100)}...`
-						}
-					});
-				});
-
-				return appeal;
-			});
+			const result = await prisma.violationAppeal.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			// Record activity event
 			await recordExecution(context, {
@@ -2116,48 +2015,28 @@ export const violationRouter = {
 
 			await context.cerbos.authorize('edit', 'violation', appeal.hearing.violationId);
 
-			const result = await withRequiredIdempotency(input.idempotencyKey, context, async () => {
-				const now = new Date();
-				const newStatus = input.decision === 'OVERTURNED' ? 'DISMISSED' : 'CLOSED';
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startViolationWorkflow(
+				{
+					action: 'RECORD_APPEAL_DECISION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: appeal.hearing.violationId,
+					data: {
+						appealId: input.appealId,
+						decision: input.decision,
+						notes: input.notes,
+						revisedFineAmount: input.revisedFineAmount
+					}
+				},
+				input.idempotencyKey
+			);
 
-				const updated = await prisma.$transaction(async (tx) => {
-					const a = await tx.violationAppeal.update({
-						where: { id: input.appealId },
-						data: {
-							status: input.decision === 'OVERTURNED' ? 'REVERSED' : input.decision,
-							decisionDate: now,
-							decisionBy: context.user!.id,
-							decisionNotes: input.notes,
-							revisedFineAmount: input.revisedFineAmount
-						}
-					});
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to record appeal decision');
+			}
 
-					// Update violation status based on decision
-					await tx.violation.update({
-						where: { id: appeal.hearing.violationId },
-						data: {
-							status: newStatus,
-							closedDate: now,
-							closedBy: context.user!.id,
-							resolutionNotes: `Appeal ${input.decision.toLowerCase()}: ${input.notes}`
-						}
-					});
-
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: appeal.hearing.violationId,
-							fromStatus: 'APPEALED',
-							toStatus: newStatus,
-							changedBy: context.user!.id,
-							notes: `Appeal decision: ${input.decision}`
-						}
-					});
-
-					return a;
-				});
-
-				return updated;
-			});
+			const result = await prisma.violationAppeal.findUniqueOrThrow({ where: { id: input.appealId } });
 
 			// Record activity event
 			await recordExecution(context, {
@@ -2211,106 +2090,37 @@ export const violationRouter = {
 		.handler(async ({ input, context }) => {
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const createCharge = async () => {
-				// Get the fine with violation details
-				const fine = await prisma.violationFine.findFirst({
-					where: { id: input.fineId },
-					include: {
-						violation: {
-							include: { unit: true }
-						}
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startViolationFineWorkflow(
+				{
+					action: 'FINE_TO_CHARGE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					fineId: input.fineId,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				if (!fine || fine.violation.associationId !== association.id) {
-					throw ApiException.notFound('Fine');
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to convert fine to charge');
+			}
 
-				if (fine.assessmentChargeId) {
-					throw ApiException.conflict('Fine has already been converted to an assessment charge');
-				}
-
-				if (!fine.violation.unitId) {
-					throw ApiException.badRequest('Violation must be associated with a unit to create a charge');
-				}
-
-				// Get or create a "Violation Fine" assessment type
-				let assessmentType = await prisma.assessmentType.findFirst({
-					where: { associationId: association.id, code: 'FINE' }
-				});
-
-				if (!assessmentType) {
-					// Get a revenue account for fines
-					const fineRevenueAccount = await prisma.gLAccount.findFirst({
-						where: {
-							associationId: association.id,
-							accountType: 'REVENUE',
-							isActive: true
-						}
-					});
-
-					if (!fineRevenueAccount) {
-						throw ApiException.badRequest('No revenue account found for fine charges');
-					}
-
-					assessmentType = await prisma.assessmentType.create({
-						data: {
-							associationId: association.id,
-							name: 'Violation Fine',
-							code: 'FINE',
-							description: 'Fines assessed for violations',
-							frequency: 'ONE_TIME',
-							defaultAmount: 0,
-							revenueAccountId: fineRevenueAccount.id
-						}
-					});
-				}
-
-				// Create the assessment charge
-				const amount = parseFloat(fine.amount.toString());
-				const charge = await prisma.assessmentCharge.create({
-					data: {
-						associationId: association.id,
-						unitId: fine.violation.unitId,
-						assessmentTypeId: assessmentType.id,
-						chargeDate: fine.assessedDate,
-						dueDate: fine.dueDate,
-						amount,
-						lateFeeAmount: 0,
-						totalAmount: amount,
-						paidAmount: parseFloat(fine.paidAmount.toString()),
-						balanceDue: parseFloat(fine.balanceDue.toString()),
-						status: fine.balanceDue.equals(0) ? 'PAID' : 'PENDING',
-						description: `Violation Fine #${fine.fineNumber} - ${fine.reason || 'Violation fine'}`
-					}
-				});
-
-				// Update the fine with the charge reference
-				await prisma.violationFine.update({
-					where: { id: input.fineId },
-					data: {
-						assessmentChargeId: charge.id,
-						glPosted: true
-					}
-				});
-
-				return { charge, fine };
-			};
-
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createCharge)).result
-				: await createCharge();
+			const charge = await prisma.assessmentCharge.findUniqueOrThrow({
+				where: { id: result.chargeId }
+			});
 
 			return successResponse(
 				{
 					charge: {
-						id: result.charge.id,
-						amount: result.charge.amount.toString(),
-						dueDate: result.charge.dueDate.toISOString()
+						id: charge.id,
+						amount: charge.amount.toString(),
+						dueDate: charge.dueDate.toISOString()
 					},
 					fine: {
 						id: input.fineId,
-						assessmentChargeId: result.charge.id
+						assessmentChargeId: charge.id
 					}
 				},
 				context

@@ -12,6 +12,8 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { EstimateStatus } from '../../../../../../generated/prisma/client.js';
+import { startEstimateCreateWorkflow } from '../../../workflows/estimateCreateWorkflow.js';
+import { startEstimateWorkflow } from '../../../workflows/estimateWorkflow.js';
 
 const estimateLineOutput = z.object({
 	id: z.string(),
@@ -209,71 +211,36 @@ export const estimateRouter = {
 			});
 			if (!customer) throw ApiException.notFound('Customer');
 
-			const createEstimate = async () => {
-				const estimateNumber = await generateEstimateNumber(context.organization!.id);
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			const result = await startEstimateCreateWorkflow(
+				{
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.jobId,
+					customerId: input.customerId,
+					title: input.title,
+					description: input.description,
+					notes: input.notes,
+					terms: input.terms,
+					validUntil: input.validUntil,
+					discount: input.discount,
+					lines: input.lines
+				},
+				input.idempotencyKey
+			);
 
-				return prisma.$transaction(async (tx) => {
-					// Calculate line totals
-					const linesWithTotals = (input.lines ?? []).map((line, idx) => ({
-						...line,
-						lineNumber: idx + 1,
-						lineTotal: line.quantity * line.unitPrice
-					}));
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create estimate');
+			}
 
-					const { subtotal, taxAmount, totalAmount } = recalculateEstimateTotals(
-						linesWithTotals,
-						input.discount
-					);
-
-					const estimate = await tx.estimate.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobId: input.jobId,
-							customerId: input.customerId,
-							estimateNumber,
-							title: input.title,
-							description: input.description,
-							notes: input.notes,
-							terms: input.terms,
-							validUntil: input.validUntil ? new Date(input.validUntil) : null,
-							discount: input.discount,
-							subtotal,
-							taxAmount,
-							totalAmount,
-							createdBy: context.user!.id
-						}
-					});
-
-					// Create lines
-					if (linesWithTotals.length > 0) {
-						await tx.estimateLine.createMany({
-							data: linesWithTotals.map((line) => ({
-								estimateId: estimate.id,
-								lineNumber: line.lineNumber,
-								description: line.description,
-								quantity: line.quantity,
-								unitPrice: line.unitPrice,
-								lineTotal: line.lineTotal,
-								pricebookItemId: line.pricebookItemId,
-								isTaxable: line.isTaxable,
-								taxRate: line.taxRate
-							}))
-						});
-					}
-
-					return tx.estimate.findUnique({
-						where: { id: estimate.id },
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
-				});
-			};
-
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createEstimate)).result
-				: await createEstimate();
+			// Fetch the created estimate with relations for the response
+			const estimate = await prisma.estimate.findUnique({
+				where: { id: result.estimateId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -331,61 +298,36 @@ export const estimateRouter = {
 				}
 			}
 
-			const generateEstimate = async () => {
-				const estimateNumber = await generateEstimateNumber(context.organization!.id);
-
-				return prisma.$transaction(async (tx) => {
-					const linesWithTotals = pricebookItems.map((item, idx) => ({
-						lineNumber: idx + 1,
-						description: `${item.name}${item.description ? ` - ${item.description}` : ''}`,
-						quantity: 1,
-						unitPrice: Number(item.basePrice),
-						lineTotal: Number(item.basePrice),
-						pricebookItemId: item.id,
-						isTaxable: item.isTaxable,
-						taxRate: input.defaultTaxRate
-					}));
-
-					const { subtotal, taxAmount, totalAmount } = recalculateEstimateTotals(linesWithTotals, 0);
-
-					const estimate = await tx.estimate.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobId: input.jobId,
-							customerId: input.customerId,
-							estimateNumber,
-							title: input.title ?? `Estimate for ${job.title}`,
-							description: input.description,
-							validUntil: input.validUntil ? new Date(input.validUntil) : null,
-							subtotal,
-							taxAmount,
-							totalAmount,
-							createdBy: context.user!.id
-						}
-					});
-
-					if (linesWithTotals.length > 0) {
-						await tx.estimateLine.createMany({
-							data: linesWithTotals.map((line) => ({
-								estimateId: estimate.id,
-								...line
-							}))
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'GENERATE_FROM_PRICEBOOK',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						jobId: input.jobId,
+						customerId: input.customerId,
+						pricebookItemIds: input.pricebookItemIds,
+						title: input.title ?? `Estimate for ${job.title}`,
+						description: input.description,
+						validUntil: input.validUntil,
+						defaultTaxRate: input.defaultTaxRate
 					}
+				},
+				input.idempotencyKey || `generate-estimate-from-pricebook-${Date.now()}`
+			);
 
-					return tx.estimate.findUnique({
-						where: { id: estimate.id },
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to generate estimate from pricebook');
+			}
 
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, generateEstimate)).result
-				: await generateEstimate();
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -516,36 +458,36 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT estimates');
 			}
 
-			const updateEstimate = async () => {
-				const discount = input.discount ?? Number(existing.discount);
-				const { subtotal, taxAmount, totalAmount } = recalculateEstimateTotals(
-					existing.lines,
-					discount
-				);
-
-				return prisma.estimate.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'UPDATE_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
 					data: {
-						title: input.title ?? existing.title,
-						description: input.description ?? existing.description,
-						notes: input.notes ?? existing.notes,
-						terms: input.terms ?? existing.terms,
-						validUntil: input.validUntil === null ? null : input.validUntil ? new Date(input.validUntil) : existing.validUntil,
-						discount,
-						subtotal,
-						taxAmount,
-						totalAmount
-					},
-					include: {
-						lines: { orderBy: { lineNumber: 'asc' } },
-						options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+						title: input.title,
+						description: input.description,
+						notes: input.notes,
+						terms: input.terms,
+						validUntil: input.validUntil,
+						discount: input.discount
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateEstimate)).result
-				: await updateEstimate();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update estimate');
+			}
+
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -589,49 +531,42 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT estimates');
 			}
 
-			const addLine = async () => {
-				return prisma.$transaction(async (tx) => {
-					const lineNumber = existing.lines.length + 1;
-					const lineTotal = input.quantity * input.unitPrice;
+			const lineNumber = existing.lines.length + 1;
+			const lineTotal = input.quantity * input.unitPrice;
 
-					await tx.estimateLine.create({
-						data: {
-							estimateId: input.estimateId,
-							lineNumber,
-							description: input.description,
-							quantity: input.quantity,
-							unitPrice: input.unitPrice,
-							lineTotal,
-							pricebookItemId: input.pricebookItemId,
-							isTaxable: input.isTaxable,
-							taxRate: input.taxRate,
-							optionId: input.optionId
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'ADD_LINE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.estimateId,
+					data: {
+						lineNumber,
+						description: input.description,
+						quantity: input.quantity,
+						unitPrice: input.unitPrice,
+						lineTotal,
+						pricebookItemId: input.pricebookItemId,
+						isTaxable: input.isTaxable,
+						taxRate: input.taxRate,
+						optionId: input.optionId
+					}
+				},
+				input.idempotencyKey
+			);
 
-					// Recalculate totals
-					const allLines = await tx.estimateLine.findMany({
-						where: { estimateId: input.estimateId }
-					});
-					const { subtotal, taxAmount, totalAmount } = recalculateEstimateTotals(
-						allLines,
-						Number(existing.discount)
-					);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add line');
+			}
 
-					return tx.estimate.update({
-						where: { id: input.estimateId },
-						data: { subtotal, taxAmount, totalAmount },
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
-				});
-			};
-
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, addLine)).result
-				: await addLine();
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -668,43 +603,30 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT estimates');
 			}
 
-			const removeLine = async () => {
-				return prisma.$transaction(async (tx) => {
-					await tx.estimateLine.delete({ where: { id: input.lineId } });
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'REMOVE_LINE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.estimateId,
+					lineId: input.lineId,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					// Renumber remaining lines
-					const remainingLines = await tx.estimateLine.findMany({
-						where: { estimateId: input.estimateId },
-						orderBy: { lineNumber: 'asc' }
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to remove line');
+			}
 
-					for (let i = 0; i < remainingLines.length; i++) {
-						await tx.estimateLine.update({
-							where: { id: remainingLines[i].id },
-							data: { lineNumber: i + 1 }
-						});
-					}
-
-					// Recalculate totals
-					const { subtotal, taxAmount, totalAmount } = recalculateEstimateTotals(
-						remainingLines,
-						Number(existing.discount)
-					);
-
-					return tx.estimate.update({
-						where: { id: input.estimateId },
-						data: { subtotal, taxAmount, totalAmount },
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
-				});
-			};
-
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, removeLine)).result
-				: await removeLine();
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -734,46 +656,29 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only send DRAFT or REVISED estimates');
 			}
 
-			const sendEstimate = async () => {
-				// Note: Actual email sending would be handled by a separate service
-				return prisma.$transaction(async (tx) => {
-					const estimate = await tx.estimate.update({
-						where: { id: input.id },
-						data: {
-							status: 'SENT',
-							sentAt: new Date()
-						},
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'SEND_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					// Phase 15: Auto-transition job to ESTIMATE_SENT if in ESTIMATE_REQUIRED
-					const job = await tx.job.findUnique({ where: { id: existing.jobId } });
-					if (job && job.status === 'ESTIMATE_REQUIRED') {
-						await tx.job.update({
-							where: { id: existing.jobId },
-							data: { status: 'ESTIMATE_SENT' }
-						});
-						await tx.jobStatusHistory.create({
-							data: {
-								jobId: existing.jobId,
-								fromStatus: 'ESTIMATE_REQUIRED',
-								toStatus: 'ESTIMATE_SENT',
-								changedBy: context.user!.id,
-								notes: `Auto-transitioned: Estimate ${estimate.estimateNumber} sent`
-							}
-						});
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to send estimate');
+			}
 
-					return estimate;
-				});
-			};
-
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, sendEstimate)).result
-				: await sendEstimate();
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -842,57 +747,29 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only accept SENT or VIEWED estimates');
 			}
 
-			const acceptEstimate = async () => {
-				return prisma.$transaction(async (tx) => {
-					// If option selected, mark it
-					if (input.selectedOptionId && existing.options.length > 0) {
-						await tx.estimateOption.updateMany({
-							where: { estimateId: input.id },
-							data: { isSelected: false }
-						});
-						await tx.estimateOption.update({
-							where: { id: input.selectedOptionId },
-							data: { isSelected: true }
-						});
-					}
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'ACCEPT_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
+					data: { selectedOptionId: input.selectedOptionId }
+				},
+				input.idempotencyKey
+			);
 
-					const estimate = await tx.estimate.update({
-						where: { id: input.id },
-						data: {
-							status: 'ACCEPTED',
-							acceptedAt: new Date()
-						},
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to accept estimate');
+			}
 
-					// Phase 15: Auto-transition job to ESTIMATE_APPROVED if in ESTIMATE_SENT
-					const job = await tx.job.findUnique({ where: { id: existing.jobId } });
-					if (job && job.status === 'ESTIMATE_SENT') {
-						await tx.job.update({
-							where: { id: existing.jobId },
-							data: { status: 'ESTIMATE_APPROVED' }
-						});
-						await tx.jobStatusHistory.create({
-							data: {
-								jobId: existing.jobId,
-								fromStatus: 'ESTIMATE_SENT',
-								toStatus: 'ESTIMATE_APPROVED',
-								changedBy: context.user!.id,
-								notes: `Auto-transitioned: Estimate ${estimate.estimateNumber} accepted`
-							}
-						});
-					}
-
-					return estimate;
-				});
-			};
-
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, acceptEstimate)).result
-				: await acceptEstimate();
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -921,24 +798,29 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only decline SENT or VIEWED estimates');
 			}
 
-			const declineEstimate = async () => {
-				return prisma.estimate.update({
-					where: { id: input.id },
-					data: {
-						status: 'DECLINED',
-						declinedAt: new Date(),
-						notes: input.reason ? `${existing.notes ?? ''}\nDecline reason: ${input.reason}`.trim() : existing.notes
-					},
-					include: {
-						lines: { orderBy: { lineNumber: 'asc' } },
-						options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'DECLINE_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, declineEstimate)).result
-				: await declineEstimate();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to decline estimate');
+			}
+
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -965,67 +847,29 @@ export const estimateRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Estimate');
 
-			const reviseEstimate = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Mark old as revised
-					await tx.estimate.update({
-						where: { id: input.id },
-						data: { status: 'REVISED' }
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'REVISE_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					// Create new version
-					const newEstimate = await tx.estimate.create({
-						data: {
-							organizationId: existing.organizationId,
-							jobId: existing.jobId,
-							customerId: existing.customerId,
-							estimateNumber: existing.estimateNumber,
-							version: existing.version + 1,
-							status: 'DRAFT',
-							title: existing.title,
-							description: existing.description,
-							notes: existing.notes,
-							terms: existing.terms,
-							validUntil: existing.validUntil,
-							subtotal: existing.subtotal,
-							taxAmount: existing.taxAmount,
-							discount: existing.discount,
-							totalAmount: existing.totalAmount,
-							previousVersionId: existing.id,
-							createdBy: context.user!.id
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to revise estimate');
+			}
 
-					// Copy lines
-					if (existing.lines.length > 0) {
-						await tx.estimateLine.createMany({
-							data: existing.lines.map((line) => ({
-								estimateId: newEstimate.id,
-								lineNumber: line.lineNumber,
-								description: line.description,
-								quantity: line.quantity,
-								unitPrice: line.unitPrice,
-								lineTotal: line.lineTotal,
-								pricebookItemId: line.pricebookItemId,
-								isTaxable: line.isTaxable,
-								taxRate: line.taxRate
-							}))
-						});
-					}
-
-					return tx.estimate.findUnique({
-						where: { id: newEstimate.id },
-						include: {
-							lines: { orderBy: { lineNumber: 'asc' } },
-							options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
-						}
-					});
-				});
-			};
-
-			const estimate = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, reviseEstimate)).result
-				: await reviseEstimate();
+			const estimate = await prisma.estimate.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: {
+					lines: { orderBy: { lineNumber: 'asc' } },
+					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
+				}
+			});
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -1055,15 +899,22 @@ export const estimateRouter = {
 				throw ApiException.badRequest('Can only delete DRAFT estimates');
 			}
 
-			const deleteEstimate = async () => {
-				await prisma.estimate.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startEstimateWorkflow(
+				{
+					action: 'DELETE_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteEstimate)).result
-				: await deleteEstimate();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete estimate');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

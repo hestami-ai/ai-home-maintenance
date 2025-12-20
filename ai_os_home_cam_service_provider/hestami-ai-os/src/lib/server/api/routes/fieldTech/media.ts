@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { MediaType } from '../../../../../../generated/prisma/client.js';
+import { startMediaWorkflow } from '../../../workflows/mediaWorkflow.js';
 
 const jobMediaOutput = z.object({
 	id: z.string(),
@@ -100,10 +101,13 @@ export const mediaRouter = {
 			});
 			if (!job) throw ApiException.notFound('Job');
 
-			const createMedia = async () => {
-				return prisma.jobMedia.create({
+			// Use DBOS workflow for durable execution
+			const result = await startMediaWorkflow(
+				{
+					action: 'REGISTER_MEDIA',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						jobId: input.jobId,
 						jobVisitId: input.jobVisitId,
 						mediaType: input.mediaType,
@@ -114,16 +118,19 @@ export const mediaRouter = {
 						caption: input.caption,
 						latitude: input.latitude,
 						longitude: input.longitude,
-						capturedAt: input.capturedAt ? new Date(input.capturedAt) : null,
-						uploadedBy: context.user!.id,
-						isUploaded: false // Will be marked true after actual upload
+						capturedAt: input.capturedAt
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const media = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createMedia)).result
-				: await createMedia();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to register media');
+			}
+
+			const media = await prisma.jobMedia.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
 		}),
@@ -155,20 +162,25 @@ export const mediaRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Media');
 
-			const markUploaded = async () => {
-				return prisma.jobMedia.update({
-					where: { id: input.mediaId },
-					data: {
-						isUploaded: true,
-						uploadedAt: new Date(),
-						storageUrl: input.storageUrl
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startMediaWorkflow(
+				{
+					action: 'MARK_UPLOADED',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					mediaId: input.mediaId,
+					data: { storageUrl: input.storageUrl }
+				},
+				input.idempotencyKey
+			);
 
-			const media = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, markUploaded)).result
-				: await markUploaded();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to mark media as uploaded');
+			}
+
+			const media = await prisma.jobMedia.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
 		}),
@@ -210,13 +222,15 @@ export const mediaRouter = {
 			});
 			if (!job) throw ApiException.notFound('Job');
 
-			const createVoiceNote = async () => {
-				return prisma.jobMedia.create({
+			// Use DBOS workflow for durable execution
+			const result = await startMediaWorkflow(
+				{
+					action: 'ADD_VOICE_NOTE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						jobId: input.jobId,
 						jobVisitId: input.jobVisitId,
-						mediaType: 'AUDIO',
 						fileName: input.fileName,
 						fileSize: input.fileSize,
 						mimeType: input.mimeType,
@@ -224,18 +238,19 @@ export const mediaRouter = {
 						caption: input.caption,
 						latitude: input.latitude,
 						longitude: input.longitude,
-						capturedAt: input.capturedAt ? new Date(input.capturedAt) : new Date(),
-						uploadedBy: context.user!.id,
-						isUploaded: false,
-						isTranscribed: false
-						// Transcription would be handled by a background job
+						capturedAt: input.capturedAt
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const media = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createVoiceNote)).result
-				: await createVoiceNote();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add voice note');
+			}
+
+			const media = await prisma.jobMedia.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
 		}),
@@ -271,19 +286,25 @@ export const mediaRouter = {
 				throw ApiException.badRequest('Transcription only applies to audio media');
 			}
 
-			const updateTranscription = async () => {
-				return prisma.jobMedia.update({
-					where: { id: input.mediaId },
-					data: {
-						transcription: input.transcription,
-						isTranscribed: true
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startMediaWorkflow(
+				{
+					action: 'UPDATE_TRANSCRIPTION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					mediaId: input.mediaId,
+					data: { transcription: input.transcription }
+				},
+				input.idempotencyKey
+			);
 
-			const media = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateTranscription)).result
-				: await updateTranscription();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update transcription');
+			}
+
+			const media = await prisma.jobMedia.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
 		}),
@@ -392,16 +413,22 @@ export const mediaRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Media');
 
-			const deleteMedia = async () => {
-				// Note: Actual file deletion from storage would be handled separately
-				await prisma.jobMedia.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startMediaWorkflow(
+				{
+					action: 'DELETE_MEDIA',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					mediaId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteMedia)).result
-				: await deleteMedia();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete media');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ChecklistItemStatus } from '../../../../../../generated/prisma/client.js';
+import { startChecklistWorkflow } from '../../../workflows/checklistWorkflow.js';
 
 const jobStepOutput = z.object({
 	id: z.string(),
@@ -115,43 +116,29 @@ export const checklistRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'job_checklist', 'new');
 
-			const createChecklist = async () => {
-				return prisma.$transaction(async (tx) => {
-					const checklist = await tx.jobChecklist.create({
-						data: {
-							organizationId: context.organization!.id,
-							name: input.name,
-							description: input.description,
-							isTemplate: true
-						}
-					});
-
-					// Create steps
-					if (input.steps.length > 0) {
-						await tx.jobStep.createMany({
-							data: input.steps.map((step, idx) => ({
-								checklistId: checklist.id,
-								stepNumber: idx + 1,
-								title: step.title,
-								description: step.description,
-								isRequired: step.isRequired,
-								requiresPhoto: step.requiresPhoto,
-								requiresSignature: step.requiresSignature,
-								requiresNotes: step.requiresNotes
-							}))
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startChecklistWorkflow(
+				{
+					action: 'CREATE_CHECKLIST',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						name: input.name,
+						description: input.description,
+						steps: input.steps
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.jobChecklist.findUnique({
-						where: { id: checklist.id },
-						include: { steps: { orderBy: { stepNumber: 'asc' } } }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create checklist');
+			}
 
-			const checklist = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createChecklist)).result
-				: await createChecklist();
+			const checklist = await prisma.jobChecklist.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { steps: { orderBy: { stepNumber: 'asc' } } }
+			});
 
 			return successResponse({ checklist: formatJobChecklist(checklist, true) }, context);
 		}),
@@ -243,46 +230,39 @@ export const checklistRouter = {
 			});
 			if (!job) throw ApiException.notFound('Job');
 
-			const applyChecklist = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Create instance from template
-					const checklist = await tx.jobChecklist.create({
-						data: {
-							organizationId: context.organization!.id,
-							name: template.name,
-							description: template.description,
-							isTemplate: false,
-							templateId: template.id,
-							jobId: input.jobId
-						}
-					});
-
-					// Copy steps
-					if (template.steps.length > 0) {
-						await tx.jobStep.createMany({
-							data: template.steps.map((step) => ({
-								checklistId: checklist.id,
-								stepNumber: step.stepNumber,
-								title: step.title,
-								description: step.description,
-								isRequired: step.isRequired,
-								requiresPhoto: step.requiresPhoto,
-								requiresSignature: step.requiresSignature,
-								requiresNotes: step.requiresNotes
-							}))
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startChecklistWorkflow(
+				{
+					action: 'APPLY_CHECKLIST',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						jobId: input.jobId,
+						templateId: template.id,
+						templateName: template.name,
+						templateDescription: template.description,
+						templateSteps: template.steps.map((step) => ({
+							stepNumber: step.stepNumber,
+							title: step.title,
+							description: step.description,
+							isRequired: step.isRequired,
+							requiresPhoto: step.requiresPhoto,
+							requiresSignature: step.requiresSignature,
+							requiresNotes: step.requiresNotes
+						}))
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.jobChecklist.findUnique({
-						where: { id: checklist.id },
-						include: { steps: { orderBy: { stepNumber: 'asc' } } }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to apply checklist');
+			}
 
-			const checklist = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, applyChecklist)).result
-				: await applyChecklist();
+			const checklist = await prisma.jobChecklist.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { steps: { orderBy: { stepNumber: 'asc' } } }
+			});
 
 			return successResponse({ checklist: formatJobChecklist(checklist, true) }, context);
 		}),
@@ -371,55 +351,29 @@ export const checklistRouter = {
 				}
 			}
 
-			const updateStep = async () => {
-				return prisma.$transaction(async (tx) => {
-					const updated = await tx.jobStep.update({
-						where: { id: input.stepId },
-						data: {
-							status: input.status,
-							completedAt:
-								input.status === 'COMPLETED' || input.status === 'SKIPPED'
-									? new Date()
-									: null,
-							completedBy:
-								input.status === 'COMPLETED' || input.status === 'SKIPPED'
-									? context.user!.id
-									: null,
-							notes: input.notes ?? step.notes
-						}
-					});
-
-					// Check if all required steps are complete
-					const allSteps = await tx.jobStep.findMany({
-						where: { checklistId: step.checklistId }
-					});
-
-					const allRequiredComplete = allSteps
-						.filter((s) => s.isRequired)
-						.every((s) =>
-							s.id === input.stepId
-								? ['COMPLETED', 'SKIPPED'].includes(input.status)
-								: ['COMPLETED', 'SKIPPED'].includes(s.status)
-						);
-
-					if (allRequiredComplete) {
-						await tx.jobChecklist.update({
-							where: { id: step.checklistId },
-							data: {
-								isCompleted: true,
-								completedAt: new Date(),
-								completedBy: context.user!.id
-							}
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startChecklistWorkflow(
+				{
+					action: 'UPDATE_STEP',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					stepId: input.stepId,
+					data: {
+						status: input.status,
+						notes: input.notes ?? step.notes,
+						checklistId: step.checklistId
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return updated;
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update step');
+			}
 
-			const updatedStep = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateStep)).result
-				: await updateStep();
+			const updatedStep = await prisma.jobStep.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ step: formatJobStep(updatedStep) }, context);
 		}),
@@ -445,15 +399,22 @@ export const checklistRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Checklist template');
 
-			const deleteChecklist = async () => {
-				await prisma.jobChecklist.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startChecklistWorkflow(
+				{
+					action: 'DELETE_CHECKLIST',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					checklistId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteChecklist)).result
-				: await deleteChecklist();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete checklist');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

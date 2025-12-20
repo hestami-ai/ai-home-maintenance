@@ -2,9 +2,8 @@
 	import { Menu, X } from 'lucide-svelte';
 	import Logo from '$lib/components/ui/Logo.svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
-	import OrganizationSwitcher from './OrganizationSwitcher.svelte';
 	import UserMenu from './UserMenu.svelte';
-	import { auth, organizationStore } from '$lib/stores';
+	import { auth } from '$lib/stores';
 
 	let mobileMenuOpen = $state(false);
 
@@ -30,9 +29,6 @@
 				<ThemeToggle />
 
 				{#if $auth.isAuthenticated}
-					{#if $organizationStore.memberships.length > 0}
-						<OrganizationSwitcher />
-					{/if}
 					<UserMenu />
 				{:else if !$auth.isLoading}
 					<a href="/login" class="btn btn-sm preset-tonal-surface">Log in</a>
@@ -64,41 +60,8 @@
 		<div class="border-t border-surface-300-700 md:hidden">
 			<div class="space-y-2 px-4 py-4">
 				{#if $auth.isAuthenticated}
-					<!-- User info -->
-					<div class="rounded-lg bg-surface-200-800 p-3">
-						<p class="font-medium">{$auth.user?.name || 'User'}</p>
-						<p class="text-sm text-surface-500">{$auth.user?.email}</p>
-					</div>
-
-					{#if $organizationStore.memberships.length > 0}
-						<div class="py-2">
-							<p class="px-1 pb-2 text-xs font-semibold uppercase text-surface-500">
-								Organization
-							</p>
-							<OrganizationSwitcher />
-						</div>
-					{/if}
-
-					<hr class="border-surface-300-700" />
-
-					<a
-						href="/app/settings"
-						onclick={closeMobileMenu}
-						class="block rounded-md px-3 py-2 text-sm hover:bg-surface-200-800"
-					>
-						Settings
-					</a>
-
-					<button
-						type="button"
-						onclick={() => {
-							closeMobileMenu();
-							// Sign out logic
-						}}
-						class="block w-full rounded-md px-3 py-2 text-left text-sm text-error-500 hover:bg-surface-200-800"
-					>
-						Sign out
-					</button>
+					<!-- User Menu handles everything on mobile too -->
+					<UserMenu />
 				{:else if !$auth.isLoading}
 					<a
 						href="/login"

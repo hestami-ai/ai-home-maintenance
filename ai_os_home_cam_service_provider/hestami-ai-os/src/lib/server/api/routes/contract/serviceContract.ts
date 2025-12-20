@@ -16,6 +16,7 @@ import {
 	ServiceContractType,
 	RecurrenceFrequency
 } from '../../../../../../generated/prisma/client.js';
+import { startServiceContractWorkflow } from '../../../workflows/contractWorkflow.js';
 
 const serviceItemOutput = z.object({
 	id: z.string(),
@@ -188,68 +189,49 @@ export const serviceContractRouter = {
 			await assertContractorOrg(context.organization!.id);
 			await context.cerbos.authorize('create', 'service_contract', 'new');
 
-			const createContract = async () => {
-				const contractNumber = await generateContractNumber(context.organization!.id);
-
-				return prisma.$transaction(async (tx) => {
-					const contract = await tx.serviceContract.create({
-						data: {
-							organizationId: context.organization!.id,
-							contractNumber,
-							name: input.name,
-							type: input.type,
-							customerId: input.customerId,
-							associationId: input.associationId,
-							propertyId: input.propertyId,
-							unitId: input.unitId,
-							startDate: new Date(input.startDate),
-							endDate: new Date(input.endDate),
-							autoRenew: input.autoRenew,
-							renewalTermDays: input.renewalTermDays,
-							contractValue: input.contractValue,
-							billingFrequency: input.billingFrequency,
-							billingAmount: input.billingAmount,
-							description: input.description,
-							scopeOfWork: input.scopeOfWork,
-							exclusions: input.exclusions,
-							responseTimeHours: input.responseTimeHours,
-							resolutionTimeHours: input.resolutionTimeHours,
-							emergencyCoverage: input.emergencyCoverage,
-							primaryTechnicianId: input.primaryTechnicianId,
-							assignedBranchId: input.assignedBranchId,
-							notes: input.notes,
-							createdBy: context.user!.id
-						}
-					});
-
-					if (input.serviceItems && input.serviceItems.length > 0) {
-						await tx.contractServiceItem.createMany({
-							data: input.serviceItems.map((item) => ({
-								contractId: contract.id,
-								name: item.name,
-								description: item.description,
-								pricebookItemId: item.pricebookItemId,
-								frequency: item.frequency,
-								visitsPerPeriod: item.visitsPerPeriod,
-								unitPrice: item.unitPrice,
-								quantity: item.quantity,
-								lineTotal: item.unitPrice * item.quantity,
-								estimatedDurationMinutes: item.estimatedDurationMinutes,
-								notes: item.notes
-							}))
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'CREATE_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						name: input.name,
+						type: input.type,
+						customerId: input.customerId,
+						associationId: input.associationId,
+						propertyId: input.propertyId,
+						unitId: input.unitId,
+						startDate: input.startDate,
+						endDate: input.endDate,
+						autoRenew: input.autoRenew,
+						renewalTermDays: input.renewalTermDays,
+						contractValue: input.contractValue,
+						billingFrequency: input.billingFrequency,
+						billingAmount: input.billingAmount,
+						description: input.description,
+						scopeOfWork: input.scopeOfWork,
+						exclusions: input.exclusions,
+						responseTimeHours: input.responseTimeHours,
+						resolutionTimeHours: input.resolutionTimeHours,
+						emergencyCoverage: input.emergencyCoverage,
+						primaryTechnicianId: input.primaryTechnicianId,
+						assignedBranchId: input.assignedBranchId,
+						notes: input.notes,
+						serviceItems: input.serviceItems
 					}
+				},
+				input.idempotencyKey || `create-contract-${Date.now()}`
+			);
 
-					return tx.serviceContract.findUnique({
-						where: { id: contract.id },
-						include: { serviceItems: true }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create contract');
+			}
 
-			const contract = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createContract)).result
-				: await createContract();
+			const contract = await prisma.serviceContract.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { serviceItems: true }
+			});
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -384,18 +366,28 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT or ACTIVE contracts');
 			}
 
-			const updateContract = async () => {
-				const { id, idempotencyKey, ...data } = input;
-				return prisma.serviceContract.update({
-					where: { id: input.id },
-					data,
-					include: { serviceItems: true }
-				});
-			};
+			const { id, idempotencyKey, ...data } = input;
 
-			const contract = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateContract)).result
-				: await updateContract();
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'UPDATE_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: id,
+					data
+				},
+				idempotencyKey || `update-contract-${id}-${Date.now()}`
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update contract');
+			}
+
+			const contract = await prisma.serviceContract.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { serviceItems: true }
+			});
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -422,17 +414,26 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Cannot activate contract in current status');
 			}
 
-			const activateContract = async () => {
-				return prisma.serviceContract.update({
-					where: { id: input.id },
-					data: { status: 'ACTIVE' },
-					include: { serviceItems: true }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'ACTIVATE_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const contract = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, activateContract)).result
-				: await activateContract();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to activate contract');
+			}
+
+			const contract = await prisma.serviceContract.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { serviceItems: true }
+			});
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -459,22 +460,26 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Can only suspend ACTIVE contracts');
 			}
 
-			const suspendContract = async () => {
-				return prisma.serviceContract.update({
-					where: { id: input.id },
-					data: {
-						status: 'SUSPENDED',
-						notes: input.reason
-							? `${existing.notes ?? ''}\nSuspended: ${input.reason}`.trim()
-							: existing.notes
-					},
-					include: { serviceItems: true }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'SUSPEND_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: input.id,
+					data: { reason: input.reason }
+				},
+				input.idempotencyKey
+			);
 
-			const contract = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, suspendContract)).result
-				: await suspendContract();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to suspend contract');
+			}
+
+			const contract = await prisma.serviceContract.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { serviceItems: true }
+			});
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -501,33 +506,26 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Contract is already cancelled or expired');
 			}
 
-			const cancelContract = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Cancel any pending scheduled visits
-					await tx.scheduledVisit.updateMany({
-						where: {
-							contractId: input.id,
-							status: { in: ['SCHEDULED', 'CONFIRMED'] }
-						},
-						data: { status: 'CANCELLED' }
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'CANCEL_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: input.id,
+					data: { reason: input.reason }
+				},
+				input.idempotencyKey
+			);
 
-					return tx.serviceContract.update({
-						where: { id: input.id },
-						data: {
-							status: 'CANCELLED',
-							notes: input.reason
-								? `${existing.notes ?? ''}\nCancelled: ${input.reason}`.trim()
-								: existing.notes
-						},
-						include: { serviceItems: true }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cancel contract');
+			}
 
-			const contract = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, cancelContract)).result
-				: await cancelContract();
+			const contract = await prisma.serviceContract.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { serviceItems: true }
+			});
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -563,51 +561,29 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Can only renew ACTIVE or EXPIRED contracts');
 			}
 
-			const renewContract = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Get renewal count
-					const renewalCount = await tx.contractRenewal.count({
-						where: { contractId: input.id }
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'RENEW_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: input.id,
+					data: {
+						newStartDate: existing.endDate.toISOString(),
+						newEndDate: input.newEndDate
+					}
+				},
+				input.idempotencyKey
+			);
 
-					const newValue = input.newContractValue ?? Number(existing.contractValue);
-					const previousValue = Number(existing.contractValue);
-					const changePercent = previousValue > 0
-						? ((newValue - previousValue) / previousValue) * 100
-						: 0;
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to renew contract');
+			}
 
-					// Create renewal record
-					await tx.contractRenewal.create({
-						data: {
-							contractId: input.id,
-							renewalNumber: renewalCount + 1,
-							previousEndDate: existing.endDate,
-							newEndDate: new Date(input.newEndDate),
-							previousValue: existing.contractValue,
-							newValue,
-							changePercent,
-							renewedAt: new Date(),
-							renewedBy: context.user!.id
-						}
-					});
-
-					// Update contract
-					return tx.serviceContract.update({
-						where: { id: input.id },
-						data: {
-							status: 'ACTIVE',
-							endDate: new Date(input.newEndDate),
-							contractValue: newValue,
-							billingAmount: input.newBillingAmount ?? existing.billingAmount
-						},
-						include: { serviceItems: true }
-					});
-				});
-			};
-
-			const contract = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, renewContract)).result
-				: await renewContract();
+			const contract = await prisma.serviceContract.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { serviceItems: true }
+			});
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -634,19 +610,23 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Can only delete DRAFT contracts');
 			}
 
-			const deleteContract = async () => {
-				await prisma.serviceContract.update({
-					where: { id: input.id },
-					data: { deletedAt: new Date() }
-				});
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'DELETE_CONTRACT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteContract)).result
-				: await deleteContract();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete contract');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		}),
 
 	addServiceItem: orgProcedure
@@ -686,27 +666,34 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Can only add items to DRAFT or ACTIVE contracts');
 			}
 
-			const addItem = async () => {
-				return prisma.contractServiceItem.create({
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'ADD_SERVICE_ITEM',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					contractId: input.contractId,
 					data: {
-						contractId: input.contractId,
 						name: input.name,
 						description: input.description,
 						pricebookItemId: input.pricebookItemId,
 						frequency: input.frequency,
-						visitsPerPeriod: input.visitsPerPeriod,
 						unitPrice: input.unitPrice,
 						quantity: input.quantity,
 						lineTotal: input.unitPrice * input.quantity,
-						estimatedDurationMinutes: input.estimatedDurationMinutes,
 						notes: input.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const serviceItem = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, addItem)).result
-				: await addItem();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add service item');
+			}
+
+			const serviceItem = await prisma.contractServiceItem.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ serviceItem: formatServiceItem(serviceItem) }, context);
 		}),
@@ -737,15 +724,22 @@ export const serviceContractRouter = {
 				throw ApiException.badRequest('Can only remove items from DRAFT or ACTIVE contracts');
 			}
 
-			const removeItem = async () => {
-				await prisma.contractServiceItem.delete({ where: { id: input.itemId } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startServiceContractWorkflow(
+				{
+					action: 'REMOVE_SERVICE_ITEM',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					serviceItemId: input.itemId,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, removeItem)).result
-				: await removeItem();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to remove service item');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

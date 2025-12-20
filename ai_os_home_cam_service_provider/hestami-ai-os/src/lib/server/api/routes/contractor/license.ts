@@ -10,6 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 
 const licenseOutput = z.object({
@@ -61,30 +62,27 @@ export const licenseRouter = {
 			});
 			if (!profile) throw ApiException.notFound('ContractorProfile');
 
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				if (id) {
-					const existing = await prisma.contractorLicense.findFirst({
-						where: { id, contractorProfileId: profile.id }
-					});
-					if (!existing) throw ApiException.notFound('ContractorLicense');
+			// Use DBOS workflow for durable execution
+			const result = await startContractorProfileWorkflow(
+				{
+					action: 'CREATE_OR_UPDATE_LICENSE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					entityId: id,
+					data: { profileId: profile.id, ...normalizeLicenseInput(data) }
+				},
+				idempotencyKey
+			);
 
-					return prisma.contractorLicense.update({
-						where: { id },
-						data: normalizeLicenseInput(data)
-					});
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create/update license');
+			}
 
-				return prisma.contractorLicense.create({
-					data: {
-						contractorProfileId: profile.id,
-						...normalizeLicenseInput(data)
-					}
-				});
-			});
+			const license = await prisma.contractorLicense.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
-					license: serializeLicense(result.result)
+					license: serializeLicense(license)
 				},
 				context
 			);

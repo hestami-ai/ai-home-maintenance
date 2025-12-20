@@ -93,7 +93,9 @@ import {
 	conciergeActionRouter,
 	externalHoaRouter,
 	externalVendorRouter,
-	materialDecisionRouter
+	materialDecisionRouter,
+	propertyPortfolioRouter,
+	individualPropertyRouter
 } from './routes/concierge/index.js';
 
 // Phase 4: Activity & Audit Subsystem
@@ -244,6 +246,10 @@ export const appRouter = {
 	externalHoa: externalHoaRouter,
 	externalVendor: externalVendorRouter,
 	materialDecision: materialDecisionRouter,
+
+	// Phase 17: Concierge Property Owner UX
+	propertyPortfolio: propertyPortfolioRouter,
+	individualProperty: individualPropertyRouter,
 
 	// Phase 4: Activity & Audit Subsystem
 	activityEvent: activityEventRouter,

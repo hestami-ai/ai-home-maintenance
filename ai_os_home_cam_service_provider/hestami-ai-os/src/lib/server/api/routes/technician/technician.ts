@@ -12,6 +12,7 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
+import { startTechnicianWorkflow } from '../../../workflows/technicianWorkflow.js';
 
 const assertServiceProviderOrg = async (organizationId: string) => {
 	const org = await prisma.organization.findFirst({
@@ -255,50 +256,36 @@ export const technicianRouter = {
 			const parsedHire = hireDate ? new Date(hireDate) : undefined;
 			const parsedTermination = terminationDate ? new Date(terminationDate) : undefined;
 
-			const work = async () => {
-				if (id) {
-					const existing = await prisma.technician.findFirst({
-						where: { id, organizationId: context.organization.id }
-					});
-					if (!existing) throw ApiException.notFound('Technician');
-					return prisma.technician.update({
-						where: { id },
-						data: {
-							...rest,
-							branchId: branchId ?? null,
-							hireDate: parsedHire,
-							terminationDate: parsedTermination
-						}
-					});
-				}
-				return prisma.technician.create({
-					data: {
-						organizationId: context.organization.id,
-						...rest,
-						branchId: branchId ?? null,
-						hireDate: parsedHire,
-						terminationDate: parsedTermination
-					}
+			// Validate existing technician if updating
+			if (id) {
+				const existing = await prisma.technician.findFirst({
+					where: { id, organizationId: context.organization.id }
 				});
-			};
+				if (!existing) throw ApiException.notFound('Technician');
+			}
 
-			const result = await withIdempotency(idempotencyKey, context, work);
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			const result = await startTechnicianWorkflow(
+				{
+					action: 'UPSERT_TECHNICIAN',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					technicianId: id,
+					data: { ...rest, branchId, hireDate, terminationDate }
+				},
+				idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'TECHNICIAN',
-				entityId: result.result.id,
-				action: input.id ? 'UPDATE' : 'CREATE',
-				summary: `Technician ${input.id ? 'updated' : 'created'}: ${result.result.firstName} ${result.result.lastName}`,
-				technicianId: result.result.id,
-				newState: {
-					firstName: result.result.firstName,
-					lastName: result.result.lastName,
-					isActive: result.result.isActive
-				}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to upsert technician');
+			}
+
+			// Fetch the technician for the response
+			const technician = await prisma.technician.findUniqueOrThrow({
+				where: { id: result.entityId }
 			});
 
-			return successResponse({ technician: serializeTechnician(result.result) }, context);
+			return successResponse({ technician: serializeTechnician(technician) }, context);
 		}),
 
 	get: orgProcedure
@@ -380,36 +367,27 @@ export const technicianRouter = {
 			await context.cerbos.authorize('edit', 'technician_skill', input.id ?? 'new');
 
 			const { id, idempotencyKey, technicianId: _ignoredTechId, ...data } = input;
-			const work = async () => {
-				if (id) {
-					const existing = await prisma.technicianSkill.findFirst({
-						where: { id, technicianId: tech.id }
-					});
-					if (!existing) throw ApiException.notFound('TechnicianSkill');
-					return prisma.technicianSkill.update({
-						where: { id },
-						data: {
-							...data,
-							trade: data.trade
-						}
-					});
-				}
-				return prisma.technicianSkill.upsert({
-					where: { technicianId_trade: { technicianId: tech.id, trade: data.trade as any } },
-					update: {
-						...data,
-						trade: data.trade
-					},
-					create: {
-						technicianId: tech.id,
-						...data,
-						trade: data.trade
-					}
-				});
-			};
 
-			const result = await withIdempotency(idempotencyKey, context, work);
-			return successResponse({ skill: serializeSkill(result.result) }, context);
+			// Use DBOS workflow for durable execution
+			const result = await startTechnicianWorkflow(
+				{
+					action: 'ADD_SKILL',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					technicianId: tech.id,
+					data: { ...data, skillId: id }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to upsert skill');
+			}
+
+			const skill = await prisma.technicianSkill.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+			return successResponse({ skill: serializeSkill(skill) }, context);
 		}),
 
 	listSkills: orgProcedure
@@ -453,32 +431,27 @@ export const technicianRouter = {
 			await context.cerbos.authorize('edit', 'technician_certification', input.id ?? 'new');
 
 			const { id, idempotencyKey, technicianId: _ignoredTechId, issuedAt, expiresAt, ...data } = input;
-			const work = async () => {
-				if (id) {
-					const existing = await prisma.technicianCertification.findFirst({
-						where: { id, technicianId: tech.id }
-					});
-					if (!existing) throw ApiException.notFound('TechnicianCertification');
-					return prisma.technicianCertification.update({
-						where: { id },
-						data: {
-							...data,
-							issuedAt: issuedAt ? new Date(issuedAt) : null,
-							expiresAt: expiresAt ? new Date(expiresAt) : null
-						}
-					});
-				}
-				return prisma.technicianCertification.create({
-					data: {
-						technicianId: tech.id,
-						...data,
-						issuedAt: issuedAt ? new Date(issuedAt) : null,
-						expiresAt: expiresAt ? new Date(expiresAt) : null
-					}
-				});
-			};
-			const result = await withIdempotency(idempotencyKey, context, work);
-			return successResponse({ certification: serializeCertification(result.result) }, context);
+
+			// Use DBOS workflow for durable execution
+			const result = await startTechnicianWorkflow(
+				{
+					action: 'ADD_CERTIFICATION',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					technicianId: tech.id,
+					data: { ...data, certId: id, issuedAt, expiresAt }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to upsert certification');
+			}
+
+			const certification = await prisma.technicianCertification.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+			return successResponse({ certification: serializeCertification(certification) }, context);
 		}),
 
 	listCertifications: orgProcedure
@@ -567,15 +540,26 @@ export const technicianRouter = {
 			validateRanges('saturday', data.saturday);
 			validateRanges('sunday', data.sunday);
 
-			const work = async () =>
-				prisma.technicianAvailability.upsert({
-					where: { technicianId: tech.id },
-					update: data,
-					create: { technicianId: tech.id, ...data }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startTechnicianWorkflow(
+				{
+					action: 'SET_AVAILABILITY',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					technicianId: tech.id,
+					data
+				},
+				idempotencyKey
+			);
 
-			const result = await withIdempotency(idempotencyKey, context, work);
-			return successResponse({ availability: serializeAvailability(result.result) }, context);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to set availability');
+			}
+
+			const availability = await prisma.technicianAvailability.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+			return successResponse({ availability: serializeAvailability(availability) }, context);
 		}),
 
 	getAvailability: orgProcedure
@@ -632,17 +616,26 @@ export const technicianRouter = {
 				throw ApiException.conflict('Time off overlaps an existing entry');
 			}
 
-			const work = async () =>
-				prisma.technicianTimeOff.create({
-					data: {
-						technicianId: tech.id,
-						startsAt: newStart,
-						endsAt: newEnd,
-						reason: data.reason
-					}
-				});
-			const result = await withIdempotency(idempotencyKey, context, work);
-			return successResponse({ timeOff: serializeTimeOff(result.result) }, context);
+			// Use DBOS workflow for durable execution
+			const result = await startTechnicianWorkflow(
+				{
+					action: 'ADD_TIME_OFF',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					technicianId: tech.id,
+					data: { startsAt: data.startsAt, endsAt: data.endsAt, reason: data.reason }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add time off');
+			}
+
+			const timeOff = await prisma.technicianTimeOff.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+			return successResponse({ timeOff: serializeTimeOff(timeOff) }, context);
 		}),
 
 	listTimeOff: orgProcedure
@@ -690,21 +683,27 @@ export const technicianRouter = {
 			if (!area) throw ApiException.forbidden('Service area not found for this organization');
 
 			const { idempotencyKey, technicianId: _ignoredTechId, isPrimary = false, ...data } = input;
-			const work = async () => {
-				if (isPrimary) {
-					await prisma.technicianTerritory.updateMany({
-						where: { technicianId: tech.id, isPrimary: true },
-						data: { isPrimary: false }
-					});
-				}
-				return prisma.technicianTerritory.upsert({
-					where: { technicianId_serviceAreaId: { technicianId: tech.id, serviceAreaId: data.serviceAreaId } },
-					update: { isPrimary },
-					create: { technicianId: tech.id, serviceAreaId: data.serviceAreaId, isPrimary }
-				});
-			};
-			const result = await withIdempotency(idempotencyKey, context, work);
-			return successResponse({ territory: serializeTerritory(result.result) }, context);
+
+			// Use DBOS workflow for durable execution
+			const result = await startTechnicianWorkflow(
+				{
+					action: 'ADD_TERRITORY',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					technicianId: tech.id,
+					data: { serviceAreaId: data.serviceAreaId, isPrimary }
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to assign territory');
+			}
+
+			const territory = await prisma.technicianTerritory.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
+			return successResponse({ territory: serializeTerritory(territory) }, context);
 		}),
 
 	listTerritories: orgProcedure

@@ -1,0 +1,197 @@
+/**
+ * Dashboard Workflow (v1)
+ *
+ * DBOS durable workflow for managing dashboard widget operations.
+ * Handles: create, update, delete, reorder.
+ */
+
+import { DBOS } from '@dbos-inc/dbos-sdk';
+import { prisma } from '../db.js';
+import type { WidgetType } from '../../../../generated/prisma/client.js';
+
+// Action types for the unified workflow
+export type DashboardAction =
+	| 'CREATE_WIDGET'
+	| 'UPDATE_WIDGET'
+	| 'DELETE_WIDGET'
+	| 'REORDER_WIDGETS';
+
+export interface DashboardWorkflowInput {
+	action: DashboardAction;
+	organizationId: string;
+	userId: string;
+	associationId: string;
+	widgetId?: string;
+	data: Record<string, unknown>;
+}
+
+export interface DashboardWorkflowResult {
+	success: boolean;
+	entityId?: string;
+	error?: string;
+}
+
+// Step functions for each operation
+async function createWidget(
+	organizationId: string,
+	userId: string,
+	associationId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const widgetUserId = data.userId as string | undefined;
+
+	// Get max position for ordering
+	const maxPos = await prisma.dashboardWidget.aggregate({
+		where: { associationId, userId: widgetUserId ?? null },
+		_max: { position: true }
+	});
+
+	const widget = await prisma.dashboardWidget.create({
+		data: {
+			associationId,
+			userId: widgetUserId,
+			widgetType: data.widgetType as WidgetType,
+			title: data.title as string,
+			configJson: data.configJson as string | undefined,
+			position: (data.position as number | undefined) ?? (maxPos._max.position ?? 0) + 1,
+			width: (data.width as number | undefined) ?? 1,
+			height: (data.height as number | undefined) ?? 1
+		}
+	});
+
+	console.log(`[DashboardWorkflow] CREATE_WIDGET widget:${widget.id} by user ${userId}`);
+	return widget.id;
+}
+
+async function updateWidget(
+	organizationId: string,
+	userId: string,
+	associationId: string,
+	widgetId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const existing = await prisma.dashboardWidget.findFirst({
+		where: { id: widgetId, associationId }
+	});
+	if (!existing) throw new Error('Dashboard widget not found');
+
+	await prisma.dashboardWidget.update({
+		where: { id: widgetId },
+		data: {
+			title: data.title as string | undefined,
+			configJson: data.configJson as string | null | undefined,
+			position: data.position as number | undefined,
+			width: data.width as number | undefined,
+			height: data.height as number | undefined,
+			isActive: data.isActive as boolean | undefined
+		}
+	});
+
+	console.log(`[DashboardWorkflow] UPDATE_WIDGET widget:${widgetId} by user ${userId}`);
+	return widgetId;
+}
+
+async function deleteWidget(
+	organizationId: string,
+	userId: string,
+	associationId: string,
+	widgetId: string
+): Promise<string> {
+	const existing = await prisma.dashboardWidget.findFirst({
+		where: { id: widgetId, associationId }
+	});
+	if (!existing) throw new Error('Dashboard widget not found');
+
+	await prisma.dashboardWidget.delete({ where: { id: widgetId } });
+
+	console.log(`[DashboardWorkflow] DELETE_WIDGET widget:${widgetId} by user ${userId}`);
+	return widgetId;
+}
+
+async function reorderWidgets(
+	organizationId: string,
+	userId: string,
+	associationId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const widgetIds = data.widgetIds as string[];
+
+	// Verify all widgets belong to this association
+	const widgets = await prisma.dashboardWidget.findMany({
+		where: { id: { in: widgetIds }, associationId }
+	});
+
+	if (widgets.length !== widgetIds.length) {
+		throw new Error('Some widgets not found or not accessible');
+	}
+
+	// Update positions in order
+	await prisma.$transaction(
+		widgetIds.map((id, index) =>
+			prisma.dashboardWidget.update({
+				where: { id },
+				data: { position: index }
+			})
+		)
+	);
+
+	console.log(`[DashboardWorkflow] REORDER_WIDGETS ${widgetIds.length} widgets by user ${userId}`);
+	return 'reordered';
+}
+
+// Main workflow function
+async function dashboardWorkflow(input: DashboardWorkflowInput): Promise<DashboardWorkflowResult> {
+	try {
+		let entityId: string | undefined;
+
+		switch (input.action) {
+			case 'CREATE_WIDGET':
+				entityId = await DBOS.runStep(
+					() => createWidget(input.organizationId, input.userId, input.associationId, input.data),
+					{ name: 'createWidget' }
+				);
+				break;
+
+			case 'UPDATE_WIDGET':
+				entityId = await DBOS.runStep(
+					() => updateWidget(input.organizationId, input.userId, input.associationId, input.widgetId!, input.data),
+					{ name: 'updateWidget' }
+				);
+				break;
+
+			case 'DELETE_WIDGET':
+				entityId = await DBOS.runStep(
+					() => deleteWidget(input.organizationId, input.userId, input.associationId, input.widgetId!),
+					{ name: 'deleteWidget' }
+				);
+				break;
+
+			case 'REORDER_WIDGETS':
+				entityId = await DBOS.runStep(
+					() => reorderWidgets(input.organizationId, input.userId, input.associationId, input.data),
+					{ name: 'reorderWidgets' }
+				);
+				break;
+
+			default:
+				return { success: false, error: `Unknown action: ${input.action}` };
+		}
+
+		return { success: true, entityId };
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		console.error(`[DashboardWorkflow] Error in ${input.action}:`, errorMessage);
+		return { success: false, error: errorMessage };
+	}
+}
+
+export const dashboardWorkflow_v1 = DBOS.registerWorkflow(dashboardWorkflow);
+
+export async function startDashboardWorkflow(
+	input: DashboardWorkflowInput,
+	idempotencyKey?: string
+): Promise<DashboardWorkflowResult> {
+	const workflowId = idempotencyKey || `dashboard-${input.action}-${input.widgetId || 'new'}-${Date.now()}`;
+	const handle = await DBOS.startWorkflow(dashboardWorkflow_v1, { workflowID: workflowId })(input);
+	return handle.getResult();
+}

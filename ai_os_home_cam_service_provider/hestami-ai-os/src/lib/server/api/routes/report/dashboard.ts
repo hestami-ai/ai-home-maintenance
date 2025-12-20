@@ -5,6 +5,7 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordActivityFromContext } from '../../middleware/activityEvent.js';
+import { startDashboardWorkflow } from '../../../workflows/dashboardWorkflow.js';
 
 // =============================================================================
 // Dashboard DTO Schemas (Phase 12 - CAM UX #6)
@@ -158,30 +159,33 @@ export const dashboardRouter = {
 			await context.cerbos.authorize('create', 'dashboard_widget', 'new');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const createWidget = async () => {
-				// Get max position for ordering
-				const maxPos = await prisma.dashboardWidget.aggregate({
-					where: { associationId: association.id, userId: input.userId ?? null },
-					_max: { position: true }
-				});
-
-				return prisma.dashboardWidget.create({
+			// Use DBOS workflow for durable execution
+			const result = await startDashboardWorkflow(
+				{
+					action: 'CREATE_WIDGET',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
 					data: {
-						associationId: association.id,
-						userId: input.userId,
 						widgetType: input.widgetType,
 						title: input.title,
 						configJson: input.configJson,
-						position: input.position ?? (maxPos._max.position ?? 0) + 1,
-						width: input.width ?? 1,
-						height: input.height ?? 1
+						position: input.position,
+						width: input.width,
+						height: input.height,
+						userId: input.userId
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const widget = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createWidget)).result
-				: await createWidget();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create widget');
+			}
+
+			const widget = await prisma.dashboardWidget.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				widget: {
@@ -274,14 +278,14 @@ export const dashboardRouter = {
 			await context.cerbos.authorize('edit', 'dashboard_widget', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const updateWidget = async () => {
-				const existing = await prisma.dashboardWidget.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Dashboard widget');
-
-				return prisma.dashboardWidget.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startDashboardWorkflow(
+				{
+					action: 'UPDATE_WIDGET',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					widgetId: input.id,
 					data: {
 						title: input.title,
 						configJson: input.configJson,
@@ -290,12 +294,17 @@ export const dashboardRouter = {
 						height: input.height,
 						isActive: input.isActive
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const widget = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateWidget)).result
-				: await updateWidget();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update widget');
+			}
+
+			const widget = await prisma.dashboardWidget.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({
 				widget: {
@@ -324,19 +333,22 @@ export const dashboardRouter = {
 			await context.cerbos.authorize('delete', 'dashboard_widget', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const deleteWidget = async () => {
-				const existing = await prisma.dashboardWidget.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Dashboard widget');
+			// Use DBOS workflow for durable execution
+			const result = await startDashboardWorkflow(
+				{
+					action: 'DELETE_WIDGET',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					widgetId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				await prisma.dashboardWidget.delete({ where: { id: input.id } });
-				return true;
-			};
-
-			input.idempotencyKey
-				? await withIdempotency(input.idempotencyKey, context, deleteWidget)
-				: await deleteWidget();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete widget');
+			}
 
 			return successResponse({ deleted: true }, context);
 		}),
@@ -358,32 +370,21 @@ export const dashboardRouter = {
 			await context.cerbos.authorize('edit', 'dashboard_widget', '*');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const reorderWidgets = async () => {
-				// Verify all widgets belong to this association
-				const widgets = await prisma.dashboardWidget.findMany({
-					where: { id: { in: input.widgetIds }, associationId: association.id }
-				});
+			// Use DBOS workflow for durable execution
+			const result = await startDashboardWorkflow(
+				{
+					action: 'REORDER_WIDGETS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					data: { widgetIds: input.widgetIds }
+				},
+				input.idempotencyKey
+			);
 
-				if (widgets.length !== input.widgetIds.length) {
-					throw ApiException.badRequest('Some widgets not found or not accessible');
-				}
-
-				// Update positions in order
-				await prisma.$transaction(
-					input.widgetIds.map((id, index) =>
-						prisma.dashboardWidget.update({
-							where: { id },
-							data: { position: index }
-						})
-					)
-				);
-
-				return true;
-			};
-
-			input.idempotencyKey
-				? await withIdempotency(input.idempotencyKey, context, reorderWidgets)
-				: await reorderWidgets();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to reorder widgets');
+			}
 
 			return successResponse({ reordered: true }, context);
 		}),

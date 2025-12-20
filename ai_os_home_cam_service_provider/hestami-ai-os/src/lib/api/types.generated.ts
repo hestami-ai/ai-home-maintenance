@@ -3988,6 +3988,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/document/uploadWithFile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["document.uploadWithFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document/uploadVersionWithFile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["document.uploadVersionWithFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/document/uploadDocument": {
         parameters: {
             query?: never;
@@ -10206,6 +10238,230 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["materialDecision.delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/propertyPortfolio/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propertyPortfolio.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/propertyPortfolio/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propertyPortfolio.get"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/propertyPortfolio/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propertyPortfolio.list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/propertyPortfolio/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propertyPortfolio.update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/propertyPortfolio/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propertyPortfolio.delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/propertyPortfolio/getOrCreateDefault": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["propertyPortfolio.getOrCreateDefault"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.get"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/addToPortfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.addToPortfolio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/removeFromPortfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.removeFromPortfolio"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/individualProperty/updateExternalHoa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["individualProperty.updateExternalHoa"];
         delete?: never;
         options?: never;
         head?: never;
@@ -23681,6 +23937,127 @@ export interface operations {
                         data: {
                             success: boolean;
                             revokedAt: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "document.uploadWithFile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    file: unknown;
+                    /** @enum {unknown} */
+                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST";
+                    contextId: string;
+                    title: string;
+                    description?: string;
+                    /** @enum {unknown} */
+                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                    /** @enum {unknown} */
+                    visibility?: "PUBLIC" | "OWNERS_ONLY" | "BOARD_ONLY" | "STAFF_ONLY" | "PRIVATE";
+                    /** Format: date-time */
+                    effectiveDate?: string;
+                    /** Format: date-time */
+                    expirationDate?: string;
+                    tags?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            document: {
+                                id: string;
+                                title: string;
+                                fileName: string;
+                                fileSize: number;
+                                mimeType: string;
+                                /** @enum {unknown} */
+                                category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                                /** @enum {unknown} */
+                                status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+                                version: number;
+                                fileUrl: string;
+                                createdAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "document.uploadVersionWithFile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    file: unknown;
+                    parentDocumentId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            document: {
+                                id: string;
+                                title: string;
+                                fileName: string;
+                                fileSize: number;
+                                mimeType: string;
+                                version: number;
+                                fileUrl: string;
+                                createdAt: string;
+                            };
                         };
                         meta: {
                             requestId: string;
@@ -45552,6 +45929,16 @@ export interface operations {
                     priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT" | "EMERGENCY";
                     originIntentId?: string;
                     assignedConciergeUserId?: string;
+                    /** @enum {unknown} */
+                    availabilityType?: "FLEXIBLE" | "SPECIFIC";
+                    availabilityNotes?: string;
+                    availabilitySlots?: {
+                        /** Format: date-time */
+                        startTime: string;
+                        /** Format: date-time */
+                        endTime: string;
+                        notes?: string;
+                    }[];
                 };
             };
         };
@@ -48292,6 +48679,816 @@ export interface operations {
                         ok: true;
                         data: {
                             deleted: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "propertyPortfolio.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    name: string;
+                    description?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            portfolio: {
+                                id: string;
+                                organizationId: string;
+                                name: string;
+                                description: string | null;
+                                isActive: boolean;
+                                propertyCount?: number;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "propertyPortfolio.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    portfolioId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            portfolio: {
+                                id: string;
+                                organizationId: string;
+                                name: string;
+                                description: string | null;
+                                isActive: boolean;
+                                propertyCount?: number;
+                                createdAt: string;
+                                updatedAt: string;
+                                properties: {
+                                    id: string;
+                                    name: string;
+                                    addressLine1: string;
+                                    city: string;
+                                    state: string;
+                                    postalCode: string;
+                                    propertyType: string;
+                                }[];
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "propertyPortfolio.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    /** @default false */
+                    includeInactive?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            portfolios: {
+                                id: string;
+                                organizationId: string;
+                                name: string;
+                                description: string | null;
+                                isActive: boolean;
+                                propertyCount?: number;
+                                createdAt: string;
+                                updatedAt: string;
+                            }[];
+                            total: number;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "propertyPortfolio.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    portfolioId: string;
+                    name?: string;
+                    description?: string;
+                    isActive?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            portfolio: {
+                                id: string;
+                                organizationId: string;
+                                name: string;
+                                description: string | null;
+                                isActive: boolean;
+                                propertyCount?: number;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "propertyPortfolio.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    portfolioId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            deleted: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "propertyPortfolio.getOrCreateDefault": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            portfolio: {
+                                id: string;
+                                organizationId: string;
+                                name: string;
+                                description: string | null;
+                                isActive: boolean;
+                                propertyCount?: number;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                            created: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    name: string;
+                    /** @enum {unknown} */
+                    propertyType: "SINGLE_FAMILY" | "CONDOMINIUM" | "TOWNHOUSE" | "COOPERATIVE" | "MIXED_USE" | "COMMERCIAL";
+                    addressLine1: string;
+                    addressLine2?: string;
+                    city: string;
+                    state: string;
+                    postalCode: string;
+                    /** @default US */
+                    country?: string;
+                    yearBuilt?: number;
+                    squareFeet?: number;
+                    lotSquareFeet?: number;
+                    bedrooms?: number;
+                    bathrooms?: number;
+                    portfolioId?: string;
+                    externalHoa?: {
+                        hoaName: string;
+                        hoaContactName?: string;
+                        /** Format: email */
+                        hoaContactEmail?: string;
+                        hoaContactPhone?: string;
+                        hoaAddress?: string;
+                        notes?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            property: {
+                                id: string;
+                                ownerOrgId: string;
+                                name: string;
+                                propertyType: string;
+                                addressLine1: string;
+                                addressLine2: string | null;
+                                city: string;
+                                state: string;
+                                postalCode: string;
+                                country: string;
+                                yearBuilt: number | null;
+                                squareFeet: number | null;
+                                lotSquareFeet: number | null;
+                                bedrooms: number | null;
+                                bathrooms: number | null;
+                                isActive: boolean;
+                                linkedUnitId: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                            externalHoa: {
+                                id: string;
+                                hoaName: string;
+                                hoaContactName: string | null;
+                                hoaContactEmail: string | null;
+                                hoaContactPhone: string | null;
+                                hoaAddress: string | null;
+                                notes: string | null;
+                            } | null;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    propertyId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            property: {
+                                id: string;
+                                ownerOrgId: string;
+                                name: string;
+                                propertyType: string;
+                                addressLine1: string;
+                                addressLine2: string | null;
+                                city: string;
+                                state: string;
+                                postalCode: string;
+                                country: string;
+                                yearBuilt: number | null;
+                                squareFeet: number | null;
+                                lotSquareFeet: number | null;
+                                bedrooms: number | null;
+                                bathrooms: number | null;
+                                isActive: boolean;
+                                linkedUnitId: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                externalHoa: {
+                                    id: string;
+                                    hoaName: string;
+                                    hoaContactName: string | null;
+                                    hoaContactEmail: string | null;
+                                    hoaContactPhone: string | null;
+                                    hoaAddress: string | null;
+                                    notes: string | null;
+                                } | null;
+                                portfolios: {
+                                    id: string;
+                                    name: string;
+                                }[];
+                                activeCaseCount: number;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    portfolioId?: string;
+                    /** @enum {unknown} */
+                    propertyType?: "SINGLE_FAMILY" | "CONDOMINIUM" | "TOWNHOUSE" | "COOPERATIVE" | "MIXED_USE" | "COMMERCIAL";
+                    /** @default false */
+                    includeInactive?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            properties: {
+                                id: string;
+                                ownerOrgId: string;
+                                name: string;
+                                propertyType: string;
+                                addressLine1: string;
+                                addressLine2: string | null;
+                                city: string;
+                                state: string;
+                                postalCode: string;
+                                country: string;
+                                yearBuilt: number | null;
+                                squareFeet: number | null;
+                                lotSquareFeet: number | null;
+                                bedrooms: number | null;
+                                bathrooms: number | null;
+                                isActive: boolean;
+                                linkedUnitId: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                                hasExternalHoa: boolean;
+                                activeCaseCount: number;
+                            }[];
+                            total: number;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    propertyId: string;
+                    name?: string;
+                    /** @enum {unknown} */
+                    propertyType?: "SINGLE_FAMILY" | "CONDOMINIUM" | "TOWNHOUSE" | "COOPERATIVE" | "MIXED_USE" | "COMMERCIAL";
+                    addressLine1?: string;
+                    addressLine2?: string | null;
+                    city?: string;
+                    state?: string;
+                    postalCode?: string;
+                    yearBuilt?: number | null;
+                    squareFeet?: number | null;
+                    lotSquareFeet?: number | null;
+                    bedrooms?: number | null;
+                    bathrooms?: number | null;
+                    isActive?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            property: {
+                                id: string;
+                                ownerOrgId: string;
+                                name: string;
+                                propertyType: string;
+                                addressLine1: string;
+                                addressLine2: string | null;
+                                city: string;
+                                state: string;
+                                postalCode: string;
+                                country: string;
+                                yearBuilt: number | null;
+                                squareFeet: number | null;
+                                lotSquareFeet: number | null;
+                                bedrooms: number | null;
+                                bathrooms: number | null;
+                                isActive: boolean;
+                                linkedUnitId: string | null;
+                                createdAt: string;
+                                updatedAt: string;
+                            };
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    propertyId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            deleted: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.addToPortfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    propertyId: string;
+                    portfolioId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            added: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.removeFromPortfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    propertyId: string;
+                    portfolioId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            removed: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "individualProperty.updateExternalHoa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    propertyId: string;
+                    hoaName: string;
+                    hoaContactName?: string | null;
+                    hoaContactEmail?: string | null;
+                    hoaContactPhone?: string | null;
+                    hoaAddress?: string | null;
+                    notes?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            externalHoa: {
+                                id: string;
+                                hoaName: string;
+                                hoaContactName: string | null;
+                                hoaContactEmail: string | null;
+                                hoaContactPhone: string | null;
+                                hoaAddress: string | null;
+                                notes: string | null;
+                            } | null;
                         };
                         meta: {
                             requestId: string;

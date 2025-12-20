@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { DispatchStatus, SLAPriority } from '../../../../../../generated/prisma/client.js';
+import { startDispatchWorkflow } from '../../../workflows/dispatchWorkflow.js';
 
 // Valid dispatch status transitions
 const DISPATCH_TRANSITIONS: Record<DispatchStatus, DispatchStatus[]> = {
@@ -296,53 +297,32 @@ export const dispatchRouter = {
 				throw ApiException.badRequest(eligibility.reason!);
 			}
 
-			const createAssignment = async () => {
-				return prisma.$transaction(async (tx) => {
-					const assignment = await tx.dispatchAssignment.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobId: input.jobId,
-							jobVisitId: input.jobVisitId,
-							technicianId: input.technicianId,
-							status: 'ASSIGNED',
-							assignedBy: context.user!.id,
-							scheduledStart: new Date(input.scheduledStart),
-							scheduledEnd: new Date(input.scheduledEnd),
-							estimatedTravelMinutes: input.estimatedTravelMinutes,
-							dispatchNotes: input.dispatchNotes
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startDispatchWorkflow(
+				{
+					action: 'CREATE_ASSIGNMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						jobId: input.jobId,
+						jobVisitId: input.jobVisitId,
+						technicianId: input.technicianId,
+						scheduledStart: input.scheduledStart,
+						scheduledEnd: input.scheduledEnd,
+						estimatedTravelMinutes: input.estimatedTravelMinutes,
+						dispatchNotes: input.dispatchNotes
+					}
+				},
+				input.idempotencyKey
+			);
 
-					// Create schedule slot for the technician
-					await tx.scheduleSlot.create({
-						data: {
-							organizationId: context.organization!.id,
-							technicianId: input.technicianId,
-							startTime: new Date(input.scheduledStart),
-							endTime: new Date(input.scheduledEnd),
-							slotType: 'JOB',
-							jobId: input.jobId,
-							jobVisitId: input.jobVisitId
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create assignment');
+			}
 
-					// Update job assignment
-					await tx.job.update({
-						where: { id: input.jobId },
-						data: {
-							assignedTechnicianId: input.technicianId,
-							assignedAt: new Date(),
-							assignedBy: context.user!.id
-						}
-					});
-
-					return assignment;
-				});
-			};
-
-			const assignment = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createAssignment)).result
-				: await createAssignment();
+			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
 		}),
@@ -400,66 +380,30 @@ export const dispatchRouter = {
 				throw ApiException.badRequest(eligibility.reason!);
 			}
 
-			const reassignDispatch = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Cancel old schedule slot
-					await tx.scheduleSlot.deleteMany({
-						where: {
-							technicianId: existing.technicianId,
-							jobId: existing.jobId,
-							slotType: 'JOB'
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startDispatchWorkflow(
+				{
+					action: 'REASSIGN',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					assignmentId: input.assignmentId,
+					data: {
+						newTechnicianId: input.newTechnicianId,
+						scheduledStart: scheduledStart.toISOString(),
+						scheduledEnd: scheduledEnd.toISOString(),
+						reason: input.reason
+					}
+				},
+				input.idempotencyKey
+			);
 
-					// Update assignment
-					const updated = await tx.dispatchAssignment.update({
-						where: { id: input.assignmentId },
-						data: {
-							technicianId: input.newTechnicianId,
-							status: 'ASSIGNED',
-							scheduledStart,
-							scheduledEnd,
-							assignedAt: new Date(),
-							assignedBy: context.user!.id,
-							acceptedAt: null,
-							declinedAt: null,
-							declineReason: null,
-							dispatchNotes: input.reason
-								? `${existing.dispatchNotes ?? ''}\nReassigned: ${input.reason}`.trim()
-								: existing.dispatchNotes
-						}
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to reassign dispatch');
+			}
 
-					// Create new schedule slot
-					await tx.scheduleSlot.create({
-						data: {
-							organizationId: context.organization!.id,
-							technicianId: input.newTechnicianId,
-							startTime: scheduledStart,
-							endTime: scheduledEnd,
-							slotType: 'JOB',
-							jobId: existing.jobId,
-							jobVisitId: existing.jobVisitId
-						}
-					});
-
-					// Update job assignment
-					await tx.job.update({
-						where: { id: existing.jobId },
-						data: {
-							assignedTechnicianId: input.newTechnicianId,
-							assignedAt: new Date(),
-							assignedBy: context.user!.id
-						}
-					});
-
-					return updated;
-				});
-			};
-
-			const assignment = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, reassignDispatch)).result
-				: await reassignDispatch();
+			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
 		}),
@@ -548,9 +492,30 @@ export const dispatchRouter = {
 				});
 			};
 
-			const assignment = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateDispatch)).result
-				: await updateDispatch();
+			// Use DBOS workflow for durable execution
+			const result = await startDispatchWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					assignmentId: input.assignmentId,
+					data: {
+						status: input.status,
+						actualStart: input.actualStart,
+						actualEnd: input.actualEnd,
+						completionNotes: input.techNotes
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update dispatch status');
+			}
+
+			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
 		}),
@@ -751,38 +716,29 @@ export const dispatchRouter = {
 				throw ApiException.badRequest(eligibility.reason!);
 			}
 
-			const rescheduleDispatch = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Update schedule slot
-					await tx.scheduleSlot.updateMany({
-						where: {
-							technicianId: existing.technicianId,
-							jobId: existing.jobId,
-							slotType: 'JOB'
-						},
-						data: {
-							startTime: new Date(input.scheduledStart),
-							endTime: new Date(input.scheduledEnd)
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startDispatchWorkflow(
+				{
+					action: 'RESCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					assignmentId: input.assignmentId,
+					data: {
+						scheduledStart: input.scheduledStart,
+						scheduledEnd: input.scheduledEnd,
+						reason: input.reason
+					}
+				},
+				input.idempotencyKey
+			);
 
-					// Update assignment
-					return tx.dispatchAssignment.update({
-						where: { id: input.assignmentId },
-						data: {
-							scheduledStart: new Date(input.scheduledStart),
-							scheduledEnd: new Date(input.scheduledEnd),
-							dispatchNotes: input.reason
-								? `${existing.dispatchNotes ?? ''}\nRescheduled: ${input.reason}`.trim()
-								: existing.dispatchNotes
-						}
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to reschedule dispatch');
+			}
 
-			const assignment = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, rescheduleDispatch)).result
-				: await rescheduleDispatch();
+			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
 		}),
@@ -891,45 +847,31 @@ export const dispatchRouter = {
 				address: a.job.addressLine1 ?? 'No address'
 			}));
 
-			const optimizeRoutePlan = async () => {
-				return prisma.routePlan.upsert({
-					where: {
-						technicianId_routeDate: {
-							technicianId: input.technicianId,
-							routeDate
-						}
-					},
-					update: {
-						isOptimized: true,
-						optimizedAt: new Date(),
-						startAddress: input.startAddress,
-						endAddress: input.endAddress,
-						stopsJson: stops,
-						totalJobMinutes: assignments.reduce(
-							(sum, a) =>
-								sum +
-								Math.round(
-									(a.scheduledEnd.getTime() - a.scheduledStart.getTime()) / 60000
-								),
-							0
-						)
-					},
-					create: {
-						organizationId: context.organization!.id,
+			// Use DBOS workflow for durable execution
+			const result = await startDispatchWorkflow(
+				{
+					action: 'OPTIMIZE_ROUTE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					technicianId: input.technicianId,
+					data: {
 						technicianId: input.technicianId,
-						routeDate,
-						isOptimized: true,
-						optimizedAt: new Date(),
+						planDate: input.routeDate,
 						startAddress: input.startAddress,
 						endAddress: input.endAddress,
-						stopsJson: stops
+						stops
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const routePlan = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, optimizeRoutePlan)).result
-				: await optimizeRoutePlan();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to optimize route');
+			}
+
+			const routePlan = await prisma.routePlan.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ routePlan: formatRoutePlan(routePlan) }, context);
 		})

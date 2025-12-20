@@ -12,6 +12,8 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobInvoiceStatus } from '../../../../../../generated/prisma/client.js';
+import { startInvoiceCreateWorkflow } from '../../../workflows/invoiceCreateWorkflow.js';
+import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
 
 const invoiceLineOutput = z.object({
 	id: z.string(),
@@ -153,79 +155,30 @@ export const invoiceRouter = {
 				throw ApiException.badRequest('Can only create invoice from ACCEPTED estimate');
 			}
 
-			const createInvoice = async () => {
-				const invoiceNumber = await generateInvoiceNumber(context.organization!.id);
-
-				return prisma.$transaction(async (tx) => {
-					// Use selected option lines if available, otherwise use main lines
-					const sourceLines = estimate.options.length > 0 && estimate.options[0].lines.length > 0
-						? estimate.options[0].lines
-						: estimate.lines;
-
-					const invoice = await tx.jobInvoice.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobId: estimate.jobId,
-							customerId: estimate.customerId,
-							invoiceNumber,
-							dueDate: input.dueDate ? new Date(input.dueDate) : null,
-							subtotal: estimate.subtotal,
-							taxAmount: estimate.taxAmount,
-							discount: estimate.discount,
-							totalAmount: estimate.totalAmount,
-							balanceDue: estimate.totalAmount,
-							notes: input.notes ?? estimate.notes,
-							terms: input.terms ?? estimate.terms,
-							estimateId: estimate.id,
-							createdBy: context.user!.id
-						}
-					});
-
-					// Copy lines
-					if (sourceLines.length > 0) {
-						await tx.invoiceLine.createMany({
-							data: sourceLines.map((line, idx) => ({
-								invoiceId: invoice.id,
-								lineNumber: idx + 1,
-								description: line.description,
-								quantity: line.quantity,
-								unitPrice: line.unitPrice,
-								lineTotal: line.lineTotal,
-								pricebookItemId: line.pricebookItemId,
-								isTaxable: line.isTaxable,
-								taxRate: line.taxRate
-							}))
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'CREATE_INVOICE_FROM_ESTIMATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						estimateId: input.estimateId,
+						dueDate: input.dueDate,
+						notes: input.notes,
+						terms: input.terms
 					}
+				},
+				input.idempotencyKey || `create-invoice-from-estimate-${input.estimateId}-${Date.now()}`
+			);
 
-					// Phase 15: Auto-transition job to INVOICED if in COMPLETED
-					const job = await tx.job.findUnique({ where: { id: estimate.jobId } });
-					if (job && job.status === 'COMPLETED') {
-						await tx.job.update({
-							where: { id: estimate.jobId },
-							data: { status: 'INVOICED', invoicedAt: new Date() }
-						});
-						await tx.jobStatusHistory.create({
-							data: {
-								jobId: estimate.jobId,
-								fromStatus: 'COMPLETED',
-								toStatus: 'INVOICED',
-								changedBy: context.user!.id,
-								notes: `Auto-transitioned: Invoice ${invoice.invoiceNumber} created`
-							}
-						});
-					}
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create invoice from estimate');
+			}
 
-					return tx.jobInvoice.findUnique({
-						where: { id: invoice.id },
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
-				});
-			};
-
-			const invoice = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createInvoice)).result
-				: await createInvoice();
+			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -279,65 +232,31 @@ export const invoiceRouter = {
 			if (!job) throw ApiException.notFound('Job');
 			if (!customer) throw ApiException.notFound('Customer');
 
-			const createInvoice = async () => {
-				const invoiceNumber = await generateInvoiceNumber(context.organization!.id);
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			const result = await startInvoiceCreateWorkflow(
+				{
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					jobId: input.jobId,
+					customerId: input.customerId,
+					dueDate: input.dueDate,
+					notes: input.notes,
+					terms: input.terms,
+					discount: input.discount,
+					lines: input.lines
+				},
+				input.idempotencyKey
+			);
 
-				return prisma.$transaction(async (tx) => {
-					const linesWithTotals = (input.lines ?? []).map((line, idx) => ({
-						...line,
-						lineNumber: idx + 1,
-						lineTotal: line.quantity * line.unitPrice
-					}));
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create invoice');
+			}
 
-					const { subtotal, taxAmount, totalAmount } = recalculateInvoiceTotals(
-						linesWithTotals,
-						input.discount
-					);
-
-					const invoice = await tx.jobInvoice.create({
-						data: {
-							organizationId: context.organization!.id,
-							jobId: input.jobId,
-							customerId: input.customerId,
-							invoiceNumber,
-							dueDate: input.dueDate ? new Date(input.dueDate) : null,
-							subtotal,
-							taxAmount,
-							discount: input.discount,
-							totalAmount,
-							balanceDue: totalAmount,
-							notes: input.notes,
-							terms: input.terms,
-							createdBy: context.user!.id
-						}
-					});
-
-					if (linesWithTotals.length > 0) {
-						await tx.invoiceLine.createMany({
-							data: linesWithTotals.map((line) => ({
-								invoiceId: invoice.id,
-								lineNumber: line.lineNumber,
-								description: line.description,
-								quantity: line.quantity,
-								unitPrice: line.unitPrice,
-								lineTotal: line.lineTotal,
-								pricebookItemId: line.pricebookItemId,
-								isTaxable: line.isTaxable,
-								taxRate: line.taxRate
-							}))
-						});
-					}
-
-					return tx.jobInvoice.findUnique({
-						where: { id: invoice.id },
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
-				});
-			};
-
-			const invoice = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createInvoice)).result
-				: await createInvoice();
+			// Fetch the created invoice with relations for the response
+			const invoice = await prisma.jobInvoice.findUnique({
+				where: { id: result.invoiceId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -469,32 +388,31 @@ export const invoiceRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT invoices');
 			}
 
-			const updateInvoice = async () => {
-				const discount = input.discount ?? Number(existing.discount);
-				const { subtotal, taxAmount, totalAmount } = recalculateInvoiceTotals(
-					existing.lines,
-					discount
-				);
-
-				return prisma.jobInvoice.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'UPDATE_INVOICE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
 					data: {
-						dueDate: input.dueDate === null ? null : input.dueDate ? new Date(input.dueDate) : existing.dueDate,
-						notes: input.notes ?? existing.notes,
-						terms: input.terms ?? existing.terms,
-						discount,
-						subtotal,
-						taxAmount,
-						totalAmount,
-						balanceDue: totalAmount - Number(existing.amountPaid)
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+						dueDate: input.dueDate,
+						notes: input.notes,
+						terms: input.terms,
+						discount: input.discount
+					}
+				},
+				input.idempotencyKey || `update-invoice-${input.id}-${Date.now()}`
+			);
 
-			const invoice = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateInvoice)).result
-				: await updateInvoice();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update invoice');
+			}
+
+			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -524,20 +442,26 @@ export const invoiceRouter = {
 				throw ApiException.badRequest('Can only send DRAFT invoices');
 			}
 
-			const sendInvoice = async () => {
-				return prisma.jobInvoice.update({
-					where: { id: input.id },
-					data: {
-						status: 'SENT',
-						sentAt: new Date()
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'SEND_INVOICE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const invoice = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, sendInvoice)).result
-				: await sendInvoice();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to send invoice');
+			}
+
+			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -612,64 +536,26 @@ export const invoiceRouter = {
 				throw ApiException.badRequest('Cannot record payment on this invoice');
 			}
 
-			const recordPayment = async () => {
-				const newAmountPaid = Number(existing.amountPaid) + input.amount;
-				const newBalanceDue = Number(existing.totalAmount) - newAmountPaid;
-				const isPaid = newBalanceDue <= 0;
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'RECORD_INVOICE_PAYMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: { amount: input.amount, paymentMethod: input.paymentMethod }
+				},
+				input.idempotencyKey
+			);
 
-				return prisma.$transaction(async (tx) => {
-					const invoice = await tx.jobInvoice.update({
-						where: { id: input.id },
-						data: {
-							amountPaid: newAmountPaid,
-							balanceDue: Math.max(0, newBalanceDue),
-							status: isPaid ? 'PAID' : 'PARTIAL',
-							paidAt: isPaid ? new Date() : null,
-							notes: input.notes
-								? `${existing.notes ?? ''}\nPayment: $${input.amount} via ${input.paymentMethod ?? 'unknown'}`.trim()
-								: existing.notes
-						},
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to record payment');
+			}
 
-					// Phase 15: Auto-transition job to PAID if fully paid and job is INVOICED
-					if (isPaid) {
-						const job = await tx.job.findUnique({ where: { id: existing.jobId } });
-						if (job && job.status === 'INVOICED') {
-							// Check if all invoices for this job are paid
-							const unpaidInvoices = await tx.jobInvoice.findFirst({
-								where: {
-									jobId: existing.jobId,
-									id: { not: input.id },
-									status: { notIn: ['PAID', 'VOID'] },
-									balanceDue: { gt: 0 }
-								}
-							});
-							if (!unpaidInvoices) {
-								await tx.job.update({
-									where: { id: existing.jobId },
-									data: { status: 'PAID', paidAt: new Date() }
-								});
-								await tx.jobStatusHistory.create({
-									data: {
-										jobId: existing.jobId,
-										fromStatus: 'INVOICED',
-										toStatus: 'PAID',
-										changedBy: context.user!.id,
-										notes: `Auto-transitioned: Invoice ${invoice.invoiceNumber} fully paid`
-									}
-								});
-							}
-						}
-					}
-
-					return invoice;
-				});
-			};
-
-			const invoice = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, recordPayment)).result
-				: await recordPayment();
+			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -699,22 +585,26 @@ export const invoiceRouter = {
 				throw ApiException.badRequest('Invoice is already void or refunded');
 			}
 
-			const voidInvoice = async () => {
-				return prisma.jobInvoice.update({
-					where: { id: input.id },
-					data: {
-						status: 'VOID',
-						notes: input.reason
-							? `${existing.notes ?? ''}\nVoided: ${input.reason}`.trim()
-							: existing.notes
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'VOID_INVOICE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const invoice = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, voidInvoice)).result
-				: await voidInvoice();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to void invoice');
+			}
+
+			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -744,15 +634,22 @@ export const invoiceRouter = {
 				throw ApiException.badRequest('Can only delete DRAFT invoices');
 			}
 
-			const deleteInvoice = async () => {
-				await prisma.jobInvoice.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startBillingWorkflow(
+				{
+					action: 'DELETE_INVOICE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteInvoice)).result
-				: await deleteInvoice();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete invoice');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

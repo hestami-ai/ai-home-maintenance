@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { PurchaseOrderStatus } from '../../../../../../generated/prisma/client.js';
+import { startPurchaseOrderWorkflow } from '../../../workflows/purchaseOrderWorkflow.js';
 
 const poLineOutput = z.object({
 	id: z.string(),
@@ -145,62 +146,33 @@ export const purchaseOrderRouter = {
 			});
 			if (!supplier) throw ApiException.notFound('Supplier');
 
-			const createPO = async () => {
-				const poNumber = await generatePONumber(context.organization!.id);
-
-				return prisma.$transaction(async (tx) => {
-					const linesWithTotals = (input.lines ?? []).map((line, idx) => ({
-						...line,
-						lineNumber: idx + 1,
-						lineTotal: line.quantity * line.unitCost
-					}));
-
-					const { subtotal, totalAmount } = recalculatePOTotals(
-						linesWithTotals,
-						input.taxAmount,
-						input.shippingCost
-					);
-
-					const po = await tx.purchaseOrder.create({
-						data: {
-							organizationId: context.organization!.id,
-							poNumber,
-							supplierId: input.supplierId,
-							expectedDate: input.expectedDate ? new Date(input.expectedDate) : null,
-							deliveryLocationId: input.deliveryLocationId,
-							subtotal,
-							taxAmount: input.taxAmount,
-							shippingCost: input.shippingCost,
-							totalAmount,
-							notes: input.notes,
-							createdBy: context.user!.id
-						}
-					});
-
-					if (linesWithTotals.length > 0) {
-						await tx.purchaseOrderLine.createMany({
-							data: linesWithTotals.map((line) => ({
-								purchaseOrderId: po.id,
-								lineNumber: line.lineNumber,
-								itemId: line.itemId,
-								description: line.description,
-								quantity: line.quantity,
-								unitCost: line.unitCost,
-								lineTotal: line.lineTotal
-							}))
-						});
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'CREATE_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					data: {
+						supplierId: input.supplierId,
+						expectedDate: input.expectedDate,
+						deliveryLocationId: input.deliveryLocationId,
+						taxAmount: input.taxAmount,
+						shippingCost: input.shippingCost,
+						notes: input.notes,
+						lines: input.lines
 					}
+				},
+				input.idempotencyKey
+			);
 
-					return tx.purchaseOrder.findUnique({
-						where: { id: po.id },
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create purchase order');
+			}
 
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createPO)).result
-				: await createPO();
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -317,13 +289,17 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Can only edit DRAFT or SUBMITTED purchase orders');
 			}
 
-			const updatePO = async () => {
-				const taxAmount = input.taxAmount ?? Number(existing.taxAmount);
-				const shippingCost = input.shippingCost ?? Number(existing.shippingCost);
-				const { subtotal, totalAmount } = recalculatePOTotals(existing.lines, taxAmount, shippingCost);
+			const taxAmount = input.taxAmount ?? Number(existing.taxAmount);
+			const shippingCost = input.shippingCost ?? Number(existing.shippingCost);
+			const { subtotal, totalAmount } = recalculatePOTotals(existing.lines, taxAmount, shippingCost);
 
-				return prisma.purchaseOrder.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'UPDATE_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.id,
 					data: {
 						expectedDate: input.expectedDate === null ? null : input.expectedDate ? new Date(input.expectedDate) : existing.expectedDate,
 						deliveryLocationId: input.deliveryLocationId === null ? null : input.deliveryLocationId ?? existing.deliveryLocationId,
@@ -333,14 +309,19 @@ export const purchaseOrderRouter = {
 						totalAmount,
 						notes: input.notes ?? existing.notes,
 						supplierNotes: input.supplierNotes ?? existing.supplierNotes
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+					}
+				},
+				input.idempotencyKey
+			);
 
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updatePO)).result
-				: await updatePO();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update purchase order');
+			}
+
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -378,37 +359,36 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Can only add lines to DRAFT purchase orders');
 			}
 
-			const addLine = async () => {
-				return prisma.$transaction(async (tx) => {
-					const lineNumber = existing.lines.length + 1;
-					const lineTotal = input.quantity * input.unitCost;
+			const lineNumber = existing.lines.length + 1;
+			const lineTotal = input.quantity * input.unitCost;
 
-					await tx.purchaseOrderLine.create({
-						data: {
-							purchaseOrderId: input.purchaseOrderId,
-							lineNumber,
-							itemId: input.itemId,
-							description: input.description,
-							quantity: input.quantity,
-							unitCost: input.unitCost,
-							lineTotal
-						}
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'ADD_LINE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.purchaseOrderId,
+					data: {
+						lineNumber,
+						itemId: input.itemId,
+						description: input.description,
+						quantity: input.quantity,
+						unitCost: input.unitCost,
+						lineTotal
+					}
+				},
+				input.idempotencyKey
+			);
 
-					const newSubtotal = Number(existing.subtotal) + lineTotal;
-					const newTotal = newSubtotal + Number(existing.taxAmount) + Number(existing.shippingCost);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add line');
+			}
 
-					return tx.purchaseOrder.update({
-						where: { id: input.purchaseOrderId },
-						data: { subtotal: newSubtotal, totalAmount: newTotal },
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
-				});
-			};
-
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, addLine)).result
-				: await addLine();
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -439,37 +419,27 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Can only remove lines from DRAFT purchase orders');
 			}
 
-			const removeLine = async () => {
-				return prisma.$transaction(async (tx) => {
-					await tx.purchaseOrderLine.delete({ where: { id: input.lineId } });
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'REMOVE_LINE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: line.purchaseOrderId,
+					lineId: input.lineId,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-					const newSubtotal = Number(line.purchaseOrder.subtotal) - Number(line.lineTotal);
-					const newTotal = newSubtotal + Number(line.purchaseOrder.taxAmount) + Number(line.purchaseOrder.shippingCost);
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to remove line');
+			}
 
-					// Renumber remaining lines
-					const remainingLines = await tx.purchaseOrderLine.findMany({
-						where: { purchaseOrderId: line.purchaseOrderId },
-						orderBy: { lineNumber: 'asc' }
-					});
-
-					for (let i = 0; i < remainingLines.length; i++) {
-						await tx.purchaseOrderLine.update({
-							where: { id: remainingLines[i].id },
-							data: { lineNumber: i + 1 }
-						});
-					}
-
-					return tx.purchaseOrder.update({
-						where: { id: line.purchaseOrderId },
-						data: { subtotal: newSubtotal, totalAmount: newTotal },
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
-				});
-			};
-
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, removeLine)).result
-				: await removeLine();
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -501,20 +471,26 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Cannot submit purchase order with no lines');
 			}
 
-			const submitPO = async () => {
-				return prisma.purchaseOrder.update({
-					where: { id: input.id },
-					data: {
-						status: 'SUBMITTED',
-						submittedAt: new Date()
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'SUBMIT_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, submitPO)).result
-				: await submitPO();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to submit purchase order');
+			}
+
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -541,20 +517,26 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Can only confirm SUBMITTED purchase orders');
 			}
 
-			const confirmPO = async () => {
-				return prisma.purchaseOrder.update({
-					where: { id: input.id },
-					data: {
-						status: 'CONFIRMED',
-						confirmedAt: new Date()
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'CONFIRM_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, confirmPO)).result
-				: await confirmPO();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to confirm purchase order');
+			}
+
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -605,112 +587,37 @@ export const purchaseOrderRouter = {
 			});
 			if (!location) throw ApiException.notFound('Location');
 
-			const receivePO = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Create receipt
-					const receiptCount = await tx.purchaseOrderReceipt.count({
-						where: { purchaseOrderId: input.id }
-					});
-					const receiptNumber = `${existing.poNumber}-R${receiptCount + 1}`;
-
-					const receipt = await tx.purchaseOrderReceipt.create({
-						data: {
-							purchaseOrderId: input.id,
-							receiptNumber,
-							receivedBy: context.user!.id,
-							locationId: input.locationId,
-							notes: input.notes
-						}
-					});
-
-					// Process each line
-					for (const recvLine of input.lines) {
-						const poLine = existing.lines.find((l) => l.id === recvLine.lineId);
-						if (!poLine) continue;
-
-						if (recvLine.quantityReceived > 0) {
-							// Create receipt line
-							await tx.purchaseOrderReceiptLine.create({
-								data: {
-									receiptId: receipt.id,
-									itemId: poLine.itemId,
-									quantityReceived: recvLine.quantityReceived,
-									lotNumber: recvLine.lotNumber,
-									serialNumber: recvLine.serialNumber,
-									expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : null
-								}
-							});
-
-							// Update PO line received quantity
-							await tx.purchaseOrderLine.update({
-								where: { id: recvLine.lineId },
-								data: { quantityReceived: poLine.quantityReceived + recvLine.quantityReceived }
-							});
-
-							// Add to inventory
-							let level = await tx.inventoryLevel.findFirst({
-								where: {
-									itemId: poLine.itemId,
-									locationId: input.locationId,
-									lotNumber: recvLine.lotNumber ?? null,
-									serialNumber: recvLine.serialNumber ?? null
-								}
-							});
-
-							if (level) {
-								await tx.inventoryLevel.update({
-									where: { id: level.id },
-									data: {
-										quantityOnHand: level.quantityOnHand + recvLine.quantityReceived,
-										quantityAvailable: level.quantityAvailable + recvLine.quantityReceived,
-										expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : level.expirationDate
-									}
-								});
-							} else {
-								await tx.inventoryLevel.create({
-									data: {
-										itemId: poLine.itemId,
-										locationId: input.locationId,
-										quantityOnHand: recvLine.quantityReceived,
-										quantityAvailable: recvLine.quantityReceived,
-										lotNumber: recvLine.lotNumber,
-										serialNumber: recvLine.serialNumber,
-										expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : null
-									}
-								});
-							}
-						}
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'RECEIVE_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.id,
+					data: {
+						poNumber: existing.poNumber,
+						locationId: input.locationId,
+						notes: input.notes,
+						existingLines: existing.lines.map((l) => ({
+							id: l.id,
+							itemId: l.itemId,
+							quantity: l.quantity,
+							quantityReceived: l.quantityReceived
+						})),
+						lines: input.lines
 					}
+				},
+				input.idempotencyKey
+			);
 
-					// Check if fully received
-					const updatedLines = await tx.purchaseOrderLine.findMany({
-						where: { purchaseOrderId: input.id }
-					});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to receive purchase order');
+			}
 
-					const fullyReceived = updatedLines.every((l) => l.quantityReceived >= l.quantity);
-					const partiallyReceived = updatedLines.some((l) => l.quantityReceived > 0);
-
-					let newStatus: PurchaseOrderStatus = existing.status as PurchaseOrderStatus;
-					if (fullyReceived) {
-						newStatus = 'RECEIVED';
-					} else if (partiallyReceived) {
-						newStatus = 'PARTIALLY_RECEIVED';
-					}
-
-					return tx.purchaseOrder.update({
-						where: { id: input.id },
-						data: {
-							status: newStatus,
-							receivedAt: fullyReceived ? new Date() : null
-						},
-						include: { lines: { orderBy: { lineNumber: 'asc' } } }
-					});
-				});
-			};
-
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, receivePO)).result
-				: await receivePO();
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -737,22 +644,26 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Cannot cancel received or already cancelled purchase order');
 			}
 
-			const cancelPO = async () => {
-				return prisma.purchaseOrder.update({
-					where: { id: input.id },
-					data: {
-						status: 'CANCELLED',
-						notes: input.reason
-							? `${existing.notes ?? ''}\nCancelled: ${input.reason}`.trim()
-							: existing.notes
-					},
-					include: { lines: { orderBy: { lineNumber: 'asc' } } }
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'CANCEL_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const po = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, cancelPO)).result
-				: await cancelPO();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cancel purchase order');
+			}
+
+			const po = await prisma.purchaseOrder.findUniqueOrThrow({
+				where: { id: result.entityId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -779,15 +690,22 @@ export const purchaseOrderRouter = {
 				throw ApiException.badRequest('Can only delete DRAFT purchase orders');
 			}
 
-			const deletePO = async () => {
-				await prisma.purchaseOrder.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startPurchaseOrderWorkflow(
+				{
+					action: 'DELETE_PO',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					purchaseOrderId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deletePO)).result
-				: await deletePO();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete purchase order');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

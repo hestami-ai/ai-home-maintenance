@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { TimeEntryType } from '../../../../../../generated/prisma/client.js';
+import { startTimeEntryWorkflow } from '../../../workflows/timeEntryWorkflow.js';
 
 const timeEntryOutput = z.object({
 	id: z.string(),
@@ -109,28 +110,34 @@ export const timeEntryRouter = {
 				throw ApiException.badRequest(`Already have an open ${input.entryType} time entry for this job`);
 			}
 
-			const createEntry = async () => {
-				return prisma.jobTimeEntry.create({
+			// Use DBOS workflow for durable execution
+			const result = await startTimeEntryWorkflow(
+				{
+					action: 'CREATE_ENTRY',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
-						organizationId: context.organization!.id,
 						jobId: input.jobId,
 						jobVisitId: input.jobVisitId,
 						technicianId: input.technicianId,
 						entryType: input.entryType,
-						startTime: input.startTime ? new Date(input.startTime) : new Date(),
+						startTime: input.startTime,
 						notes: input.notes,
 						isBillable: input.isBillable,
 						hourlyRate: input.hourlyRate,
-						localId: input.localId,
-						isSynced: !input.localId, // If has localId, it's from offline
-						syncedAt: input.localId ? new Date() : null
+						localId: input.localId
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const timeEntry = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createEntry)).result
-				: await createEntry();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create time entry');
+			}
+
+			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ timeEntry: formatTimeEntry(timeEntry) }, context);
 		}),
@@ -173,20 +180,29 @@ export const timeEntryRouter = {
 				(endTime.getTime() - existing.startTime.getTime()) / 60000
 			);
 
-			const stopEntry = async () => {
-				return prisma.jobTimeEntry.update({
-					where: { id: input.timeEntryId },
+			// Use DBOS workflow for durable execution
+			const result = await startTimeEntryWorkflow(
+				{
+					action: 'STOP_ENTRY',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entryId: input.timeEntryId,
 					data: {
-						endTime,
+						endTime: endTime.toISOString(),
 						durationMinutes,
 						notes: input.notes ?? existing.notes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const timeEntry = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, stopEntry)).result
-				: await stopEntry();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to stop time entry');
+			}
+
+			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ timeEntry: formatTimeEntry(timeEntry) }, context);
 		}),
@@ -368,35 +384,44 @@ export const timeEntryRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Time entry');
 
-			const updateEntry = async () => {
-				const startTime = input.startTime ? new Date(input.startTime) : existing.startTime;
-				const endTime =
-					input.endTime === null
-						? null
-						: input.endTime
-							? new Date(input.endTime)
-							: existing.endTime;
+			const startTime = input.startTime ? new Date(input.startTime) : existing.startTime;
+			const endTime =
+				input.endTime === null
+					? null
+					: input.endTime
+						? new Date(input.endTime)
+						: existing.endTime;
 
-				const durationMinutes = endTime
-					? Math.round((endTime.getTime() - startTime.getTime()) / 60000)
-					: null;
+			const durationMinutes = endTime
+				? Math.round((endTime.getTime() - startTime.getTime()) / 60000)
+				: null;
 
-				return prisma.jobTimeEntry.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startTimeEntryWorkflow(
+				{
+					action: 'UPDATE_ENTRY',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entryId: input.id,
 					data: {
-						startTime,
-						endTime,
+						startTime: startTime.toISOString(),
+						endTime: endTime?.toISOString() ?? null,
 						durationMinutes,
 						notes: input.notes !== undefined ? input.notes : existing.notes,
 						isBillable: input.isBillable ?? existing.isBillable,
 						hourlyRate: input.hourlyRate !== undefined ? input.hourlyRate : existing.hourlyRate
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const timeEntry = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateEntry)).result
-				: await updateEntry();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update time entry');
+			}
+
+			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ timeEntry: formatTimeEntry(timeEntry) }, context);
 		}),
@@ -422,15 +447,22 @@ export const timeEntryRouter = {
 			});
 			if (!existing) throw ApiException.notFound('Time entry');
 
-			const deleteEntry = async () => {
-				await prisma.jobTimeEntry.delete({ where: { id: input.id } });
-				return { deleted: true };
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startTimeEntryWorkflow(
+				{
+					action: 'DELETE_ENTRY',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					entryId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteEntry)).result
-				: await deleteEntry();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete time entry');
+			}
 
-			return successResponse(result, context);
+			return successResponse({ deleted: true }, context);
 		})
 };

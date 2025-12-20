@@ -4,6 +4,7 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startServiceAreaWorkflow } from '../../../workflows/serviceAreaWorkflow.js';
 
 const assertServiceProviderOrg = async (organizationId: string) => {
 	const org = await prisma.organization.findFirst({
@@ -45,10 +46,13 @@ export const serviceAreaRouter = {
 			await context.cerbos.authorize('create', 'service_area', 'new');
 			const org = await assertServiceProviderOrg(context.organization!.id);
 
-			const createArea = async () => {
-				return prisma.serviceArea.create({
+			// Use DBOS workflow for durable execution
+			const result = await startServiceAreaWorkflow(
+				{
+					action: 'CREATE_AREA',
+					organizationId: org.id,
+					userId: context.user!.id,
 					data: {
-						serviceProviderOrgId: org.id,
 						name: input.name,
 						zipCodes: input.zipCodes,
 						serviceCategories: input.serviceCategories,
@@ -56,12 +60,15 @@ export const serviceAreaRouter = {
 						centerLat: input.centerLat,
 						centerLng: input.centerLng
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const serviceArea = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createArea)).result
-				: await createArea();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create service area');
+			}
+
+			const serviceArea = await prisma.serviceArea.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({
 				serviceArea: {
@@ -148,14 +155,13 @@ export const serviceAreaRouter = {
 			await context.cerbos.authorize('edit', 'service_area', input.id);
 			const org = await assertServiceProviderOrg(context.organization!.id);
 
-			const updateArea = async () => {
-				const existing = await prisma.serviceArea.findFirst({
-					where: { id: input.id, serviceProviderOrgId: org.id }
-				});
-				if (!existing) throw ApiException.notFound('Service area');
-
-				return prisma.serviceArea.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startServiceAreaWorkflow(
+				{
+					action: 'UPDATE_AREA',
+					organizationId: org.id,
+					userId: context.user!.id,
+					serviceAreaId: input.id,
 					data: {
 						name: input.name,
 						zipCodes: input.zipCodes,
@@ -165,12 +171,15 @@ export const serviceAreaRouter = {
 						centerLng: input.centerLng,
 						isActive: input.isActive
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const serviceArea = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateArea)).result
-				: await updateArea();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update service area');
+			}
+
+			const serviceArea = await prisma.serviceArea.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({
 				serviceArea: {
@@ -198,19 +207,21 @@ export const serviceAreaRouter = {
 			await context.cerbos.authorize('delete', 'service_area', input.id);
 			const org = await assertServiceProviderOrg(context.organization!.id);
 
-			const deleteArea = async () => {
-				const existing = await prisma.serviceArea.findFirst({
-					where: { id: input.id, serviceProviderOrgId: org.id }
-				});
-				if (!existing) throw ApiException.notFound('Service area');
+			// Use DBOS workflow for durable execution
+			const result = await startServiceAreaWorkflow(
+				{
+					action: 'DELETE_AREA',
+					organizationId: org.id,
+					userId: context.user!.id,
+					serviceAreaId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				await prisma.serviceArea.delete({ where: { id: input.id } });
-				return true;
-			};
-
-			input.idempotencyKey
-				? await withIdempotency(input.idempotencyKey, context, deleteArea)
-				: await deleteArea();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete service area');
+			}
 
 			return successResponse({ deleted: true }, context);
 		})

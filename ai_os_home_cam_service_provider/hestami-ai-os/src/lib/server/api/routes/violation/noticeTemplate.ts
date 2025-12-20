@@ -4,6 +4,7 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { withIdempotency } from '../../middleware/idempotency.js';
+import { startNoticeTemplateWorkflow } from '../../../workflows/noticeTemplateWorkflow.js';
 
 const noticeTypeEnum = z.enum([
 	'WARNING', 'FIRST_NOTICE', 'SECOND_NOTICE', 'FINAL_NOTICE',
@@ -47,30 +48,29 @@ export const noticeTemplateRouter = {
 			await context.cerbos.authorize('create', 'notice_template', 'new');
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const createTemplate = async () => {
-				// Check for duplicate name
-				const existing = await prisma.noticeTemplate.findFirst({
-					where: { associationId: association.id, name: input.name }
-				});
-				if (existing) {
-					throw ApiException.conflict('Notice template with this name already exists');
-				}
-
-				return prisma.noticeTemplate.create({
+			// Use DBOS workflow for durable execution
+			const result = await startNoticeTemplateWorkflow(
+				{
+					action: 'CREATE_TEMPLATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
 					data: {
-						associationId: association.id,
 						name: input.name,
 						noticeType: input.noticeType,
 						subject: input.subject,
 						bodyTemplate: input.bodyTemplate,
 						defaultCurePeriodDays: input.defaultCurePeriodDays
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const template = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createTemplate)).result
-				: await createTemplate();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create notice template');
+			}
+
+			const template = await prisma.noticeTemplate.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({
 				template: {
@@ -204,24 +204,14 @@ export const noticeTemplateRouter = {
 			await context.cerbos.authorize('edit', 'notice_template', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const updateTemplate = async () => {
-				const existing = await prisma.noticeTemplate.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Notice template');
-
-				// Check for duplicate name if changing
-				if (input.name && input.name !== existing.name) {
-					const duplicate = await prisma.noticeTemplate.findFirst({
-						where: { associationId: association.id, name: input.name, id: { not: input.id } }
-					});
-					if (duplicate) {
-						throw ApiException.conflict('Notice template with this name already exists');
-					}
-				}
-
-				return prisma.noticeTemplate.update({
-					where: { id: input.id },
+			// Use DBOS workflow for durable execution
+			const result = await startNoticeTemplateWorkflow(
+				{
+					action: 'UPDATE_TEMPLATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					templateId: input.id,
 					data: {
 						name: input.name,
 						subject: input.subject,
@@ -229,12 +219,15 @@ export const noticeTemplateRouter = {
 						defaultCurePeriodDays: input.defaultCurePeriodDays,
 						isActive: input.isActive
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const template = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, updateTemplate)).result
-				: await updateTemplate();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to update notice template');
+			}
+
+			const template = await prisma.noticeTemplate.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({
 				template: {
@@ -262,33 +255,22 @@ export const noticeTemplateRouter = {
 			await context.cerbos.authorize('delete', 'notice_template', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id);
 
-			const deleteTemplate = async () => {
-				const existing = await prisma.noticeTemplate.findFirst({
-					where: { id: input.id, associationId: association.id }
-				});
-				if (!existing) throw ApiException.notFound('Notice template');
+			// Use DBOS workflow for durable execution
+			const result = await startNoticeTemplateWorkflow(
+				{
+					action: 'DELETE_TEMPLATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					templateId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-				// Check if template is used in any sequence
-				const usedInSequence = await prisma.noticeSequenceStep.findFirst({
-					where: { templateId: input.id }
-				});
-				if (usedInSequence) {
-					// Soft delete by deactivating
-					await prisma.noticeTemplate.update({
-						where: { id: input.id },
-						data: { isActive: false }
-					});
-					return { softDeleted: true };
-				}
-
-				// Hard delete if not used
-				await prisma.noticeTemplate.delete({ where: { id: input.id } });
-				return { softDeleted: false };
-			};
-
-			const result = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, deleteTemplate)).result
-				: await deleteTemplate();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to delete notice template');
+			}
 
 			return successResponse({ deleted: true }, context);
 		})

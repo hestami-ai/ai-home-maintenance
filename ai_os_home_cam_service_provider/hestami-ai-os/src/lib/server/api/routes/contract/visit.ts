@@ -12,6 +12,7 @@ import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ScheduledVisitStatus } from '../../../../../../generated/prisma/client.js';
+import { startVisitWorkflow } from '../../../workflows/visitWorkflow.js';
 
 const visitOutput = z.object({
 	id: z.string(),
@@ -94,30 +95,37 @@ export const scheduledVisitRouter = {
 			});
 			if (!contract) throw ApiException.notFound('Service contract');
 
-			const createVisit = async () => {
-				const maxVisit = await prisma.scheduledVisit.findFirst({
-					where: { contractId: input.contractId },
-					orderBy: { visitNumber: 'desc' }
-				});
+		const maxVisit = await prisma.scheduledVisit.findFirst({
+				where: { contractId: input.contractId },
+				orderBy: { visitNumber: 'desc' }
+			});
 
-				return prisma.scheduledVisit.create({
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'CREATE_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					data: {
 						contractId: input.contractId,
 						visitNumber: (maxVisit?.visitNumber ?? 0) + 1,
-						scheduledDate: new Date(input.scheduledDate),
-						scheduledStart: input.scheduledStart ? new Date(input.scheduledStart) : null,
-						scheduledEnd: input.scheduledEnd ? new Date(input.scheduledEnd) : null,
+						scheduledDate: input.scheduledDate,
+						scheduledStart: input.scheduledStart,
+						scheduledEnd: input.scheduledEnd,
 						technicianId: input.technicianId,
-						assignedAt: input.technicianId ? new Date() : null,
-						serviceNotes: input.serviceNotes,
-						customerNotes: input.customerNotes
+						notes: input.serviceNotes
 					}
-				});
-			};
+				},
+				input.idempotencyKey
+			);
 
-			const visit = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, createVisit)).result
-				: await createVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to create visit');
+			}
+
+			const visit = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(visit) }, context);
 		}),
@@ -245,19 +253,25 @@ export const scheduledVisitRouter = {
 			});
 			if (!tech) throw ApiException.notFound('Technician');
 
-			const assignVisit = async () => {
-				return prisma.scheduledVisit.update({
-					where: { id: input.id },
-					data: {
-						technicianId: input.technicianId,
-						assignedAt: new Date()
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'ASSIGN_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					visitId: input.id,
+					data: { technicianId: input.technicianId }
+				},
+				input.idempotencyKey
+			);
 
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, assignVisit)).result
-				: await assignVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to assign visit');
+			}
+
+			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),
@@ -287,19 +301,25 @@ export const scheduledVisitRouter = {
 				throw ApiException.badRequest('Can only confirm SCHEDULED visits');
 			}
 
-			const confirmVisit = async () => {
-				return prisma.scheduledVisit.update({
-					where: { id: input.id },
-					data: {
-						status: 'CONFIRMED',
-						confirmedAt: new Date()
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'CONFIRM_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					visitId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, confirmVisit)).result
-				: await confirmVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to confirm visit');
+			}
+
+			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),
@@ -329,19 +349,25 @@ export const scheduledVisitRouter = {
 				throw ApiException.badRequest('Can only start SCHEDULED or CONFIRMED visits');
 			}
 
-			const startVisit = async () => {
-				return prisma.scheduledVisit.update({
-					where: { id: input.id },
-					data: {
-						status: 'IN_PROGRESS',
-						actualStart: new Date()
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'START_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					visitId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, startVisit)).result
-				: await startVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to start visit');
+			}
+
+			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),
@@ -379,60 +405,25 @@ export const scheduledVisitRouter = {
 				throw ApiException.badRequest('Can only complete IN_PROGRESS visits');
 			}
 
-			const completeVisit = async () => {
-				return prisma.$transaction(async (tx) => {
-					let jobId = visit.jobId;
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'COMPLETE_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					visitId: input.id,
+					data: { completionNotes: input.completionNotes }
+				},
+				input.idempotencyKey
+			);
 
-					if (input.createJob && !jobId) {
-						// Generate job number
-						const year = new Date().getFullYear();
-						const count = await tx.job.count({
-							where: {
-								organizationId: context.organization!.id,
-								jobNumber: { startsWith: `JOB-${year}-` }
-							}
-						});
-						const jobNumber = `JOB-${year}-${String(count + 1).padStart(6, '0')}`;
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to complete visit');
+			}
 
-						const job = await tx.job.create({
-							data: {
-								organizationId: context.organization!.id,
-								jobNumber,
-								title: `Contract Visit #${visit.visitNumber}`,
-								description: visit.serviceNotes,
-								sourceType: 'RECURRING',
-								status: 'COMPLETED',
-								customerId: visit.contract.customerId,
-								associationId: visit.contract.associationId,
-								propertyId: visit.contract.propertyId,
-								unitId: visit.contract.unitId,
-								assignedTechnicianId: visit.technicianId,
-								scheduledStart: visit.scheduledStart,
-								scheduledEnd: visit.scheduledEnd,
-								startedAt: visit.actualStart,
-								completedAt: new Date(),
-								resolutionNotes: input.completionNotes
-							}
-						});
-						jobId = job.id;
-					}
-
-					return tx.scheduledVisit.update({
-						where: { id: input.id },
-						data: {
-							status: 'COMPLETED',
-							actualEnd: new Date(),
-							completedAt: new Date(),
-							completionNotes: input.completionNotes,
-							jobId
-						}
-					});
-				});
-			};
-
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, completeVisit)).result
-				: await completeVisit();
+			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),
@@ -462,21 +453,25 @@ export const scheduledVisitRouter = {
 				throw ApiException.badRequest('Cannot cancel completed or already cancelled visits');
 			}
 
-			const cancelVisit = async () => {
-				return prisma.scheduledVisit.update({
-					where: { id: input.id },
-					data: {
-						status: 'CANCELLED',
-						completionNotes: input.reason
-							? `Cancelled: ${input.reason}`
-							: visit.completionNotes
-					}
-				});
-			};
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'CANCEL_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					visitId: input.id,
+					data: { reason: input.reason }
+				},
+				input.idempotencyKey
+			);
 
-			const updated = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, cancelVisit)).result
-				: await cancelVisit();
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to cancel visit');
+			}
+
+			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),
@@ -516,43 +511,40 @@ export const scheduledVisitRouter = {
 				throw ApiException.badRequest('Can only reschedule SCHEDULED or CONFIRMED visits');
 			}
 
-			const rescheduleVisit = async () => {
-				return prisma.$transaction(async (tx) => {
-					// Mark original as rescheduled
-					await tx.scheduledVisit.update({
-						where: { id: input.id },
-						data: { status: 'RESCHEDULED' }
-					});
+			// Get next visit number
+			const maxVisit = await prisma.scheduledVisit.findFirst({
+				where: { contractId: visit.contractId },
+				orderBy: { visitNumber: 'desc' }
+			});
 
-					// Get next visit number
-					const maxVisit = await tx.scheduledVisit.findFirst({
-						where: { contractId: visit.contractId },
-						orderBy: { visitNumber: 'desc' }
-					});
+			// Use DBOS workflow for durable execution
+			const result = await startVisitWorkflow(
+				{
+					action: 'RESCHEDULE_VISIT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					visitId: input.id,
+					data: {
+						contractId: visit.contractId,
+						scheduleId: visit.scheduleId,
+						visitNumber: (maxVisit?.visitNumber ?? 0) + 1,
+						newScheduledDate: input.newDate,
+						newScheduledStart: input.newStart,
+						newScheduledEnd: input.newEnd,
+						technicianId: visit.technicianId,
+						reason: input.reason
+					}
+				},
+				input.idempotencyKey
+			);
 
-					// Create new visit
-					return tx.scheduledVisit.create({
-						data: {
-							contractId: visit.contractId,
-							scheduleId: visit.scheduleId,
-							visitNumber: (maxVisit?.visitNumber ?? 0) + 1,
-							scheduledDate: new Date(input.newDate),
-							scheduledStart: input.newStart ? new Date(input.newStart) : null,
-							scheduledEnd: input.newEnd ? new Date(input.newEnd) : null,
-							technicianId: visit.technicianId,
-							assignedAt: visit.technicianId ? new Date() : null,
-							serviceNotes: visit.serviceNotes,
-							customerNotes: visit.customerNotes,
-							rescheduledFrom: input.id,
-							rescheduleReason: input.reason
-						}
-					});
-				});
-			};
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to reschedule visit');
+			}
 
-			const newVisit = input.idempotencyKey
-				? (await withIdempotency(input.idempotencyKey, context, rescheduleVisit)).result
-				: await rescheduleVisit();
+			const newVisit = await prisma.scheduledVisit.findUniqueOrThrow({
+				where: { id: result.entityId }
+			});
 
 			return successResponse({ visit: formatVisit(newVisit) }, context);
 		}),

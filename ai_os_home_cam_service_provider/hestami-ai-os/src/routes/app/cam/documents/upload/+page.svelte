@@ -4,6 +4,7 @@
 	import { ArrowLeft, Upload, FileText, X, AlertTriangle, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
+	import { orpc } from '$lib/api';
 	import {
 		CAM_DOCUMENT_CATEGORIES,
 		CAM_CATEGORY_LABELS,
@@ -179,29 +180,29 @@
 		try {
 			const documentCategory = CAM_TO_PRIMARY_DOCUMENT_CATEGORY[sharedMetadata.category];
 
+			// Use oRPC's native file upload support
 			const uploadPromises = files.map(async (uploadedFile) => {
-				const formDataObj = new FormData();
-				formDataObj.append('file', uploadedFile.file);
-				formDataObj.append('associationId', $currentAssociation!.id);
-				formDataObj.append('title', uploadedFile.title);
-				formDataObj.append('description', uploadedFile.description);
-				formDataObj.append('category', documentCategory);
-				formDataObj.append('visibility', sharedMetadata.visibility);
-				formDataObj.append('effectiveDate', sharedMetadata.effectiveDate);
-				formDataObj.append('version', String(uploadedFile.version));
-				if (sharedMetadata.contextType) formDataObj.append('contextType', sharedMetadata.contextType);
-				if (sharedMetadata.contextId) formDataObj.append('contextId', sharedMetadata.contextId);
+				// Determine context - use provided context or default to ASSOCIATION
+				const contextType = sharedMetadata.contextType || 'ASSOCIATION';
+				const contextId = sharedMetadata.contextId || $currentAssociation!.id;
 
-				const response = await fetch('/api/document/upload', {
-					method: 'POST',
-					body: formDataObj
+				const result = await orpc.document.uploadWithFile({
+					idempotencyKey: crypto.randomUUID(),
+					file: uploadedFile.file,
+					contextType: contextType as any,
+					contextId,
+					title: uploadedFile.title,
+					description: uploadedFile.description || undefined,
+					category: documentCategory as any,
+					visibility: sharedMetadata.visibility as any,
+					effectiveDate: sharedMetadata.effectiveDate ? new Date(sharedMetadata.effectiveDate).toISOString() : undefined
 				});
 
-				if (!response.ok) {
+				if (!result.ok) {
 					throw new Error(`Failed to upload ${uploadedFile.file.name}`);
 				}
 
-				return response.json();
+				return result.data.document;
 			});
 
 			await Promise.all(uploadPromises);

@@ -28,7 +28,21 @@ if (isEnabled) {
 		traceExporter,
 		instrumentations: [
 			getNodeAutoInstrumentations({
-				'@opentelemetry/instrumentation-fs': { enabled: false }
+				'@opentelemetry/instrumentation-fs': { enabled: false },
+				// Ensure HTTP instrumentation captures incoming requests
+				'@opentelemetry/instrumentation-http': {
+					enabled: true,
+					ignoreIncomingRequestHook: (request) => {
+						// Ignore health checks and static assets
+						const url = request.url || '';
+						return url.includes('/_app/') || url.includes('/favicon') || url === '/health';
+					}
+				},
+				// Ensure pg instrumentation is enabled for database queries
+				'@opentelemetry/instrumentation-pg': {
+					enabled: true,
+					enhancedDatabaseReporting: true
+				}
 			})
 		]
 	});

@@ -1,0 +1,4404 @@
+{
+    "data": [
+        {
+            "traceID": "f06ad40f81ceb5abe92a993137ed70be",
+            "spans": [
+                {
+                    "traceID": "f06ad40f81ceb5abe92a993137ed70be",
+                    "spanID": "53ea6729a4034404",
+                    "operationName": "pg.query:\n hestami",
+                    "references": [],
+                    "startTime": 1766173441217000,
+                    "duration": 508,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "\n        SELECT workflow_uuid\n        FROM \"dbos\".workflow_status\n        WHERE status = $1\n          AND queue_name = $2\n          AND (application_version IS NULL OR application_version = $3)\n          \n        ORDER BY created_at ASC\n        \n        FOR UPDATE SKIP LOCKED\n      "
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 258
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 258
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "8fc5983a3140cb55817bea7fa3dfc427",
+            "spans": [
+                {
+                    "traceID": "8fc5983a3140cb55817bea7fa3dfc427",
+                    "spanID": "86d4b8b0142f3d4a",
+                    "operationName": "pg.query:COMMIT hestami",
+                    "references": [],
+                    "startTime": 1766173441217000,
+                    "duration": 275,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "COMMIT"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 258
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 258
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "88819f1474efb5caeef09025f593e91e",
+            "spans": [
+                {
+                    "traceID": "88819f1474efb5caeef09025f593e91e",
+                    "spanID": "1b8633351906a871",
+                    "operationName": "pg.query:BEGIN hestami",
+                    "references": [],
+                    "startTime": 1766173441216000,
+                    "duration": 416,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "BEGIN ISOLATION LEVEL REPEATABLE READ"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 258
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 258
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "65283c678f440693bb4ae8a23a7e161c",
+            "spans": [
+                {
+                    "traceID": "65283c678f440693bb4ae8a23a7e161c",
+                    "spanID": "f5349178a38a87e5",
+                    "operationName": "pg-pool.connect",
+                    "references": [],
+                    "startTime": 1766173441216000,
+                    "duration": 99,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.postgresql.idle.timeout.millis",
+                            "type": "int64",
+                            "value": 10000
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 258
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 258
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "e7ce81e7ec401be9c1a9d3941631a877",
+            "spans": [
+                {
+                    "traceID": "e7ce81e7ec401be9c1a9d3941631a877",
+                    "spanID": "eb2bee24ff35f8ff",
+                    "operationName": "pg.query:COMMIT hestami",
+                    "references": [],
+                    "startTime": 1766173441011000,
+                    "duration": 224,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "COMMIT"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 247
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 247
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "103dac7afb78f74092ff1cf36bdde204",
+            "spans": [
+                {
+                    "traceID": "103dac7afb78f74092ff1cf36bdde204",
+                    "spanID": "660c895b4b558f10",
+                    "operationName": "pg.query:\n hestami",
+                    "references": [],
+                    "startTime": 1766173441011000,
+                    "duration": 464,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "\n        SELECT workflow_uuid\n        FROM \"dbos\".workflow_status\n        WHERE status = $1\n          AND queue_name = $2\n          AND (application_version IS NULL OR application_version = $3)\n          \n        ORDER BY created_at ASC\n        \n        FOR UPDATE SKIP LOCKED\n      "
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 247
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 247
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "f76e602b22b3da5b6ef1fb76a51321d2",
+            "spans": [
+                {
+                    "traceID": "f76e602b22b3da5b6ef1fb76a51321d2",
+                    "spanID": "1af0998cf82b0a66",
+                    "operationName": "pg.query:BEGIN hestami",
+                    "references": [],
+                    "startTime": 1766173441010000,
+                    "duration": 324,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "BEGIN ISOLATION LEVEL REPEATABLE READ"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 247
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 247
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "a51a2fc52fed8c5f0d6f0c19d18b7be6",
+            "spans": [
+                {
+                    "traceID": "a51a2fc52fed8c5f0d6f0c19d18b7be6",
+                    "spanID": "cf385a8488b53302",
+                    "operationName": "pg-pool.connect",
+                    "references": [],
+                    "startTime": 1766173441010000,
+                    "duration": 87,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.postgresql.idle.timeout.millis",
+                            "type": "int64",
+                            "value": 10000
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 247
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 247
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "cb60cd79594cdc3403391f22930d6b92",
+            "spans": [
+                {
+                    "traceID": "cb60cd79594cdc3403391f22930d6b92",
+                    "spanID": "ffcf89c48805dae8",
+                    "operationName": "pg.query:COMMIT hestami",
+                    "references": [],
+                    "startTime": 1766173440992000,
+                    "duration": 308,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "COMMIT"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 147
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 147
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "bdc73008bbb695e11e3a0e3003ba3f4c",
+            "spans": [
+                {
+                    "traceID": "bdc73008bbb695e11e3a0e3003ba3f4c",
+                    "spanID": "4f36a937f6dc5b17",
+                    "operationName": "pg.query:\n hestami",
+                    "references": [],
+                    "startTime": 1766173440991000,
+                    "duration": 769,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "\n        SELECT workflow_uuid\n        FROM \"dbos\".workflow_status\n        WHERE status = $1\n          AND queue_name = $2\n          AND (application_version IS NULL OR application_version = $3)\n          \n        ORDER BY created_at ASC\n        \n        FOR UPDATE SKIP LOCKED\n      "
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 147
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 147
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "30171b33f53368f5e6af604732240043",
+            "spans": [
+                {
+                    "traceID": "30171b33f53368f5e6af604732240043",
+                    "spanID": "16293da5bf96f95c",
+                    "operationName": "pg.query:BEGIN hestami",
+                    "references": [],
+                    "startTime": 1766173440990000,
+                    "duration": 512,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "BEGIN ISOLATION LEVEL REPEATABLE READ"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 147
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 147
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "27422bb12ab9a044c347c59d07d801dc",
+            "spans": [
+                {
+                    "traceID": "27422bb12ab9a044c347c59d07d801dc",
+                    "spanID": "d04927f62fb9eaee",
+                    "operationName": "pg-pool.connect",
+                    "references": [],
+                    "startTime": 1766173440990000,
+                    "duration": 174,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.postgresql.idle.timeout.millis",
+                            "type": "int64",
+                            "value": 10000
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 147
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 147
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "d3312e84c00a024f32523c42c1f27e67",
+            "spans": [
+                {
+                    "traceID": "d3312e84c00a024f32523c42c1f27e67",
+                    "spanID": "a5a539e234c47385",
+                    "operationName": "pg.query:COMMIT hestami",
+                    "references": [],
+                    "startTime": 1766173440984000,
+                    "duration": 311,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "COMMIT"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 107
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 107
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "b89635539ab674c70751764a53c9679c",
+            "spans": [
+                {
+                    "traceID": "b89635539ab674c70751764a53c9679c",
+                    "spanID": "50e4003841c74107",
+                    "operationName": "pg.query:\n hestami",
+                    "references": [],
+                    "startTime": 1766173440983000,
+                    "duration": 759,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "\n        SELECT workflow_uuid\n        FROM \"dbos\".workflow_status\n        WHERE status = $1\n          AND queue_name = $2\n          AND (application_version IS NULL OR application_version = $3)\n          \n        ORDER BY created_at ASC\n        \n        FOR UPDATE SKIP LOCKED\n      "
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 107
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 107
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "698895fc38cf9cdfde283d1e92b592e8",
+            "spans": [
+                {
+                    "traceID": "698895fc38cf9cdfde283d1e92b592e8",
+                    "spanID": "a927f00a3e8558af",
+                    "operationName": "pg.query:BEGIN hestami",
+                    "references": [],
+                    "startTime": 1766173440983000,
+                    "duration": 481,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "BEGIN ISOLATION LEVEL REPEATABLE READ"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 107
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 107
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "067163bb0c4018182a9acc417032d0ad",
+            "spans": [
+                {
+                    "traceID": "067163bb0c4018182a9acc417032d0ad",
+                    "spanID": "dd806a11065188c4",
+                    "operationName": "pg-pool.connect",
+                    "references": [],
+                    "startTime": 1766173440982000,
+                    "duration": 135,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.postgresql.idle.timeout.millis",
+                            "type": "int64",
+                            "value": 10000
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 107
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 107
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "713e6dbb035fb5a6ac06a7bc6ac2478b",
+            "spans": [
+                {
+                    "traceID": "713e6dbb035fb5a6ac06a7bc6ac2478b",
+                    "spanID": "0d97708ea17c8705",
+                    "operationName": "pg.query:COMMIT hestami",
+                    "references": [],
+                    "startTime": 1766173440947000,
+                    "duration": 331,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "COMMIT"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 218
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 218
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "6f438919952c7cf8999bc6c75a4b22ad",
+            "spans": [
+                {
+                    "traceID": "6f438919952c7cf8999bc6c75a4b22ad",
+                    "spanID": "65ef44fd865139fb",
+                    "operationName": "pg.query:COMMIT hestami",
+                    "references": [],
+                    "startTime": 1766173440947000,
+                    "duration": 392,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "COMMIT"
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 125
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 125
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "555d2e607ae7a9ce64d01a962e14f060",
+            "spans": [
+                {
+                    "traceID": "555d2e607ae7a9ce64d01a962e14f060",
+                    "spanID": "adf8b10ac8cb9a54",
+                    "operationName": "pg.query:\n hestami",
+                    "references": [],
+                    "startTime": 1766173440947000,
+                    "duration": 659,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "\n        SELECT workflow_uuid\n        FROM \"dbos\".workflow_status\n        WHERE status = $1\n          AND queue_name = $2\n          AND (application_version IS NULL OR application_version = $3)\n          \n        ORDER BY created_at ASC\n        \n        FOR UPDATE SKIP LOCKED\n      "
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 218
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 218
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        },
+        {
+            "traceID": "e99b08fa4cb4769f0572d5401e67d0af",
+            "spans": [
+                {
+                    "traceID": "e99b08fa4cb4769f0572d5401e67d0af",
+                    "spanID": "7e3d3254eaba0437",
+                    "operationName": "pg.query:\n hestami",
+                    "references": [],
+                    "startTime": 1766173440946000,
+                    "duration": 718,
+                    "tags": [
+                        {
+                            "key": "db.connection_string",
+                            "type": "string",
+                            "value": "postgresql://postgres:5432/hestami"
+                        },
+                        {
+                            "key": "db.name",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "db.statement",
+                            "type": "string",
+                            "value": "\n        SELECT workflow_uuid\n        FROM \"dbos\".workflow_status\n        WHERE status = $1\n          AND queue_name = $2\n          AND (application_version IS NULL OR application_version = $3)\n          \n        ORDER BY created_at ASC\n        \n        FOR UPDATE SKIP LOCKED\n      "
+                        },
+                        {
+                            "key": "db.system",
+                            "type": "string",
+                            "value": "postgresql"
+                        },
+                        {
+                            "key": "db.user",
+                            "type": "string",
+                            "value": "hestami"
+                        },
+                        {
+                            "key": "internal.span.format",
+                            "type": "string",
+                            "value": "otlp"
+                        },
+                        {
+                            "key": "net.peer.name",
+                            "type": "string",
+                            "value": "postgres"
+                        },
+                        {
+                            "key": "net.peer.port",
+                            "type": "int64",
+                            "value": 5432
+                        },
+                        {
+                            "key": "span.kind",
+                            "type": "string",
+                            "value": "client"
+                        }
+                    ],
+                    "logs": [],
+                    "processID": "p1",
+                    "warnings": [],
+                    "process": {
+                        "serviceName": "hestami-ai-os",
+                        "tags": [
+                            {
+                                "key": "host.arch",
+                                "type": "string",
+                                "value": "amd64"
+                            },
+                            {
+                                "key": "host.name",
+                                "type": "string",
+                                "value": "f8f1dc4c4e94"
+                            },
+                            {
+                                "key": "otel.library.name",
+                                "type": "string",
+                                "value": "@opentelemetry/instrumentation-pg"
+                            },
+                            {
+                                "key": "otel.library.version",
+                                "type": "string",
+                                "value": "0.61.1"
+                            },
+                            {
+                                "key": "process.command",
+                                "type": "string",
+                                "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                            },
+                            {
+                                "key": "process.command_args",
+                                "type": "string",
+                                "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                            },
+                            {
+                                "key": "process.executable.name",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.executable.path",
+                                "type": "string",
+                                "value": "/usr/local/bin/node"
+                            },
+                            {
+                                "key": "process.owner",
+                                "type": "string",
+                                "value": "sveltekit"
+                            },
+                            {
+                                "key": "process.pid",
+                                "type": "int64",
+                                "value": 125
+                            },
+                            {
+                                "key": "process.runtime.description",
+                                "type": "string",
+                                "value": "Node.js"
+                            },
+                            {
+                                "key": "process.runtime.name",
+                                "type": "string",
+                                "value": "nodejs"
+                            },
+                            {
+                                "key": "process.runtime.version",
+                                "type": "string",
+                                "value": "22.21.1"
+                            },
+                            {
+                                "key": "service.version",
+                                "type": "string",
+                                "value": "0.0.1"
+                            }
+                        ]
+                    },
+                    "relativeStartTime": 0,
+                    "depth": 0,
+                    "hasChildren": false,
+                    "childSpanIds": []
+                }
+            ],
+            "processes": {
+                "p1": {
+                    "serviceName": "hestami-ai-os",
+                    "tags": [
+                        {
+                            "key": "host.arch",
+                            "type": "string",
+                            "value": "amd64"
+                        },
+                        {
+                            "key": "host.name",
+                            "type": "string",
+                            "value": "f8f1dc4c4e94"
+                        },
+                        {
+                            "key": "otel.library.name",
+                            "type": "string",
+                            "value": "@opentelemetry/instrumentation-pg"
+                        },
+                        {
+                            "key": "otel.library.version",
+                            "type": "string",
+                            "value": "0.61.1"
+                        },
+                        {
+                            "key": "process.command",
+                            "type": "string",
+                            "value": "/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js"
+                        },
+                        {
+                            "key": "process.command_args",
+                            "type": "string",
+                            "value": "[\"/usr/local/bin/node\",\"--require\",\"./telemetry.cjs\",\"/usr/local/lib/node_modules/pm2/lib/ProcessContainer.js\",\"ecosystem.config.cjs\"]"
+                        },
+                        {
+                            "key": "process.executable.name",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.executable.path",
+                            "type": "string",
+                            "value": "/usr/local/bin/node"
+                        },
+                        {
+                            "key": "process.owner",
+                            "type": "string",
+                            "value": "sveltekit"
+                        },
+                        {
+                            "key": "process.pid",
+                            "type": "int64",
+                            "value": 125
+                        },
+                        {
+                            "key": "process.runtime.description",
+                            "type": "string",
+                            "value": "Node.js"
+                        },
+                        {
+                            "key": "process.runtime.name",
+                            "type": "string",
+                            "value": "nodejs"
+                        },
+                        {
+                            "key": "process.runtime.version",
+                            "type": "string",
+                            "value": "22.21.1"
+                        },
+                        {
+                            "key": "service.version",
+                            "type": "string",
+                            "value": "0.0.1"
+                        }
+                    ]
+                }
+            },
+            "warnings": null
+        }
+    ]
+}

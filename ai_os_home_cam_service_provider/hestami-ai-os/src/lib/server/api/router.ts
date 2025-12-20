@@ -106,11 +106,13 @@ export const orgProcedure = authedProcedure.use(async ({ context, next }) => {
 	const organization = context.organization;
 	const role = context.role!;
 
-	// Build Cerbos principal from context
+	// Build Cerbos principal from context, including current org role
 	const principal = buildPrincipal(
 		user,
 		context.orgRoles,
-		organization.slug ?? undefined
+		organization.slug ?? undefined,
+		undefined, // vendorId
+		organization.id // currentOrgId - needed to add org role to principal
 	);
 
 	// Create Cerbos helper functions

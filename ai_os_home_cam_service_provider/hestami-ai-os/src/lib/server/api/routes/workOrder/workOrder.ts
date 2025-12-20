@@ -20,6 +20,11 @@ import {
 	getWorkOrderTransitionError,
 	type TransitionInput
 } from '../../../workflows/workOrderLifecycle.js';
+import {
+	startAddLineItemWorkflow,
+	startRemoveLineItemWorkflow
+} from '../../../workflows/workOrderLineItemWorkflow.js';
+import { startWorkOrderConfigWorkflow } from '../../../workflows/workOrderConfigWorkflow.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
 
 // Use shared enum schemas from schemas.ts
@@ -2055,22 +2060,33 @@ export const workOrderRouter = {
 				if (!template) throw ApiException.notFound('JobTemplate');
 			}
 
-			const result = await withIdempotency(input.idempotencyKey, context, async () =>
-				prisma.workOrder.update({
-					where: { id: input.workOrderId },
+			// Use DBOS workflow for durable execution
+			const result = await startWorkOrderConfigWorkflow(
+				{
+					action: 'SET_PRICEBOOK_OR_TEMPLATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					workOrderId: input.workOrderId,
 					data: {
-						pricebookVersionId: input.pricebookVersionId ?? wo.pricebookVersionId,
-						jobTemplateId: input.jobTemplateId ?? wo.jobTemplateId
+						pricebookVersionId: input.pricebookVersionId,
+						jobTemplateId: input.jobTemplateId
 					}
-				})
+				},
+				input.idempotencyKey
 			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to set pricebook/template');
+			}
+
+			const updatedWO = await prisma.workOrder.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
 					workOrder: {
-						id: result.result.id,
-						pricebookVersionId: result.result.pricebookVersionId,
-						jobTemplateId: result.result.jobTemplateId
+						id: updatedWO.id,
+						pricebookVersionId: updatedWO.pricebookVersionId,
+						jobTemplateId: updatedWO.jobTemplateId
 					}
 				},
 				context
@@ -2127,67 +2143,43 @@ export const workOrderRouter = {
 			});
 			if (!wo) throw ApiException.notFound('Work Order');
 
-			let unitPrice = input.unitPrice ?? 0;
-			let itemCode = input.itemCode ?? null;
-			let itemName = input.itemName ?? null;
-			let itemType = input.itemType ?? null;
-			let unitOfMeasure = input.unitOfMeasure ?? null;
-			let trade = input.trade ?? null;
-			const isCustom = !input.pricebookItemId;
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			const result = await startAddLineItemWorkflow(
+				{
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					workOrderId: input.workOrderId,
+					pricebookItemId: input.pricebookItemId,
+					quantity: input.quantity,
+					unitPrice: input.unitPrice,
+					notes: input.notes,
+					itemCode: input.itemCode,
+					itemName: input.itemName,
+					itemType: input.itemType,
+					unitOfMeasure: input.unitOfMeasure,
+					trade: input.trade
+				},
+				input.idempotencyKey
+			);
 
-			// If pricebook item provided, snapshot its data
-			if (input.pricebookItemId) {
-				const pbItem = await prisma.pricebookItem.findUnique({
-					where: { id: input.pricebookItemId }
-				});
-				if (!pbItem) throw ApiException.notFound('PricebookItem');
-
-				unitPrice = input.unitPrice ?? pbItem.basePrice.toNumber();
-				itemCode = pbItem.code;
-				itemName = pbItem.name;
-				itemType = pbItem.type;
-				unitOfMeasure = pbItem.unitOfMeasure;
-				trade = pbItem.trade;
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to add line item');
 			}
 
-			const total = unitPrice * input.quantity;
-
-			// Get next line number
-			const maxLine = await prisma.workOrderLineItem.aggregate({
-				where: { workOrderId: input.workOrderId },
-				_max: { lineNumber: true }
+			// Fetch the created line item for the response
+			const lineItem = await prisma.workOrderLineItem.findUniqueOrThrow({
+				where: { id: result.lineItemId }
 			});
-			const lineNumber = (maxLine._max?.lineNumber ?? 0) + 1;
-
-			const result = await withIdempotency(input.idempotencyKey, context, async () =>
-				prisma.workOrderLineItem.create({
-					data: {
-						workOrderId: input.workOrderId,
-						pricebookItemId: input.pricebookItemId ?? null,
-						quantity: input.quantity,
-						unitPrice,
-						total,
-						lineNumber,
-						notes: input.notes ?? null,
-						isCustom,
-						itemCode,
-						itemName,
-						itemType,
-						unitOfMeasure,
-						trade
-					}
-				})
-			);
 
 			return successResponse(
 				{
 					lineItem: {
-						id: result.result.id,
-						lineNumber: result.result.lineNumber,
-						itemName: result.result.itemName,
-						quantity: result.result.quantity.toString(),
-						unitPrice: result.result.unitPrice.toString(),
-						total: result.result.total.toString()
+						id: lineItem.id,
+						lineNumber: lineItem.lineNumber,
+						itemName: lineItem.itemName,
+						quantity: lineItem.quantity.toString(),
+						unitPrice: lineItem.unitPrice.toString(),
+						total: lineItem.total.toString()
 					}
 				},
 				context
@@ -2307,9 +2299,20 @@ export const workOrderRouter = {
 			});
 			if (!lineItem) throw ApiException.notFound('LineItem');
 
-			await withIdempotency(input.idempotencyKey, context, async () =>
-				prisma.workOrderLineItem.delete({ where: { id: input.lineItemId } })
+			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+			const result = await startRemoveLineItemWorkflow(
+				{
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					workOrderId: input.workOrderId,
+					lineItemId: input.lineItemId
+				},
+				input.idempotencyKey
 			);
+
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to remove line item');
+			}
 
 			return successResponse({ deleted: true }, context);
 		}),
@@ -2359,63 +2362,33 @@ export const workOrderRouter = {
 			});
 			if (!template) throw ApiException.notFound('JobTemplate');
 
-			const result = await withIdempotency(input.idempotencyKey, context, async () => {
-				// Optionally clear existing line items
-				if (input.clearExisting) {
-					await prisma.workOrderLineItem.deleteMany({ where: { workOrderId: input.workOrderId } });
-				}
-
-				// Get starting line number
-				const maxLine = await prisma.workOrderLineItem.aggregate({
-					where: { workOrderId: input.workOrderId },
-					_max: { lineNumber: true }
-				});
-				let lineNumber = input.clearExisting ? 1 : (maxLine._max?.lineNumber ?? 0) + 1;
-
-				// Create line items from template
-				const lineItemsData = template.items.map((ti) => {
-					const pbItem = ti.pricebookItem;
-					const unitPrice = pbItem.basePrice.toNumber();
-					const quantity = ti.quantity.toNumber();
-					const total = unitPrice * quantity;
-					const data = {
-						workOrderId: input.workOrderId,
-						pricebookItemId: ti.pricebookItemId,
-						quantity,
-						unitPrice,
-						total,
-						lineNumber: lineNumber++,
-						notes: ti.notes,
-						isCustom: false,
-						itemCode: pbItem.code,
-						itemName: pbItem.name,
-						itemType: pbItem.type,
-						unitOfMeasure: pbItem.unitOfMeasure,
-						trade: pbItem.trade
-					};
-					return data;
-				});
-
-				await prisma.workOrderLineItem.createMany({ data: lineItemsData });
-
-				// Update work order with template reference
-				const updatedWO = await prisma.workOrder.update({
-					where: { id: input.workOrderId },
+			// Use DBOS workflow for durable execution
+			const result = await startWorkOrderConfigWorkflow(
+				{
+					action: 'APPLY_JOB_TEMPLATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					workOrderId: input.workOrderId,
 					data: {
-						jobTemplateId: template.id,
-						pricebookVersionId: template.pricebookVersionId
+						jobTemplateId: input.jobTemplateId,
+						clearExisting: input.clearExisting
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return { addedCount: lineItemsData.length, workOrder: updatedWO };
-			});
+			if (!result.success) {
+				throw ApiException.internal(result.error || 'Failed to apply job template');
+			}
+
+			const updatedWO = await prisma.workOrder.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
-					addedCount: result.result.addedCount,
+					addedCount: result.addedCount ?? 0,
 					workOrder: {
-						id: result.result.workOrder.id,
-						jobTemplateId: result.result.workOrder.jobTemplateId!
+						id: updatedWO.id,
+						jobTemplateId: updatedWO.jobTemplateId!
 					}
 				},
 				context
