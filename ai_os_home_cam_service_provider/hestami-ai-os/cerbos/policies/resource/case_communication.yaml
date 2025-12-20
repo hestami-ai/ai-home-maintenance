@@ -4,7 +4,7 @@ resourcePolicy:
   version: default
   resource: case_communication
   importDerivedRoles:
-    - common
+    - common_roles
   rules:
     - actions: ["view", "create", "update"]
       effect: EFFECT_ALLOW

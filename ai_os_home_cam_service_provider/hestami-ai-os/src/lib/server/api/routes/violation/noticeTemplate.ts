@@ -3,7 +3,6 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import { startNoticeTemplateWorkflow } from '../../../workflows/noticeTemplateWorkflow.js';
 
 const noticeTypeEnum = z.enum([

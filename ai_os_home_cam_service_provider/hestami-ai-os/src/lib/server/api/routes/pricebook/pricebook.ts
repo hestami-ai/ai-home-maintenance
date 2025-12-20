@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ContractorTradeType, PricebookItemType, PricebookVersionStatus, PriceRuleType } from '../../../../../../generated/prisma/client.js';
@@ -714,72 +713,35 @@ export const pricebookRouter = {
 			}
 
 			const { id, idempotencyKey, items, pricebookVersionId: _versionId, ...data } = input;
-			const baseTemplateData = {
-				...data,
-				defaultTrade: data.defaultTrade ?? null,
-				defaultServiceAreaId: data.defaultServiceAreaId ?? null,
-				metadata: data.metadata ?? null
-			};
-			const result = await withIdempotency(idempotencyKey, context, async () => {
-				if (id) {
-					const existing = await prisma.jobTemplate.findFirst({
-						where: { id, organizationId: context.organization.id, pricebookVersionId: version.id },
-						include: { items: true }
-					});
-					if (!existing) throw ApiException.notFound('JobTemplate');
 
-					const updated = await prisma.jobTemplate.update({
-						where: { id },
-						data: {
-							...baseTemplateData,
-							items: items
-								? {
-										deleteMany: { jobTemplateId: id, id: { notIn: items.filter((i) => i.id).map((i) => i.id!) } },
-										upsert: items.map((i, idx) => ({
-											where: { id: i.id ?? '' },
-											create: {
-												pricebookItemId: i.pricebookItemId,
-												quantity: i.quantity,
-												lineNumber: i.lineNumber ?? idx + 1,
-												notes: i.notes ?? null
-											},
-											update: {
-												pricebookItemId: i.pricebookItemId,
-												quantity: i.quantity,
-												lineNumber: i.lineNumber ?? idx + 1,
-												notes: i.notes ?? null
-											}
-										}))
-									}
-								: undefined
-						},
-						include: { items: true }
-					});
-
-					return updated;
-				}
-
-				return prisma.jobTemplate.create({
+			const workflowResult = await startPricebookWorkflow(
+				{
+					action: 'UPSERT_TEMPLATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					versionId: version.id,
+					templateId: id,
 					data: {
-						organizationId: context.organization.id,
-						pricebookVersionId: version.id,
-						...baseTemplateData,
-						items: items
-							? {
-									create: items.map((i, idx) => ({
-										pricebookItemId: i.pricebookItemId,
-										quantity: i.quantity,
-										lineNumber: i.lineNumber ?? idx + 1,
-										notes: i.notes ?? null
-									}))
-								}
-							: undefined
-					},
-					include: { items: true }
-				});
+						...data,
+						defaultTrade: data.defaultTrade ?? null,
+						defaultServiceAreaId: data.defaultServiceAreaId ?? null,
+						metadata: data.metadata ?? null,
+						items
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to upsert job template');
+			}
+
+			const result = await prisma.jobTemplate.findUniqueOrThrow({
+				where: { id: workflowResult.entityId },
+				include: { items: true }
 			});
 
-			return successResponse({ jobTemplate: serializeJobTemplate(result.result) }, context);
+			return successResponse({ jobTemplate: serializeJobTemplate(result) }, context);
 		}),
 
 	listJobTemplates: orgProcedure

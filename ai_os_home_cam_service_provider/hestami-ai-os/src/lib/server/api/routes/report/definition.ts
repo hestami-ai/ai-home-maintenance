@@ -3,7 +3,6 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';
 
 const reportCategoryEnum = z.enum([

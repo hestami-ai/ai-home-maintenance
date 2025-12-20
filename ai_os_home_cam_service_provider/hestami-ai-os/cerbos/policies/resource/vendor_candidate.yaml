@@ -4,7 +4,7 @@ resourcePolicy:
   version: default
   resource: vendor_candidate
   importDerivedRoles:
-    - common
+    - common_roles
   rules:
     - actions: ["view", "create", "update", "update_status", "delete"]
       effect: EFFECT_ALLOW

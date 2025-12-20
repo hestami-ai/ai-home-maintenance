@@ -89,6 +89,8 @@
 		"nanoid": "^5.1.6",
 		"pg": "^8.16.3",
 		"swagger-ui-dist": "^5.31.0",
+		"winston": "^3.19.0",
+		"winston-transport": "^4.9.0",
 		"zod": "^4.1.13"
 	}
 }

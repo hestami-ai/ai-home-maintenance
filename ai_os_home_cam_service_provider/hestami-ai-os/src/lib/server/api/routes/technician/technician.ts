@@ -10,7 +10,6 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
 import { startTechnicianWorkflow } from '../../../workflows/technicianWorkflow.js';
 

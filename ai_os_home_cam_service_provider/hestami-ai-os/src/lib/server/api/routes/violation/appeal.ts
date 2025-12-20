@@ -3,7 +3,6 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import type { AppealStatus } from '../../../../../../generated/prisma/client.js';
 import { startAppealWorkflow } from '../../../workflows/appealWorkflow.js';
 

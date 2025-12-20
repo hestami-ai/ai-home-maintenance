@@ -3,7 +3,6 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordActivityFromContext } from '../../middleware/activityEvent.js';
 import { startDashboardWorkflow } from '../../../workflows/dashboardWorkflow.js';
 

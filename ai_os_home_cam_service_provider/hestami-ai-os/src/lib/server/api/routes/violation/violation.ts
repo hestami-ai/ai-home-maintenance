@@ -12,7 +12,6 @@ import {
 	HearingOutcomeSchema
 } from '../../schemas.js';
 import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
 import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';
 import { startViolationFineWorkflow } from '../../../workflows/violationFineWorkflow.js';
@@ -43,18 +42,6 @@ const assertStatusChangeAllowed = (current: ViolationStatus, next: ViolationStat
 	if (!allowedTransitions[current]?.includes(next)) {
 		throw ApiException.badRequest(`Status change from ${current} to ${next} is not allowed`);
 	}
-};
-
-const withRequiredIdempotency = async <T>(
-	idempotencyKey: string | undefined,
-	context: Parameters<typeof withIdempotency>[1],
-	operation: () => Promise<T>
-) => {
-	if (!idempotencyKey) {
-		throw ApiException.badRequest('Idempotency key is required for mutating operations');
-	}
-	const { result } = await withIdempotency(idempotencyKey, context, operation);
-	return result;
 };
 
 const getAssociationOrThrow = async (organizationId: string) => {

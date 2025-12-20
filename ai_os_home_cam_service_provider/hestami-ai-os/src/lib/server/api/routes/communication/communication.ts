@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
-import { withIdempotency } from '../../middleware/idempotency.js';
+import { startCommunicationWorkflow } from '../../../workflows/communicationWorkflow.js';
 import type {
 	CommunicationTemplateType,
 	CommunicationChannel,
@@ -21,7 +21,6 @@ import type {
 	DeliveryStatus,
 	Prisma
 } from '../../../../../../generated/prisma/client.js';
-import type { RequestContext } from '../../context.js';
 
 const templateTypeEnum = z.enum(['EMAIL', 'SMS', 'LETTER']);
 const channelEnum = z.enum(['EMAIL', 'SMS', 'LETTER']);
@@ -30,12 +29,6 @@ const announcementStatusEnum = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
 const eventTypeEnum = z.enum(['MEETING', 'MAINTENANCE', 'AMENITY_CLOSURE', 'OTHER']);
 const deliveryStatusEnum = z.enum(['PENDING', 'SENT', 'FAILED']);
 const notificationStatusEnum = z.enum(['PENDING', 'SENT', 'FAILED', 'CANCELLED']);
-
-const requireIdempotency = async <T>(key: string | undefined, ctx: RequestContext, fn: () => Promise<T>) => {
-	if (!key) throw ApiException.badRequest('Idempotency key is required');
-	const { result } = await withIdempotency(key, ctx, fn);
-	return result;
-};
 
 const ensureAssociation = async (associationId: string, organizationId: string) => {
 	const association = await prisma.association.findFirst({
@@ -83,22 +76,31 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'communication_template', input.associationId);
-			const { idempotencyKey, ...rest } = input;
+			await ensureAssociation(input.associationId, context.organization.id);
 
-			const template = await requireIdempotency(idempotencyKey, context, async () => {
-				await ensureAssociation(rest.associationId, context.organization.id);
-				return prisma.communicationTemplate.create({
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_TEMPLATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
-						associationId: rest.associationId,
-						name: rest.name,
-						type: rest.type as CommunicationTemplateType,
-						channel: rest.channel as CommunicationChannel,
-						subject: rest.subject,
-						body: rest.body,
-						variables: rest.variables as Prisma.InputJsonValue | undefined
+						associationId: input.associationId,
+						name: input.name,
+						type: input.type,
+						channel: input.channel,
+						subject: input.subject,
+						body: input.body,
+						variables: input.variables
 					}
-				});
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create template');
+			}
+
+			const template = await prisma.communicationTemplate.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -201,34 +203,37 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'communication_template', input.templateId);
-			const { idempotencyKey, ...rest } = input;
 
-			const version = await requireIdempotency(idempotencyKey, context, async () => {
-				const template = await prisma.communicationTemplate.findFirst({
-					where: { id: rest.templateId },
-					include: { association: true }
-				});
-				if (!template || template.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Template');
-				}
-
-				const existing = await prisma.communicationTemplateVersion.findFirst({
-					where: { templateId: rest.templateId, version: rest.version }
-				});
-				if (existing) return existing;
-
-				return prisma.communicationTemplateVersion.create({
-					data: {
-						templateId: rest.templateId,
-						version: rest.version,
-						subject: rest.subject,
-						body: rest.body,
-						variables: rest.variables as Prisma.InputJsonValue | undefined,
-						status: rest.status as TemplateVersionStatus,
-						createdBy: context.user?.id
-					}
-				});
+			const template = await prisma.communicationTemplate.findFirst({
+				where: { id: input.templateId },
+				include: { association: true }
 			});
+			if (!template || template.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Template');
+			}
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_TEMPLATE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						templateId: input.templateId,
+						version: input.version,
+						subject: input.subject,
+						body: input.body,
+						variables: input.variables,
+						status: input.status
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create template version');
+			}
+
+			const version = await prisma.communicationTemplateVersion.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -266,39 +271,38 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'communication_template', input.templateId);
-			const { idempotencyKey, ...rest } = input;
 
-			const template = await requireIdempotency(idempotencyKey, context, async () => {
-				const tpl = await prisma.communicationTemplate.findFirst({
-					where: { id: rest.templateId },
-					include: { association: true }
-				});
-				if (!tpl || tpl.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Template');
-				}
-
-				const targetVersion = await prisma.communicationTemplateVersion.findFirst({
-					where: { templateId: rest.templateId, version: rest.version }
-				});
-				if (!targetVersion) throw ApiException.notFound('Template version');
-
-				await prisma.communicationTemplateVersion.updateMany({
-					where: { templateId: rest.templateId, status: 'ACTIVE' },
-					data: { status: 'RETIRED' }
-				});
-
-				await prisma.communicationTemplateVersion.update({
-					where: { id: targetVersion.id },
-					data: { status: 'ACTIVE' }
-				});
-
-				const updatedTemplate = await prisma.communicationTemplate.update({
-					where: { id: rest.templateId },
-					data: { currentVersion: rest.version }
-				});
-
-				return updatedTemplate;
+			const tpl = await prisma.communicationTemplate.findFirst({
+				where: { id: input.templateId },
+				include: { association: true }
 			});
+			if (!tpl || tpl.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Template');
+			}
+
+			const targetVersion = await prisma.communicationTemplateVersion.findFirst({
+				where: { templateId: input.templateId, version: input.version }
+			});
+			if (!targetVersion) throw ApiException.notFound('Template version');
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'ACTIVATE_TEMPLATE_VERSION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						templateId: input.templateId,
+						version: input.version
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to activate template version');
+			}
+
+			const template = await prisma.communicationTemplate.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -343,30 +347,39 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'communication_mass', input.associationId);
-			const { idempotencyKey, ...rest } = input;
+			await ensureAssociation(input.associationId, context.organization.id);
 
-			const comm = await requireIdempotency(idempotencyKey, context, async () => {
-				await ensureAssociation(rest.associationId, context.organization.id);
-				if (rest.templateId) {
-					const template = await prisma.communicationTemplate.findFirst({
-						where: { id: rest.templateId, associationId: rest.associationId }
-					});
-					if (!template) throw ApiException.notFound('Template');
-				}
-				return prisma.massCommunication.create({
-					data: {
-						associationId: rest.associationId,
-						templateId: rest.templateId,
-						subject: rest.subject,
-						body: rest.body,
-						channel: rest.channel as CommunicationChannel,
-						status: rest.status as CommunicationStatus,
-						scheduledFor: rest.scheduledFor ? new Date(rest.scheduledFor) : undefined,
-						targetFilter: rest.targetFilter as Prisma.InputJsonValue | undefined,
-						createdBy: context.user?.id
-					}
+			if (input.templateId) {
+				const template = await prisma.communicationTemplate.findFirst({
+					where: { id: input.templateId, associationId: input.associationId }
 				});
-			});
+				if (!template) throw ApiException.notFound('Template');
+			}
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_MASS_COMMUNICATION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						associationId: input.associationId,
+						templateId: input.templateId,
+						subject: input.subject,
+						body: input.body,
+						channel: input.channel,
+						status: input.status,
+						scheduledFor: input.scheduledFor,
+						targetFilter: input.targetFilter
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create mass communication');
+			}
+
+			const comm = await prisma.massCommunication.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -477,28 +490,37 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('edit', 'communication_mass', input.massCommunicationId);
-			const { idempotencyKey, ...rest } = input;
 
-			const delivery = await requireIdempotency(idempotencyKey, context, async () => {
-				const comm = await prisma.massCommunication.findFirst({
-					where: { id: rest.massCommunicationId },
-					include: { association: true }
-				});
-				if (!comm || comm.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Mass communication');
-				}
-
-				return prisma.massCommunicationDelivery.create({
-					data: {
-						massCommunicationId: rest.massCommunicationId,
-						recipient: rest.recipient,
-						channel: rest.channel as CommunicationChannel,
-						status: rest.status as DeliveryStatus,
-						sentAt: rest.sentAt ? new Date(rest.sentAt) : undefined,
-						errorMessage: rest.errorMessage
-					}
-				});
+			const comm = await prisma.massCommunication.findFirst({
+				where: { id: input.massCommunicationId },
+				include: { association: true }
 			});
+			if (!comm || comm.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Mass communication');
+			}
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_DELIVERY_LOG',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						massCommunicationId: input.massCommunicationId,
+						recipient: input.recipient,
+						channel: input.channel,
+						status: input.status,
+						sentAt: input.sentAt,
+						errorMessage: input.errorMessage
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create delivery log');
+			}
+
+			const delivery = await prisma.massCommunicationDelivery.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -537,33 +559,39 @@ export const communicationRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const { idempotencyKey, ...rest } = input;
-
-			const delivery = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.massCommunicationDelivery.findFirst({
-					where: { id: rest.deliveryId },
-					include: { massCommunication: { include: { association: true } } }
-				});
-				if (
-					!existing ||
-					existing.massCommunication.association.organizationId !== context.organization.id
-				) {
-					throw ApiException.notFound('Delivery');
-				}
-
-				await context.cerbos.authorize('edit', 'communication_mass', existing.massCommunication.id);
-
-				const updated = await prisma.massCommunicationDelivery.update({
-					where: { id: rest.deliveryId },
-					data: {
-						status: rest.status as DeliveryStatus,
-						sentAt: rest.sentAt ? new Date(rest.sentAt) : existing.sentAt,
-						errorMessage: rest.errorMessage ?? existing.errorMessage
-					}
-				});
-
-				return updated;
+			const existing = await prisma.massCommunicationDelivery.findFirst({
+				where: { id: input.deliveryId },
+				include: { massCommunication: { include: { association: true } } }
 			});
+			if (
+				!existing ||
+				existing.massCommunication.association.organizationId !== context.organization.id
+			) {
+				throw ApiException.notFound('Delivery');
+			}
+
+			await context.cerbos.authorize('edit', 'communication_mass', existing.massCommunication.id);
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'UPDATE_DELIVERY_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: input.deliveryId,
+					data: {
+						status: input.status,
+						sentAt: input.sentAt,
+						errorMessage: input.errorMessage
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update delivery status');
+			}
+
+			const delivery = await prisma.massCommunicationDelivery.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -601,23 +629,31 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'communication_announcement', input.associationId);
-			const { idempotencyKey, ...rest } = input;
+			await ensureAssociation(input.associationId, context.organization.id);
 
-			const ann = await requireIdempotency(idempotencyKey, context, async () => {
-				await ensureAssociation(rest.associationId, context.organization.id);
-				return prisma.announcement.create({
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_ANNOUNCEMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
-						associationId: rest.associationId,
-						title: rest.title,
-						content: rest.content,
-						status: rest.status as AnnouncementStatus,
-						publishedAt: rest.publishedAt ? new Date(rest.publishedAt) : undefined,
-						expiresAt: rest.expiresAt ? new Date(rest.expiresAt) : undefined,
-						audience: rest.audience as Prisma.InputJsonValue | undefined,
-						createdBy: context.user?.id
+						associationId: input.associationId,
+						title: input.title,
+						content: input.content,
+						status: input.status,
+						publishedAt: input.publishedAt,
+						expiresAt: input.expiresAt,
+						audience: input.audience
 					}
-				});
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create announcement');
+			}
+
+			const ann = await prisma.announcement.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{ announcement: { id: ann.id, associationId: ann.associationId, status: ann.status } },
@@ -709,31 +745,35 @@ export const communicationRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const { idempotencyKey, ...rest } = input;
-			await context.cerbos.authorize('view', 'communication_announcement', rest.announcementId);
+			await context.cerbos.authorize('view', 'communication_announcement', input.announcementId);
 
-			const read = await requireIdempotency(idempotencyKey, context, async () => {
-				const ann = await prisma.announcement.findFirst({
-					where: { id: rest.announcementId },
-					include: { association: true }
-				});
-				if (!ann || ann.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Announcement');
-				}
-				await ensurePartyBelongs(rest.partyId, ann.association.organizationId);
-
-				const existing = await prisma.announcementRead.findFirst({
-					where: { announcementId: rest.announcementId, partyId: rest.partyId }
-				});
-				if (existing) return existing;
-
-				return prisma.announcementRead.create({
-					data: {
-						announcementId: rest.announcementId,
-						partyId: rest.partyId
-					}
-				});
+			const ann = await prisma.announcement.findFirst({
+				where: { id: input.announcementId },
+				include: { association: true }
 			});
+			if (!ann || ann.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Announcement');
+			}
+			await ensurePartyBelongs(input.partyId, ann.association.organizationId);
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'MARK_ANNOUNCEMENT_READ',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						announcementId: input.announcementId,
+						partyId: input.partyId
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to mark announcement read');
+			}
+
+			const read = await prisma.announcementRead.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -775,26 +815,34 @@ export const communicationRouter = {
 		)
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('create', 'communication_event', input.associationId);
-			const { idempotencyKey, ...rest } = input;
+			await ensureAssociation(input.associationId, context.organization.id);
 
-			const ev = await requireIdempotency(idempotencyKey, context, async () => {
-				await ensureAssociation(rest.associationId, context.organization.id);
-				return prisma.calendarEvent.create({
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_EVENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
-						associationId: rest.associationId,
-						type: rest.type as CalendarEventType,
-						title: rest.title,
-						description: rest.description,
-						startsAt: new Date(rest.startsAt),
-						endsAt: rest.endsAt ? new Date(rest.endsAt) : undefined,
-						location: rest.location,
-						recurrenceRule: rest.recurrenceRule,
-						notifyAt: rest.notifyAt ? new Date(rest.notifyAt) : undefined,
-						metadata: rest.metadata as Prisma.InputJsonValue | undefined,
-						createdBy: context.user?.id
+						associationId: input.associationId,
+						type: input.type,
+						title: input.title,
+						description: input.description,
+						startsAt: input.startsAt,
+						endsAt: input.endsAt,
+						location: input.location,
+						recurrenceRule: input.recurrenceRule,
+						notifyAt: input.notifyAt,
+						metadata: input.metadata
 					}
-				});
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create event');
+			}
+
+			const ev = await prisma.calendarEvent.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{ event: { id: ev.id, associationId: ev.associationId, type: ev.type } },
@@ -889,29 +937,37 @@ export const communicationRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const { idempotencyKey, ...rest } = input;
-			await context.cerbos.authorize('edit', 'communication_event', rest.eventId);
+			await context.cerbos.authorize('edit', 'communication_event', input.eventId);
 
-			const notification = await requireIdempotency(idempotencyKey, context, async () => {
-				const event = await prisma.calendarEvent.findFirst({
-					where: { id: rest.eventId },
-					include: { association: true }
-				});
-				if (!event || event.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Event');
-				}
+			const event = await prisma.calendarEvent.findFirst({
+				where: { id: input.eventId },
+				include: { association: true }
+			});
+			if (!event || event.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Event');
+			}
 
-				return prisma.calendarEventNotification.create({
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'CREATE_EVENT_NOTIFICATION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					data: {
 						associationId: event.associationId,
-						eventId: rest.eventId,
-						notifyAt: rest.notifyAt ? new Date(rest.notifyAt) : event.notifyAt ?? new Date(),
-						status: 'PENDING',
-						channel: rest.channel as CommunicationChannel | undefined,
-						payload: rest.payload as Prisma.InputJsonValue | undefined
+						eventId: input.eventId,
+						notifyAt: input.notifyAt || event.notifyAt?.toISOString() || new Date().toISOString(),
+						channel: input.channel,
+						payload: input.payload
 					}
-				});
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to create event notification');
+			}
+
+			const notification = await prisma.calendarEventNotification.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -951,27 +1007,35 @@ export const communicationRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			const { idempotencyKey, ...rest } = input;
-
-			const notif = await requireIdempotency(idempotencyKey, context, async () => {
-				const existing = await prisma.calendarEventNotification.findFirst({
-					where: { id: rest.notificationId },
-					include: { association: true, event: true }
-				});
-				if (!existing || existing.association.organizationId !== context.organization.id) {
-					throw ApiException.notFound('Notification');
-				}
-				await context.cerbos.authorize('edit', 'communication_event', existing.eventId);
-
-				return prisma.calendarEventNotification.update({
-					where: { id: rest.notificationId },
-					data: {
-						status: rest.status as NotificationStatus,
-						sentAt: rest.sentAt ? new Date(rest.sentAt) : existing.sentAt,
-						errorMessage: rest.errorMessage ?? existing.errorMessage
-					}
-				});
+			const existing = await prisma.calendarEventNotification.findFirst({
+				where: { id: input.notificationId },
+				include: { association: true, event: true }
 			});
+			if (!existing || existing.association.organizationId !== context.organization.id) {
+				throw ApiException.notFound('Notification');
+			}
+			await context.cerbos.authorize('edit', 'communication_event', existing.eventId);
+
+			const workflowResult = await startCommunicationWorkflow(
+				{
+					action: 'UPDATE_EVENT_NOTIFICATION_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: input.notificationId,
+					data: {
+						status: input.status,
+						sentAt: input.sentAt,
+						errorMessage: input.errorMessage
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw ApiException.internal(workflowResult.error || 'Failed to update notification status');
+			}
+
+			const notif = await prisma.calendarEventNotification.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
