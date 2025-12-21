@@ -7,20 +7,26 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { EstimateStatus } from '../../../../generated/prisma/client.js';
+import { EstimateStatus, type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('EstimateWorkflow');
 
 // Action types for the unified workflow
-export type EstimateAction =
-	| 'GENERATE_ESTIMATE'
-	| 'GENERATE_FROM_PRICEBOOK'
-	| 'UPDATE_ESTIMATE'
-	| 'ADD_LINE'
-	| 'REMOVE_LINE'
-	| 'SEND_ESTIMATE'
-	| 'ACCEPT_ESTIMATE'
-	| 'DECLINE_ESTIMATE'
-	| 'REVISE_ESTIMATE'
-	| 'DELETE_ESTIMATE';
+export const EstimateAction = {
+	GENERATE_ESTIMATE: 'GENERATE_ESTIMATE',
+	GENERATE_FROM_PRICEBOOK: 'GENERATE_FROM_PRICEBOOK',
+	UPDATE_ESTIMATE: 'UPDATE_ESTIMATE',
+	ADD_LINE: 'ADD_LINE',
+	REMOVE_LINE: 'REMOVE_LINE',
+	SEND_ESTIMATE: 'SEND_ESTIMATE',
+	ACCEPT_ESTIMATE: 'ACCEPT_ESTIMATE',
+	DECLINE_ESTIMATE: 'DECLINE_ESTIMATE',
+	REVISE_ESTIMATE: 'REVISE_ESTIMATE',
+	DELETE_ESTIMATE: 'DELETE_ESTIMATE'
+} as const;
+
+export type EstimateAction = (typeof EstimateAction)[keyof typeof EstimateAction];
 
 export interface EstimateWorkflowInput {
 	action: EstimateAction;
@@ -31,10 +37,8 @@ export interface EstimateWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface EstimateWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface EstimateWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

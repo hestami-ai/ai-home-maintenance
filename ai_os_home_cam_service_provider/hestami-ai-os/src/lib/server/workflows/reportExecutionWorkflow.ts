@@ -8,9 +8,18 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ReportFormat } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ReportExecutionWorkflow');
 
 // Action types for the unified workflow
-export type ReportExecutionAction = 'GENERATE_REPORT' | 'CANCEL_EXECUTION';
+export const ReportExecutionAction = {
+	GENERATE_REPORT: 'GENERATE_REPORT',
+	CANCEL_EXECUTION: 'CANCEL_EXECUTION'
+} as const;
+
+export type ReportExecutionAction = (typeof ReportExecutionAction)[keyof typeof ReportExecutionAction];
 
 export interface ReportExecutionWorkflowInput {
 	action: ReportExecutionAction;
@@ -21,10 +30,8 @@ export interface ReportExecutionWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ReportExecutionWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ReportExecutionWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

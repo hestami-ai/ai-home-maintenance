@@ -9,6 +9,9 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ContractorTradeType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('TechnicianWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'technician_status';
 const WORKFLOW_ERROR_EVENT = 'technician_error';

@@ -17,6 +17,9 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ARCRequestStatus } from '../../../../generated/prisma/client.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ARCReviewLifecycleWorkflow');
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'arc_status';

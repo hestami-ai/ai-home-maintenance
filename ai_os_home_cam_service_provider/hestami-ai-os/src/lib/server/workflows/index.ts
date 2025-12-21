@@ -592,6 +592,51 @@ export {
 	type ResolutionCloseoutWorkflowResult
 } from './resolutionCloseoutWorkflow.js';
 
+// Communication Workflow (P3.10)
+export {
+	communicationWorkflow_v1,
+	startCommunicationWorkflow,
+	type CommunicationWorkflowInput,
+	type CommunicationWorkflowResult,
+	type CommunicationAction
+} from './communicationWorkflow.js';
+
+// Document Workflow (P3.10)
+export {
+	documentWorkflow_v1,
+	startDocumentWorkflow,
+	type DocumentWorkflowInput,
+	type DocumentWorkflowResult,
+	type DocumentAction
+} from './documentWorkflow.js';
+
+// Owner Portal Workflow (P3.10)
+export {
+	ownerPortalWorkflow_v1,
+	startOwnerPortalWorkflow,
+	type OwnerPortalWorkflowInput,
+	type OwnerPortalWorkflowResult,
+	type OwnerPortalAction
+} from './ownerPortalWorkflow.js';
+
+// Motion Lifecycle (Phase 11)
+export {
+	motionLifecycle_v1,
+	startMotionTransition,
+	getMotionTransitionStatus,
+	type MotionTransitionInput,
+	type MotionTransitionResult
+} from './motionLifecycle.js';
+
+// Resolution Closeout (Phase 11) - different from resolutionCloseoutWorkflow
+export {
+	resolutionCloseout_v1,
+	startResolutionCloseout,
+	getResolutionCloseoutStatus,
+	type ResolutionCloseoutInput,
+	type ResolutionCloseoutResult
+} from './resolutionCloseout.js';
+
 // Future workflows:
 // - apPaymentProcessing_v1 (Phase 13)
 // - vendorAssignment_v1 (Phase 13)

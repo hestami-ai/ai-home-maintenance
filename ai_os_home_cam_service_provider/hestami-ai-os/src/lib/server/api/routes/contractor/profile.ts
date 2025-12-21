@@ -6,6 +6,9 @@ import { ApiException } from '../../errors.js';
 import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ContractorProfileRoute');
 
 const profileOutput = z.object({
 	id: z.string(),

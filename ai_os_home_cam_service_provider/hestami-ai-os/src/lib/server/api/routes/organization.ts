@@ -5,6 +5,9 @@ import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { recordActivityEvent, recordActivityFromContext } from '../middleware/activityEvent.js';
+import { createLogger, createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('OrganizationRoute');
 
 /**
  * Organization management procedures

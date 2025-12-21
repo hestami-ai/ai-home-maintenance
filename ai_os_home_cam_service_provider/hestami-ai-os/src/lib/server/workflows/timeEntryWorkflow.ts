@@ -7,13 +7,17 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type TimeEntryAction =
-	| 'CREATE_ENTRY'
-	| 'STOP_ENTRY'
-	| 'UPDATE_ENTRY'
-	| 'DELETE_ENTRY';
+export const TimeEntryAction = {
+	CREATE_ENTRY: 'CREATE_ENTRY',
+	STOP_ENTRY: 'STOP_ENTRY',
+	UPDATE_ENTRY: 'UPDATE_ENTRY',
+	DELETE_ENTRY: 'DELETE_ENTRY'
+} as const;
+
+export type TimeEntryAction = (typeof TimeEntryAction)[keyof typeof TimeEntryAction];
 
 export interface TimeEntryWorkflowInput {
 	action: TimeEntryAction;
@@ -23,10 +27,8 @@ export interface TimeEntryWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface TimeEntryWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface TimeEntryWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

@@ -1400,13 +1400,13 @@ enum DocumentCategory {
   ESTIMATE // Cost estimates
   INVOICE // Invoices, receipts
   WORK_ORDER // Work order documents
-  JOB_PHOTO // Before/after photos
-  JOB_VIDEO // Job videos
   VOICE_NOTE // Voice memos, transcriptions
   SIGNATURE // Digital signatures
   CHECKLIST // Completed checklists
 
   // === Cross-Pillar ===
+  PHOTO // Photos (property, job, case - context determines meaning)
+  VIDEO // Videos (property, job, case - context determines meaning)
   GENERAL // Other documents
 }
 

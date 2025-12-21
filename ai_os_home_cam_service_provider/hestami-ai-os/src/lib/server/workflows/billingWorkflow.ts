@@ -7,40 +7,47 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ProposalStatus, JobPaymentStatus, EstimateStatus, JobInvoiceStatus } from '../../../../generated/prisma/client.js';
+import { EstimateStatus, InvoiceStatus, type EntityWorkflowResult } from './schemas.js';
+import type { ProposalStatus, JobPaymentStatus, JobInvoiceStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('BillingWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'billing_status';
 const WORKFLOW_ERROR_EVENT = 'billing_error';
 
-type BillingAction =
+export const BillingAction = {
 	// Proposal actions
-	| 'CREATE_PROPOSAL'
-	| 'UPDATE_PROPOSAL'
-	| 'SEND_PROPOSAL'
-	| 'ACCEPT_PROPOSAL'
-	| 'DECLINE_PROPOSAL'
-	| 'DELETE_PROPOSAL'
+	CREATE_PROPOSAL: 'CREATE_PROPOSAL',
+	UPDATE_PROPOSAL: 'UPDATE_PROPOSAL',
+	SEND_PROPOSAL: 'SEND_PROPOSAL',
+	ACCEPT_PROPOSAL: 'ACCEPT_PROPOSAL',
+	DECLINE_PROPOSAL: 'DECLINE_PROPOSAL',
+	DELETE_PROPOSAL: 'DELETE_PROPOSAL',
 	// Payment actions
-	| 'CREATE_PAYMENT_INTENT'
-	| 'PROCESS_PAYMENT'
-	| 'MARK_PAYMENT_FAILED'
-	| 'REFUND_PAYMENT'
-	| 'CANCEL_PAYMENT'
+	CREATE_PAYMENT_INTENT: 'CREATE_PAYMENT_INTENT',
+	PROCESS_PAYMENT: 'PROCESS_PAYMENT',
+	MARK_PAYMENT_FAILED: 'MARK_PAYMENT_FAILED',
+	REFUND_PAYMENT: 'REFUND_PAYMENT',
+	CANCEL_PAYMENT: 'CANCEL_PAYMENT',
 	// Estimate actions
-	| 'UPDATE_ESTIMATE'
-	| 'ADD_ESTIMATE_LINE'
-	| 'REMOVE_ESTIMATE_LINE'
-	| 'SEND_ESTIMATE'
-	| 'ACCEPT_ESTIMATE'
-	| 'DECLINE_ESTIMATE'
+	UPDATE_ESTIMATE: 'UPDATE_ESTIMATE',
+	ADD_ESTIMATE_LINE: 'ADD_ESTIMATE_LINE',
+	REMOVE_ESTIMATE_LINE: 'REMOVE_ESTIMATE_LINE',
+	SEND_ESTIMATE: 'SEND_ESTIMATE',
+	ACCEPT_ESTIMATE: 'ACCEPT_ESTIMATE',
+	DECLINE_ESTIMATE: 'DECLINE_ESTIMATE',
 	// Invoice actions
-	| 'CREATE_INVOICE_FROM_ESTIMATE'
-	| 'UPDATE_INVOICE'
-	| 'SEND_INVOICE'
-	| 'RECORD_INVOICE_PAYMENT'
-	| 'VOID_INVOICE'
-	| 'DELETE_INVOICE';
+	CREATE_INVOICE_FROM_ESTIMATE: 'CREATE_INVOICE_FROM_ESTIMATE',
+	UPDATE_INVOICE: 'UPDATE_INVOICE',
+	SEND_INVOICE: 'SEND_INVOICE',
+	RECORD_INVOICE_PAYMENT: 'RECORD_INVOICE_PAYMENT',
+	VOID_INVOICE: 'VOID_INVOICE',
+	DELETE_INVOICE: 'DELETE_INVOICE'
+} as const;
+
+export type BillingAction = (typeof BillingAction)[keyof typeof BillingAction];
 
 interface BillingWorkflowInput {
 	action: BillingAction;
@@ -646,4 +653,4 @@ export async function startBillingWorkflow(
 	return handle.getResult();
 }
 
-export type { BillingWorkflowInput, BillingWorkflowResult, BillingAction };
+export type { BillingWorkflowInput, BillingWorkflowResult };

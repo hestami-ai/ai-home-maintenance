@@ -7,16 +7,23 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
 
-export type OwnerPortalAction =
-	| 'CREATE_OWNER_REQUEST'
-	| 'SUBMIT_OWNER_REQUEST'
-	| 'UPDATE_REQUEST_STATUS'
-	| 'LINK_WORK_ORDER'
-	| 'ADD_PAYMENT_METHOD'
-	| 'SET_DEFAULT_PAYMENT'
-	| 'CONFIGURE_AUTO_PAY'
-	| 'GRANT_DOCUMENT_ACCESS';
+const log = createWorkflowLogger('OwnerPortalWorkflow');
+
+export const OwnerPortalAction = {
+	CREATE_OWNER_REQUEST: 'CREATE_OWNER_REQUEST',
+	SUBMIT_OWNER_REQUEST: 'SUBMIT_OWNER_REQUEST',
+	UPDATE_REQUEST_STATUS: 'UPDATE_REQUEST_STATUS',
+	LINK_WORK_ORDER: 'LINK_WORK_ORDER',
+	ADD_PAYMENT_METHOD: 'ADD_PAYMENT_METHOD',
+	SET_DEFAULT_PAYMENT: 'SET_DEFAULT_PAYMENT',
+	CONFIGURE_AUTO_PAY: 'CONFIGURE_AUTO_PAY',
+	GRANT_DOCUMENT_ACCESS: 'GRANT_DOCUMENT_ACCESS'
+} as const;
+
+export type OwnerPortalAction = (typeof OwnerPortalAction)[keyof typeof OwnerPortalAction];
 
 export interface OwnerPortalWorkflowInput {
 	action: OwnerPortalAction;
@@ -26,10 +33,8 @@ export interface OwnerPortalWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface OwnerPortalWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface OwnerPortalWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 async function createOwnerRequest(

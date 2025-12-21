@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { recordActivityFromContext } from '../../middleware/activityEvent.js';
 import { startDashboardWorkflow } from '../../../workflows/dashboardWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('DashboardRoute');
 
 // =============================================================================
 // Dashboard DTO Schemas (Phase 12 - CAM UX #6)

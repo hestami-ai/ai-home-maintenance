@@ -7,9 +7,18 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('WorkOrderConfigWorkflow');
 
 // Action types for the unified workflow
-export type WorkOrderConfigAction = 'SET_PRICEBOOK_OR_TEMPLATE' | 'APPLY_JOB_TEMPLATE';
+export const WorkOrderConfigAction = {
+	SET_PRICEBOOK_OR_TEMPLATE: 'SET_PRICEBOOK_OR_TEMPLATE',
+	APPLY_JOB_TEMPLATE: 'APPLY_JOB_TEMPLATE'
+} as const;
+
+export type WorkOrderConfigAction = (typeof WorkOrderConfigAction)[keyof typeof WorkOrderConfigAction];
 
 export interface WorkOrderConfigWorkflowInput {
 	action: WorkOrderConfigAction;
@@ -19,11 +28,8 @@ export interface WorkOrderConfigWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface WorkOrderConfigWorkflowResult {
-	success: boolean;
-	entityId?: string;
+export interface WorkOrderConfigWorkflowResult extends EntityWorkflowResult {
 	addedCount?: number;
-	error?: string;
 }
 
 // Step functions for each operation

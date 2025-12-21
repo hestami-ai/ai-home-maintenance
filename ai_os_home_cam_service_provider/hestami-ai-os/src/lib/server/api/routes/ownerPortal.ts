@@ -8,6 +8,9 @@ import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { PaginationInputSchema, PaginationOutputSchema, IdempotencyKeySchema } from '../router.js';
 import { startOwnerPortalWorkflow } from '../../workflows/ownerPortalWorkflow.js';
 import type { RequestContext } from '../context.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('OwnerPortalRoute');
 
 const ContactPreferenceChannelEnum = z.enum(['EMAIL', 'SMS', 'PUSH', 'MAIL', 'PORTAL']);
 const NotificationCategoryEnum = z.enum([

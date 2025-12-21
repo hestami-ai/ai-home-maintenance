@@ -18,6 +18,9 @@ import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { createHash } from 'crypto';
+import { createLogger, createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('DocumentRoute');
 
 // Use shared enum schemas from schemas.ts
 const DocumentCategoryEnum = DocumentCategorySchema;
@@ -116,63 +119,95 @@ export const documentRouter = {
 			)
 		)
 		.handler(async ({ input, context }) => {
-			await context.cerbos.authorize('create', 'document', 'new');
+			const reqLog = createLogger(context).child({ handler: 'uploadWithFile' });
+			
+			reqLog.info('Document upload started', {
+				fileName: input.file.name,
+				fileSize: input.file.size,
+				mimeType: input.file.type,
+				category: input.category,
+				contextType: input.contextType,
+				contextId: input.contextId
+			});
 
-			// Save file to local storage first (non-idempotent file operation)
-			const { storagePath, fileUrl, checksum } = await saveFileToLocal(
-				input.file,
-				context.organization.id,
-				input.contextType,
-				input.contextId
-			);
+			try {
+				await context.cerbos.authorize('create', 'document', 'new');
+				reqLog.debug('Authorization passed for document creation');
 
-			// Use DBOS workflow for durable database execution
-			const workflowResult = await startDocumentWorkflow(
-				{
-					action: 'CREATE_DOCUMENT',
-					organizationId: context.organization.id,
-					userId: context.user.id,
-					data: {
-						title: input.title,
-						description: input.description,
-						category: input.category,
-						visibility: input.visibility ?? 'PUBLIC',
-						storagePath,
-						fileUrl,
-						fileName: input.file.name,
-						fileSize: input.file.size,
-						mimeType: input.file.type || 'application/octet-stream',
-						checksum,
-						contextType: input.contextType,
-						contextId: input.contextId
-					}
-				},
-				input.idempotencyKey
-			);
+				// Save file to local storage first (non-idempotent file operation)
+				reqLog.debug('Saving file to local storage');
+				const { storagePath, fileUrl, checksum } = await saveFileToLocal(
+					input.file,
+					context.organization.id,
+					input.contextType,
+					input.contextId
+				);
+				reqLog.debug('File saved to local storage', { storagePath, fileUrl });
 
-			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create document');
+				// Use DBOS workflow for durable database execution
+				reqLog.debug('Starting document workflow', { action: 'CREATE_DOCUMENT' });
+				const workflowResult = await startDocumentWorkflow(
+					{
+						action: 'CREATE_DOCUMENT',
+						organizationId: context.organization.id,
+						userId: context.user.id,
+						data: {
+							title: input.title,
+							description: input.description,
+							category: input.category,
+							visibility: input.visibility ?? 'PUBLIC',
+							storagePath,
+							fileUrl,
+							fileName: input.file.name,
+							fileSize: input.file.size,
+							mimeType: input.file.type || 'application/octet-stream',
+							checksum,
+							contextType: input.contextType,
+							contextId: input.contextId
+						}
+					},
+					input.idempotencyKey
+				);
+
+				if (!workflowResult.success) {
+					reqLog.error('Document workflow failed', { error: workflowResult.error });
+					throw ApiException.internal(workflowResult.error || 'Failed to create document');
+				}
+
+				reqLog.debug('Document workflow completed', { documentId: workflowResult.entityId });
+
+				const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+
+				reqLog.info('Document upload completed', {
+					documentId: document.id,
+					fileName: document.fileName,
+					version: document.version
+				});
+
+				return successResponse(
+					{
+						document: {
+							id: document.id,
+							title: document.title,
+							fileName: document.fileName,
+							fileSize: document.fileSize,
+							mimeType: document.mimeType,
+							category: document.category,
+							status: document.status,
+							version: document.version,
+							fileUrl: document.fileUrl,
+							createdAt: document.createdAt.toISOString()
+						}
+					},
+					context
+				);
+			} catch (error) {
+				reqLog.exception(error instanceof Error ? error : new Error(String(error)), {
+					fileName: input.file.name,
+					category: input.category
+				});
+				throw error;
 			}
-
-			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
-
-			return successResponse(
-				{
-					document: {
-						id: document.id,
-						title: document.title,
-						fileName: document.fileName,
-						fileSize: document.fileSize,
-						mimeType: document.mimeType,
-						category: document.category,
-						status: document.status,
-						version: document.version,
-						fileUrl: document.fileUrl,
-						createdAt: document.createdAt.toISOString()
-					}
-				},
-				context
-			);
 		}),
 
 	/**

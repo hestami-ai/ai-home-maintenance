@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../../accounting/index.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('GLAccountRoute');
 
 /**
  * GL Account management procedures

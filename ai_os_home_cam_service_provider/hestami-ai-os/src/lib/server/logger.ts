@@ -1,133 +1,314 @@
+/**
+ * Production-ready Winston logger with OpenTelemetry integration
+ * 
+ * Features:
+ * - Structured JSON logging for SigNoz ingestion
+ * - Automatic OpenTelemetry trace correlation (traceId, spanId)
+ * - Request context binding (userId, orgId, requestId)
+ * - Sensitive field redaction
+ * - Child logger factory for module-specific logging
+ * - Error serialization with stack traces
+ */
+
+import winston from 'winston';
+import { trace } from '@opentelemetry/api';
 import type { RequestContext } from './api/context.js';
 
-/**
- * Log levels
- */
+// Re-export types for consumers
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 /**
- * Structured log entry
+ * Fields that should be redacted from logs
  */
-export interface LogEntry {
-	level: LogLevel;
-	message: string;
-	timestamp: string;
+const SENSITIVE_FIELDS = new Set([
+	'password',
+	'token',
+	'secret',
+	'authorization',
+	'apiKey',
+	'accessToken',
+	'refreshToken',
+	'cookie',
+	'sessionId'
+]);
+
+/**
+ * Recursively redact sensitive fields from an object
+ */
+function redactSensitive(obj: unknown, depth = 0): unknown {
+	if (depth > 10) return '[MAX_DEPTH]';
+	if (obj === null || obj === undefined) return obj;
+	if (typeof obj !== 'object') return obj;
+
+	if (Array.isArray(obj)) {
+		return obj.map((item) => redactSensitive(item, depth + 1));
+	}
+
+	const result: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+		const lowerKey = key.toLowerCase();
+		if (SENSITIVE_FIELDS.has(lowerKey) || lowerKey.includes('password') || lowerKey.includes('secret')) {
+			result[key] = '[REDACTED]';
+		} else if (typeof value === 'object' && value !== null) {
+			result[key] = redactSensitive(value, depth + 1);
+		} else {
+			result[key] = value;
+		}
+	}
+	return result;
+}
+
+/**
+ * Serialize an error object for logging
+ */
+function serializeError(error: Error): Record<string, unknown> {
+	const serialized: Record<string, unknown> = {
+		name: error.name,
+		message: error.message,
+		stack: error.stack
+	};
+
+	// Include any additional properties on the error
+	for (const key of Object.keys(error)) {
+		if (!(key in serialized)) {
+			serialized[key] = (error as unknown as Record<string, unknown>)[key];
+		}
+	}
+
+	return serialized;
+}
+
+/**
+ * Get current OpenTelemetry trace context
+ */
+function getTraceContext(): { traceId: string | null; spanId: string | null } {
+	try {
+		const span = trace.getActiveSpan();
+		if (span) {
+			const spanContext = span.spanContext();
+			return {
+				traceId: spanContext.traceId,
+				spanId: spanContext.spanId
+			};
+		}
+	} catch {
+		// OpenTelemetry not available
+	}
+	return { traceId: null, spanId: null };
+}
+
+/**
+ * Custom format that adds trace context and service metadata
+ */
+const traceFormat = winston.format((info) => {
+	const traceContext = getTraceContext();
+	return {
+		...info,
+		service: process.env.OTEL_SERVICE_NAME || 'hestami-ai-os',
+		traceId: info.traceId || traceContext.traceId,
+		spanId: info.spanId || traceContext.spanId
+	};
+});
+
+/**
+ * Custom format that redacts sensitive fields
+ */
+const redactFormat = winston.format((info) => {
+	// Redact sensitive fields in the info object
+	if (info.meta && typeof info.meta === 'object') {
+		info.meta = redactSensitive(info.meta);
+	}
+	if (info.input && typeof info.input === 'object') {
+		info.input = redactSensitive(info.input);
+	}
+	if (info.data && typeof info.data === 'object') {
+		info.data = redactSensitive(info.data);
+	}
+	return info;
+});
+
+/**
+ * Determine log level from environment
+ */
+function getLogLevel(): string {
+	const envLevel = process.env.LOG_LEVEL?.toLowerCase();
+	if (envLevel && ['debug', 'info', 'warn', 'error'].includes(envLevel)) {
+		return envLevel;
+	}
+	return process.env.NODE_ENV === 'production' ? 'info' : 'debug';
+}
+
+/**
+ * Create the Winston logger instance
+ */
+const winstonLogger = winston.createLogger({
+	level: getLogLevel(),
+	format: winston.format.combine(
+		winston.format.timestamp(),
+		traceFormat(),
+		redactFormat(),
+		winston.format.errors({ stack: true }),
+		process.env.NODE_ENV === 'production'
+			? winston.format.json()
+			: winston.format.combine(
+					winston.format.colorize(),
+					winston.format.printf(({ level, message, timestamp, ...meta }) => {
+						const metaStr = Object.keys(meta).length > 0 
+							? ` ${JSON.stringify(meta, null, 2)}` 
+							: '';
+						return `${timestamp} [${level}] ${message}${metaStr}`;
+					})
+				)
+	),
+	transports: [new winston.transports.Console()],
+	// Don't exit on handled exceptions
+	exitOnError: false
+});
+
+/**
+ * Context for logging - can be RequestContext or partial context
+ */
+export interface LogContext {
 	requestId?: string;
 	traceId?: string | null;
 	spanId?: string | null;
-	organizationId?: string;
 	userId?: string;
+	userEmail?: string;
+	orgId?: string;
+	orgSlug?: string;
 	[key: string]: unknown;
 }
 
 /**
- * Current log level based on environment
+ * Extract logging context from RequestContext
  */
-const LOG_LEVEL: LogLevel = (process.env.LOG_LEVEL as LogLevel) || 
-	(process.env.NODE_ENV === 'production' ? 'info' : 'debug');
+function extractContext(context?: RequestContext | LogContext): LogContext {
+	if (!context) return {};
 
-const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = {
-	debug: 0,
-	info: 1,
-	warn: 2,
-	error: 3
-};
-
-/**
- * Check if a log level should be output
- */
-function shouldLog(level: LogLevel): boolean {
-	return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[LOG_LEVEL];
-}
-
-/**
- * Format and output a log entry
- */
-function output(entry: LogEntry): void {
-	if (!shouldLog(entry.level)) return;
-
-	const json = JSON.stringify(entry);
-	
-	switch (entry.level) {
-		case 'error':
-			console.error(json);
-			break;
-		case 'warn':
-			console.warn(json);
-			break;
-		default:
-			console.log(json);
+	// Check if it's a full RequestContext
+	if ('user' in context && 'organization' in context) {
+		const reqContext = context as RequestContext;
+		return {
+			requestId: reqContext.requestId,
+			traceId: reqContext.traceId,
+			spanId: reqContext.spanId,
+			userId: reqContext.user?.id,
+			userEmail: reqContext.user?.email,
+			orgId: reqContext.organization?.id,
+			orgSlug: reqContext.organization?.slug ?? undefined
+		};
 	}
+
+	// It's already a LogContext
+	return context as LogContext;
 }
 
 /**
- * Create a log entry with common fields
- */
-function createEntry(
-	level: LogLevel,
-	message: string,
-	context?: RequestContext,
-	extra?: Record<string, unknown>
-): LogEntry {
-	return {
-		level,
-		message,
-		timestamp: new Date().toISOString(),
-		requestId: context?.requestId,
-		traceId: context?.traceId,
-		spanId: context?.spanId,
-		organizationId: context?.organization?.id,
-		userId: context?.user?.id,
-		...extra
-	};
-}
-
-/**
- * Logger with context support
+ * Main logger interface
  */
 export const logger = {
-	debug(message: string, context?: RequestContext, extra?: Record<string, unknown>): void {
-		output(createEntry('debug', message, context, extra));
-	},
-
-	info(message: string, context?: RequestContext, extra?: Record<string, unknown>): void {
-		output(createEntry('info', message, context, extra));
-	},
-
-	warn(message: string, context?: RequestContext, extra?: Record<string, unknown>): void {
-		output(createEntry('warn', message, context, extra));
-	},
-
-	error(message: string, context?: RequestContext, extra?: Record<string, unknown>): void {
-		output(createEntry('error', message, context, extra));
+	/**
+	 * Log at debug level
+	 */
+	debug(message: string, context?: RequestContext | LogContext, meta?: Record<string, unknown>): void {
+		const ctx = extractContext(context);
+		winstonLogger.debug(message, { ...ctx, ...meta });
 	},
 
 	/**
-	 * Log an error with stack trace
+	 * Log at info level
 	 */
-	exception(error: Error, context?: RequestContext, extra?: Record<string, unknown>): void {
-		output(createEntry('error', error.message, context, {
-			...extra,
-			errorName: error.name,
-			stack: error.stack
-		}));
+	info(message: string, context?: RequestContext | LogContext, meta?: Record<string, unknown>): void {
+		const ctx = extractContext(context);
+		winstonLogger.info(message, { ...ctx, ...meta });
+	},
+
+	/**
+	 * Log at warn level
+	 */
+	warn(message: string, context?: RequestContext | LogContext, meta?: Record<string, unknown>): void {
+		const ctx = extractContext(context);
+		winstonLogger.warn(message, { ...ctx, ...meta });
+	},
+
+	/**
+	 * Log at error level
+	 */
+	error(message: string, context?: RequestContext | LogContext, meta?: Record<string, unknown>): void {
+		const ctx = extractContext(context);
+		winstonLogger.error(message, { ...ctx, ...meta });
+	},
+
+	/**
+	 * Log an error with full serialization
+	 */
+	exception(
+		error: Error,
+		context?: RequestContext | LogContext,
+		meta?: Record<string, unknown>
+	): void {
+		const ctx = extractContext(context);
+		winstonLogger.error(error.message, {
+			...ctx,
+			...meta,
+			error: serializeError(error)
+		});
+	},
+
+	/**
+	 * Get the underlying Winston logger for advanced use cases
+	 */
+	getWinstonLogger(): winston.Logger {
+		return winstonLogger;
 	}
 };
 
 /**
- * Create a child logger with bound context
+ * Child logger interface with bound context
  */
-export function createLogger(context: RequestContext) {
+export interface ChildLogger {
+	debug(message: string, meta?: Record<string, unknown>): void;
+	info(message: string, meta?: Record<string, unknown>): void;
+	warn(message: string, meta?: Record<string, unknown>): void;
+	error(message: string, meta?: Record<string, unknown>): void;
+	exception(error: Error, meta?: Record<string, unknown>): void;
+	child(additionalContext: LogContext): ChildLogger;
+}
+
+/**
+ * Create a child logger with bound context
+ * Useful for adding module/component context to all logs
+ * 
+ * @example
+ * const log = createLogger({ module: 'DocumentWorkflow' });
+ * log.info('Processing document', { documentId: '123' });
+ */
+export function createLogger(context: RequestContext | LogContext): ChildLogger {
+	const boundContext = extractContext(context);
+
 	return {
-		debug: (message: string, extra?: Record<string, unknown>) => 
-			logger.debug(message, context, extra),
-		info: (message: string, extra?: Record<string, unknown>) => 
-			logger.info(message, context, extra),
-		warn: (message: string, extra?: Record<string, unknown>) => 
-			logger.warn(message, context, extra),
-		error: (message: string, extra?: Record<string, unknown>) => 
-			logger.error(message, context, extra),
-		exception: (error: Error, extra?: Record<string, unknown>) => 
-			logger.exception(error, context, extra)
+		debug: (message: string, meta?: Record<string, unknown>) =>
+			logger.debug(message, boundContext, meta),
+		info: (message: string, meta?: Record<string, unknown>) =>
+			logger.info(message, boundContext, meta),
+		warn: (message: string, meta?: Record<string, unknown>) =>
+			logger.warn(message, boundContext, meta),
+		error: (message: string, meta?: Record<string, unknown>) =>
+			logger.error(message, boundContext, meta),
+		exception: (error: Error, meta?: Record<string, unknown>) =>
+			logger.exception(error, boundContext, meta),
+		child: (additionalContext: LogContext) =>
+			createLogger({ ...boundContext, ...additionalContext })
 	};
+}
+
+/**
+ * Create a module-specific logger
+ * 
+ * @example
+ * const log = createModuleLogger('oRPC');
+ * log.info('Request started', { path: '/api/v1/rpc/document/upload' });
+ */
+export function createModuleLogger(module: string): ChildLogger {
+	return createLogger({ module });
 }

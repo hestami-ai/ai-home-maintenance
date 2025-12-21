@@ -21,6 +21,9 @@ import type {
 	ActivityActorType,
 	ActivityEventCategory
 } from '../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('ActivityEventMiddleware');
 
 // =============================================================================
 // TYPED METADATA SCHEMAS

@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startContractorComplianceWorkflow } from '../../../workflows/contractorComplianceWorkflow.js';
 import { assertContractorOrg } from './utils.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ContractorComplianceRoute');
 
 const vendorApprovalEnum = z.enum(['PENDING', 'APPROVED', 'CONDITIONAL', 'SUSPENDED', 'REJECTED']);
 

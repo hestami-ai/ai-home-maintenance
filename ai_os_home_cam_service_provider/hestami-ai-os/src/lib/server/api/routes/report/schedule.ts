@@ -4,6 +4,9 @@ import { orgProcedure, successResponse, PaginationInputSchema } from '../../rout
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startReportScheduleWorkflow } from '../../../workflows/reportScheduleWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ReportScheduleRoute');
 
 const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 const scheduleFrequencyEnum = z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY', 'CUSTOM']);

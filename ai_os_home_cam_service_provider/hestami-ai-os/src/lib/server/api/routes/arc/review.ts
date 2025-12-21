@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startARCReviewWorkflow } from '../../../workflows/arcReviewWorkflow.js';
 import type { Prisma, ARCReviewAction, ARCRequestStatus } from '../../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ARCReviewRoute');
 
 const arcReviewActionEnum = z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']);
 const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];

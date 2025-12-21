@@ -5,6 +5,12 @@ import type { RequestHandler } from './$types';
 import { appRouter, createEmptyContext } from '$server/api';
 import { prisma } from '$server/db';
 import { auth } from '$server/auth';
+import {
+	createORPCLogContext,
+	logRequestStart,
+	logRequestEnd,
+	logRequestError
+} from '$server/api/middleware/logging';
 
 /**
  * oRPC handler for /api/v1/rpc/*
@@ -79,22 +85,47 @@ async function createContext(
  * Handle all HTTP methods for oRPC
  */
 const handleRequest: RequestHandler = async ({ request, locals }) => {
+	const startTime = Date.now();
+	let context = createEmptyContext(nanoid());
+	let logContext = createORPCLogContext(request, context);
+
 	try {
-		const context = await createContext(request, locals);
-		console.log('[oRPC] Request:', request.url, 'User:', context.user?.id ?? 'anonymous', 'Org:', context.organization?.slug ?? 'none');
+		context = await createContext(request, locals);
+		logContext = createORPCLogContext(request, context);
+		
+		logRequestStart(logContext);
 
 		const result = await handler.handle(request, {
 			prefix: '/api/v1/rpc',
 			context
 		});
 
+		const durationMs = Date.now() - startTime;
+
 		if (result.matched) {
+			const statusCode = result.response.status;
+			
+			// Log error responses with body for debugging
+			if (statusCode >= 400) {
+				const clonedResponse = result.response.clone();
+				try {
+					const body = await clonedResponse.json();
+					logRequestError(logContext, new Error(JSON.stringify(body)));
+				} catch {
+					// Non-JSON error response
+				}
+			}
+			
+			logRequestEnd(logContext, statusCode, durationMs);
 			return result.response;
 		}
 
+		logRequestEnd(logContext, 404, durationMs);
 		return new Response('Not Found', { status: 404 });
 	} catch (error) {
-		console.error('[oRPC] Unhandled error:', error);
+		const durationMs = Date.now() - startTime;
+		logRequestError(logContext, error);
+		logRequestEnd(logContext, 500, durationMs);
 		throw error;
 	}
 };

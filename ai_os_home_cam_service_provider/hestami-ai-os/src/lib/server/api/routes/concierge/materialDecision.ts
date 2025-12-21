@@ -12,6 +12,9 @@ import { ApiException } from '../../errors.js';
 import { DecisionCategorySchema } from '../../../../../../generated/zod/inputTypeSchemas/DecisionCategorySchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('MaterialDecisionRoute');
 
 /**
  * Material Decision management for Phase 3.9

@@ -7,13 +7,17 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type StockAction =
-	| 'ADJUST_STOCK'
-	| 'RESERVE_STOCK'
-	| 'RELEASE_STOCK'
-	| 'RECORD_COUNT';
+export const StockAction = {
+	ADJUST_STOCK: 'ADJUST_STOCK',
+	RESERVE_STOCK: 'RESERVE_STOCK',
+	RELEASE_STOCK: 'RELEASE_STOCK',
+	RECORD_COUNT: 'RECORD_COUNT'
+} as const;
+
+export type StockAction = (typeof StockAction)[keyof typeof StockAction];
 
 export interface StockWorkflowInput {
 	action: StockAction;
@@ -25,10 +29,8 @@ export interface StockWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface StockWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface StockWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

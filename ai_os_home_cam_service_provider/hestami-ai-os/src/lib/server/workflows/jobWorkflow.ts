@@ -7,22 +7,29 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { JobStatus, CheckpointType } from '../../../../generated/prisma/client.js';
+import { JobStatus, type EntityWorkflowResult } from './schemas.js';
+import type { CheckpointType } from '../../../../generated/prisma/client.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('JobWorkflow');
 
 // Action types for the unified workflow
-export type JobAction =
-	| 'UPDATE_JOB'
-	| 'TRANSITION_STATUS'
-	| 'ASSIGN_TECHNICIAN'
-	| 'SCHEDULE_JOB'
-	| 'ADD_NOTE'
-	| 'ADD_ATTACHMENT'
-	| 'DELETE_ATTACHMENT'
-	| 'ADD_CHECKPOINT'
-	| 'COMPLETE_CHECKPOINT'
-	| 'ADD_VISIT'
-	| 'UPDATE_VISIT'
-	| 'DELETE_JOB';
+export const JobAction = {
+	UPDATE_JOB: 'UPDATE_JOB',
+	TRANSITION_STATUS: 'TRANSITION_STATUS',
+	ASSIGN_TECHNICIAN: 'ASSIGN_TECHNICIAN',
+	SCHEDULE_JOB: 'SCHEDULE_JOB',
+	ADD_NOTE: 'ADD_NOTE',
+	ADD_ATTACHMENT: 'ADD_ATTACHMENT',
+	DELETE_ATTACHMENT: 'DELETE_ATTACHMENT',
+	ADD_CHECKPOINT: 'ADD_CHECKPOINT',
+	COMPLETE_CHECKPOINT: 'COMPLETE_CHECKPOINT',
+	ADD_VISIT: 'ADD_VISIT',
+	UPDATE_VISIT: 'UPDATE_VISIT',
+	DELETE_JOB: 'DELETE_JOB'
+} as const;
+
+export type JobAction = (typeof JobAction)[keyof typeof JobAction];
 
 export interface JobWorkflowInput {
 	action: JobAction;
@@ -33,10 +40,8 @@ export interface JobWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface JobWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface JobWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Helper to record workflow events - simplified logging for now

@@ -8,11 +8,29 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ConciergeCaseStatus, ConciergeCasePriority } from '../../../../generated/prisma/client.js';
+import {
+	ConciergeCaseStatus,
+	ConciergeCasePriority,
+	type LifecycleWorkflowResult
+} from './schemas.js';
 import { recordWorkflowEvent, recordWorkflowLifecycleEvent } from '../api/middleware/activityEvent.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 
 const WORKFLOW_STATUS_EVENT = 'case_lifecycle_status';
 const WORKFLOW_ERROR_EVENT = 'case_lifecycle_error';
+
+// Action types for case lifecycle operations
+export const CaseLifecycleAction = {
+	CREATE_CASE: 'CREATE_CASE',
+	CONVERT_INTENT: 'CONVERT_INTENT',
+	TRANSITION_STATUS: 'TRANSITION_STATUS',
+	ASSIGN_CONCIERGE: 'ASSIGN_CONCIERGE',
+	RESOLVE_CASE: 'RESOLVE_CASE',
+	CLOSE_CASE: 'CLOSE_CASE',
+	CANCEL_CASE: 'CANCEL_CASE'
+} as const;
+
+export type CaseLifecycleAction = (typeof CaseLifecycleAction)[keyof typeof CaseLifecycleAction];
 
 interface AvailabilitySlot {
 	startTime: string;
@@ -20,15 +38,8 @@ interface AvailabilitySlot {
 	notes?: string;
 }
 
-interface CaseLifecycleWorkflowInput {
-	action:
-		| 'CREATE_CASE'
-		| 'CONVERT_INTENT'
-		| 'TRANSITION_STATUS'
-		| 'ASSIGN_CONCIERGE'
-		| 'RESOLVE_CASE'
-		| 'CLOSE_CASE'
-		| 'CANCEL_CASE';
+export interface CaseLifecycleWorkflowInput {
+	action: CaseLifecycleAction;
 	organizationId: string;
 	userId: string;
 	caseId?: string;
@@ -48,14 +59,10 @@ interface CaseLifecycleWorkflowInput {
 	availabilitySlots?: AvailabilitySlot[];
 }
 
-interface CaseLifecycleWorkflowResult {
-	success: boolean;
-	action: string;
-	timestamp: string;
+export interface CaseLifecycleWorkflowResult extends LifecycleWorkflowResult {
 	caseId?: string;
 	caseNumber?: string;
 	status?: string;
-	error?: string;
 }
 
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -517,14 +524,25 @@ async function cancelCase(
 }
 
 async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise<CaseLifecycleWorkflowResult> {
+	const log = createWorkflowLogger('CaseLifecycleWorkflow', undefined, input.action);
+	const startTime = logWorkflowStart(log, input.action, {
+		organizationId: input.organizationId,
+		userId: input.userId,
+		caseId: input.caseId,
+		intentId: input.intentId
+	});
+
 	try {
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
 			case 'CREATE_CASE': {
 				if (!input.propertyId || !input.title || !input.description) {
-					throw new Error('Missing required fields for CREATE_CASE');
+					const error = new Error('Missing required fields for CREATE_CASE');
+					logStepError(log, 'validation', error, { propertyId: input.propertyId, title: input.title });
+					throw error;
 				}
+				log.debug('Step: createCase starting', { propertyId: input.propertyId, priority: input.priority });
 				const result = await DBOS.runStep(
 					() =>
 						createCase(
@@ -542,8 +560,9 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 						),
 					{ name: 'createCase' }
 				);
+				log.info('Step: createCase completed', { caseId: result.id, caseNumber: result.caseNumber });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_created', ...result });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
@@ -551,18 +570,24 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 					caseNumber: result.caseNumber,
 					status: result.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
 			case 'CONVERT_INTENT': {
 				if (!input.intentId) {
-					throw new Error('Missing intentId for CONVERT_INTENT');
+					const error = new Error('Missing intentId for CONVERT_INTENT');
+					logStepError(log, 'validation', error, { intentId: input.intentId });
+					throw error;
 				}
+				log.debug('Step: convertIntentToCase starting', { intentId: input.intentId });
 				const result = await DBOS.runStep(
 					() => convertIntentToCase(input.intentId!, input.userId),
 					{ name: 'convertIntentToCase' }
 				);
+				log.info('Step: convertIntentToCase completed', { caseId: result.id, caseNumber: result.caseNumber });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'intent_converted', ...result });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
@@ -570,114 +595,162 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 					caseNumber: result.caseNumber,
 					status: result.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
 			case 'TRANSITION_STATUS': {
 				if (!input.caseId || !input.targetStatus) {
-					throw new Error('Missing caseId or targetStatus for TRANSITION_STATUS');
+					const error = new Error('Missing caseId or targetStatus for TRANSITION_STATUS');
+					logStepError(log, 'validation', error, { caseId: input.caseId, targetStatus: input.targetStatus });
+					throw error;
 				}
+				log.debug('Step: transitionStatus starting', { caseId: input.caseId, targetStatus: input.targetStatus });
 				const result = await DBOS.runStep(
 					() =>
 						transitionStatus(input.caseId!, input.targetStatus!, input.userId, input.statusChangeReason),
 					{ name: 'transitionStatus' }
 				);
+				log.info('Step: transitionStatus completed', { caseId: input.caseId, newStatus: result.status });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'status_transitioned', ...result });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
 					status: result.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
 			case 'ASSIGN_CONCIERGE': {
 				if (!input.caseId || !input.assigneeUserId) {
-					throw new Error('Missing caseId or assigneeUserId for ASSIGN_CONCIERGE');
+					const error = new Error('Missing caseId or assigneeUserId for ASSIGN_CONCIERGE');
+					logStepError(log, 'validation', error, { caseId: input.caseId, assigneeUserId: input.assigneeUserId });
+					throw error;
 				}
+				log.debug('Step: assignConcierge starting', { caseId: input.caseId, assigneeUserId: input.assigneeUserId });
 				await DBOS.runStep(
 					() => assignConcierge(input.caseId!, input.assigneeUserId!, input.userId),
 					{ name: 'assignConcierge' }
 				);
+				log.info('Step: assignConcierge completed', { caseId: input.caseId, assigneeUserId: input.assigneeUserId });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'concierge_assigned' });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
 			case 'RESOLVE_CASE': {
 				if (!input.caseId || !input.resolutionSummary) {
-					throw new Error('Missing caseId or resolutionSummary for RESOLVE_CASE');
+					const error = new Error('Missing caseId or resolutionSummary for RESOLVE_CASE');
+					logStepError(log, 'validation', error, { caseId: input.caseId });
+					throw error;
 				}
+				log.debug('Step: resolveCase starting', { caseId: input.caseId });
 				const result = await DBOS.runStep(
 					() => resolveCase(input.caseId!, input.resolutionSummary!, input.userId),
 					{ name: 'resolveCase' }
 				);
+				log.info('Step: resolveCase completed', { caseId: input.caseId, status: result.status });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_resolved', ...result });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
 					status: result.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
 			case 'CLOSE_CASE': {
 				if (!input.caseId) {
-					throw new Error('Missing caseId for CLOSE_CASE');
+					const error = new Error('Missing caseId for CLOSE_CASE');
+					logStepError(log, 'validation', error, { caseId: input.caseId });
+					throw error;
 				}
+				log.debug('Step: closeCase starting', { caseId: input.caseId });
 				const result = await DBOS.runStep(() => closeCase(input.caseId!, input.userId), {
 					name: 'closeCase'
 				});
+				log.info('Step: closeCase completed', { caseId: input.caseId, status: result.status });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_closed', ...result });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
 					status: result.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
 			case 'CANCEL_CASE': {
 				if (!input.caseId || !input.cancelReason) {
-					throw new Error('Missing caseId or cancelReason for CANCEL_CASE');
+					const error = new Error('Missing caseId or cancelReason for CANCEL_CASE');
+					logStepError(log, 'validation', error, { caseId: input.caseId });
+					throw error;
 				}
+				log.debug('Step: cancelCase starting', { caseId: input.caseId, reason: input.cancelReason });
 				const result = await DBOS.runStep(
 					() => cancelCase(input.caseId!, input.cancelReason!, input.userId),
 					{ name: 'cancelCase' }
 				);
+				log.info('Step: cancelCase completed', { caseId: input.caseId, status: result.status });
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_cancelled', ...result });
-				return {
+				const successResult = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
 					status: result.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
 			}
 
-			default:
-				return {
+			default: {
+				const errorResult = {
 					success: false,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					error: `Unknown action: ${input.action}`
 				};
+				log.warn('Unknown workflow action', { action: input.action });
+				logWorkflowEnd(log, input.action, false, startTime, errorResult);
+				return errorResult;
+			}
 		}
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorStack = error instanceof Error ? error.stack : undefined;
+		
+		log.error('Workflow failed', {
+			action: input.action,
+			caseId: input.caseId,
+			intentId: input.intentId,
+			error: errorMessage,
+			stack: errorStack
+		});
+		
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
-		return {
+		const errorResult = {
 			success: false,
 			action: input.action,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(log, input.action, false, startTime, errorResult);
+		return errorResult;
 	}
 }
 
@@ -700,4 +773,3 @@ export async function getCaseLifecycleWorkflowStatus(
 	return status as { step: string; [key: string]: unknown } | null;
 }
 
-export type { CaseLifecycleWorkflowInput, CaseLifecycleWorkflowResult };

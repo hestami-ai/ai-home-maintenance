@@ -12,6 +12,9 @@ import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ProposalStatus } from '../../../../../../generated/prisma/client.js';
 import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ProposalRoute');
 
 const proposalOutput = z.object({
 	id: z.string(),

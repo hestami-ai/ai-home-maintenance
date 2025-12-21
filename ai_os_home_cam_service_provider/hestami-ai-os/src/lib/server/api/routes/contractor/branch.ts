@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { startContractorBranchWorkflow } from '../../../workflows/contractorBranchWorkflow.js';
 import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from './utils.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ContractorBranchRoute');
 
 const branchOutput = z.object({
 	id: z.string(),

@@ -20,6 +20,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { JobStatus } from '../../../../generated/prisma/client.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 
 const WORKFLOW_STATUS_EVENT = 'job_status';
 const WORKFLOW_ERROR_EVENT = 'job_error';
@@ -263,16 +264,24 @@ async function queueJobNotifications(
 
 async function jobTransitionWorkflow(input: JobTransitionInput): Promise<JobTransitionResult> {
 	const workflowId = DBOS.workflowID;
+	const log = createWorkflowLogger('JobLifecycleWorkflow', workflowId, `transition_to_${input.toStatus}`);
+	const startTime = logWorkflowStart(log, `transition_to_${input.toStatus}`, {
+		jobId: input.jobId,
+		toStatus: input.toStatus,
+		userId: input.userId
+	});
 
 	try {
+		log.debug('Step: validateJobTransition starting', { jobId: input.jobId, toStatus: input.toStatus });
 		const validation = await DBOS.runStep(
 			() => validateJobTransition(input),
 			{ name: 'validateJobTransition' }
 		);
+		log.debug('Step: validateJobTransition completed', { valid: validation.valid, currentStatus: validation.currentStatus });
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'validated', ...validation });
 
 		if (!validation.valid) {
-			return {
+			const errorResult = {
 				success: false,
 				jobId: input.jobId,
 				fromStatus: validation.currentStatus,
@@ -280,37 +289,57 @@ async function jobTransitionWorkflow(input: JobTransitionInput): Promise<JobTran
 				timestamp: new Date().toISOString(),
 				error: validation.error
 			};
+			log.warn('Job transition validation failed', {
+				jobId: input.jobId,
+				fromStatus: validation.currentStatus,
+				toStatus: input.toStatus,
+				error: validation.error
+			});
+			logWorkflowEnd(log, `transition_to_${input.toStatus}`, false, startTime, errorResult);
+			return errorResult;
 		}
 
+		log.debug('Step: updateJobStatus starting', { jobId: input.jobId, fromStatus: validation.currentStatus, toStatus: input.toStatus });
 		await DBOS.runStep(
 			() => updateJobStatus(input, validation.currentStatus),
 			{ name: 'updateJobStatus' }
 		);
+		log.info('Step: updateJobStatus completed', { jobId: input.jobId, newStatus: input.toStatus });
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'updated', status: input.toStatus });
 
+		log.debug('Step: checkJobSlaCompliance starting', { jobId: input.jobId });
 		const slaStatus = await DBOS.runStep(
 			() => checkJobSlaCompliance(input.jobId),
 			{ name: 'checkJobSlaCompliance' }
 		);
+		log.debug('Step: checkJobSlaCompliance completed', { isOverdue: slaStatus.isOverdue, hoursRemaining: slaStatus.hoursRemaining });
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'sla_checked', ...slaStatus });
 
+		log.debug('Step: syncWithWorkOrder starting', { jobId: input.jobId });
 		await DBOS.runStep(
 			() => syncWithWorkOrder(input.jobId, input.toStatus),
 			{ name: 'syncWithWorkOrder' }
 		);
+		log.debug('Step: syncWithWorkOrder completed');
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'synced' });
 
+		log.debug('Step: queueJobNotifications starting');
 		await DBOS.runStep(
 			() => queueJobNotifications(input.jobId, validation.currentStatus, input.toStatus, input.userId),
 			{ name: 'queueJobNotifications' }
 		);
+		log.debug('Step: queueJobNotifications completed');
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'notifications_queued' });
 
 		if (slaStatus.isOverdue) {
-			console.warn(`[Workflow ${workflowId}] Job ${input.jobId} is OVERDUE by ${Math.abs(slaStatus.hoursRemaining!)} hours`);
+			log.warn('Job is OVERDUE', {
+				jobId: input.jobId,
+				hoursOverdue: Math.abs(slaStatus.hoursRemaining!),
+				status: input.toStatus
+			});
 		}
 
-		return {
+		const successResult = {
 			success: true,
 			jobId: input.jobId,
 			fromStatus: validation.currentStatus,
@@ -318,18 +347,31 @@ async function jobTransitionWorkflow(input: JobTransitionInput): Promise<JobTran
 			timestamp: new Date().toISOString(),
 			slaStatus
 		};
+		logWorkflowEnd(log, `transition_to_${input.toStatus}`, true, startTime, successResult);
+		return successResult;
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorStack = error instanceof Error ? error.stack : undefined;
+		
+		log.error('Workflow failed', {
+			jobId: input.jobId,
+			toStatus: input.toStatus,
+			error: errorMessage,
+			stack: errorStack
+		});
+		
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
-		return {
+		const errorResult = {
 			success: false,
 			jobId: input.jobId,
-			fromStatus: 'LEAD',
+			fromStatus: 'LEAD' as JobStatus,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(log, `transition_to_${input.toStatus}`, false, startTime, errorResult);
+		return errorResult;
 	}
 }
 

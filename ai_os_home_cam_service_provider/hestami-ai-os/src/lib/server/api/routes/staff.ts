@@ -12,6 +12,9 @@ import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import { recordActivityEvent } from '../middleware/activityEvent.js';
 import { StaffStatusSchema, StaffRoleSchema, PillarAccessSchema } from '../../../../../generated/zod/index.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('StaffRoute');
 
 // =============================================================================
 // Zod Schemas for Staff API

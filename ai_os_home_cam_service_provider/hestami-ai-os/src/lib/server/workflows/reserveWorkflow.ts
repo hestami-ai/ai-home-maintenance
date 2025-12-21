@@ -7,14 +7,21 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ReserveWorkflow');
 
 // Action types for the unified workflow
-export type ReserveAction = 
-	| 'CREATE_COMPONENT'
-	| 'UPDATE_COMPONENT'
-	| 'CREATE_STUDY'
-	| 'ADD_STUDY_COMPONENT'
-	| 'GENERATE_FUNDING_SCHEDULE';
+export const ReserveAction = {
+	CREATE_COMPONENT: 'CREATE_COMPONENT',
+	UPDATE_COMPONENT: 'UPDATE_COMPONENT',
+	CREATE_STUDY: 'CREATE_STUDY',
+	ADD_STUDY_COMPONENT: 'ADD_STUDY_COMPONENT',
+	GENERATE_FUNDING_SCHEDULE: 'GENERATE_FUNDING_SCHEDULE'
+} as const;
+
+export type ReserveAction = (typeof ReserveAction)[keyof typeof ReserveAction];
 
 export interface ReserveWorkflowInput {
 	action: ReserveAction;
@@ -24,10 +31,8 @@ export interface ReserveWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ReserveWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ReserveWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

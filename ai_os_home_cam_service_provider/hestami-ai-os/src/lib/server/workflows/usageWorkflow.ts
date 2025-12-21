@@ -7,11 +7,15 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type UsageAction =
-	| 'RECORD_USAGE'
-	| 'REVERSE_USAGE';
+export const UsageAction = {
+	RECORD_USAGE: 'RECORD_USAGE',
+	REVERSE_USAGE: 'REVERSE_USAGE'
+} as const;
+
+export type UsageAction = (typeof UsageAction)[keyof typeof UsageAction];
 
 export interface UsageWorkflowInput {
 	action: UsageAction;
@@ -21,10 +25,8 @@ export interface UsageWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface UsageWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface UsageWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

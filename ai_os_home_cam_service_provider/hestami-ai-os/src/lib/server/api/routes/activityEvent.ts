@@ -21,6 +21,9 @@ import type {
 	ActivityEventCategory,
 	Prisma
 } from '../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('ActivityEventRoute');
 
 // =============================================================================
 // SCHEMAS

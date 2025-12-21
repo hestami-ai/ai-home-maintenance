@@ -11,6 +11,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { PropertyOwnershipRoleSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipRoleSchema.js';
 import { PropertyOwnershipStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipStatusSchema.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('PropertyOwnershipRoute');
 
 /**
  * Property Ownership management procedures for Phase 3 Concierge Platform

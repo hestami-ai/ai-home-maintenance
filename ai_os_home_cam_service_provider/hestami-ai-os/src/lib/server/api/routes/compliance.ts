@@ -6,6 +6,9 @@ import { ApiException } from '../errors.js';
 import { startComplianceWorkflow } from '../../workflows/complianceWorkflow.js';
 import type { RequestContext } from '../context.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('ComplianceRoute');
 
 const RequirementTypeEnum = z.enum([
 	'STATUTORY_DEADLINE',

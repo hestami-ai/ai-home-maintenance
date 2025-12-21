@@ -7,14 +7,37 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ChecklistItemStatus } from '../../../../generated/prisma/client.js';
+import { ChecklistItemStatus, type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ChecklistWorkflow');
 
 // Action types for the unified workflow
-export type ChecklistAction =
-	| 'CREATE_CHECKLIST'
-	| 'APPLY_CHECKLIST'
-	| 'UPDATE_STEP'
-	| 'DELETE_CHECKLIST';
+export const ChecklistAction = {
+	CREATE_CHECKLIST: 'CREATE_CHECKLIST',
+	APPLY_CHECKLIST: 'APPLY_CHECKLIST',
+	UPDATE_STEP: 'UPDATE_STEP',
+	DELETE_CHECKLIST: 'DELETE_CHECKLIST'
+} as const;
+
+export type ChecklistAction = (typeof ChecklistAction)[keyof typeof ChecklistAction];
+
+interface ChecklistStep {
+	title: string;
+	description?: string | null;
+	isRequired?: boolean;
+	requiresPhoto?: boolean;
+	requiresSignature?: boolean;
+	requiresNotes?: boolean;
+}
+
+interface TemplateStep extends ChecklistStep {
+	stepNumber: number;
+	isRequired: boolean;
+	requiresPhoto: boolean;
+	requiresSignature: boolean;
+	requiresNotes: boolean;
+}
 
 export interface ChecklistWorkflowInput {
 	action: ChecklistAction;
@@ -22,31 +45,34 @@ export interface ChecklistWorkflowInput {
 	userId: string;
 	checklistId?: string;
 	stepId?: string;
-	data: Record<string, unknown>;
+	data: {
+		name?: string;
+		description?: string | null;
+		steps?: ChecklistStep[];
+		jobId?: string;
+		templateId?: string;
+		templateName?: string;
+		templateDescription?: string | null;
+		templateSteps?: TemplateStep[];
+		status?: ChecklistItemStatus;
+		notes?: string | null;
+		checklistId?: string;
+	};
 }
 
-export interface ChecklistWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ChecklistWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation
 async function createChecklist(
 	organizationId: string,
 	userId: string,
-	data: Record<string, unknown>
+	data: ChecklistWorkflowInput['data']
 ): Promise<string> {
-	const name = data.name as string;
-	const description = data.description as string | undefined;
-	const steps = data.steps as Array<{
-		title: string;
-		description?: string;
-		isRequired?: boolean;
-		requiresPhoto?: boolean;
-		requiresSignature?: boolean;
-		requiresNotes?: boolean;
-	}>;
+	const name = data.name!;
+	const description = data.description;
+	const steps = data.steps || [];
 
 	const checklist = await prisma.jobChecklist.create({
 		data: {
@@ -79,21 +105,13 @@ async function createChecklist(
 async function applyChecklist(
 	organizationId: string,
 	userId: string,
-	data: Record<string, unknown>
+	data: ChecklistWorkflowInput['data']
 ): Promise<string> {
-	const jobId = data.jobId as string;
-	const templateId = data.templateId as string;
-	const templateName = data.templateName as string;
-	const templateDescription = data.templateDescription as string | undefined;
-	const templateSteps = data.templateSteps as Array<{
-		stepNumber: number;
-		title: string;
-		description?: string;
-		isRequired: boolean;
-		requiresPhoto: boolean;
-		requiresSignature: boolean;
-		requiresNotes: boolean;
-	}>;
+	const jobId = data.jobId!;
+	const templateId = data.templateId!;
+	const templateName = data.templateName!;
+	const templateDescription = data.templateDescription;
+	const templateSteps = data.templateSteps || [];
 
 	// Create job checklist from template
 	const checklist = await prisma.jobChecklist.create({
@@ -131,19 +149,21 @@ async function updateStep(
 	organizationId: string,
 	userId: string,
 	stepId: string,
-	data: Record<string, unknown>
+	data: ChecklistWorkflowInput['data']
 ): Promise<string> {
-	const status = data.status as ChecklistItemStatus;
-	const notes = data.notes as string | undefined;
-	const checklistId = data.checklistId as string;
+	const status = data.status!;
+	const notes = data.notes;
+	const checklistId = data.checklistId!;
+
+	const isComplete = status === ChecklistItemStatus.COMPLETED || status === ChecklistItemStatus.SKIPPED;
 
 	// Update the step
 	await prisma.jobStep.update({
 		where: { id: stepId },
 		data: {
 			status,
-			completedAt: status === 'COMPLETED' || status === 'SKIPPED' ? new Date() : null,
-			completedBy: status === 'COMPLETED' || status === 'SKIPPED' ? userId : null,
+			completedAt: isComplete ? new Date() : null,
+			completedBy: isComplete ? userId : null,
 			notes
 		}
 	});
@@ -153,12 +173,13 @@ async function updateStep(
 		where: { checklistId }
 	});
 
+	const isStatusComplete = (s: string) => s === ChecklistItemStatus.COMPLETED || s === ChecklistItemStatus.SKIPPED;
 	const allRequiredComplete = allSteps
 		.filter((s) => s.isRequired)
 		.every((s) =>
 			s.id === stepId
-				? ['COMPLETED', 'SKIPPED'].includes(status)
-				: ['COMPLETED', 'SKIPPED'].includes(s.status)
+				? isStatusComplete(status)
+				: isStatusComplete(s.status)
 		);
 
 	if (allRequiredComplete) {

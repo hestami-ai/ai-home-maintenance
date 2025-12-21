@@ -8,14 +8,18 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type OfflineSyncAction =
-	| 'QUEUE_ITEM'
-	| 'BATCH_QUEUE'
-	| 'MARK_SYNCED'
-	| 'MARK_FAILED'
-	| 'CLEAR_SYNCED';
+export const OfflineSyncAction = {
+	QUEUE_ITEM: 'QUEUE_ITEM',
+	BATCH_QUEUE: 'BATCH_QUEUE',
+	MARK_SYNCED: 'MARK_SYNCED',
+	MARK_FAILED: 'MARK_FAILED',
+	CLEAR_SYNCED: 'CLEAR_SYNCED'
+} as const;
+
+export type OfflineSyncAction = (typeof OfflineSyncAction)[keyof typeof OfflineSyncAction];
 
 export interface OfflineSyncWorkflowInput {
 	action: OfflineSyncAction;
@@ -25,12 +29,9 @@ export interface OfflineSyncWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface OfflineSyncWorkflowResult {
-	success: boolean;
-	entityId?: string;
+export interface OfflineSyncWorkflowResult extends EntityWorkflowResult {
 	entityIds?: string[];
 	deletedCount?: number;
-	error?: string;
 }
 
 // Step functions for each operation

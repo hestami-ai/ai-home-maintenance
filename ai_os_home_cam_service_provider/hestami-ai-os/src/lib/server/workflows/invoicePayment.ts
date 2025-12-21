@@ -8,6 +8,9 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { JobInvoiceStatus } from '../../../../generated/prisma/client.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('InvoicePaymentWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'invoice_status';
 const WORKFLOW_ERROR_EVENT = 'invoice_error';

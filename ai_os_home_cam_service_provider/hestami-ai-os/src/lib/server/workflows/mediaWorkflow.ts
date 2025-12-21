@@ -8,14 +8,18 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { MediaType } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type MediaAction =
-	| 'REGISTER_MEDIA'
-	| 'MARK_UPLOADED'
-	| 'ADD_VOICE_NOTE'
-	| 'UPDATE_TRANSCRIPTION'
-	| 'DELETE_MEDIA';
+export const MediaAction = {
+	REGISTER_MEDIA: 'REGISTER_MEDIA',
+	MARK_UPLOADED: 'MARK_UPLOADED',
+	ADD_VOICE_NOTE: 'ADD_VOICE_NOTE',
+	UPDATE_TRANSCRIPTION: 'UPDATE_TRANSCRIPTION',
+	DELETE_MEDIA: 'DELETE_MEDIA'
+} as const;
+
+export type MediaAction = (typeof MediaAction)[keyof typeof MediaAction];
 
 export interface MediaWorkflowInput {
 	action: MediaAction;
@@ -25,10 +29,8 @@ export interface MediaWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface MediaWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface MediaWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

@@ -3,6 +3,9 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('BidRoute');
 
 const bidStatusEnum = z.enum([
 	'REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW',

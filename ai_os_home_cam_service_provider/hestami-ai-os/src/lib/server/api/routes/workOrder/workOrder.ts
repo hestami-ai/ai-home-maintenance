@@ -25,6 +25,9 @@ import {
 } from '../../../workflows/workOrderLineItemWorkflow.js';
 import { startWorkOrderConfigWorkflow } from '../../../workflows/workOrderConfigWorkflow.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('WorkOrderRoute');
 
 // Use shared enum schemas from schemas.ts
 const workOrderStatusEnum = WorkOrderStatusSchema;

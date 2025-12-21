@@ -7,12 +7,16 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type SupplierAction =
-	| 'CREATE_SUPPLIER'
-	| 'UPDATE_SUPPLIER'
-	| 'DELETE_SUPPLIER';
+export const SupplierAction = {
+	CREATE_SUPPLIER: 'CREATE_SUPPLIER',
+	UPDATE_SUPPLIER: 'UPDATE_SUPPLIER',
+	DELETE_SUPPLIER: 'DELETE_SUPPLIER'
+} as const;
+
+export type SupplierAction = (typeof SupplierAction)[keyof typeof SupplierAction];
 
 export interface SupplierWorkflowInput {
 	action: SupplierAction;
@@ -22,10 +26,8 @@ export interface SupplierWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface SupplierWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface SupplierWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

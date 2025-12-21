@@ -5,6 +5,9 @@ import {
 	type DefaultAccountDefinition
 } from './defaultChartOfAccounts.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../logger.js';
+
+const log = createModuleLogger('GLService');
 
 /**
  * GL Service - Handles chart of accounts initialization and GL posting
@@ -20,11 +23,11 @@ export async function seedDefaultChartOfAccounts(associationId: string): Promise
 	});
 
 	if (existingCount > 0) {
-		console.log(`Association ${associationId} already has ${existingCount} GL accounts, skipping seed`);
+		log.info('Association already has GL accounts, skipping seed', { associationId, existingCount });
 		return;
 	}
 
-	console.log(`Seeding default chart of accounts for association ${associationId}`);
+	log.info('Seeding default chart of accounts', { associationId });
 
 	// Create accounts in a transaction
 	await prisma.$transaction(async (tx) => {
@@ -45,7 +48,7 @@ export async function seedDefaultChartOfAccounts(associationId: string): Promise
 		where: { associationId }
 	});
 
-	console.log(`Created ${finalCount} GL accounts for association ${associationId}`);
+	log.info('GL accounts created', { associationId, count: finalCount });
 }
 
 async function createAccountFromDefinition(

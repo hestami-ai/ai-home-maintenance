@@ -4,6 +4,9 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('JournalEntryRoute');
 
 const journalLineSchema = z.object({
 	accountId: z.string(),

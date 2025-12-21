@@ -7,50 +7,78 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import {
+	DocumentCategory,
+	DocumentContextType,
+	DocumentVisibility,
+	DocumentStatus,
+	StorageProvider,
+	type EntityWorkflowResult
+} from './schemas.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 
-export type DocumentAction =
-	| 'CREATE_DOCUMENT'
-	| 'CREATE_DOCUMENT_METADATA'
-	| 'UPDATE_DOCUMENT'
-	| 'CREATE_VERSION'
-	| 'RESTORE_VERSION'
-	| 'CHANGE_CATEGORY'
-	| 'ADD_CONTEXT_BINDING';
+// Action types for document operations
+export const DocumentAction = {
+	CREATE_DOCUMENT: 'CREATE_DOCUMENT',
+	CREATE_DOCUMENT_METADATA: 'CREATE_DOCUMENT_METADATA',
+	UPDATE_DOCUMENT: 'UPDATE_DOCUMENT',
+	CREATE_VERSION: 'CREATE_VERSION',
+	RESTORE_VERSION: 'RESTORE_VERSION',
+	CHANGE_CATEGORY: 'CHANGE_CATEGORY',
+	ADD_CONTEXT_BINDING: 'ADD_CONTEXT_BINDING'
+} as const;
+
+export type DocumentAction = (typeof DocumentAction)[keyof typeof DocumentAction];
 
 export interface DocumentWorkflowInput {
 	action: DocumentAction;
 	organizationId: string;
 	userId: string;
 	documentId?: string;
-	data: Record<string, unknown>;
+	data: {
+		title?: string;
+		description?: string;
+		category?: DocumentCategory;
+		visibility?: DocumentVisibility;
+		status?: DocumentStatus;
+		contextType?: DocumentContextType;
+		contextId?: string;
+		isPrimary?: boolean;
+		fileName?: string;
+		fileSize?: number;
+		mimeType?: string;
+		storageProvider?: string;
+		storagePath?: string;
+		fileUrl?: string;
+		checksum?: string;
+		targetVersionId?: string;
+	};
 }
 
-export interface DocumentWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface DocumentWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 async function createDocument(
 	organizationId: string,
 	userId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
 	const document = await prisma.document.create({
 		data: {
 			organizationId,
-			title: data.title as string,
-			description: data.description as string | undefined,
-			category: data.category as any,
-			visibility: (data.visibility as any) || 'INTERNAL',
-			status: 'ACTIVE',
-			fileName: data.fileName as string,
-			fileSize: data.fileSize as number,
-			mimeType: data.mimeType as string,
+			title: data.title!,
+			description: data.description,
+			category: data.category!,
+			visibility: data.visibility || DocumentVisibility.PRIVATE,
+			status: DocumentStatus.ACTIVE,
+			fileName: data.fileName!,
+			fileSize: data.fileSize!,
+			mimeType: data.mimeType!,
 			storageProvider: 'LOCAL',
-			storagePath: data.storagePath as string,
-			fileUrl: data.fileUrl as string,
-			checksum: data.checksum as string | undefined,
+			storagePath: data.storagePath!,
+			fileUrl: data.fileUrl!,
+			checksum: data.checksum,
 			uploadedBy: userId,
 			version: 1
 		}
@@ -61,8 +89,8 @@ async function createDocument(
 		await prisma.documentContextBinding.create({
 			data: {
 				documentId: document.id,
-				contextType: data.contextType as any,
-				contextId: data.contextId as string,
+				contextType: data.contextType,
+				contextId: data.contextId,
 				isPrimary: true,
 				createdBy: userId
 			}
@@ -76,23 +104,23 @@ async function createDocument(
 async function createDocumentMetadata(
 	organizationId: string,
 	userId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
 	const document = await prisma.document.create({
 		data: {
 			organizationId,
-			title: data.title as string,
-			description: data.description as string | undefined,
-			category: data.category as any,
-			visibility: (data.visibility as any) || 'INTERNAL',
-			status: 'ACTIVE',
-			fileName: data.fileName as string,
-			fileSize: (data.fileSize as number) || 0,
-			mimeType: (data.mimeType as string) || 'application/octet-stream',
-			storageProvider: data.storageProvider as any || 'EXTERNAL',
-			storagePath: (data.storagePath as string) || '',
-			fileUrl: data.fileUrl as string,
-			checksum: data.checksum as string | undefined,
+			title: data.title!,
+			description: data.description,
+			category: data.category!,
+			visibility: data.visibility || DocumentVisibility.PRIVATE,
+			status: DocumentStatus.ACTIVE,
+			fileName: data.fileName!,
+			fileSize: data.fileSize || 0,
+			mimeType: data.mimeType || 'application/octet-stream',
+			storageProvider: StorageProvider.S3,
+			storagePath: data.storagePath || '',
+			fileUrl: data.fileUrl!,
+			checksum: data.checksum,
 			uploadedBy: userId,
 			version: 1
 		}
@@ -103,8 +131,8 @@ async function createDocumentMetadata(
 		await prisma.documentContextBinding.create({
 			data: {
 				documentId: document.id,
-				contextType: data.contextType as any,
-				contextId: data.contextId as string,
+				contextType: data.contextType,
+				contextId: data.contextId,
 				isPrimary: true,
 				createdBy: userId
 			}
@@ -119,18 +147,23 @@ async function updateDocument(
 	organizationId: string,
 	userId: string,
 	documentId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
-	const updateData: Record<string, unknown> = {};
+	const updateData: {
+		title?: string;
+		description?: string;
+		visibility?: DocumentVisibility;
+		status?: DocumentStatus;
+	} = {};
 	
-	if (data.title !== undefined) updateData.title = data.title as string;
-	if (data.description !== undefined) updateData.description = data.description as string;
+	if (data.title !== undefined) updateData.title = data.title;
+	if (data.description !== undefined) updateData.description = data.description;
 	if (data.visibility !== undefined) updateData.visibility = data.visibility;
 	if (data.status !== undefined) updateData.status = data.status;
 
 	await prisma.document.update({
 		where: { id: documentId },
-		data: updateData as any
+		data: updateData
 	});
 
 	console.log(`[DocumentWorkflow] UPDATE_DOCUMENT document:${documentId} by user ${userId}`);
@@ -141,7 +174,7 @@ async function createVersion(
 	organizationId: string,
 	userId: string,
 	parentId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
 	// Get parent document
 	const parent = await prisma.document.findUniqueOrThrow({
@@ -177,17 +210,17 @@ async function createVersion(
 			organizationId: parent.organizationId,
 			parentDocumentId: parentId,
 			title: parent.title,
-			description: (data.description as string) || parent.description,
+			description: data.description || parent.description,
 			category: parent.category,
 			visibility: parent.visibility,
-			status: 'ACTIVE',
-			fileName: data.fileName as string,
-			fileSize: data.fileSize as number,
-			mimeType: data.mimeType as string,
-			storageProvider: 'LOCAL',
-			storagePath: data.storagePath as string,
-			fileUrl: data.fileUrl as string,
-			checksum: data.checksum as string | undefined,
+			status: DocumentStatus.ACTIVE,
+			fileName: data.fileName!,
+			fileSize: data.fileSize!,
+			mimeType: data.mimeType!,
+			storageProvider: StorageProvider.LOCAL,
+			storagePath: data.storagePath!,
+			fileUrl: data.fileUrl!,
+			checksum: data.checksum,
 			uploadedBy: userId,
 			version: newVersion
 		}
@@ -214,9 +247,9 @@ async function restoreVersion(
 	organizationId: string,
 	userId: string,
 	currentId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
-	const targetVersionId = data.targetVersionId as string;
+	const targetVersionId = data.targetVersionId!;
 
 	// Get current and target documents
 	const current = await prisma.document.findUniqueOrThrow({ where: { id: currentId } });
@@ -252,7 +285,7 @@ async function restoreVersion(
 			description: target.description,
 			category: target.category,
 			visibility: target.visibility,
-			status: 'ACTIVE',
+			status: DocumentStatus.ACTIVE,
 			fileName: target.fileName,
 			fileSize: target.fileSize,
 			mimeType: target.mimeType,
@@ -273,11 +306,11 @@ async function changeCategory(
 	organizationId: string,
 	userId: string,
 	documentId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
 	await prisma.document.update({
 		where: { id: documentId },
-		data: { category: data.category as any }
+		data: { category: data.category! }
 	});
 
 	console.log(`[DocumentWorkflow] CHANGE_CATEGORY document:${documentId} to:${data.category} by user ${userId}`);
@@ -288,18 +321,18 @@ async function addContextBinding(
 	organizationId: string,
 	userId: string,
 	documentId: string,
-	data: Record<string, unknown>
+	data: DocumentWorkflowInput['data']
 ): Promise<string> {
-	const contextType = data.contextType as string;
-	const contextId = data.contextId as string;
-	const isPrimary = data.isPrimary as boolean || false;
+	const contextType = data.contextType!;
+	const contextId = data.contextId!;
+	const isPrimary = data.isPrimary || false;
 
 	// Check if binding already exists
 	const existing = await prisma.documentContextBinding.findUnique({
 		where: {
 			documentId_contextType_contextId: {
 				documentId,
-				contextType: contextType as any,
+				contextType,
 				contextId
 			}
 		}
@@ -320,7 +353,7 @@ async function addContextBinding(
 	const binding = await prisma.documentContextBinding.create({
 		data: {
 			documentId,
-			contextType: contextType as any,
+			contextType,
 			contextId,
 			isPrimary,
 			createdBy: userId
@@ -332,11 +365,23 @@ async function addContextBinding(
 }
 
 async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentWorkflowResult> {
+	const log = createWorkflowLogger('DocumentWorkflow', undefined, input.action);
+	const startTime = logWorkflowStart(log, input.action, {
+		organizationId: input.organizationId,
+		userId: input.userId,
+		documentId: input.documentId,
+		category: input.data.category,
+		contextType: input.data.contextType,
+		contextId: input.data.contextId,
+		fileName: input.data.fileName
+	});
+
 	try {
 		let entityId: string;
 
 		switch (input.action) {
 			case 'CREATE_DOCUMENT':
+				log.debug('Executing CREATE_DOCUMENT step');
 				entityId = await DBOS.runStep(
 					() => createDocument(input.organizationId, input.userId, input.data),
 					{ name: 'createDocument' }
@@ -344,6 +389,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			case 'CREATE_DOCUMENT_METADATA':
+				log.debug('Executing CREATE_DOCUMENT_METADATA step');
 				entityId = await DBOS.runStep(
 					() => createDocumentMetadata(input.organizationId, input.userId, input.data),
 					{ name: 'createDocumentMetadata' }
@@ -351,6 +397,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			case 'UPDATE_DOCUMENT':
+				log.debug('Executing UPDATE_DOCUMENT step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => updateDocument(input.organizationId, input.userId, input.documentId!, input.data),
 					{ name: 'updateDocument' }
@@ -358,6 +405,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			case 'CREATE_VERSION':
+				log.debug('Executing CREATE_VERSION step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => createVersion(input.organizationId, input.userId, input.documentId!, input.data),
 					{ name: 'createVersion' }
@@ -365,6 +413,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			case 'RESTORE_VERSION':
+				log.debug('Executing RESTORE_VERSION step', { documentId: input.documentId, targetVersionId: input.data.targetVersionId });
 				entityId = await DBOS.runStep(
 					() => restoreVersion(input.organizationId, input.userId, input.documentId!, input.data),
 					{ name: 'restoreVersion' }
@@ -372,6 +421,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			case 'CHANGE_CATEGORY':
+				log.debug('Executing CHANGE_CATEGORY step', { documentId: input.documentId, category: input.data.category });
 				entityId = await DBOS.runStep(
 					() => changeCategory(input.organizationId, input.userId, input.documentId!, input.data),
 					{ name: 'changeCategory' }
@@ -379,6 +429,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			case 'ADD_CONTEXT_BINDING':
+				log.debug('Executing ADD_CONTEXT_BINDING step', { documentId: input.documentId, contextType: input.data.contextType });
 				entityId = await DBOS.runStep(
 					() => addContextBinding(input.organizationId, input.userId, input.documentId!, input.data),
 					{ name: 'addContextBinding' }
@@ -386,13 +437,19 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				break;
 
 			default:
+				log.error('Unknown action', { action: input.action });
 				return { success: false, error: `Unknown action: ${input.action}` };
 		}
 
+		logWorkflowEnd(log, input.action, true, startTime, { entityId });
 		return { success: true, entityId };
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[DocumentWorkflow] Error in ${input.action}:`, errorMessage);
+		logStepError(log, input.action, error instanceof Error ? error : new Error(errorMessage), {
+			organizationId: input.organizationId,
+			documentId: input.documentId
+		});
+		logWorkflowEnd(log, input.action, false, startTime, { error: errorMessage });
 		return { success: false, error: errorMessage };
 	}
 }

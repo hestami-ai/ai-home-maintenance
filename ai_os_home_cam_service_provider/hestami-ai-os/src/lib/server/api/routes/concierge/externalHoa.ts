@@ -12,6 +12,9 @@ import { ApiException } from '../../errors.js';
 import { ExternalApprovalStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ExternalApprovalStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordIntent } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ExternalHoaRoute');
 
 /**
  * External HOA Context management for Phase 3.7

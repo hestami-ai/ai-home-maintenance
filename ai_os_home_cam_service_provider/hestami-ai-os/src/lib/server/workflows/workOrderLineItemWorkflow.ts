@@ -9,6 +9,9 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ContractorTradeType, PricebookItemType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('WorkOrderLineItemWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'wo_line_item_status';
 const WORKFLOW_ERROR_EVENT = 'wo_line_item_error';

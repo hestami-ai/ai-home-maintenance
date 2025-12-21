@@ -11,11 +11,15 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { JobSourceType, JobStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { type BaseWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('JobCreateWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'job_create_status';
 const WORKFLOW_ERROR_EVENT = 'job_create_error';
 
-interface JobCreateInput {
+export interface JobCreateInput {
 	organizationId: string;
 	userId: string;
 	sourceType: JobSourceType;
@@ -40,13 +44,11 @@ interface JobCreateInput {
 	estimatedCost?: number;
 }
 
-interface JobCreateResult {
-	success: boolean;
+export interface JobCreateResult extends BaseWorkflowResult {
 	jobId?: string;
 	jobNumber?: string;
 	status?: JobStatus;
 	timestamp: string;
-	error?: string;
 }
 
 async function generateJobNumber(organizationId: string): Promise<string> {
@@ -193,4 +195,3 @@ export async function getJobCreateWorkflowStatus(
 	return status as { step: string; [key: string]: unknown } | null;
 }
 
-export type { JobCreateInput, JobCreateResult };

@@ -7,12 +7,19 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('InventoryItemWorkflow');
 
 // Action types for the unified workflow
-export type InventoryItemAction =
-	| 'CREATE_ITEM'
-	| 'UPDATE_ITEM'
-	| 'DELETE_ITEM';
+export const InventoryItemAction = {
+	CREATE_ITEM: 'CREATE_ITEM',
+	UPDATE_ITEM: 'UPDATE_ITEM',
+	DELETE_ITEM: 'DELETE_ITEM'
+} as const;
+
+export type InventoryItemAction = (typeof InventoryItemAction)[keyof typeof InventoryItemAction];
 
 export interface InventoryItemWorkflowInput {
 	action: InventoryItemAction;
@@ -22,10 +29,8 @@ export interface InventoryItemWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface InventoryItemWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface InventoryItemWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

@@ -12,6 +12,9 @@ import { ResponseMetaSchema } from '../schemas.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../accounting/index.js';
 import { recordExecution } from '../middleware/activityEvent.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('AssociationRoute');
 
 /**
  * Association management procedures

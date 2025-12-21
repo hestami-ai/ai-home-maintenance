@@ -10,6 +10,9 @@ import {
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startCommunicationWorkflow } from '../../../workflows/communicationWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('CommunicationRoute');
 import type {
 	CommunicationTemplateType,
 	CommunicationChannel,

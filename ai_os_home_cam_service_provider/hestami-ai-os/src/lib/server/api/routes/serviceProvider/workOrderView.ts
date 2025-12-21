@@ -3,6 +3,9 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('WorkOrderViewRoute');
 
 const assertServiceProviderOrg = async (organizationId: string) => {
 	const org = await prisma.organization.findFirst({

@@ -13,6 +13,9 @@ import { ConciergeActionTypeSchema } from '../../../../../../generated/zod/input
 import { ConciergeActionStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeActionStatusSchema.js';
 import type { ConciergeActionStatus, Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ConciergeActionRoute');
 
 // Valid status transitions for the action state machine
 const VALID_ACTION_STATUS_TRANSITIONS: Record<string, string[]> = {

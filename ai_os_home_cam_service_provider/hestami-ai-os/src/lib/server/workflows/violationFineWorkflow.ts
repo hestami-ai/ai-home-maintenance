@@ -7,9 +7,14 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type ViolationFineAction = 'FINE_TO_CHARGE';
+export const ViolationFineAction = {
+	FINE_TO_CHARGE: 'FINE_TO_CHARGE'
+} as const;
+
+export type ViolationFineAction = (typeof ViolationFineAction)[keyof typeof ViolationFineAction];
 
 export interface ViolationFineWorkflowInput {
 	action: ViolationFineAction;
@@ -20,11 +25,8 @@ export interface ViolationFineWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ViolationFineWorkflowResult {
-	success: boolean;
-	entityId?: string;
+export interface ViolationFineWorkflowResult extends EntityWorkflowResult {
 	chargeId?: string;
-	error?: string;
 }
 
 // Step functions for each operation

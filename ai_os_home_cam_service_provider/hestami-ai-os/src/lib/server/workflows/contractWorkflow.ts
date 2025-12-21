@@ -9,22 +9,29 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ServiceContractStatus, RecurrenceFrequency, ServiceContractType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ContractWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'contract_status';
 const WORKFLOW_ERROR_EVENT = 'contract_error';
 
-type ContractAction =
-	| 'CREATE_CONTRACT'
-	| 'UPDATE_CONTRACT'
-	| 'ACTIVATE_CONTRACT'
-	| 'SUSPEND_CONTRACT'
-	| 'CANCEL_CONTRACT'
-	| 'RENEW_CONTRACT'
-	| 'DELETE_CONTRACT'
-	| 'ADD_SERVICE_ITEM'
-	| 'REMOVE_SERVICE_ITEM';
+export const ContractAction = {
+	CREATE_CONTRACT: 'CREATE_CONTRACT',
+	UPDATE_CONTRACT: 'UPDATE_CONTRACT',
+	ACTIVATE_CONTRACT: 'ACTIVATE_CONTRACT',
+	SUSPEND_CONTRACT: 'SUSPEND_CONTRACT',
+	CANCEL_CONTRACT: 'CANCEL_CONTRACT',
+	RENEW_CONTRACT: 'RENEW_CONTRACT',
+	DELETE_CONTRACT: 'DELETE_CONTRACT',
+	ADD_SERVICE_ITEM: 'ADD_SERVICE_ITEM',
+	REMOVE_SERVICE_ITEM: 'REMOVE_SERVICE_ITEM'
+} as const;
 
-interface ServiceContractWorkflowInput {
+export type ContractAction = (typeof ContractAction)[keyof typeof ContractAction];
+
+export interface ServiceContractWorkflowInput {
 	action: ContractAction;
 	organizationId: string;
 	userId: string;
@@ -33,12 +40,8 @@ interface ServiceContractWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-interface ServiceContractWorkflowResult {
-	success: boolean;
-	action: ContractAction;
+export interface ServiceContractWorkflowResult extends LifecycleWorkflowResult {
 	entityId?: string;
-	timestamp: string;
-	error?: string;
 }
 
 async function createContract(
@@ -456,4 +459,3 @@ export async function startServiceContractWorkflow(
 	return handle.getResult();
 }
 
-export type { ServiceContractWorkflowInput, ServiceContractWorkflowResult, ContractAction };

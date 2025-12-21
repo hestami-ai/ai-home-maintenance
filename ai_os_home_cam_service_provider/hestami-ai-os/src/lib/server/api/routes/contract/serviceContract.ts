@@ -16,6 +16,9 @@ import {
 	RecurrenceFrequency
 } from '../../../../../../generated/prisma/client.js';
 import { startServiceContractWorkflow } from '../../../workflows/contractWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ServiceContractRoute');
 
 const serviceItemOutput = z.object({
 	id: z.string(),

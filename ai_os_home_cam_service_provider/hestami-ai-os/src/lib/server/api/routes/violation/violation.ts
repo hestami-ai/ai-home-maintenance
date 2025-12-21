@@ -16,6 +16,9 @@ import { recordExecution, recordStatusChange } from '../../middleware/activityEv
 import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';
 import { startViolationFineWorkflow } from '../../../workflows/violationFineWorkflow.js';
 import { startViolationWorkflow } from '../../../workflows/violationWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ViolationRoute');
 
 const FINAL_STATUSES: ViolationStatus[] = ['CLOSED', 'DISMISSED'];
 

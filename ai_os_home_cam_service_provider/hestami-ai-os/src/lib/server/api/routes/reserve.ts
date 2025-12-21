@@ -5,6 +5,9 @@ import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import { startReserveWorkflow } from '../../workflows/reserveWorkflow.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('ReserveRoute');
 
 const ComponentCategoryEnum = z.enum([
 	'ROOFING',

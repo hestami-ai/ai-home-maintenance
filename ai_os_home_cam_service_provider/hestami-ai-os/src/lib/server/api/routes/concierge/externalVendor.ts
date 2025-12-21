@@ -11,6 +11,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ExternalVendorRoute');
 
 /**
  * External Vendor Context management for Phase 3.8

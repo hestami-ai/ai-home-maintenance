@@ -8,13 +8,23 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('CustomerWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'customer_status';
 const WORKFLOW_ERROR_EVENT = 'customer_error';
 
-type CustomerAction = 'CREATE' | 'UPDATE' | 'DELETE';
+export const CustomerAction = {
+	CREATE: 'CREATE',
+	UPDATE: 'UPDATE',
+	DELETE: 'DELETE'
+} as const;
 
-interface CustomerWorkflowInput {
+export type CustomerAction = (typeof CustomerAction)[keyof typeof CustomerAction];
+
+export interface CustomerWorkflowInput {
 	action: CustomerAction;
 	organizationId: string;
 	userId: string;
@@ -22,12 +32,8 @@ interface CustomerWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-interface CustomerWorkflowResult {
-	success: boolean;
-	action: CustomerAction;
+export interface CustomerWorkflowResult extends LifecycleWorkflowResult {
 	customerId?: string;
-	timestamp: string;
-	error?: string;
 }
 
 async function createCustomer(
@@ -211,4 +217,3 @@ export async function startCustomerWorkflow(
 	return handle.getResult();
 }
 
-export type { CustomerWorkflowInput, CustomerWorkflowResult, CustomerAction };

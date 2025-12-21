@@ -7,12 +7,19 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('InventoryLocationWorkflow');
 
 // Action types for the unified workflow
-export type InventoryLocationAction =
-	| 'CREATE_LOCATION'
-	| 'UPDATE_LOCATION'
-	| 'DELETE_LOCATION';
+export const InventoryLocationAction = {
+	CREATE_LOCATION: 'CREATE_LOCATION',
+	UPDATE_LOCATION: 'UPDATE_LOCATION',
+	DELETE_LOCATION: 'DELETE_LOCATION'
+} as const;
+
+export type InventoryLocationAction = (typeof InventoryLocationAction)[keyof typeof InventoryLocationAction];
 
 export interface InventoryLocationWorkflowInput {
 	action: InventoryLocationAction;
@@ -22,10 +29,8 @@ export interface InventoryLocationWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface InventoryLocationWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface InventoryLocationWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

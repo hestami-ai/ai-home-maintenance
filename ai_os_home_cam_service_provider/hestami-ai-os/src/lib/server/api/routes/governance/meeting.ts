@@ -11,6 +11,9 @@ import type {
 	VoteMethod,
 	VoteChoice
 } from '../../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('MeetingRoute');
 
 const meetingTypeEnum = z.enum(['BOARD', 'ANNUAL', 'SPECIAL']);
 const meetingStatusEnum = z.enum(['SCHEDULED', 'IN_SESSION', 'ADJOURNED', 'MINUTES_DRAFT', 'MINUTES_APPROVED', 'ARCHIVED', 'CANCELLED']);

@@ -7,9 +7,18 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ContractorBranchWorkflow');
 
 // Action types for the unified workflow
-export type ContractorBranchAction = 'CREATE_OR_UPDATE_BRANCH' | 'ARCHIVE_BRANCH';
+export const ContractorBranchAction = {
+	CREATE_OR_UPDATE_BRANCH: 'CREATE_OR_UPDATE_BRANCH',
+	ARCHIVE_BRANCH: 'ARCHIVE_BRANCH'
+} as const;
+
+export type ContractorBranchAction = (typeof ContractorBranchAction)[keyof typeof ContractorBranchAction];
 
 export interface ContractorBranchWorkflowInput {
 	action: ContractorBranchAction;
@@ -19,10 +28,8 @@ export interface ContractorBranchWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ContractorBranchWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ContractorBranchWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

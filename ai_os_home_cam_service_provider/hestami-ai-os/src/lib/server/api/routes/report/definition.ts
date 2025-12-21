@@ -4,6 +4,9 @@ import { orgProcedure, successResponse, PaginationInputSchema } from '../../rout
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ReportDefinitionRoute');
 
 const reportCategoryEnum = z.enum([
 	'FINANCIAL', 'RECEIVABLES', 'PAYABLES', 'OPERATIONAL', 'COMPLIANCE', 'GOVERNANCE', 'CUSTOM'

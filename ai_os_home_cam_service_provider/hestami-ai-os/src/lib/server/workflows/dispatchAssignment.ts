@@ -7,6 +7,9 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('DispatchAssignmentWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'dispatch_status';
 const WORKFLOW_ERROR_EVENT = 'dispatch_error';

@@ -7,18 +7,24 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ARCRequestStatus } from '../../../../generated/prisma/client.js';
+import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ARCRequestWorkflow');
 
 // Action types for the unified workflow
-export type ARCRequestAction = 
-	| 'CREATE_REQUEST'
-	| 'UPDATE_REQUEST'
-	| 'SUBMIT_REQUEST'
-	| 'WITHDRAW_REQUEST'
-	| 'ADD_DOCUMENT'
-	| 'RECORD_DECISION'
-	| 'REQUEST_INFO'
-	| 'SUBMIT_INFO';
+export const ARCRequestAction = {
+	CREATE_REQUEST: 'CREATE_REQUEST',
+	UPDATE_REQUEST: 'UPDATE_REQUEST',
+	SUBMIT_REQUEST: 'SUBMIT_REQUEST',
+	WITHDRAW_REQUEST: 'WITHDRAW_REQUEST',
+	ADD_DOCUMENT: 'ADD_DOCUMENT',
+	RECORD_DECISION: 'RECORD_DECISION',
+	REQUEST_INFO: 'REQUEST_INFO',
+	SUBMIT_INFO: 'SUBMIT_INFO'
+} as const;
+
+export type ARCRequestAction = (typeof ARCRequestAction)[keyof typeof ARCRequestAction];
 
 export interface ARCRequestWorkflowInput {
 	action: ARCRequestAction;
@@ -28,15 +34,18 @@ export interface ARCRequestWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ARCRequestWorkflowResult {
-	success: boolean;
-	entityId?: string;
+export interface ARCRequestWorkflowResult extends EntityWorkflowResult {
 	previousStatus?: string;
 	newStatus?: string;
-	error?: string;
 }
 
-const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
+const terminalStatuses: ARCRequestStatus[] = [
+	ARCRequestStatus.APPROVED,
+	ARCRequestStatus.DENIED,
+	ARCRequestStatus.WITHDRAWN,
+	ARCRequestStatus.CANCELLED,
+	ARCRequestStatus.EXPIRED
+];
 
 // Helper to generate request number
 async function generateRequestNumber(associationId: string): Promise<string> {

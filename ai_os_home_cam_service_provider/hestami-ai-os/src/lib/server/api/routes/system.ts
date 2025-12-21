@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { publicProcedure, successResponse } from '../router.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('SystemRoute');
 
 /**
  * System/health check procedures

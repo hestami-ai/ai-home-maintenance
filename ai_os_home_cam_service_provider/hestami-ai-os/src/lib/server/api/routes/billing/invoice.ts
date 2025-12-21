@@ -13,6 +13,9 @@ import { assertContractorOrg } from '../contractor/utils.js';
 import { JobInvoiceStatus } from '../../../../../../generated/prisma/client.js';
 import { startInvoiceCreateWorkflow } from '../../../workflows/invoiceCreateWorkflow.js';
 import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('InvoiceRoute');
 
 const invoiceLineOutput = z.object({
 	id: z.string(),

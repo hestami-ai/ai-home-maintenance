@@ -11,11 +11,15 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { JobInvoiceStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { type BaseWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('InvoiceCreateWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'invoice_create_status';
 const WORKFLOW_ERROR_EVENT = 'invoice_create_error';
 
-interface InvoiceLine {
+export interface InvoiceLine {
 	description: string;
 	quantity: number;
 	unitPrice: number;
@@ -24,7 +28,7 @@ interface InvoiceLine {
 	taxRate?: number;
 }
 
-interface InvoiceCreateInput {
+export interface InvoiceCreateInput {
 	organizationId: string;
 	userId: string;
 	jobId: string;
@@ -36,13 +40,11 @@ interface InvoiceCreateInput {
 	lines?: InvoiceLine[];
 }
 
-interface InvoiceCreateResult {
-	success: boolean;
+export interface InvoiceCreateResult extends BaseWorkflowResult {
 	invoiceId?: string;
 	invoiceNumber?: string;
 	status?: JobInvoiceStatus;
 	timestamp: string;
-	error?: string;
 }
 
 async function generateInvoiceNumber(organizationId: string): Promise<string> {
@@ -232,4 +234,3 @@ export async function getInvoiceCreateWorkflowStatus(
 	return status as { step: string; [key: string]: unknown } | null;
 }
 
-export type { InvoiceCreateInput, InvoiceCreateResult, InvoiceLine };

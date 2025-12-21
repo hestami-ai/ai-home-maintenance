@@ -7,15 +7,22 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ARCRequestStatus, ARCReviewAction } from '../../../../generated/prisma/client.js';
+import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
+import type { ARCReviewAction } from '../../../../generated/prisma/client.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ARCReviewWorkflow');
 
 // Action types for the unified workflow
-export type ARCReviewAction_WF =
-	| 'ADD_MEMBER'
-	| 'REMOVE_MEMBER'
-	| 'ASSIGN_COMMITTEE'
-	| 'SUBMIT_REVIEW'
-	| 'RECORD_DECISION';
+export const ARCReviewAction_WF = {
+	ADD_MEMBER: 'ADD_MEMBER',
+	REMOVE_MEMBER: 'REMOVE_MEMBER',
+	ASSIGN_COMMITTEE: 'ASSIGN_COMMITTEE',
+	SUBMIT_REVIEW: 'SUBMIT_REVIEW',
+	RECORD_DECISION: 'RECORD_DECISION'
+} as const;
+
+export type ARCReviewAction_WF = (typeof ARCReviewAction_WF)[keyof typeof ARCReviewAction_WF];
 
 export interface ARCReviewWorkflowInput {
 	action: ARCReviewAction_WF;
@@ -26,16 +33,22 @@ export interface ARCReviewWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ARCReviewWorkflowResult {
-	success: boolean;
-	entityId?: string;
+export interface ARCReviewWorkflowResult extends EntityWorkflowResult {
 	status?: string;
 	leftAt?: string;
-	error?: string;
 }
 
-const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
-const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
+const terminalStatuses: ARCRequestStatus[] = [
+	ARCRequestStatus.APPROVED,
+	ARCRequestStatus.DENIED,
+	ARCRequestStatus.WITHDRAWN,
+	ARCRequestStatus.CANCELLED,
+	ARCRequestStatus.EXPIRED
+];
+const reviewableStatuses: ARCRequestStatus[] = [
+	ARCRequestStatus.SUBMITTED,
+	ARCRequestStatus.UNDER_REVIEW
+];
 
 const ensureCommitteeBelongs = async (committeeId: string, associationId: string) => {
 	const committee = await prisma.aRCCommittee.findFirst({ where: { id: committeeId, associationId, isActive: true } });

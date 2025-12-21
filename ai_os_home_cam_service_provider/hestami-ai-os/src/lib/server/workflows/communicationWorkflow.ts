@@ -1,33 +1,98 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
+import {
+	CommunicationChannel,
+	CommunicationTemplateType,
+	DeliveryStatus,
+	AnnouncementStatus,
+	NotificationStatus,
+	type EntityWorkflowResult
+} from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('CommunicationWorkflow');
 
 // Action types for communication operations
-export type CommunicationAction =
-	| 'CREATE_TEMPLATE'
-	| 'CREATE_TEMPLATE_VERSION'
-	| 'ACTIVATE_TEMPLATE_VERSION'
-	| 'CREATE_MASS_COMMUNICATION'
-	| 'CREATE_DELIVERY_LOG'
-	| 'UPDATE_DELIVERY_STATUS'
-	| 'CREATE_ANNOUNCEMENT'
-	| 'MARK_ANNOUNCEMENT_READ'
-	| 'CREATE_EVENT'
-	| 'CREATE_EVENT_NOTIFICATION'
-	| 'UPDATE_EVENT_NOTIFICATION_STATUS';
+export const CommunicationAction = {
+	CREATE_TEMPLATE: 'CREATE_TEMPLATE',
+	CREATE_TEMPLATE_VERSION: 'CREATE_TEMPLATE_VERSION',
+	ACTIVATE_TEMPLATE_VERSION: 'ACTIVATE_TEMPLATE_VERSION',
+	CREATE_MASS_COMMUNICATION: 'CREATE_MASS_COMMUNICATION',
+	CREATE_DELIVERY_LOG: 'CREATE_DELIVERY_LOG',
+	UPDATE_DELIVERY_STATUS: 'UPDATE_DELIVERY_STATUS',
+	CREATE_ANNOUNCEMENT: 'CREATE_ANNOUNCEMENT',
+	MARK_ANNOUNCEMENT_READ: 'MARK_ANNOUNCEMENT_READ',
+	CREATE_EVENT: 'CREATE_EVENT',
+	CREATE_EVENT_NOTIFICATION: 'CREATE_EVENT_NOTIFICATION',
+	UPDATE_EVENT_NOTIFICATION_STATUS: 'UPDATE_EVENT_NOTIFICATION_STATUS'
+} as const;
+
+export type CommunicationAction = (typeof CommunicationAction)[keyof typeof CommunicationAction];
 
 export interface CommunicationWorkflowInput {
 	action: CommunicationAction;
 	organizationId: string;
 	userId: string;
 	entityId?: string;
-	data: Record<string, unknown>;
+	data: {
+		associationId?: string;
+		name?: string;
+		type?: CommunicationTemplateType | string;
+		channel?: CommunicationChannel;
+		subject?: string;
+		body?: string;
+		variables?: Prisma.InputJsonValue;
+		templateId?: string;
+		version?: string;
+		status?: DeliveryStatus | AnnouncementStatus | NotificationStatus | string;
+		scheduledAt?: string;
+		scheduledFor?: string;
+		recipientType?: string;
+		recipientFilter?: Prisma.InputJsonValue;
+		targetFilter?: Prisma.InputJsonValue;
+		recipientCount?: number;
+		recipientId?: string;
+		recipient?: string;
+		deliveryMethod?: string;
+		deliveryAddress?: string;
+		sentAt?: string;
+		deliveredAt?: string;
+		failedAt?: string;
+		errorMessage?: string;
+		title?: string;
+		content?: string;
+		priority?: string;
+		expiresAt?: string;
+		publishedAt?: string;
+		targetAudience?: string;
+		audienceFilter?: Prisma.InputJsonValue;
+		audience?: Prisma.InputJsonValue;
+		announcementId?: string;
+		partyId?: string;
+		eventType?: string;
+		eventId?: string;
+		userId?: string;
+		notificationId?: string;
+		notifyAt?: string;
+		readAt?: string;
+		dismissedAt?: string;
+		massCommunicationId?: string;
+		description?: string;
+		location?: string;
+		startTime?: string;
+		endTime?: string;
+		startsAt?: string;
+		endsAt?: string;
+		isAllDay?: boolean;
+		payload?: Prisma.InputJsonValue;
+		recurrenceRule?: string;
+		metadata?: Prisma.InputJsonValue;
+	};
 }
 
-export interface CommunicationWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface CommunicationWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each action

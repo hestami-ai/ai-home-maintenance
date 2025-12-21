@@ -5,6 +5,11 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
+	import { 
+		CONCIERGE_DOCUMENT_CATEGORIES,
+		CONCIERGE_CATEGORY_LABELS,
+		type ConciergeDocumentCategory
+	} from '$lib/utils/documentCategories';
 
 	interface Property {
 		id: string;
@@ -20,7 +25,7 @@
 	// Form state
 	let title = $state('');
 	let description = $state('');
-	let category = $state('OTHER');
+	let category = $state<ConciergeDocumentCategory>('GENERAL');
 	let selectedPropertyId = $state('');
 	let selectedFile = $state<globalThis.File | null>(null);
 	let isDragging = $state(false);
@@ -28,16 +33,11 @@
 	// Get pre-selected property from URL
 	const urlPropertyId = $page.url.searchParams.get('propertyId');
 
-	const categories = [
-		{ value: 'PROPERTY_DEED', label: 'Property Deed' },
-		{ value: 'INSURANCE', label: 'Insurance Policy' },
-		{ value: 'WARRANTY', label: 'Warranty' },
-		{ value: 'INSPECTION', label: 'Inspection Report' },
-		{ value: 'RECEIPT', label: 'Receipt' },
-		{ value: 'CONTRACT', label: 'Contract' },
-		{ value: 'PHOTO', label: 'Photo' },
-		{ value: 'OTHER', label: 'Other' }
-	];
+	// Use centralized category definitions from documentCategories.ts
+	const categories = CONCIERGE_DOCUMENT_CATEGORIES.map((cat) => ({
+		value: cat,
+		label: CONCIERGE_CATEGORY_LABELS[cat]
+	}));
 
 	const allowedTypes = [
 		'application/pdf',
@@ -163,7 +163,7 @@
 				contextId: selectedPropertyId,
 				title: title.trim(),
 				description: description.trim() || undefined,
-				category: category as any,
+				category: category,
 				visibility: 'PRIVATE'
 			});
 

@@ -3,10 +3,13 @@ import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/ap
 import { auth } from '$server/auth';
 import { prisma } from '$server/db';
 import { initDBOS } from '$server/dbos';
+import { createModuleLogger } from '$server/logger';
+
+const log = createModuleLogger('Hooks');
 
 // Initialize DBOS workflow engine
 const dbosReady = initDBOS().catch((err) => {
-	console.error('[DBOS] Failed to initialize:', err);
+	log.error('DBOS initialization failed', { error: err instanceof Error ? err.message : String(err) });
 });
 
 // Get tracer for creating spans
@@ -60,6 +63,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 				event.locals.session = session.session;
 				span.setAttribute('user.id', session.user.id);
 
+				log.debug('Session validated', {
+					userId: session.user.id,
+					email: session.user.email,
+					sessionId: session.session.id,
+					expiresAt: session.session.expiresAt.toISOString()
+				});
+
 				// Check for organization context header
 				const orgId = event.request.headers.get('X-Org-Id');
 				if (orgId) {
@@ -80,7 +90,38 @@ export const handle: Handle = async ({ event, resolve }) => {
 						event.locals.organization = membership.organization;
 						event.locals.role = membership.role;
 						span.setAttribute('org.id', orgId);
+						
+						log.debug('Organization context resolved', {
+							orgId,
+							orgSlug: membership.organization.slug,
+							role: membership.role,
+							userId: session.user.id
+						});
+					} else {
+						log.warn('Organization access denied', {
+							userId: session.user.id,
+							requestedOrgId: orgId,
+							reason: 'no_membership'
+						});
 					}
+				} else {
+					log.debug('No organization context in request', {
+						userId: session.user.id,
+						path: event.url.pathname
+					});
+				}
+			} else {
+				// No session - check if auth was expected
+				const authHeader = event.request.headers.get('Authorization');
+				const hasCookie = event.request.headers.get('Cookie')?.includes('better-auth');
+				
+				if (authHeader || hasCookie) {
+					log.warn('Auth validation failed', {
+						reason: 'invalid_or_expired',
+						hasAuthHeader: !!authHeader,
+						hasCookie: !!hasCookie,
+						path: event.url.pathname
+					});
 				}
 			}
 

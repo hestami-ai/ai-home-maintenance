@@ -91,32 +91,8 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  # Jaeger for distributed tracing (with Badger persistent storage)
-  jaeger:
-    image: jaegertracing/all-in-one:1.53
-    container_name: hestami-jaeger
-    user: root
-    env_file:
-      - ./.env
-    environment:
-      # Disable Jaeger's internal OTEL self-tracing
-      - OTEL_TRACES_EXPORTER=none
-      - OTEL_METRICS_EXPORTER=none
-    volumes:
-      - jaeger_badger:/badger
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "6831:6831/udp" # Jaeger agent (Thrift compact) - for Cerbos
-    networks:
-      - hestami-network
-    #restart: unless-stopped
-    logging:
-      driver: "local"
-      options:
-        max-size: "20m"
-        max-file: "5"
+  # NOTE: Jaeger removed - using SigNoz for distributed tracing
+  # SigNoz runs in separate docker-compose, connected via signoz-net network
 
   # Cerbos Policy Decision Point
   cerbos:
@@ -124,7 +100,7 @@ services:
     container_name: hestami-cerbos
     environment:
       - OTEL_SERVICE_NAME=cerbos
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-otel-collector:4318
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
     ports:
       - "3593:3593"  # gRPC
@@ -135,6 +111,7 @@ services:
     command: ["server", "--config=/config.yaml"]
     networks:
       - hestami-network
+      - signoz-net
     healthcheck:
       test: ["CMD", "/cerbos", "healthcheck", "--config=/config.yaml"]
       interval: 10s
@@ -170,8 +147,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      jaeger:
-        condition: service_started
       cerbos:
         condition: service_healthy
     labels:
@@ -186,6 +161,7 @@ services:
       - "traefik.http.routers.frontend.middlewares=upload-limit"
     networks:
       - hestami-network
+      - signoz-net
     #restart: unless-stopped
     logging:
       driver: "local"
@@ -196,8 +172,9 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  jaeger_badger:
 
 networks:
   hestami-network:
     driver: bridge
+  signoz-net:
+    external: true

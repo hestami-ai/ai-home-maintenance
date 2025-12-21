@@ -8,9 +8,19 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { NoticeType } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('NoticeTemplateWorkflow');
 
 // Action types for the unified workflow
-export type NoticeTemplateAction = 'CREATE_TEMPLATE' | 'UPDATE_TEMPLATE' | 'DELETE_TEMPLATE';
+export const NoticeTemplateAction = {
+	CREATE_TEMPLATE: 'CREATE_TEMPLATE',
+	UPDATE_TEMPLATE: 'UPDATE_TEMPLATE',
+	DELETE_TEMPLATE: 'DELETE_TEMPLATE'
+} as const;
+
+export type NoticeTemplateAction = (typeof NoticeTemplateAction)[keyof typeof NoticeTemplateAction];
 
 export interface NoticeTemplateWorkflowInput {
 	action: NoticeTemplateAction;
@@ -21,10 +31,8 @@ export interface NoticeTemplateWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface NoticeTemplateWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface NoticeTemplateWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

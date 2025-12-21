@@ -23965,12 +23965,12 @@ export interface operations {
                     idempotencyKey: string;
                     file: unknown;
                     /** @enum {unknown} */
-                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST";
+                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST" | "BOARD_MOTION" | "RESOLUTION" | "MEETING";
                     contextId: string;
                     title: string;
                     description?: string;
                     /** @enum {unknown} */
-                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                     /** @enum {unknown} */
                     visibility?: "PUBLIC" | "OWNERS_ONLY" | "BOARD_ONLY" | "STAFF_ONLY" | "PRIVATE";
                     /** Format: date-time */
@@ -23999,7 +23999,7 @@ export interface operations {
                                 fileSize: number;
                                 mimeType: string;
                                 /** @enum {unknown} */
-                                category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                                category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                                 /** @enum {unknown} */
                                 status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                                 version: number;
@@ -24085,12 +24085,12 @@ export interface operations {
                     /** Format: uuid */
                     idempotencyKey: string;
                     /** @enum {unknown} */
-                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST";
+                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST" | "BOARD_MOTION" | "RESOLUTION" | "MEETING";
                     contextId: string;
                     title: string;
                     description?: string;
                     /** @enum {unknown} */
-                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                     /** @enum {unknown} */
                     visibility?: "PUBLIC" | "OWNERS_ONLY" | "BOARD_ONLY" | "STAFF_ONLY" | "PRIVATE";
                     /** @enum {unknown} */
@@ -24124,7 +24124,7 @@ export interface operations {
                                 id: string;
                                 title: string;
                                 /** @enum {unknown} */
-                                category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                                category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                                 /** @enum {unknown} */
                                 status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                                 version: number;
@@ -24232,10 +24232,10 @@ export interface operations {
                     /** @default 20 */
                     limit?: number;
                     /** @enum {unknown} */
-                    contextType?: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST";
+                    contextType?: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST" | "BOARD_MOTION" | "RESOLUTION" | "MEETING";
                     contextId?: string;
                     /** @enum {unknown} */
-                    category?: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                    category?: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                     /** @enum {unknown} */
                     status?: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                     search?: string;
@@ -24299,7 +24299,7 @@ export interface operations {
                     title?: string;
                     description?: string;
                     /** @enum {unknown} */
-                    category?: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                    category?: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                     /** @enum {unknown} */
                     visibility?: "PUBLIC" | "OWNERS_ONLY" | "BOARD_ONLY" | "STAFF_ONLY" | "PRIVATE";
                     /** Format: date-time */
@@ -24725,7 +24725,7 @@ export interface operations {
                     idempotencyKey: string;
                     id: string;
                     /** @enum {unknown} */
-                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "JOB_PHOTO" | "JOB_VIDEO" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "GENERAL";
+                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                     reason: string;
                 };
             };
@@ -24775,7 +24775,7 @@ export interface operations {
                     idempotencyKey: string;
                     documentId: string;
                     /** @enum {unknown} */
-                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST";
+                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST" | "BOARD_MOTION" | "RESOLUTION" | "MEETING";
                     contextId: string;
                     isPrimary?: boolean;
                     bindingNotes?: string;
@@ -24826,7 +24826,7 @@ export interface operations {
                 "application/json": {
                     documentId: string;
                     /** @enum {unknown} */
-                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST";
+                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST" | "BOARD_MOTION" | "RESOLUTION" | "MEETING";
                     contextId: string;
                 };
             };

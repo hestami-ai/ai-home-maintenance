@@ -17,6 +17,9 @@ import type { ConciergeCaseStatus } from '../../../../../../generated/prisma/cli
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { DBOS } from '../../../dbos.js';
 import { caseLifecycleWorkflow_v1 } from '../../../workflows/caseLifecycleWorkflow.js';
+import { createLogger, createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ConciergeCaseRoute');
 
 // Schema for availability time slots
 const AvailabilitySlotSchema = z.object({
@@ -78,26 +81,34 @@ export const conciergeCaseRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			// Cerbos authorization
-			await context.cerbos.authorize('create', 'concierge_case', 'new');
-
-			// Verify property belongs to this organization
-			const property = await prisma.individualProperty.findFirst({
-				where: { id: input.propertyId, ownerOrgId: context.organization.id }
+			const reqLog = createLogger(context).child({ handler: 'create' });
+			
+			reqLog.info('Creating concierge case', {
+				propertyId: input.propertyId,
+				title: input.title,
+				priority: input.priority
 			});
 
-			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
-			}
+			try {
+				// Cerbos authorization
+				await context.cerbos.authorize('create', 'concierge_case', 'new');
+				reqLog.debug('Authorization passed');
 
-			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
-			// This ensures:
-			// 1. Idempotency - same key returns same result
-			// 2. Durability - workflow survives crashes
-			// 3. Trace correlation - all DB operations are in same trace
-			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
-				workflowID: input.idempotencyKey
-			})({
+				// Verify property belongs to this organization
+				const property = await prisma.individualProperty.findFirst({
+					where: { id: input.propertyId, ownerOrgId: context.organization.id }
+				});
+
+				if (!property) {
+					reqLog.warn('Property not found', { propertyId: input.propertyId });
+					throw ApiException.notFound('IndividualProperty');
+				}
+
+				// Use DBOS workflow for durable execution with idempotencyKey as workflowID
+				reqLog.debug('Starting case lifecycle workflow');
+				const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+					workflowID: input.idempotencyKey
+				})({
 				action: 'CREATE_CASE',
 				organizationId: context.organization.id,
 				userId: context.user.id,
@@ -112,32 +123,43 @@ export const conciergeCaseRouter = {
 				availabilitySlots: input.availabilitySlots
 			});
 
-			// Wait for the workflow to complete and get the result
-			const result = await handle.getResult();
+				// Wait for the workflow to complete and get the result
+				const result = await handle.getResult();
 
-			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create case');
+				if (!result.success) {
+					reqLog.error('Case creation workflow failed', { error: result.error });
+					throw ApiException.internal(result.error || 'Failed to create case');
+				}
+
+				// Fetch the created case for the response
+				const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+					where: { id: result.caseId }
+				});
+
+				reqLog.info('Concierge case created', {
+					caseId: conciergeCase.id,
+					caseNumber: conciergeCase.caseNumber,
+					status: conciergeCase.status
+				});
+
+				return successResponse(
+					{
+						case: {
+							id: conciergeCase.id,
+							caseNumber: conciergeCase.caseNumber,
+							propertyId: conciergeCase.propertyId,
+							title: conciergeCase.title,
+							status: conciergeCase.status,
+							priority: conciergeCase.priority,
+							createdAt: conciergeCase.createdAt.toISOString()
+						}
+					},
+					context
+				);
+			} catch (error) {
+				reqLog.exception(error instanceof Error ? error : new Error(String(error)));
+				throw error;
 			}
-
-			// Fetch the created case for the response
-			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: result.caseId }
-			});
-
-			return successResponse(
-				{
-					case: {
-						id: conciergeCase.id,
-						caseNumber: conciergeCase.caseNumber,
-						propertyId: conciergeCase.propertyId,
-						title: conciergeCase.title,
-						status: conciergeCase.status,
-						priority: conciergeCase.priority,
-						createdAt: conciergeCase.createdAt.toISOString()
-					}
-				},
-				context
-			);
 		}),
 
 	/**

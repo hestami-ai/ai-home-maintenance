@@ -8,13 +8,20 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ScheduleFrequency, ReportFormat, ReportDeliveryMethod } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ReportScheduleWorkflow');
 
 // Action types for the unified workflow
-export type ReportScheduleAction =
-	| 'CREATE_SCHEDULE'
-	| 'UPDATE_SCHEDULE'
-	| 'DELETE_SCHEDULE'
-	| 'RUN_NOW';
+export const ReportScheduleAction = {
+	CREATE_SCHEDULE: 'CREATE_SCHEDULE',
+	UPDATE_SCHEDULE: 'UPDATE_SCHEDULE',
+	DELETE_SCHEDULE: 'DELETE_SCHEDULE',
+	RUN_NOW: 'RUN_NOW'
+} as const;
+
+export type ReportScheduleAction = (typeof ReportScheduleAction)[keyof typeof ReportScheduleAction];
 
 export interface ReportScheduleWorkflowInput {
 	action: ReportScheduleAction;
@@ -25,10 +32,8 @@ export interface ReportScheduleWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ReportScheduleWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ReportScheduleWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Calculate next run date based on frequency

@@ -13,6 +13,9 @@ import { assertContractorOrg } from '../contractor/utils.js';
 import { EstimateStatus } from '../../../../../../generated/prisma/client.js';
 import { startEstimateCreateWorkflow } from '../../../workflows/estimateCreateWorkflow.js';
 import { startEstimateWorkflow } from '../../../workflows/estimateWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('EstimateRoute');
 
 const estimateLineOutput = z.object({
 	id: z.string(),

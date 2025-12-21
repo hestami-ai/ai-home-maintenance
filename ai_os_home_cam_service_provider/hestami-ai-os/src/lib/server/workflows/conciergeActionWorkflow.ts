@@ -8,12 +8,27 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ConciergeActionType, ConciergeActionStatus } from '../../../../generated/prisma/client.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ConciergeActionWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'concierge_action_status';
 const WORKFLOW_ERROR_EVENT = 'concierge_action_error';
 
-interface ConciergeActionWorkflowInput {
-	action: 'CREATE_ACTION' | 'START_ACTION' | 'COMPLETE_ACTION' | 'BLOCK_ACTION' | 'RESUME_ACTION' | 'CANCEL_ACTION';
+export const ConciergeActionAction = {
+	CREATE_ACTION: 'CREATE_ACTION',
+	START_ACTION: 'START_ACTION',
+	COMPLETE_ACTION: 'COMPLETE_ACTION',
+	BLOCK_ACTION: 'BLOCK_ACTION',
+	RESUME_ACTION: 'RESUME_ACTION',
+	CANCEL_ACTION: 'CANCEL_ACTION'
+} as const;
+
+export type ConciergeActionAction = (typeof ConciergeActionAction)[keyof typeof ConciergeActionAction];
+
+export interface ConciergeActionWorkflowInput {
+	action: ConciergeActionAction;
 	organizationId: string;
 	userId: string;
 	actionId?: string;
@@ -27,13 +42,9 @@ interface ConciergeActionWorkflowInput {
 	notes?: string;
 }
 
-interface ConciergeActionWorkflowResult {
-	success: boolean;
-	action: string;
-	timestamp: string;
+export interface ConciergeActionWorkflowResult extends LifecycleWorkflowResult {
 	actionId?: string;
 	status?: string;
-	error?: string;
 }
 
 const VALID_ACTION_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -423,4 +434,3 @@ export async function getConciergeActionWorkflowStatus(
 	return status as { step: string; [key: string]: unknown } | null;
 }
 
-export type { ConciergeActionWorkflowInput, ConciergeActionWorkflowResult };

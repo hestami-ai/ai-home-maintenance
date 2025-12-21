@@ -8,18 +8,22 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { PurchaseOrderStatus } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type PurchaseOrderAction =
-	| 'CREATE_PO'
-	| 'UPDATE_PO'
-	| 'ADD_LINE'
-	| 'REMOVE_LINE'
-	| 'SUBMIT_PO'
-	| 'CONFIRM_PO'
-	| 'RECEIVE_PO'
-	| 'CANCEL_PO'
-	| 'DELETE_PO';
+export const PurchaseOrderAction = {
+	CREATE_PO: 'CREATE_PO',
+	UPDATE_PO: 'UPDATE_PO',
+	ADD_LINE: 'ADD_LINE',
+	REMOVE_LINE: 'REMOVE_LINE',
+	SUBMIT_PO: 'SUBMIT_PO',
+	CONFIRM_PO: 'CONFIRM_PO',
+	RECEIVE_PO: 'RECEIVE_PO',
+	CANCEL_PO: 'CANCEL_PO',
+	DELETE_PO: 'DELETE_PO'
+} as const;
+
+export type PurchaseOrderAction = (typeof PurchaseOrderAction)[keyof typeof PurchaseOrderAction];
 
 export interface PurchaseOrderWorkflowInput {
 	action: PurchaseOrderAction;
@@ -30,10 +34,8 @@ export interface PurchaseOrderWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface PurchaseOrderWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface PurchaseOrderWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Helper to generate PO number

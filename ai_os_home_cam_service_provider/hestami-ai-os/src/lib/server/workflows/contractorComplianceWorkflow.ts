@@ -8,9 +8,19 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { VendorApprovalStatus } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ContractorComplianceWorkflow');
 
 // Action types for the unified workflow
-export type ContractorComplianceAction = 'REFRESH' | 'SET_BLOCK' | 'LINK_HOA_APPROVAL';
+export const ContractorComplianceAction = {
+	REFRESH: 'REFRESH',
+	SET_BLOCK: 'SET_BLOCK',
+	LINK_HOA_APPROVAL: 'LINK_HOA_APPROVAL'
+} as const;
+
+export type ContractorComplianceAction = (typeof ContractorComplianceAction)[keyof typeof ContractorComplianceAction];
 
 export interface ContractorComplianceWorkflowInput {
 	action: ContractorComplianceAction;
@@ -20,11 +30,8 @@ export interface ContractorComplianceWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ContractorComplianceWorkflowResult {
-	success: boolean;
-	entityId?: string;
+export interface ContractorComplianceWorkflowResult extends EntityWorkflowResult {
 	complianceData?: Record<string, unknown>;
-	error?: string;
 }
 
 async function getLinkAndProfile(vendorId: string, organizationId: string) {

@@ -8,16 +8,25 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ExternalApprovalStatus } from '../../../../generated/prisma/client.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ExternalApprovalWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'external_approval_status';
 const WORKFLOW_ERROR_EVENT = 'external_approval_error';
 
-interface ExternalApprovalWorkflowInput {
-	action:
-		| 'SUBMIT_APPROVAL'
-		| 'RECORD_RESPONSE'
-		| 'CHECK_EXPIRATIONS'
-		| 'EXTEND_APPROVAL';
+export const ExternalApprovalAction = {
+	SUBMIT_APPROVAL: 'SUBMIT_APPROVAL',
+	RECORD_RESPONSE: 'RECORD_RESPONSE',
+	CHECK_EXPIRATIONS: 'CHECK_EXPIRATIONS',
+	EXTEND_APPROVAL: 'EXTEND_APPROVAL'
+} as const;
+
+export type ExternalApprovalAction = (typeof ExternalApprovalAction)[keyof typeof ExternalApprovalAction];
+
+export interface ExternalApprovalWorkflowInput {
+	action: ExternalApprovalAction;
 	organizationId: string;
 	userId: string;
 	approvalId?: string;
@@ -28,14 +37,10 @@ interface ExternalApprovalWorkflowInput {
 	daysAhead?: number;
 }
 
-interface ExternalApprovalWorkflowResult {
-	success: boolean;
-	action: string;
-	timestamp: string;
+export interface ExternalApprovalWorkflowResult extends LifecycleWorkflowResult {
 	approvalId?: string;
 	status?: string;
 	expiringApprovals?: Array<{ id: string; approvalType: string; expiresAt: string; daysUntil: number }>;
-	error?: string;
 }
 
 async function submitApproval(
@@ -307,4 +312,3 @@ export async function getExternalApprovalWorkflowStatus(
 	return status as { step: string; [key: string]: unknown } | null;
 }
 
-export type { ExternalApprovalWorkflowInput, ExternalApprovalWorkflowResult };

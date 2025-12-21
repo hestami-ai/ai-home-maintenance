@@ -7,9 +7,19 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ContractSLAWorkflow');
 
 // Action types for the unified workflow
-export type ContractSLAAction = 'CREATE_SLA' | 'UPDATE_SLA' | 'CALCULATE_SLA';
+export const ContractSLAAction = {
+	CREATE_SLA: 'CREATE_SLA',
+	UPDATE_SLA: 'UPDATE_SLA',
+	CALCULATE_SLA: 'CALCULATE_SLA'
+} as const;
+
+export type ContractSLAAction = (typeof ContractSLAAction)[keyof typeof ContractSLAAction];
 
 export interface ContractSLAWorkflowInput {
 	action: ContractSLAAction;
@@ -19,10 +29,8 @@ export interface ContractSLAWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ContractSLAWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ContractSLAWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

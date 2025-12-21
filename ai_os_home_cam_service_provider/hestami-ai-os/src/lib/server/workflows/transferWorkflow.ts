@@ -7,13 +7,17 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type TransferAction =
-	| 'CREATE_TRANSFER'
-	| 'SHIP_TRANSFER'
-	| 'RECEIVE_TRANSFER'
-	| 'CANCEL_TRANSFER';
+export const TransferAction = {
+	CREATE_TRANSFER: 'CREATE_TRANSFER',
+	SHIP_TRANSFER: 'SHIP_TRANSFER',
+	RECEIVE_TRANSFER: 'RECEIVE_TRANSFER',
+	CANCEL_TRANSFER: 'CANCEL_TRANSFER'
+} as const;
+
+export type TransferAction = (typeof TransferAction)[keyof typeof TransferAction];
 
 export interface TransferWorkflowInput {
 	action: TransferAction;
@@ -23,10 +27,8 @@ export interface TransferWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface TransferWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface TransferWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Helper to generate transfer number

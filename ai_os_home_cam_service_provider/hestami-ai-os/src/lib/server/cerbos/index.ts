@@ -9,6 +9,9 @@ import { GRPC } from '@cerbos/grpc';
 import type { Value } from '@cerbos/core';
 import { ApiException } from '../api/errors.js';
 import type { User, UserRole } from '../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../logger.js';
+
+const log = createModuleLogger('Cerbos');
 
 // ============================================================================
 // Types
@@ -136,7 +139,7 @@ export function buildPrincipal(
 		roles.push(cerbosRole);
 	}
 
-	return {
+	const principal: CerbosPrincipal = {
 		id: user.id,
 		roles,
 		attr: {
@@ -145,6 +148,18 @@ export function buildPrincipal(
 		},
 		scope: currentOrgSlug
 	};
+
+	log.debug('Principal constructed', {
+		userId: user.id,
+		email: user.email,
+		roles: principal.roles,
+		scope: principal.scope,
+		orgRolesCount: Object.keys(orgRoles).length,
+		hasVendorId: !!vendorId,
+		currentOrgId
+	});
+
+	return principal;
 }
 
 // ============================================================================
@@ -183,9 +198,25 @@ export async function isAllowed(
 			action
 		});
 
-		return result === true;
+		const allowed = result === true;
+		log.debug('Authorization check', {
+			principalId: principal.id,
+			roles: principal.roles,
+			resourceKind: resource.kind,
+			resourceId: resource.id,
+			action,
+			allowed
+		});
+
+		return allowed;
 	} catch (error) {
-		console.error('[Cerbos] isAllowed error:', error);
+		log.error('Authorization check failed', {
+			principalId: principal.id,
+			resourceKind: resource.kind,
+			resourceId: resource.id,
+			action,
+			error: error instanceof Error ? error.message : String(error)
+		});
 		throw error;
 	}
 }

@@ -7,12 +7,25 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('InventoryWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'inventory_status';
 const WORKFLOW_ERROR_EVENT = 'inventory_error';
 
-interface InventoryWorkflowInput {
-	action: 'LOG_USAGE' | 'CHECK_REORDER' | 'CREATE_PO' | 'RECEIVE_PO';
+export const InventoryAction = {
+	LOG_USAGE: 'LOG_USAGE',
+	CHECK_REORDER: 'CHECK_REORDER',
+	CREATE_PO: 'CREATE_PO',
+	RECEIVE_PO: 'RECEIVE_PO'
+} as const;
+
+export type InventoryAction = (typeof InventoryAction)[keyof typeof InventoryAction];
+
+export interface InventoryWorkflowInput {
+	action: InventoryAction;
 	organizationId: string;
 	userId: string;
 	// For LOG_USAGE
@@ -26,14 +39,10 @@ interface InventoryWorkflowInput {
 	items?: Array<{ itemId: string; quantity: number; unitCost: number }>;
 }
 
-interface InventoryWorkflowResult {
-	success: boolean;
-	action: string;
-	timestamp: string;
+export interface InventoryWorkflowResult extends LifecycleWorkflowResult {
 	usageId?: string;
 	reorderItems?: Array<{ itemId: string; itemName: string; currentStock: number; reorderPoint: number }>;
 	purchaseOrderId?: string;
-	error?: string;
 }
 
 async function logMaterialUsage(
@@ -359,4 +368,3 @@ export async function getInventoryWorkflowError(
 	return error as { error: string } | null;
 }
 
-export type { InventoryWorkflowInput, InventoryWorkflowResult };

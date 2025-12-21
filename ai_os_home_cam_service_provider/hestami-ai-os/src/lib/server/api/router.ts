@@ -16,6 +16,9 @@ import {
 	type QueryPlanResult
 } from '../cerbos/index.js';
 import type { User, Organization, UserRole } from '../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../logger.js';
+
+const log = createModuleLogger('api:router');
 
 /**
  * Base oRPC instance with context type
@@ -132,7 +135,16 @@ export const orgProcedure = authedProcedure.use(async ({ context, next }) => {
 				attrs,
 				organization.slug ?? undefined
 			);
-			return isAllowed(principal, resource, action);
+			const allowed = await isAllowed(principal, resource, action);
+			log.debug('Authorization check', {
+				action,
+				resourceKind,
+				resourceId,
+				allowed,
+				userId: user.id,
+				orgId: organization.id
+			});
+			return allowed;
 		},
 
 		authorize: async (
@@ -148,7 +160,26 @@ export const orgProcedure = authedProcedure.use(async ({ context, next }) => {
 				attrs,
 				organization.slug ?? undefined
 			);
-			await requireAuthorization(principal, resource, action);
+			try {
+				await requireAuthorization(principal, resource, action);
+				log.debug('Authorization granted', {
+					action,
+					resourceKind,
+					resourceId,
+					userId: user.id,
+					orgId: organization.id
+				});
+			} catch (error) {
+				log.warn('Authorization denied', {
+					action,
+					resourceKind,
+					resourceId,
+					userId: user.id,
+					orgId: organization.id,
+					roles: principal.roles
+				});
+				throw error;
+			}
 		},
 
 		queryFilter: async (
@@ -162,11 +193,20 @@ export const orgProcedure = authedProcedure.use(async ({ context, next }) => {
 				action,
 				organization.slug ?? undefined
 			);
-			return queryPlanToPrismaWhere(
+			const result = queryPlanToPrismaWhere(
 				plan,
 				fieldMapper || STANDARD_FIELD_MAPPINGS,
 				user.id
 			);
+			log.debug('Query filter generated', {
+				action,
+				resourceKind,
+				filterKind: result.kind,
+				hasFilter: result.kind === 'conditional',
+				userId: user.id,
+				orgId: organization.id
+			});
+			return result;
 		}
 	};
 

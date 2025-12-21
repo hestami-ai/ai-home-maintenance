@@ -8,12 +8,19 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ReportCategory, ReportFormat } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ReportDefinitionWorkflow');
 
 // Action types for the unified workflow
-export type ReportDefinitionAction =
-	| 'CREATE_REPORT'
-	| 'UPDATE_REPORT'
-	| 'DELETE_REPORT';
+export const ReportDefinitionAction = {
+	CREATE_REPORT: 'CREATE_REPORT',
+	UPDATE_REPORT: 'UPDATE_REPORT',
+	DELETE_REPORT: 'DELETE_REPORT'
+} as const;
+
+export type ReportDefinitionAction = (typeof ReportDefinitionAction)[keyof typeof ReportDefinitionAction];
 
 export interface ReportDefinitionWorkflowInput {
 	action: ReportDefinitionAction;
@@ -24,10 +31,8 @@ export interface ReportDefinitionWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ReportDefinitionWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ReportDefinitionWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

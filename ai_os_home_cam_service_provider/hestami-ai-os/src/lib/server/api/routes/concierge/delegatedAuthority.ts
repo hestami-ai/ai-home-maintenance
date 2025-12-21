@@ -12,6 +12,9 @@ import { ApiException } from '../../errors.js';
 import { DelegatedAuthorityTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/DelegatedAuthorityTypeSchema.js';
 import { DelegatedAuthorityStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/DelegatedAuthorityStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('DelegatedAuthorityRoute');
 
 /**
  * Delegated Authority management procedures for Phase 3 Concierge Platform

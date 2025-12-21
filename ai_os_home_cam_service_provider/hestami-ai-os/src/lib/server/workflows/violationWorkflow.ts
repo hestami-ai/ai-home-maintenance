@@ -7,30 +7,70 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ViolationStatus, Prisma } from '../../../../generated/prisma/client.js';
+import type { Prisma } from '../../../../generated/prisma/client.js';
+import {
+	ViolationStatus,
+	ViolationSeverity,
+	HearingOutcome,
+	AppealStatus,
+	type EntityWorkflowResult
+} from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ViolationWorkflow');
 
 // Action types for the unified workflow
-export type ViolationAction = 
-	| 'UPDATE_VIOLATION'
-	| 'UPDATE_STATUS'
-	| 'SCHEDULE_HEARING'
-	| 'RECORD_HEARING_OUTCOME'
-	| 'RECORD_APPEAL'
-	| 'SCHEDULE_APPEAL_HEARING'
-	| 'RECORD_APPEAL_DECISION';
+export const ViolationAction = {
+	UPDATE_VIOLATION: 'UPDATE_VIOLATION',
+	UPDATE_STATUS: 'UPDATE_STATUS',
+	SCHEDULE_HEARING: 'SCHEDULE_HEARING',
+	RECORD_HEARING_OUTCOME: 'RECORD_HEARING_OUTCOME',
+	RECORD_APPEAL: 'RECORD_APPEAL',
+	SCHEDULE_APPEAL_HEARING: 'SCHEDULE_APPEAL_HEARING',
+	RECORD_APPEAL_DECISION: 'RECORD_APPEAL_DECISION'
+} as const;
+
+export type ViolationAction = (typeof ViolationAction)[keyof typeof ViolationAction];
 
 export interface ViolationWorkflowInput {
 	action: ViolationAction;
 	organizationId: string;
 	userId: string;
 	violationId: string;
-	data: Record<string, unknown>;
+	data: {
+		title?: string;
+		description?: string;
+		severity?: ViolationSeverity;
+		unitId?: string;
+		commonAreaName?: string;
+		locationDetails?: string;
+		observedDate?: string;
+		responsiblePartyId?: string;
+		reporterType?: string;
+		status?: ViolationStatus;
+		notes?: string;
+		hearingDate?: string;
+		hearingLocation?: string;
+		hearingNotes?: string;
+		outcome?: HearingOutcome;
+		fineAmount?: number;
+		appealReason?: string;
+		appealDate?: string;
+		appealStatus?: AppealStatus;
+		appealDecision?: string;
+		appealDecisionDate?: string;
+		hearingId?: string;
+		reason?: string;
+		appealId?: string;
+		decision?: string;
+		filedBy?: string;
+		documentsJson?: string | null;
+		revisedFineAmount?: number;
+	};
 }
 
-export interface ViolationWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ViolationWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

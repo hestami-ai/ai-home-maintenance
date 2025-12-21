@@ -27,6 +27,9 @@ import type {
 	ARCDocumentType
 } from '../../../../../../generated/prisma/client.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ARCRequestRoute');
 
 // Use shared enum schemas from schemas.ts
 const arcCategoryEnum = ARCCategorySchema;

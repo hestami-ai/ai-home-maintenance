@@ -7,14 +7,20 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { AppealStatus } from '../../../../generated/prisma/client.js';
+import { AppealStatus, type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('AppealWorkflow');
 
 // Action types for the unified workflow
-export type AppealAction =
-	| 'FILE_APPEAL'
-	| 'SCHEDULE_HEARING'
-	| 'RECORD_DECISION'
-	| 'WITHDRAW_APPEAL';
+export const AppealAction = {
+	FILE_APPEAL: 'FILE_APPEAL',
+	SCHEDULE_HEARING: 'SCHEDULE_HEARING',
+	RECORD_DECISION: 'RECORD_DECISION',
+	WITHDRAW_APPEAL: 'WITHDRAW_APPEAL'
+} as const;
+
+export type AppealAction = (typeof AppealAction)[keyof typeof AppealAction];
 
 export interface AppealWorkflowInput {
 	action: AppealAction;
@@ -25,10 +31,8 @@ export interface AppealWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface AppealWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface AppealWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

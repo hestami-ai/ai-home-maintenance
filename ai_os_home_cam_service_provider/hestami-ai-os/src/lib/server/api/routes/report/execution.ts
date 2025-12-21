@@ -4,6 +4,9 @@ import { orgProcedure, successResponse, PaginationInputSchema } from '../../rout
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startReportExecutionWorkflow } from '../../../workflows/reportExecutionWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ReportExecutionRoute');
 
 const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 const executionStatusEnum = z.enum(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);

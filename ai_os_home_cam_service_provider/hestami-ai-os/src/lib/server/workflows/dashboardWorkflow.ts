@@ -8,13 +8,20 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { WidgetType } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('DashboardWorkflow');
 
 // Action types for the unified workflow
-export type DashboardAction =
-	| 'CREATE_WIDGET'
-	| 'UPDATE_WIDGET'
-	| 'DELETE_WIDGET'
-	| 'REORDER_WIDGETS';
+export const DashboardAction = {
+	CREATE_WIDGET: 'CREATE_WIDGET',
+	UPDATE_WIDGET: 'UPDATE_WIDGET',
+	DELETE_WIDGET: 'DELETE_WIDGET',
+	REORDER_WIDGETS: 'REORDER_WIDGETS'
+} as const;
+
+export type DashboardAction = (typeof DashboardAction)[keyof typeof DashboardAction];
 
 export interface DashboardWorkflowInput {
 	action: DashboardAction;
@@ -25,10 +32,8 @@ export interface DashboardWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface DashboardWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface DashboardWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

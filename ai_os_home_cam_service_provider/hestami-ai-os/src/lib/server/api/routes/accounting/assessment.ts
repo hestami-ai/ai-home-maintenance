@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { postAssessmentChargeToGL } from '../../../accounting/index.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('AssessmentRoute');
 
 /**
  * Assessment management procedures

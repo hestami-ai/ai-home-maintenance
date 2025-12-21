@@ -4,6 +4,9 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startServiceAreaWorkflow } from '../../../workflows/serviceAreaWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('ServiceAreaRoute');
 
 const assertServiceProviderOrg = async (organizationId: string) => {
 	const org = await prisma.organization.findFirst({

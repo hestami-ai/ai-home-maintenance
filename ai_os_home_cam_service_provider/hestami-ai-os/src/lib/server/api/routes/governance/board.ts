@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type { BoardRole, Prisma } from '../../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('BoardRoute');
 
 const boardRoleEnum = z.enum(['PRESIDENT', 'VICE_PRESIDENT', 'SECRETARY', 'TREASURER', 'DIRECTOR', 'MEMBER_AT_LARGE']);
 

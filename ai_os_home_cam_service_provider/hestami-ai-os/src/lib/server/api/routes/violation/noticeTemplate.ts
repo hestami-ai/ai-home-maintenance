@@ -4,6 +4,9 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { startNoticeTemplateWorkflow } from '../../../workflows/noticeTemplateWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('NoticeTemplateRoute');
 
 const noticeTypeEnum = z.enum([
 	'WARNING', 'FIRST_NOTICE', 'SECOND_NOTICE', 'FINAL_NOTICE',

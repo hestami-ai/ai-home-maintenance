@@ -1,6 +1,9 @@
 import { prisma } from '../../db.js';
 import { ApiException, ErrorCode, ErrorType } from '../errors.js';
 import type { RequestContext } from '../context.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('IdempotencyMiddleware');
 
 /**
  * Idempotency key TTL in milliseconds (24 hours)

@@ -3,18 +3,41 @@
  * 
  * This file provides typed Zod schemas for API responses.
  * 
- * NOTE: Due to Prisma 7.x compatibility issues with zod-prisma-types,
- * we define schemas manually here rather than importing from generated files.
- * These schemas should match the Prisma model definitions.
- * 
  * These schemas are used in route `.output()` definitions to ensure:
  * 1. Runtime validation of responses
  * 2. Accurate OpenAPI specification generation
  * 3. Type-safe frontend code generation
+ * 
+ * ARCHITECTURE:
+ * - Enum schemas are imported from generated Zod schemas (single source of truth)
+ * - Model schemas are defined here for API response shaping
  */
 
 import { z } from 'zod';
 import { ResponseMetaSchema } from './errors.js';
+
+// Import generated enum schemas from Prisma/Zod generation
+import { ARCCategorySchema as GeneratedARCCategorySchema } from '../../../../generated/zod/inputTypeSchemas/ARCCategorySchema.js';
+import { ARCRequestStatusSchema as GeneratedARCRequestStatusSchema } from '../../../../generated/zod/inputTypeSchemas/ARCRequestStatusSchema.js';
+import { ARCReviewActionSchema as GeneratedARCReviewActionSchema } from '../../../../generated/zod/inputTypeSchemas/ARCReviewActionSchema.js';
+import { ARCDocumentTypeSchema as GeneratedARCDocumentTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ARCDocumentTypeSchema.js';
+import { ViolationStatusSchema as GeneratedViolationStatusSchema } from '../../../../generated/zod/inputTypeSchemas/ViolationStatusSchema.js';
+import { ViolationSeveritySchema as GeneratedViolationSeveritySchema } from '../../../../generated/zod/inputTypeSchemas/ViolationSeveritySchema.js';
+import { NoticeTypeSchema as GeneratedNoticeTypeSchema } from '../../../../generated/zod/inputTypeSchemas/NoticeTypeSchema.js';
+import { NoticeDeliveryMethodSchema as GeneratedNoticeDeliveryMethodSchema } from '../../../../generated/zod/inputTypeSchemas/NoticeDeliveryMethodSchema.js';
+import { HearingOutcomeSchema as GeneratedHearingOutcomeSchema } from '../../../../generated/zod/inputTypeSchemas/HearingOutcomeSchema.js';
+import { AppealStatusSchema as GeneratedAppealStatusSchema } from '../../../../generated/zod/inputTypeSchemas/AppealStatusSchema.js';
+import { DocumentCategorySchema as GeneratedDocumentCategorySchema } from '../../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
+import { DocumentContextTypeSchema as GeneratedDocumentContextTypeSchema } from '../../../../generated/zod/inputTypeSchemas/DocumentContextTypeSchema.js';
+import { DocumentVisibilitySchema as GeneratedDocumentVisibilitySchema } from '../../../../generated/zod/inputTypeSchemas/DocumentVisibilitySchema.js';
+import { DocumentStatusSchema as GeneratedDocumentStatusSchema } from '../../../../generated/zod/inputTypeSchemas/DocumentStatusSchema.js';
+import { StorageProviderSchema as GeneratedStorageProviderSchema } from '../../../../generated/zod/inputTypeSchemas/StorageProviderSchema.js';
+import { WorkOrderStatusSchema as GeneratedWorkOrderStatusSchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderStatusSchema.js';
+import { WorkOrderPrioritySchema as GeneratedWorkOrderPrioritySchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderPrioritySchema.js';
+import { WorkOrderCategorySchema as GeneratedWorkOrderCategorySchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderCategorySchema.js';
+import { WorkOrderOriginTypeSchema as GeneratedWorkOrderOriginTypeSchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderOriginTypeSchema.js';
+import { BidStatusSchema as GeneratedBidStatusSchema } from '../../../../generated/zod/inputTypeSchemas/BidStatusSchema.js';
+import { FundTypeSchema as GeneratedFundTypeSchema } from '../../../../generated/zod/inputTypeSchemas/FundTypeSchema.js';
 
 // Re-export for convenience
 export { ResponseMetaSchema };
@@ -50,29 +73,19 @@ export function paginatedResponseSchema<T extends z.ZodTypeAny>(itemSchema: T, i
 }
 
 // =============================================================================
-// Enum Schemas
+// Enum Schemas (re-exported from generated Zod schemas)
 // =============================================================================
 
-export const ARCCategorySchema = z.enum([
-	'FENCE', 'ROOF', 'PAINT', 'ADDITION', 'LANDSCAPING', 'WINDOWS',
-	'DOORS', 'DRIVEWAY', 'GARAGE', 'SOLAR', 'HVAC', 'OTHER'
-]);
+export const ARCCategorySchema = GeneratedARCCategorySchema;
 export type ARCCategory = z.infer<typeof ARCCategorySchema>;
 
-export const ARCRequestStatusSchema = z.enum([
-	'DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'DENIED',
-	'CHANGES_REQUESTED', 'TABLED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'
-]);
+export const ARCRequestStatusSchema = GeneratedARCRequestStatusSchema;
 export type ARCRequestStatus = z.infer<typeof ARCRequestStatusSchema>;
 
-export const ARCReviewActionSchema = z.enum([
-	'APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE'
-]);
+export const ARCReviewActionSchema = GeneratedARCReviewActionSchema;
 export type ARCReviewAction = z.infer<typeof ARCReviewActionSchema>;
 
-export const ARCDocumentTypeSchema = z.enum([
-	'PLANS', 'SPECS', 'PHOTO', 'PERMIT', 'RENDERING', 'SURVEY', 'OTHER'
-]);
+export const ARCDocumentTypeSchema = GeneratedARCDocumentTypeSchema;
 export type ARCDocumentType = z.infer<typeof ARCDocumentTypeSchema>;
 
 // =============================================================================
@@ -344,40 +357,25 @@ export const ARCRequestFinalizeResponseSchema = successResponseSchema(
 );
 
 // =============================================================================
-// Violation Domain Enum Schemas
+// Violation Domain Enum Schemas (re-exported from generated Zod schemas)
 // =============================================================================
 
-export const ViolationStatusSchema = z.enum([
-	'DRAFT', 'OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'CURED', 'ESCALATED',
-	'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'APPEALED',
-	'CLOSED', 'DISMISSED'
-]);
+export const ViolationStatusSchema = GeneratedViolationStatusSchema;
 export type ViolationStatus = z.infer<typeof ViolationStatusSchema>;
 
-export const ViolationSeveritySchema = z.enum([
-	'MINOR', 'MODERATE', 'MAJOR', 'CRITICAL'
-]);
+export const ViolationSeveritySchema = GeneratedViolationSeveritySchema;
 export type ViolationSeverity = z.infer<typeof ViolationSeveritySchema>;
 
-export const NoticeTypeSchema = z.enum([
-	'WARNING', 'FIRST_NOTICE', 'SECOND_NOTICE', 'FINAL_NOTICE',
-	'FINE_NOTICE', 'HEARING_NOTICE', 'CURE_CONFIRMATION'
-]);
+export const NoticeTypeSchema = GeneratedNoticeTypeSchema;
 export type NoticeType = z.infer<typeof NoticeTypeSchema>;
 
-export const NoticeDeliveryMethodSchema = z.enum([
-	'EMAIL', 'MAIL', 'CERTIFIED_MAIL', 'POSTED', 'HAND_DELIVERED', 'PORTAL'
-]);
+export const NoticeDeliveryMethodSchema = GeneratedNoticeDeliveryMethodSchema;
 export type NoticeDeliveryMethod = z.infer<typeof NoticeDeliveryMethodSchema>;
 
-export const HearingOutcomeSchema = z.enum([
-	'PENDING', 'UPHELD', 'MODIFIED', 'DISMISSED', 'CONTINUED'
-]);
+export const HearingOutcomeSchema = GeneratedHearingOutcomeSchema;
 export type HearingOutcome = z.infer<typeof HearingOutcomeSchema>;
 
-export const AppealStatusSchema = z.enum([
-	'PENDING', 'GRANTED', 'DENIED', 'WITHDRAWN'
-]);
+export const AppealStatusSchema = GeneratedAppealStatusSchema;
 export type AppealStatus = z.infer<typeof AppealStatusSchema>;
 
 // =============================================================================
@@ -594,39 +592,22 @@ export const ViolationSummarySchema = z.object({
 export type ViolationSummary = z.infer<typeof ViolationSummarySchema>;
 
 // =============================================================================
-// Document Domain Enum Schemas
+// Document Domain Enum Schemas (re-exported from generated Zod schemas)
 // =============================================================================
 
-export const DocumentCategorySchema = z.enum([
-	'GOVERNING_DOCS', 'FINANCIAL', 'MEETING', 'LEGAL', 'INSURANCE',
-	'MAINTENANCE', 'ARCHITECTURAL', 'RESERVE_STUDY', 'INSPECTION', 'CONTRACT',
-	'CC_AND_RS', 'PERMIT', 'APPROVAL', 'CORRESPONDENCE', 'TITLE_DEED',
-	'SURVEY', 'WARRANTY', 'LICENSE', 'CERTIFICATION', 'BOND',
-	'PROPOSAL', 'ESTIMATE', 'INVOICE', 'WORK_ORDER', 'JOB_PHOTO',
-	'JOB_VIDEO', 'VOICE_NOTE', 'SIGNATURE', 'CHECKLIST', 'GENERAL'
-]);
+export const DocumentCategorySchema = GeneratedDocumentCategorySchema;
 export type DocumentCategory = z.infer<typeof DocumentCategorySchema>;
 
-export const DocumentContextTypeSchema = z.enum([
-	'ASSOCIATION', 'PROPERTY', 'UNIT', 'JOB', 'CASE', 'WORK_ORDER',
-	'TECHNICIAN', 'CONTRACTOR', 'VENDOR', 'PARTY', 'OWNER_INTENT',
-	'VIOLATION', 'ARC_REQUEST'
-]);
+export const DocumentContextTypeSchema = GeneratedDocumentContextTypeSchema;
 export type DocumentContextType = z.infer<typeof DocumentContextTypeSchema>;
 
-export const DocumentVisibilitySchema = z.enum([
-	'PUBLIC', 'OWNERS_ONLY', 'BOARD_ONLY', 'STAFF_ONLY', 'PRIVATE'
-]);
+export const DocumentVisibilitySchema = GeneratedDocumentVisibilitySchema;
 export type DocumentVisibility = z.infer<typeof DocumentVisibilitySchema>;
 
-export const DocumentStatusSchema = z.enum([
-	'DRAFT', 'ACTIVE', 'SUPERSEDED', 'ARCHIVED'
-]);
+export const DocumentStatusSchema = GeneratedDocumentStatusSchema;
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
 
-export const StorageProviderSchema = z.enum([
-	'LOCAL', 'S3', 'AZURE_BLOB', 'GCS'
-]);
+export const StorageProviderSchema = GeneratedStorageProviderSchema;
 export type StorageProvider = z.infer<typeof StorageProviderSchema>;
 
 // =============================================================================
@@ -713,39 +694,25 @@ export const DocumentSummarySchema = z.object({
 export type DocumentSummary = z.infer<typeof DocumentSummarySchema>;
 
 // =============================================================================
-// WorkOrder Domain Enum Schemas
+// WorkOrder Domain Enum Schemas (re-exported from generated Zod schemas)
 // =============================================================================
 
-export const WorkOrderStatusSchema = z.enum([
-	'DRAFT', 'SUBMITTED', 'TRIAGED', 'AUTHORIZED', 'ASSIGNED', 'SCHEDULED',
-	'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'REVIEW_REQUIRED', 'INVOICED', 'CLOSED', 'CANCELLED'
-]);
+export const WorkOrderStatusSchema = GeneratedWorkOrderStatusSchema;
 export type WorkOrderStatus = z.infer<typeof WorkOrderStatusSchema>;
 
-export const WorkOrderPrioritySchema = z.enum([
-	'EMERGENCY', 'HIGH', 'MEDIUM', 'LOW', 'SCHEDULED'
-]);
+export const WorkOrderPrioritySchema = GeneratedWorkOrderPrioritySchema;
 export type WorkOrderPriority = z.infer<typeof WorkOrderPrioritySchema>;
 
-export const WorkOrderCategorySchema = z.enum([
-	'MAINTENANCE', 'REPAIR', 'INSPECTION', 'INSTALLATION', 'REPLACEMENT',
-	'EMERGENCY', 'PREVENTIVE', 'LANDSCAPING', 'CLEANING', 'SECURITY', 'OTHER'
-]);
+export const WorkOrderCategorySchema = GeneratedWorkOrderCategorySchema;
 export type WorkOrderCategory = z.infer<typeof WorkOrderCategorySchema>;
 
-export const WorkOrderOriginTypeSchema = z.enum([
-	'VIOLATION_REMEDIATION', 'ARC_APPROVAL', 'PREVENTIVE_MAINTENANCE',
-	'BOARD_DIRECTIVE', 'EMERGENCY_ACTION', 'MANUAL'
-]);
+export const WorkOrderOriginTypeSchema = GeneratedWorkOrderOriginTypeSchema;
 export type WorkOrderOriginType = z.infer<typeof WorkOrderOriginTypeSchema>;
 
-export const BidStatusSchema = z.enum([
-	'REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW',
-	'ACCEPTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED'
-]);
+export const BidStatusSchema = GeneratedBidStatusSchema;
 export type BidStatus = z.infer<typeof BidStatusSchema>;
 
-export const FundTypeSchema = z.enum(['OPERATING', 'RESERVE', 'SPECIAL']);
+export const FundTypeSchema = GeneratedFundTypeSchema;
 export type FundType = z.infer<typeof FundTypeSchema>;
 
 // =============================================================================

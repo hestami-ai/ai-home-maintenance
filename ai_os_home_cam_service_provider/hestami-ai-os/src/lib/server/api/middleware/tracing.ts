@@ -5,6 +5,9 @@
  */
 
 import type { RequestContext } from '../context.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('TracingMiddleware');
 
 /**
  * Span attribute keys for contractor operations

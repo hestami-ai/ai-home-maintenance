@@ -13,6 +13,9 @@ import type {
 	ActivityActorType,
 	Prisma
 } from '../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../logger.js';
+
+const log = createModuleLogger('GovernanceActivityService');
 
 interface GovernanceActivityInput {
 	organizationId: string;

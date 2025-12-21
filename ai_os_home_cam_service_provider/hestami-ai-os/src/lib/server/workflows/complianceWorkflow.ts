@@ -7,35 +7,38 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ComplianceWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'compliance_status';
 const WORKFLOW_ERROR_EVENT = 'compliance_error';
 
-type ComplianceAction = 
-	| 'CHECK_COMPLIANCE' 
-	| 'CHECK_EXPIRATIONS' 
-	| 'UPDATE_COMPLIANCE_SCORE'
-	| 'CREATE_REQUIREMENT'
-	| 'UPDATE_REQUIREMENT'
-	| 'CREATE_DEADLINE';
+export const ComplianceAction = {
+	CHECK_COMPLIANCE: 'CHECK_COMPLIANCE',
+	CHECK_EXPIRATIONS: 'CHECK_EXPIRATIONS',
+	UPDATE_COMPLIANCE_SCORE: 'UPDATE_COMPLIANCE_SCORE',
+	CREATE_REQUIREMENT: 'CREATE_REQUIREMENT',
+	UPDATE_REQUIREMENT: 'UPDATE_REQUIREMENT',
+	CREATE_DEADLINE: 'CREATE_DEADLINE'
+} as const;
 
-interface ComplianceWorkflowInput {
+export type ComplianceAction = (typeof ComplianceAction)[keyof typeof ComplianceAction];
+
+export interface ComplianceWorkflowInput {
 	action: ComplianceAction;
 	organizationId: string;
 	userId: string;
 	data?: Record<string, unknown>;
 }
 
-interface ComplianceWorkflowResult {
-	success: boolean;
-	action: string;
-	timestamp: string;
+export interface ComplianceWorkflowResult extends LifecycleWorkflowResult {
 	entityId?: string;
 	isCompliant?: boolean;
 	complianceScore?: number;
 	issues?: string[];
 	expiringItems?: Array<{ type: string; id: string; expiresAt: string; daysUntil: number }>;
-	error?: string;
 }
 
 async function checkOrganizationCompliance(
@@ -414,4 +417,3 @@ export async function getComplianceWorkflowError(
 	return error as { error: string } | null;
 }
 
-export type { ComplianceWorkflowInput, ComplianceWorkflowResult };

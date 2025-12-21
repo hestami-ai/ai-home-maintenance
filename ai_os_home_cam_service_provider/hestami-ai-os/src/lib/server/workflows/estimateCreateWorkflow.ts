@@ -9,13 +9,16 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { EstimateStatus } from '../../../../generated/prisma/client.js';
+import { EstimateStatus, type BaseWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('EstimateCreateWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'estimate_create_status';
 const WORKFLOW_ERROR_EVENT = 'estimate_create_error';
 
-interface EstimateLine {
+export interface EstimateLine {
 	description: string;
 	quantity: number;
 	unitPrice: number;
@@ -24,7 +27,7 @@ interface EstimateLine {
 	taxRate?: number;
 }
 
-interface EstimateCreateInput {
+export interface EstimateCreateInput {
 	organizationId: string;
 	userId: string;
 	jobId: string;
@@ -38,13 +41,11 @@ interface EstimateCreateInput {
 	lines?: EstimateLine[];
 }
 
-interface EstimateCreateResult {
-	success: boolean;
+export interface EstimateCreateResult extends BaseWorkflowResult {
 	estimateId?: string;
 	estimateNumber?: string;
 	status?: EstimateStatus;
 	timestamp: string;
-	error?: string;
 }
 
 async function generateEstimateNumber(organizationId: string): Promise<string> {
@@ -217,4 +218,3 @@ export async function getEstimateCreateWorkflowStatus(
 	return status as { step: string; [key: string]: unknown } | null;
 }
 
-export type { EstimateCreateInput, EstimateCreateResult, EstimateLine };

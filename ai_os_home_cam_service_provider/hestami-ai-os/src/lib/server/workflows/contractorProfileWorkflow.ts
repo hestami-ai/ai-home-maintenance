@@ -8,12 +8,19 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { LicenseStatus, InsuranceType, InsuranceStatus } from '../../../../generated/prisma/client.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ContractorProfileWorkflow');
 
 // Action types for the unified workflow
-export type ContractorProfileAction = 
-	| 'CREATE_OR_UPDATE_PROFILE'
-	| 'CREATE_OR_UPDATE_LICENSE'
-	| 'CREATE_OR_UPDATE_INSURANCE';
+export const ContractorProfileAction = {
+	CREATE_OR_UPDATE_PROFILE: 'CREATE_OR_UPDATE_PROFILE',
+	CREATE_OR_UPDATE_LICENSE: 'CREATE_OR_UPDATE_LICENSE',
+	CREATE_OR_UPDATE_INSURANCE: 'CREATE_OR_UPDATE_INSURANCE'
+} as const;
+
+export type ContractorProfileAction = (typeof ContractorProfileAction)[keyof typeof ContractorProfileAction];
 
 export interface ContractorProfileWorkflowInput {
 	action: ContractorProfileAction;
@@ -23,10 +30,8 @@ export interface ContractorProfileWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ContractorProfileWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ContractorProfileWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

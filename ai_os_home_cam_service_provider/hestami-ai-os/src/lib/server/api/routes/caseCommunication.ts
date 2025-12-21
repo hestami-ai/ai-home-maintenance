@@ -17,6 +17,9 @@ import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import type { CommunicationChannel, CommunicationDirection } from '../../../../../generated/prisma/client.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('CaseCommunicationRoute');
 
 // =============================================================================
 // Schemas

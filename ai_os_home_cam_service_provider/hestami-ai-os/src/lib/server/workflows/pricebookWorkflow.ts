@@ -9,20 +9,27 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ContractorTradeType, PricebookItemType, PriceRuleType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('PricebookWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'pricebook_status';
 const WORKFLOW_ERROR_EVENT = 'pricebook_error';
 
-type PricebookAction =
-	| 'UPSERT_PRICEBOOK'
-	| 'CREATE_VERSION'
-	| 'PUBLISH_VERSION'
-	| 'ACTIVATE_VERSION'
-	| 'UPSERT_ITEM'
-	| 'UPSERT_RULE'
-	| 'UPSERT_TEMPLATE';
+export const PricebookAction = {
+	UPSERT_PRICEBOOK: 'UPSERT_PRICEBOOK',
+	CREATE_VERSION: 'CREATE_VERSION',
+	PUBLISH_VERSION: 'PUBLISH_VERSION',
+	ACTIVATE_VERSION: 'ACTIVATE_VERSION',
+	UPSERT_ITEM: 'UPSERT_ITEM',
+	UPSERT_RULE: 'UPSERT_RULE',
+	UPSERT_TEMPLATE: 'UPSERT_TEMPLATE'
+} as const;
 
-interface PricebookWorkflowInput {
+export type PricebookAction = (typeof PricebookAction)[keyof typeof PricebookAction];
+
+export interface PricebookWorkflowInput {
 	action: PricebookAction;
 	organizationId: string;
 	userId: string;
@@ -34,12 +41,8 @@ interface PricebookWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-interface PricebookWorkflowResult {
-	success: boolean;
-	action: PricebookAction;
+export interface PricebookWorkflowResult extends LifecycleWorkflowResult {
 	entityId?: string;
-	timestamp: string;
-	error?: string;
 }
 
 async function upsertPricebook(
@@ -444,4 +447,3 @@ export async function startPricebookWorkflow(
 	return handle.getResult();
 }
 
-export type { PricebookWorkflowInput, PricebookWorkflowResult, PricebookAction };

@@ -7,9 +7,15 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
-export type SignatureAction = 'CAPTURE_SIGNATURE' | 'DELETE_SIGNATURE';
+export const SignatureAction = {
+	CAPTURE_SIGNATURE: 'CAPTURE_SIGNATURE',
+	DELETE_SIGNATURE: 'DELETE_SIGNATURE'
+} as const;
+
+export type SignatureAction = (typeof SignatureAction)[keyof typeof SignatureAction];
 
 export interface SignatureWorkflowInput {
 	action: SignatureAction;
@@ -19,10 +25,8 @@ export interface SignatureWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface SignatureWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface SignatureWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

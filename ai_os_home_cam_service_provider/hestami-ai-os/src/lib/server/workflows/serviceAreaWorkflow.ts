@@ -7,9 +7,19 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('ServiceAreaWorkflow');
 
 // Action types for the unified workflow
-export type ServiceAreaAction = 'CREATE_AREA' | 'UPDATE_AREA' | 'DELETE_AREA';
+export const ServiceAreaAction = {
+	CREATE_AREA: 'CREATE_AREA',
+	UPDATE_AREA: 'UPDATE_AREA',
+	DELETE_AREA: 'DELETE_AREA'
+} as const;
+
+export type ServiceAreaAction = (typeof ServiceAreaAction)[keyof typeof ServiceAreaAction];
 
 export interface ServiceAreaWorkflowInput {
 	action: ServiceAreaAction;
@@ -19,10 +29,8 @@ export interface ServiceAreaWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-export interface ServiceAreaWorkflowResult {
-	success: boolean;
-	entityId?: string;
-	error?: string;
+export interface ServiceAreaWorkflowResult extends EntityWorkflowResult {
+	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
 // Step functions for each operation

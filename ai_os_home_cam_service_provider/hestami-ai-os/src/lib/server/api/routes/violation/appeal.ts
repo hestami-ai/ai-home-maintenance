@@ -5,6 +5,9 @@ import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import type { AppealStatus } from '../../../../../../generated/prisma/client.js';
 import { startAppealWorkflow } from '../../../workflows/appealWorkflow.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('AppealRoute');
 
 const appealStatusEnum = z.enum([
 	'PENDING', 'SCHEDULED', 'UPHELD', 'MODIFIED', 'REVERSED', 'WITHDRAWN'

@@ -9,6 +9,9 @@ import {
 import { prisma } from '../../../db.js';
 import { ApiException } from '../../errors.js';
 import { PropertyTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyTypeSchema.js';
+import { createModuleLogger } from '../../../logger.js';
+
+const log = createModuleLogger('IndividualPropertyRoute');
 
 /**
  * Individual Property Schema for responses

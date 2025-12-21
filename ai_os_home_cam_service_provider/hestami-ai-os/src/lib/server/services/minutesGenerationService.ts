@@ -6,6 +6,9 @@
  */
 
 import { prisma } from '../db.js';
+import { createModuleLogger } from '../logger.js';
+
+const log = createModuleLogger('MinutesGenerationService');
 
 // ============================================================================
 // Types

@@ -14,6 +14,9 @@ import {
 import { prisma } from '../../db.js';
 import { ApiException } from '../errors.js';
 import { recordExecution } from '../middleware/activityEvent.js';
+import { createModuleLogger } from '../../logger.js';
+
+const log = createModuleLogger('CaseReviewRoute');
 
 // =============================================================================
 // Schemas

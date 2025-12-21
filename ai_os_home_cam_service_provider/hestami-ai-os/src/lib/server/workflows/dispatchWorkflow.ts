@@ -9,18 +9,25 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { DispatchStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { type LifecycleWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('DispatchWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'dispatch_status';
 const WORKFLOW_ERROR_EVENT = 'dispatch_error';
 
-type DispatchAction =
-	| 'CREATE_ASSIGNMENT'
-	| 'REASSIGN'
-	| 'UPDATE_STATUS'
-	| 'RESCHEDULE'
-	| 'OPTIMIZE_ROUTE';
+export const DispatchAction = {
+	CREATE_ASSIGNMENT: 'CREATE_ASSIGNMENT',
+	REASSIGN: 'REASSIGN',
+	UPDATE_STATUS: 'UPDATE_STATUS',
+	RESCHEDULE: 'RESCHEDULE',
+	OPTIMIZE_ROUTE: 'OPTIMIZE_ROUTE'
+} as const;
 
-interface DispatchWorkflowInput {
+export type DispatchAction = (typeof DispatchAction)[keyof typeof DispatchAction];
+
+export interface DispatchWorkflowInput {
 	action: DispatchAction;
 	organizationId: string;
 	userId: string;
@@ -30,12 +37,8 @@ interface DispatchWorkflowInput {
 	data: Record<string, unknown>;
 }
 
-interface DispatchWorkflowResult {
-	success: boolean;
-	action: DispatchAction;
+export interface DispatchWorkflowResult extends LifecycleWorkflowResult {
 	entityId?: string;
-	timestamp: string;
-	error?: string;
 }
 
 async function createAssignment(
@@ -372,4 +375,3 @@ export async function startDispatchWorkflow(
 	return handle.getResult();
 }
 
-export type { DispatchWorkflowInput, DispatchWorkflowResult, DispatchAction };

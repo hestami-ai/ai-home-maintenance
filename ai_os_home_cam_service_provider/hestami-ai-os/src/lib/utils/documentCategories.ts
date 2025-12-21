@@ -1,14 +1,30 @@
 /**
- * CAM Document Category Mapping
+ * Document Category Utilities
  *
- * Maps the system-wide DocumentCategory enum to the 9 canonical CAM categories
- * as defined in the UX specification.
+ * Provides pillar-specific category mappings derived from the canonical
+ * DocumentCategory enum generated from the Prisma schema.
+ * 
+ * ARCHITECTURE:
+ * - Prisma schema (source of truth) -> generated/prisma/enums.ts
+ * - Generated Zod schema -> generated/zod/inputTypeSchemas/DocumentCategorySchema.ts
+ * - This file provides UI-friendly mappings and pillar-specific subsets
+ * 
+ * All category values are validated at compile-time against the generated enum.
  */
 
-import type { DocumentCategory } from '../../../generated/prisma/client.js';
+import { DocumentCategory } from '../../../generated/prisma/enums.js';
+import { DocumentCategorySchema } from '../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
+
+// Re-export for convenience - consumers should use these instead of importing directly
+export { DocumentCategory, DocumentCategorySchema };
+export type DocumentCategoryType = DocumentCategory;
+
+// Compile-time validation: all enum values from generated schema
+const ALL_DOCUMENT_CATEGORIES = DocumentCategorySchema.options;
 
 /**
- * Canonical CAM document categories for UI display and filtering
+ * Canonical CAM document categories for UI display and filtering.
+ * These are UI groupings that map multiple DocumentCategory values.
  */
 export const CAM_DOCUMENT_CATEGORIES = [
 	'GOVERNING_DOCUMENTS',
@@ -40,61 +56,63 @@ export const CAM_CATEGORY_LABELS: Record<CamDocumentCategory, string> = {
 };
 
 /**
- * Maps system DocumentCategory values to CAM categories
+ * Maps system DocumentCategory values to CAM UI categories.
+ * Uses DocumentCategory enum values for compile-time validation.
  */
 export const DOCUMENT_CATEGORY_TO_CAM: Record<DocumentCategory, CamDocumentCategory> = {
 	// CAM / HOA categories
-	GOVERNING_DOCS: 'GOVERNING_DOCUMENTS',
-	FINANCIAL: 'FINANCIAL_RECORDS',
-	MEETING: 'MEETING_MINUTES',
-	LEGAL: 'POLICIES_RESOLUTIONS',
-	INSURANCE: 'CONTRACTS_AGREEMENTS',
-	MAINTENANCE: 'EVIDENCE_INSPECTIONS',
-	ARCHITECTURAL: 'ARCHITECTURAL_GUIDELINES',
-	RESERVE_STUDY: 'FINANCIAL_RECORDS',
-	INSPECTION: 'EVIDENCE_INSPECTIONS',
-	CONTRACT: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.GOVERNING_DOCS]: 'GOVERNING_DOCUMENTS',
+	[DocumentCategory.FINANCIAL]: 'FINANCIAL_RECORDS',
+	[DocumentCategory.MEETING]: 'MEETING_MINUTES',
+	[DocumentCategory.LEGAL]: 'POLICIES_RESOLUTIONS',
+	[DocumentCategory.INSURANCE]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.MAINTENANCE]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.ARCHITECTURAL]: 'ARCHITECTURAL_GUIDELINES',
+	[DocumentCategory.RESERVE_STUDY]: 'FINANCIAL_RECORDS',
+	[DocumentCategory.INSPECTION]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.CONTRACT]: 'CONTRACTS_AGREEMENTS',
 
 	// Property Owner / Concierge categories
-	CC_AND_RS: 'GOVERNING_DOCUMENTS',
-	PERMIT: 'POLICIES_RESOLUTIONS',
-	APPROVAL: 'POLICIES_RESOLUTIONS',
-	CORRESPONDENCE: 'CORRESPONDENCE',
-	TITLE_DEED: 'GOVERNING_DOCUMENTS',
-	SURVEY: 'EVIDENCE_INSPECTIONS',
-	WARRANTY: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.CC_AND_RS]: 'GOVERNING_DOCUMENTS',
+	[DocumentCategory.PERMIT]: 'POLICIES_RESOLUTIONS',
+	[DocumentCategory.APPROVAL]: 'POLICIES_RESOLUTIONS',
+	[DocumentCategory.CORRESPONDENCE]: 'CORRESPONDENCE',
+	[DocumentCategory.TITLE_DEED]: 'GOVERNING_DOCUMENTS',
+	[DocumentCategory.SURVEY]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.WARRANTY]: 'CONTRACTS_AGREEMENTS',
 
 	// Contractor / Service Provider categories
-	LICENSE: 'CONTRACTS_AGREEMENTS',
-	CERTIFICATION: 'CONTRACTS_AGREEMENTS',
-	BOND: 'CONTRACTS_AGREEMENTS',
-	PROPOSAL: 'CONTRACTS_AGREEMENTS',
-	ESTIMATE: 'FINANCIAL_RECORDS',
-	INVOICE: 'FINANCIAL_RECORDS',
-	WORK_ORDER: 'EVIDENCE_INSPECTIONS',
-	JOB_PHOTO: 'EVIDENCE_INSPECTIONS',
-	JOB_VIDEO: 'EVIDENCE_INSPECTIONS',
-	VOICE_NOTE: 'CORRESPONDENCE',
-	SIGNATURE: 'CONTRACTS_AGREEMENTS',
-	CHECKLIST: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.LICENSE]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.CERTIFICATION]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.BOND]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.PROPOSAL]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.ESTIMATE]: 'FINANCIAL_RECORDS',
+	[DocumentCategory.INVOICE]: 'FINANCIAL_RECORDS',
+	[DocumentCategory.WORK_ORDER]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.VOICE_NOTE]: 'CORRESPONDENCE',
+	[DocumentCategory.SIGNATURE]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.CHECKLIST]: 'EVIDENCE_INSPECTIONS',
 
 	// Cross-pillar
-	GENERAL: 'OTHER'
+	[DocumentCategory.PHOTO]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.VIDEO]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.GENERAL]: 'OTHER'
 };
 
 /**
- * Maps CAM categories back to primary DocumentCategory values for uploads
+ * Maps CAM UI categories back to primary DocumentCategory values for uploads.
+ * Uses DocumentCategory enum values for compile-time validation.
  */
 export const CAM_TO_PRIMARY_DOCUMENT_CATEGORY: Record<CamDocumentCategory, DocumentCategory> = {
-	GOVERNING_DOCUMENTS: 'GOVERNING_DOCS',
-	ARCHITECTURAL_GUIDELINES: 'ARCHITECTURAL',
-	POLICIES_RESOLUTIONS: 'LEGAL',
-	MEETING_MINUTES: 'MEETING',
-	CONTRACTS_AGREEMENTS: 'CONTRACT',
-	FINANCIAL_RECORDS: 'FINANCIAL',
-	EVIDENCE_INSPECTIONS: 'INSPECTION',
-	CORRESPONDENCE: 'CORRESPONDENCE',
-	OTHER: 'GENERAL'
+	GOVERNING_DOCUMENTS: DocumentCategory.GOVERNING_DOCS,
+	ARCHITECTURAL_GUIDELINES: DocumentCategory.ARCHITECTURAL,
+	POLICIES_RESOLUTIONS: DocumentCategory.LEGAL,
+	MEETING_MINUTES: DocumentCategory.MEETING,
+	CONTRACTS_AGREEMENTS: DocumentCategory.CONTRACT,
+	FINANCIAL_RECORDS: DocumentCategory.FINANCIAL,
+	EVIDENCE_INSPECTIONS: DocumentCategory.INSPECTION,
+	CORRESPONDENCE: DocumentCategory.CORRESPONDENCE,
+	OTHER: DocumentCategory.GENERAL
 };
 
 /**
@@ -137,3 +155,58 @@ export function getCamCategoryOptions(): Array<{ value: CamDocumentCategory; lab
 		label: CAM_CATEGORY_LABELS[category]
 	}));
 }
+
+// =============================================================================
+// Concierge Document Categories
+// =============================================================================
+
+/**
+ * Document categories relevant to Concierge/Property Owner pillar.
+ * These are actual DocumentCategory enum values (not UI groupings like CAM).
+ * Using enum values ensures compile-time validation against Prisma schema.
+ */
+export const CONCIERGE_DOCUMENT_CATEGORIES = [
+	DocumentCategory.TITLE_DEED,
+	DocumentCategory.INSURANCE,
+	DocumentCategory.WARRANTY,
+	DocumentCategory.INSPECTION,
+	DocumentCategory.INVOICE,
+	DocumentCategory.CONTRACT,
+	DocumentCategory.PHOTO,
+	DocumentCategory.VIDEO,
+	DocumentCategory.CORRESPONDENCE,
+	DocumentCategory.PERMIT,
+	DocumentCategory.SURVEY,
+	DocumentCategory.GENERAL
+] as const;
+
+export type ConciergeDocumentCategory = (typeof CONCIERGE_DOCUMENT_CATEGORIES)[number];
+
+/**
+ * Human-readable labels for Concierge document categories
+ */
+export const CONCIERGE_CATEGORY_LABELS: Record<ConciergeDocumentCategory, string> = {
+	[DocumentCategory.TITLE_DEED]: 'Property Deed',
+	[DocumentCategory.INSURANCE]: 'Insurance Policy',
+	[DocumentCategory.WARRANTY]: 'Warranty',
+	[DocumentCategory.INSPECTION]: 'Inspection Report',
+	[DocumentCategory.INVOICE]: 'Receipt/Invoice',
+	[DocumentCategory.CONTRACT]: 'Contract',
+	[DocumentCategory.PHOTO]: 'Photo',	
+	[DocumentCategory.VIDEO]: 'Video',
+	[DocumentCategory.CORRESPONDENCE]: 'Correspondence',
+	[DocumentCategory.PERMIT]: 'Permit',
+	[DocumentCategory.SURVEY]: 'Survey',
+	[DocumentCategory.GENERAL]: 'Other'
+};
+
+/**
+ * Get all Concierge categories as options for dropdowns
+ */
+export function getConciergeDocumentCategoryOptions(): Array<{ value: ConciergeDocumentCategory; label: string }> {
+	return CONCIERGE_DOCUMENT_CATEGORIES.map((category) => ({
+		value: category,
+		label: CONCIERGE_CATEGORY_LABELS[category]
+	}));
+}
+
