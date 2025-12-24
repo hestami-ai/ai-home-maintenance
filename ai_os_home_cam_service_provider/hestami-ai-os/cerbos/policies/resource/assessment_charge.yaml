@@ -1,0 +1,42 @@
+# Assessment Charge Resource Policy
+# Controls access to assessment charges (AR)
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "assessment_charge"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to charges
+    - actions: ["view", "create", "edit", "delete", "write_off"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit charges
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view charges
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view their own unit's charges
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          expr: request.resource.attr.unitOwnerId == request.principal.id
+
+    # Tenants can view their unit's charges
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant

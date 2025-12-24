@@ -1,0 +1,39 @@
+# Ownership Resource Policy
+# Controls access to ownership records (linking parties to units)
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "ownership"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full CRUD access
+    - actions: ["view", "create", "edit", "delete", "end"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, edit, and end ownerships
+    - actions: ["view", "create", "edit", "end"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view ownerships
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view their own ownership records
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          any:
+            of:
+              - expr: "has(R.attr.partyUserId) && R.attr.partyUserId == P.id"
+              - expr: "!has(R.attr.partyUserId)"

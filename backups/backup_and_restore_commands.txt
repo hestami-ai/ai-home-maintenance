@@ -1,0 +1,31 @@
+Backup Command:
+
+docker exec hestami-postgres pg_dump -U hestami -d hestami -Fc -f /tmp/backup.dump && docker cp hestami-postgres:/tmp/backup.dump "E:\Projects\hestami-ai\backups\backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').dump"
+
+docker cp "E:\Projects\hestami-ai\backups\backup_20251209_161653.dump" hestami-postgres:/tmp/backup.dump && docker exec hestami-postgres pg_restore -U hestami -d hestami --clean --if-exists /tmp/backup.dump
+
+This:
+
+Copies the backup file from host into the container
+Restores it with --clean --if-exists (drops existing objects before recreating)
+Options:
+
+--clean - Drop objects before recreating
+--if-exists - Don't error if objects don't exist yet
+Add --no-owner if you don't want to restore ownership info
+Add -j 4 for parallel restore (4 jobs) on large databases
+
+npx tsc --noEmit
+
+
+Updating Prisma Schema and generating migrations
+0) npx prisma format 
+1) npx prisma migrate dev --name add_<name_of_migration> --create-only
+2) npm run db:generate
+3) npx prisma migrate dev
+4) npm run db:generate
+5) npx prisma generate
+
+
+Atlas tool supports various Postgres features (some we use) that Prisma doesn't directly
+https://atlasgo.io/guides/orms/prisma/vector-index

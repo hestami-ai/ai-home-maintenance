@@ -1,0 +1,49 @@
+# Governance Motion Resource Policy
+# Controls access to board motions - formal proposals made during meetings
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_motion"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all motion operations
+    - actions: ["view", "create", "edit", "propose", "second", "vote", "decide", "withdraw", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers have full access to motion operations
+    - actions: ["view", "create", "edit", "propose", "second", "vote", "decide", "withdraw", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can propose, second, vote on motions
+    - actions: ["view", "create", "edit", "propose", "second", "vote", "withdraw"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Board chair can decide (finalize) motions
+    # Note: Chair status should be passed as resource attribute isChair
+    - actions: ["decide"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+      condition:
+        match:
+          expr: "has(R.attr.isChair) && R.attr.isChair == true"
+
+    # Owners can view motions (read-only access to governance)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Auditors can view motions for audit purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

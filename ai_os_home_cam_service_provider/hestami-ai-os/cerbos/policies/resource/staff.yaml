@@ -1,0 +1,34 @@
+# Phase 16: Staff Management Resource Policy
+# Controls access to Hestami internal staff entities
+#
+# Resource attributes expected:
+#   - userId: string (the user ID linked to this staff profile)
+#   - status: string (PENDING, ACTIVE, SUSPENDED, DEACTIVATED)
+#
+# Principal attributes expected:
+#   - staffRoles: string[] (StaffRole enum values)
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "staff"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Platform admins can perform all staff management actions
+    - actions: ["view", "create", "update", "deactivate", "suspend", "reactivate", "assign_role", "revoke_role", "update_pillar_access", "list"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # All Hestami staff can view staff list and profiles
+    - actions: ["view", "list"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff
+
+    # Users can view their own staff profile
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - own_staff_profile

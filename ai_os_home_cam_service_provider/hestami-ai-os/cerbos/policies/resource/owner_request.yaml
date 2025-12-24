@@ -1,0 +1,27 @@
+# Owner Request Resource Policy
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "ownerRequest"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins and managers: full access
+    - actions: ["view", "create", "update", "delete", "submit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_manager
+
+    # Owners: can create, view, and submit their own requests
+    - actions: ["view", "create", "submit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants: can create and view their own requests
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant

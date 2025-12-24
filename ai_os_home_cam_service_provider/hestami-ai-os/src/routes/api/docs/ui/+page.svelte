@@ -1,0 +1,29 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import 'swagger-ui-dist/swagger-ui.css';
+	import { SwaggerUIBundle } from 'swagger-ui-dist';
+
+	onMount(() => {
+		SwaggerUIBundle({
+			dom_id: '#swagger-ui',
+			url: '/api/docs',
+			deepLinking: true
+		});
+	});
+</script>
+
+<svelte:head>
+	<title>Hestami API Documentation</title>
+</svelte:head>
+
+<div id="swagger-ui"></div>
+
+<style>
+	:global(body) {
+		margin: 0;
+		padding: 0;
+	}
+	#swagger-ui {
+		min-height: 100vh;
+	}
+</style>

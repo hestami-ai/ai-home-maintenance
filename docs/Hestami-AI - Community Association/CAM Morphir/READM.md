@@ -1,0 +1,18 @@
+hestami-cdm/
+  morphir.json
+  src/
+    Hestami/
+      Common.elm
+      Domain/
+        Association.elm
+        Accounting.elm
+        Workflow.elm
+        Violation.elm
+        Arc.elm
+        WorkOrder.elm
+        Communication.elm
+        Governance.elm
+        Portal.elm
+        Document.elm
+        Reserve.elm
+        Compliance.elm

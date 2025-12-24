@@ -1,0 +1,254 @@
+<script lang="ts">
+	import { Home, Plus, FileText, Wrench, Bell, Loader2, ArrowRight } from 'lucide-svelte';
+	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { auth, organizationStore } from '$lib/stores';
+	import { orpc } from '$lib/api';
+	import { onMount } from 'svelte';
+	import {
+		getServiceCallStatusLabel,
+		getServiceCallStatusColor,
+		getServiceCallStatusDotColor
+	} from '$lib/utils/serviceCallTerminology';
+	import type { ConciergeCaseStatus } from '$lib/api/cam';
+
+	interface Property {
+		id: string;
+		name: string;
+		addressLine1: string;
+	}
+
+	interface ServiceCall {
+		id: string;
+		caseNumber: string;
+		title: string;
+		status: ConciergeCaseStatus;
+		createdAt: string;
+	}
+
+	let properties = $state<Property[]>([]);
+	let serviceCalls = $state<ServiceCall[]>([]);
+	let isLoading = $state(true);
+
+	const quickActions = [
+		{ label: 'New Service Call', icon: Wrench, href: '/app/concierge/service-calls' },
+		{ label: 'View Documents', icon: FileText, href: '/app/concierge/documents' },
+		{ label: 'Manage Properties', icon: Home, href: '/app/concierge/properties' },
+		{ label: 'Notifications', icon: Bell, href: '/app/concierge/notifications' }
+	];
+
+	const activeCallCount = $derived(
+		serviceCalls.filter((c) => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(c.status)).length
+	);
+
+	onMount(async () => {
+		await loadDashboardData();
+	});
+
+	async function loadDashboardData() {
+		isLoading = true;
+		try {
+			const [propertiesResult, casesResult] = await Promise.all([
+				orpc.individualProperty.list({ limit: 50 }),
+				orpc.conciergeCase.list({ limit: 10 })
+			]);
+
+			properties = propertiesResult.data.properties.map((p) => ({
+				id: p.id,
+				name: p.name,
+				addressLine1: p.addressLine1
+			}));
+
+			serviceCalls = casesResult.data.cases.map((c: { id: string; caseNumber: string; title: string; status: string; createdAt: string }) => ({
+				id: c.id,
+				caseNumber: c.caseNumber,
+				title: c.title,
+				status: c.status as ConciergeCaseStatus,
+				createdAt: c.createdAt
+			}));
+		} catch (err) {
+			console.error('Failed to load dashboard data:', err);
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	function formatRelativeTime(dateString: string): string {
+		const date = new Date(dateString);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffMins = Math.floor(diffMs / 60000);
+		const diffHours = Math.floor(diffMs / 3600000);
+		const diffDays = Math.floor(diffMs / 86400000);
+
+		if (diffMins < 1) return 'Just now';
+		if (diffMins < 60) return `${diffMins}m ago`;
+		if (diffHours < 24) return `${diffHours}h ago`;
+		if (diffDays < 7) return `${diffDays}d ago`;
+		return date.toLocaleDateString();
+	}
+</script>
+
+<svelte:head>
+	<title>Concierge Dashboard | Hestami AI</title>
+</svelte:head>
+
+<PageContainer>
+	<div class="py-8">
+		<!-- Welcome Header -->
+		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+			<div>
+				<h1 class="text-2xl font-bold">
+					Welcome back, {$auth.user?.name?.split(' ')[0] || 'there'}!
+				</h1>
+				<p class="mt-1 text-surface-500">
+					{$organizationStore.current?.organization.name || 'Your Property Dashboard'}
+				</p>
+			</div>
+			<a href="/app/concierge/service-calls" class="btn preset-filled-primary-500">
+				<Plus class="mr-2 h-4 w-4" />
+				New Service Call
+			</a>
+		</div>
+
+		<!-- Quick Stats -->
+		<div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<a href="/app/concierge/properties" class="group">
+				<Card variant="outlined" padding="md" class="transition-all group-hover:border-primary-500">
+					<div class="flex items-center gap-3">
+						<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-500/10">
+							<Home class="h-5 w-5 text-primary-500" />
+						</div>
+						<div>
+							{#if isLoading}
+								<Loader2 class="h-6 w-6 animate-spin text-surface-400" />
+							{:else}
+								<p class="text-2xl font-bold">{properties.length}</p>
+							{/if}
+							<p class="text-sm text-surface-500">Properties</p>
+						</div>
+					</div>
+				</Card>
+			</a>
+			<Card variant="outlined" padding="md">
+				<div class="flex items-center gap-3">
+					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-500/10">
+						<Wrench class="h-5 w-5 text-warning-500" />
+					</div>
+					<div>
+						{#if isLoading}
+							<Loader2 class="h-6 w-6 animate-spin text-surface-400" />
+						{:else}
+							<p class="text-2xl font-bold">{activeCallCount}</p>
+						{/if}
+						<p class="text-sm text-surface-500">Active Calls</p>
+					</div>
+				</div>
+			</Card>
+			<Card variant="outlined" padding="md">
+				<div class="flex items-center gap-3">
+					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success-500/10">
+						<FileText class="h-5 w-5 text-success-500" />
+					</div>
+					<div>
+						<p class="text-2xl font-bold">0</p>
+						<p class="text-sm text-surface-500">Documents</p>
+					</div>
+				</div>
+			</Card>
+			<Card variant="outlined" padding="md">
+				<div class="flex items-center gap-3">
+					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary-500/10">
+						<Bell class="h-5 w-5 text-secondary-500" />
+					</div>
+					<div>
+						<p class="text-2xl font-bold">0</p>
+						<p class="text-sm text-surface-500">Notifications</p>
+					</div>
+				</div>
+			</Card>
+		</div>
+
+		<!-- Main Content -->
+		<div class="mt-8 grid gap-8 lg:grid-cols-3">
+			<!-- Recent Service Calls -->
+			<div class="lg:col-span-2">
+				<Card variant="outlined" padding="none">
+					<div class="flex items-center justify-between border-b border-surface-300-700 px-6 py-4">
+						<h2 class="font-semibold">Recent Service Calls</h2>
+						{#if serviceCalls.length > 0}
+							<a href="/app/concierge/service-calls" class="text-sm text-primary-500 hover:underline">
+								View All
+							</a>
+						{/if}
+					</div>
+					<div class="p-6">
+						{#if isLoading}
+							<div class="flex items-center justify-center py-8">
+								<Loader2 class="h-6 w-6 animate-spin text-surface-400" />
+							</div>
+						{:else if serviceCalls.length === 0}
+							<EmptyState
+								title="No service calls yet"
+								description="Submit a service call when you need help with your property."
+							>
+								{#snippet actions()}
+									<a href="/app/concierge/service-calls" class="btn preset-filled-primary-500">
+										<Plus class="mr-2 h-4 w-4" />
+										New Service Call
+									</a>
+								{/snippet}
+							</EmptyState>
+						{:else}
+							<div class="space-y-3">
+								{#each serviceCalls as call}
+									<a
+										href="/app/concierge/service-calls/{call.id}"
+										class="flex items-center justify-between rounded-lg border border-surface-300-700 p-4 transition-all hover:border-primary-500 hover:bg-surface-500/5"
+									>
+										<div class="min-w-0 flex-1">
+											<div class="flex items-center gap-2">
+												<span class="font-medium">{call.title}</span>
+												<span
+													class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium {getServiceCallStatusColor(call.status)}"
+												>
+													<span class="h-1.5 w-1.5 rounded-full {getServiceCallStatusDotColor(call.status)}"></span>
+													{getServiceCallStatusLabel(call.status)}
+												</span>
+											</div>
+											<p class="mt-1 text-sm text-surface-500">
+												{call.caseNumber} • {formatRelativeTime(call.createdAt)}
+											</p>
+										</div>
+										<ArrowRight class="h-4 w-4 shrink-0 text-surface-400" />
+									</a>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				</Card>
+			</div>
+
+			<!-- Quick Actions -->
+			<div>
+				<Card variant="outlined" padding="none">
+					<div class="border-b border-surface-300-700 px-6 py-4">
+						<h2 class="font-semibold">Quick Actions</h2>
+					</div>
+					<div class="p-4">
+						<div class="space-y-2">
+							{#each quickActions as action}
+								<a
+									href={action.href}
+									class="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-surface-200-800"
+								>
+									<action.icon class="h-5 w-5 text-surface-500" />
+									<span class="text-sm font-medium">{action.label}</span>
+								</a>
+							{/each}
+						</div>
+					</div>
+				</Card>
+			</div>
+		</div>
+	</div>
+</PageContainer>

@@ -1,0 +1,203 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "document"
+  rules:
+    # ==========================================================================
+    # DOCUMENT VISIBILITY POLICIES
+    # ==========================================================================
+
+    # Admins and managers have full access to all documents
+    - actions: ["view", "create", "update", "delete", "classify", "version", "link"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_admin
+        - org_manager
+
+    # Board members can view, create, update, classify, and version documents
+    - actions: ["view", "create", "update", "classify", "version", "link"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_board_member
+
+    # Staff can view and create documents, link to decisions
+    - actions: ["view", "create", "link"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_staff
+
+    # ==========================================================================
+    # OWNER VISIBILITY - Based on document visibility setting
+    # ==========================================================================
+
+    # Owners can view PUBLIC documents
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          expr: "request.resource.attr.visibility == 'PUBLIC'"
+
+    # Owners can view OWNERS_ONLY documents
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          expr: "request.resource.attr.visibility == 'OWNERS_ONLY'"
+
+    # Owners can view documents related to their own violations
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.contextType == 'VIOLATION'"
+              - expr: "request.resource.attr.contextId in request.principal.attr.violationIds"
+
+    # Owners can view documents related to their own ARC requests
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.contextType == 'ARC_REQUEST'"
+              - expr: "request.resource.attr.contextId in request.principal.attr.arcRequestIds"
+
+    # Owners can view documents related to their own units
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.contextType == 'UNIT'"
+              - expr: "request.resource.attr.contextId in request.principal.attr.unitIds"
+
+    # ==========================================================================
+    # CONTRACTOR VISIBILITY
+    # ==========================================================================
+
+    # Contractors can view documents linked to their assigned work orders
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_contractor
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.contextType == 'WORK_ORDER'"
+              - expr: "request.resource.attr.contextId in request.principal.attr.assignedWorkOrderIds"
+
+    # Contractors can view documents linked to their assigned jobs
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_contractor
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.contextType == 'JOB'"
+              - expr: "request.resource.attr.contextId in request.principal.attr.assignedJobIds"
+
+    # ==========================================================================
+    # DELETION PROTECTION
+    # ==========================================================================
+
+    # Prevent deletion of referenced documents (has context bindings)
+    - actions: ["delete"]
+      effect: EFFECT_DENY
+      roles: ["*"]
+      condition:
+        match:
+          expr: "request.resource.attr.referenceCount > 0"
+
+    # ==========================================================================
+    # DOCUMENT TYPE-SPECIFIC VISIBILITY
+    # ==========================================================================
+
+    # Governing documents are visible to all members
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+        - org_board_member
+        - org_staff
+      condition:
+        match:
+          expr: "request.resource.attr.category == 'GOVERNING_DOCS'"
+
+    # Meeting minutes are visible to all members
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+        - org_board_member
+        - org_staff
+      condition:
+        match:
+          expr: "request.resource.attr.category == 'MEETING'"
+
+    # Architectural guidelines are visible to all members
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+        - org_board_member
+        - org_staff
+      condition:
+        match:
+          expr: "request.resource.attr.category == 'ARCHITECTURAL'"
+
+    # Financial documents - owners can only see their own unit's financials
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.category == 'FINANCIAL'"
+              - expr: "request.resource.attr.contextType == 'UNIT'"
+              - expr: "request.resource.attr.contextId in request.principal.attr.unitIds"
+
+    # Contracts - limited visibility for staff, no access for owners
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_staff
+      condition:
+        match:
+          all:
+            of:
+              - expr: "request.resource.attr.category == 'CONTRACT'"
+              - expr: "request.resource.attr.visibility != 'BOARD_ONLY'"
+
+    # ==========================================================================
+    # LIST ACCESS
+    # ==========================================================================
+
+    # All authenticated users can list documents (filtered by visibility in app layer)
+    - actions: ["list"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_admin
+        - org_manager
+        - org_board_member
+        - org_staff
+        - org_owner
+        - org_contractor

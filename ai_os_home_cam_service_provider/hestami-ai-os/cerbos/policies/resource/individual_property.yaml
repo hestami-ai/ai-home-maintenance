@@ -1,0 +1,19 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "individual_property"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins and managers can perform all actions
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_manager
+
+    # Owners can view and manage properties in their organization
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner

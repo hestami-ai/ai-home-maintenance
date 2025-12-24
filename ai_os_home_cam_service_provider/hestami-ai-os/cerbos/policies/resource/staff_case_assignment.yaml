@@ -1,0 +1,29 @@
+# Phase 16: Staff Case Assignment Resource Policy
+# Controls access to staff-case assignment records
+#
+# Resource attributes expected:
+#   - staffId: string (the staff member assigned)
+#   - caseId: string (the case being assigned)
+#
+# Principal attributes expected:
+#   - staffRoles: string[] (StaffRole enum values)
+#   - staffId: string (current user's staff ID if they are staff)
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "staff_case_assignment"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Platform admins and operations coordinators can manage all assignments
+    - actions: ["view", "create", "update", "delete", "reassign", "list"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # All Hestami staff can view assignments
+    - actions: ["view", "list"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

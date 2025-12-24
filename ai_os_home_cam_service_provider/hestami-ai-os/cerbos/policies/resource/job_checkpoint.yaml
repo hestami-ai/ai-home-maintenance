@@ -1,0 +1,17 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "job_checkpoint"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    - actions: ["view", "create", "edit", "delete", "complete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_manager
+    - actions: ["view", "complete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor
+        - org_technician

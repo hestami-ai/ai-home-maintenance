@@ -1,0 +1,15 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "report_schedule"
+  rules:
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      roles:
+        - admin
+        - manager
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - staff
+        - board_member

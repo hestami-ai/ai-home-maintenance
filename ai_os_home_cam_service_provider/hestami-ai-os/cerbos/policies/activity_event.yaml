@@ -1,0 +1,77 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "activity_event"
+  rules:
+    # Admins and managers have full view and export access
+    - actions: ["view", "export"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_admin
+        - org_manager
+
+    # Board members can view association-scoped events
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_board_member
+      condition:
+        match:
+          expr: "request.resource.attr.associationId != ''"
+
+    # Property owners can view events related to their properties/units
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          any:
+            of:
+              - expr: "request.resource.attr.propertyId != '' && request.resource.attr.propertyId in request.principal.attr.propertyIds"
+              - expr: "request.resource.attr.unitId != '' && request.resource.attr.unitId in request.principal.attr.unitIds"
+
+    # Contractors can view job/work order events they're assigned to
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_contractor
+      condition:
+        match:
+          any:
+            of:
+              - expr: "request.resource.attr.jobId != '' && request.resource.attr.jobId in request.principal.attr.assignedJobIds"
+              - expr: "request.resource.attr.workOrderId != '' && request.resource.attr.workOrderId in request.principal.attr.assignedWorkOrderIds"
+
+    # Concierge staff can view case events they're assigned to
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_concierge
+      condition:
+        match:
+          expr: "request.resource.attr.caseId != '' && request.resource.attr.caseId in request.principal.attr.assignedCaseIds"
+
+    # Technicians can view their own activity events
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_technician
+      condition:
+        match:
+          any:
+            of:
+              - expr: "request.resource.attr.technicianId == request.principal.attr.technicianId"
+              - expr: "request.resource.attr.performedById == request.principal.id"
+
+    # Staff members have general view access
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_staff
+
+    # No create, update, or delete actions - activity events are immutable
+    - actions: ["create", "update", "delete"]
+      effect: EFFECT_DENY
+      roles: ["*"]
