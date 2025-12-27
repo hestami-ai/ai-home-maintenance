@@ -101,6 +101,9 @@ dependencies {
     // Markdown rendering
     implementation(libs.compose.markdown)
 
+    // ONNX Runtime to support AI models
+    implementation(libs.onnxruntime.android)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

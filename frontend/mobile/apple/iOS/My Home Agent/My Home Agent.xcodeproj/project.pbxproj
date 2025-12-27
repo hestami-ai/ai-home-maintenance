@@ -32,8 +32,8 @@
 		32CE0DDA2D8850C3005A4C78 = {
 			isa = PBXGroup;
 			children = (
-				32CE0DE52D8850C3005A4C78 /* My Home Agent */,
 				32CE0DE42D8850C3005A4C78 /* Products */,
+				32CE0DE52D8850C3005A4C78 /* My Home Agent */,
 			);
 			sourceTree = "<group>";
 		};
