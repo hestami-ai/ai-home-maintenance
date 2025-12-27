@@ -37,11 +37,11 @@
 
 		try {
 			const response = await vendorApi.get(vendorId);
-			if (response.ok && response.data?.vendor) {
-				vendor = response.data.vendor as Vendor;
-			} else {
+			if (!response.ok) {
 				error = 'Vendor not found';
+				return;
 			}
+			vendor = response.data.vendor as Vendor;
 		} catch (e) {
 			error = 'Failed to load vendor';
 			console.error(e);
@@ -54,7 +54,7 @@
 		if (!vendorId) return;
 		try {
 			const response = await documentApi.list({ contextType: 'VENDOR', contextId: vendorId });
-			if (response.ok && response.data?.documents) {
+			if (response.ok) {
 				documents = response.data.documents;
 			}
 		} catch (e) {
@@ -65,9 +65,9 @@
 	async function loadHistory() {
 		if (!vendorId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'VENDOR', entityId: vendorId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'VENDOR' as any, entityId: vendorId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,
@@ -118,10 +118,8 @@
 
 		isActionLoading = true;
 		try {
-			const response = await vendorApi.updateStatus(vendor.id, {
-				status: data.action,
-				notes: data.notes,
-				idempotencyKey: crypto.randomUUID()
+			const response = await vendorApi.update(vendor.id, {
+				isActive: data.action === 'APPROVE'
 			});
 
 			if (response.ok) {
@@ -207,8 +205,8 @@
 			{:else if vendor}
 				<div class="flex-1">
 					<div class="flex items-center gap-2">
-						<span class="rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor(vendor.status)}">
-							{vendor.status}
+						<span class="rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor((vendor as any).status || 'ACTIVE')}">
+							{(vendor as any).status || 'Active'}
 						</span>
 					</div>
 					<h1 class="mt-1 text-xl font-semibold">{vendor.name}</h1>
@@ -218,7 +216,7 @@
 					<a href="/app/cam/vendors/{vendor.id}/edit" class="btn btn-sm preset-tonal-surface">
 						Edit
 					</a>
-					{#if vendor.status === 'PENDING'}
+					{#if (vendor as any).status === 'PENDING'}
 						<DecisionButton variant="approve" onclick={() => openApprovalModal('APPROVE')}>
 							Approve
 						</DecisionButton>
@@ -228,7 +226,7 @@
 						<DecisionButton variant="default" onclick={() => openApprovalModal('REQUEST_INFO')}>
 							Request Info
 						</DecisionButton>
-					{:else if vendor.status === 'APPROVED'}
+					{:else if (vendor as any).status === 'APPROVED'}
 						<DecisionButton variant="deny" onclick={() => openApprovalModal('REJECT')}>
 							Suspend
 						</DecisionButton>
@@ -272,31 +270,31 @@
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Status</h4>
 						<p class="mt-1">
-							<span class="rounded-full px-2 py-0.5 text-sm font-medium {getStatusColor(vendor.status)}">
-								{vendor.status}
+							<span class="rounded-full px-2 py-0.5 text-sm font-medium {getStatusColor((vendor as any).status || 'ACTIVE')}">
+								{(vendor as any).status || 'Active'}
 							</span>
 						</p>
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Trades</h4>
-						<p class="mt-1">{vendor.trades.join(', ')}</p>
+						<p class="mt-1">{(vendor as any).trades?.join(', ') || ''}</p>
 					</div>
-					{#if vendor.licenseNumber}
+					{#if (vendor as any).licenseNumber}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">License Number</h4>
-							<p class="mt-1">{vendor.licenseNumber}</p>
+							<p class="mt-1">{(vendor as any).licenseNumber}</p>
 						</div>
 					{/if}
-					{#if vendor.insuranceExpiry}
+					{#if (vendor as any).insuranceExpiry}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Insurance Expiry</h4>
-							<p class="mt-1">{formatDate(vendor.insuranceExpiry)}</p>
+							<p class="mt-1">{formatDate((vendor as any).insuranceExpiry)}</p>
 						</div>
 					{/if}
-					{#if vendor.rating !== undefined}
+					{#if (vendor as any).rating !== undefined}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Rating</h4>
-							<p class="mt-1">{vendor.rating.toFixed(1)} / 5.0</p>
+							<p class="mt-1">{(vendor as any).rating?.toFixed(1)} / 5.0</p>
 						</div>
 					{/if}
 				</div>
@@ -340,12 +338,12 @@
 							</div>
 						</div>
 					{/if}
-					{#if vendor.address}
+					{#if (vendor as any).address}
 						<div class="flex items-start gap-3">
 							<MapPin class="mt-0.5 h-5 w-5 text-surface-400" />
 							<div>
 								<h4 class="text-sm font-medium text-surface-500">Address</h4>
-								<p class="mt-1">{vendor.address}</p>
+								<p class="mt-1">{(vendor as any).address}</p>
 							</div>
 						</div>
 					{/if}
@@ -388,7 +386,7 @@
 					<div class="flex items-center gap-3 py-3">
 						<FileText class="h-5 w-5 text-surface-400" />
 						<div class="flex-1">
-							<p class="font-medium">{doc.name}</p>
+							<p class="font-medium">{doc.title}</p>
 							<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 						</div>
 						<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">

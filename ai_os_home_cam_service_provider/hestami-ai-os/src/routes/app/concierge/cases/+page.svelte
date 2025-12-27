@@ -40,11 +40,9 @@
 		try {
 			const params: {
 				status?: ConciergeCaseStatus;
-				page?: number;
-				pageSize?: number;
+				limit?: number;
 			} = {
-				page: currentPage,
-				pageSize
+				limit: pageSize
 			};
 
 			if (statusFilter) {
@@ -52,9 +50,9 @@
 			}
 
 			const response = await conciergeCaseApi.list(params);
-			if (response.ok && response.data) {
-				cases = response.data.items;
-				total = response.data.total;
+			if (response.ok) {
+				cases = response.data.cases;
+				total = response.data.cases.length;
 
 				if (cases.length > 0 && !selectedCase) {
 					selectCase(cases[0]);
@@ -73,7 +71,7 @@
 
 		try {
 			const response = await conciergeCaseApi.getDetail(caseItem.id);
-			if (response.ok && response.data) {
+			if (response.ok) {
 				selectedCaseDetail = response.data;
 			}
 		} catch (error) {

@@ -22,8 +22,8 @@
 			const params: { search?: string } = {};
 			if (searchQuery) params.search = searchQuery;
 
-			const response = await propertyApi.list(params);
-			if (response.ok && response.data?.properties) {
+			const response = await propertyApi.list(params as any);
+			if (response.ok) {
 				properties = response.data.properties as PropertyListItem[];
 			}
 		} catch (error) {
@@ -48,7 +48,7 @@
 	const filteredProperties = $derived(
 		properties.filter((p) =>
 			p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			p.address.toLowerCase().includes(searchQuery.toLowerCase())
+			(p.city + ', ' + p.state).toLowerCase().includes(searchQuery.toLowerCase())
 		)
 	);
 
@@ -99,7 +99,7 @@
 						<div class="flex items-start justify-between">
 							<div class="flex-1">
 								<p class="font-medium">{p.name}</p>
-								<p class="mt-0.5 text-sm text-surface-500">{p.address}</p>
+								<p class="mt-0.5 text-sm text-surface-500">{p.city}, {p.state}</p>
 							</div>
 							<span class="rounded bg-surface-200-800 px-2 py-0.5 text-xs">
 								{p.unitCount} units
@@ -107,10 +107,6 @@
 						</div>
 						<div class="mt-2 flex items-center gap-2 text-xs text-surface-500">
 							<span>{getPropertyTypeLabel(p.propertyType)}</span>
-							{#if (p.commonAreaCount ?? 0) > 0}
-								<span>·</span>
-								<span>{p.commonAreaCount} common areas</span>
-							{/if}
 						</div>
 					</button>
 				{/each}
@@ -126,7 +122,7 @@
 					<div class="flex items-center justify-between">
 						<div>
 							<h2 class="text-lg font-semibold">{p.name}</h2>
-							<p class="text-sm text-surface-500">{p.address}</p>
+							<p class="text-sm text-surface-500">{p.city}, {p.state}</p>
 						</div>
 						<a href="/app/cam/properties/{p.id}" class="btn btn-sm preset-tonal-surface">
 							View Details
@@ -143,7 +139,7 @@
 
 						<Card variant="outlined" padding="md">
 							<p class="text-sm text-surface-500">Status</p>
-							<p class="mt-1 font-medium">{p.status}</p>
+							<p class="mt-1 font-medium">Active</p>
 						</Card>
 
 						<Card variant="outlined" padding="md">
@@ -153,7 +149,7 @@
 
 						<Card variant="outlined" padding="md">
 							<p class="text-sm text-surface-500">Common Areas</p>
-							<p class="mt-1 text-2xl font-semibold">{p.commonAreaCount}</p>
+							<p class="mt-1 text-2xl font-semibold">-</p>
 						</Card>
 					</div>
 

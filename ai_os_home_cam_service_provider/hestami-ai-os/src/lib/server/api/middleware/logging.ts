@@ -97,8 +97,8 @@ export function createORPCLogContext(
 ): ORPCLogContext {
 	return {
 		requestId: context.requestId,
-		traceId: context.traceId,
-		spanId: context.spanId,
+		trace_id: context.traceId,
+		span_id: context.spanId,
 		userId: context.user?.id,
 		userEmail: context.user?.email,
 		orgId: context.organization?.id,

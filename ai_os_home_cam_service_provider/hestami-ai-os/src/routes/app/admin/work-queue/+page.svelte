@@ -53,11 +53,9 @@
 				assignedToMe,
 				unassignedOnly
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				items = response.data.items;
 				summary = response.data.summary;
-			} else {
-				error = response.error?.message || 'Failed to load work queue';
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load work queue';
@@ -277,8 +275,8 @@
 											</p>
 										</div>
 										<div class="flex flex-shrink-0 flex-col items-end gap-2">
-											<span class="badge {getUrgencyBadgeClass(item.urgency)}">
-												{URGENCY_LABELS[item.urgency]}
+											<span class="badge {getUrgencyBadgeClass(item.urgency as WorkQueueUrgency)}">
+												{URGENCY_LABELS[item.urgency as WorkQueueUrgency]}
 											</span>
 											<div class="flex items-center gap-1 text-xs text-surface-400">
 												<Clock class="h-3 w-3" />

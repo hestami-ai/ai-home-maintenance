@@ -29,7 +29,7 @@
 		isLoading = true;
 		try {
 			const response = await governanceApi.boards.list();
-			if (response.ok && response.data?.boards) {
+			if (response.ok) {
 				// Map boards to board members format for now
 				boardMembers = [];
 			}

@@ -40,7 +40,7 @@
 		isLoadingData = true;
 		try {
 			const response = await unitApi.list({});
-			if (response.ok && response.data?.units) {
+			if (response.ok) {
 				units = response.data.units;
 			}
 		} catch (e) {
@@ -68,22 +68,22 @@
 
 		try {
 			const response = await arcRequestApi.create({
-				unitId: formData.unitId,
+				associationId: $currentAssociation.id,
+				requesterPartyId: '', // TODO: Get from current user context
 				title: formData.title,
 				description: formData.description || '',
-				category: formData.category,
-				projectScope: formData.projectScope || undefined,
+				category: formData.category as any,
 				estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
-				plannedStartDate: formData.startDate || undefined,
-				plannedCompletionDate: formData.completionDate || undefined,
+				proposedStartDate: formData.startDate || undefined,
+				proposedEndDate: formData.completionDate || undefined,
 				idempotencyKey: crypto.randomUUID()
-			});
+			} as any);
 
-			if (response.ok && response.data?.request) {
-				goto(`/app/cam/arc/${response.data.request.id}`);
-			} else {
-				error = response.error?.message || 'Failed to submit ARC request';
+			if (!response.ok) {
+				error = 'Failed to submit ARC request';
+				return;
 			}
+			goto(`/app/cam/arc/${response.data.request.id}`);
 		} catch (e) {
 			error = 'Failed to submit ARC request';
 			console.error(e);
@@ -151,7 +151,7 @@
 								<option value="">Select your unit</option>
 								{#each units as unit}
 									<option value={unit.id}>
-										Unit {unit.unitNumber}{unit.ownerName ? ` - ${unit.ownerName}` : ''}
+										Unit {unit.unitNumber} - {unit.propertyName}
 									</option>
 								{/each}
 							</select>

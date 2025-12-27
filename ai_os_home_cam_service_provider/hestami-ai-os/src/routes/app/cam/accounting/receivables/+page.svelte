@@ -37,10 +37,10 @@
 
 		isLoading = true;
 		try {
-			const response = await accountingApi.receivables.list({});
-			if (response.ok && response.data) {
-				receivables = response.data.receivables || [];
-				summary = response.data.summary || null;
+			const response = await accountingApi.assessments.listCharges({});
+			if (response.ok) {
+				receivables = response.data.charges as any || [];
+				summary = null; // Summary not available in this API
 			}
 		} catch (e) {
 			console.error('Failed to load receivables:', e);

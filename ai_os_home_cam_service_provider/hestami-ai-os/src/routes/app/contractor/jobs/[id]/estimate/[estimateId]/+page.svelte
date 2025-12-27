@@ -96,17 +96,17 @@
 				estimateApi.get(estimateId)
 			]);
 
-			if (jobRes.ok && jobRes.data) {
+			if (jobRes.ok) {
 				job = jobRes.data.job;
 			}
 
-			if (estimateRes.ok && estimateRes.data) {
-				estimate = estimateRes.data.estimate;
-				editNotes = estimate.notes || '';
-				editTerms = estimate.terms || '';
-			} else {
-				error = estimateRes.error?.message || 'Failed to load estimate';
+			if (!estimateRes.ok) {
+				error = 'Failed to load estimate';
+				return;
 			}
+			estimate = estimateRes.data.estimate;
+			editNotes = estimate.notes || '';
+			editTerms = estimate.terms || '';
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load data';
 		} finally {
@@ -126,7 +126,7 @@
 				isTaxable: newLineTaxable,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				estimate = response.data.estimate;
 				// Reset form
 				newLineDescription = '';
@@ -150,7 +150,7 @@
 				lineId,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				estimate = response.data.estimate;
 			}
 		} catch (e) {
@@ -168,7 +168,7 @@
 				terms: editTerms || undefined,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				estimate = response.data.estimate;
 			}
 		} catch (e) {
@@ -186,7 +186,7 @@
 				id: estimate.id,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				estimate = response.data.estimate;
 			}
 		} catch (e) {
@@ -566,9 +566,6 @@
 							<div class="flex items-center gap-2 text-error-500">
 								<XCircle class="h-4 w-4" />
 								<span>Declined on {new Date(estimate.declinedAt).toLocaleString()}</span>
-								{#if estimate.declineReason}
-									<span class="text-surface-400">- {estimate.declineReason}</span>
-								{/if}
 							</div>
 						{/if}
 					</div>

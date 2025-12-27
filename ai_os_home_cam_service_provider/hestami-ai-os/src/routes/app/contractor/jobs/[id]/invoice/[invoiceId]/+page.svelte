@@ -56,12 +56,12 @@
 				job = jobRes.data.job;
 			}
 
-			if (invoiceRes.ok && invoiceRes.data) {
-				invoice = invoiceRes.data.invoice;
-				paymentAmount = Number(invoice.balanceDue);
-			} else {
-				error = invoiceRes.error?.message || 'Failed to load invoice';
+			if (!invoiceRes.ok) {
+				error = 'Failed to load invoice';
+				return;
 			}
+			invoice = invoiceRes.data.invoice;
+			paymentAmount = Number(invoice.balanceDue);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load data';
 		} finally {
@@ -77,7 +77,7 @@
 				id: invoice.id,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				invoice = response.data.invoice;
 			}
 		} catch (e) {
@@ -99,7 +99,7 @@
 				notes: paymentNotes || undefined,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				invoice = response.data.invoice;
 				showPaymentForm = false;
 				paymentAmount = Number(invoice.balanceDue);

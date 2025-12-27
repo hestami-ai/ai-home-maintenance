@@ -84,11 +84,11 @@
 		isLoading = true;
 		try {
 			const response = await documentApi.list({
-				category: categoryFilter || undefined,
-				status: statusFilter || undefined,
+				category: categoryFilter as any || undefined,
+				status: statusFilter as any || undefined,
 				search: searchQuery || undefined
 			});
-			if (response.ok && response.data?.documents) {
+			if (response.ok) {
 				documents = response.data.documents;
 			}
 		} catch (error) {
@@ -122,6 +122,9 @@
 					id: v.id,
 					version: v.version,
 					status: v.status,
+					fileName: '',
+					fileSize: 0,
+					uploadedBy: '',
 					createdAt: v.createdAt
 				}));
 			}
@@ -131,9 +134,9 @@
 					id: e.id,
 					action: e.action,
 					summary: e.summary,
-					performedBy: e.performedBy,
-					actorType: e.actorType,
-					createdAt: e.createdAt,
+					performedBy: e.performedById || '',
+					actorType: e.performedByType || '',
+					createdAt: e.performedAt,
 					previousState: null,
 					newState: null
 				}));
@@ -238,7 +241,7 @@
 
 		if (searchQuery) {
 			const query = searchQuery.toLowerCase();
-			filtered = filtered.filter((d) => (d.title || d.name || '').toLowerCase().includes(query));
+			filtered = filtered.filter((d) => (d.title || '').toLowerCase().includes(query));
 		}
 
 		if (referencedFilter === 'referenced') {
@@ -354,11 +357,11 @@
 										</p>
 										<div class="mt-0.5 flex items-center gap-2 text-xs text-surface-400">
 											<span>{formatDate(doc.createdAt)}</span>
-											{#if doc.effectiveDate}
+											{#if (doc as any).effectiveDate}
 												<span class="flex items-center gap-1">
 													<Calendar class="h-3 w-3" />
-													{formatDate(doc.effectiveDate)}
-													{#if isNotYetEffective(doc.effectiveDate)}
+													{formatDate((doc as any).effectiveDate)}
+													{#if isNotYetEffective((doc as any).effectiveDate)}
 														<span class="text-warning-500">(not yet effective)</span>
 													{/if}
 												</span>
@@ -385,7 +388,7 @@
 							<span class="rounded px-1.5 py-0.5 text-xs {getStatusBadgeClass(d.status)}">
 								{d.status}
 							</span>
-							{#if isNotYetEffective(d.effectiveDate)}
+							{#if isNotYetEffective((d as any).effectiveDate)}
 								<span class="flex items-center gap-1 rounded bg-warning-500/10 px-1.5 py-0.5 text-xs text-warning-600">
 									<Clock class="h-3 w-3" />
 									Not Yet Effective
@@ -399,7 +402,7 @@
 
 				{#snippet actions()}
 					{@const d = selectedDocument!}
-					<a href={d.fileUrl} download class="btn btn-sm preset-filled-primary-500">
+					<a href={(d as any).fileUrl} download class="btn btn-sm preset-filled-primary-500">
 						Download
 					</a>
 					<a href="/app/cam/documents/{d.id}/new-version" class="btn btn-sm preset-tonal-surface">
@@ -521,7 +524,7 @@
 				<div class="flex gap-2">
 					<button
 						type="button"
-						onclick={() => window.open(selectedDocument?.fileUrl, '_blank')}
+						onclick={() => window.open((selectedDocument as any)?.fileUrl, '_blank')}
 						class="btn btn-sm preset-tonal-surface"
 					>
 						<ExternalLink class="mr-1 h-4 w-4" />
@@ -542,7 +545,7 @@
 				{#if selectedDocument.mimeType.startsWith('image/')}
 					<div class="rounded-lg border border-surface-300-700 bg-surface-200-800 p-4">
 						<img
-							src={selectedDocument.fileUrl}
+							src={(selectedDocument as any).fileUrl}
 							alt={selectedDocument.title}
 							class="mx-auto max-h-[500px] rounded"
 						/>
@@ -550,7 +553,7 @@
 				{:else if selectedDocument.mimeType === 'application/pdf'}
 					<div class="rounded-lg border border-surface-300-700 bg-surface-200-800">
 						<iframe
-							src={selectedDocument.fileUrl}
+							src={(selectedDocument as any).fileUrl}
 							title={selectedDocument.title}
 							class="h-[600px] w-full rounded-lg"
 						></iframe>
@@ -560,7 +563,7 @@
 						<div class="text-center">
 							<Eye class="mx-auto h-8 w-8 text-surface-400" />
 							<p class="mt-2 text-surface-500">Preview not available for this file type</p>
-							<a href={selectedDocument.fileUrl} download class="btn btn-sm preset-filled-primary-500 mt-3">
+							<a href={(selectedDocument as any).fileUrl} download class="btn btn-sm preset-filled-primary-500 mt-3">
 								Download to View
 							</a>
 						</div>
@@ -571,7 +574,7 @@
 					<div class="text-center">
 						<FileText class="mx-auto h-8 w-8 text-surface-400" />
 						<p class="mt-2 text-surface-500">Preview not available for {selectedDocument.mimeType}</p>
-						<a href={selectedDocument.fileUrl} download class="btn btn-sm preset-filled-primary-500 mt-3">
+						<a href={(selectedDocument as any).fileUrl} download class="btn btn-sm preset-filled-primary-500 mt-3">
 							Download to View
 						</a>
 					</div>

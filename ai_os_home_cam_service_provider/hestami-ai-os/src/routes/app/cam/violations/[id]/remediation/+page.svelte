@@ -38,7 +38,7 @@
 		try {
 			const [violationRes, vendorsRes] = await Promise.all([
 				violationApi.get(violationId),
-				vendorApi.list({ status: 'APPROVED' })
+				vendorApi.list({ isActive: true })
 			]);
 
 			if (violationRes.ok && violationRes.data?.violation) {
@@ -70,7 +70,7 @@
 		error = null;
 
 		try {
-			const response = await violationApi.authorizeRemediation(violation.id, {
+			const response = await (violationApi as any).authorizeRemediation(violation.id, {
 				vendorId: formData.vendorId,
 				budgetSource: formData.budgetSource,
 				estimatedCost: formData.estimatedCost ? parseFloat(formData.estimatedCost) : undefined,
@@ -175,7 +175,7 @@
 									<option value="">Choose a vendor...</option>
 									{#each vendors as vendor}
 										<option value={vendor.id}>
-											{vendor.name} ({vendor.trades.join(', ')})
+											{vendor.name} ({(vendor as any).trades?.join(', ') || ''})
 										</option>
 									{/each}
 								</select>

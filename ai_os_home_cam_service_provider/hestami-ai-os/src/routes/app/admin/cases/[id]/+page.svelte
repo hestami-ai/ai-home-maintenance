@@ -45,11 +45,11 @@
 		error = null;
 		try {
 			const response = await conciergeCaseApi.getDetail(caseId);
-			if (response.ok && response.data) {
-				caseDetail = response.data;
-			} else {
-				error = response.error?.message || 'Failed to load case details';
+			if (!response.ok) {
+				error = 'Failed to load case details';
+				return;
 			}
+			caseDetail = response.data;
 		} catch (err) {
 			console.error('Failed to load case:', err);
 			error = 'An error occurred while loading the case';

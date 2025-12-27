@@ -50,16 +50,14 @@
 		isLoading = true;
 		error = null;
 		try {
-			const response = await vendorCandidateApi.get(vendorId, organizationId);
-			if (response.ok && response.data) {
+			const response = await vendorCandidateApi.get(vendorId);
+			if (response.ok) {
 				vendor = response.data.vendorCandidate;
 				// Load bids for this vendor
-				const bidsResponse = await vendorBidApi.listByCase({ caseId }, organizationId);
-				if (bidsResponse.ok && bidsResponse.data) {
+				const bidsResponse = await vendorBidApi.listByCase({ caseId });
+				if (bidsResponse.ok) {
 					bids = bidsResponse.data.bids.filter(b => b.vendorCandidateId === vendorId);
 				}
-			} else {
-				error = response.error?.message || 'Failed to load vendor';
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load vendor';

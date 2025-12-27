@@ -38,11 +38,11 @@
 
 		isLoading = true;
 		try {
-			const response = await accountingApi.assessments.list({
-				status: statusFilter !== 'all' ? statusFilter : undefined
+			const response = await accountingApi.assessments.listCharges({
+				status: statusFilter !== 'all' ? statusFilter as any : undefined
 			});
-			if (response.ok && response.data?.assessments) {
-				assessments = response.data.assessments;
+			if (response.ok) {
+				assessments = response.data.charges as any;
 			}
 		} catch (e) {
 			console.error('Failed to load assessments:', e);

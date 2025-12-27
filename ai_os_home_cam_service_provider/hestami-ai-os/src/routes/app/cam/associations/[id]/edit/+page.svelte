@@ -3,22 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { associationApi } from '$lib/api/cam';
+	import { associationApi, type AssociationDetail } from '$lib/api/cam';
 
-	interface Association {
-		id: string;
-		name: string;
-		legalName?: string;
-		status: string;
-		fiscalYearEnd: number;
-		address?: string;
-		phone?: string;
-		email?: string;
-		website?: string;
-		taxId?: string;
-	}
-
-	let association = $state<Association | null>(null);
+	let association = $state<AssociationDetail | null>(null);
 	let isLoading = $state(true);
 	let isSaving = $state(false);
 	let error = $state<string | null>(null);
@@ -26,21 +13,11 @@
 	let formData = $state({
 		name: '',
 		legalName: '',
-		status: 'ACTIVE',
 		fiscalYearEnd: '12',
-		address: '',
-		phone: '',
-		email: '',
-		website: '',
 		taxId: ''
 	});
 
-	const statusOptions = [
-		{ value: 'ACTIVE', label: 'Active' },
-		{ value: 'INACTIVE', label: 'Inactive' },
-		{ value: 'PENDING', label: 'Pending' }
-	];
-
+	
 	const monthOptions = [
 		{ value: '1', label: 'January' },
 		{ value: '2', label: 'February' },
@@ -66,23 +43,18 @@
 
 		try {
 			const response = await associationApi.get(associationId);
-			if (response.ok && response.data?.association) {
-				const a = response.data.association;
-				association = a;
-				formData = {
-					name: a.name || '',
-					legalName: a.legalName || '',
-					status: a.status || 'ACTIVE',
-					fiscalYearEnd: a.fiscalYearEnd?.toString() || '12',
-					address: a.address || '',
-					phone: a.phone || '',
-					email: a.email || '',
-					website: a.website || '',
-					taxId: a.taxId || ''
-				};
-			} else {
+			if (!response.ok) {
 				error = 'Association not found';
+				return;
 			}
+			const a = response.data.association;
+			association = a;
+			formData = {
+				name: a.name || '',
+				legalName: a.legalName || '',
+				fiscalYearEnd: a.fiscalYearEnd?.toString() || '12',
+				taxId: a.taxId || ''
+			};
 		} catch (e) {
 			error = 'Failed to load data';
 			console.error(e);
@@ -108,20 +80,15 @@
 			const response = await associationApi.update(association.id, {
 				name: formData.name,
 				legalName: formData.legalName || undefined,
-				status: formData.status,
 				fiscalYearEnd: parseInt(formData.fiscalYearEnd),
-				address: formData.address || undefined,
-				phone: formData.phone || undefined,
-				email: formData.email || undefined,
-				website: formData.website || undefined,
 				taxId: formData.taxId || undefined
 			});
 
-			if (response.ok) {
-				goto(`/app/cam/associations/${association.id}`);
-			} else {
-				error = response.error?.message || 'Failed to update association';
+			if (!response.ok) {
+				error = 'Failed to update association';
+				return;
 			}
+			goto(`/app/cam/associations/${association.id}`);
 		} catch (e) {
 			error = 'Failed to update association';
 			console.error(e);
@@ -206,36 +173,19 @@
 								/>
 							</div>
 
-							<div class="grid gap-4 sm:grid-cols-2">
-								<div>
-									<label for="status" class="mb-1 block text-sm font-medium">
-										Status
-									</label>
-									<select
-										id="status"
-										bind:value={formData.status}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each statusOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
-								</div>
-
-								<div>
-									<label for="fiscalYearEnd" class="mb-1 block text-sm font-medium">
-										Fiscal Year End
-									</label>
-									<select
-										id="fiscalYearEnd"
-										bind:value={formData.fiscalYearEnd}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each monthOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
-								</div>
+							<div>
+								<label for="fiscalYearEnd" class="mb-1 block text-sm font-medium">
+									Fiscal Year End
+								</label>
+								<select
+									id="fiscalYearEnd"
+									bind:value={formData.fiscalYearEnd}
+									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+								>
+									{#each monthOptions as option}
+										<option value={option.value}>{option.label}</option>
+									{/each}
+								</select>
 							</div>
 
 							<div>
@@ -247,62 +197,6 @@
 									type="text"
 									bind:value={formData.taxId}
 									placeholder="XX-XXXXXXX"
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								/>
-							</div>
-						</div>
-					</Card>
-
-					<Card variant="outlined" padding="lg">
-						<h3 class="mb-4 font-semibold">Contact Information</h3>
-						<div class="space-y-4">
-							<div>
-								<label for="address" class="mb-1 block text-sm font-medium">
-									Address
-								</label>
-								<textarea
-									id="address"
-									bind:value={formData.address}
-									rows={2}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								></textarea>
-							</div>
-
-							<div class="grid gap-4 sm:grid-cols-2">
-								<div>
-									<label for="phone" class="mb-1 block text-sm font-medium">
-										Phone
-									</label>
-									<input
-										id="phone"
-										type="tel"
-										bind:value={formData.phone}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									/>
-								</div>
-
-								<div>
-									<label for="email" class="mb-1 block text-sm font-medium">
-										Email
-									</label>
-									<input
-										id="email"
-										type="email"
-										bind:value={formData.email}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									/>
-								</div>
-							</div>
-
-							<div>
-								<label for="website" class="mb-1 block text-sm font-medium">
-									Website
-								</label>
-								<input
-									id="website"
-									type="url"
-									bind:value={formData.website}
-									placeholder="https://"
 									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 								/>
 							</div>

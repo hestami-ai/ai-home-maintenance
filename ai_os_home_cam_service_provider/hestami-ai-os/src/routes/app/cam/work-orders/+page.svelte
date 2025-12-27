@@ -65,8 +65,8 @@
 			if (priorityFilter) params.priority = priorityFilter;
 			if (searchQuery) params.search = searchQuery;
 
-			const response = await workOrderApi.list(params);
-			if (response.ok && response.data?.workOrders) {
+			const response = await workOrderApi.list(params as any);
+			if (response.ok) {
 				workOrders = response.data.workOrders as WorkOrderListItem[];
 			}
 		} catch (error) {
@@ -151,7 +151,7 @@
 	}
 
 	const filteredWorkOrders = $derived(
-		workOrders.filter((wo) =>
+		workOrders.filter((wo: any) =>
 			wo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			wo.workOrderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			(wo.unitNumber && wo.unitNumber.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -230,7 +230,7 @@
 				{:else}
 					<div class="divide-y divide-surface-300-700">
 						{#each filteredWorkOrders as workOrder}
-							{@const overdue = isOverdue(workOrder.dueDate, workOrder.status)}
+							{@const overdue = isOverdue((workOrder as any).dueDate, workOrder.status)}
 							<button
 								type="button"
 								onclick={() => selectWorkOrder(workOrder)}
@@ -253,9 +253,9 @@
 										</div>
 										<p class="mt-1 truncate font-medium">{workOrder.title}</p>
 										<p class="mt-0.5 text-sm text-surface-500">
-											{workOrder.locationDescription}
-											{#if workOrder.vendorName}
-												· {workOrder.vendorName}
+											{(workOrder as any).locationDescription || ''}
+											{#if (workOrder as any).vendorName}
+												· {(workOrder as any).vendorName}
 											{/if}
 										</p>
 									</div>
@@ -264,9 +264,9 @@
 									</span>
 								</div>
 								<p class="mt-1 text-xs text-surface-400">
-									{workOrder.createdAt ? formatDate(workOrder.createdAt) : ''}
-									{#if workOrder.dueDate}
-										· Due {formatDate(workOrder.dueDate)}
+									{(workOrder as any).createdAt ? formatDate((workOrder as any).createdAt) : ''}
+									{#if (workOrder as any).dueDate}
+										· Due {formatDate((workOrder as any).dueDate)}
 									{/if}
 								</p>
 							</button>
@@ -368,27 +368,27 @@
 		<div class="space-y-6">
 			<div>
 				<h3 class="text-sm font-medium text-surface-500">Description</h3>
-				<p class="mt-1">{selectedWorkOrder.description || 'No description provided.'}</p>
+				<p class="mt-1">{(selectedWorkOrder as any).description || 'No description provided.'}</p>
 			</div>
 
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Location</h3>
-					<p class="mt-1">{selectedWorkOrder.locationDescription}</p>
+					<p class="mt-1">{(selectedWorkOrder as any).locationDescription || '-'}</p>
 				</div>
-				{#if selectedWorkOrder.unitId}
+				{#if (selectedWorkOrder as any).unitId}
 					<div>
 						<h3 class="text-sm font-medium text-surface-500">Unit</h3>
 						<p class="mt-1">
-							<a href="/app/cam/units/{selectedWorkOrder.unitId}" class="text-primary-500 hover:underline">
-								Unit {selectedWorkOrder.unitNumber}
+							<a href="/app/cam/units/{(selectedWorkOrder as any).unitId}" class="text-primary-500 hover:underline">
+								Unit {(selectedWorkOrder as any).unitNumber}
 							</a>
 						</p>
 					</div>
 				{/if}
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Vendor</h3>
-					<p class="mt-1">{selectedWorkOrder.vendorName || 'Not assigned'}</p>
+					<p class="mt-1">{(selectedWorkOrder as any).vendorName || 'Not assigned'}</p>
 				</div>
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Category</h3>
@@ -396,13 +396,13 @@
 				</div>
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Created</h3>
-					<p class="mt-1">{selectedWorkOrder.createdAt ? formatDate(selectedWorkOrder.createdAt) : '-'}</p>
+					<p class="mt-1">{(selectedWorkOrder as any).createdAt ? formatDate((selectedWorkOrder as any).createdAt) : '-'}</p>
 				</div>
-				{#if selectedWorkOrder.dueDate}
+				{#if (selectedWorkOrder as any).dueDate}
 					<div>
 						<h3 class="text-sm font-medium text-surface-500">Due Date</h3>
-						<p class="mt-1" class:text-error-500={isOverdue(selectedWorkOrder.dueDate, selectedWorkOrder.status)}>
-							{formatDate(selectedWorkOrder.dueDate)}
+						<p class="mt-1" class:text-error-500={isOverdue((selectedWorkOrder as any).dueDate, selectedWorkOrder.status)}>
+							{formatDate((selectedWorkOrder as any).dueDate)}
 						</p>
 					</div>
 				{/if}
@@ -430,16 +430,16 @@
 		<div class="space-y-6">
 			<div>
 				<h3 class="text-sm font-medium text-surface-500">Scope Description</h3>
-				<p class="mt-1">{selectedWorkOrder.description || 'No description provided.'}</p>
+				<p class="mt-1">{(selectedWorkOrder as any).description || 'No description provided.'}</p>
 			</div>
 
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Origin Type</h3>
 					<p class="mt-1">
-						{#if selectedWorkOrder.originType}
-							<span class="rounded px-2 py-0.5 text-xs font-medium {getOriginTypeColor(selectedWorkOrder.originType)}">
-								{getOriginTypeLabel(selectedWorkOrder.originType)}
+						{#if (selectedWorkOrder as any).originType}
+							<span class="rounded px-2 py-0.5 text-xs font-medium {getOriginTypeColor((selectedWorkOrder as any).originType)}">
+								{getOriginTypeLabel((selectedWorkOrder as any).originType)}
 							</span>
 						{:else}
 							<span class="text-surface-400">Not specified</span>
@@ -448,7 +448,7 @@
 				</div>
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Constraints</h3>
-					<p class="mt-1">{selectedWorkOrder.constraints || 'None'}</p>
+					<p class="mt-1">{(selectedWorkOrder as any).constraints || 'None'}</p>
 				</div>
 			</div>
 
@@ -457,26 +457,26 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<h4 class="text-xs text-surface-400">Authorizing Role</h4>
-						<p class="mt-0.5 font-medium">{selectedWorkOrder.authorizingRole || 'Pending'}</p>
+						<p class="mt-0.5 font-medium">{(selectedWorkOrder as any).authorizingRole || 'Pending'}</p>
 					</div>
 					<div>
 						<h4 class="text-xs text-surface-400">Authorized At</h4>
-						<p class="mt-0.5">{selectedWorkOrder.authorizedAt ? formatDate(selectedWorkOrder.authorizedAt) : 'Not yet authorized'}</p>
+						<p class="mt-0.5">{(selectedWorkOrder as any).authorizedAt ? formatDate((selectedWorkOrder as any).authorizedAt) : 'Not yet authorized'}</p>
 					</div>
 					<div class="sm:col-span-2">
 						<h4 class="text-xs text-surface-400">Authorization Rationale</h4>
-						<p class="mt-0.5">{selectedWorkOrder.authorizationRationale || 'N/A'}</p>
+						<p class="mt-0.5">{(selectedWorkOrder as any).authorizationRationale || 'N/A'}</p>
 					</div>
 				</div>
 			</div>
 
-			{#if selectedWorkOrder.requiresBoardApproval}
+			{#if (selectedWorkOrder as any).requiresBoardApproval}
 				<div class="border-t border-surface-300-700 pt-4">
 					<h3 class="text-sm font-medium text-surface-500 mb-3">Board Approval</h3>
 					<div class="grid gap-4 sm:grid-cols-2">
 						<div>
 							<h4 class="text-xs text-surface-400">Status</h4>
-							<p class="mt-0.5 font-medium">{selectedWorkOrder.boardApprovalStatus || 'Pending'}</p>
+							<p class="mt-0.5 font-medium">{(selectedWorkOrder as any).boardApprovalStatus || 'Pending'}</p>
 						</div>
 					</div>
 				</div>
@@ -491,24 +491,24 @@
 			<div class="grid gap-4 sm:grid-cols-3">
 				<div class="rounded-lg border border-surface-300-700 p-4">
 					<h4 class="text-xs text-surface-400">Budget Source</h4>
-					<p class="mt-1 text-lg font-semibold">{selectedWorkOrder.budgetSource || 'Not set'}</p>
+					<p class="mt-1 text-lg font-semibold">{(selectedWorkOrder as any).budgetSource || 'Not set'}</p>
 				</div>
 				<div class="rounded-lg border border-surface-300-700 p-4">
 					<h4 class="text-xs text-surface-400">Approved Amount</h4>
 					<p class="mt-1 text-lg font-semibold">
-						{selectedWorkOrder.approvedAmount ? `$${Number(selectedWorkOrder.approvedAmount).toLocaleString()}` : '-'}
+						{(selectedWorkOrder as any).approvedAmount ? `$${Number((selectedWorkOrder as any).approvedAmount).toLocaleString()}` : '-'}
 					</p>
 				</div>
 				<div class="rounded-lg border border-surface-300-700 p-4">
 					<h4 class="text-xs text-surface-400">Spend to Date</h4>
 					<p class="mt-1 text-lg font-semibold">
-						{selectedWorkOrder.spendToDate ? `$${Number(selectedWorkOrder.spendToDate).toLocaleString()}` : '$0'}
+						{(selectedWorkOrder as any).spendToDate ? `$${Number((selectedWorkOrder as any).spendToDate).toLocaleString()}` : '$0'}
 					</p>
 				</div>
 			</div>
 
-			{#if selectedWorkOrder.approvedAmount && selectedWorkOrder.spendToDate}
-				{@const variance = Number(selectedWorkOrder.spendToDate) - Number(selectedWorkOrder.approvedAmount)}
+			{#if (selectedWorkOrder as any).approvedAmount && (selectedWorkOrder as any).spendToDate}
+				{@const variance = Number((selectedWorkOrder as any).spendToDate) - Number((selectedWorkOrder as any).approvedAmount)}
 				{@const isOverBudget = variance > 0}
 				<div class="rounded-lg border p-4 {isOverBudget ? 'border-error-500 bg-error-500/10' : 'border-success-500 bg-success-500/10'}">
 					<h4 class="text-xs {isOverBudget ? 'text-error-600' : 'text-success-600'}">Budget Variance</h4>
@@ -534,7 +534,7 @@
 		<div class="space-y-6">
 			<div>
 				<h3 class="text-sm font-medium text-surface-500">Assigned Vendor</h3>
-				<p class="mt-1 text-lg font-medium">{selectedWorkOrder.vendorName || 'Not assigned'}</p>
+				<p class="mt-1 text-lg font-medium">{(selectedWorkOrder as any).vendorName || 'Not assigned'}</p>
 			</div>
 
 			<div class="border-t border-surface-300-700 pt-4">
@@ -551,19 +551,19 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<h4 class="text-xs text-surface-400">Started At</h4>
-						<p class="mt-0.5">{selectedWorkOrder.startedAt ? formatDate(selectedWorkOrder.startedAt) : '-'}</p>
+						<p class="mt-0.5">{(selectedWorkOrder as any).startedAt ? formatDate((selectedWorkOrder as any).startedAt) : '-'}</p>
 					</div>
 					<div>
 						<h4 class="text-xs text-surface-400">Completed At</h4>
-						<p class="mt-0.5">{selectedWorkOrder.completedAt ? formatDate(selectedWorkOrder.completedAt) : '-'}</p>
+						<p class="mt-0.5">{(selectedWorkOrder as any).completedAt ? formatDate((selectedWorkOrder as any).completedAt) : '-'}</p>
 					</div>
 					<div>
 						<h4 class="text-xs text-surface-400">Actual Cost</h4>
-						<p class="mt-0.5">{selectedWorkOrder.actualCost ? `$${Number(selectedWorkOrder.actualCost).toLocaleString()}` : '-'}</p>
+						<p class="mt-0.5">{(selectedWorkOrder as any).actualCost ? `$${Number((selectedWorkOrder as any).actualCost).toLocaleString()}` : '-'}</p>
 					</div>
 					<div>
 						<h4 class="text-xs text-surface-400">Actual Hours</h4>
-						<p class="mt-0.5">{selectedWorkOrder.actualHours || '-'}</p>
+						<p class="mt-0.5">{(selectedWorkOrder as any).actualHours || '-'}</p>
 					</div>
 				</div>
 			</div>

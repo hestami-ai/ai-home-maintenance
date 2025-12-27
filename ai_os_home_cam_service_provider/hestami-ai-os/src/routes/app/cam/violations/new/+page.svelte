@@ -79,17 +79,17 @@
 				violationTypeId: formData.violationTypeId,
 				title: formData.title,
 				description: formData.description || '',
-				severity: formData.severity,
+				severity: formData.severity as any,
 				unitId: formData.unitId,
 				observedDate: formData.reportedDate,
 				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok && response.data?.violation) {
-				goto(`/app/cam/violations/${response.data.violation.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create violation';
+			if (!response.ok) {
+				error = 'Failed to create violation';
+				return;
 			}
+			goto(`/app/cam/violations/${response.data.violation.id}`);
 		} catch (e) {
 			error = 'Failed to create violation';
 			console.error(e);
@@ -158,7 +158,7 @@
 									<option value="">Select a unit</option>
 									{#each units as unit}
 										<option value={unit.id}>
-											Unit {unit.unitNumber}{unit.ownerName ? ` - ${unit.ownerName}` : ''}
+											Unit {unit.unitNumber} - {unit.propertyName}
 										</option>
 									{/each}
 								</select>

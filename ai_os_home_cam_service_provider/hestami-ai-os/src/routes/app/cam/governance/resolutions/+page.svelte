@@ -43,9 +43,9 @@
 		isLoading = true;
 		try {
 			const response = await governanceApi.resolutions.list({
-				status: statusFilter !== 'all' ? statusFilter : undefined
+				status: statusFilter !== 'all' ? statusFilter as any : undefined
 			});
-			if (response.ok && response.data?.resolutions) {
+			if (response.ok) {
 				resolutions = response.data.resolutions;
 			}
 		} catch (e) {

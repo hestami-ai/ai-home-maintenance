@@ -25,7 +25,8 @@ export const DocumentAction = {
 	CREATE_VERSION: 'CREATE_VERSION',
 	RESTORE_VERSION: 'RESTORE_VERSION',
 	CHANGE_CATEGORY: 'CHANGE_CATEGORY',
-	ADD_CONTEXT_BINDING: 'ADD_CONTEXT_BINDING'
+	ADD_CONTEXT_BINDING: 'ADD_CONTEXT_BINDING',
+	HANDLE_TUS_HOOK: 'HANDLE_TUS_HOOK'
 } as const;
 
 export type DocumentAction = (typeof DocumentAction)[keyof typeof DocumentAction];
@@ -52,6 +53,8 @@ export interface DocumentWorkflowInput {
 		fileUrl?: string;
 		checksum?: string;
 		targetVersionId?: string;
+		// TUS Hook Data
+		tusPayload?: any;
 	};
 }
 
@@ -155,7 +158,7 @@ async function updateDocument(
 		visibility?: DocumentVisibility;
 		status?: DocumentStatus;
 	} = {};
-	
+
 	if (data.title !== undefined) updateData.title = data.title;
 	if (data.description !== undefined) updateData.description = data.description;
 	if (data.visibility !== undefined) updateData.visibility = data.visibility;
@@ -364,6 +367,67 @@ async function addContextBinding(
 	return binding.id;
 }
 
+// ---- Phase 18: File Ingestion & Processing Steps ----
+
+async function updateDocumentStatus(
+	documentId: string,
+	status: DocumentStatus,
+	malwareStatus?: string
+): Promise<void> {
+	await prisma.document.update({
+		where: { id: documentId },
+		data: {
+			status,
+			...(malwareStatus ? { malwareScanStatus: malwareStatus } : {})
+		}
+	});
+}
+
+async function dispatchProcessing(
+	documentId: string,
+	storagePath: string
+): Promise<any> {
+	// Call the hestami-worker-document
+	const workerUrl = process.env.WORKER_DOCUMENT_URL || 'http://hestami-worker-document:8000';
+	console.log(`[DocumentWorkflow] Dispatching ${documentId} to worker at ${workerUrl}...`);
+
+	// In production, use standard fetch
+	const response = await fetch(`${workerUrl}/process`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+		},
+		body: JSON.stringify({
+			documentId,
+			storagePath,
+		}),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Worker returned status ${response.status}`);
+	}
+
+	return await response.json();
+}
+
+async function finalizeProcessing(
+	documentId: string,
+	workerResult: any
+): Promise<void> {
+	const isClean = workerResult.status === 'clean';
+
+	await prisma.document.update({
+		where: { id: documentId },
+		data: {
+			status: isClean ? DocumentStatus.ACTIVE : DocumentStatus.ARCHIVED, // Using ARCHIVED as proxy for QUARANTINED/SUSPENDED if enum not available
+			malwareScanStatus: isClean ? 'CLEAN' : 'INFECTED',
+			metadata: workerResult.metadata ?? {},
+			processingCompletedAt: new Date()
+		}
+	});
+	console.log(`[DocumentWorkflow] FINALIZED ${documentId}. Clean: ${isClean}`);
+}
+
 async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentWorkflowResult> {
 	const log = createWorkflowLogger('DocumentWorkflow', undefined, input.action);
 	const startTime = logWorkflowStart(log, input.action, {
@@ -433,6 +497,42 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				entityId = await DBOS.runStep(
 					() => addContextBinding(input.organizationId, input.userId, input.documentId!, input.data),
 					{ name: 'addContextBinding' }
+				);
+				break;
+
+			case 'HANDLE_TUS_HOOK':
+				log.debug('Executing HANDLE_TUS_HOOK step');
+				// TUS Hook Logic
+				const tusPayload = input.data.tusPayload;
+				if (!tusPayload) throw new Error('Missing TUS payload');
+
+				const uploadId = tusPayload.Event.Upload.ID;
+				const docIdFromMeta = tusPayload.Event.Upload.MetaData['documentId'];
+
+				if (!docIdFromMeta) {
+					// If no documentId in metadata, we can't link it easily without more logic.
+					// Fallback: search by storagePath if we saved it in CREATE_DOCUMENT_METADATA.
+					throw new Error('Missing documentId in TUS metadata');
+				}
+
+				entityId = docIdFromMeta;
+
+				// 1. Mark Processing
+				await DBOS.runStep(
+					() => updateDocumentStatus(docIdFromMeta, DocumentStatus.ACTIVE, 'PENDING'), // Temporarily ACTIVE or keep as UPLOADING/PROCESSING if enum supported
+					{ name: 'markPendingScan' }
+				);
+
+				// 2. Dispatch
+				const workerResult = await DBOS.runStep(
+					() => dispatchProcessing(docIdFromMeta, uploadId),
+					{ name: 'dispatchProcessing' }
+				);
+
+				// 3. Finalize
+				await DBOS.runStep(
+					() => finalizeProcessing(docIdFromMeta, workerResult),
+					{ name: 'finalizeProcessing' }
 				);
 				break;
 

@@ -49,7 +49,7 @@
 		isLoadingData = true;
 		try {
 			const response = await propertyApi.list({});
-			if (response.ok && response.data?.properties) {
+			if (response.ok) {
 				properties = response.data.properties;
 			}
 
@@ -78,21 +78,18 @@
 			const response = await unitApi.create({
 				propertyId: formData.propertyId,
 				unitNumber: formData.unitNumber,
-				unitType: formData.unitType,
-				status: formData.status,
-				address: formData.address || undefined,
-				squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
+				unitType: formData.unitType as any,
+				addressLine1: formData.address || undefined,
+				squareFeet: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
 				bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
-				bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined,
-				floor: formData.floor ? parseInt(formData.floor) : undefined,
-				idempotencyKey: crypto.randomUUID()
+				bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined
 			});
 
-			if (response.ok && response.data?.unit) {
-				goto(`/app/cam/units/${response.data.unit.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create unit';
+			if (!response.ok) {
+				error = 'Failed to create unit';
+				return;
 			}
+			goto(`/app/cam/units/${response.data.unit.id}`);
 		} catch (e) {
 			error = 'Failed to create unit';
 			console.error(e);

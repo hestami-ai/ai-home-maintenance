@@ -37,11 +37,11 @@
 
 		isLoading = true;
 		try {
-			const response = await accountingApi.payables.list({
-				status: statusFilter !== 'all' ? statusFilter : undefined
+			const response = await accountingApi.apInvoices.list({
+				status: statusFilter !== 'all' ? statusFilter as any : undefined
 			});
-			if (response.ok && response.data?.payables) {
-				payables = response.data.payables;
+			if (response.ok) {
+				payables = response.data.invoices as any;
 			}
 		} catch (e) {
 			console.error('Failed to load payables:', e);

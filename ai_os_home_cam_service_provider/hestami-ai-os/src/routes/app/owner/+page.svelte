@@ -12,14 +12,14 @@
 	async function loadDashboardData() {
 		isLoading = true;
 		try {
-			const response = await conciergeCaseApi.list({ pageSize: 5 });
-			if (response.ok && response.data?.items) {
-				cases = response.data.items;
-				activeCaseCount = response.data.items.filter(
-					(c) => !['CLOSED', 'CANCELLED', 'RESOLVED'].includes(c.status)
+			const response = await conciergeCaseApi.list({ limit: 5 });
+			if (response.ok) {
+				cases = response.data.cases;
+				activeCaseCount = response.data.cases.filter(
+					(c: ConciergeCase) => !['CLOSED', 'CANCELLED', 'RESOLVED'].includes(c.status)
 				).length;
-				pendingClarificationCount = response.data.items.filter(
-					(c) => c.status === 'PENDING_OWNER'
+				pendingClarificationCount = response.data.cases.filter(
+					(c: ConciergeCase) => c.status === 'PENDING_OWNER'
 				).length;
 			}
 		} catch (error) {

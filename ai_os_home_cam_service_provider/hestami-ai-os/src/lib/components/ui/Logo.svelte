@@ -20,12 +20,19 @@
 </script>
 
 <a href="/" class="flex items-center gap-2 no-underline">
-	<div
-		class="flex items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-secondary-500 {sizeClasses[
-			size
-		]}"
-	>
-		<span class="font-bold text-white" class:text-sm={size === 'sm'} class:text-base={size === 'md'} class:text-lg={size === 'lg'}>H</span>
+	<div class="relative {sizeClasses[size]}">
+		<!-- Light mode logo (default) -->
+		<img 
+			src="/hestami-ai-company-logo-transparent.png" 
+			alt="Hestami AI" 
+			class="absolute inset-0 h-full w-full object-contain dark:hidden"
+		/>
+		<!-- Dark mode logo -->
+		<img 
+			src="/hestami-ai-company-logo-light-w-green.png" 
+			alt="Hestami AI" 
+			class="absolute inset-0 h-full w-full object-contain hidden dark:block"
+		/>
 	</div>
 	{#if showText}
 		<span class="font-semibold {textClasses[size]}">Hestami</span>

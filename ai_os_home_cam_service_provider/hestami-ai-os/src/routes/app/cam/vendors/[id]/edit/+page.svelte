@@ -68,23 +68,23 @@
 
 		try {
 			const response = await vendorApi.get(vendorId);
-			if (response.ok && response.data?.vendor) {
-				const v = response.data.vendor;
-				vendor = v;
-				formData = {
-					name: v.name || '',
-					contactName: v.contactName || '',
-					email: v.email || '',
-					phone: v.phone || '',
-					address: v.address || '',
-					licenseNumber: v.licenseNumber || '',
-					insuranceExpiry: v.insuranceExpiry?.split('T')[0] || '',
-					trades: v.trades || [],
-					status: v.status || 'PENDING'
-				};
-			} else {
+			if (!response.ok) {
 				error = 'Vendor not found';
+				return;
 			}
+			const v = response.data.vendor as any;
+			vendor = v;
+			formData = {
+				name: v.name || '',
+				contactName: v.contactName || '',
+				email: v.email || '',
+				phone: v.phone || '',
+				address: v.addressLine1 || '',
+				licenseNumber: v.licenseNumber || '',
+				insuranceExpiry: v.insuranceExpiry?.split('T')[0] || '',
+				trades: v.trades || [],
+				status: v.status || 'PENDING'
+			};
 		} catch (e) {
 			error = 'Failed to load data';
 			console.error(e);
@@ -115,20 +115,16 @@
 			const response = await vendorApi.update(vendor.id, {
 				name: formData.name,
 				contactName: formData.contactName || undefined,
-				email: formData.email || undefined,
-				phone: formData.phone || undefined,
-				address: formData.address || undefined,
-				licenseNumber: formData.licenseNumber || undefined,
-				insuranceExpiry: formData.insuranceExpiry || undefined,
-				trades: formData.trades,
-				status: formData.status
+				contactEmail: formData.email || undefined,
+				contactPhone: formData.phone || undefined,
+				addressLine1: formData.address || undefined
 			});
 
-			if (response.ok) {
-				goto(`/app/cam/vendors/${vendor.id}`);
-			} else {
-				error = response.error?.message || 'Failed to update vendor';
+			if (!response.ok) {
+				error = 'Failed to update vendor';
+				return;
 			}
+			goto(`/app/cam/vendors/${vendor.id}`);
 		} catch (e) {
 			error = 'Failed to update vendor';
 			console.error(e);

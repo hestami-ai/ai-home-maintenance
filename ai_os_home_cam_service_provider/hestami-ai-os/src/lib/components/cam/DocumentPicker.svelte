@@ -11,13 +11,14 @@
 
 	interface Document {
 		id: string;
-		name: string;
-		title?: string;
+		title: string;
 		category: string;
-		status?: string;
-		version?: number;
-		fileName?: string;
-		fileSize?: number;
+		status: string;
+		visibility: string;
+		fileName: string;
+		fileSize: number;
+		mimeType: string;
+		version: number;
 		createdAt: string;
 	}
 
@@ -86,8 +87,8 @@
 		isLoading = true;
 		try {
 			const response = await documentApi.list({
-				category: localCategoryFilter || undefined,
-				status: statusFilter || undefined,
+				category: localCategoryFilter as any || undefined,
+				status: statusFilter as any || undefined,
 				search: searchQuery || undefined
 			});
 			if (response.ok && response.data?.documents) {
@@ -113,7 +114,7 @@
 			const newSelection: SelectedDocument = {
 				documentId: doc.id,
 				version: doc.version || 1,
-				title: doc.title || doc.name
+				title: doc.title
 			};
 
 			if (multiSelect) {

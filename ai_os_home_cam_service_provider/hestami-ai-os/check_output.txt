@@ -1,0 +1,53 @@
+
+> hestami-ai-os@0.0.1 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os
+Getting Svelte diagnostics...
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:439:8
+[33mWarn[39m: This element is implicitly closed by the following `</div>`, which can cause an unexpected DOM structure. Add an explicit `</p>` to avoid surprises.
+https://svelte.dev/e/element_implicitly_closed (svelte)
+[36m							<h4 class="text-sm font-medium text-surface-500">Actual Cost</h4>
+							[35m<p class="mt-1">[36m{formatCurrency(Number((workOrder as any).actualCost))}
+						</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:508:36
+[31mError[39m: Property 'name' does not exist on type '{ id: string; title: string; category: string; status: string; visibility: string; fileName: string; fileSize: number; mimeType: string; version: number; createdAt: string; }'. (ts)
+[36m						<div class="flex-1">
+							<p class="font-medium">{doc.[35mname[36m}</p>
+							<p class="text-sm text-surface-500">{doc.category} ┬╖ {formatDate(doc.createdAt)}</p>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:290:22
+[31mError[39m: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'. (ts)
+[36m						</span>
+						{#if isOverdue([35mworkOrder.slaDeadline[36m, workOrder.status)}
+							<span class="rounded-full bg-error-500 px-2 py-0.5 text-xs font-medium text-white">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:553:3
+[31mError[39m: Type '{ id: string; name: string; dba: string | null; contactName: string | null; email: string | null; phone: string | null; isActive: boolean; is1099Eligible: boolean; }[]' is not assignable to type 'Vendor[]'.
+  Type '{ id: string; name: string; dba: string | null; contactName: string | null; email: string | null; phone: string | null; isActive: boolean; is1099Eligible: boolean; }' is missing the following properties from type 'Vendor': trades, status (ts)
+[36m	open={showAssignVendorModal}
+	{[35mvendors[36m}
+	loading={isActionLoading}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\edit\+page.svelte[39m:119:40
+[31mError[39m: Property 'update' does not exist on type '{ list: (params?: { status?: WorkOrderStatus | undefined; priority?: WorkOrderPriority | undefined; category?: WorkOrderCategory | undefined; unitId?: string | undefined; vendorId?: string | undefined; search?: string | undefined; } | undefined) => ClientPromiseResult<...>; ... 10 more ...; transitionStatus: (id: st...'. (ts)
+[36m		try {
+			const response = await workOrderApi.[35mupdate[36m(workOrder.id, {
+				unitId: formData.locationType === 'unit' ? formData.unitId : undefined,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:187:46
+[31mError[39m: Argument of type '{ jobId: string; idempotencyKey: `${string}-${string}-${string}-${string}-${string}`; }' is not assignable to parameter of type '{ jobId: string; customerId: string; title?: string | undefined; description?: string | undefined; notes?: string | undefined; terms?: string | undefined; validUntil?: string | undefined; discount?: number | undefined; lines?: { ...; }[] | undefined; idempotencyKey: string; }'.
+  Property 'customerId' is missing in type '{ jobId: string; idempotencyKey: `${string}-${string}-${string}-${string}-${string}`; }' but required in type '{ jobId: string; customerId: string; title?: string | undefined; description?: string | undefined; notes?: string | undefined; terms?: string | undefined; validUntil?: string | undefined; discount?: number | undefined; lines?: { ...; }[] | undefined; idempotencyKey: string; }'. (ts)
+[36m		try {
+			const response = await estimateApi.create([35m{
+				jobId: jobId,
+				idempotencyKey: crypto.randomUUID()
+			}[36m);
+			if (response.ok) {[39m
+
+====================================
+[31msvelte-check found 5 errors and 1 warning in 3 files
+[39m

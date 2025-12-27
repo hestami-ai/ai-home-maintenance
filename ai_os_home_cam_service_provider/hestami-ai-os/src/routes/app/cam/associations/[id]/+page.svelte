@@ -56,11 +56,11 @@
 
 		try {
 			const response = await associationApi.get(associationId);
-			if (response.ok && response.data?.association) {
-				association = response.data.association;
-			} else {
+			if (!response.ok) {
 				error = 'Association not found';
+				return;
 			}
+			association = response.data.association as any;
 		} catch (e) {
 			error = 'Failed to load association';
 			console.error(e);
@@ -73,8 +73,8 @@
 		if (!associationId) return;
 		try {
 			const response = await documentApi.list({ contextType: 'ASSOCIATION', contextId: associationId });
-			if (response.ok && response.data?.documents) {
-				documents = response.data.documents;
+			if (response.ok) {
+				documents = response.data.documents as any;
 			}
 		} catch (e) {
 			console.error('Failed to load documents:', e);
@@ -84,9 +84,9 @@
 	async function loadHistory() {
 		if (!associationId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'ASSOCIATION', entityId: associationId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'ASSOCIATION', entityId: associationId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,

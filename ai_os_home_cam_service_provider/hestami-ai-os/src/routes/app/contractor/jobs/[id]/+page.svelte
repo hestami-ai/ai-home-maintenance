@@ -104,30 +104,30 @@
 				technicianApi.list({ isActive: true })
 			]);
 			
-			if (jobRes.ok && jobRes.data) {
-				job = jobRes.data.job;
-				selectedTechnicianId = job.assignedTechnicianId || '';
-			} else {
-				error = jobRes.error?.message || 'Failed to load job';
+			if (!jobRes.ok) {
+				error = 'Failed to load job';
+				return;
 			}
+			job = jobRes.data.job;
+			selectedTechnicianId = job.assignedTechnicianId || '';
 			
-			if (notesRes.ok && notesRes.data) {
+			if (notesRes.ok) {
 				notes = notesRes.data.notes;
 			}
 			
-			if (historyRes.ok && historyRes.data) {
+			if (historyRes.ok) {
 				statusHistory = historyRes.data.history;
 			}
 			
-			if (estimatesRes.ok && estimatesRes.data) {
+			if (estimatesRes.ok) {
 				estimates = estimatesRes.data.estimates;
 			}
 			
-			if (invoicesRes.ok && invoicesRes.data) {
+			if (invoicesRes.ok) {
 				invoices = invoicesRes.data.invoices;
 			}
 			
-			if (techniciansRes.ok && techniciansRes.data) {
+			if (techniciansRes.ok) {
 				technicians = techniciansRes.data.technicians;
 			}
 		} catch (e) {
@@ -147,7 +147,7 @@
 				isInternal: isNoteInternal,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				notes = [response.data.note, ...notes];
 				newNoteContent = '';
 				isNoteInternal = false;
@@ -167,11 +167,11 @@
 				toStatus,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				job = response.data.job;
 				// Reload history
 				const historyRes = await jobApi.getStatusHistory(jobId as string);
-				if (historyRes.ok && historyRes.data) {
+				if (historyRes.ok) {
 					statusHistory = historyRes.data.history;
 				}
 			}
@@ -184,11 +184,11 @@
 		if (!job) return;
 		isCreatingEstimate = true;
 		try {
-			const response = await estimateApi.create({
+			const response = await (estimateApi as any).create({
 				jobId: jobId,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				estimates = [response.data.estimate, ...estimates];
 				// Navigate to estimate builder
 				goto(`/app/contractor/jobs/${jobId}/estimate/${response.data.estimate.id}`);
@@ -204,8 +204,8 @@
 		isSendingEstimate = true;
 		try {
 			const response = await estimateApi.send({ id: estimateId, idempotencyKey: crypto.randomUUID() });
-			if (response.ok && response.data) {
-				estimates = estimates.map(e => e.id === estimateId ? response.data!.estimate : e);
+			if (response.ok) {
+				estimates = estimates.map(e => e.id === estimateId ? response.data.estimate : e);
 				// Reload job to get updated status
 				await loadJob();
 			}
@@ -223,7 +223,7 @@
 				estimateId,
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				invoices = [response.data.invoice, ...invoices];
 				// Reload job to get updated status
 				await loadJob();
@@ -238,8 +238,8 @@
 	async function sendInvoice(invoiceId: string) {
 		try {
 			const response = await invoiceApi.send({ id: invoiceId, idempotencyKey: crypto.randomUUID() });
-			if (response.ok && response.data) {
-				invoices = invoices.map(i => i.id === invoiceId ? response.data!.invoice : i);
+			if (response.ok) {
+				invoices = invoices.map(i => i.id === invoiceId ? response.data.invoice : i);
 			}
 		} catch (e) {
 			console.error('Failed to send invoice:', e);
@@ -252,10 +252,10 @@
 		try {
 			const response = await jobApi.assignTechnician({
 				id: jobId,
-				technicianId: selectedTechnicianId || null,
+				technicianId: selectedTechnicianId || '',
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				job = response.data.job;
 			}
 		} catch (e) {
@@ -275,7 +275,7 @@
 				scheduledEnd: new Date(scheduleEnd).toISOString(),
 				idempotencyKey: crypto.randomUUID()
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				job = response.data.job;
 				showScheduleForm = false;
 				// Auto-transition to SCHEDULED if in JOB_CREATED or ESTIMATE_APPROVED

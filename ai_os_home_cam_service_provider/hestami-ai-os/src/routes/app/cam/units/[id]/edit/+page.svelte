@@ -42,21 +42,21 @@
 
 		try {
 			const response = await unitApi.get(unitId);
-			if (response.ok && response.data?.unit) {
-				const u = response.data.unit;
-				unit = u;
-				formData = {
-					unitNumber: u.unitNumber || '',
-					unitType: u.unitType || 'RESIDENTIAL',
-					status: u.status || 'OCCUPIED',
-					address: u.address || '',
-					squareFootage: u.squareFootage?.toString() || '',
-					bedrooms: u.bedrooms?.toString() || '',
-					bathrooms: u.bathrooms?.toString() || ''
-				};
-			} else {
+			if (!response.ok) {
 				error = 'Unit not found';
+				return;
 			}
+			const u = response.data.unit as any;
+			unit = u;
+			formData = {
+				unitNumber: u.unitNumber || '',
+				unitType: u.unitType || 'RESIDENTIAL',
+				status: u.status || 'OCCUPIED',
+				address: u.addressLine1 || '',
+				squareFootage: u.squareFeet?.toString() || '',
+				bedrooms: u.bedrooms?.toString() || '',
+				bathrooms: u.bathrooms?.toString() || ''
+			};
 		} catch (e) {
 			error = 'Failed to load data';
 			console.error(e);
@@ -81,19 +81,18 @@
 		try {
 			const response = await unitApi.update(unit.id, {
 				unitNumber: formData.unitNumber,
-				unitType: formData.unitType,
-				status: formData.status,
-				address: formData.address || undefined,
-				squareFootage: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
+				unitType: formData.unitType as any,
+				addressLine1: formData.address || undefined,
+				squareFeet: formData.squareFootage ? parseInt(formData.squareFootage) : undefined,
 				bedrooms: formData.bedrooms ? parseInt(formData.bedrooms) : undefined,
 				bathrooms: formData.bathrooms ? parseFloat(formData.bathrooms) : undefined
 			});
 
-			if (response.ok) {
-				goto(`/app/cam/units/${unit.id}`);
-			} else {
-				error = response.error?.message || 'Failed to update unit';
+			if (!response.ok) {
+				error = 'Failed to update unit';
+				return;
 			}
+			goto(`/app/cam/units/${unit.id}`);
 		} catch (e) {
 			error = 'Failed to update unit';
 			console.error(e);

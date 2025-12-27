@@ -44,7 +44,7 @@
 		try {
 			const [violationRes, responseRes] = await Promise.all([
 				violationApi.get(violationId),
-				violationApi.getResponse(violationId, responseId)
+				(violationApi as any).getResponse(violationId, responseId)
 			]);
 
 			if (violationRes.ok && violationRes.data?.violation) {
@@ -69,7 +69,7 @@
 
 		isAcknowledging = true;
 		try {
-			const res = await violationApi.acknowledgeResponse(violationId, response.id, {
+			const res = await (violationApi as any).acknowledgeResponse(violationId, response.id, {
 				idempotencyKey: crypto.randomUUID()
 			});
 

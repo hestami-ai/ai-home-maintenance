@@ -1,229 +1,38 @@
 /**
- * Staff Management API client
- * Provides typed functions for calling staff oRPC backend endpoints
+ * Staff API client wrapper
+ * 
+ * Provides a convenient wrapper around the oRPC staff endpoints
+ * with type exports and label mappings for UI usage.
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.ts';
 import { v4 as uuidv4 } from 'uuid';
+import type { operations } from './types.generated.js';
 
-// ============================================================================
-// Types
-// ============================================================================
+// =============================================================================
+// Type Definitions (extracted from generated types)
+// =============================================================================
 
-export type StaffStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+// Extract Staff type from staff.get response
+export type Staff = operations['staff.get']['responses']['200']['content']['application/json']['data']['staff'];
 
-export type StaffRole =
-	| 'CONCIERGE_OPERATOR'
-	| 'OPERATIONS_COORDINATOR'
-	| 'CAM_SPECIALIST'
-	| 'VENDOR_LIAISON'
-	| 'PLATFORM_ADMIN';
+// Extract StaffListItem type from staff.list response (array element)
+export type StaffListItem = operations['staff.list']['responses']['200']['content']['application/json']['data']['staff'][number];
 
-export type PillarAccess = 'CONCIERGE' | 'CAM' | 'CONTRACTOR' | 'VENDOR' | 'ADMIN';
+// Extract enum types from staff.create request body
+type StaffCreateInput = operations['staff.create']['requestBody']['content']['application/json'];
+export type StaffRole = StaffCreateInput['roles'][number];
+export type PillarAccess = StaffCreateInput['pillarAccess'][number];
 
-export interface StaffUser {
-	id: string;
-	email: string;
-	name: string | null;
-}
+// Extract status from Staff type
+export type StaffStatus = Staff['status'];
 
-export interface Staff {
-	id: string;
-	userId: string;
-	displayName: string;
-	title: string | null;
-	status: StaffStatus;
-	roles: StaffRole[];
-	pillarAccess: PillarAccess[];
-	canBeAssignedCases: boolean;
-	activatedAt: string | null;
-	suspendedAt: string | null;
-	deactivatedAt: string | null;
-	createdAt: string;
-	updatedAt: string;
-	user?: StaffUser;
-}
-
-export interface StaffListItem {
-	id: string;
-	userId: string;
-	displayName: string;
-	title: string | null;
-	status: StaffStatus;
-	roles: StaffRole[];
-	pillarAccess: PillarAccess[];
-	canBeAssignedCases: boolean;
-	createdAt: string;
-	user: {
-		email: string;
-		name: string | null;
-	};
-}
-
-export interface StaffCaseAssignment {
-	id: string;
-	caseId: string;
-	isPrimary: boolean;
-	assignedAt: string;
-	unassignedAt: string | null;
-	justification: string | null;
-}
-
-// ============================================================================
-// API Functions
-// ============================================================================
-
-export const staffApi = {
-	/**
-	 * Create a new staff member
-	 */
-	create: (data: {
-		userId: string;
-		displayName: string;
-		title?: string;
-		roles: StaffRole[];
-		pillarAccess: PillarAccess[];
-		canBeAssignedCases?: boolean;
-	}) =>
-		apiCall<{ staff: Staff }>('staff/create', {
-			body: {
-				...data,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Get a staff member by ID
-	 */
-	get: (staffId: string) =>
-		apiCall<{ staff: Staff }>('staff/get', {
-			body: { staffId }
-		}),
-
-	/**
-	 * Get current user's staff profile
-	 */
-	me: () => apiCall<{ staff: Staff | null }>('staff/me'),
-
-	/**
-	 * List all staff members
-	 */
-	list: (params?: {
-		status?: StaffStatus;
-		role?: StaffRole;
-		pillar?: PillarAccess;
-		limit?: number;
-		cursor?: string;
-	}) =>
-		apiCall<{
-			staff: StaffListItem[];
-			nextCursor: string | null;
-			hasMore: boolean;
-		}>('staff/list', {
-			body: params || {}
-		}),
-
-	/**
-	 * Update staff member details
-	 */
-	update: (data: {
-		staffId: string;
-		displayName?: string;
-		title?: string | null;
-		canBeAssignedCases?: boolean;
-	}) =>
-		apiCall<{ staff: Staff }>('staff/update', {
-			body: {
-				...data,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Activate a pending staff member
-	 */
-	activate: (staffId: string) =>
-		apiCall<{ staff: Staff }>('staff/activate', {
-			body: {
-				staffId,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Suspend a staff member (emergency)
-	 */
-	suspend: (staffId: string, reason: string) =>
-		apiCall<{ staff: Staff; escalatedCaseCount: number }>('staff/suspend', {
-			body: {
-				staffId,
-				reason,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Deactivate a staff member (normal offboarding)
-	 */
-	deactivate: (staffId: string, reason: string) =>
-		apiCall<{ staff: Staff; activeCaseCount: number }>('staff/deactivate', {
-			body: {
-				staffId,
-				reason,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Reactivate a suspended or deactivated staff member
-	 */
-	reactivate: (staffId: string) =>
-		apiCall<{ staff: Staff }>('staff/reactivate', {
-			body: {
-				staffId,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Update staff roles
-	 */
-	updateRoles: (staffId: string, roles: StaffRole[]) =>
-		apiCall<{ staff: Staff }>('staff/updateRoles', {
-			body: {
-				staffId,
-				roles,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Update staff pillar access
-	 */
-	updatePillarAccess: (staffId: string, pillarAccess: PillarAccess[]) =>
-		apiCall<{ staff: Staff }>('staff/updatePillarAccess', {
-			body: {
-				staffId,
-				pillarAccess,
-				idempotencyKey: uuidv4()
-			}
-		}),
-
-	/**
-	 * Get case assignments for a staff member
-	 */
-	getAssignments: (staffId: string, includeUnassigned?: boolean) =>
-		apiCall<{ assignments: StaffCaseAssignment[] }>('staff/getAssignments', {
-			body: {
-				staffId,
-				includeUnassigned: includeUnassigned ?? false
-			}
-		})
-};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
+// =============================================================================
+// Label Mappings for UI
+// =============================================================================
 
 export const STAFF_ROLE_LABELS: Record<StaffRole, string> = {
 	CONCIERGE_OPERATOR: 'Concierge Operator',
@@ -242,15 +51,15 @@ export const STAFF_ROLE_DESCRIPTIONS: Record<StaffRole, string> = {
 };
 
 export const PILLAR_ACCESS_LABELS: Record<PillarAccess, string> = {
-	CONCIERGE: 'Concierge Operations',
-	CAM: 'CAM / Governance',
-	CONTRACTOR: 'Contractor Operations',
-	VENDOR: 'Vendor Management',
-	ADMIN: 'System Administration'
+	CONCIERGE: 'Concierge',
+	CAM: 'CAM',
+	CONTRACTOR: 'Contractor',
+	VENDOR: 'Vendor',
+	ADMIN: 'Admin'
 };
 
 export const STAFF_STATUS_LABELS: Record<StaffStatus, string> = {
-	PENDING: 'Pending Activation',
+	PENDING: 'Pending',
 	ACTIVE: 'Active',
 	SUSPENDED: 'Suspended',
 	DEACTIVATED: 'Deactivated'
@@ -261,4 +70,96 @@ export const STAFF_STATUS_COLORS: Record<StaffStatus, string> = {
 	ACTIVE: 'success',
 	SUSPENDED: 'error',
 	DEACTIVATED: 'surface'
+};
+
+// =============================================================================
+// API Client Wrapper
+// =============================================================================
+
+export interface CreateStaffInput {
+	userId: string;
+	displayName: string;
+	title?: string;
+	roles: StaffRole[];
+	pillarAccess: PillarAccess[];
+	canBeAssignedCases?: boolean;
+}
+
+export interface UpdateStaffInput {
+	staffId: string;
+	displayName?: string;
+	title?: string | null;
+	canBeAssignedCases?: boolean;
+}
+
+export const staffApi = {
+	/**
+	 * Create a new staff member
+	 */
+	async create(input: CreateStaffInput) {
+		return orpc.staff.create({
+			userId: input.userId,
+			displayName: input.displayName,
+			title: input.title,
+			roles: input.roles,
+			pillarAccess: input.pillarAccess,
+			canBeAssignedCases: input.canBeAssignedCases ?? true,
+			idempotencyKey: uuidv4()
+		});
+	},
+
+	/**
+	 * Get a staff member by ID
+	 */
+	async get(staffId: string) {
+		return orpc.staff.get({ staffId });
+	},
+
+	/**
+	 * List all staff members with optional filters
+	 */
+	async list(params?: { status?: StaffStatus; role?: StaffRole; pillar?: PillarAccess; limit?: number; cursor?: string }) {
+		return orpc.staff.list(params ?? {});
+	},
+
+	/**
+	 * Update a staff member
+	 */
+	async update(input: UpdateStaffInput) {
+		return orpc.staff.update({
+			staffId: input.staffId,
+			displayName: input.displayName,
+			title: input.title,
+			canBeAssignedCases: input.canBeAssignedCases,
+			idempotencyKey: uuidv4()
+		});
+	},
+
+	/**
+	 * Activate a staff member
+	 */
+	async activate(staffId: string) {
+		return orpc.staff.activate({ staffId, idempotencyKey: uuidv4() });
+	},
+
+	/**
+	 * Suspend a staff member
+	 */
+	async suspend(staffId: string, reason: string) {
+		return orpc.staff.suspend({ staffId, reason, idempotencyKey: uuidv4() });
+	},
+
+	/**
+	 * Deactivate a staff member
+	 */
+	async deactivate(staffId: string, reason: string) {
+		return orpc.staff.deactivate({ staffId, reason, idempotencyKey: uuidv4() });
+	},
+
+	/**
+	 * Reactivate a deactivated staff member (alias for activate)
+	 */
+	async reactivate(staffId: string) {
+		return orpc.staff.activate({ staffId, idempotencyKey: uuidv4() });
+	}
 };

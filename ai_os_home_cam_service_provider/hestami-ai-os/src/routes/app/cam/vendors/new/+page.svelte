@@ -67,21 +67,18 @@
 		try {
 			const response = await vendorApi.create({
 				name: formData.name,
+				tradeCategory: 'GENERAL',
 				contactName: formData.contactName || undefined,
-				email: formData.email || undefined,
-				phone: formData.phone || undefined,
-				address: formData.address || undefined,
-				licenseNumber: formData.licenseNumber || undefined,
-				insuranceExpiry: formData.insuranceExpiry || undefined,
-				trades: formData.trades,
-				idempotencyKey: crypto.randomUUID()
+				contactEmail: formData.email || undefined,
+				contactPhone: formData.phone || undefined,
+				addressLine1: formData.address || undefined
 			});
 
-			if (response.ok && response.data?.vendor) {
-				goto(`/app/cam/vendors/${response.data.vendor.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create vendor';
+			if (!response.ok) {
+				error = 'Failed to create vendor';
+				return;
 			}
+			goto(`/app/cam/vendors/${response.data.vendor.id}`);
 		} catch (e) {
 			error = 'Failed to create vendor';
 			console.error(e);

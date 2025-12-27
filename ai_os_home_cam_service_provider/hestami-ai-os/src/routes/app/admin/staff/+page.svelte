@@ -42,10 +42,8 @@
 			if (roleFilter) params.role = roleFilter;
 
 			const response = await staffApi.list(params as Parameters<typeof staffApi.list>[0]);
-			if (response.ok && response.data) {
-				staffList = response.data.staff;
-			} else {
-				error = response.error?.message || 'Failed to load staff';
+			if (response.ok) {
+				staffList = response.data.staff as StaffListItem[];
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load staff';

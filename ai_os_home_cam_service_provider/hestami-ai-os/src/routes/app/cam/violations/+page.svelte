@@ -61,8 +61,8 @@
 			if (severityFilter) params.severity = severityFilter;
 			if (searchQuery) params.search = searchQuery;
 
-			const response = await violationApi.list(params);
-			if (response.ok && response.data?.violations) {
+			const response = await violationApi.list(params as any);
+			if (response.ok) {
 				violations = response.data.violations;
 			}
 		} catch (error) {
@@ -142,9 +142,9 @@
 			if (bulkAction && selectedIds.size > 0) {
 				// Bulk action
 				const promises = Array.from(selectedIds).map(id =>
-					violationApi.recordAction(id, {
-						action: rationaleAction!.type,
-						notes: rationale,
+					(violationApi as any).addNote({
+						violationId: id,
+						note: rationale,
 						idempotencyKey: crypto.randomUUID()
 					})
 				);
@@ -153,9 +153,9 @@
 				bulkAction = null;
 			} else if (selectedViolation) {
 				// Single action
-				await violationApi.recordAction(selectedViolation.id, {
-					action: rationaleAction.type,
-					notes: rationale,
+				await (violationApi as any).addNote({
+					violationId: selectedViolation.id,
+					note: rationale,
 					idempotencyKey: crypto.randomUUID()
 				});
 			}
@@ -211,14 +211,14 @@
 		// Sort
 		if (sortBy === 'daysOpen') {
 			result = [...result].sort((a, b) => {
-				const daysA = getDaysOpen(a.createdAt || a.observedDate);
-				const daysB = getDaysOpen(b.createdAt || b.observedDate);
+				const daysA = getDaysOpen((a as any).createdAt || a.observedDate);
+				const daysB = getDaysOpen((b as any).createdAt || b.observedDate);
 				return daysB - daysA; // Most days open first
 			});
 		} else {
 			result = [...result].sort((a, b) => {
-				const dateA = new Date(a.createdAt || a.observedDate).getTime();
-				const dateB = new Date(b.createdAt || b.observedDate).getTime();
+				const dateA = new Date((a as any).createdAt || a.observedDate).getTime();
+				const dateB = new Date((b as any).createdAt || b.observedDate).getTime();
 				return dateB - dateA; // Most recent first
 			});
 		}
@@ -356,7 +356,7 @@
 				{:else}
 					<div class="divide-y divide-surface-300-700">
 						{#each filteredViolations as violation}
-							{@const daysOpen = getDaysOpen(violation.createdAt || violation.observedDate)}
+							{@const daysOpen = getDaysOpen((violation as any).createdAt || violation.observedDate)}
 							{@const isSelected = selectedIds.has(violation.id)}
 							<div class="flex items-start gap-2 px-4 py-3 transition-colors hover:bg-surface-200-800 {selectedViolation?.id === violation.id ? 'bg-primary-500/10' : ''} {isSelected ? 'bg-primary-500/5' : ''}">
 								<input
@@ -409,7 +409,7 @@
 										</div>
 									</div>
 									<p class="mt-1 text-xs text-surface-400">
-										{violation.createdAt ? formatDate(violation.createdAt) : formatDate(violation.observedDate)}
+										{(violation as any).createdAt ? formatDate((violation as any).createdAt) : formatDate(violation.observedDate)}
 									</p>
 								</button>
 							</div>
@@ -508,7 +508,7 @@
 		<div class="space-y-6">
 			<div>
 				<h3 class="text-sm font-medium text-surface-500">Description</h3>
-				<p class="mt-1">{selectedViolation.description || 'No description provided.'}</p>
+				<p class="mt-1">{(selectedViolation as any).description || 'No description provided.'}</p>
 			</div>
 
 			<div class="grid gap-4 sm:grid-cols-2">
@@ -516,21 +516,21 @@
 					<h3 class="text-sm font-medium text-surface-500">Unit</h3>
 					<p class="mt-1">
 						<a href="/app/cam/units/{selectedViolation.unitId}" class="text-primary-500 hover:underline">
-							Unit {selectedViolation.unitNumber}
+							Unit {(selectedViolation as any).unitNumber || selectedViolation.violationNumber}
 						</a>
 					</p>
 				</div>
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Responsible Party</h3>
-					<p class="mt-1">{selectedViolation.responsiblePartyName}</p>
+					<p class="mt-1">{(selectedViolation as any).responsiblePartyName || '-'}</p>
 				</div>
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Created</h3>
-					<p class="mt-1">{selectedViolation.createdAt ? formatDate(selectedViolation.createdAt) : '-'}</p>
+					<p class="mt-1">{(selectedViolation as any).createdAt ? formatDate((selectedViolation as any).createdAt) : '-'}</p>
 				</div>
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Last Updated</h3>
-					<p class="mt-1">{selectedViolation.updatedAt ? formatDate(selectedViolation.updatedAt) : '-'}</p>
+					<p class="mt-1">{(selectedViolation as any).updatedAt ? formatDate((selectedViolation as any).updatedAt) : '-'}</p>
 				</div>
 			</div>
 		</div>

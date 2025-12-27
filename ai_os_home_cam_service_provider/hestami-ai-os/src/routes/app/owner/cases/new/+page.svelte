@@ -54,11 +54,11 @@
 				idempotencyKey: generateIdempotencyKey()
 			});
 
-			if (response.ok && response.data?.case) {
-				goto(`/app/owner/cases/${response.data.case.id}`);
-			} else {
+			if (!response.ok) {
 				error = 'Failed to create request. Please try again.';
+				return;
 			}
+			goto(`/app/owner/cases/${response.data.case.id}`);
 		} catch (err) {
 			console.error('Failed to create case:', err);
 			error = 'An error occurred. Please try again.';

@@ -31,11 +31,9 @@
 		try {
 			const params: {
 				status?: ConciergeCaseStatus;
-				page?: number;
-				pageSize?: number;
+				limit?: number;
 			} = {
-				page: currentPage,
-				pageSize
+				limit: pageSize
 			};
 
 			if (statusFilter) {
@@ -43,9 +41,9 @@
 			}
 
 			const response = await conciergeCaseApi.list(params);
-			if (response.ok && response.data) {
-				cases = response.data.items;
-				total = response.data.total;
+			if (response.ok) {
+				cases = response.data.cases;
+				total = response.data.cases.length;
 			}
 		} catch (error) {
 			console.error('Failed to load cases:', error);
@@ -184,9 +182,6 @@
 									<th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-500">
 										Created
 									</th>
-									<th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-surface-500">
-										Updated
-									</th>
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-surface-300-700">
@@ -222,9 +217,6 @@
 										</td>
 										<td class="px-6 py-4 text-sm text-surface-500">
 											{formatDate(caseItem.createdAt)}
-										</td>
-										<td class="px-6 py-4 text-sm text-surface-500">
-											{formatDate(caseItem.updatedAt)}
 										</td>
 									</tr>
 								{/each}

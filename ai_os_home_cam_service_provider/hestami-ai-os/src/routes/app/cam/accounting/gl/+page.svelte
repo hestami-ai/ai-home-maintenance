@@ -37,16 +37,16 @@
 		isLoading = true;
 		try {
 			const [accountsRes, journalRes] = await Promise.all([
-				accountingApi.gl.accounts({}),
-				accountingApi.gl.journal({ limit: 20 })
+				accountingApi.glAccounts.list({}),
+				accountingApi.journalEntries.list({})
 			]);
 
 			if (accountsRes.ok && accountsRes.data?.accounts) {
-				accounts = accountsRes.data.accounts;
+				accounts = accountsRes.data.accounts as any;
 			}
 
 			if (journalRes.ok && journalRes.data?.entries) {
-				journalEntries = journalRes.data.entries;
+				journalEntries = journalRes.data.entries as any;
 			}
 		} catch (e) {
 			console.error('Failed to load GL data:', e);

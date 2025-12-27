@@ -12,6 +12,7 @@
 
 import winston from 'winston';
 import { trace } from '@opentelemetry/api';
+import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
 import type { RequestContext } from './api/context.js';
 
 // Re-export types for consumers
@@ -81,20 +82,20 @@ function serializeError(error: Error): Record<string, unknown> {
 /**
  * Get current OpenTelemetry trace context
  */
-function getTraceContext(): { traceId: string | null; spanId: string | null } {
+function getTraceContext(): { trace_id: string | null; span_id: string | null } {
 	try {
 		const span = trace.getActiveSpan();
 		if (span) {
 			const spanContext = span.spanContext();
 			return {
-				traceId: spanContext.traceId,
-				spanId: spanContext.spanId
+				trace_id: spanContext.traceId,
+				span_id: spanContext.spanId
 			};
 		}
 	} catch {
 		// OpenTelemetry not available
 	}
-	return { traceId: null, spanId: null };
+	return { trace_id: null, span_id: null };
 }
 
 /**
@@ -104,9 +105,9 @@ const traceFormat = winston.format((info) => {
 	const traceContext = getTraceContext();
 	return {
 		...info,
-		service: process.env.OTEL_SERVICE_NAME || 'hestami-ai-os',
-		traceId: info.traceId || traceContext.traceId,
-		spanId: info.spanId || traceContext.spanId
+		'service.name': process.env.OTEL_SERVICE_NAME || 'hestami-ai-os',
+		trace_id: info.trace_id || traceContext.trace_id,
+		span_id: info.span_id || traceContext.span_id
 	};
 });
 
@@ -139,6 +140,22 @@ function getLogLevel(): string {
 }
 
 /**
+ * Build transports array based on environment
+ */
+function buildTransports(): winston.transport[] {
+	const transports: winston.transport[] = [new winston.transports.Console()];
+
+	// Add OpenTelemetry transport when OTLP endpoint is configured
+	// This sends logs directly to Signoz via OTLP, bypassing Docker log scraping
+	if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
+		transports.push(new OpenTelemetryTransportV3());
+		console.log('[Logger] OpenTelemetry log transport enabled');
+	}
+
+	return transports;
+}
+
+/**
  * Create the Winston logger instance
  */
 const winstonLogger = winston.createLogger({
@@ -160,7 +177,7 @@ const winstonLogger = winston.createLogger({
 					})
 				)
 	),
-	transports: [new winston.transports.Console()],
+	transports: buildTransports(),
 	// Don't exit on handled exceptions
 	exitOnError: false
 });
@@ -170,8 +187,8 @@ const winstonLogger = winston.createLogger({
  */
 export interface LogContext {
 	requestId?: string;
-	traceId?: string | null;
-	spanId?: string | null;
+	trace_id?: string | null;
+	span_id?: string | null;
 	userId?: string;
 	userEmail?: string;
 	orgId?: string;
@@ -190,8 +207,8 @@ function extractContext(context?: RequestContext | LogContext): LogContext {
 		const reqContext = context as RequestContext;
 		return {
 			requestId: reqContext.requestId,
-			traceId: reqContext.traceId,
-			spanId: reqContext.spanId,
+			trace_id: reqContext.traceId,
+			span_id: reqContext.spanId,
 			userId: reqContext.user?.id,
 			userEmail: reqContext.user?.email,
 			orgId: reqContext.organization?.id,

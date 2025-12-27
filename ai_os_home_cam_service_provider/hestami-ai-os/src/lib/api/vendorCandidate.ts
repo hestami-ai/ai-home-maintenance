@@ -1,71 +1,35 @@
 /**
  * Vendor Candidate API client
  * Provides typed functions for vendor discovery and management
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.js';
+import { v4 as uuidv4 } from 'uuid';
+import type { operations } from './types.generated.js';
 
 // =============================================================================
-// Types
+// Type Definitions (extracted from generated types)
 // =============================================================================
 
-export type VendorCandidateStatus =
-	| 'IDENTIFIED'
-	| 'CONTACTED'
-	| 'RESPONDED'
-	| 'QUOTED'
-	| 'SELECTED'
-	| 'REJECTED'
-	| 'ARCHIVED';
+// Extract VendorCandidate type from get response
+export type VendorCandidate = operations['vendorCandidate.get']['responses']['200']['content']['application/json']['data']['vendorCandidate'];
 
-export interface VendorCandidate {
-	id: string;
-	caseId: string;
-	vendorName: string;
-	vendorContactName: string | null;
-	vendorContactEmail: string | null;
-	vendorContactPhone: string | null;
-	vendorAddress: string | null;
-	vendorWebsite: string | null;
-	serviceCategories: string[] | null;
-	coverageArea: string | null;
-	licensesAndCerts: string[] | null;
-	status: VendorCandidateStatus;
-	statusChangedAt: string | null;
-	sourceUrl: string | null;
-	extractedAt: string | null;
-	extractionConfidence: number | null;
-	notes: string | null;
-	riskFlags: string[] | null;
-	createdAt: string;
-	updatedAt: string;
-}
+// Extract VendorCandidateListItem from listByCase response
+export type VendorCandidateListItem = operations['vendorCandidate.listByCase']['responses']['200']['content']['application/json']['data']['vendorCandidates'][number];
 
-export interface VendorCandidateListItem {
-	id: string;
-	caseId: string;
-	vendorName: string;
-	vendorContactEmail: string | null;
-	vendorContactPhone: string | null;
-	serviceCategories: string[] | null;
-	status: VendorCandidateStatus;
-	extractionConfidence: number | null;
-	createdAt: string;
-}
+// Extract ExtractedVendorData from extract response
+export type ExtractedVendorData = operations['vendorCandidate.extract']['responses']['200']['content']['application/json']['data']['extracted'];
 
-export interface ExtractedVendorData {
-	vendorName: string | null;
-	vendorContactName: string | null;
-	vendorContactEmail: string | null;
-	vendorContactPhone: string | null;
-	vendorAddress: string | null;
-	vendorWebsite: string | null;
-	serviceCategories: string[];
-	coverageArea: string | null;
-	licensesAndCerts: string[];
-	confidence: number;
-	fieldConfidences: Record<string, number>;
-}
+// Extract VendorCandidateStatus from VendorCandidate
+export type VendorCandidateStatus = VendorCandidate['status'];
+
+// Extract input types
+type CreateInput = operations['vendorCandidate.create']['requestBody']['content']['application/json'];
+type UpdateInput = operations['vendorCandidate.update']['requestBody']['content']['application/json'];
+type UpdateStatusInput = operations['vendorCandidate.updateStatus']['requestBody']['content']['application/json'];
 
 // =============================================================================
 // API Functions
@@ -75,38 +39,17 @@ export const vendorCandidateApi = {
 	/**
 	 * Create a new vendor candidate
 	 */
-	create: (data: {
-		caseId: string;
-		vendorName: string;
-		vendorContactName?: string;
-		vendorContactEmail?: string;
-		vendorContactPhone?: string;
-		vendorAddress?: string;
-		vendorWebsite?: string;
-		serviceCategories?: string[];
-		coverageArea?: string;
-		licensesAndCerts?: string[];
-		notes?: string;
-		sourceUrl?: string;
-		sourceHtml?: string;
-		sourcePlainText?: string;
-		extractionConfidence?: number;
-		extractionMetadata?: Record<string, unknown>;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ vendorCandidate: VendorCandidate }>('vendorCandidate/create', {
-			body: data,
-			organizationId
+	create: (data: Omit<CreateInput, 'idempotencyKey'>) =>
+		orpc.vendorCandidate.create({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Get vendor candidate by ID
 	 */
-	get: (id: string, organizationId: string) =>
-		apiCall<{ vendorCandidate: VendorCandidate }>('vendorCandidate/get', {
-			body: { id },
-			organizationId
-		}),
+	get: (id: string) =>
+		orpc.vendorCandidate.get({ id }),
 
 	/**
 	 * List vendor candidates for a case
@@ -116,62 +59,33 @@ export const vendorCandidateApi = {
 		status?: VendorCandidateStatus;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			vendorCandidates: VendorCandidateListItem[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('vendorCandidate/listByCase', {
-			body: params,
-			organizationId
-		}),
+	}) => orpc.vendorCandidate.listByCase(params),
 
 	/**
 	 * Update vendor candidate details
 	 */
-	update: (data: {
-		id: string;
-		vendorName?: string;
-		vendorContactName?: string | null;
-		vendorContactEmail?: string | null;
-		vendorContactPhone?: string | null;
-		vendorAddress?: string | null;
-		vendorWebsite?: string | null;
-		serviceCategories?: string[];
-		coverageArea?: string | null;
-		licensesAndCerts?: string[];
-		notes?: string | null;
-		riskFlags?: string[];
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ vendorCandidate: VendorCandidate }>('vendorCandidate/update', {
-			body: data,
-			organizationId
+	update: (data: Omit<UpdateInput, 'idempotencyKey'>) =>
+		orpc.vendorCandidate.update({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Update vendor candidate status
 	 */
-	updateStatus: (data: {
-		id: string;
-		status: VendorCandidateStatus;
-		reason?: string;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ vendorCandidate: VendorCandidate }>('vendorCandidate/updateStatus', {
-			body: data,
-			organizationId
+	updateStatus: (data: Omit<UpdateStatusInput, 'idempotencyKey'>) =>
+		orpc.vendorCandidate.updateStatus({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Delete vendor candidate
 	 */
-	delete: (data: {
-		id: string;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ success: boolean }>('vendorCandidate/delete', {
-			body: data,
-			organizationId
+	delete: (id: string) =>
+		orpc.vendorCandidate.delete({
+			id,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
@@ -182,15 +96,7 @@ export const vendorCandidateApi = {
 		sourceUrl?: string;
 		sourceHtml?: string;
 		sourcePlainText?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			extracted: ExtractedVendorData;
-			multipleVendorsDetected: boolean;
-			rawSource: string | null;
-		}>('vendorCandidate/extract', {
-			body: data,
-			organizationId
-		})
+	}) => orpc.vendorCandidate.extract(data)
 };
 
 // =============================================================================

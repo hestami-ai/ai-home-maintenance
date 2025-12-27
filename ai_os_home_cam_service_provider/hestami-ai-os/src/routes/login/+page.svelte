@@ -2,7 +2,8 @@
 	import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-svelte';
 	import { PageContainer, Card, Logo } from '$lib/components/ui';
 	import { signIn } from '$lib/auth-client';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	let email = $state('');
 	let password = $state('');
@@ -27,9 +28,11 @@
 				return;
 			}
 
-			// Redirect to app or onboarding based on user state
-			// For now, redirect to home which will handle the routing
-			goto('/');
+			// Invalidate all load functions to ensure fresh server data with the new session
+			await invalidateAll();
+			// Redirect to returnTo URL if provided, otherwise to /app for role-based routing
+			const returnTo = $page.url.searchParams.get('returnTo');
+			goto(returnTo || '/app');
 		} catch (err) {
 			error = 'An unexpected error occurred. Please try again.';
 			isLoading = false;

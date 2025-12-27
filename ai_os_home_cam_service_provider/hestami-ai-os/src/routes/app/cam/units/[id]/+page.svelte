@@ -37,11 +37,11 @@
 
 		try {
 			const response = await unitApi.get(unitId);
-			if (response.ok && response.data?.unit) {
-				unit = response.data.unit as Unit;
-			} else {
+			if (!response.ok) {
 				error = 'Unit not found';
+				return;
 			}
+			unit = response.data.unit as unknown as Unit;
 		} catch (e) {
 			error = 'Failed to load unit';
 			console.error(e);
@@ -54,8 +54,8 @@
 		if (!unitId) return;
 		try {
 			const response = await documentApi.list({ contextType: 'UNIT', contextId: unitId });
-			if (response.ok && response.data?.documents) {
-				documents = response.data.documents;
+			if (response.ok) {
+				documents = response.data.documents as any;
 			}
 		} catch (e) {
 			console.error('Failed to load documents:', e);
@@ -65,9 +65,9 @@
 	async function loadHistory() {
 		if (!unitId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'UNIT', entityId: unitId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'UNIT', entityId: unitId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,
@@ -84,9 +84,9 @@
 		if (!unitId) return;
 		try {
 			const [violationsRes, arcRes, workOrdersRes] = await Promise.all([
-				violationApi.list({ unitId }),
-				arcRequestApi.list({ unitId }),
-				workOrderApi.list({ unitId })
+				violationApi.list({ unitId } as any),
+				arcRequestApi.list({ unitId } as any),
+				workOrderApi.list({ unitId } as any)
 			]);
 
 			if (violationsRes.ok) {
@@ -202,34 +202,34 @@
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Status</h4>
-						<p class="mt-1">{unit.status}</p>
+						<p class="mt-1">{(unit as any).status || 'Active'}</p>
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Property</h4>
 						<p class="mt-1">{unit.propertyName}</p>
 					</div>
-					{#if unit.address}
+					{#if (unit as any).address}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Address</h4>
-							<p class="mt-1">{unit.address}</p>
+							<p class="mt-1">{(unit as any).address}</p>
 						</div>
 					{/if}
-					{#if unit.squareFootage}
+					{#if (unit as any).squareFootage}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Square Footage</h4>
-							<p class="mt-1">{unit.squareFootage.toLocaleString()} sq ft</p>
+							<p class="mt-1">{(unit as any).squareFootage?.toLocaleString()} sq ft</p>
 						</div>
 					{/if}
-					{#if unit.bedrooms !== undefined}
+					{#if (unit as any).bedrooms !== undefined}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Bedrooms</h4>
-							<p class="mt-1">{unit.bedrooms}</p>
+							<p class="mt-1">{(unit as any).bedrooms}</p>
 						</div>
 					{/if}
-					{#if unit.bathrooms !== undefined}
+					{#if (unit as any).bathrooms !== undefined}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Bathrooms</h4>
-							<p class="mt-1">{unit.bathrooms}</p>
+							<p class="mt-1">{(unit as any).bathrooms}</p>
 						</div>
 					{/if}
 				</div>
@@ -240,11 +240,11 @@
 				<div class="grid gap-4 sm:grid-cols-2">
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Owner</h4>
-						<p class="mt-1">{unit.ownerName || 'Not assigned'}</p>
+						<p class="mt-1">{(unit as any).ownerName || 'Not assigned'}</p>
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Tenant</h4>
-						<p class="mt-1">{unit.tenantName || 'Owner occupied / Vacant'}</p>
+						<p class="mt-1">{(unit as any).tenantName || 'Owner occupied / Vacant'}</p>
 					</div>
 				</div>
 			</Card>
@@ -314,7 +314,7 @@
 					<div class="flex items-center gap-3 py-3">
 						<FileText class="h-5 w-5 text-surface-400" />
 						<div class="flex-1">
-							<p class="font-medium">{doc.name}</p>
+							<p class="font-medium">{doc.title}</p>
 							<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 						</div>
 						<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">

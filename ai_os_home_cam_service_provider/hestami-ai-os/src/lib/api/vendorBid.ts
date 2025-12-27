@@ -1,72 +1,37 @@
 /**
  * Vendor Bid API client
  * Provides typed functions for bid management and comparison
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.js';
+import { v4 as uuidv4 } from 'uuid';
+import type { operations } from './types.generated.js';
 
 // =============================================================================
-// Types
+// Type Definitions (extracted from generated types)
 // =============================================================================
 
-export type BidStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+// Extract VendorBid type from get response
+export type VendorBid = operations['vendorBid.get']['responses']['200']['content']['application/json']['data']['bid'];
 
-export interface VendorBid {
-	id: string;
-	vendorCandidateId: string;
-	caseId: string;
-	vendorName: string;
-	scopeVersion: string | null;
-	amount: string | null;
-	currency: string;
-	validUntil: string | null;
-	laborCost: string | null;
-	materialsCost: string | null;
-	otherCosts: string | null;
-	estimatedStartDate: string | null;
-	estimatedDuration: number | null;
-	estimatedEndDate: string | null;
-	status: BidStatus;
-	receivedAt: string;
-	respondedAt: string | null;
-	notes: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
+// Extract VendorBidListItem from listByCase response
+export type VendorBidListItem = operations['vendorBid.listByCase']['responses']['200']['content']['application/json']['data']['bids'][number];
 
-export interface VendorBidListItem {
-	id: string;
-	vendorCandidateId: string;
-	vendorName: string;
-	amount: string | null;
-	currency: string;
-	status: BidStatus;
-	validUntil: string | null;
-	estimatedDuration: number | null;
-	receivedAt: string;
-}
+// Extract BidComparison from compare response
+export type BidComparison = operations['vendorBid.compare']['responses']['200']['content']['application/json']['data']['comparison'];
 
-export interface BidComparisonItem {
-	id: string;
-	vendorName: string;
-	amount: string | null;
-	laborCost: string | null;
-	materialsCost: string | null;
-	otherCosts: string | null;
-	estimatedDuration: number | null;
-	status: BidStatus;
-	validUntil: string | null;
-	isLowest: boolean;
-	isFastest: boolean;
-}
+// Extract BidComparisonItem from BidComparison
+export type BidComparisonItem = BidComparison['bids'][number];
 
-export interface BidComparison {
-	caseId: string;
-	bids: BidComparisonItem[];
-	lowestBidId: string | null;
-	fastestBidId: string | null;
-	averageAmount: string | null;
-}
+// Extract BidStatus from VendorBid
+export type BidStatus = VendorBid['status'];
+
+// Extract input types
+type CreateInput = operations['vendorBid.create']['requestBody']['content']['application/json'];
+type UpdateInput = operations['vendorBid.update']['requestBody']['content']['application/json'];
 
 // =============================================================================
 // API Functions
@@ -76,35 +41,17 @@ export const vendorBidApi = {
 	/**
 	 * Create a new bid
 	 */
-	create: (data: {
-		vendorCandidateId: string;
-		caseId: string;
-		scopeVersion?: string;
-		amount?: number;
-		currency?: string;
-		validUntil?: string;
-		laborCost?: number;
-		materialsCost?: number;
-		otherCosts?: number;
-		estimatedStartDate?: string;
-		estimatedDuration?: number;
-		estimatedEndDate?: string;
-		notes?: string;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ bid: VendorBid }>('vendorBid/create', {
-			body: data,
-			organizationId
+	create: (data: Omit<CreateInput, 'idempotencyKey'>) =>
+		orpc.vendorBid.create({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Get bid by ID
 	 */
-	get: (id: string, organizationId: string) =>
-		apiCall<{ bid: VendorBid }>('vendorBid/get', {
-			body: { id },
-			organizationId
-		}),
+	get: (id: string) =>
+		orpc.vendorBid.get({ id }),
 
 	/**
 	 * List bids for a case
@@ -114,71 +61,42 @@ export const vendorBidApi = {
 		status?: BidStatus;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			bids: VendorBidListItem[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('vendorBid/listByCase', {
-			body: params,
-			organizationId
-		}),
+	}) => orpc.vendorBid.listByCase(params),
 
 	/**
 	 * Update bid details
 	 */
-	update: (data: {
-		id: string;
-		scopeVersion?: string | null;
-		amount?: number | null;
-		validUntil?: string | null;
-		laborCost?: number | null;
-		materialsCost?: number | null;
-		otherCosts?: number | null;
-		estimatedStartDate?: string | null;
-		estimatedDuration?: number | null;
-		estimatedEndDate?: string | null;
-		notes?: string | null;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ bid: VendorBid }>('vendorBid/update', {
-			body: data,
-			organizationId
+	update: (data: Omit<UpdateInput, 'idempotencyKey'>) =>
+		orpc.vendorBid.update({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Accept a bid
 	 */
-	accept: (data: {
-		id: string;
-		reason?: string;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ bid: VendorBid }>('vendorBid/accept', {
-			body: data,
-			organizationId
+	accept: (id: string, reason?: string) =>
+		orpc.vendorBid.accept({
+			id,
+			reason,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Reject a bid
 	 */
-	reject: (data: {
-		id: string;
-		reason?: string;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ bid: VendorBid }>('vendorBid/reject', {
-			body: data,
-			organizationId
+	reject: (id: string, reason?: string) =>
+		orpc.vendorBid.reject({
+			id,
+			reason,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Get bid comparison for a case
 	 */
-	compare: (caseId: string, organizationId: string) =>
-		apiCall<{ comparison: BidComparison }>('vendorBid/compare', {
-			body: { caseId },
-			organizationId
-		})
+	compare: (caseId: string) =>
+		orpc.vendorBid.compare({ caseId })
 };
 
 // =============================================================================

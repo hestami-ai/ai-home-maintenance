@@ -84,11 +84,11 @@
 				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok && response.data) {
-				goto(`/app/contractor/jobs/${response.data.job.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create job';
+			if (!response.ok) {
+				error = 'Failed to create job';
+				return;
 			}
+			goto(`/app/contractor/jobs/${response.data.job.id}`);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to create job';
 		} finally {

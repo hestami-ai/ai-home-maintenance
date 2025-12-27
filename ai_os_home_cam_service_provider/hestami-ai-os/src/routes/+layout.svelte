@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { Header } from '$lib/components/layout';
 	import { theme, auth, organizationStore } from '$lib/stores';
 	import { orpc } from '$lib/api';
@@ -73,7 +72,6 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
 	<title>Hestami AI</title>
 </svelte:head>
 

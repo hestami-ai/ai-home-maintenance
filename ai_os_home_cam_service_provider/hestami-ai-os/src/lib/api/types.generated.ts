@@ -24094,7 +24094,7 @@ export interface operations {
                     /** @enum {unknown} */
                     visibility?: "PUBLIC" | "OWNERS_ONLY" | "BOARD_ONLY" | "STAFF_ONLY" | "PRIVATE";
                     /** @enum {unknown} */
-                    storageProvider?: "LOCAL" | "S3" | "AZURE_BLOB" | "GCS";
+                    storageProvider?: "LOCAL" | "S3" | "AZURE_BLOB" | "GCS" | "SEAWEEDFS";
                     storagePath: string;
                     fileUrl: string;
                     fileName: string;

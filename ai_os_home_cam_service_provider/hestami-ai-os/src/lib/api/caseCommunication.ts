@@ -1,57 +1,32 @@
 /**
  * Case Communication API client
  * Provides typed functions for case communications management
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.js';
+import { v4 as uuidv4 } from 'uuid';
+import type { operations } from './types.generated.js';
 
 // =============================================================================
-// Types
+// Type Definitions (extracted from generated types)
 // =============================================================================
 
-export type CommunicationChannel = 'EMAIL' | 'SMS' | 'LETTER';
-export type CommunicationDirection = 'INBOUND' | 'OUTBOUND' | 'INTERNAL';
+// Extract CaseCommunication type from get response
+export type CaseCommunication = operations['caseCommunication.get']['responses']['200']['content']['application/json']['data']['communication'];
 
-export interface CaseCommunication {
-	id: string;
-	caseId: string;
-	channel: CommunicationChannel;
-	direction: CommunicationDirection;
-	subject: string | null;
-	content: string;
-	fromUserId: string | null;
-	fromUserName: string | null;
-	toRecipient: string | null;
-	ccRecipients: string | null;
-	externalMessageId: string | null;
-	threadId: string | null;
-	sentAt: string | null;
-	deliveredAt: string | null;
-	readAt: string | null;
-	failedAt: string | null;
-	failureReason: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
+// Extract CaseCommunicationListItem from listByCase response
+export type CaseCommunicationListItem = operations['caseCommunication.listByCase']['responses']['200']['content']['application/json']['data']['communications'][number];
 
-export interface CaseCommunicationListItem {
-	id: string;
-	channel: CommunicationChannel;
-	direction: CommunicationDirection;
-	subject: string | null;
-	contentPreview: string;
-	fromUserName: string | null;
-	toRecipient: string | null;
-	sentAt: string | null;
-	createdAt: string;
-}
+// Extract CommunicationThread from getThreads response
+export type CommunicationThread = operations['caseCommunication.getThreads']['responses']['200']['content']['application/json']['data']['threads'][number];
 
-export interface CommunicationThread {
-	threadId: string | null;
-	messageCount: number;
-	lastMessageAt: string;
-	subject: string | null;
-}
+// Extract enum types from create request body
+type CreateInput = operations['caseCommunication.create']['requestBody']['content']['application/json'];
+export type CommunicationChannel = CreateInput['channel'];
+export type CommunicationDirection = CreateInput['direction'];
 
 // =============================================================================
 // API Functions
@@ -61,31 +36,17 @@ export const caseCommunicationApi = {
 	/**
 	 * Create a new communication record
 	 */
-	create: (data: {
-		caseId: string;
-		channel: CommunicationChannel;
-		direction: CommunicationDirection;
-		subject?: string;
-		content: string;
-		toRecipient?: string;
-		ccRecipients?: string;
-		threadId?: string;
-		sentAt?: string;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ communication: CaseCommunication }>('caseCommunication/create', {
-			body: data,
-			organizationId
+	create: (data: Omit<CreateInput, 'idempotencyKey'>) =>
+		orpc.caseCommunication.create({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Get communication by ID
 	 */
-	get: (id: string, organizationId: string) =>
-		apiCall<{ communication: CaseCommunication }>('caseCommunication/get', {
-			body: { id },
-			organizationId
-		}),
+	get: (id: string) =>
+		orpc.caseCommunication.get({ id }),
 
 	/**
 	 * List communications for a case
@@ -97,14 +58,7 @@ export const caseCommunicationApi = {
 		threadId?: string;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			communications: CaseCommunicationListItem[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('caseCommunication/listByCase', {
-			body: params,
-			organizationId
-		}),
+	}) => orpc.caseCommunication.listByCase(params),
 
 	/**
 	 * Update communication status
@@ -115,21 +69,17 @@ export const caseCommunicationApi = {
 		readAt?: string | null;
 		failedAt?: string | null;
 		failureReason?: string | null;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ communication: CaseCommunication }>('caseCommunication/update', {
-			body: data,
-			organizationId
+	}) =>
+		orpc.caseCommunication.update({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Get communication threads for a case
 	 */
-	getThreads: (caseId: string, organizationId: string) =>
-		apiCall<{ threads: CommunicationThread[] }>('caseCommunication/getThreads', {
-			body: { caseId },
-			organizationId
-		})
+	getThreads: (caseId: string) =>
+		orpc.caseCommunication.getThreads({ caseId })
 };
 
 // =============================================================================

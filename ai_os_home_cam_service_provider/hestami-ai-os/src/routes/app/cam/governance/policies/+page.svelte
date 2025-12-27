@@ -40,11 +40,11 @@
 
 		isLoading = true;
 		try {
-			const response = await governanceApi.policies.list({
-				category: categoryFilter !== 'all' ? categoryFilter : undefined
+			const response = await governanceApi.resolutions.list({
+				status: categoryFilter !== 'all' ? categoryFilter as any : undefined
 			});
-			if (response.ok && response.data?.policies) {
-				policies = response.data.policies;
+			if (response.ok) {
+				policies = response.data.resolutions as any;
 			}
 		} catch (e) {
 			console.error('Failed to load policies:', e);

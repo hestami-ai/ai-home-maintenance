@@ -61,11 +61,11 @@
 		error = null;
 		try {
 			const response = await conciergeCaseApi.getDetail(caseId);
-			if (response.ok && response.data) {
-				caseDetail = response.data;
-			} else {
+			if (!response.ok) {
 				error = 'Failed to load case details';
+				return;
 			}
+			caseDetail = response.data;
 		} catch (err) {
 			console.error('Failed to load case:', err);
 			error = 'An error occurred while loading the case';
@@ -216,8 +216,8 @@
 		isUpdatingStatus = true;
 		try {
 			const response = await conciergeCaseApi.updateStatus({
-				caseId,
-				status: newStatus,
+				id: caseId,
+				status: newStatus as ConciergeCaseStatus,
 				reason: statusReason || undefined,
 				idempotencyKey: generateIdempotencyKey()
 			});
@@ -390,7 +390,7 @@
 							onUpdateStatus={async (status, reason) => {
 								if (!caseDetail) return;
 								await conciergeCaseApi.updateStatus({
-									caseId: caseDetail.case.id,
+									id: caseDetail.case.id,
 									status,
 									reason,
 									idempotencyKey: generateIdempotencyKey()
@@ -427,7 +427,7 @@
 								if (!caseDetail) return;
 								await conciergeCaseApi.assign({
 									caseId: caseDetail.case.id,
-									conciergeUserId,
+									conciergeId: conciergeUserId,
 									idempotencyKey: generateIdempotencyKey()
 								});
 								await loadCaseDetail();

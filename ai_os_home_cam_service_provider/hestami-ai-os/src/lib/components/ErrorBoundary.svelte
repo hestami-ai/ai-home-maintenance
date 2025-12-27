@@ -34,7 +34,7 @@
 	let error: Error | null = $state(null);
 	let errorInfo: string | null = $state(null);
 	
-	function handleError(e: Error, info?: string) {
+	const handleError = (e: Error, info?: string) => {
 		error = e;
 		errorInfo = info || null;
 		
@@ -44,12 +44,13 @@
 			errorInfo,
 			errorBoundary: true
 		});
-	}
+	};
 	
-	function reset() {
+	// svelte-ignore non_reactive_update
+	const reset = () => {
 		error = null;
 		errorInfo = null;
-	}
+	};
 	
 	// Expose error handler for programmatic use
 	export { handleError, reset };

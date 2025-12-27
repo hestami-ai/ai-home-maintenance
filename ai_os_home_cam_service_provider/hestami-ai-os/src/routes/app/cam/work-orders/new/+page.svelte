@@ -78,14 +78,14 @@
 		try {
 			const [unitsRes, vendorsRes] = await Promise.all([
 				unitApi.list({}).catch(() => null),
-				vendorApi.list({ status: 'APPROVED' }).catch(() => null)
+				vendorApi.list({ isActive: true }).catch(() => null)
 			]);
 
-			if (unitsRes?.ok && unitsRes.data?.units) {
+			if (unitsRes?.ok) {
 				units = unitsRes.data.units;
 			}
 
-			if (vendorsRes?.ok && vendorsRes.data?.vendors) {
+			if (vendorsRes?.ok) {
 				vendors = vendorsRes.data.vendors;
 			}
 		} catch (e) {
@@ -125,20 +125,20 @@
 			const response = await workOrderApi.create({
 				title: formData.title,
 				description: formData.description || '',
-				category: formData.category,
-				priority: formData.priority,
+				category: formData.category as any,
+				priority: formData.priority as any,
 				unitId: formData.locationType === 'unit' ? formData.unitId : undefined,
 				commonAreaDescription: formData.locationType === 'common_area' ? formData.commonAreaDescription : undefined,
 				vendorId: formData.vendorId || undefined,
-				dueDate: formData.dueDate || undefined,
+				slaDeadline: formData.dueDate || undefined,
 				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok && response.data?.workOrder) {
-				goto(`/app/cam/work-orders/${response.data.workOrder.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create work order';
+			if (!response.ok) {
+				error = 'Failed to create work order';
+				return;
 			}
+			goto(`/app/cam/work-orders/${response.data.workOrder.id}`);
 		} catch (e) {
 			error = 'Failed to create work order';
 			console.error(e);
@@ -441,7 +441,7 @@
 								<option value="">Assign later</option>
 								{#each vendors as vendor}
 									<option value={vendor.id}>
-										{vendor.name} ({vendor.trades.join(', ')})
+										{vendor.name}
 									</option>
 								{/each}
 							</select>

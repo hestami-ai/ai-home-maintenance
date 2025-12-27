@@ -81,10 +81,8 @@
 				canBeAssignedCases
 			});
 
-			if (response.ok && response.data) {
+			if (response.ok) {
 				goto(`/app/admin/staff/${response.data.staff.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create staff member';
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to create staff member';

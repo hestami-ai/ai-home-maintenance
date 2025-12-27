@@ -41,9 +41,9 @@
 			if (statusFilter) params.status = statusFilter;
 			if (searchQuery) params.search = searchQuery;
 
-			const response = await arcRequestApi.list(params);
-			if (response.ok && response.data?.requests) {
-				requests = response.data.requests as ARCRequestListItem[];
+			const response = await arcRequestApi.list(params as any);
+			if (response.ok) {
+				requests = response.data.requests as unknown as ARCRequestListItem[];
 			}
 		} catch (error) {
 			console.error('Failed to load ARC requests:', error);
@@ -305,14 +305,14 @@
 		<div class="space-y-6">
 			<div>
 				<h3 class="text-sm font-medium text-surface-500">Description</h3>
-				<p class="mt-1">{selectedRequest.description || 'No description provided.'}</p>
+				<p class="mt-1">{(selectedRequest as any).description || 'No description provided.'}</p>
 			</div>
 
 			<div class="grid gap-4 sm:grid-cols-2">
 				<div>
 					<h3 class="text-sm font-medium text-surface-500">Unit</h3>
 					<p class="mt-1">
-						<a href="/app/cam/units/{selectedRequest.unitId}" class="text-primary-500 hover:underline">
+						<a href="/app/cam/units/{(selectedRequest as any).unitId}" class="text-primary-500 hover:underline">
 							Unit {selectedRequest.unitNumber}
 						</a>
 					</p>

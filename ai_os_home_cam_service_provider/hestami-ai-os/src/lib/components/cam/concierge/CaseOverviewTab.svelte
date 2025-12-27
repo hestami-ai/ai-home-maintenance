@@ -40,9 +40,9 @@
 <div class="space-y-6">
 	<!-- Status & Priority -->
 	<div class="flex flex-wrap items-center gap-3">
-		<CaseStatusBadge status={caseDetail.case.status} size="lg" />
-		<CasePriorityBadge priority={caseDetail.case.priority} size="md" />
-		<WaitingOnIndicator status={caseDetail.case.status} />
+		<CaseStatusBadge status={caseDetail.case.status as any} size="lg" />
+		<CasePriorityBadge priority={caseDetail.case.priority as any} size="md" />
+		<WaitingOnIndicator status={caseDetail.case.status as any} />
 	</div>
 
 	<!-- Blocking Indicator -->

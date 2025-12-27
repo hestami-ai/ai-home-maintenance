@@ -93,15 +93,15 @@
 			const response = await violationApi.update(violation.id, {
 				unitId: formData.unitId,
 				title: formData.title,
-				description: formData.description || undefined,
-				severity: formData.severity
+				severity: formData.severity as any,
+				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok) {
-				goto(`/app/cam/violations/${violation.id}`);
-			} else {
-				error = response.error?.message || 'Failed to update violation';
+			if (!response.ok) {
+				error = 'Failed to update violation';
+				return;
 			}
+			goto(`/app/cam/violations/${violation.id}`);
 		} catch (e) {
 			error = 'Failed to update violation';
 			console.error(e);
@@ -173,7 +173,7 @@
 								<option value="">Select a unit</option>
 								{#each units as unit}
 									<option value={unit.id}>
-										Unit {unit.unitNumber}{unit.ownerName ? ` - ${unit.ownerName}` : ''}
+										Unit {unit.unitNumber}{(unit as any).ownerName ? ` - ${(unit as any).ownerName}` : ''}
 									</option>
 								{/each}
 							</select>

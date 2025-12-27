@@ -18,7 +18,7 @@
 	let workOrder = $state<WorkOrder | null>(null);
 	let documents = $state<Document[]>([]);
 	let history = $state<WorkOrderHistoryEvent[]>([]);
-	let vendors = $state<Vendor[]>([]);
+	let vendors = $state<any[]>([]);
 	let isLoading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -39,11 +39,11 @@
 
 		try {
 			const response = await workOrderApi.get(workOrderId);
-			if (response.ok && response.data?.workOrder) {
-				workOrder = response.data.workOrder as WorkOrder;
-			} else {
+			if (!response.ok) {
 				error = 'Work order not found';
+				return;
 			}
+			workOrder = response.data.workOrder as WorkOrder;
 		} catch (e) {
 			error = 'Failed to load work order';
 			console.error(e);
@@ -56,7 +56,7 @@
 		if (!workOrderId) return;
 		try {
 			const response = await documentApi.list({ contextType: 'WORK_ORDER', contextId: workOrderId });
-			if (response.ok && response.data?.documents) {
+			if (response.ok) {
 				documents = response.data.documents;
 			}
 		} catch (e) {
@@ -67,9 +67,9 @@
 	async function loadHistory() {
 		if (!workOrderId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'WORK_ORDER', entityId: workOrderId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'WORK_ORDER', entityId: workOrderId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,
@@ -138,8 +138,8 @@
 
 	async function loadVendors() {
 		try {
-			const response = await vendorApi.list({ status: 'APPROVED' });
-			if (response.ok && response.data?.vendors) {
+			const response = await vendorApi.list({ isActive: true });
+			if (response.ok) {
 				vendors = response.data.vendors;
 			}
 		} catch (e) {
@@ -152,7 +152,7 @@
 
 		isActionLoading = true;
 		try {
-			const response = await workOrderApi.assign(workOrder.id, {
+			const response = await workOrderApi.assignVendor(workOrder.id, {
 				vendorId: data.vendorId,
 				notes: data.notes,
 				idempotencyKey: crypto.randomUUID()
@@ -177,9 +177,7 @@
 		isActionLoading = true;
 		try {
 			const response = await workOrderApi.schedule(workOrder.id, {
-				scheduledDate: data.scheduledDate,
-				scheduledTime: data.scheduledTime,
-				estimatedDuration: data.estimatedDuration,
+				scheduledStart: data.scheduledDate + (data.scheduledTime ? `T${data.scheduledTime}:00` : 'T09:00:00'),
 				notes: data.notes,
 				idempotencyKey: crypto.randomUUID()
 			});
@@ -203,9 +201,8 @@
 		isActionLoading = true;
 		try {
 			const response = await workOrderApi.complete(workOrder.id, {
-				completedDate: data.completedDate,
 				actualCost: data.actualCost,
-				notes: data.notes,
+				completionNotes: data.notes,
 				idempotencyKey: crypto.randomUUID()
 			});
 
@@ -290,7 +287,7 @@
 						<span class="rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor(workOrder.status)}">
 							{workOrder.status.replace(/_/g, ' ')}
 						</span>
-						{#if isOverdue(workOrder.dueDate, workOrder.status)}
+						{#if isOverdue(workOrder.slaDeadline ?? undefined, workOrder.status)}
 							<span class="rounded-full bg-error-500 px-2 py-0.5 text-xs font-medium text-white">
 								OVERDUE
 							</span>
@@ -307,13 +304,13 @@
 						<Pencil class="mr-1 h-4 w-4" />
 						Edit
 					</a>
-					{#if workOrder.status === 'SUBMITTED' || !workOrder.vendorId}
+					{#if workOrder.status === 'SUBMITTED' || !workOrder.assignedVendorId}
 						<DecisionButton variant="default" onclick={openAssignVendorModal}>
 							<UserPlus class="mr-1 h-4 w-4" />
 							Assign Vendor
 						</DecisionButton>
 					{/if}
-					{#if workOrder.status === 'ASSIGNED' || (workOrder.vendorId && !workOrder.scheduledDate)}
+					{#if workOrder.status === 'ASSIGNED' || (workOrder.assignedVendorId && !workOrder.scheduledStart)}
 						<DecisionButton variant="default" onclick={() => showScheduleWorkModal = true}>
 							<Calendar class="mr-1 h-4 w-4" />
 							Schedule
@@ -365,7 +362,7 @@
 				<div class="space-y-4">
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Description</h4>
-						<p class="mt-1">{workOrder.description || 'No description provided.'}</p>
+						<p class="mt-1">{(workOrder as any).description || 'No description provided.'}</p>
 					</div>
 
 					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -396,20 +393,20 @@
 			<Card variant="outlined" padding="lg">
 				<h3 class="mb-4 font-semibold">Location</h3>
 				<div class="grid gap-4 sm:grid-cols-2">
-					{#if workOrder.unitId}
+					{#if (workOrder as any).unitId}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Unit</h4>
 							<p class="mt-1">
-								<a href="/app/cam/units/{workOrder.unitId}" class="text-primary-500 hover:underline">
-									Unit {workOrder.unitNumber}
+								<a href="/app/cam/units/{(workOrder as any).unitId}" class="text-primary-500 hover:underline">
+									Unit {(workOrder as any).unitNumber}
 								</a>
 							</p>
 						</div>
 					{/if}
-					{#if workOrder.commonAreaName}
+					{#if (workOrder as any).commonAreaName}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Common Area</h4>
-							<p class="mt-1">{workOrder.commonAreaName}</p>
+							<p class="mt-1">{(workOrder as any).commonAreaName}</p>
 						</div>
 					{/if}
 				</div>
@@ -421,25 +418,25 @@
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Assigned Vendor</h4>
 						<p class="mt-1">
-							{#if workOrder.vendorId}
-								<a href="/app/cam/vendors/{workOrder.vendorId}" class="text-primary-500 hover:underline">
-									{workOrder.vendorName}
+							{#if (workOrder as any).vendorId}
+								<a href="/app/cam/vendors/{(workOrder as any).vendorId}" class="text-primary-500 hover:underline">
+									{(workOrder as any).vendorName}
 								</a>
 							{:else}
 								<span class="text-surface-400">Not assigned</span>
 							{/if}
 						</p>
 					</div>
-					{#if workOrder.estimatedCost}
+					{#if (workOrder as any).estimatedCost}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Estimated Cost</h4>
-							<p class="mt-1">{formatCurrency(workOrder.estimatedCost)}</p>
+							<p class="mt-1">{formatCurrency((workOrder as any).estimatedCost)}</p>
 						</div>
 					{/if}
-					{#if workOrder.actualCost}
+					{#if (workOrder as any).actualCost}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Actual Cost</h4>
-							<p class="mt-1">{formatCurrency(Number(workOrder.actualCost))}</p>
+							<p class="mt-1">{formatCurrency(Number((workOrder as any).actualCost))}</p>
 						</div>
 					{/if}
 				</div>
@@ -450,26 +447,26 @@
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Created</h4>
-						<p class="mt-1">{formatDate(workOrder.createdAt)}</p>
+						<p class="mt-1">{formatDate((workOrder as any).createdAt)}</p>
 					</div>
-					{#if workOrder.dueDate}
+					{#if (workOrder as any).dueDate}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Due Date</h4>
-							<p class="mt-1 {isOverdue(workOrder.dueDate, workOrder.status) ? 'text-error-500 font-medium' : ''}">
-								{formatDate(workOrder.dueDate)}
+							<p class="mt-1 {isOverdue((workOrder as any).dueDate, workOrder.status) ? 'text-error-500 font-medium' : ''}">
+								{formatDate((workOrder as any).dueDate)}
 							</p>
 						</div>
 					{/if}
-					{#if workOrder.scheduledDate}
+					{#if workOrder.scheduledStart}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Scheduled</h4>
-							<p class="mt-1">{formatDate(workOrder.scheduledDate)}</p>
+							<p class="mt-1">{formatDate(workOrder.scheduledStart)}</p>
 						</div>
 					{/if}
-					{#if workOrder.completedDate}
+					{#if (workOrder as any).completedAt}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Completed</h4>
-							<p class="mt-1">{formatDate(workOrder.completedDate)}</p>
+							<p class="mt-1">{formatDate((workOrder as any).completedAt)}</p>
 						</div>
 					{/if}
 				</div>
@@ -508,7 +505,7 @@
 					<div class="flex items-center gap-3 py-3">
 						<FileText class="h-5 w-5 text-surface-400" />
 						<div class="flex-1">
-							<p class="font-medium">{doc.name}</p>
+							<p class="font-medium">{doc.title}</p>
 							<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 						</div>
 						<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">

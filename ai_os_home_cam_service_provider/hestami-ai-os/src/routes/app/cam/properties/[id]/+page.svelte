@@ -63,11 +63,11 @@
 
 		try {
 			const response = await propertyApi.get(propertyId);
-			if (response.ok && response.data?.property) {
-				property = response.data.property as Property;
-			} else {
+			if (!response.ok) {
 				error = 'Property not found';
+				return;
 			}
+			property = response.data.property as unknown as Property;
 		} catch (e) {
 			error = 'Failed to load property';
 			console.error(e);
@@ -81,8 +81,8 @@
 
 		try {
 			const response = await documentApi.list({ contextType: 'PROPERTY', contextId: propertyId });
-			if (response.ok && response.data?.documents) {
-				documents = response.data.documents;
+			if (response.ok) {
+				documents = response.data.documents as any;
 			}
 		} catch (e) {
 			console.error('Failed to load documents:', e);
@@ -93,9 +93,9 @@
 		if (!propertyId) return;
 
 		try {
-			const response = await activityEventApi.list({ entityType: 'PROPERTY', entityId: propertyId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'PROPERTY' as any, entityId: propertyId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,

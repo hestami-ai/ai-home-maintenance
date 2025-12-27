@@ -1,59 +1,27 @@
 /**
  * Activity Event API client
  * Provides typed functions for querying activity events (audit trail)
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.js';
+import type { operations } from './types.generated.js';
 
 // =============================================================================
-// Types
+// Type Definitions (extracted from generated types)
 // =============================================================================
 
-export type ActivityEntityType =
-	| 'ASSOCIATION' | 'UNIT' | 'OWNER' | 'VIOLATION' | 'ARC_REQUEST' | 'ASSESSMENT'
-	| 'GOVERNING_DOCUMENT' | 'BOARD_ACTION' | 'JOB' | 'WORK_ORDER' | 'ESTIMATE'
-	| 'INVOICE' | 'TECHNICIAN' | 'CONTRACTOR' | 'INVENTORY' | 'CONCIERGE_CASE'
-	| 'OWNER_INTENT' | 'INDIVIDUAL_PROPERTY' | 'PROPERTY_DOCUMENT' | 'MATERIAL_DECISION'
-	| 'EXTERNAL_HOA' | 'EXTERNAL_VENDOR' | 'CONCIERGE_ACTION' | 'USER' | 'USER_ROLE'
-	| 'ORGANIZATION' | 'DOCUMENT' | 'STAFF' | 'STAFF_ASSIGNMENT' | 'OTHER';
+// Extract ActivityEvent type from getByEntity response
+export type ActivityEvent = operations['activityEvent.getByEntity']['responses']['200']['content']['application/json']['data']['events'][number];
 
-export type ActivityActionType =
-	| 'CREATE' | 'UPDATE' | 'DELETE' | 'ARCHIVE' | 'RESTORE' | 'STATUS_CHANGE'
-	| 'ASSIGN' | 'UNASSIGN' | 'APPROVE' | 'DENY' | 'SUBMIT' | 'CANCEL' | 'COMPLETE'
-	| 'CLOSE' | 'REOPEN' | 'ESCALATE' | 'COMMENT' | 'ATTACH' | 'DETACH' | 'TRANSFER'
-	| 'SCHEDULE' | 'DISPATCH' | 'START' | 'PAUSE' | 'RESUME' | 'INVOICE' | 'PAY'
-	| 'REFUND' | 'ADJUST' | 'VERIFY' | 'REJECT' | 'EXPIRE' | 'RENEW' | 'LOGIN'
-	| 'LOGOUT' | 'PASSWORD_CHANGE' | 'ROLE_CHANGE' | 'PERMISSION_CHANGE' | 'OTHER';
-
-export type ActivityActorType = 'HUMAN' | 'AI' | 'SYSTEM';
-
-export type ActivityEventCategory = 'INTENT' | 'DECISION' | 'EXECUTION' | 'SYSTEM';
-
-export interface ActivityEvent {
-	id: string;
-	entityType: ActivityEntityType;
-	entityId: string;
-	action: ActivityActionType;
-	eventCategory: ActivityEventCategory;
-	summary: string;
-	performedById: string | null;
-	performedByType: ActivityActorType;
-	performedAt: string;
-	previousState: unknown | null;
-	newState: unknown | null;
-	metadata: unknown | null;
-	caseId: string | null;
-	intentId: string | null;
-	propertyId: string | null;
-	decisionId: string | null;
-	jobId: string | null;
-	workOrderId: string | null;
-	technicianId: string | null;
-	associationId: string | null;
-	unitId: string | null;
-	violationId: string | null;
-	arcRequestId: string | null;
-}
+// Extract enum types from search request body (has all the enum options)
+type SearchInput = NonNullable<operations['activityEvent.search']['requestBody']>['content']['application/json'];
+export type ActivityEntityType = NonNullable<SearchInput['entityType']>;
+export type ActivityActionType = NonNullable<SearchInput['action']>;
+export type ActivityEventCategory = NonNullable<SearchInput['eventCategory']>;
+export type ActivityActorType = NonNullable<SearchInput['performedByType']>;
 
 // =============================================================================
 // API Functions
@@ -68,19 +36,12 @@ export const activityEventApi = {
 		entityId: string;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			events: ActivityEvent[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('activityEvent/getByEntity', {
-			body: params,
-			organizationId
-		}),
+	}) => orpc.activityEvent.getByEntity(params),
 
 	/**
 	 * Get activity events for the organization
 	 */
-	getByOrganization: (params: {
+	getByOrganization: (params?: {
 		entityType?: ActivityEntityType;
 		action?: ActivityActionType;
 		eventCategory?: ActivityEventCategory;
@@ -89,14 +50,7 @@ export const activityEventApi = {
 		endDate?: string;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			events: ActivityEvent[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('activityEvent/getByOrganization', {
-			body: params,
-			organizationId
-		}),
+	}) => orpc.activityEvent.getByOrganization(params ?? {}),
 
 	/**
 	 * Get activity events for a case
@@ -105,14 +59,16 @@ export const activityEventApi = {
 		caseId: string;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			events: ActivityEvent[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('activityEvent/getByCase', {
-			body: params,
-			organizationId
-		}),
+	}) => orpc.activityEvent.getByCase(params),
+
+	/**
+	 * Get activity events for a job
+	 */
+	getByJob: (params: {
+		jobId: string;
+		limit?: number;
+		cursor?: string;
+	}) => orpc.activityEvent.getByJob(params),
 
 	/**
 	 * Get activity events by actor
@@ -122,14 +78,12 @@ export const activityEventApi = {
 		actorType?: ActivityActorType;
 		limit?: number;
 		cursor?: string;
-	}, organizationId: string) =>
-		apiCall<{
-			events: ActivityEvent[];
-			pagination: { hasMore: boolean; nextCursor: string | null };
-		}>('activityEvent/getByActor', {
-			body: params,
-			organizationId
-		})
+	}) => orpc.activityEvent.getByActor(params),
+
+	/**
+	 * Search activity events with filters
+	 */
+	search: (params?: SearchInput) => orpc.activityEvent.search(params ?? {})
 };
 
 // =============================================================================
@@ -164,8 +118,6 @@ export const ENTITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
 	USER_ROLE: 'User Role',
 	ORGANIZATION: 'Organization',
 	DOCUMENT: 'Document',
-	STAFF: 'Staff',
-	STAFF_ASSIGNMENT: 'Staff Assignment',
 	OTHER: 'Other'
 };
 

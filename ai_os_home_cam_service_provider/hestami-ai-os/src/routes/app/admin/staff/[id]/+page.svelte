@@ -54,10 +54,8 @@
 		error = null;
 		try {
 			const response = await staffApi.get(staffId);
-			if (response.ok && response.data) {
-				staff = response.data.staff;
-			} else {
-				error = response.error?.message || 'Failed to load staff member';
+			if (response.ok) {
+				staff = response.data.staff as Staff;
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load staff member';
@@ -72,10 +70,8 @@
 		actionError = null;
 		try {
 			const response = await staffApi.activate(staff.id);
-			if (response.ok && response.data) {
-				staff = response.data.staff;
-			} else {
-				actionError = response.error?.message || 'Failed to activate staff member';
+			if (response.ok) {
+				staff = response.data.staff as Staff;
 			}
 		} catch (e) {
 			actionError = e instanceof Error ? e.message : 'Failed to activate staff member';
@@ -90,12 +86,10 @@
 		actionError = null;
 		try {
 			const response = await staffApi.suspend(staff.id, suspendReason.trim());
-			if (response.ok && response.data) {
-				staff = response.data.staff;
+			if (response.ok) {
+				staff = response.data.staff as Staff;
 				showSuspendModal = false;
 				suspendReason = '';
-			} else {
-				actionError = response.error?.message || 'Failed to suspend staff member';
 			}
 		} catch (e) {
 			actionError = e instanceof Error ? e.message : 'Failed to suspend staff member';
@@ -110,12 +104,10 @@
 		actionError = null;
 		try {
 			const response = await staffApi.deactivate(staff.id, deactivateReason.trim());
-			if (response.ok && response.data) {
-				staff = response.data.staff;
+			if (response.ok) {
+				staff = response.data.staff as Staff;
 				showDeactivateModal = false;
 				deactivateReason = '';
-			} else {
-				actionError = response.error?.message || 'Failed to deactivate staff member';
 			}
 		} catch (e) {
 			actionError = e instanceof Error ? e.message : 'Failed to deactivate staff member';
@@ -130,10 +122,8 @@
 		actionError = null;
 		try {
 			const response = await staffApi.reactivate(staff.id);
-			if (response.ok && response.data) {
-				staff = response.data.staff;
-			} else {
-				actionError = response.error?.message || 'Failed to reactivate staff member';
+			if (response.ok) {
+				staff = response.data.staff as Staff;
 			}
 		} catch (e) {
 			actionError = e instanceof Error ? e.message : 'Failed to reactivate staff member';

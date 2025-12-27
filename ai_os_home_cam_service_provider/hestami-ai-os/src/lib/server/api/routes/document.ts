@@ -32,6 +32,8 @@ const StorageProviderEnum = StorageProviderSchema;
 
 // Helper to get upload directory path
 const getUploadDir = () => {
+	// UPLOAD_DIR should be set in production (e.g., /mnt/hestami-user-media)
+	// Falls back to ./uploads relative to cwd for local development
 	return process.env.UPLOAD_DIR || join(process.cwd(), 'uploads');
 };
 

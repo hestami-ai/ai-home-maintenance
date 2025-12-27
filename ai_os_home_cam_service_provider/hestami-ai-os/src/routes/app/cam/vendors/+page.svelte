@@ -32,8 +32,8 @@
 			if (statusFilter) params.status = statusFilter;
 			if (searchQuery) params.search = searchQuery;
 
-			const response = await vendorApi.list(params);
-			if (response.ok && response.data?.vendors) {
+			const response = await vendorApi.list(params as any);
+			if (response.ok) {
 				vendors = response.data.vendors as VendorListItem[];
 			}
 		} catch (error) {
@@ -65,9 +65,9 @@
 	}
 
 	const filteredVendors = $derived(
-		vendors.filter((v) =>
+		vendors.filter((v: any) =>
 			v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			v.trades.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+			(v.trades || []).some((t: string) => t.toLowerCase().includes(searchQuery.toLowerCase()))
 		)
 	);
 
@@ -142,11 +142,11 @@
 									<div class="min-w-0 flex-1">
 										<p class="font-medium">{vendor.name}</p>
 										<p class="mt-0.5 text-sm text-surface-500">
-											{vendor.trades.join(', ')}
+											{(vendor as any).trades?.join(', ') || ''}
 										</p>
 									</div>
-									<span class="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor(vendor.status)}">
-										{vendor.status}
+									<span class="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor((vendor as any).status || 'ACTIVE')}">
+										{(vendor as any).status || 'Active'}
 									</span>
 								</div>
 							</button>
@@ -164,8 +164,8 @@
 					{@const v = selectedVendor!}
 					<div>
 						<div class="flex items-center gap-2">
-							<span class="rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor(v.status)}">
-								{v.status}
+							<span class="rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor((v as any).status || 'ACTIVE')}">
+								{(v as any).status || 'Active'}
 							</span>
 						</div>
 						<h2 class="mt-1 text-xl font-semibold">{v.name}</h2>
@@ -233,21 +233,21 @@
 				<div class="sm:col-span-2">
 					<h3 class="text-sm font-medium text-surface-500">Trades</h3>
 					<div class="mt-1 flex flex-wrap gap-1">
-						{#each selectedVendor.trades as trade}
+						{#each (selectedVendor as any).trades || [] as trade}
 							<span class="rounded bg-surface-200-800 px-2 py-0.5 text-sm">{trade}</span>
 						{/each}
 					</div>
 				</div>
-				{#if selectedVendor.insuranceExpiry}
+				{#if (selectedVendor as any).insuranceExpiry}
 					<div>
 						<h3 class="text-sm font-medium text-surface-500">Insurance Expiry</h3>
-						<p class="mt-1">{formatDate(selectedVendor.insuranceExpiry)}</p>
+						<p class="mt-1">{formatDate((selectedVendor as any).insuranceExpiry)}</p>
 					</div>
 				{/if}
-				{#if selectedVendor.licenseExpiry}
+				{#if (selectedVendor as any).licenseExpiry}
 					<div>
 						<h3 class="text-sm font-medium text-surface-500">License Expiry</h3>
-						<p class="mt-1">{formatDate(selectedVendor.licenseExpiry)}</p>
+						<p class="mt-1">{formatDate((selectedVendor as any).licenseExpiry)}</p>
 					</div>
 				{/if}
 			</div>

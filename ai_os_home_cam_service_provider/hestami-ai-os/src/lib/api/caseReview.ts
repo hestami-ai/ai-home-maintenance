@@ -1,34 +1,25 @@
 /**
  * Case Review API client
  * Provides typed functions for post-completion case reviews
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.js';
+import { v4 as uuidv4 } from 'uuid';
+import type { operations } from './types.generated.js';
 
 // =============================================================================
-// Types
+// Type Definitions (extracted from generated types)
 // =============================================================================
 
-export interface CaseReview {
-	id: string;
-	caseId: string;
-	outcomeSummary: string;
-	vendorPerformanceNotes: string | null;
-	issuesEncountered: string | null;
-	lessonsLearned: string | null;
-	vendorRating: number | null;
-	communicationRating: number | null;
-	timelinessRating: number | null;
-	overallSatisfaction: number | null;
-	reusableVendor: boolean;
-	reusableScope: boolean;
-	reusableProcess: boolean;
-	reviewedByUserId: string;
-	reviewedByUserName: string | null;
-	reviewedAt: string;
-	createdAt: string;
-	updatedAt: string;
-}
+// Extract CaseReview type from getByCase response
+export type CaseReview = NonNullable<operations['caseReview.getByCase']['responses']['200']['content']['application/json']['data']['review']>;
+
+// Extract input types
+type CreateInput = operations['caseReview.create']['requestBody']['content']['application/json'];
+type UpdateInput = operations['caseReview.update']['requestBody']['content']['application/json'];
 
 // =============================================================================
 // API Functions
@@ -38,56 +29,25 @@ export const caseReviewApi = {
 	/**
 	 * Create a case review
 	 */
-	create: (data: {
-		caseId: string;
-		outcomeSummary: string;
-		vendorPerformanceNotes?: string;
-		issuesEncountered?: string;
-		lessonsLearned?: string;
-		vendorRating?: number;
-		communicationRating?: number;
-		timelinessRating?: number;
-		overallSatisfaction?: number;
-		reusableVendor?: boolean;
-		reusableScope?: boolean;
-		reusableProcess?: boolean;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ review: CaseReview }>('caseReview/create', {
-			body: data,
-			organizationId
+	create: (data: Omit<CreateInput, 'idempotencyKey'>) =>
+		orpc.caseReview.create({
+			...data,
+			idempotencyKey: uuidv4()
 		}),
 
 	/**
 	 * Get case review by case ID
 	 */
-	getByCase: (caseId: string, organizationId: string) =>
-		apiCall<{ review: CaseReview | null }>('caseReview/getByCase', {
-			body: { caseId },
-			organizationId
-		}),
+	getByCase: (caseId: string) =>
+		orpc.caseReview.getByCase({ caseId }),
 
 	/**
 	 * Update case review
 	 */
-	update: (data: {
-		caseId: string;
-		outcomeSummary?: string;
-		vendorPerformanceNotes?: string | null;
-		issuesEncountered?: string | null;
-		lessonsLearned?: string | null;
-		vendorRating?: number | null;
-		communicationRating?: number | null;
-		timelinessRating?: number | null;
-		overallSatisfaction?: number | null;
-		reusableVendor?: boolean;
-		reusableScope?: boolean;
-		reusableProcess?: boolean;
-		idempotencyKey: string;
-	}, organizationId: string) =>
-		apiCall<{ review: CaseReview }>('caseReview/update', {
-			body: data,
-			organizationId
+	update: (data: Omit<UpdateInput, 'idempotencyKey'>) =>
+		orpc.caseReview.update({
+			...data,
+			idempotencyKey: uuidv4()
 		})
 };
 

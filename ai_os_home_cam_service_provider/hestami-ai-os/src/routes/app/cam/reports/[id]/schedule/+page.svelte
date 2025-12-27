@@ -61,11 +61,11 @@
 
 		try {
 			const response = await reportApi.definitions.get(reportId);
-			if (response.ok && response.data?.report) {
-				report = response.data.report;
-			} else {
+			if (!response.ok) {
 				error = 'Report not found';
+				return;
 			}
+			report = response.data.report as any;
 		} catch (e) {
 			error = 'Failed to load report';
 			console.error(e);
@@ -82,13 +82,12 @@
 		successMessage = null;
 
 		try {
-			const response = await reportApi.schedule(report.id, {
-				frequency,
-				dayOfWeek: frequency === 'WEEKLY' ? parseInt(dayOfWeek) : undefined,
-				dayOfMonth: frequency === 'MONTHLY' || frequency === 'QUARTERLY' ? parseInt(dayOfMonth) : undefined,
-				time,
-				outputFormat,
-				recipients: recipients.split(',').map(r => r.trim()).filter(r => r),
+			const response = await reportApi.schedules.create({
+				reportId: report.id,
+				name: `${report.name} Schedule`,
+				frequency: frequency as any,
+				format: outputFormat as any,
+				recipientsJson: JSON.stringify(recipients.split(',').map(r => r.trim()).filter(r => r)),
 				isActive,
 				idempotencyKey: crypto.randomUUID()
 			});

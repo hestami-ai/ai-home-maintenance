@@ -8,23 +8,31 @@ export const load: LayoutServerLoad = async ({ request, cookies }) => {
 		headers: request.headers
 	});
 
-	// Get user's default organization if authenticated
+	// Get user's default organization and staff profile if authenticated
 	let organization = null;
+	let staff = null;
 	if (session?.user) {
-		const membership = await prisma.userOrganization.findFirst({
-			where: {
-				userId: session.user.id,
-				isDefault: true,
-				organization: { deletedAt: null }
-			},
-			include: { organization: true }
-		});
+		const [membership, staffProfile] = await Promise.all([
+			prisma.userOrganization.findFirst({
+				where: {
+					userId: session.user.id,
+					isDefault: true,
+					organization: { deletedAt: null }
+				},
+				include: { organization: true }
+			}),
+			prisma.staff.findUnique({
+				where: { userId: session.user.id }
+			})
+		]);
 		organization = membership?.organization ?? null;
+		staff = staffProfile;
 	}
 
 	return {
 		user: session?.user ?? null,
 		session: session?.session ?? null,
-		organization
+		organization,
+		staff
 	};
 };

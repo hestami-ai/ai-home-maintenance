@@ -76,11 +76,11 @@
 
 		try {
 			const response = await violationApi.get(violationId);
-			if (response.ok && response.data?.violation) {
-				violation = response.data.violation;
-			} else {
+			if (!response.ok) {
 				error = 'Violation not found';
+				return;
 			}
+			violation = response.data.violation;
 		} catch (e) {
 			error = 'Failed to load violation';
 			console.error(e);
@@ -93,7 +93,7 @@
 		if (!violationId) return;
 		try {
 			const response = await documentApi.list({ contextType: 'VIOLATION', contextId: violationId });
-			if (response.ok && response.data?.documents) {
+			if (response.ok) {
 				documents = response.data.documents;
 			}
 		} catch (e) {
@@ -104,9 +104,9 @@
 	async function loadHistory() {
 		if (!violationId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'VIOLATION', entityId: violationId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'VIOLATION', entityId: violationId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,
@@ -123,8 +123,8 @@
 		if (!violationId) return;
 		try {
 			const response = await violationApi.getNotices(violationId);
-			if (response.ok && response.data?.notices) {
-				notices = response.data.notices.map(n => ({
+			if (response.ok) {
+				notices = response.data.notices.map((n: any) => ({
 					id: n.id,
 					noticeType: n.noticeType,
 					sentDate: n.sentAt,
@@ -140,9 +140,9 @@
 	async function loadOwnerResponses() {
 		if (!violationId) return;
 		try {
-			const response = await violationApi.getResponses(violationId);
-			if (response.ok && response.data?.responses) {
-				ownerResponses = response.data.responses.map(r => ({
+			const response = await (violationApi as any).getResponses(violationId);
+			if (response.ok) {
+				ownerResponses = response.data.responses.map((r: any) => ({
 					id: r.id,
 					submittedDate: r.submittedAt,
 					content: r.content,
@@ -161,7 +161,7 @@
 		try {
 			// Load violations for the same unit (excluding current)
 			const unitRes = await violationApi.list({ unitId: violation.unitId });
-			if (unitRes.ok && unitRes.data?.violations) {
+			if (unitRes.ok) {
 				priorUnitViolations = unitRes.data.violations
 					.filter((v) => v.id !== violation?.id)
 					.slice(0, 5)
@@ -171,14 +171,14 @@
 						title: v.title,
 						status: v.status,
 						severity: v.severity,
-						createdAt: v.createdAt || ''
+						createdAt: (v as any).createdAt || ''
 					}));
 			}
 
 			// Load violations of the same type (excluding current)
 			if (violation.violationTypeId) {
 				const typeRes = await violationApi.list({ violationTypeId: violation.violationTypeId });
-				if (typeRes.ok && typeRes.data?.violations) {
+				if (typeRes.ok) {
 					priorTypeViolations = typeRes.data.violations
 						.filter((v) => v.id !== violation?.id)
 						.slice(0, 5)
@@ -188,7 +188,7 @@
 							title: v.title,
 							status: v.status,
 							severity: v.severity,
-							createdAt: v.createdAt || ''
+							createdAt: (v as any).createdAt || ''
 						}));
 				}
 			}
@@ -307,7 +307,7 @@
 
 		isActionLoading = true;
 		try {
-			const response = await violationApi.recordAction(violation.id, {
+			const response = await (violationApi as any).recordAction(violation.id, {
 				action: rationaleAction.type,
 				notes: rationale,
 				idempotencyKey: crypto.randomUUID()
@@ -333,12 +333,11 @@
 		isActionLoading = true;
 		try {
 			const response = await violationApi.sendNotice(violation.id, {
-				noticeType: data.noticeType,
-				templateId: data.templateId,
-				curePeriodDays: data.curePeriodDays,
-				deliveryMethod: 'EMAIL',
-				notes: data.notes,
-				idempotencyKey: crypto.randomUUID()
+				noticeType: data.noticeType as any,
+				subject: 'Violation Notice',
+				body: data.notes || '',
+				recipientName: '',
+				deliveryMethod: 'EMAIL'
 			});
 
 			if (response.ok) {
@@ -412,7 +411,7 @@
 		isActionLoading = true;
 		try {
 			const response = await violationApi.fileAppeal(violation.id, {
-				appealReason: data.reason,
+				reason: data.reason,
 				idempotencyKey: crypto.randomUUID()
 			});
 
@@ -512,7 +511,7 @@
 						<Pencil class="mr-1 h-4 w-4" />
 						Edit
 					</a>
-					{#if violation.status === 'DETECTED'}
+					{#if violation.status === 'DRAFT'}
 						<DecisionButton
 							variant="default"
 							requiresRationale
@@ -624,27 +623,27 @@
 
 {#snippet overviewTab()}
 	{#if violation}
-		{@const slaStatus = calculateSlaStatus(violation.dueDate, violation.curePeriodDays, violation.createdAt)}
+		{@const slaStatus = calculateSlaStatus((violation as any).dueDate, (violation as any).curePeriodDays, (violation as any).createdAt)}
 		<div class="space-y-6">
-			{#if violation.hasHoaConflict}
+			{#if (violation as any).hasHoaConflict}
 				<div class="flex items-start gap-3 rounded-lg border border-error-500/50 bg-error-500/10 p-4">
 					<AlertOctagon class="h-5 w-5 flex-shrink-0 text-error-500" />
 					<div>
 						<h4 class="font-semibold text-error-500">HOA Rule Conflict</h4>
 						<p class="mt-1 text-sm text-surface-600">
-							{violation.hoaConflictNotes || 'This violation has a potential conflict with HOA governing documents. Manual review required.'}
+							{(violation as any).hoaConflictNotes || 'This violation has a potential conflict with HOA governing documents. Manual review required.'}
 						</p>
 					</div>
 				</div>
 			{/if}
 
-			{#if violation.hasAppeal}
+			{#if (violation as any).hasAppeal}
 				<div class="flex items-start gap-3 rounded-lg border border-warning-500/50 bg-warning-500/10 p-4">
 					<Scale class="h-5 w-5 flex-shrink-0 text-warning-500" />
 					<div>
 						<h4 class="font-semibold text-warning-600">Appeal Filed</h4>
 						<p class="mt-1 text-sm text-surface-600">
-							An appeal has been filed for this violation. Status: {violation.appealStatus || 'Pending Review'}
+							An appeal has been filed for this violation. Status: {(violation as any).appealStatus || 'Pending Review'}
 						</p>
 					</div>
 				</div>
@@ -662,7 +661,7 @@
 							{/if}
 						</h4>
 						<p class="text-sm opacity-75">
-							{violation.dueDate ? `Due: ${formatDate(violation.dueDate)}` : `Cure period: ${violation.curePeriodDays} days`}
+							{(violation as any).dueDate ? `Due: ${formatDate((violation as any).dueDate)}` : `Cure period: ${(violation as any).curePeriodDays || violation.curePeriodEnds} days`}
 						</p>
 					</div>
 				</div>
@@ -679,7 +678,7 @@
 					<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Violation Type</h4>
-							<p class="mt-1">{violation.violationTypeName || 'N/A'}</p>
+							<p class="mt-1">{(violation as any).violationTypeName || 'N/A'}</p>
 						</div>
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Severity</h4>
@@ -701,17 +700,17 @@
 				</div>
 			</Card>
 
-			{#if violation.violationTypeRuleText}
+			{#if (violation as any).violationTypeRuleText}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 flex items-center gap-2 font-semibold">
 						<BookOpen class="h-5 w-5 text-primary-500" />
 						Governing Rule
 					</h3>
 					<div class="rounded-lg bg-surface-100-900 p-4">
-						<p class="text-sm italic text-surface-600">"{violation.violationTypeRuleText}"</p>
+						<p class="text-sm italic text-surface-600">"{(violation as any).violationTypeRuleText}"</p>
 					</div>
 					<p class="mt-2 text-xs text-surface-500">
-						Rule associated with violation type: {violation.violationTypeName}
+						Rule associated with violation type: {(violation as any).violationTypeName}
 					</p>
 				</Card>
 			{/if}
@@ -723,13 +722,13 @@
 						<h4 class="text-sm font-medium text-surface-500">Unit</h4>
 						<p class="mt-1">
 							<a href="/app/cam/units/{violation.unitId}" class="text-primary-500 hover:underline">
-								Unit {violation.unitNumber}
+								Unit {(violation as any).unitNumber || violation.violationNumber}
 							</a>
 						</p>
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Responsible Party</h4>
-						<p class="mt-1">{violation.responsiblePartyName}</p>
+						<p class="mt-1">{(violation as any).responsiblePartyName || '-'}</p>
 					</div>
 				</div>
 			</Card>
@@ -739,23 +738,23 @@
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Reported</h4>
-						<p class="mt-1">{(violation.reportedDate || violation.createdAt) ? formatDate(violation.reportedDate || violation.createdAt || '') : '-'}</p>
+						<p class="mt-1">{((violation as any).reportedDate || (violation as any).createdAt) ? formatDate((violation as any).reportedDate || (violation as any).createdAt || '') : '-'}</p>
 					</div>
-					{#if violation.dueDate}
+					{#if (violation as any).dueDate}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Due Date</h4>
-							<p class="mt-1">{formatDate(violation.dueDate)}</p>
+							<p class="mt-1">{formatDate((violation as any).dueDate)}</p>
 						</div>
 					{/if}
-					{#if violation.resolvedDate}
+					{#if (violation as any).resolvedDate}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Resolved</h4>
-							<p class="mt-1">{formatDate(violation.resolvedDate)}</p>
+							<p class="mt-1">{formatDate((violation as any).resolvedDate)}</p>
 						</div>
 					{/if}
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Last Updated</h4>
-						<p class="mt-1">{violation.updatedAt ? formatDate(violation.updatedAt) : '-'}</p>
+						<p class="mt-1">{(violation as any).updatedAt ? formatDate((violation as any).updatedAt) : '-'}</p>
 					</div>
 				</div>
 			</Card>
@@ -839,7 +838,7 @@
 {#snippet actionsTab()}
 	{#if violation}
 		<div class="space-y-6">
-			{#if violation.status === 'DETECTED'}
+			{#if violation.status === 'DRAFT'}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Review & Confirmation</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -1013,14 +1012,14 @@
 					<div class="flex items-center gap-3 text-success-500">
 						<CheckCircle class="h-6 w-6" />
 						<div>
-							<h3 class="font-semibold">Violation {violation.status === 'RESOLVED' ? 'Resolved' : 'Closed'}</h3>
+							<h3 class="font-semibold">Violation {violation.status === 'CLOSED' ? 'Closed' : 'Resolved'}</h3>
 							<p class="text-sm text-surface-500">No further actions available.</p>
 						</div>
 					</div>
 				</Card>
 			{/if}
 
-			{#if !['DETECTED', 'CLOSED'].includes(violation.status)}
+			{#if !['DRAFT', 'CLOSED'].includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold flex items-center gap-2">
 						<Scale class="h-5 w-5 text-primary-500" />
@@ -1168,7 +1167,7 @@
 					<div class="flex items-center gap-3 py-3">
 						<FileText class="h-5 w-5 text-surface-400" />
 						<div class="flex-1">
-							<p class="font-medium">{doc.name}</p>
+							<p class="font-medium">{doc.title}</p>
 							<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 						</div>
 						<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">

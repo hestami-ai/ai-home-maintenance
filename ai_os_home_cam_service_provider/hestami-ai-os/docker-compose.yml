@@ -25,6 +25,9 @@ services:
       - "--entrypoints.websecure.http2.maxConcurrentStreams=250"
     ports:
       - "443:443"
+      # Expose S3 Gateway and TUSD for local dev/testing if needed (via Traefik is preferred)
+      # - "8333:8333" # SeaweedFS S3
+      # - "1080:1080" # TUSD
     volumes:
       - "./volumes/traefik/certs:/etc/traefik/certs:ro"
       - "/var/run/docker.sock:/var/run/docker.sock"
@@ -37,6 +40,132 @@ services:
       options:
         max-size: "20m"
         max-file: "5" 
+
+  # Storage: SeaweedFS Master
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:4.04
+    container_name: hestami-seaweedfs-master
+    ports:
+      - "9333:9333"
+      - "19333:19333"
+    command: "master -ip=hestami-seaweedfs-master -volumeSizeLimitMB=1000 -defaultReplication=000"
+    networks:
+      - hestami-network
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+
+  # Storage: SeaweedFS Volume
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:4.04
+    container_name: hestami-seaweedfs-volume
+    ports:
+      - "8080:8080"
+      - "18080:18080"
+    command: "volume -mserver=hestami-seaweedfs-master:9333 -port=8080"
+    volumes:
+      - ./volumes/seaweedfs/data:/data
+    depends_on:
+      - seaweedfs-master
+    networks:
+      - hestami-network
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+
+  # Storage: SeaweedFS Filer (Required for S3)
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs:4.04
+    container_name: hestami-seaweedfs-filer
+    ports:
+      - "8888:8888"
+      - "18888:18888"
+    command: "filer -master=hestami-seaweedfs-master:9333 -port=8888"
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+    networks:
+      - hestami-network
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+
+  # Storage: SeaweedFS S3 Gateway
+  seaweedfs-s3:
+    image: chrislusf/seaweedfs:4.04
+    container_name: hestami-seaweedfs-s3
+    ports:
+      - "8333:8333"
+    command: "s3 -filer=hestami-seaweedfs-filer:8888 -port=8333 -config=/etc/seaweedfs/s3.json"
+    volumes:
+      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+      - seaweedfs-filer
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.s3.rule=Host(`dev-s3.hestami-ai.com`)"
+      - "traefik.http.routers.s3.tls=true"
+      - "traefik.http.services.s3.loadbalancer.server.port=8333"
+    networks:
+      - hestami-network
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+
+  # Upload: TUSD
+  tusd:
+    image: tusproject/tusd:v2.8.0
+    container_name: hestami-tusd
+    command:
+      - "-s3-endpoint=http://hestami-seaweedfs-s3:8333"
+      - "-s3-bucket=uploads"
+      - "-s3-access-key-id=${S3_ACCESS_KEY:-hestami_admin}"
+      - "-s3-secret-access-key=${S3_SECRET_KEY:-hestami_secret}"
+      - "-s3-object-prefix="
+      - "-behind-proxy"
+      - "-hooks-http=http://hestami-app:3000/api/internal/tus-hook"
+      - "-hooks-http-retry=3"
+      - "-hooks-http-backoff=1"
+    depends_on:
+      - seaweedfs-s3
+      - app # Needs app for hooks
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tusd.rule=Host(`dev-upload.hestami-ai.com`)"
+      - "traefik.http.routers.tusd.tls=true"
+      - "traefik.http.services.tusd.loadbalancer.server.port=1080"
+      - "traefik.http.routers.tusd.middlewares=upload-limit"
+    networks:
+      - hestami-network
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+
+  # Worker: Document Processing (Dumb Muscle)
+  worker-document:
+    build:
+      context: ./docker/worker-document
+      dockerfile: Dockerfile
+    container_name: hestami-worker-document
+    environment:
+      - SEAWEEDFS_S3_ENDPOINT=http://hestami-seaweedfs-s3:8333
+      - SEAWEEDFS_S3_ACCESS_KEY=${S3_ACCESS_KEY:-hestami_admin}
+      - SEAWEEDFS_S3_SECRET_KEY=${S3_SECRET_KEY:-hestami_secret}
+    depends_on:
+      - seaweedfs-s3
+    networks:
+      - hestami-network
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m" 
 
   # PostgreSQL with PostGIS
   postgres:
@@ -151,7 +280,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`homeservices.hai`)"
+      - "traefik.http.routers.frontend.rule=Host(`dev-platform.hestami-ai.com`)"
       - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
       # Define upload-limit middleware (referenced by entrypoint)
@@ -163,8 +292,12 @@ services:
       - hestami-network
       - signoz-net
     #restart: unless-stopped
+    volumes:
+      - ./volumes/hestami-ai-os-app/user_media:/mnt/hestami-user-media
     logging:
-      driver: "local"
+      # Use json-file driver so Signoz OTel Collector filelog receiver can scrape DBOS logs
+      # Winston logs also go via OTLP directly, but DBOS logs only go to console
+      driver: "json-file"
       options:
         max-size: "20m"
         max-file: "5"

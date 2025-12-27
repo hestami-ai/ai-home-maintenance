@@ -40,11 +40,11 @@
 		error = null;
 		try {
 			const response = await jobApi.list({ limit: 100 });
-			if (response.ok && response.data) {
-				jobs = response.data.jobs;
-			} else {
-				error = response.error?.message || 'Failed to load jobs';
+			if (!response.ok) {
+				error = 'Failed to load jobs';
+				return;
 			}
+			jobs = response.data.jobs;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load jobs';
 		} finally {

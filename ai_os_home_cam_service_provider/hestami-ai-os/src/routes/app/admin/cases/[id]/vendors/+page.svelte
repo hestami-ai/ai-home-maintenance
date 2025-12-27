@@ -73,7 +73,7 @@
 		if (!caseId) return;
 		try {
 			const response = await conciergeCaseApi.getDetail(caseId);
-			if (response.ok && response.data) {
+			if (response.ok) {
 				caseDetail = response.data;
 			}
 		} catch (err) {
@@ -87,8 +87,8 @@
 		if (!caseId || !organizationId) return;
 		isLoadingVendors = true;
 		try {
-			const response = await vendorCandidateApi.listByCase({ caseId }, organizationId);
-			if (response.ok && response.data) {
+			const response = await vendorCandidateApi.listByCase({ caseId });
+			if (response.ok) {
 				vendors = response.data.vendorCandidates;
 			}
 		} catch (err) {
@@ -109,23 +109,18 @@
 		extractedData = null;
 
 		try {
-			const response = await vendorCandidateApi.extract(
-				{
+			const response = await vendorCandidateApi.extract({
 					caseId,
 					sourceUrl: sourceUrl || undefined,
 					sourceHtml: sourceHtml || undefined,
 					sourcePlainText: sourcePlainText || undefined
-				},
-				organizationId
-			);
+				});
 
-			if (response.ok && response.data) {
+			if (response.ok) {
 				extractedData = response.data.extracted;
 				if (response.data.multipleVendorsDetected) {
 					extractionError = 'Multiple vendors detected. Please refine your source.';
 				}
-			} else {
-				extractionError = response.error?.message || 'Extraction failed';
 			}
 		} catch (err) {
 			extractionError = err instanceof Error ? err.message : 'Extraction failed';
@@ -142,8 +137,7 @@
 
 		isSubmitting = true;
 		try {
-			const response = await vendorCandidateApi.create(
-				{
+			const response = await vendorCandidateApi.create({
 					caseId,
 					vendorName: extractedData.vendorName,
 					vendorContactName: extractedData.vendorContactName || undefined,
@@ -158,17 +152,12 @@
 					sourceHtml: sourceHtml || undefined,
 					sourcePlainText: sourcePlainText || undefined,
 					extractionConfidence: extractedData.confidence,
-					extractionMetadata: extractedData.fieldConfidences,
-					idempotencyKey: generateIdempotencyKey()
-				},
-				organizationId
-			);
+					extractionMetadata: extractedData.fieldConfidences
+				});
 
 			if (response.ok) {
 				resetCaptureForm();
 				await loadVendors();
-			} else {
-				extractionError = response.error?.message || 'Failed to save vendor';
 			}
 		} catch (err) {
 			extractionError = err instanceof Error ? err.message : 'Failed to save vendor';
@@ -186,8 +175,7 @@
 		isSubmitting = true;
 		error = null;
 		try {
-			const response = await vendorCandidateApi.create(
-				{
+			const response = await vendorCandidateApi.create({
 					caseId,
 					vendorName: manualVendorName.trim(),
 					vendorContactName: manualContactName.trim() || undefined,
@@ -198,17 +186,12 @@
 					serviceCategories: manualServiceCategories
 						? manualServiceCategories.split(',').map((s) => s.trim())
 						: undefined,
-					notes: manualNotes.trim() || undefined,
-					idempotencyKey: generateIdempotencyKey()
-				},
-				organizationId
-			);
+					notes: manualNotes.trim() || undefined
+				});
 
 			if (response.ok) {
 				resetManualForm();
 				await loadVendors();
-			} else {
-				error = response.error?.message || 'Failed to save vendor';
 			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to save vendor';

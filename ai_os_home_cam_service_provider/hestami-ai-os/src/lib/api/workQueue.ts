@@ -1,69 +1,34 @@
 /**
  * Work Queue API client
  * Provides typed functions for calling work queue oRPC backend endpoints
+ * 
+ * Types are extracted from the generated OpenAPI types to follow
+ * the type generation pipeline: Prisma → Zod → oRPC → OpenAPI → types.generated.ts
  */
 
-import { apiCall } from './client';
+import { orpc } from './orpc.js';
+import type { operations } from './types.generated.js';
 
 // =============================================================================
-// Types
+// Type Definitions (extracted from generated types)
 // =============================================================================
 
-export type WorkQueuePillar = 'CONCIERGE' | 'CAM' | 'CONTRACTOR' | 'ALL';
-export type WorkQueueUrgency = 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW';
-export type SLAStatus = 'ON_TRACK' | 'AT_RISK' | 'BREACHED';
+// Extract WorkQueueItem from list response
+export type WorkQueueItem = operations['workQueue.list']['responses']['200']['content']['application/json']['data']['items'][number];
 
-export interface WorkQueueItem {
-	id: string;
-	pillar: string;
-	itemType: string;
-	itemId: string;
-	itemNumber: string;
-	title: string;
-	currentState: string;
-	timeInState: number;
-	timeInStateFormatted: string;
-	requiredAction: string;
-	priority: string;
-	urgency: WorkQueueUrgency;
-	slaStatus: SLAStatus | null;
-	slaDeadline: string | null;
-	assignedToId: string | null;
-	assignedToName: string | null;
-	propertyName: string | null;
-	associationName: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
+// Extract WorkQueueSummary from list response
+export type WorkQueueSummary = operations['workQueue.list']['responses']['200']['content']['application/json']['data']['summary'];
 
-export interface WorkQueueSummary {
-	total: number;
-	critical: number;
-	high: number;
-	normal: number;
-	low: number;
-	unassigned: number;
-}
+// Extract WorkQueueDashboardSummary from summary response
+export type WorkQueueDashboardSummary = operations['workQueue.summary']['responses']['200']['content']['application/json']['data'];
 
-export interface WorkQueueDashboardSummary {
-	concierge: {
-		total: number;
-		intake: number;
-		inProgress: number;
-		pendingExternal: number;
-		pendingOwner: number;
-	};
-	cam: {
-		workOrders: number;
-		violations: number;
-		arcRequests: number;
-	};
-	urgency: {
-		critical: number;
-		high: number;
-		normal: number;
-	};
-}
+// Extract enum types from list request body
+type ListInput = NonNullable<operations['workQueue.list']['requestBody']>['content']['application/json'];
+export type WorkQueuePillar = NonNullable<ListInput['pillar']>;
+export type WorkQueueUrgency = NonNullable<ListInput['urgency']>;
+
+// Extract SLAStatus from WorkQueueItem
+export type SLAStatus = NonNullable<WorkQueueItem['slaStatus']>;
 
 // =============================================================================
 // API Functions
@@ -73,30 +38,12 @@ export const workQueueApi = {
 	/**
 	 * List work queue items
 	 */
-	list: (params?: {
-		pillar?: WorkQueuePillar;
-		urgency?: WorkQueueUrgency;
-		assignedToMe?: boolean;
-		unassignedOnly?: boolean;
-		state?: string;
-		limit?: number;
-		cursor?: string;
-	}) =>
-		apiCall<{
-			items: WorkQueueItem[];
-			summary: WorkQueueSummary;
-			pagination: {
-				nextCursor: string | null;
-				hasMore: boolean;
-			};
-		}>('workQueue/list', {
-			body: params || {}
-		}),
+	list: (params?: ListInput) => orpc.workQueue.list(params ?? {}),
 
 	/**
 	 * Get work queue summary counts
 	 */
-	summary: () => apiCall<WorkQueueDashboardSummary>('workQueue/summary')
+	summary: () => orpc.workQueue.summary({})
 };
 
 // =============================================================================

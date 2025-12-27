@@ -37,13 +37,13 @@
 		try {
 			const response = await conciergeCaseApi.list({
 				status: (statusFilter || undefined) as any,
-				pageSize: 50
+				limit: 50
 			});
-			if (response.ok && response.data) {
-				cases = response.data.items;
-			} else {
-				error = response.error?.message || 'Failed to load cases';
+			if (!response.ok) {
+				error = 'Failed to load cases';
+				return;
 			}
+			cases = response.data.cases;
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load cases';
 		} finally {
@@ -107,8 +107,7 @@
 				const query = searchQuery.toLowerCase();
 				return (
 					c.title.toLowerCase().includes(query) ||
-					c.caseNumber.toLowerCase().includes(query) ||
-					c.description?.toLowerCase().includes(query)
+					c.caseNumber.toLowerCase().includes(query)
 				);
 			}
 			return true;
@@ -223,10 +222,7 @@
 										</span>
 									</div>
 									<h3 class="mt-1 font-medium">{caseItem.title}</h3>
-									{#if caseItem.description}
-										<p class="mt-1 text-sm text-surface-500 line-clamp-1">{caseItem.description}</p>
-									{/if}
-									<div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-surface-400">
+																		<div class="mt-2 flex flex-wrap items-center gap-4 text-xs text-surface-400">
 										<span class="flex items-center gap-1">
 											<Clock class="h-3 w-3" />
 											{formatDate(caseItem.createdAt)}

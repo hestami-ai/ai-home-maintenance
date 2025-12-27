@@ -84,22 +84,22 @@
 
 		try {
 			const response = await propertyApi.get(propertyId);
-			if (response.ok && response.data?.property) {
-				const p = response.data.property;
-				property = p;
-				formData = {
-					name: p.name || '',
-					address: p.address || '',
-					propertyType: p.propertyType || 'CONDO',
-					status: p.status || 'ACTIVE',
-					yearBuilt: p.yearBuilt?.toString() || '',
-					totalSquareFootage: p.totalSquareFootage?.toString() || '',
-					parkingSpaces: p.parkingSpaces?.toString() || '',
-					amenities: p.amenities || []
-				};
-			} else {
+			if (!response.ok) {
 				error = 'Property not found';
+				return;
 			}
+			const p = response.data.property as any;
+			property = p;
+			formData = {
+				name: p.name || '',
+				address: p.addressLine1 || '',
+				propertyType: p.propertyType || 'CONDO',
+				status: 'ACTIVE',
+				yearBuilt: p.yearBuilt?.toString() || '',
+				totalSquareFootage: p.totalSquareFeet?.toString() || '',
+				parkingSpaces: p.parkingSpaces?.toString() || '',
+				amenities: p.amenities || []
+			};
 		} catch (e) {
 			error = 'Failed to load data';
 			console.error(e);
@@ -124,20 +124,17 @@
 		try {
 			const response = await propertyApi.update(property.id, {
 				name: formData.name,
-				address: formData.address,
-				propertyType: formData.propertyType,
-				status: formData.status,
+				addressLine1: formData.address,
+				propertyType: formData.propertyType as any,
 				yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : undefined,
-				totalSquareFootage: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) : undefined,
-				parkingSpaces: formData.parkingSpaces ? parseInt(formData.parkingSpaces) : undefined,
-				amenities: formData.amenities.length > 0 ? formData.amenities : undefined
+				totalAcres: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) / 43560 : undefined
 			});
 
-			if (response.ok) {
-				goto(`/app/cam/properties/${property.id}`);
-			} else {
-				error = response.error?.message || 'Failed to update property';
+			if (!response.ok) {
+				error = 'Failed to update property';
+				return;
 			}
+			goto(`/app/cam/properties/${property.id}`);
 		} catch (e) {
 			error = 'Failed to update property';
 			console.error(e);

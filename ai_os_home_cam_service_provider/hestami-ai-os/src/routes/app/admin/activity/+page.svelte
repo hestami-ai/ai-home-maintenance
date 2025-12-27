@@ -81,26 +81,20 @@
 		try {
 			// If filtering by specific entity
 			if (urlEntityType && urlEntityId) {
-				const response = await activityEventApi.getByEntity(
-					{
+				const response = await activityEventApi.getByEntity({
 						entityType: urlEntityType,
 						entityId: urlEntityId,
 						limit: 50,
 						cursor: append ? nextCursor || undefined : undefined
-					},
-					organizationId
-				);
-				if (response.ok && response.data) {
+					});
+				if (response.ok) {
 					events = append ? [...events, ...response.data.events] : response.data.events;
 					hasMore = response.data.pagination.hasMore;
 					nextCursor = response.data.pagination.nextCursor;
-				} else {
-					error = response.error?.message || 'Failed to load activity events';
 				}
 			} else {
 				// General organization query with filters
-				const response = await activityEventApi.getByOrganization(
-					{
+				const response = await activityEventApi.getByOrganization({
 						entityType: entityTypeFilter || undefined,
 						action: actionFilter || undefined,
 						eventCategory: categoryFilter || undefined,
@@ -109,15 +103,11 @@
 						endDate: endDate ? new Date(endDate).toISOString() : undefined,
 						limit: 50,
 						cursor: append ? nextCursor || undefined : undefined
-					},
-					organizationId
-				);
-				if (response.ok && response.data) {
+					});
+				if (response.ok) {
 					events = append ? [...events, ...response.data.events] : response.data.events;
 					hasMore = response.data.pagination.hasMore;
 					nextCursor = response.data.pagination.nextCursor;
-				} else {
-					error = response.error?.message || 'Failed to load activity events';
 				}
 			}
 		} catch (e) {
@@ -176,7 +166,7 @@
 	}
 
 	const entityTypes: ActivityEntityType[] = [
-		'CONCIERGE_CASE', 'WORK_ORDER', 'VIOLATION', 'ARC_REQUEST', 'STAFF',
+		'CONCIERGE_CASE', 'WORK_ORDER', 'VIOLATION', 'ARC_REQUEST',
 		'USER', 'ORGANIZATION', 'INDIVIDUAL_PROPERTY', 'ASSOCIATION'
 	];
 

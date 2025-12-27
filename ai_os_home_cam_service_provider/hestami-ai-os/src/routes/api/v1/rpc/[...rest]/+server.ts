@@ -92,7 +92,7 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 	try {
 		context = await createContext(request, locals);
 		logContext = createORPCLogContext(request, context);
-		
+
 		logRequestStart(logContext);
 
 		const result = await handler.handle(request, {
@@ -104,7 +104,7 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 
 		if (result.matched) {
 			const statusCode = result.response.status;
-			
+
 			// Log error responses with body for debugging
 			if (statusCode >= 400) {
 				const clonedResponse = result.response.clone();
@@ -115,7 +115,7 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 					// Non-JSON error response
 				}
 			}
-			
+
 			logRequestEnd(logContext, statusCode, durationMs);
 			return result.response;
 		}

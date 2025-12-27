@@ -1,0 +1,700 @@
+src/lib/server/api/routes/accounting/apInvoice.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/accounting/assessment.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/accounting/bankAccount.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/accounting/glAccount.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/accounting/journalEntry.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/accounting/payment.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/accounting/vendor.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/activityEvent.ts(9,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/arc/request.ts(20,8): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/arc/request.ts(144,24): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(145,48): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(148,91): error TS2339: Property 'entityId' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(317,24): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(318,48): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(358,24): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(359,48): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(413,24): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(414,48): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(483,24): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(484,48): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(487,94): error TS2339: Property 'entityId' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(546,24): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(547,48): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(712,16): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(713,40): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(716,33): error TS2339: Property 'entityId' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(770,16): error TS2339: Property 'success' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(771,40): error TS2339: Property 'error' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/request.ts(774,33): error TS2339: Property 'entityId' does not exist on type 'ARCRequestWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/arc/review.ts(83,16): error TS2339: Property 'success' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(84,40): error TS2339: Property 'error' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(87,91): error TS2339: Property 'entityId' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(127,16): error TS2339: Property 'success' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(128,40): error TS2339: Property 'error' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(217,16): error TS2339: Property 'success' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(218,40): error TS2339: Property 'error' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(222,29): error TS2339: Property 'entityId' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(268,16): error TS2339: Property 'success' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(269,40): error TS2339: Property 'error' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(272,82): error TS2339: Property 'entityId' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(321,16): error TS2339: Property 'success' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(322,40): error TS2339: Property 'error' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/arc/review.ts(325,51): error TS2339: Property 'entityId' does not exist on type 'ARCReviewWorkflowResult'.
+src/lib/server/api/routes/association.ts(11,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/billing/estimate.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/billing/estimate.ts(234,16): error TS2339: Property 'success' does not exist on type 'EstimateCreateResult'.
+src/lib/server/api/routes/billing/estimate.ts(235,40): error TS2339: Property 'error' does not exist on type 'EstimateCreateResult'.
+src/lib/server/api/routes/billing/estimate.ts(322,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(323,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(327,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(482,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(483,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(487,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(561,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(562,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(566,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(621,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(622,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(626,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(673,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(674,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(678,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(764,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(765,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(769,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(815,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(816,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(820,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(864,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(865,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(869,25): error TS2339: Property 'entityId' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(916,16): error TS2339: Property 'success' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/estimate.ts(917,40): error TS2339: Property 'error' does not exist on type 'EstimateWorkflowResult'.
+src/lib/server/api/routes/billing/invoice.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/billing/invoice.ts(253,16): error TS2339: Property 'success' does not exist on type 'InvoiceCreateResult'.
+src/lib/server/api/routes/billing/invoice.ts(254,40): error TS2339: Property 'error' does not exist on type 'InvoiceCreateResult'.
+src/lib/server/api/routes/billing/payment.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/billing/proposal.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/caseCommunication.ts(8,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/caseReview.ts(8,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/communication/communication.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/communication/communication.ts(102,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(103,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(106,104): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(235,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(236,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(239,110): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(304,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(305,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(308,104): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(381,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(382,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(385,96): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(522,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(523,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(526,108): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(593,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(594,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(597,108): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(655,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(656,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(659,90): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(775,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(776,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(779,95): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(844,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(845,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(848,90): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(969,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(970,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(973,112): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(1037,24): error TS2339: Property 'success' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(1038,48): error TS2339: Property 'error' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/communication/communication.ts(1041,105): error TS2339: Property 'entityId' does not exist on type 'CommunicationWorkflowResult'.
+src/lib/server/api/routes/compliance.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/compliance.ts(113,24): error TS2339: Property 'success' does not exist on type 'ComplianceWorkflowResult'.
+src/lib/server/api/routes/compliance.ts(114,48): error TS2339: Property 'error' does not exist on type 'ComplianceWorkflowResult'.
+src/lib/server/api/routes/compliance.ts(322,24): error TS2339: Property 'success' does not exist on type 'ComplianceWorkflowResult'.
+src/lib/server/api/routes/compliance.ts(323,48): error TS2339: Property 'error' does not exist on type 'ComplianceWorkflowResult'.
+src/lib/server/api/routes/compliance.ts(405,24): error TS2339: Property 'success' does not exist on type 'ComplianceWorkflowResult'.
+src/lib/server/api/routes/compliance.ts(406,48): error TS2339: Property 'error' does not exist on type 'ComplianceWorkflowResult'.
+src/lib/server/api/routes/concierge/conciergeAction.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/conciergeCase.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/conciergeCase.ts(129,17): error TS2339: Property 'success' does not exist on type 'CaseLifecycleWorkflowResult'.
+src/lib/server/api/routes/concierge/conciergeCase.ts(130,68): error TS2339: Property 'error' does not exist on type 'CaseLifecycleWorkflowResult'.
+src/lib/server/api/routes/concierge/conciergeCase.ts(131,41): error TS2339: Property 'error' does not exist on type 'CaseLifecycleWorkflowResult'.
+src/lib/server/api/routes/concierge/delegatedAuthority.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/externalHoa.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/externalVendor.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/individualProperty.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/materialDecision.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/ownerIntent.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/portfolio.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/propertyOwnership.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/concierge/propertyPortfolio.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contract/schedule.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contract/serviceContract.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contract/serviceContract.ts(229,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(230,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(385,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(386,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(431,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(432,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(477,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(478,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(523,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(524,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(581,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(582,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(627,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(628,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(692,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(693,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(741,16): error TS2339: Property 'success' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/serviceContract.ts(742,40): error TS2339: Property 'error' does not exist on type 'ServiceContractWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contract/sla.ts(121,16): error TS2339: Property 'success' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(122,40): error TS2339: Property 'error' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(125,93): error TS2339: Property 'entityId' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(275,16): error TS2339: Property 'success' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(276,40): error TS2339: Property 'error' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(279,93): error TS2339: Property 'entityId' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(325,16): error TS2339: Property 'success' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(326,40): error TS2339: Property 'error' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/sla.ts(329,93): error TS2339: Property 'entityId' does not exist on type 'ContractSLAWorkflowResult'.
+src/lib/server/api/routes/contract/visit.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contractor/branch.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contractor/branch.ts(77,16): error TS2339: Property 'success' does not exist on type 'ContractorBranchWorkflowResult'.
+src/lib/server/api/routes/contractor/branch.ts(78,40): error TS2339: Property 'error' does not exist on type 'ContractorBranchWorkflowResult'.
+src/lib/server/api/routes/contractor/branch.ts(81,89): error TS2339: Property 'entityId' does not exist on type 'ContractorBranchWorkflowResult'.
+src/lib/server/api/routes/contractor/branch.ts(182,16): error TS2339: Property 'success' does not exist on type 'ContractorBranchWorkflowResult'.
+src/lib/server/api/routes/contractor/branch.ts(183,40): error TS2339: Property 'error' does not exist on type 'ContractorBranchWorkflowResult'.
+src/lib/server/api/routes/contractor/branch.ts(186,89): error TS2339: Property 'entityId' does not exist on type 'ContractorBranchWorkflowResult'.
+src/lib/server/api/routes/contractor/compliance.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contractor/compliance.ts(57,16): error TS2339: Property 'success' does not exist on type 'ContractorComplianceWorkflowResult'.
+src/lib/server/api/routes/contractor/compliance.ts(58,40): error TS2339: Property 'error' does not exist on type 'ContractorComplianceWorkflowResult'.
+src/lib/server/api/routes/contractor/compliance.ts(89,16): error TS2339: Property 'success' does not exist on type 'ContractorComplianceWorkflowResult'.
+src/lib/server/api/routes/contractor/compliance.ts(90,40): error TS2339: Property 'error' does not exist on type 'ContractorComplianceWorkflowResult'.
+src/lib/server/api/routes/contractor/compliance.ts(130,16): error TS2339: Property 'success' does not exist on type 'ContractorComplianceWorkflowResult'.
+src/lib/server/api/routes/contractor/compliance.ts(131,40): error TS2339: Property 'error' does not exist on type 'ContractorComplianceWorkflowResult'.
+src/lib/server/api/routes/contractor/insurance.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contractor/insurance.ts(92,16): error TS2339: Property 'success' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/insurance.ts(93,40): error TS2339: Property 'error' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/insurance.ts(96,95): error TS2339: Property 'entityId' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/license.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contractor/license.ts(76,16): error TS2339: Property 'success' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/license.ts(77,40): error TS2339: Property 'error' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/license.ts(80,91): error TS2339: Property 'entityId' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/profile.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/contractor/profile.ts(79,16): error TS2339: Property 'success' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/profile.ts(80,40): error TS2339: Property 'error' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/contractor/profile.ts(83,91): error TS2339: Property 'entityId' does not exist on type 'ContractorProfileWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/dispatch/dispatch.ts(318,16): error TS2339: Property 'success' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(319,40): error TS2339: Property 'error' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(399,16): error TS2339: Property 'success' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(400,40): error TS2339: Property 'error' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(511,16): error TS2339: Property 'success' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(512,40): error TS2339: Property 'error' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(734,16): error TS2339: Property 'success' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(735,40): error TS2339: Property 'error' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(867,16): error TS2339: Property 'success' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/dispatch.ts(868,40): error TS2339: Property 'error' does not exist on type 'DispatchWorkflowResult'.
+src/lib/server/api/routes/dispatch/sla.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/document.ts(13,8): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/document.ts(174,25): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(175,71): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(176,49): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(179,78): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(181,92): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(293,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(294,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(297,91): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(384,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(385,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(388,91): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(674,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(675,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(793,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(794,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(797,91): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(920,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(921,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(924,91): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(1179,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(1180,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(1267,24): error TS2339: Property 'success' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(1268,48): error TS2339: Property 'error' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/document.ts(1271,104): error TS2339: Property 'entityId' does not exist on type 'DocumentWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/fieldTech/checklist.ts(133,16): error TS2339: Property 'success' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(134,40): error TS2339: Property 'error' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(138,25): error TS2339: Property 'entityId' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(257,16): error TS2339: Property 'success' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(258,40): error TS2339: Property 'error' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(262,25): error TS2339: Property 'entityId' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(369,16): error TS2339: Property 'success' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(370,40): error TS2339: Property 'error' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(374,25): error TS2339: Property 'entityId' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(413,16): error TS2339: Property 'success' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/checklist.ts(414,40): error TS2339: Property 'error' does not exist on type 'ChecklistWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/fieldTech/media.ts(126,16): error TS2339: Property 'success' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(127,40): error TS2339: Property 'error' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(131,25): error TS2339: Property 'entityId' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(176,16): error TS2339: Property 'success' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(177,40): error TS2339: Property 'error' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(181,25): error TS2339: Property 'entityId' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(246,16): error TS2339: Property 'success' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(247,40): error TS2339: Property 'error' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(251,25): error TS2339: Property 'entityId' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(300,16): error TS2339: Property 'success' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(301,40): error TS2339: Property 'error' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(305,25): error TS2339: Property 'entityId' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(427,16): error TS2339: Property 'success' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/media.ts(428,40): error TS2339: Property 'error' does not exist on type 'MediaWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(101,16): error TS2339: Property 'success' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(102,40): error TS2339: Property 'error' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(106,25): error TS2551: Property 'entityId' does not exist on type 'OfflineSyncWorkflowResult'. Did you mean 'entityIds'?
+src/lib/server/api/routes/fieldTech/offlineSync.ts(165,16): error TS2339: Property 'success' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(166,40): error TS2339: Property 'error' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(279,16): error TS2339: Property 'success' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(280,40): error TS2339: Property 'error' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(284,25): error TS2551: Property 'entityId' does not exist on type 'OfflineSyncWorkflowResult'. Did you mean 'entityIds'?
+src/lib/server/api/routes/fieldTech/offlineSync.ts(332,16): error TS2339: Property 'success' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(333,40): error TS2339: Property 'error' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(337,25): error TS2551: Property 'entityId' does not exist on type 'OfflineSyncWorkflowResult'. Did you mean 'entityIds'?
+src/lib/server/api/routes/fieldTech/offlineSync.ts(383,16): error TS2339: Property 'success' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/offlineSync.ts(384,40): error TS2339: Property 'error' does not exist on type 'OfflineSyncWorkflowResult'.
+src/lib/server/api/routes/fieldTech/signature.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/fieldTech/signature.ts(121,16): error TS2339: Property 'success' does not exist on type 'SignatureWorkflowResult'.
+src/lib/server/api/routes/fieldTech/signature.ts(122,40): error TS2339: Property 'error' does not exist on type 'SignatureWorkflowResult'.
+src/lib/server/api/routes/fieldTech/signature.ts(126,25): error TS2339: Property 'entityId' does not exist on type 'SignatureWorkflowResult'.
+src/lib/server/api/routes/fieldTech/signature.ts(248,16): error TS2339: Property 'success' does not exist on type 'SignatureWorkflowResult'.
+src/lib/server/api/routes/fieldTech/signature.ts(249,40): error TS2339: Property 'error' does not exist on type 'SignatureWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(133,16): error TS2339: Property 'success' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(134,40): error TS2339: Property 'error' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(138,25): error TS2339: Property 'entityId' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(198,16): error TS2339: Property 'success' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(199,40): error TS2339: Property 'error' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(203,25): error TS2339: Property 'entityId' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(417,16): error TS2339: Property 'success' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(418,40): error TS2339: Property 'error' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(422,25): error TS2339: Property 'entityId' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(461,16): error TS2339: Property 'success' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/fieldTech/timeEntry.ts(462,40): error TS2339: Property 'error' does not exist on type 'TimeEntryWorkflowResult'.
+src/lib/server/api/routes/governance/board.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/governance/boardMotion.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/governance/meeting.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/governance/resolution.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/item.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/item.ts(119,16): error TS2339: Property 'success' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(120,40): error TS2339: Property 'error' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(124,25): error TS2339: Property 'entityId' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(268,16): error TS2339: Property 'success' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(269,40): error TS2339: Property 'error' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(273,25): error TS2339: Property 'entityId' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(309,16): error TS2339: Property 'success' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/item.ts(310,40): error TS2339: Property 'error' does not exist on type 'InventoryItemWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/location.ts(123,16): error TS2339: Property 'success' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(124,40): error TS2339: Property 'error' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(128,25): error TS2339: Property 'entityId' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(264,16): error TS2339: Property 'success' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(265,40): error TS2339: Property 'error' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(269,25): error TS2339: Property 'entityId' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(313,16): error TS2339: Property 'success' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/location.ts(314,40): error TS2339: Property 'error' does not exist on type 'InventoryLocationWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(167,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(168,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(172,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(316,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(317,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(321,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(383,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(384,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(388,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(434,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(435,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(439,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(485,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(486,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(490,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(531,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(532,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(536,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(612,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(613,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(617,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(658,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(659,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(663,25): error TS2339: Property 'entityId' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(704,16): error TS2339: Property 'success' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/purchaseOrder.ts(705,40): error TS2339: Property 'error' does not exist on type 'PurchaseOrderWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/stock.ts(211,16): error TS2339: Property 'success' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(212,40): error TS2339: Property 'error' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(216,25): error TS2339: Property 'entityId' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(267,16): error TS2339: Property 'success' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(268,40): error TS2339: Property 'error' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(272,25): error TS2339: Property 'entityId' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(322,16): error TS2339: Property 'success' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(323,40): error TS2339: Property 'error' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(327,25): error TS2339: Property 'entityId' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(393,16): error TS2339: Property 'success' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(394,40): error TS2339: Property 'error' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/stock.ts(398,25): error TS2339: Property 'entityId' does not exist on type 'StockWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/supplier.ts(126,16): error TS2339: Property 'success' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(127,40): error TS2339: Property 'error' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(131,25): error TS2339: Property 'entityId' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(275,16): error TS2339: Property 'success' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(276,40): error TS2339: Property 'error' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(280,25): error TS2339: Property 'entityId' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(316,16): error TS2339: Property 'success' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/supplier.ts(317,40): error TS2339: Property 'error' does not exist on type 'SupplierWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/transfer.ts(148,16): error TS2339: Property 'success' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(149,40): error TS2339: Property 'error' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(153,25): error TS2339: Property 'entityId' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(296,16): error TS2339: Property 'success' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(297,40): error TS2339: Property 'error' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(301,25): error TS2339: Property 'entityId' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(365,16): error TS2339: Property 'success' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(366,40): error TS2339: Property 'error' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(370,25): error TS2339: Property 'entityId' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(428,16): error TS2339: Property 'success' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(429,40): error TS2339: Property 'error' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/transfer.ts(433,25): error TS2339: Property 'entityId' does not exist on type 'TransferWorkflowResult'.
+src/lib/server/api/routes/inventory/usage.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/inventory/usage.ts(122,16): error TS2339: Property 'success' does not exist on type 'UsageWorkflowResult'.
+src/lib/server/api/routes/inventory/usage.ts(123,40): error TS2339: Property 'error' does not exist on type 'UsageWorkflowResult'.
+src/lib/server/api/routes/inventory/usage.ts(127,25): error TS2339: Property 'entityId' does not exist on type 'UsageWorkflowResult'.
+src/lib/server/api/routes/inventory/usage.ts(303,16): error TS2339: Property 'success' does not exist on type 'UsageWorkflowResult'.
+src/lib/server/api/routes/inventory/usage.ts(304,40): error TS2339: Property 'error' does not exist on type 'UsageWorkflowResult'.
+src/lib/server/api/routes/job/customer.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/job/customer.ts(144,16): error TS2339: Property 'success' does not exist on type 'CustomerWorkflowResult'.
+src/lib/server/api/routes/job/customer.ts(145,40): error TS2339: Property 'error' does not exist on type 'CustomerWorkflowResult'.
+src/lib/server/api/routes/job/customer.ts(334,16): error TS2339: Property 'success' does not exist on type 'CustomerWorkflowResult'.
+src/lib/server/api/routes/job/customer.ts(335,40): error TS2339: Property 'error' does not exist on type 'CustomerWorkflowResult'.
+src/lib/server/api/routes/job/customer.ts(385,16): error TS2339: Property 'success' does not exist on type 'CustomerWorkflowResult'.
+src/lib/server/api/routes/job/customer.ts(386,40): error TS2339: Property 'error' does not exist on type 'CustomerWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/job/job.ts(406,16): error TS2339: Property 'success' does not exist on type 'JobCreateResult'.
+src/lib/server/api/routes/job/job.ts(407,40): error TS2339: Property 'error' does not exist on type 'JobCreateResult'.
+src/lib/server/api/routes/job/job.ts(569,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(570,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(573,73): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(666,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(667,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(670,80): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(734,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(735,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(738,80): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(802,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(803,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(806,80): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(898,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(899,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(902,78): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(983,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(984,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(987,90): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1053,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1054,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1100,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1101,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1104,90): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1153,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1154,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1157,87): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1253,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1254,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1257,80): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1313,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1314,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1317,82): error TS2339: Property 'entityId' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1383,16): error TS2339: Property 'success' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/job/job.ts(1384,40): error TS2339: Property 'error' does not exist on type 'JobWorkflowResult'.
+src/lib/server/api/routes/organization.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/ownerPortal.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/ownerPortal.ts(540,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(541,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(544,94): error TS2339: Property 'entityId' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(767,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(768,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(846,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(847,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(931,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(932,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1071,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1072,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1075,100): error TS2339: Property 'entityId' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1182,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1183,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1277,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1278,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1281,96): error TS2339: Property 'entityId' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1687,24): error TS2339: Property 'success' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1688,48): error TS2339: Property 'error' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownerPortal.ts(1691,99): error TS2339: Property 'entityId' does not exist on type 'OwnerPortalWorkflowResult'.
+src/lib/server/api/routes/ownership.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/party.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/pricebook/pricebook.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/pricebook/pricebook.ts(180,16): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(181,40): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(303,16): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(304,40): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(361,16): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(362,40): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(402,16): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(403,40): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(508,16): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(509,40): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(626,16): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(627,40): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(735,24): error TS2339: Property 'success' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/pricebook/pricebook.ts(736,48): error TS2339: Property 'error' does not exist on type 'PricebookWorkflowResult'.
+src/lib/server/api/routes/property.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/report/dashboard.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/report/dashboard.ts(184,16): error TS2339: Property 'success' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(185,40): error TS2339: Property 'error' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(189,25): error TS2339: Property 'entityId' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(303,16): error TS2339: Property 'success' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(304,40): error TS2339: Property 'error' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(308,25): error TS2339: Property 'entityId' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(351,16): error TS2339: Property 'success' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(352,40): error TS2339: Property 'error' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(387,16): error TS2339: Property 'success' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/dashboard.ts(388,40): error TS2339: Property 'error' does not exist on type 'DashboardWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/report/definition.ts(80,16): error TS2339: Property 'success' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(81,40): error TS2339: Property 'error' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(85,25): error TS2339: Property 'entityId' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(283,16): error TS2339: Property 'success' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(284,40): error TS2339: Property 'error' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(288,25): error TS2339: Property 'entityId' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(330,16): error TS2339: Property 'success' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/definition.ts(331,40): error TS2339: Property 'error' does not exist on type 'ReportDefinitionWorkflowResult'.
+src/lib/server/api/routes/report/execution.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/report/execution.ts(65,16): error TS2339: Property 'success' does not exist on type 'ReportExecutionWorkflowResult'.
+src/lib/server/api/routes/report/execution.ts(66,40): error TS2339: Property 'error' does not exist on type 'ReportExecutionWorkflowResult'.
+src/lib/server/api/routes/report/execution.ts(70,25): error TS2339: Property 'entityId' does not exist on type 'ReportExecutionWorkflowResult'.
+src/lib/server/api/routes/report/execution.ts(247,16): error TS2339: Property 'success' does not exist on type 'ReportExecutionWorkflowResult'.
+src/lib/server/api/routes/report/execution.ts(248,40): error TS2339: Property 'error' does not exist on type 'ReportExecutionWorkflowResult'.
+src/lib/server/api/routes/report/execution.ts(252,25): error TS2339: Property 'entityId' does not exist on type 'ReportExecutionWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/report/schedule.ts(104,16): error TS2339: Property 'success' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(105,40): error TS2339: Property 'error' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(109,25): error TS2339: Property 'entityId' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(307,16): error TS2339: Property 'success' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(308,40): error TS2339: Property 'error' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(312,25): error TS2339: Property 'entityId' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(355,16): error TS2339: Property 'success' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(356,40): error TS2339: Property 'error' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(397,16): error TS2339: Property 'success' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(398,40): error TS2339: Property 'error' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/report/schedule.ts(402,25): error TS2339: Property 'entityId' does not exist on type 'ReportScheduleWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/reserve.ts(109,16): error TS2339: Property 'success' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(110,40): error TS2339: Property 'error' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(113,92): error TS2339: Property 'entityId' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(339,16): error TS2339: Property 'success' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(340,40): error TS2339: Property 'error' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(343,90): error TS2339: Property 'entityId' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(459,16): error TS2339: Property 'success' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(460,40): error TS2339: Property 'error' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(463,84): error TS2339: Property 'entityId' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(676,16): error TS2339: Property 'success' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(677,40): error TS2339: Property 'error' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(680,96): error TS2339: Property 'entityId' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(808,16): error TS2339: Property 'success' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/reserve.ts(809,40): error TS2339: Property 'error' does not exist on type 'ReserveWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(69,16): error TS2339: Property 'success' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(70,40): error TS2339: Property 'error' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(73,89): error TS2339: Property 'entityId' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(180,16): error TS2339: Property 'success' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(181,40): error TS2339: Property 'error' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(184,89): error TS2339: Property 'entityId' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(224,16): error TS2339: Property 'success' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/serviceArea.ts(225,40): error TS2339: Property 'error' does not exist on type 'ServiceAreaWorkflowResult'.
+src/lib/server/api/routes/serviceProvider/workOrderView.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/staff.ts(9,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/technician/technician.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/unit.ts(2,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/vendorBid.ts(8,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/vendorCandidate.ts(9,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/violation/appeal.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/violation/appeal.ts(67,16): error TS2339: Property 'success' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(68,40): error TS2339: Property 'error' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(72,25): error TS2339: Property 'entityId' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(239,16): error TS2339: Property 'success' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(240,40): error TS2339: Property 'error' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(244,25): error TS2339: Property 'entityId' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(300,16): error TS2339: Property 'success' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(301,40): error TS2339: Property 'error' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(305,25): error TS2339: Property 'entityId' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(353,16): error TS2339: Property 'success' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(354,40): error TS2339: Property 'error' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/appeal.ts(358,25): error TS2339: Property 'entityId' does not exist on type 'AppealWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/violation/noticeTemplate.ts(71,16): error TS2339: Property 'success' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(72,40): error TS2339: Property 'error' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(75,89): error TS2339: Property 'entityId' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(228,16): error TS2339: Property 'success' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(229,40): error TS2339: Property 'error' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(232,89): error TS2339: Property 'entityId' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(273,16): error TS2339: Property 'success' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/noticeTemplate.ts(274,40): error TS2339: Property 'error' does not exist on type 'NoticeTemplateWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(13,8): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/violation/violation.ts(481,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(482,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(548,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(549,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1615,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1616,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1686,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1687,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1760,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1761,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1868,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1869,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(1872,96): error TS2339: Property 'entityId' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(2025,24): error TS2339: Property 'success' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(2026,48): error TS2339: Property 'error' does not exist on type 'ViolationWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(2096,16): error TS2339: Property 'success' does not exist on type 'ViolationFineWorkflowResult'.
+src/lib/server/api/routes/violation/violation.ts(2097,40): error TS2339: Property 'error' does not exist on type 'ViolationFineWorkflowResult'.
+src/lib/server/api/routes/violation/violationType.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/workOrder/asset.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/workOrder/bid.ts(2,36): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/workOrder/workOrder.ts(12,8): error TS2307: Cannot find module '../../schemas.js' or its corresponding type declarations.
+src/lib/server/api/routes/workOrder/workOrder.ts(2080,16): error TS2339: Property 'success' does not exist on type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/api/routes/workOrder/workOrder.ts(2081,40): error TS2339: Property 'error' does not exist on type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/api/routes/workOrder/workOrder.ts(2084,85): error TS2339: Property 'entityId' does not exist on type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/api/routes/workOrder/workOrder.ts(2382,16): error TS2339: Property 'success' does not exist on type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/api/routes/workOrder/workOrder.ts(2383,40): error TS2339: Property 'error' does not exist on type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/api/routes/workOrder/workOrder.ts(2386,85): error TS2339: Property 'entityId' does not exist on type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/api/routes/workQueue.ts(15,36): error TS2307: Cannot find module '../schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/appealWorkflow.ts(10,57): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/arcRequestWorkflow.ts(10,61): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/arcRequestWorkflow.ts(396,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCRequestWorkflowResult'.
+src/lib/server/workflows/arcRequestWorkflow.ts(400,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCRequestWorkflowResult'.
+src/lib/server/workflows/arcRequestWorkflow.ts(408,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCRequestWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(10,61): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/arcReviewWorkflow.ts(312,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(320,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(328,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(336,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(344,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(348,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/arcReviewWorkflow.ts(353,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ARCReviewWorkflowResult'.
+src/lib/server/workflows/billingWorkflow.ts(10,74): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/caseLifecycleWorkflow.ts(15,8): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/caseLifecycleWorkflow.ts(730,5): error TS2559: Type '{ success: boolean; action: never; timestamp: string; error: string; }' has no properties in common with type 'CaseLifecycleWorkflowResult'.
+src/lib/server/workflows/caseLifecycleWorkflow.ts(753,3): error TS2559: Type '{ success: boolean; action: CaseLifecycleAction; timestamp: string; error: string; }' has no properties in common with type 'CaseLifecycleWorkflowResult'.
+src/lib/server/workflows/checklistWorkflow.ts(10,64): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/communicationWorkflow.ts(11,8): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/complianceWorkflow.ts(10,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/complianceWorkflow.ts(288,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(305,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(325,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(339,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(353,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(367,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(376,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/complianceWorkflow.ts(387,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ComplianceWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(11,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/conciergeActionWorkflow.ts(300,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(317,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(335,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(353,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(371,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(389,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(399,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/conciergeActionWorkflow.ts(409,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ConciergeActionWorkflowResult'.
+src/lib/server/workflows/contractorBranchWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/contractorComplianceWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/contractorComplianceWorkflow.ts(236,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ContractorComplianceWorkflowResult'.
+src/lib/server/workflows/contractorComplianceWorkflow.ts(239,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ContractorComplianceWorkflowResult'.
+src/lib/server/workflows/contractorComplianceWorkflow.ts(243,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ContractorComplianceWorkflowResult'.
+src/lib/server/workflows/contractorProfileWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/contractSLAWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/contractWorkflow.ts(12,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/contractWorkflow.ts(431,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ServiceContractWorkflowResult'.
+src/lib/server/workflows/contractWorkflow.ts(441,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ServiceContractWorkflowResult'.
+src/lib/server/workflows/customerWorkflow.ts(11,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/customerWorkflow.ts(189,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'CustomerWorkflowResult'.
+src/lib/server/workflows/customerWorkflow.ts(199,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'CustomerWorkflowResult'.
+src/lib/server/workflows/dashboardWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/dispatchWorkflow.ts(12,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/dispatchWorkflow.ts(347,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'DispatchWorkflowResult'.
+src/lib/server/workflows/dispatchWorkflow.ts(357,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'DispatchWorkflowResult'.
+src/lib/server/workflows/documentWorkflow.ts(17,8): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/estimateCreateWorkflow.ts(12,57): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/estimateCreateWorkflow.ts(183,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'EstimateCreateResult'.
+src/lib/server/workflows/estimateCreateWorkflow.ts(194,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'EstimateCreateResult'.
+src/lib/server/workflows/estimateWorkflow.ts(10,59): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/externalApprovalWorkflow.ts(11,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/externalApprovalWorkflow.ts(200,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ExternalApprovalWorkflowResult'.
+src/lib/server/workflows/externalApprovalWorkflow.ts(225,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ExternalApprovalWorkflowResult'.
+src/lib/server/workflows/externalApprovalWorkflow.ts(251,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ExternalApprovalWorkflowResult'.
+src/lib/server/workflows/externalApprovalWorkflow.ts(268,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ExternalApprovalWorkflowResult'.
+src/lib/server/workflows/externalApprovalWorkflow.ts(277,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ExternalApprovalWorkflowResult'.
+src/lib/server/workflows/externalApprovalWorkflow.ts(287,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ExternalApprovalWorkflowResult'.
+src/lib/server/workflows/governanceWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/inventoryItemWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/inventoryLocationWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/inventoryWorkflow.ts(10,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/inventoryWorkflow.ts(228,7): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(249,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(264,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(274,7): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(293,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(303,7): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(317,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(327,6): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/inventoryWorkflow.ts(338,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InventoryWorkflowResult'.
+src/lib/server/workflows/invoiceCreateWorkflow.ts(14,41): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/invoiceCreateWorkflow.ts(199,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InvoiceCreateResult'.
+src/lib/server/workflows/invoiceCreateWorkflow.ts(210,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'InvoiceCreateResult'.
+src/lib/server/workflows/jobCreateWorkflow.ts(14,41): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/jobCreateWorkflow.ts(160,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'JobCreateResult'.
+src/lib/server/workflows/jobCreateWorkflow.ts(171,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'JobCreateResult'.
+src/lib/server/workflows/jobWorkflow.ts(10,54): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/mediaWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/noticeTemplateWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/offlineSyncWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/offlineSyncWorkflow.ts(195,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'OfflineSyncWorkflowResult'.
+src/lib/server/workflows/offlineSyncWorkflow.ts(198,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'OfflineSyncWorkflowResult'.
+src/lib/server/workflows/offlineSyncWorkflow.ts(202,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'OfflineSyncWorkflowResult'.
+src/lib/server/workflows/ownerPortalWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/pricebookWorkflow.ts(12,46): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/pricebookWorkflow.ts(419,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'PricebookWorkflowResult'.
+src/lib/server/workflows/pricebookWorkflow.ts(429,4): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'PricebookWorkflowResult'.
+src/lib/server/workflows/purchaseOrderWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/reportDefinitionWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/reportExecutionWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/reportScheduleWorkflow.ts(11,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/reserveWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/serviceAreaWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/signatureWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/stockWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/supplierWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/timeEntryWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/transferWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/usageWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/violationFineWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/violationFineWorkflow.ts(134,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ViolationFineWorkflowResult'.
+src/lib/server/workflows/violationFineWorkflow.ts(138,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ViolationFineWorkflowResult'.
+src/lib/server/workflows/violationFineWorkflow.ts(143,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'ViolationFineWorkflowResult'.
+src/lib/server/workflows/violationWorkflow.ts(17,8): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/workOrderConfigWorkflow.ts(10,43): error TS2307: Cannot find module './schemas.js' or its corresponding type declarations.
+src/lib/server/workflows/workOrderConfigWorkflow.ts(151,14): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/workflows/workOrderConfigWorkflow.ts(154,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'WorkOrderConfigWorkflowResult'.
+src/lib/server/workflows/workOrderConfigWorkflow.ts(158,12): error TS2353: Object literal may only specify known properties, and 'success' does not exist in type 'WorkOrderConfigWorkflowResult'.

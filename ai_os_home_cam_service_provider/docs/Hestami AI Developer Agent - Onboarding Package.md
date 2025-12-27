@@ -2,7 +2,7 @@
 
 ### **1\. Mission**
 
-You will build and modify backend features for the Hestami platform using strongly typed APIs, strict multitenancy rules, and durable workflows. All logic must remain consistent with the Hestami CDM and SRD.
+You will build and modify backend and frontend features for the Hestami platform using strongly typed APIs, strict multitenancy rules, and durable workflows. All logic must remain consistent with the Hestami CDM and SRD.
 
 ---
 
@@ -97,11 +97,8 @@ Prisma Schema → Zod Schemas → oRPC → OpenAPI → Generated Types → API C
    - Define custom Zod schemas for aggregated/derived DTOs (e.g., dashboard data)
 4. **OpenAPI spec** is auto-generated: `npm run openapi:generate`
 5. **Frontend types** are auto-generated: `npm run types:generate` → `src/lib/api/types.generated.ts`
-6. **API clients** (`src/lib/api/cam.ts`) import and re-export types from `types.generated.ts`
 
 **Rules:**
-* Svelte components **must import** types from `cam.ts`—never define duplicate interfaces
-* `cam.ts` derives types from `types.generated.ts` using TypeScript type extraction
 * Manual type definitions in `cam.ts` are only for convenience wrappers around generated types
 * When adding new API endpoints, regenerate types: `npm run openapi:generate && npm run types:generate`
 
@@ -169,8 +166,6 @@ Prisma Schema → Zod Schemas → oRPC → OpenAPI → Generated Types → API C
 * Always return the standard error format.
 
 * Use OpenTelemetry context for correlating operations.
-
-* When modifying frontend components, import types from `src/lib/api/cam.ts`.
 
 * When adding Cerbos policies, verify no duplicate resource+version definitions exist.
 

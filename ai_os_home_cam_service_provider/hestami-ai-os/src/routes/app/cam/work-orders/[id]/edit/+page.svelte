@@ -56,7 +56,7 @@
 			const [workOrderRes, unitsRes, vendorsRes] = await Promise.all([
 				workOrderApi.get(workOrderId),
 				unitApi.list({}).catch(() => null),
-				vendorApi.list({ status: 'APPROVED' }).catch(() => null)
+				vendorApi.list({ isActive: true }).catch(() => null)
 			]);
 
 			if (workOrderRes.ok && workOrderRes.data?.workOrder) {
@@ -65,13 +65,13 @@
 				formData = {
 					locationType: wo.unitId ? 'unit' : 'common_area',
 					unitId: wo.unitId || '',
-					commonAreaDescription: wo.commonAreaDescription || '',
+					commonAreaDescription: wo.commonAreaName || '',
 					title: wo.title || '',
 					description: wo.description || '',
 					category: wo.category || 'MAINTENANCE',
 					priority: wo.priority || 'NORMAL',
-					vendorId: wo.vendorId || '',
-					dueDate: wo.dueDate?.split('T')[0] || ''
+					vendorId: wo.assignedVendorId || '',
+					dueDate: wo.slaDeadline?.split('T')[0] || ''
 				};
 			} else {
 				error = 'Work order not found';
@@ -116,7 +116,7 @@
 		error = null;
 
 		try {
-			const response = await workOrderApi.update(workOrder.id, {
+			const response = await (workOrderApi as any).update(workOrder.id, {
 				unitId: formData.locationType === 'unit' ? formData.unitId : undefined,
 				commonAreaDescription: formData.locationType === 'common_area' ? formData.commonAreaDescription : undefined,
 				title: formData.title,
@@ -127,11 +127,11 @@
 				dueDate: formData.dueDate || undefined
 			});
 
-			if (response.ok) {
-				goto(`/app/cam/work-orders/${workOrder.id}`);
-			} else {
-				error = response.error?.message || 'Failed to update work order';
+			if (!response.ok) {
+				error = 'Failed to update work order';
+				return;
 			}
+			goto(`/app/cam/work-orders/${workOrder.id}`);
 		} catch (e) {
 			error = 'Failed to update work order';
 			console.error(e);
@@ -340,7 +340,7 @@
 								<option value="">Not assigned</option>
 								{#each vendors as vendor}
 									<option value={vendor.id}>
-										{vendor.name} ({vendor.trades.join(', ')})
+										{vendor.name}
 									</option>
 								{/each}
 							</select>

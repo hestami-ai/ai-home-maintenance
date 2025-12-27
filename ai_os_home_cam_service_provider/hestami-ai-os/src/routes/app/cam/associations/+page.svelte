@@ -26,9 +26,9 @@
 
 		isLoading = true;
 		try {
-			const response = await associationApi.list({ organizationId: orgId });
-			if (response.ok && response.data?.associations) {
-				associations = response.data.associations;
+			const response = await associationApi.list({});
+			if (response.ok) {
+				associations = response.data.associations as any;
 			}
 		} catch (error) {
 			console.error('Failed to load associations:', error);

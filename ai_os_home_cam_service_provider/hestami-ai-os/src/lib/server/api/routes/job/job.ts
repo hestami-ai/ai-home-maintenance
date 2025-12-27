@@ -90,25 +90,25 @@ const JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 	// Initial states
 	LEAD: ['TICKET', 'CANCELLED'],
 	TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
-	
+
 	// Estimate workflow
 	ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
 	ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'],
 	ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
-	
+
 	// Job execution
 	JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
 	SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
 	DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'],
 	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
 	ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
-	
+
 	// Completion & payment
 	COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
 	INVOICED: ['PAID', 'CANCELLED'],
 	PAID: ['WARRANTY', 'CLOSED'],
 	WARRANTY: ['CLOSED', 'IN_PROGRESS'],
-	
+
 	// Terminal states
 	CLOSED: [],
 	CANCELLED: []
@@ -442,46 +442,56 @@ export const jobRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
-			await context.cerbos.authorize('view', 'job', 'list');
+			try {
+				console.log(`[Job.list] Request from user ${context.user?.id} for org ${context.organization?.id}`);
 
-			const limit = input?.limit ?? 20;
-			const cursor = input?.cursor;
+				await assertContractorOrg(context.organization!.id);
+				await context.cerbos.authorize('view', 'job', 'list');
 
-			const where = {
-				organizationId: context.organization!.id,
-				deletedAt: null,
-				...(input?.status && { status: input.status }),
-				...(input?.sourceType && { sourceType: input.sourceType }),
-				...(input?.customerId && { customerId: input.customerId }),
-				...(input?.assignedTechnicianId && { assignedTechnicianId: input.assignedTechnicianId }),
-				...(input?.search && {
-					OR: [
-						{ jobNumber: { contains: input.search, mode: 'insensitive' as const } },
-						{ title: { contains: input.search, mode: 'insensitive' as const } }
-					]
-				})
-			};
+				const limit = input?.limit ?? 20;
+				const cursor = input?.cursor;
 
-			const jobs = await prisma.job.findMany({
-				where,
-				take: limit + 1,
-				...(cursor && { cursor: { id: cursor }, skip: 1 }),
-				orderBy: { createdAt: 'desc' }
-			});
+				const where = {
+					organizationId: context.organization!.id,
+					deletedAt: null,
+					...(input?.status && { status: input.status }),
+					...(input?.sourceType && { sourceType: input.sourceType }),
+					...(input?.customerId && { customerId: input.customerId }),
+					...(input?.assignedTechnicianId && { assignedTechnicianId: input.assignedTechnicianId }),
+					...(input?.search && {
+						OR: [
+							{ jobNumber: { contains: input.search, mode: 'insensitive' as const } },
+							{ title: { contains: input.search, mode: 'insensitive' as const } }
+						]
+					})
+				};
 
-			const hasMore = jobs.length > limit;
-			if (hasMore) jobs.pop();
+				const jobs = await prisma.job.findMany({
+					where,
+					take: limit + 1,
+					...(cursor && { cursor: { id: cursor }, skip: 1 }),
+					orderBy: { createdAt: 'desc' }
+				});
 
-			const nextCursor = hasMore ? jobs[jobs.length - 1]?.id ?? null : null;
+				const hasMore = jobs.length > limit;
+				if (hasMore) jobs.pop();
 
-			return successResponse(
-				{
-					jobs: jobs.map(formatJob),
-					pagination: { nextCursor, hasMore }
-				},
-				context
-			);
+				const nextCursor = hasMore ? jobs[jobs.length - 1]?.id ?? null : null;
+
+				const formattedJobs = jobs.map(formatJob);
+
+				return successResponse(
+					{
+						jobs: formattedJobs,
+						pagination: { nextCursor, hasMore }
+					},
+					context
+				);
+			} catch (error) {
+				console.error('[Job.list] Error:', error);
+				if (error instanceof ApiException) throw error;
+				throw ApiException.internal(error instanceof Error ? error.message : 'Unknown error during job listing');
+			}
 		}),
 
 	/**
@@ -630,8 +640,8 @@ export const jobRouter = {
 			if (input.toStatus === 'PAID') {
 				// Validate all invoices are paid (balance due = 0)
 				const unpaidInvoices = await prisma.jobInvoice.findFirst({
-					where: { 
-						jobId: input.id, 
+					where: {
+						jobId: input.id,
 						status: { notIn: ['PAID', 'VOID'] },
 						balanceDue: { gt: 0 }
 					}
@@ -660,7 +670,7 @@ export const jobRouter = {
 			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			// Record activity event
-			await recordStatusChange(context, 'JOB', updatedJob.id, job.status, input.toStatus, 
+			await recordStatusChange(context, 'JOB', updatedJob.id, job.status, input.toStatus,
 				`Job status changed from ${job.status} to ${input.toStatus}${input.notes ? `: ${input.notes}` : ''}`,
 				{ jobId: updatedJob.id }
 			);

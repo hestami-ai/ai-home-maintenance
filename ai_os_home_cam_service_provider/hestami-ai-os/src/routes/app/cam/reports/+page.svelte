@@ -35,10 +35,10 @@
 		isLoading = true;
 		try {
 			const response = await reportApi.definitions.list({
-				category: categoryFilter || undefined
+				category: categoryFilter as any || undefined
 			});
-			if (response.ok && response.data?.reports) {
-				reports = response.data.reports;
+			if (response.ok) {
+				reports = response.data.reports as any;
 			}
 		} catch (error) {
 			console.error('Failed to load reports:', error);

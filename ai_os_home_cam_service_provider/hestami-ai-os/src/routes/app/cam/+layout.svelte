@@ -23,9 +23,9 @@
 			const orgId = $organizationStore.current?.organization.id;
 			if (!orgId) return;
 
-			const response = await associationApi.list({ organizationId: orgId });
-			if (response.ok && response.data?.associations) {
-				camStore.setAssociations(response.data.associations);
+			const response = await associationApi.list({});
+			if (response.ok) {
+				camStore.setAssociations(response.data.associations as any);
 			}
 		} catch (error) {
 			console.error('Failed to load associations:', error);
@@ -42,9 +42,9 @@
 			if (!associationId) return;
 
 			const [violationsRes, arcRes, workOrdersRes] = await Promise.all([
-				violationApi.list({ status: 'OPEN' }),
-				arcRequestApi.list({ status: 'SUBMITTED' }),
-				workOrderApi.list({ status: 'IN_PROGRESS' })
+				violationApi.list({ status: 'OPEN' as any }),
+				arcRequestApi.list({ status: 'SUBMITTED' as any }),
+				workOrderApi.list({ status: 'IN_PROGRESS' as any })
 			]);
 
 			const counts = { violations: 0, arcRequests: 0, workOrders: 0 };

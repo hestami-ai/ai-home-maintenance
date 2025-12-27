@@ -51,18 +51,18 @@
 
 		try {
 			const response = await reportApi.definitions.get(reportId);
-			if (response.ok && response.data?.report) {
-				report = response.data.report;
-				// Initialize parameter values with defaults
-				if (report?.parameters) {
-					for (const param of report.parameters) {
-						if (param.defaultValue) {
-							parameterValues[param.name] = param.defaultValue;
-						}
+			if (!response.ok) {
+				error = 'Report not found';
+				return;
+			}
+			report = response.data.report as any;
+			// Initialize parameter values with defaults
+			if (report?.parameters) {
+				for (const param of report.parameters) {
+					if (param.defaultValue) {
+						parameterValues[param.name] = param.defaultValue;
 					}
 				}
-			} else {
-				error = 'Report not found';
 			}
 		} catch (e) {
 			error = 'Failed to load report';
@@ -80,16 +80,17 @@
 		error = null;
 
 		try {
-			const response = await reportApi.execute(report.id, {
-				parameters: parameterValues,
+			const response = await reportApi.execute({
+				reportId: report.id,
+				parametersJson: JSON.stringify(parameterValues),
 				idempotencyKey: crypto.randomUUID()
 			});
 
-			if (response.ok && response.data?.result) {
-				result = response.data.result;
-			} else {
+			if (!response.ok) {
 				error = 'Failed to generate report';
+				return;
 			}
+			result = response.data.execution as any;
 		} catch (e) {
 			error = 'Failed to execute report';
 			console.error(e);

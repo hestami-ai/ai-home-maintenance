@@ -1,401 +1,107 @@
 /**
  * CAM (Community Association Management) API client
  * Provides typed functions for calling oRPC backend endpoints
+ * 
+ * Types are extracted from types.generated.ts following the pipeline:
+ * Prisma Schema → Zod Schemas → oRPC → OpenAPI → Generated Types → API Clients
  */
 
-import { apiCall } from './client';
 import { orpc } from './index';
+import type { operations } from './types.generated';
 
 // ============================================================================
-// Types
+// Types - Extracted from types.generated.ts
 // ============================================================================
 
-export interface Violation {
-	id: string;
-	violationNumber: string;
-	title: string;
-	description?: string;
-	status: string;
-	severity: string;
-	observedDate: string;
-	unitId: string | null;
-	unitNumber?: string;
-	responsiblePartyName?: string;
-	noticeCount: number;
-	totalFinesAssessed: string;
-	createdAt?: string;
-	updatedAt?: string;
-}
+// Violation Types
+export type Violation = operations['violation.list']['responses']['200']['content']['application/json']['data']['violations'][number];
+export type ViolationDetail = operations['violation.get']['responses']['200']['content']['application/json']['data']['violation'];
+export type ViolationStatus = operations['violation.list']['requestBody'] extends { content: { 'application/json': infer T } } ? NonNullable<T extends { status?: infer S } ? S : never> : never;
+export type ViolationSeverity = operations['violation.list']['requestBody'] extends { content: { 'application/json': infer T } } ? NonNullable<T extends { severity?: infer S } ? S : never> : never;
 
-export interface ViolationDetail extends Violation {
-	commonAreaName?: string;
-	locationDetails?: string;
-	reportedDate: string;
-	curePeriodEnds?: string;
-	curedDate?: string;
-	closedDate?: string;
-	resolvedDate?: string;
-	dueDate?: string;
-	curePeriodDays?: number;
-	responsiblePartyId?: string;
-	violationTypeId: string;
-	violationTypeName?: string;
-	violationTypeRuleText?: string;
-	violationType?: { id: string; name: string; code: string };
-	unit?: { id: string; unitNumber: string };
-	responsibleParty?: { id: string; partyType: string };
-	hasHoaConflict?: boolean;
-	hoaConflictNotes?: string;
-	hasAppeal?: boolean;
-	appealStatus?: string;
-	createdAt: string;
-	updatedAt: string;
-}
+// Violation Type
+export type ViolationType = operations['violationType.list']['responses']['200']['content']['application/json']['data']['violationTypes'][number];
 
-export interface ViolationType {
-	id: string;
-	code: string;
-	name: string;
-	description?: string;
-	defaultSeverity: string;
-	defaultCurePeriodDays: number;
-	isActive: boolean;
-}
+// ARC Request Types
+export type ARCRequest = operations['arcRequest.list']['responses']['200']['content']['application/json']['data']['requests'][number];
+export type ARCRequestDetail = operations['arcRequest.get']['responses']['200']['content']['application/json']['data']['request'];
 
-export interface ARCRequest {
-	id: string;
-	requestNumber: string;
-	title: string;
-	description?: string;
-	status: string;
-	category: string;
-	unitId: string | null;
-	unitNumber?: string;
-	submitterId?: string;
-	submitterName?: string;
-	projectScope?: string;
-	estimatedCost?: string | number;
-	plannedStartDate?: string;
-	plannedCompletionDate?: string;
-	startDate?: string;
-	completionDate?: string;
-	conditions?: string;
-	submittedAt: string;
-	createdAt: string;
-	updatedAt?: string;
-}
-
-export interface WorkOrder {
-	id: string;
-	workOrderNumber: string;
-	title: string;
-	description?: string;
-	status: string;
-	priority: string;
-	category: string;
-	unitId?: string;
-	unitNumber?: string;
-	locationDescription?: string;
-	commonAreaId?: string;
-	commonAreaName?: string;
-	commonAreaDescription?: string;
-	vendorId?: string;
-	vendorName?: string;
-	estimatedCost?: string;
-	actualCost?: string;
-	actualHours?: string;
-	dueDate?: string;
-	scheduledDate?: string;
-	completedDate?: string;
-	startedAt?: string;
-	completedAt?: string;
-	createdAt: string;
-	updatedAt: string;
-	// Phase 9: Origin tracking
-	originType?: string;
-	violationId?: string;
-	arcRequestId?: string;
-	resolutionId?: string;
-	originNotes?: string;
-	// Phase 9: Authorization
-	authorizedBy?: string;
-	authorizedAt?: string;
-	authorizationRationale?: string;
-	authorizingRole?: string;
-	// Phase 9: Budget
-	budgetSource?: string;
-	approvedAmount?: string;
-	spendToDate?: string;
-	// Phase 9: Constraints and Board Approval
-	constraints?: string;
-	requiresBoardApproval?: boolean;
-	boardApprovalVoteId?: string;
-	boardApprovalStatus?: string;
-}
+// Work Order Types
+export type WorkOrder = operations['workOrder.list']['responses']['200']['content']['application/json']['data']['workOrders'][number];
+export type WorkOrderDetail = operations['workOrder.get']['responses']['200']['content']['application/json']['data']['workOrder'];
 
 // ============================================================================
-// Phase 11: Governance Types
+// Phase 11: Governance Types - Extracted from types.generated.ts
 // ============================================================================
 
-export type MeetingType = 'BOARD' | 'ANNUAL' | 'SPECIAL' | 'COMMITTEE' | 'BUDGET' | 'EXECUTIVE';
-export type MeetingStatus = 'SCHEDULED' | 'IN_SESSION' | 'ADJOURNED' | 'MINUTES_DRAFT' | 'MINUTES_APPROVED' | 'ARCHIVED' | 'CANCELLED';
-export type MeetingAttendanceStatus = 'PRESENT' | 'ABSENT' | 'REMOTE' | 'PROXY' | 'EXCUSED';
+// Meeting Types
+export type Meeting = operations['governanceMeeting.get']['responses']['200']['content']['application/json']['data']['meeting'];
+export type MeetingListItem = operations['governanceMeeting.list']['responses']['200']['content']['application/json']['data']['meetings'][number];
+
+// Board Motion Types - boardMotion routes don't exist in oRPC, using manual types
 export type BoardMotionStatus = 'PROPOSED' | 'SECONDED' | 'UNDER_DISCUSSION' | 'UNDER_VOTE' | 'APPROVED' | 'DENIED' | 'TABLED' | 'WITHDRAWN';
-export type VoteChoice = 'YES' | 'NO' | 'ABSTAIN';
-export type ResolutionStatus = 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
-
-export interface Meeting {
+export type BoardMotion = {
 	id: string;
-	associationId: string;
-	boardId?: string;
-	type: MeetingType;
-	status: MeetingStatus;
 	title: string;
-	description?: string;
-	scheduledFor: string;
-	location?: string;
-	virtualLink?: string;
-	quorumRequired?: number | null;
-	createdBy: string;
-	createdAt: string;
-	updatedAt: string;
-	// Relations (when included)
-	agendaItems?: MeetingAgendaItem[];
-	attendance?: MeetingAttendance[];
-	minutes?: MeetingMinutes | null;
-	boardMotions?: BoardMotion[];
-	votes?: Vote[];
-}
-
-export interface MeetingAgendaItem {
-	id: string;
-	meetingId: string;
-	order: number;
-	title: string;
-	description?: string | null;
-	timeAllotment?: number | null;
-	createdAt: string;
-	updatedAt: string;
-	// Cross-domain links
-	arcRequestId?: string | null;
-	violationId?: string | null;
-	workOrderId?: string | null;
-	policyDocumentId?: string | null;
-	// Relations (when included)
-	arcRequest?: ARCRequest | null;
-	violation?: Violation | null;
-	workOrder?: WorkOrder | null;
-}
-
-export interface MeetingAttendance {
-	id: string;
-	meetingId: string;
-	partyId: string;
-	status: MeetingAttendanceStatus;
-	proxyForPartyId?: string | null;
-	arrivedAt?: string | null;
-	leftAt?: string | null;
-	createdAt: string;
-	// Relations (when included)
-	party?: { id: string; displayName?: string; partyType: string };
-}
-
-export interface MeetingMinutes {
-	id: string;
-	meetingId: string;
-	content: string;
-	status: 'DRAFT' | 'SUBMITTED' | 'APPROVED';
-	approvedAt?: string | null;
-	approvedBy?: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface BoardMotion {
-	id: string;
-	meetingId: string;
-	motionNumber: string;
-	title: string;
-	description?: string | null;
 	status: BoardMotionStatus;
-	category?: string | null;
+	description?: string;
 	movedById: string;
-	secondedById?: string | null;
-	outcome?: string | null;
-	decidedAt?: string | null;
-	createdAt: string;
-	updatedAt: string;
-	// Relations (when included)
-	movedBy?: { id: string; displayName?: string };
-	secondedBy?: { id: string; displayName?: string } | null;
-	vote?: Vote | null;
-	resolutions?: Resolution[];
-}
+	secondedById?: string;
+};
+export type BoardMotionListItem = BoardMotion;
 
-export interface Vote {
-	id: string;
-	meetingId: string;
-	motionId?: string | null;
-	agendaItemId?: string | null;
-	question: string;
-	method: 'VOICE' | 'ROLL_CALL' | 'BALLOT' | 'SHOW_OF_HANDS';
-	status: 'OPEN' | 'CLOSED';
-	openedAt: string;
-	closedAt?: string | null;
-	result?: string | null;
-	createdAt: string;
-	updatedAt: string;
-	// Relations (when included)
-	ballots?: VoteBallot[];
-}
+// Resolution Types
+export type Resolution = operations['governanceResolution.getResolution']['responses']['200']['content']['application/json']['data']['resolution'];
+export type ResolutionListItem = operations['governanceResolution.listResolutions']['responses']['200']['content']['application/json']['data']['resolutions'][number];
 
-export interface VoteBallot {
-	id: string;
-	voteId: string;
-	voterId: string;
-	choice: VoteChoice;
-	hasConflictOfInterest: boolean;
-	conflictNotes?: string | null;
-	castAt: string;
-	// Relations (when included)
-	voter?: { id: string; displayName?: string };
-}
-
-export interface Resolution {
-	id: string;
-	associationId: string;
-	resolutionNumber: string;
-	title: string;
-	content: string;
-	status: ResolutionStatus;
-	category?: string | null;
-	effectiveDate?: string | null;
-	expirationDate?: string | null;
-	supersededById?: string | null;
-	motionId?: string | null;
-	createdAt: string;
-	updatedAt: string;
-	// Relations (when included)
-	motion?: BoardMotion | null;
-	workOrders?: WorkOrder[];
-	policyDocuments?: Array<{ id: string; title: string }>;
-}
+// Governance Board Types
+export type GovernanceBoard = operations['governanceBoard.get']['responses']['200']['content']['application/json']['data']['board'];
+export type GovernanceBoardListItem = operations['governanceBoard.list']['responses']['200']['content']['application/json']['data']['boards'][number];
 
 // ============================================================================
-// Other Types
+// Other Types - Extracted from types.generated.ts
 // ============================================================================
 
-export interface Unit {
-	id: string;
-	unitNumber: string;
-	unitType: string;
-	status: string;
-	address?: string;
-	squareFootage?: number;
-	bedrooms?: number;
-	bathrooms?: number;
-	propertyId: string;
-	propertyName?: string;
-	ownerName?: string;
-	tenantName?: string;
-	createdAt?: string;
-	property?: { id: string; name: string };
-}
+// Unit Types
+export type Unit = operations['unit.list']['responses']['200']['content']['application/json']['data']['units'][number];
+export type UnitDetail = operations['unit.get']['responses']['200']['content']['application/json']['data']['unit'];
 
-export interface Property {
-	id: string;
-	name: string;
-	address: string;
-	propertyType: string;
-	status: string;
-	unitCount?: number;
-	commonAreaCount?: number;
-	yearBuilt?: number;
-	totalSquareFootage?: number;
-	parkingSpaces?: number;
-	amenities?: string[];
-}
+// Property Types
+export type Property = operations['property.list']['responses']['200']['content']['application/json']['data']['properties'][number];
+export type PropertyDetail = operations['property.get']['responses']['200']['content']['application/json']['data']['property'];
 
-export interface Vendor {
-	id: string;
-	name: string;
-	status: string;
-	trades: string[];
-	contactName?: string;
-	email?: string;
-	phone?: string;
-	address?: string;
-	licenseNumber?: string;
-	licenseExpiry?: string;
-	insuranceExpiry?: string;
-	rating?: number;
-	createdAt?: string;
-}
+// Vendor Types
+export type Vendor = operations['vendor.list']['responses']['200']['content']['application/json']['data']['vendors'][number];
+export type VendorDetail = operations['vendor.get']['responses']['200']['content']['application/json']['data']['vendor'];
 
-export interface Association {
-	id: string;
-	name: string;
-	legalName?: string;
-	status: string;
-	fiscalYearEnd: number;
-	address?: string;
-	phone?: string;
-	email?: string;
-	website?: string;
-	taxId?: string;
-	createdAt?: string;
-	updatedAt?: string;
-}
+// Association Types
+export type Association = operations['association.list']['responses']['200']['content']['application/json']['data']['associations'][number];
+export type AssociationDetail = operations['association.get']['responses']['200']['content']['application/json']['data']['association'];
 
-export interface Document {
-	id: string;
-	name: string;
-	title?: string;
-	category: string;
-	visibility: string;
-	status?: string;
-	mimeType: string;
-	size: number;
-	fileSize?: number;
-	fileName?: string;
-	fileUrl?: string;
-	version?: number;
-	effectiveDate?: string | null;
-	uploadedBy?: string;
-	uploadedByName?: string;
-	contextType?: string;
-	contextId?: string;
-	contextName?: string;
-	createdAt: string;
-	updatedAt?: string;
-}
+// Document Types
+export type Document = operations['document.listDocuments']['responses']['200']['content']['application/json']['data']['documents'][number];
+export type DocumentDetail = operations['document.getDocument']['responses']['200']['content']['application/json']['data']['document'];
 
 // ============================================================================
-// Violation API
+// Violation API - Using oRPC client
 // ============================================================================
 
 export const violationApi = {
 	list: (params?: {
-		status?: string;
-		severity?: string;
+		status?: ViolationStatus;
+		severity?: ViolationSeverity;
 		unitId?: string;
 		violationTypeId?: string;
 		search?: string;
-	}) =>
-		apiCall<{ violations: Violation[] }>('violation/list', {
-			body: params || {}
-		}),
+	}) => orpc.violation.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ violation: ViolationDetail }>('violation/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.violation.get({ id }),
 
 	create: (data: {
 		violationTypeId: string;
 		title: string;
 		description: string;
-		severity?: string;
+		severity?: ViolationSeverity;
 		unitId?: string;
 		commonAreaName?: string;
 		locationDetails?: string;
@@ -403,54 +109,44 @@ export const violationApi = {
 		responsiblePartyId?: string;
 		reporterType?: 'STAFF' | 'RESIDENT' | 'ANONYMOUS';
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ violation: { id: string; violationNumber: string; title: string; status: string; severity: string } }>(
-			'violation/create',
-			{ body: data }
-		),
+	}) => orpc.violation.create(data),
 
 	update: (
 		id: string,
 		data: {
 			title?: string;
 			description?: string;
-			severity?: string;
+			severity?: ViolationSeverity;
 			unitId?: string;
 			commonAreaName?: string;
 			locationDetails?: string;
 			responsiblePartyId?: string;
+			idempotencyKey: string;
 		}
-	) =>
-		apiCall<{ violation: ViolationDetail }>('violation/update', {
-			body: { id, ...data }
-		}),
+	) => orpc.violation.update({ id, ...data }),
 
 	changeStatus: (
 		id: string,
 		data: {
-			status: string;
+			status: ViolationStatus;
 			notes?: string;
 			idempotencyKey: string;
 		}
-	) =>
-		apiCall<{ violation: { id: string; status: string } }>('violation/changeStatus', {
-			body: { id, ...data }
-		}),
+	) => orpc.violation.updateStatus({ id, ...data }),
 
 	sendNotice: (
 		id: string,
 		data: {
-			noticeType: string;
-			templateId?: string;
+			noticeType: 'WARNING' | 'FIRST_NOTICE' | 'SECOND_NOTICE' | 'FINAL_NOTICE' | 'FINE_NOTICE' | 'HEARING_NOTICE' | 'CURE_CONFIRMATION';
+			subject: string;
+			body: string;
+			recipientName: string;
+			recipientEmail?: string;
+			recipientAddress?: string;
+			deliveryMethod: 'EMAIL' | 'PORTAL' | 'MAIL' | 'CERTIFIED_MAIL' | 'POSTED' | 'HAND_DELIVERED';
 			curePeriodDays?: number;
-			deliveryMethod: string;
-			notes?: string;
-			idempotencyKey: string;
 		}
-	) =>
-		apiCall<{ notice: { id: string; noticeType: string } }>('violation/sendNotice', {
-			body: { violationId: id, ...data }
-		}),
+	) => orpc.violation.sendNotice({ violationId: id, ...data }),
 
 	scheduleHearing: (
 		id: string,
@@ -460,10 +156,7 @@ export const violationApi = {
 			notes?: string;
 			idempotencyKey: string;
 		}
-	) =>
-		apiCall<{ hearing: { id: string; hearingDate: string } }>('violation/scheduleHearing', {
-			body: { violationId: id, ...data }
-		}),
+	) => orpc.violation.scheduleHearing({ violationId: id, ...data }),
 
 	assessFine: (
 		id: string,
@@ -474,132 +167,94 @@ export const violationApi = {
 			notes?: string;
 			idempotencyKey: string;
 		}
-	) =>
-		apiCall<{ fine: { id: string; amount: string } }>('violation/assessFine', {
-			body: { violationId: id, ...data }
-		}),
+	) => orpc.violation.assessFine({ violationId: id, ...data }),
 
-	getNotices: (id: string) =>
-		apiCall<{ notices: Array<{ id: string; noticeType: string; sentAt: string; deliveryMethod: string }> }>(
-			'violation/getNotices',
-			{ body: { violationId: id } }
-		),
+	getNotices: (id: string) => orpc.violation.listNotices({ violationId: id }),
 
-	getResponses: (id: string) =>
-		apiCall<{ responses: Array<{ id: string; responseType: string; submittedAt: string; content: string }> }>(
-			'violation/getResponses',
-			{ body: { violationId: id } }
-		),
-
-	recordAction: (
-		id: string,
-		data: {
-			action: string;
-			notes?: string;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ success: boolean }>('violation/recordAction', {
-			body: { violationId: id, ...data }
-		}),
+	getStatusHistory: (id: string) => orpc.violation.getStatusHistory({ violationId: id }),
 
 	fileAppeal: (
 		id: string,
 		data: {
-			appealReason: string;
-			supportingDocuments?: string[];
+			reason: string;
+			supportingDocumentIds?: string[];
 			idempotencyKey: string;
 		}
-	) =>
-		apiCall<{ appeal: { id: string } }>('violation/fileAppeal', {
-			body: { violationId: id, ...data }
-		}),
+	) => orpc.violation.fileAppeal({ violationId: id, ...data }),
 
-	authorizeRemediation: (
-		id: string,
-		data: {
-			vendorId: string;
-			budgetSource: string;
-			estimatedCost?: number;
-			scope: string;
-			notes?: string;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ workOrderId?: string }>('violation/authorizeRemediation', {
-			body: { violationId: id, ...data }
-		}),
+	getAppeal: (violationId: string) => orpc.violation.getAppeal({ violationId }),
 
-	getResponse: (violationId: string, responseId: string) =>
-		apiCall<{ response: { id: string; submittedDate: string; content: string; submittedBy: string; submittedByEmail?: string; submittedByPhone?: string; hasAttachments: boolean; acknowledged: boolean; acknowledgedBy?: string; acknowledgedAt?: string } }>(
-			'violation/getResponse',
-			{ body: { violationId, responseId } }
-		),
+	cure: (id: string, data?: { notes?: string }) => orpc.violation.cure({ id, ...data }),
 
-	acknowledgeResponse: (
-		violationId: string,
-		responseId: string,
-		data: { idempotencyKey: string }
-	) =>
-		apiCall<{ success: boolean }>('violation/acknowledgeResponse', {
-			body: { violationId, responseId, ...data }
-		})
+	close: (id: string, data?: { notes?: string }) => orpc.violation.close({ id, ...data }),
+
+	escalate: (id: string, data: { reason: string; idempotencyKey: string }) => 
+		orpc.violation.escalate({ id, ...data }),
+
+	resolve: (id: string, data: { notes: string; idempotencyKey: string }) => 
+		orpc.violation.resolve({ id, ...data }),
+
+	addEvidence: (data: {
+		violationId: string;
+		evidenceType: 'DOCUMENT' | 'PHOTO' | 'VIDEO' | 'AUDIO';
+		fileName: string;
+		fileUrl: string;
+		fileSize?: number;
+		mimeType?: string;
+		description?: string;
+		capturedAt?: string;
+		gpsLatitude?: number;
+		gpsLongitude?: number;
+	}) => orpc.violation.addEvidence(data),
+
+	listEvidence: (violationId: string) => orpc.violation.listEvidence({ violationId }),
+
+	listHearings: (violationId: string) => orpc.violation.listHearings({ violationId }),
+
+	listFines: (violationId: string) => orpc.violation.listFines({ violationId }),
+
+	getPriorViolations: (data: { violationId: string; unitId?: string; violationTypeId?: string; limit?: number }) => 
+		orpc.violation.getPriorViolations(data)
 };
 
 export const violationTypeApi = {
-	list: () =>
-		apiCall<{ violationTypes: ViolationType[] }>('violationType/list', {
-			body: {}
-		}),
-
-	get: (id: string) =>
-		apiCall<{ violationType: ViolationType }>('violationType/get', {
-			body: { id }
-		})
+	list: () => orpc.violationType.list({}),
+	get: (id: string) => orpc.violationType.get({ id })
 };
 
 // ============================================================================
-// ARC Request API
+// ARC Request API - Using oRPC client
 // ============================================================================
+
+// ARC Request category enum for type safety
+export type ARCCategory = 'LANDSCAPING' | 'OTHER' | 'HVAC' | 'FENCE' | 'ROOF' | 'PAINT' | 'ADDITION' | 'WINDOWS' | 'DOORS' | 'DRIVEWAY' | 'GARAGE' | 'SOLAR';
+export type ARCStatus = 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'CHANGES_REQUESTED' | 'APPROVED' | 'DENIED' | 'TABLED' | 'WITHDRAWN' | 'EXPIRED' | 'CANCELLED';
 
 export const arcRequestApi = {
 	list: (params?: {
-		status?: string;
-		category?: string;
-		unitId?: string;
-		search?: string;
-	}) =>
-		apiCall<{ requests: ARCRequest[] }>('arcRequest/list', {
-			body: params || {}
-		}),
+		associationId?: string;
+		status?: ARCStatus;
+		cursor?: string;
+		limit?: number;
+	}) => orpc.arcRequest.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ request: ARCRequest }>('arcRequest/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.arcRequest.get({ id }),
 
 	create: (data: {
-		unitId?: string;
+		associationId: string;
+		requesterPartyId: string;
 		title: string;
 		description: string;
-		category: string;
+		category: ARCCategory;
 		projectScope?: string;
 		estimatedCost?: number;
-		plannedStartDate?: string;
-		plannedCompletionDate?: string;
+		proposedStartDate?: string;
+		proposedEndDate?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ request: { id: string; requestNumber: string } }>('arcRequest/create', {
-			body: data
-		}),
+	}) => orpc.arcRequest.create(data),
 
-	getPriorPrecedents: (requestId: string, params?: { unitId?: string; category?: string; limit?: number }) =>
-		apiCall<{
-			unitPrecedents: Array<{ id: string; requestNumber: string; title: string; status: string; category: string; decisionDate: string | null }>;
-			categoryPrecedents: Array<{ id: string; requestNumber: string; title: string; status: string; category: string; decisionDate: string | null }>;
-		}>('arcRequest/getPriorPrecedents', {
-			body: { requestId, ...params }
-		}),
+	getPriorPrecedents: (requestId: string, params?: { unitId?: string; category?: ARCCategory; limit?: number }) =>
+		orpc.arcRequest.getPriorPrecedents({ requestId, ...params }),
 
 	recordDecision: (data: {
 		requestId: string;
@@ -608,71 +263,27 @@ export const arcRequestApi = {
 		conditions?: string;
 		expiresAt?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ request: { id: string; status: string } }>('arcRequest/recordDecision', {
-			body: data
-		}),
+	}) => orpc.arcRequest.recordDecision(data),
 
 	requestInfo: (data: {
 		requestId: string;
 		infoNeeded: string;
 		dueDate?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ request: { id: string; status: string } }>('arcRequest/requestInfo', {
-			body: data
-		}),
+	}) => orpc.arcRequest.requestInfo(data),
 
 	submitInfo: (data: {
 		requestId: string;
 		response: string;
 		documentIds?: string[];
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ request: { id: string; status: string } }>('arcRequest/submitInfo', {
-			body: data
-		})
+	}) => orpc.arcRequest.submitInfo(data)
 };
 
 export const arcReviewApi = {
-	getVotes: (requestId: string) =>
-		apiCall<{
-			votes: Array<{
-				id: string;
-				reviewerId: string;
-				reviewerName: string | null;
-				action: string;
-				notes: string | null;
-				conditions: string | null;
-				createdAt: string;
-			}>;
-			summary: { total: number; approve: number; deny: number; requestChanges: number; table: number };
-			quorum: { required: number | null; met: boolean; activeMembers: number };
-			threshold: { required: number | null; current: number; met: boolean };
-		}>('arcReview/getVotes', {
-			body: { requestId }
-		}),
+	getVotes: (requestId: string) => orpc.arcReview.getVotes({ requestId }),
 
-	getCommitteeForRequest: (requestId: string) =>
-		apiCall<{
-			committee: {
-				id: string;
-				name: string;
-				quorum: number | null;
-				approvalThreshold: number | null;
-				members: Array<{
-					id: string;
-					partyId: string;
-					name: string | null;
-					role: string | null;
-					isChair: boolean;
-					hasVoted: boolean;
-					vote: string | null;
-				}>;
-			} | null;
-		}>('arcReview/getCommitteeForRequest', {
-			body: { requestId }
-		}),
+	getCommitteeForRequest: (requestId: string) => orpc.arcReview.getCommitteeForRequest({ requestId }),
 
 	submitReview: (data: {
 		requestId: string;
@@ -681,10 +292,7 @@ export const arcReviewApi = {
 		conditions?: string;
 		expiresAt?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ review: { id: string; requestId: string; action: string } }>('arcReview/submitReview', {
-			body: data
-		}),
+	}) => orpc.arcReview.submitReview(data),
 
 	recordDecision: (data: {
 		requestId: string;
@@ -693,902 +301,610 @@ export const arcReviewApi = {
 		conditions?: string;
 		expiresAt?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ request: { id: string; status: string } }>('arcReview/recordDecision', {
-			body: data
-		})
+	}) => orpc.arcReview.recordDecision(data)
 };
 
 // ============================================================================
-// Work Order API
+// Work Order API - Using oRPC client
 // ============================================================================
+
+// Work Order enums for type safety
+export type WorkOrderStatus = 'DRAFT' | 'SUBMITTED' | 'TRIAGED' | 'AUTHORIZED' | 'ASSIGNED' | 'SCHEDULED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'REVIEW_REQUIRED' | 'INVOICED' | 'CLOSED' | 'CANCELLED';
+export type WorkOrderPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'EMERGENCY' | 'SCHEDULED';
+export type WorkOrderCategory = 'EMERGENCY' | 'MAINTENANCE' | 'REPAIR' | 'INSPECTION' | 'INSTALLATION' | 'REPLACEMENT' | 'PREVENTIVE' | 'LANDSCAPING' | 'CLEANING' | 'SECURITY' | 'OTHER';
 
 export const workOrderApi = {
 	list: (params?: {
-		status?: string;
-		priority?: string;
-		category?: string;
+		status?: WorkOrderStatus;
+		priority?: WorkOrderPriority;
+		category?: WorkOrderCategory;
 		unitId?: string;
 		vendorId?: string;
 		search?: string;
-	}) =>
-		apiCall<{ workOrders: WorkOrder[] }>('workOrder/list', {
-			body: params || {}
-		}),
+	}) => orpc.workOrder.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ workOrder: WorkOrder }>('workOrder/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.workOrder.get({ id }),
 
 	create: (data: {
 		title: string;
 		description: string;
-		category: string;
-		priority: string;
+		category: WorkOrderCategory;
+		priority: WorkOrderPriority;
 		unitId?: string;
 		commonAreaDescription?: string;
 		vendorId?: string;
-		dueDate?: string;
+		slaDeadline?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ workOrder: { id: string; workOrderNumber: string } }>('workOrder/create', {
-			body: data
-		}),
+	}) => orpc.workOrder.create(data),
 
-	update: (
-		id: string,
-		data: {
-			title?: string;
-			description?: string;
-			category?: string;
-			priority?: string;
-			unitId?: string;
-			commonAreaDescription?: string;
-			vendorId?: string;
-			dueDate?: string;
-		}
-	) =>
-		apiCall<{ workOrder: WorkOrder }>('workOrder/update', {
-			body: { id, ...data }
-		}),
+	updateStatus: (id: string, data: { status: WorkOrderStatus; notes?: string; idempotencyKey: string }) =>
+		orpc.workOrder.updateStatus({ id, ...data }),
 
-	assign: (
-		id: string,
-		data: {
-			vendorId: string;
-			notes?: string;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ workOrder: { id: string; status: string } }>('workOrder/assign', {
-			body: { workOrderId: id, ...data }
-		}),
+	assignVendor: (id: string, data: { vendorId: string; notes?: string; idempotencyKey: string }) =>
+		orpc.workOrder.assignVendor({ id, ...data }),
 
-	schedule: (
-		id: string,
-		data: {
-			scheduledDate: string;
-			scheduledTime?: string;
-			estimatedDuration?: number;
-			notes?: string;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ workOrder: { id: string; status: string } }>('workOrder/schedule', {
-			body: { workOrderId: id, ...data }
-		}),
+	assignTechnician: (id: string, data: { technicianId: string; notes?: string; idempotencyKey: string }) =>
+		orpc.workOrder.assignTechnician({ id, ...data }),
 
-	complete: (
-		id: string,
-		data: {
-			completedDate: string;
-			actualCost?: number;
-			notes?: string;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ workOrder: { id: string; status: string } }>('workOrder/complete', {
-			body: { workOrderId: id, ...data }
-		})
+	schedule: (id: string, data: { scheduledStart: string; scheduledEnd?: string; technicianId?: string; notes?: string; idempotencyKey: string }) =>
+		orpc.workOrder.schedule({ id, ...data }),
+
+	complete: (id: string, data: { completionNotes?: string; actualCost?: number; idempotencyKey: string }) =>
+		orpc.workOrder.complete({ id, ...data }),
+
+	authorize: (data: { workOrderId: string; rationale: string; budgetSource: 'OPERATING' | 'RESERVE' | 'SPECIAL'; approvedAmount: number; constraints?: string }) =>
+		orpc.workOrder.authorize(data),
+
+	getStatusHistory: (id: string) => orpc.workOrder.getStatusHistory({ workOrderId: id }),
+
+	addComment: (data: { workOrderId: string; comment: string; isInternal?: boolean }) =>
+		orpc.workOrder.addComment(data),
+
+	transitionStatus: (id: string, data: { toStatus: WorkOrderStatus; notes?: string; idempotencyKey: string }) =>
+		orpc.workOrder.transitionStatus({ workOrderId: id, ...data })
 };
 
 // ============================================================================
-// Unit API
+// Unit API - Using oRPC client
 // ============================================================================
+
+// Unit type enum for type safety
+export type UnitType = 'SINGLE_FAMILY_HOME' | 'CONDO_UNIT' | 'TOWNHOUSE' | 'LOT' | 'COMMERCIAL_UNIT';
 
 export const unitApi = {
 	list: (params?: {
 		propertyId?: string;
-		status?: string;
-		unitType?: string;
-		search?: string;
-	}) =>
-		apiCall<{ units: Unit[] }>('unit/list', {
-			body: params || {}
-		}),
+		unitType?: UnitType;
+		cursor?: string;
+		limit?: number;
+	}) => orpc.unit.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ unit: Unit }>('unit/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.unit.get({ id }),
 
 	create: (data: {
 		propertyId: string;
 		unitNumber: string;
-		unitType: string;
-		status?: string;
-		address?: string;
-		squareFootage?: number;
+		unitType: UnitType;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
 		bedrooms?: number;
 		bathrooms?: number;
-		floor?: number;
-		idempotencyKey: string;
-	}) =>
-		apiCall<{ unit: { id: string; unitNumber: string } }>('unit/create', {
-			body: data
-		}),
+		squareFeet?: number;
+		lotSquareFeet?: number;
+		parkingSpaces?: number;
+		assessmentClass?: string;
+		votingWeight?: number;
+	}) => orpc.unit.create(data),
 
-	update: (
-		id: string,
-		data: {
-			unitNumber?: string;
-			unitType?: string;
-			status?: string;
-			address?: string;
-			squareFootage?: number;
-			bedrooms?: number;
-			bathrooms?: number;
-		}
-	) =>
-		apiCall<{ unit: Unit }>('unit/update', {
-			body: { id, ...data }
-		})
+	update: (id: string, data: {
+		unitNumber?: string;
+		unitType?: UnitType;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
+		bedrooms?: number;
+		bathrooms?: number;
+		squareFeet?: number;
+		lotSquareFeet?: number;
+		parkingSpaces?: number;
+		assessmentClass?: string;
+		votingWeight?: number;
+	}) => orpc.unit.update({ id, ...data })
 };
 
 // ============================================================================
-// Property API
+// Property API - Using oRPC client
 // ============================================================================
+
+// Property type enum for type safety
+export type PropertyType = 'SINGLE_FAMILY' | 'CONDOMINIUM' | 'TOWNHOUSE' | 'COOPERATIVE' | 'MIXED_USE' | 'COMMERCIAL';
 
 export const propertyApi = {
 	list: (params?: {
-		status?: string;
-		propertyType?: string;
-		search?: string;
-	}) =>
-		apiCall<{ properties: Property[] }>('property/list', {
-			body: params || {}
-		}),
+		associationId?: string;
+		propertyType?: PropertyType;
+		cursor?: string;
+		limit?: number;
+	}) => orpc.property.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ property: Property }>('property/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.property.get({ id }),
 
 	create: (data: {
+		associationId: string;
 		name: string;
-		address: string;
-		propertyType: string;
-		status?: string;
+		propertyType: PropertyType;
+		addressLine1: string;
+		addressLine2?: string;
+		city: string;
+		state: string;
+		postalCode: string;
+		latitude?: number;
+		longitude?: number;
 		yearBuilt?: number;
-		totalSquareFootage?: number;
-		parkingSpaces?: number;
-		amenities?: string[];
-		idempotencyKey: string;
-	}) =>
-		apiCall<{ property: { id: string; name: string } }>('property/create', {
-			body: data
-		}),
+		totalUnits?: number;
+		totalAcres?: number;
+	}) => orpc.property.create(data),
 
-	update: (
-		id: string,
-		data: {
-			name?: string;
-			address?: string;
-			propertyType?: string;
-			status?: string;
-			yearBuilt?: number;
-			totalSquareFootage?: number;
-			parkingSpaces?: number;
-			amenities?: string[];
-		}
-	) =>
-		apiCall<{ property: Property }>('property/update', {
-			body: { id, ...data }
-		})
+	update: (id: string, data: {
+		name?: string;
+		propertyType?: PropertyType;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
+		latitude?: number;
+		longitude?: number;
+		yearBuilt?: number;
+		totalUnits?: number;
+		totalAcres?: number;
+	}) => orpc.property.update({ id, ...data })
 };
 
 // ============================================================================
-// Vendor API
+// Vendor API - Using oRPC client
 // ============================================================================
 
 export const vendorApi = {
 	list: (params?: {
-		status?: string;
-		trade?: string;
-		search?: string;
-	}) =>
-		apiCall<{ vendors: Vendor[] }>('vendor/list', {
-			body: params || {}
-		}),
+		isActive?: boolean;
+		tradeCategory?: string;
+		cursor?: string;
+		limit?: number;
+	}) => orpc.vendor.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ vendor: Vendor }>('vendor/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.vendor.get({ id }),
 
 	create: (data: {
 		name: string;
-		trades: string[];
+		tradeCategory: string;
 		contactName?: string;
-		email?: string;
-		phone?: string;
-		address?: string;
+		contactEmail?: string;
+		contactPhone?: string;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
 		licenseNumber?: string;
+		licenseExpiry?: string;
 		insuranceExpiry?: string;
-		idempotencyKey: string;
-	}) =>
-		apiCall<{ vendor: { id: string; name: string } }>('vendor/create', {
-			body: data
-		}),
+		notes?: string;
+	}) => orpc.vendor.create(data),
 
-	update: (
-		id: string,
-		data: {
-			name?: string;
-			status?: string;
-			trades?: string[];
-			contactName?: string;
-			email?: string;
-			phone?: string;
-			address?: string;
-			licenseNumber?: string;
-			insuranceExpiry?: string;
-		}
-	) =>
-		apiCall<{ vendor: Vendor }>('vendor/update', {
-			body: { id, ...data }
-		}),
-
-	updateStatus: (
-		id: string,
-		data: {
-			status: string;
-			notes?: string;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ vendor: Vendor }>('vendor/updateStatus', {
-			body: { vendorId: id, ...data }
-		})
+	update: (id: string, data: {
+		name?: string;
+		tradeCategory?: string;
+		contactName?: string;
+		contactEmail?: string;
+		contactPhone?: string;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
+		licenseNumber?: string;
+		licenseExpiry?: string;
+		insuranceExpiry?: string;
+		notes?: string;
+		isActive?: boolean;
+	}) => orpc.vendor.update({ id, ...data })
 };
 
 // ============================================================================
-// Association API
+// Association API - Using oRPC client
 // ============================================================================
 
 export const associationApi = {
-	list: (params?: { organizationId?: string }) =>
-		apiCall<{ associations: Association[] }>('association/list', {
-			body: params || {}
-		}),
+	list: (params?: { cursor?: string; limit?: number }) => orpc.association.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ association: Association }>('association/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.association.get({ id }),
 
-	update: (
-		id: string,
-		data: {
-			name?: string;
-			legalName?: string;
-			status?: string;
-			fiscalYearEnd?: number;
-			address?: string;
-			phone?: string;
-			email?: string;
-			website?: string;
-			taxId?: string;
-		}
-	) =>
-		apiCall<{ association: Association }>('association/update', {
-			body: { id, ...data }
-		})
+	create: (data: {
+		name: string;
+		legalName?: string;
+		taxId?: string;
+		incorporationDate?: string;
+		fiscalYearEnd?: number;
+		settings?: Record<string, unknown>;
+	}) => orpc.association.create(data),
+
+	update: (id: string, data: {
+		name?: string;
+		legalName?: string;
+		taxId?: string;
+		incorporationDate?: string;
+		fiscalYearEnd?: number;
+		settings?: Record<string, unknown>;
+	}) => orpc.association.update({ id, ...data })
 };
 
 // ============================================================================
-// Document API
+// Document API - Using oRPC client
 // ============================================================================
 
-export interface DocumentDetail extends Document {
-	title?: string;
-	description?: string;
-	version: number;
-	status: string;
-	effectiveDate?: string;
-	tags?: string[];
-	parentDocumentId?: string;
-	supersededById?: string;
-	uploadedById?: string;
-	uploadedByName?: string;
-	updatedAt?: string;
-}
+// Document context type enum for type safety (matches oRPC schema)
+export type DocumentContextType = 'ASSOCIATION' | 'PROPERTY' | 'UNIT' | 'JOB' | 'CASE' | 'WORK_ORDER' | 'TECHNICIAN' | 'CONTRACTOR' | 'VENDOR' | 'PARTY' | 'OWNER_INTENT' | 'VIOLATION' | 'ARC_REQUEST' | 'BOARD_MOTION' | 'RESOLUTION' | 'MEETING';
 
-export interface DocumentReference {
-	id: string;
-	contextType: string;
-	contextId: string;
-	bindingNotes?: string;
-	createdAt: string;
-	// Resolved entity info
-	entityTitle?: string;
-	entityNumber?: string;
-	entityStatus?: string;
-}
+// Document category enum for type safety (matches oRPC schema)
+export type DocumentCategory = 'GOVERNING_DOCS' | 'FINANCIAL' | 'MEETING' | 'LEGAL' | 'INSURANCE' | 'MAINTENANCE' | 'ARCHITECTURAL' | 'RESERVE_STUDY' | 'INSPECTION' | 'CONTRACT' | 'CC_AND_RS' | 'PERMIT' | 'APPROVAL' | 'CORRESPONDENCE' | 'TITLE_DEED' | 'SURVEY' | 'WARRANTY' | 'LICENSE' | 'CERTIFICATION' | 'BOND' | 'PROPOSAL' | 'ESTIMATE' | 'INVOICE' | 'WORK_ORDER' | 'VOICE_NOTE' | 'SIGNATURE' | 'CHECKLIST' | 'PHOTO' | 'VIDEO' | 'GENERAL';
 
-export interface DocumentVersion {
-	id: string;
-	version: number;
-	status: string;
-	createdAt: string;
-}
+// DocumentReference and DocumentVersion extracted from document operations
+export type DocumentReference = operations['document.getReferences']['responses']['200']['content']['application/json']['data']['references'][number];
+export type DocumentVersion = operations['document.getVersions']['responses']['200']['content']['application/json']['data']['versions'][number];
+
+export type DocumentStatus = 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
 
 export const documentApi = {
 	list: (params?: {
-		category?: string;
-		visibility?: string;
-		status?: string;
-		contextType?: string;
+		category?: DocumentCategory;
+		contextType?: DocumentContextType;
 		contextId?: string;
+		status?: DocumentStatus;
 		search?: string;
-	}) =>
-		apiCall<{ documents: Document[] }>('document/list', {
-			body: params || {}
-		}),
+		cursor?: string;
+		limit?: number;
+	}) => orpc.document.listDocuments(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ document: DocumentDetail }>('document/get', {
-			body: { id }
-		}),
+	get: (id: string) => orpc.document.getDocument({ id }),
 
 	classify: (data: {
-		documentId: string;
-		category: string;
+		id: string;
+		category: DocumentCategory;
 		reason: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ document: { id: string; category: string } }>('document/classifyDocument', {
-			body: data
-		}),
+	}) => orpc.document.classifyDocument(data),
 
 	linkToContext: (data: {
 		documentId: string;
-		contextType: string;
+		contextType: DocumentContextType;
 		contextId: string;
+		isPrimary?: boolean;
 		bindingNotes?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ binding: { id: string; documentId: string; contextType: string; contextId: string } }>(
-			'document/linkToContext',
-			{ body: data }
-		),
+	}) => orpc.document.linkToContext(data),
 
 	unlinkFromContext: (data: {
 		documentId: string;
-		contextType: string;
+		contextType: DocumentContextType;
 		contextId: string;
-		idempotencyKey: string;
-	}) =>
-		apiCall<{ success: boolean }>('document/unlinkFromContext', {
-			body: data
-		}),
+	}) => orpc.document.unlinkFromContext(data),
 
-	getReferences: (documentId: string) =>
-		apiCall<{ references: DocumentReference[]; referenceCount: number }>('document/getReferences', {
-			body: { documentId }
-		}),
+	getReferences: (documentId: string) => orpc.document.getReferences({ documentId }),
 
-	getActivityHistory: (documentId: string) =>
-		apiCall<{
-			events: Array<{
-				id: string;
-				action: string;
-				summary: string;
-				actorType: string;
-				performedBy: string;
-				createdAt: string;
-			}>;
-		}>('document/getActivityHistory', {
-			body: { documentId }
-		}),
+	getVersions: (documentId: string) => orpc.document.getVersions({ documentId }),
 
-	getVersions: (documentId: string) =>
-		apiCall<{ versions: DocumentVersion[] }>('document/getVersions', {
-			body: { documentId }
-		})
+	getActivityHistory: (documentId: string) => orpc.document.getActivityHistory({ documentId })
 };
 
 // ============================================================================
-// Activity Event API
+// Activity Event API - Using oRPC client
 // ============================================================================
+
+// Activity entity type enum for type safety (matches oRPC schema)
+export type ActivityEntityType = 'ASSOCIATION' | 'UNIT' | 'OWNER' | 'VIOLATION' | 'ARC_REQUEST' | 'ASSESSMENT' | 'GOVERNING_DOCUMENT' | 'BOARD_ACTION' | 'JOB' | 'WORK_ORDER' | 'ESTIMATE' | 'INVOICE' | 'TECHNICIAN' | 'CONTRACTOR' | 'INVENTORY' | 'CONCIERGE_CASE' | 'OWNER_INTENT' | 'INDIVIDUAL_PROPERTY' | 'PROPERTY_DOCUMENT' | 'MATERIAL_DECISION' | 'EXTERNAL_HOA' | 'EXTERNAL_VENDOR' | 'CONCIERGE_ACTION' | 'USER' | 'USER_ROLE' | 'ORGANIZATION' | 'DOCUMENT' | 'OTHER';
 
 export const activityEventApi = {
-	list: (params?: {
-		entityType?: string;
-		entityId?: string;
-		contextType?: string;
-		contextId?: string;
-	}) =>
-		apiCall<{
-			events: Array<{
-				id: string;
-				action: string;
-				summary: string;
-				performedBy: string;
-				actorType?: string;
-				rationale?: string;
-				relatedDocuments?: string[];
-				createdAt: string;
-			}>;
-		}>('activityEvent/list', {
-			body: params || {}
-		})
+	getByEntity: (params: { entityType: ActivityEntityType; entityId: string; cursor?: string; limit?: number }) =>
+		orpc.activityEvent.getByEntity(params),
+
+	getByOrganization: (params?: { cursor?: string; limit?: number }) =>
+		orpc.activityEvent.getByOrganization(params || {}),
+
+	getByCase: (params: { caseId: string; cursor?: string; limit?: number }) =>
+		orpc.activityEvent.getByCase(params),
+
+	getByJob: (params: { jobId: string; cursor?: string; limit?: number }) =>
+		orpc.activityEvent.getByJob(params),
+
+	search: (params: { query: string; entityTypes?: ActivityEntityType[]; startDate?: string; endDate?: string; cursor?: string; limit?: number }) =>
+		orpc.activityEvent.search(params)
 };
 
 // ============================================================================
-// Governance API
+// Governance API - Using oRPC client
 // ============================================================================
 
 export const governanceApi = {
 	boards: {
-		list: () =>
-			apiCall<{
-				boards: Array<{
-					id: string;
-					name: string;
-					boardType: string;
-					status: string;
-				}>;
-			}>('governanceBoard/list', { body: {} })
-	},
-	policies: {
-		list: (params?: { category?: string }) =>
-			apiCall<{
-				policies: Array<{
-					id: string;
-					title: string;
-					category: string;
-					version: string;
-					status: string;
-					effectiveDate: string;
-					lastReviewedDate?: string;
-					nextReviewDate?: string;
-					summary?: string;
-					documentId?: string;
-				}>;
-			}>('governancePolicy/list', { body: params || {} })
+		list: (params?: { associationId?: string }) => orpc.governanceBoard.list(params || {}),
+		get: (id: string) => orpc.governanceBoard.get({ id }),
+		create: (data: { associationId: string; name: string; description?: string; idempotencyKey: string }) =>
+			orpc.governanceBoard.create(data),
+		addMember: (data: { 
+			boardId: string; 
+			partyId: string; 
+			role: 'PRESIDENT' | 'VICE_PRESIDENT' | 'SECRETARY' | 'TREASURER' | 'DIRECTOR' | 'MEMBER_AT_LARGE';
+			termStart: string;
+			termEnd?: string;
+			idempotencyKey: string 
+		}) => orpc.governanceBoard.addMember(data),
+		removeMember: (data: { boardId: string; memberId: string; idempotencyKey: string }) =>
+			orpc.governanceBoard.removeMember(data)
 	},
 	meetings: {
-		list: (params?: { boardId?: string; status?: string }) =>
-			apiCall<{
-				meetings: Array<{
-					id: string;
-					title: string;
-					meetingType: string;
-					scheduledDate: string;
-					status: string;
-				}>;
-			}>('governanceMeeting/list', { body: params || {} }),
+		list: (params?: { associationId?: string; status?: 'SCHEDULED' | 'CANCELLED' | 'IN_SESSION' | 'ADJOURNED' | 'MINUTES_DRAFT' | 'MINUTES_APPROVED' | 'ARCHIVED' }) =>
+			orpc.governanceMeeting.list(params || {}),
 
-		get: (id: string) =>
-			apiCall<{ meeting: unknown }>('governanceMeeting/get', { body: { id } }),
+		get: (id: string) => orpc.governanceMeeting.get({ id }),
 
 		create: (data: {
 			associationId: string;
 			boardId?: string;
-			type: string;
+			type: 'BOARD' | 'ANNUAL' | 'SPECIAL';
 			title: string;
 			description?: string;
 			scheduledFor: string;
 			location?: string;
-			virtualLink?: string;
-			quorumRequired?: number;
 			idempotencyKey: string;
-		}) =>
-			apiCall<{ meeting: { id: string; associationId: string; status: string } }>(
-				'governanceMeeting/create',
-				{ body: data }
-			),
+		}) => orpc.governanceMeeting.create(data),
 
-		// Phase 11: Meeting State Transitions
 		startSession: (data: { meetingId: string; idempotencyKey: string }) =>
-			apiCall<{
-				meeting: { id: string; status: string };
-				quorumStatus: { required: number | null; present: number; met: boolean };
-			}>('governanceMeeting/startSession', { body: data }),
+			orpc.governanceMeeting.startSession(data),
 
 		adjourn: (data: { meetingId: string; notes?: string; idempotencyKey: string }) =>
-			apiCall<{ meeting: { id: string; status: string } }>('governanceMeeting/adjourn', { body: data }),
+			orpc.governanceMeeting.adjourn(data),
 
 		submitMinutesDraft: (data: { meetingId: string; content: string; idempotencyKey: string }) =>
-			apiCall<{ meeting: { id: string; status: string } }>('governanceMeeting/submitMinutesDraft', { body: data }),
+			orpc.governanceMeeting.submitMinutesDraft(data),
 
 		approveMinutes: (data: { meetingId: string; idempotencyKey: string }) =>
-			apiCall<{ meeting: { id: string; status: string } }>('governanceMeeting/approveMinutes', { body: data }),
+			orpc.governanceMeeting.approveMinutes(data),
 
 		archive: (data: { meetingId: string; idempotencyKey: string }) =>
-			apiCall<{ meeting: { id: string; status: string } }>('governanceMeeting/archive', { body: data }),
+			orpc.governanceMeeting.archive(data),
 
 		getQuorumStatus: (meetingId: string) =>
-			apiCall<{
-				quorumRequired: number | null;
-				presentCount: number;
-				quorumMet: boolean;
-				attendees: Array<{ partyId: string; status: string }>;
-			}>('governanceMeeting/getQuorumStatus', { body: { meetingId } }),
+			orpc.governanceMeeting.getQuorumStatus({ meetingId }),
 
-		// Agenda Items
 		addAgendaItem: (data: {
 			meetingId: string;
 			title: string;
 			description?: string;
 			order?: number;
+			timeAllotment?: number;
 			arcRequestId?: string;
 			violationId?: string;
 			workOrderId?: string;
 			policyDocumentId?: string;
 			idempotencyKey: string;
-		}) =>
-			apiCall<{ agendaItem: { id: string; meetingId: string } }>('governanceMeeting/addAgendaItem', { body: data }),
+		}) => orpc.governanceMeeting.addAgendaItem(data),
 
-		// Attendance
 		recordAttendance: (data: {
 			meetingId: string;
 			partyId: string;
-			status: string;
+			status?: 'PRESENT' | 'ABSENT' | 'EXCUSED';
 			proxyForPartyId?: string;
+			checkedInAt?: string;
 			idempotencyKey: string;
-		}) =>
-			apiCall<{ attendance: { id: string; meetingId: string; partyId: string; status: string } }>(
-				'governanceMeeting/recordAttendance',
-				{ body: data }
-			),
+		}) => orpc.governanceMeeting.recordAttendance(data),
 
-		// Voting
 		openVote: (data: {
 			meetingId: string;
 			agendaItemId?: string;
 			question: string;
-			method?: string;
+			method: 'IN_PERSON' | 'PROXY' | 'ELECTRONIC';
 			quorumRequired?: number;
 			idempotencyKey: string;
-		}) =>
-			apiCall<{ vote: { id: string; meetingId: string; question: string; quorumRequired: number | null } }>(
-				'governanceMeeting/openVote',
-				{ body: data }
-			),
+		}) => orpc.governanceMeeting.openVote(data),
 
 		castBallot: (data: {
 			voteId: string;
 			voterPartyId: string;
-			choice: string;
+			choice: 'YES' | 'NO' | 'ABSTAIN';
 			hasConflictOfInterest?: boolean;
 			conflictNotes?: string;
 			idempotencyKey: string;
-		}) =>
-			apiCall<{ ballot: { id: string; voteId: string; voterPartyId: string; choice: string; hasConflictOfInterest: boolean } }>(
-				'governanceMeeting/castBallot',
-				{ body: data }
-			),
+		}) => orpc.governanceMeeting.castBallot(data),
 
 		getEligibleVoters: (voteId: string) =>
-			apiCall<{
-				eligibleVoters: Array<{ partyId: string; name: string | null; hasVoted: boolean; attendanceStatus: string }>;
-				totalEligible: number;
-				totalVoted: number;
-			}>('governanceMeeting/getEligibleVoters', { body: { voteId } }),
+			orpc.governanceMeeting.getEligibleVoters({ voteId }),
 
 		tallyVote: (voteId: string) =>
-			apiCall<{
-				results: {
-					yes: number;
-					no: number;
-					abstain: number;
-					totalBallots: number;
-					attendanceCount: number;
-					turnoutPct: number;
-					quorumRequired: number | null;
-					quorumMet: boolean;
-				};
-			}>('governanceMeeting/tallyVote', { body: { voteId } }),
+			orpc.governanceMeeting.tallyVote({ voteId }),
 
 		closeVote: (data: { voteId: string; idempotencyKey: string }) =>
-			apiCall<{
-				vote: {
-					id: string;
-					closedAt: string;
-					results: {
-						yes: number;
-						no: number;
-						abstain: number;
-						totalBallots: number;
-						attendanceCount: number;
-						turnoutPct: number;
-						quorumRequired: number | null;
-						quorumMet: boolean;
-					};
-				};
-			}>('governanceMeeting/closeVote', { body: data })
+			orpc.governanceMeeting.closeVote(data)
 	},
 	resolutions: {
-		list: (params?: { status?: string }) =>
-			apiCall<{
-				resolutions: Array<{
-					id: string;
-					resolutionNumber: string;
-					title: string;
-					status: string;
-					adoptedDate?: string;
-				}>;
-			}>('governanceResolution/list', { body: params || {} }),
+		list: (params?: { associationId?: string; status?: 'PROPOSED' | 'ADOPTED' | 'SUPERSEDED' | 'ARCHIVED' }) =>
+			orpc.governanceResolution.listResolutions(params || {}),
 
-		get: (id: string) =>
-			apiCall<{ resolution: unknown }>('governanceResolution/getResolution', { body: { id } }),
+		get: (id: string) => orpc.governanceResolution.getResolution({ id }),
 
 		create: (data: {
 			associationId: string;
-			boardId?: string;
+			resolutionNumber: string;
 			title: string;
-			summary?: string;
-			effectiveDate?: string;
-			idempotencyKey: string;
-		}) =>
-			apiCall<{ resolution: { id: string; associationId: string; title: string; status: string } }>(
-				'governanceResolution/createResolution',
-				{ body: data }
-			),
-
-		updateStatus: (data: { id: string; status: string; idempotencyKey: string }) =>
-			apiCall<{ resolution: { id: string; title: string; status: string } }>(
-				'governanceResolution/updateResolutionStatus',
-				{ body: data }
-			),
-
-		// Phase 11: Resolution Linking
-		linkToMotion: (data: { resolutionId: string; motionId: string; idempotencyKey: string }) =>
-			apiCall<{ resolution: { id: string; title: string; motionId: string } }>(
-				'governanceResolution/linkToMotion',
-				{ body: data }
-			),
-
-		getLinkedActions: (resolutionId: string) =>
-			apiCall<{
-				resolution: { id: string; title: string };
-				linkedMotion: { id: string; title: string; status: string } | null;
-				linkedWorkOrders: Array<{ id: string; workOrderNumber: string; status: string }>;
-				linkedPolicies: Array<{ id: string; title: string; status: string }>;
-			}>('governanceResolution/getLinkedActions', { body: { resolutionId } })
-	},
-	motions: {
-		list: (params: {
-			associationId: string;
-			meetingId?: string;
-			status?: string;
+			content: string;
 			category?: string;
-			outcome?: string;
-			search?: string;
-			page?: number;
-			pageSize?: number;
-		}) =>
-			apiCall<{
-				motions: BoardMotion[];
-				pagination: { page: number; pageSize: number; total: number; totalPages: number };
-			}>('boardMotion/list', { body: params }),
-
-		get: (id: string) =>
-			apiCall<{ motion: BoardMotion }>('boardMotion/get', { body: { id } }),
-
-		create: (data: {
-			associationId: string;
-			meetingId?: string;
-			title: string;
-			description?: string;
-			category: string;
-			movedById?: string;
-			secondedById?: string;
-			rationale?: string;
 			effectiveDate?: string;
-			expiresAt?: string;
+			expirationDate?: string;
 			idempotencyKey: string;
-		}) =>
-			apiCall<{ motion: { id: string; motionNumber: string; title: string; status: string } }>(
-				'boardMotion/create',
-				{ body: data }
-			),
+		}) => orpc.governanceResolution.createResolution(data),
 
-		update: (
-			id: string,
-			data: {
-				title?: string;
-				description?: string;
-				category?: string;
-				rationale?: string;
-				effectiveDate?: string | null;
-				expiresAt?: string | null;
-			}
-		) =>
-			apiCall<{ motion: BoardMotion }>('boardMotion/update', { body: { id, ...data } }),
+		updateStatus: (data: { id: string; status: 'PROPOSED' | 'ADOPTED' | 'SUPERSEDED' | 'ARCHIVED'; effectiveDate?: string; supersededById?: string; idempotencyKey: string }) =>
+			orpc.governanceResolution.updateResolutionStatus(data),
 
-		second: (data: { id: string; secondedById: string; idempotencyKey: string }) =>
-			apiCall<{ motion: { id: string; motionNumber: string; status: string } }>(
-				'boardMotion/second',
-				{ body: data }
-			),
-
-		changeStatus: (data: { id: string; status: string; notes?: string; idempotencyKey: string }) =>
-			apiCall<{ motion: { id: string; motionNumber: string; status: string } }>(
-				'boardMotion/changeStatus',
-				{ body: data }
-			),
-
-		recordOutcome: (data: {
-			id: string;
-			outcome: string;
-			outcomeNotes?: string;
-			idempotencyKey: string;
-		}) =>
-			apiCall<{ motion: { id: string; motionNumber: string; status: string; outcome: string | null } }>(
-				'boardMotion/recordOutcome',
-				{ body: data }
-			),
-
-		withdraw: (data: { id: string; reason?: string; idempotencyKey: string }) =>
-			apiCall<{ motion: { id: string; motionNumber: string; status: string; outcome: string | null } }>(
-				'boardMotion/withdraw',
-				{ body: data }
-			),
-
-		// Phase 11: Motion Voting Lifecycle
-		openVoting: (data: { id: string; meetingId: string; voteQuestion?: string; idempotencyKey: string }) =>
-			apiCall<{
-				motion: { id: string; motionNumber: string; status: string };
-				vote: { id: string; question: string };
-			}>('boardMotion/openVoting', { body: data }),
-
-		closeVoting: (data: { id: string; idempotencyKey: string }) =>
-			apiCall<{
-				motion: { id: string; motionNumber: string; status: string; outcome: string | null };
-				voteResults: { yes: number; no: number; abstain: number; passed: boolean };
-			}>('boardMotion/closeVoting', { body: data }),
-
-		table: (data: { id: string; reason?: string; idempotencyKey: string }) =>
-			apiCall<{ motion: { id: string; motionNumber: string; status: string; outcome: string | null } }>(
-				'boardMotion/table',
-				{ body: data }
-			)
+		linkToMotion: (data: { resolutionId: string; motionId: string; idempotencyKey: string }) =>
+			orpc.governanceResolution.linkToMotion(data)
 	}
 };
 
 // ============================================================================
-// Report API
+// Report API - Using oRPC client
 // ============================================================================
+
+export type ReportCategory = 'GOVERNANCE' | 'FINANCIAL' | 'CUSTOM' | 'RECEIVABLES' | 'PAYABLES' | 'OPERATIONAL' | 'COMPLIANCE';
 
 export const reportApi = {
 	definitions: {
-		list: (params?: { category?: string }) =>
-			apiCall<{
-				reports: Array<{
-					id: string;
-					name: string;
-					description?: string;
-					category: string;
-					isSystem: boolean;
-				}>;
-			}>('reportDefinition/list', { body: params || {} }),
+		list: (params?: { category?: ReportCategory; isActive?: boolean; pagination?: { cursor?: string; limit?: number } }) =>
+			orpc.reportDefinition.list(params || {}),
 
-		get: (id: string) =>
-			apiCall<{
-				report: {
-					id: string;
-					name: string;
-					description?: string;
-					category: string;
-					outputFormat?: string;
-					parameters?: Array<{
-						name: string;
-						label: string;
-						type: string;
-						required: boolean;
-						options?: Array<{ value: string; label: string }>;
-						defaultValue?: string;
-					}>;
-				};
-			}>('reportDefinition/get', { body: { id } })
+		get: (id: string) => orpc.reportDefinition.get({ id }),
+
+		create: (data: {
+			code: string;
+			name: string;
+			description?: string;
+			category: 'GOVERNANCE' | 'FINANCIAL' | 'CUSTOM' | 'RECEIVABLES' | 'PAYABLES' | 'OPERATIONAL' | 'COMPLIANCE';
+			queryTemplate: string;
+			outputFormat?: string;
+			parameters?: Array<{ name: string; label: string; type: string; required: boolean; defaultValue?: string }>;
+			idempotencyKey?: string;
+		}) => orpc.reportDefinition.create(data)
 	},
 
-	execute: (
-		id: string,
-		data: {
-			parameters?: Record<string, string>;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{
-			result: {
-				id: string;
-				status: string;
-				generatedAt: string;
-				rowCount?: number;
-				data?: Record<string, unknown>[];
-				columns?: Array<{ key: string; label: string }>;
-				downloadUrl?: string;
-			};
-		}>('report/execute', { body: { reportId: id, ...data } }),
+	execute: (data: { reportId: string; parametersJson?: string; format?: 'PDF' | 'EXCEL' | 'CSV' | 'JSON' | 'HTML'; idempotencyKey?: string }) =>
+		orpc.reportExecution.generate(data),
 
-	schedule: (
-		id: string,
-		data: {
-			frequency: string;
-			dayOfWeek?: number;
-			dayOfMonth?: number;
-			time: string;
-			outputFormat: string;
-			recipients: string[];
-			isActive: boolean;
-			idempotencyKey: string;
-		}
-	) =>
-		apiCall<{ schedule: { id: string } }>('report/schedule', { body: { reportId: id, ...data } })
-};
+	getExecution: (id: string) => orpc.reportExecution.get({ id }),
 
-// ============================================================================
-// Accounting API
-// ============================================================================
+	listExecutions: (params?: { reportId?: string; status?: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'; pagination?: { cursor?: string; limit?: number } }) =>
+		orpc.reportExecution.list(params || {}),
 
-export const accountingApi = {
-	assessments: {
-		list: (params?: { status?: string }) =>
-			apiCall<{ assessments: Array<{ id: string; unitId: string; unitNumber: string; ownerName: string; type: string; amount: number; dueDate: string; status: string; paidAmount: number; createdAt: string }> }>(
-				'accounting/assessments/list',
-				{ body: params || {} }
-			)
-	},
-	payables: {
-		list: (params?: { status?: string }) =>
-			apiCall<{ payables: Array<{ id: string; vendorId: string; vendorName: string; invoiceNumber: string; description: string; amount: number; dueDate: string; status: string; createdAt: string }> }>(
-				'accounting/payables/list',
-				{ body: params || {} }
-			)
-	},
-	receivables: {
-		list: (params?: Record<string, unknown>) =>
-			apiCall<{ receivables: Array<{ unitId: string; unitNumber: string; ownerName: string; current: number; days30: number; days60: number; days90: number; days90Plus: number; total: number }>; summary: { totalOutstanding: number; current: number; days30: number; days60: number; days90: number; days90Plus: number; delinquentUnits: number } | null }>(
-				'accounting/receivables/list',
-				{ body: params || {} }
-			)
-	},
-	gl: {
-		accounts: (params?: Record<string, unknown>) =>
-			apiCall<{ accounts: Array<{ id: string; accountNumber: string; name: string; type: string; balance: number; isActive: boolean }> }>(
-				'accounting/gl/accounts',
-				{ body: params || {} }
-			),
-		journal: (params?: { limit?: number }) =>
-			apiCall<{ entries: Array<{ id: string; entryNumber: string; date: string; description: string; debitTotal: number; creditTotal: number; status: string; createdBy: string }> }>(
-				'accounting/gl/journal',
-				{ body: params || {} }
-			)
+	schedules: {
+		list: (params?: { reportId?: string; isActive?: boolean; pagination?: { cursor?: string; limit?: number } }) =>
+			orpc.reportSchedule.list(params || {}),
+
+		get: (id: string) => orpc.reportSchedule.get({ id }),
+
+		create: (data: {
+			reportId: string;
+			name: string;
+			frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | 'CUSTOM';
+			cronExpression?: string;
+			parametersJson?: string;
+			format?: 'PDF' | 'EXCEL' | 'CSV' | 'JSON' | 'HTML';
+			deliveryMethod?: 'EMAIL' | 'PORTAL' | 'BOTH';
+			recipientsJson?: string;
+			isActive?: boolean;
+			idempotencyKey?: string;
+		}) => orpc.reportSchedule.create(data),
+
+		update: (id: string, data: {
+			name?: string;
+			cronExpression?: string;
+			outputFormat?: string;
+			parameters?: Record<string, unknown>;
+			recipients?: string[];
+			isActive?: boolean;
+		}) => orpc.reportSchedule.update({ id, ...data }),
+
+		runNow: (data: { id: string; idempotencyKey: string }) => orpc.reportSchedule.runNow(data)
 	}
 };
 
 // ============================================================================
-// Dashboard API (Phase 12)
+// Accounting API - Using oRPC client
 // ============================================================================
 
-// Re-export dashboard types from generated types for convenience
-import type { operations } from './types.generated';
+export const accountingApi = {
+	glAccounts: {
+		list: (params?: { accountType?: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE'; fundType?: 'OPERATING' | 'RESERVE' | 'SPECIAL'; isActive?: boolean; parentId?: string }) =>
+			orpc.glAccount.list(params || {}),
+		get: (id: string) => orpc.glAccount.get({ id }),
+		create: (data: {
+			accountNumber: string;
+			name: string;
+			accountType: string;
+			category: string;
+			description?: string;
+			fundType?: string;
+			parentId?: string;
+		}) => orpc.glAccount.create(data as any)
+	},
+	journalEntries: {
+		list: (params?: { status?: 'DRAFT' | 'PENDING_APPROVAL' | 'POSTED' | 'REVERSED'; fromDate?: string; toDate?: string }) =>
+			orpc.journalEntry.list(params || {}),
+		get: (id: string) => orpc.journalEntry.get({ id }),
+		create: (data: {
+			entryDate: string;
+			description: string;
+			lines: Array<{ accountId: string; debitAmount?: number; creditAmount?: number; description?: string }>;
+			referenceType?: string;
+			referenceId?: string;
+			idempotencyKey: string;
+		}) => orpc.journalEntry.create(data),
+		post: (data: { id: string; idempotencyKey: string }) => orpc.journalEntry.post(data)
+	},
+	assessments: {
+		createType: (data: {
+			name: string;
+			code: string;
+			frequency: 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL' | 'ONE_TIME';
+			defaultAmount: number;
+			revenueAccountId: string;
+			description?: string;
+			lateFeePercentage?: number;
+			lateFeeFixedAmount?: number;
+			gracePeriodDays?: number;
+			isRecurring?: boolean;
+			prorateOnTransfer?: boolean;
+		}) => orpc.assessment.createType(data),
+		listTypes: (params?: { isActive?: boolean }) =>
+			orpc.assessment.listTypes(params || {}),
+		createCharge: (data: { unitId: string; assessmentTypeId: string; chargeDate: string; dueDate: string; amount: number; periodStart?: string; periodEnd?: string; description?: string; postToGL?: boolean }) =>
+			orpc.assessment.createCharge(data),
+		listCharges: (params?: { unitId?: string; status?: 'PENDING' | 'BILLED' | 'PARTIALLY_PAID' | 'PAID' | 'WRITTEN_OFF' | 'CREDITED'; fromDate?: string; toDate?: string }) =>
+			orpc.assessment.listCharges(params || {}),
+		getUnitBalance: (unitId: string) => orpc.assessment.getUnitBalance({ unitId })
+	},
+	payments: {
+		list: (params?: { unitId?: string; status?: 'PENDING' | 'CLEARED' | 'BOUNCED' | 'REFUNDED' | 'VOIDED'; fromDate?: string; toDate?: string }) =>
+			orpc.payment.list(params || {}),
+		get: (id: string) => orpc.payment.get({ id }),
+		create: (data: { unitId: string; amount: number; paymentDate: string; paymentMethod: 'CASH' | 'CHECK' | 'ACH' | 'CREDIT_CARD' | 'WIRE' | 'OTHER'; referenceNumber?: string; notes?: string; idempotencyKey: string }) =>
+			orpc.payment.create(data)
+	},
+	apInvoices: {
+		list: (params?: { vendorId?: string; status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'PARTIALLY_PAID' | 'PAID' | 'VOIDED'; fromDate?: string; toDate?: string }) =>
+			orpc.apInvoice.list(params || {}),
+		get: (id: string) => orpc.apInvoice.get({ id }),
+		create: (data: {
+			vendorId: string;
+			invoiceNumber: string;
+			invoiceDate: string;
+			dueDate: string;
+			description?: string;
+			lines: Array<{ glAccountId: string; unitPrice: number; description: string; quantity?: number }>;
+			idempotencyKey: string;
+		}) => orpc.apInvoice.create(data),
+		approve: (data: { id: string; idempotencyKey: string }) => orpc.apInvoice.approve(data)
+	}
+};
 
+// ============================================================================
+// Dashboard API (Phase 12) - Using oRPC client
+// ============================================================================
+
+// Dashboard types extracted from generated types
 export type DashboardData = operations['dashboard.getData']['responses']['200']['content']['application/json']['data']['dashboard'];
 export type DashboardFilters = operations['dashboard.getData']['requestBody'] extends { content: { 'application/json': infer T } } ? T : never;
 export type DashboardRequiresAction = DashboardData['requiresAction'];
@@ -1600,50 +916,17 @@ export type DashboardRecentGovernanceItem = DashboardRecentGovernance['items'][n
 export type DashboardEventType = 'DASHBOARD_VIEWED' | 'CARD_CLICKED' | 'FILTER_APPLIED';
 
 export const dashboardApi = {
-	/**
-	 * Get comprehensive dashboard data for all four sections (Phase 12)
-	 */
-	getData: (filters?: DashboardFilters) =>
-		apiCall<{ dashboard: DashboardData }>('dashboard/getData', {
-			body: filters || {}
-		}),
+	getData: (filters?: DashboardFilters) => orpc.dashboard.getData(filters || {}),
 
-	/**
-	 * Record dashboard view/interaction for audit trail (Phase 12)
-	 */
 	recordView: (data: {
 		eventType: DashboardEventType;
 		section?: string;
 		card?: string;
 		targetUrl?: string;
 		filters?: DashboardFilters;
-	}) =>
-		apiCall<{ recorded: boolean }>('dashboard/recordView', {
-			body: data
-		}),
+	}) => orpc.dashboard.recordView(data),
 
-	/**
-	 * Get existing summary data (legacy endpoint)
-	 */
-	getSummary: () =>
-		apiCall<{
-			summary: {
-				financials: {
-					totalReceivables: string;
-					totalPayables: string;
-					delinquentUnits: number;
-				};
-				operations: {
-					openWorkOrders: number;
-					pendingViolations: number;
-					pendingArcRequests: number;
-				};
-				compliance: {
-					upcomingDeadlines: number;
-					overdueItems: number;
-				};
-			};
-		}>('dashboard/getSummary', { body: {} })
+	getSummary: () => orpc.dashboard.getSummary({})
 };
 
 // ============================================================================
@@ -1658,163 +941,36 @@ export interface BadgeCounts {
 	pendingVendors: number;
 }
 
-export const badgeCountApi = {
-	get: (associationId: string) =>
-		apiCall<{ counts: BadgeCounts }>('cam/getBadgeCounts', { body: { associationId } })
-};
-
 // ============================================================================
-// Phase 13: Concierge Case API
+// Phase 13: Concierge Case API - Using oRPC client
 // ============================================================================
 
-export type ConciergeCaseStatus =
-	| 'INTAKE'
-	| 'ASSESSMENT'
-	| 'IN_PROGRESS'
-	| 'PENDING_EXTERNAL'
-	| 'PENDING_OWNER'
-	| 'ON_HOLD'
-	| 'RESOLVED'
-	| 'CLOSED'
-	| 'CANCELLED';
-
+// Concierge Case types extracted from generated types
+export type ConciergeCase = operations['conciergeCase.list']['responses']['200']['content']['application/json']['data']['cases'][number];
+export type ConciergeCaseDetail = operations['conciergeCase.getDetail']['responses']['200']['content']['application/json']['data'];
+export type ConciergeCaseStatus = 'INTAKE' | 'ASSESSMENT' | 'IN_PROGRESS' | 'PENDING_EXTERNAL' | 'PENDING_OWNER' | 'ON_HOLD' | 'RESOLVED' | 'CLOSED' | 'CANCELLED';
 export type ConciergeCasePriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'EMERGENCY';
+export type CaseNoteType = 'GENERAL' | 'CLARIFICATION_REQUEST' | 'CLARIFICATION_RESPONSE' | 'DECISION_RATIONALE';
 
-export type CaseNoteType =
-	| 'GENERAL'
-	| 'CLARIFICATION_REQUEST'
-	| 'CLARIFICATION_RESPONSE'
-	| 'DECISION_RATIONALE';
-
-export interface ConciergeCase {
-	id: string;
-	caseNumber: string;
-	propertyId: string;
-	title: string;
-	description: string;
-	status: ConciergeCaseStatus;
-	priority: ConciergeCasePriority;
-	originIntentId?: string | null;
-	assignedConciergeUserId?: string | null;
-	assignedConciergeName?: string | null;
-	linkedUnitId?: string | null;
-	linkedJobId?: string | null;
-	linkedArcRequestId?: string | null;
-	linkedWorkOrderId?: string | null;
-	resolvedAt?: string | null;
-	resolutionSummary?: string | null;
-	closedAt?: string | null;
-	cancelledAt?: string | null;
-	cancelReason?: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface CaseNote {
-	id: string;
-	caseId?: string;
-	content: string;
-	noteType: CaseNoteType;
-	isInternal: boolean;
-	createdBy: string;
-	createdAt: string;
-}
-
-export interface CaseStatusHistoryItem {
-	id: string;
-	fromStatus: string | null;
-	toStatus: string;
-	reason: string | null;
-	changedBy: string;
-	createdAt: string;
-}
-
-export interface CaseParticipant {
-	id: string;
-	partyId: string | null;
-	partyName: string | null;
-	externalContactName: string | null;
-	externalContactEmail: string | null;
-	role: string;
-	addedAt: string;
-}
-
-export interface CaseAction {
-	id: string;
-	actionType: string;
-	status: string;
-	description: string;
-	plannedAt: string | null;
-	completedAt: string | null;
-	createdAt: string;
-}
-
-export interface CaseDecision {
-	id: string;
-	category: string;
-	title: string;
-	rationale: string;
-	decidedAt: string;
-	hasOutcome: boolean;
-}
-
-export interface CaseAttachment {
-	id: string;
-	fileName: string;
-	fileSize: number;
-	mimeType: string;
-	fileUrl: string;
-	uploadedBy: string;
-	createdAt: string;
-}
-
-export interface CaseDetailProperty {
-	id: string;
-	name: string;
-	addressLine1: string;
-	city: string | null;
-	state: string | null;
-	postalCode: string | null;
-}
-
-export interface CaseOriginIntent {
-	id: string;
-	title: string;
-	description: string;
-	status: string;
-	createdAt: string;
-}
-
-export interface ConciergeCaseDetail {
-	case: ConciergeCase;
-	property: CaseDetailProperty;
-	originIntent: CaseOriginIntent | null;
-	statusHistory: CaseStatusHistoryItem[];
-	notes: CaseNote[];
-	participants: CaseParticipant[];
-	actions: CaseAction[];
-	decisions: CaseDecision[];
-	attachments: CaseAttachment[];
-}
+// Additional case-related types for backward compatibility
+export type CaseNote = ConciergeCaseDetail extends { notes: (infer T)[] } ? T : never;
+export type CaseStatusHistoryItem = ConciergeCaseDetail extends { statusHistory: (infer T)[] } ? T : never;
+export type CaseParticipant = ConciergeCaseDetail extends { participants: (infer T)[] } ? T : never;
+export type CaseAction = ConciergeCaseDetail extends { actions: (infer T)[] } ? T : never;
 
 export const conciergeCaseApi = {
-	list: (params: {
+	list: (params?: {
 		status?: ConciergeCaseStatus;
 		priority?: ConciergeCasePriority;
 		propertyId?: string;
-		assignedConciergeUserId?: string;
-		page?: number;
-		pageSize?: number;
-	}) =>
-		apiCall<{ items: ConciergeCase[]; total: number; page: number; pageSize: number }>(
-			'concierge/case/list',
-			{ body: params }
-		),
+		assignedConciergeId?: string;
+		cursor?: string;
+		limit?: number;
+	}) => orpc.conciergeCase.list(params || {}),
 
-	get: (id: string) => apiCall<{ case: ConciergeCase }>('concierge/case/get', { body: { id } }),
+	get: (id: string) => orpc.conciergeCase.get({ id }),
 
-	getDetail: (id: string) =>
-		apiCall<ConciergeCaseDetail>('concierge/case/getDetail', { body: { id } }),
+	getDetail: (id: string) => orpc.conciergeCase.getDetail({ id }),
 
 	create: (data: {
 		propertyId: string;
@@ -1823,26 +979,26 @@ export const conciergeCaseApi = {
 		priority?: ConciergeCasePriority;
 		originIntentId?: string;
 		idempotencyKey: string;
-	}) => apiCall<{ case: ConciergeCase }>('concierge/case/create', { body: data }),
+	}) => orpc.conciergeCase.create(data),
 
 	updateStatus: (data: {
-		caseId: string;
+		id: string;
 		status: ConciergeCaseStatus;
 		reason?: string;
 		idempotencyKey: string;
-	}) => apiCall<{ case: ConciergeCase }>('concierge/case/updateStatus', { body: data }),
+	}) => orpc.conciergeCase.updateStatus(data),
 
-	assign: (data: { caseId: string; conciergeUserId: string; idempotencyKey: string }) =>
-		apiCall<{ case: ConciergeCase }>('concierge/case/assign', { body: data }),
+	assign: (data: { caseId: string; conciergeId: string; idempotencyKey: string }) =>
+		orpc.conciergeCase.assign({ id: data.caseId, assignedConciergeUserId: data.conciergeId, idempotencyKey: data.idempotencyKey }),
 
 	resolve: (data: { caseId: string; resolutionSummary: string; idempotencyKey: string }) =>
-		apiCall<{ case: ConciergeCase }>('concierge/case/resolve', { body: data }),
+		orpc.conciergeCase.resolve({ id: data.caseId, resolutionSummary: data.resolutionSummary, idempotencyKey: data.idempotencyKey }),
 
 	close: (data: { caseId: string; idempotencyKey: string }) =>
-		apiCall<{ case: ConciergeCase }>('concierge/case/close', { body: data }),
+		orpc.conciergeCase.close({ id: data.caseId, idempotencyKey: data.idempotencyKey }),
 
 	cancel: (data: { caseId: string; reason: string; idempotencyKey: string }) =>
-		apiCall<{ case: ConciergeCase }>('concierge/case/cancel', { body: data }),
+		orpc.conciergeCase.cancel({ id: data.caseId, reason: data.reason, idempotencyKey: data.idempotencyKey }),
 
 	addNote: (data: {
 		caseId: string;
@@ -1850,40 +1006,31 @@ export const conciergeCaseApi = {
 		noteType?: CaseNoteType;
 		isInternal?: boolean;
 		idempotencyKey: string;
-	}) => apiCall<{ note: CaseNote }>('concierge/case/addNote', { body: data }),
+	}) => orpc.conciergeCase.addNote(data),
 
-	listNotes: (params: { caseId: string; noteType?: CaseNoteType; includeInternal?: boolean }) =>
-		apiCall<{ notes: CaseNote[] }>('concierge/case/listNotes', { body: params }),
+	listNotes: (params: { caseId: string }) =>
+		orpc.conciergeCase.listNotes(params),
 
 	requestClarification: (data: { caseId: string; question: string; idempotencyKey: string }) =>
-		apiCall<{ note: CaseNote; case: { id: string; status: string } }>(
-			'concierge/case/requestClarification',
-			{ body: data }
-		),
+		orpc.conciergeCase.requestClarification(data),
 
 	respondToClarification: (data: { caseId: string; response: string; idempotencyKey: string }) =>
-		apiCall<{ note: CaseNote }>('concierge/case/respondToClarification', { body: data }),
+		orpc.conciergeCase.respondToClarification(data),
 
 	linkToArc: (data: { caseId: string; arcRequestId: string; idempotencyKey: string }) =>
-		apiCall<{ caseId: string; linkedArcRequestId: string }>('concierge/case/linkToArc', {
-			body: data
-		}),
+		orpc.conciergeCase.linkToArc(data),
 
 	linkToWorkOrder: (data: { caseId: string; workOrderId: string; idempotencyKey: string }) =>
-		apiCall<{ caseId: string; linkedWorkOrderId: string }>('concierge/case/linkToWorkOrder', {
-			body: data
-		}),
+		orpc.conciergeCase.linkToWorkOrder(data),
 
 	linkToUnit: (data: { caseId: string; unitId: string; idempotencyKey: string }) =>
-		apiCall<{ caseId: string; linkedUnitId: string }>('concierge/case/linkToUnit', { body: data }),
+		orpc.conciergeCase.linkToUnit(data),
 
 	linkToJob: (data: { caseId: string; jobId: string; idempotencyKey: string }) =>
-		apiCall<{ caseId: string; linkedJobId: string }>('concierge/case/linkToJob', { body: data }),
+		orpc.conciergeCase.linkToJob(data),
 
 	getStatusHistory: (caseId: string) =>
-		apiCall<{ history: CaseStatusHistoryItem[] }>('concierge/case/getStatusHistory', {
-			body: { caseId }
-		}),
+		orpc.conciergeCase.getStatusHistory({ caseId }),
 
 	addParticipant: (data: {
 		caseId: string;
@@ -1894,122 +1041,31 @@ export const conciergeCaseApi = {
 		role: string;
 		notes?: string;
 		idempotencyKey: string;
-	}) =>
-		apiCall<{ participant: CaseParticipant }>('concierge/case/addParticipant', { body: data }),
+	}) => orpc.conciergeCase.addParticipant(data),
 
 	listParticipants: (caseId: string) =>
-		apiCall<{ participants: CaseParticipant[] }>('concierge/case/listParticipants', {
-			body: { caseId }
-		}),
+		orpc.conciergeCase.listParticipants({ caseId }),
 
 	removeParticipant: (data: { caseId: string; participantId: string; idempotencyKey: string }) =>
-		apiCall<{ removed: boolean }>('concierge/case/removeParticipant', { body: data }),
+		orpc.conciergeCase.removeParticipant(data),
 
-	listConcierges: () =>
-		apiCall<{ concierges: Array<{ id: string; name: string; email: string }> }>(
-			'concierge/case/listConcierges',
-			{ body: {} }
-		)
+	listConcierges: () => orpc.conciergeCase.listConcierges({})
 };
 
 // ============================================================================
-// Job API (Phase 15 - Contractor Job Lifecycle)
+// Job API (Phase 15 - Contractor Job Lifecycle) - Using oRPC client
 // ============================================================================
 
-export type JobStatus =
-	| 'LEAD'
-	| 'TICKET'
-	| 'ESTIMATE_REQUIRED'
-	| 'ESTIMATE_SENT'
-	| 'ESTIMATE_APPROVED'
-	| 'JOB_CREATED'
-	| 'SCHEDULED'
-	| 'DISPATCHED'
-	| 'IN_PROGRESS'
-	| 'ON_HOLD'
-	| 'COMPLETED'
-	| 'INVOICED'
-	| 'PAID'
-	| 'WARRANTY'
-	| 'CLOSED'
-	| 'CANCELLED';
+// Job types extracted from generated types
+export type Job = operations['job.list']['responses']['200']['content']['application/json']['data']['jobs'][number];
+export type JobDetail = operations['job.get']['responses']['200']['content']['application/json']['data']['job'];
+export type JobStatus = 'LEAD' | 'TICKET' | 'ESTIMATE_REQUIRED' | 'ESTIMATE_SENT' | 'ESTIMATE_APPROVED' | 'JOB_CREATED' | 'SCHEDULED' | 'DISPATCHED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'INVOICED' | 'PAID' | 'WARRANTY' | 'CLOSED' | 'CANCELLED';
+export type JobSourceType = 'WORK_ORDER' | 'VIOLATION' | 'ARC_REQUEST' | 'DIRECT_CUSTOMER' | 'LEAD' | 'RECURRING';
+export type JobPriority = 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW';
 
-export type JobSourceType =
-	| 'WORK_ORDER'
-	| 'VIOLATION'
-	| 'ARC_REQUEST'
-	| 'DIRECT_CUSTOMER'
-	| 'LEAD'
-	| 'RECURRING';
-
-export interface Job {
-	id: string;
-	organizationId: string;
-	jobNumber: string;
-	status: JobStatus;
-	sourceType: JobSourceType;
-	workOrderId: string | null;
-	violationId: string | null;
-	arcRequestId: string | null;
-	customerId: string | null;
-	unitId: string | null;
-	propertyId: string | null;
-	associationId: string | null;
-	addressLine1: string | null;
-	addressLine2: string | null;
-	city: string | null;
-	state: string | null;
-	postalCode: string | null;
-	locationNotes: string | null;
-	title: string;
-	description: string | null;
-	category: string | null;
-	priority: string;
-	assignedTechnicianId: string | null;
-	assignedBranchId: string | null;
-	assignedAt: string | null;
-	assignedBy: string | null;
-	scheduledStart: string | null;
-	scheduledEnd: string | null;
-	estimatedHours: string | null;
-	dispatchedAt: string | null;
-	startedAt: string | null;
-	completedAt: string | null;
-	invoicedAt: string | null;
-	paidAt: string | null;
-	closedAt: string | null;
-	closedBy: string | null;
-	cancelledAt: string | null;
-	estimatedCost: string | null;
-	actualCost: string | null;
-	actualHours: string | null;
-	warrantyEnds: string | null;
-	warrantyNotes: string | null;
-	resolutionNotes: string | null;
-	customerRating: number | null;
-	customerFeedback: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface JobNote {
-	id: string;
-	jobId: string;
-	authorId: string;
-	content: string;
-	isInternal: boolean;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface JobStatusHistoryItem {
-	id: string;
-	fromStatus: JobStatus | null;
-	toStatus: JobStatus;
-	changedBy: string;
-	changedAt: string;
-	notes: string | null;
-}
+// Additional job-related types for backward compatibility
+export type JobNote = operations['job.listNotes']['responses']['200']['content']['application/json']['data']['notes'][number];
+export type JobStatusHistoryItem = operations['job.getStatusHistory']['responses']['200']['content']['application/json']['data']['history'][number];
 
 export const jobApi = {
 	list: (params?: {
@@ -2020,16 +1076,16 @@ export const jobApi = {
 		search?: string;
 		cursor?: string;
 		limit?: number;
-	}) => apiCall<{ jobs: Job[]; pagination: { nextCursor: string | null; hasMore: boolean } }>('job/list', { body: params || {} }),
+	}) => orpc.job.list(params || {}),
 
-	get: (id: string) => apiCall<{ job: Job }>('job/get', { body: { id } }),
+	get: (id: string) => orpc.job.get({ id }),
 
 	create: (data: {
 		sourceType: JobSourceType;
 		title: string;
 		description?: string;
 		category?: string;
-		priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW';
+		priority?: JobPriority;
 		workOrderId?: string;
 		violationId?: string;
 		arcRequestId?: string;
@@ -2046,123 +1102,94 @@ export const jobApi = {
 		estimatedHours?: number;
 		estimatedCost?: number;
 		idempotencyKey: string;
-	}) => apiCall<{ job: Job }>('job/create', { body: data }),
+	}) => orpc.job.create(data),
 
 	update: (data: {
 		id: string;
 		title?: string;
-		description?: string | null;
-		category?: string | null;
-		priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW';
-		addressLine1?: string | null;
-		addressLine2?: string | null;
-		city?: string | null;
-		state?: string | null;
-		postalCode?: string | null;
-		locationNotes?: string | null;
-		estimatedHours?: number | null;
-		estimatedCost?: number | null;
-		warrantyNotes?: string | null;
-		resolutionNotes?: string | null;
-		idempotencyKey?: string;
-	}) => apiCall<{ job: Job }>('job/update', { body: data }),
+		description?: string;
+		category?: string;
+		priority?: JobPriority;
+		addressLine1?: string;
+		addressLine2?: string;
+		city?: string;
+		state?: string;
+		postalCode?: string;
+		locationNotes?: string;
+		estimatedHours?: number;
+		estimatedCost?: number;
+		warrantyNotes?: string;
+		resolutionNotes?: string;
+		idempotencyKey: string;
+	}) => orpc.job.update(data),
 
 	transitionStatus: (data: {
 		id: string;
 		toStatus: JobStatus;
 		notes?: string;
-		idempotencyKey?: string;
-	}) => apiCall<{ job: Job }>('job/transitionStatus', { body: data }),
+		idempotencyKey: string;
+	}) => orpc.job.transitionStatus(data),
 
 	assignTechnician: (data: {
 		id: string;
-		technicianId: string | null;
-		branchId?: string | null;
-		idempotencyKey?: string;
-	}) => apiCall<{ job: Job }>('job/assignTechnician', { body: data }),
+		technicianId: string;
+		branchId?: string;
+		idempotencyKey: string;
+	}) => orpc.job.assignTechnician(data),
 
 	schedule: (data: {
 		id: string;
 		scheduledStart: string;
 		scheduledEnd: string;
-		idempotencyKey?: string;
-	}) => apiCall<{ job: Job }>('job/schedule', { body: data }),
+		idempotencyKey: string;
+	}) => orpc.job.schedule(data),
 
-	getStatusHistory: (jobId: string) =>
-		apiCall<{ history: JobStatusHistoryItem[] }>('job/getStatusHistory', { body: { jobId } }),
+	getStatusHistory: (jobId: string) => orpc.job.getStatusHistory({ jobId }),
 
 	addNote: (data: {
 		jobId: string;
 		content: string;
 		isInternal?: boolean;
 		idempotencyKey: string;
-	}) => apiCall<{ note: JobNote }>('job/addNote', { body: data }),
+	}) => orpc.job.addNote(data),
 
 	listNotes: (params: { jobId: string; includeInternal?: boolean }) =>
-		apiCall<{ notes: JobNote[] }>('job/listNotes', { body: params }),
+		orpc.job.listNotes(params),
 
-	delete: (data: { id: string; idempotencyKey?: string }) =>
-		apiCall<{ deleted: boolean }>('job/delete', { body: data })
+	delete: (data: { id: string; idempotencyKey: string }) =>
+		orpc.job.delete(data)
 };
 
 // ============================================================================
-// Estimate API (Phase 15 - Contractor Job Lifecycle)
+// Estimate API (Phase 15 - Contractor Job Lifecycle) - Using oRPC client
 // ============================================================================
 
+// Estimate types extracted from generated types
+export type Estimate = operations['estimate.list']['responses']['200']['content']['application/json']['data']['estimates'][number];
+export type EstimateDetail = operations['estimate.get']['responses']['200']['content']['application/json']['data']['estimate'];
 export type EstimateStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'REVISED';
 
-export interface EstimateLine {
-	id: string;
-	lineNumber: number;
-	description: string;
-	quantity: string;
-	unitPrice: string;
-	lineTotal: string;
-	pricebookItemId: string | null;
-	isTaxable: boolean;
-	taxRate: string | null;
-}
-
-export interface Estimate {
-	id: string;
-	organizationId: string;
-	jobId: string;
-	customerId: string | null;
-	estimateNumber: string;
-	status: EstimateStatus;
-	version: number;
-	subtotal: string;
-	taxAmount: string;
-	discount: string;
-	totalAmount: string;
-	notes: string | null;
-	terms: string | null;
-	validUntil: string | null;
-	sentAt: string | null;
-	viewedAt: string | null;
-	acceptedAt: string | null;
-	declinedAt: string | null;
-	declineReason: string | null;
-	createdAt: string;
-	updatedAt: string;
-	lines?: EstimateLine[];
-}
+// Additional estimate-related types for backward compatibility
+export type EstimateLine = EstimateDetail extends { lines?: (infer T)[] } ? T : never;
 
 export const estimateApi = {
-	list: (params: { jobId: string }) =>
-		apiCall<{ estimates: Estimate[] }>('billing/estimate/list', { body: params }),
+	list: (params: { jobId?: string; customerId?: string; status?: EstimateStatus; cursor?: string; limit?: number }) =>
+		orpc.estimate.list(params),
 
-	get: (id: string) =>
-		apiCall<{ estimate: Estimate }>('billing/estimate/get', { body: { id } }),
+	get: (id: string) => orpc.estimate.get({ id }),
 
 	create: (data: {
 		jobId: string;
-		customerId?: string;
+		customerId: string;
+		title?: string;
+		description?: string;
 		notes?: string;
 		terms?: string;
 		validUntil?: string;
+		discount?: number;
+		lines?: Array<{ description: string; quantity: number; unitPrice: number; isTaxable?: boolean; taxRate?: number; pricebookItemId?: string }>;
 		idempotencyKey: string;
-	}) => apiCall<{ estimate: Estimate }>('billing/estimate/create', { body: data }),
+	}) => orpc.estimate.create(data),
 
 	update: (data: {
 		id: string;
@@ -2170,8 +1197,8 @@ export const estimateApi = {
 		terms?: string;
 		validUntil?: string;
 		discount?: number;
-		idempotencyKey?: string;
-	}) => apiCall<{ estimate: Estimate }>('billing/estimate/update', { body: data }),
+		idempotencyKey: string;
+	}) => orpc.estimate.update(data),
 
 	addLine: (data: {
 		estimateId: string;
@@ -2182,76 +1209,41 @@ export const estimateApi = {
 		taxRate?: number;
 		pricebookItemId?: string;
 		idempotencyKey: string;
-	}) => apiCall<{ estimate: Estimate }>('billing/estimate/addLine', { body: data }),
+	}) => orpc.estimate.addLine(data),
 
 	removeLine: (data: {
 		estimateId: string;
 		lineId: string;
 		idempotencyKey: string;
-	}) => apiCall<{ estimate: Estimate }>('billing/estimate/removeLine', { body: data }),
+	}) => orpc.estimate.removeLine(data),
 
-	send: (data: { id: string; idempotencyKey?: string }) =>
-		apiCall<{ estimate: Estimate }>('billing/estimate/send', { body: data }),
+	send: (data: { id: string; idempotencyKey: string }) => orpc.estimate.send(data),
 
-	accept: (data: { id: string; selectedOptionId?: string; idempotencyKey?: string }) =>
-		apiCall<{ estimate: Estimate }>('billing/estimate/accept', { body: data }),
+	accept: (data: { id: string; idempotencyKey: string }) => orpc.estimate.accept(data),
 
-	decline: (data: { id: string; reason?: string; idempotencyKey?: string }) =>
-		apiCall<{ estimate: Estimate }>('billing/estimate/decline', { body: data }),
+	decline: (data: { id: string; reason?: string; idempotencyKey: string }) => orpc.estimate.decline(data),
 
-	revise: (data: { id: string; idempotencyKey?: string }) =>
-		apiCall<{ estimate: Estimate }>('billing/estimate/revise', { body: data })
+	revise: (data: { id: string; idempotencyKey: string }) => orpc.estimate.revise(data)
 };
 
 // ============================================================================
-// Invoice API (Phase 15 - Contractor Job Lifecycle)
+// Invoice API (Phase 15 - Contractor Job Lifecycle) - Using oRPC client
 // ============================================================================
 
+// Invoice types extracted from generated types
+export type JobInvoice = operations['jobInvoice.list']['responses']['200']['content']['application/json']['data']['invoices'][number];
+export type JobInvoiceDetail = operations['jobInvoice.get']['responses']['200']['content']['application/json']['data']['invoice'];
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'VIEWED' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'VOID' | 'REFUNDED';
 
-export interface InvoiceLine {
-	id: string;
-	lineNumber: number;
-	description: string;
-	quantity: string;
-	unitPrice: string;
-	lineTotal: string;
-	pricebookItemId: string | null;
-	isTaxable: boolean;
-	taxRate: string | null;
-}
-
-export interface JobInvoice {
-	id: string;
-	organizationId: string;
-	jobId: string;
-	customerId: string | null;
-	estimateId: string | null;
-	invoiceNumber: string;
-	status: InvoiceStatus;
-	dueDate: string | null;
-	subtotal: string;
-	taxAmount: string;
-	discount: string;
-	totalAmount: string;
-	amountPaid: string;
-	balanceDue: string;
-	notes: string | null;
-	terms: string | null;
-	sentAt: string | null;
-	viewedAt: string | null;
-	paidAt: string | null;
-	createdAt: string;
-	updatedAt: string;
-	lines?: InvoiceLine[];
-}
+// Additional invoice-related types for backward compatibility
+export type InvoiceLine = JobInvoiceDetail extends { lines?: (infer T)[] } ? T : never;
+export type InvoicePayment = operations['jobPayment.list']['responses']['200']['content']['application/json']['data']['paymentIntents'][number];
 
 export const invoiceApi = {
-	list: (params: { jobId: string }) =>
-		apiCall<{ invoices: JobInvoice[] }>('billing/invoice/list', { body: params }),
+	list: (params: { jobId?: string; customerId?: string; status?: InvoiceStatus; cursor?: string; limit?: number }) =>
+		orpc.jobInvoice.list(params),
 
-	get: (id: string) =>
-		apiCall<{ invoice: JobInvoice }>('billing/invoice/get', { body: { id } }),
+	get: (id: string) => orpc.jobInvoice.get({ id }),
 
 	createFromEstimate: (data: {
 		estimateId: string;
@@ -2259,19 +1251,20 @@ export const invoiceApi = {
 		notes?: string;
 		terms?: string;
 		idempotencyKey: string;
-	}) => apiCall<{ invoice: JobInvoice }>('billing/invoice/createFromEstimate', { body: data }),
+	}) => orpc.jobInvoice.createFromEstimate(data),
 
 	create: (data: {
 		jobId: string;
-		customerId?: string;
+		customerId: string;
 		dueDate?: string;
 		notes?: string;
 		terms?: string;
+		discount?: number;
+		lines?: Array<{ description: string; quantity: number; unitPrice: number; isTaxable?: boolean; taxRate?: number }>;
 		idempotencyKey: string;
-	}) => apiCall<{ invoice: JobInvoice }>('billing/invoice/create', { body: data }),
+	}) => orpc.jobInvoice.create(data),
 
-	send: (data: { id: string; idempotencyKey?: string }) =>
-		apiCall<{ invoice: JobInvoice }>('billing/invoice/send', { body: data }),
+	send: (data: { id: string; idempotencyKey: string }) => orpc.jobInvoice.send(data),
 
 	recordPayment: (data: {
 		id: string;
@@ -2279,90 +1272,58 @@ export const invoiceApi = {
 		paymentMethod?: string;
 		referenceNumber?: string;
 		notes?: string;
-		idempotencyKey?: string;
-	}) => apiCall<{ invoice: JobInvoice }>('billing/invoice/recordPayment', { body: data }),
+		idempotencyKey: string;
+	}) => orpc.jobInvoice.recordPayment(data),
 
-	void: (data: { id: string; reason?: string; idempotencyKey?: string }) =>
-		apiCall<{ invoice: JobInvoice }>('billing/invoice/void', { body: data }),
-
-	getPayments: (invoiceId: string) =>
-		apiCall<{ payments: InvoicePayment[] }>('billing/invoice/getPayments', { body: { invoiceId } })
+	void: (data: { id: string; reason?: string; idempotencyKey: string }) => orpc.jobInvoice.void(data)
 };
 
-export interface InvoicePayment {
-	id: string;
-	invoiceId: string;
-	amount: string;
-	paymentMethod: string | null;
-	referenceNumber: string | null;
-	notes: string | null;
-	paidAt: string;
-	recordedBy: string;
-	createdAt: string;
-}
-
 // ============================================================================
-// Technician API (Phase 15 - Contractor Job Lifecycle)
+// Technician API (Phase 15 - Contractor Job Lifecycle) - Using oRPC client
 // ============================================================================
 
-export interface Technician {
-	id: string;
-	organizationId: string;
-	userId: string | null;
-	firstName: string;
-	lastName: string;
-	email: string | null;
-	phone: string | null;
-	employeeId: string | null;
-	isActive: boolean;
-	skills: string[];
-	certifications: string[];
-	createdAt: string;
-}
+// Technician types extracted from generated types
+export type Technician = operations['technician.list']['responses']['200']['content']['application/json']['data']['technicians'][number];
+export type TechnicianDetail = operations['technician.get']['responses']['200']['content']['application/json']['data']['technician'];
 
 export const technicianApi = {
-	list: (params?: { isActive?: boolean; limit?: number }) =>
-		apiCall<{ technicians: Technician[] }>('contractor/technician/list', { body: params || {} }),
+	list: (params?: { isActive?: boolean; cursor?: string; limit?: number }) =>
+		orpc.technician.list(params || {}),
 
-	get: (id: string) =>
-		apiCall<{ technician: Technician }>('contractor/technician/get', { body: { id } })
+	get: (id: string) => orpc.technician.get({ id }),
+
+	upsert: (data: {
+		id?: string;
+		firstName: string;
+		lastName: string;
+		email?: string;
+		phone?: string;
+		employeeId?: string;
+		skills?: string[];
+		certifications?: string[];
+		isActive?: boolean;
+		idempotencyKey: string;
+	}) => orpc.technician.upsert(data)
 };
 
 // ============================================================================
-// Job Document API (Phase 15 - Job Documents)
+// Job Document API - jobDocument route doesn't exist in oRPC, use documentApi instead
 // ============================================================================
 
-export interface JobDocument {
+// Job Document types - manual definition for backward compatibility
+export type JobDocument = {
 	id: string;
 	jobId: string;
-	name: string;
-	description: string | null;
+	fileName: string;
 	fileUrl: string;
-	fileType: string;
-	fileSize: number;
-	category: string;
-	uploadedBy: string;
+	mimeType?: string;
+	fileSize?: number;
+	category?: string;
+	description?: string;
 	createdAt: string;
-}
-
-export const jobDocumentApi = {
-	listForJob: (jobId: string) =>
-		apiCall<{ documents: JobDocument[] }>('job/listDocuments', { body: { jobId } }),
-
-	upload: (data: {
-		jobId: string;
-		name: string;
-		description?: string;
-		fileUrl: string;
-		fileType: string;
-		fileSize: number;
-		category: string;
-		idempotencyKey: string;
-	}) => apiCall<{ document: JobDocument }>('job/uploadDocument', { body: data }),
-
-	delete: (data: { id: string; idempotencyKey?: string }) =>
-		apiCall<{ deleted: boolean }>('job/deleteDocument', { body: data })
 };
+
+// Note: Use documentApi with contextType='JOB' and contextId=jobId instead of jobDocumentApi
 
 /**
  * Fetch badge counts using oRPC endpoints

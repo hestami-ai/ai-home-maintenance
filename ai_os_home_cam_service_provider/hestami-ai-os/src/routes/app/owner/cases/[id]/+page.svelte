@@ -37,11 +37,11 @@
 		error = null;
 		try {
 			const response = await conciergeCaseApi.getDetail(caseId);
-			if (response.ok && response.data) {
-				caseDetail = response.data;
-			} else {
+			if (!response.ok) {
 				error = 'Failed to load case details';
+				return;
 			}
+			caseDetail = response.data;
 		} catch (err) {
 			console.error('Failed to load case:', err);
 			error = 'An error occurred while loading the case';
@@ -112,8 +112,8 @@
 		});
 	}
 
-	function getNoteTypeLabel(noteType: CaseNoteType): string {
-		const labels: Record<CaseNoteType, string> = {
+	function getNoteTypeLabel(noteType: string): string {
+		const labels: Record<string, string> = {
 			GENERAL: 'Note',
 			CLARIFICATION_REQUEST: 'Question from Concierge',
 			CLARIFICATION_RESPONSE: 'Your Response',
@@ -122,7 +122,7 @@
 		return labels[noteType] || noteType;
 	}
 
-	function getNoteTypeIcon(noteType: CaseNoteType) {
+	function getNoteTypeIcon(noteType: string) {
 		switch (noteType) {
 			case 'CLARIFICATION_REQUEST':
 				return AlertCircle;

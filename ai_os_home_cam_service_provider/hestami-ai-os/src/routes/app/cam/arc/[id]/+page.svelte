@@ -86,11 +86,11 @@
 
 		try {
 			const response = await arcRequestApi.get(requestId);
-			if (response.ok && response.data?.request) {
-				request = response.data.request as ARCRequest;
-			} else {
+			if (!response.ok) {
 				error = 'ARC request not found';
+				return;
 			}
+			request = response.data.request as unknown as ARCRequest;
 		} catch (e) {
 			error = 'Failed to load ARC request';
 			console.error(e);
@@ -103,7 +103,7 @@
 		if (!requestId) return;
 		try {
 			const response = await documentApi.list({ contextType: 'ARC_REQUEST', contextId: requestId });
-			if (response.ok && response.data?.documents) {
+			if (response.ok) {
 				documents = response.data.documents;
 			}
 		} catch (e) {
@@ -114,9 +114,9 @@
 	async function loadHistory() {
 		if (!requestId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'ARC_REQUEST', entityId: requestId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'ARC_REQUEST', entityId: requestId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,
@@ -136,10 +136,10 @@
 		if (!requestId || !request) return;
 		try {
 			const response = await arcRequestApi.getPriorPrecedents(requestId, {
-				unitId: request.unitId || undefined,
-				category: request.category || undefined
+				unitId: (request as any).unitId || undefined,
+				category: request.category as any || undefined
 			});
-			if (response.ok && response.data) {
+			if (response.ok) {
 				unitPrecedents = response.data.unitPrecedents || [];
 				categoryPrecedents = response.data.categoryPrecedents || [];
 			}
@@ -152,7 +152,7 @@
 		if (!requestId) return;
 		try {
 			const response = await arcReviewApi.getVotes(requestId);
-			if (response.ok && response.data) {
+			if (response.ok) {
 				votes = response.data.votes || [];
 				voteSummary = response.data.summary || null;
 				quorum = response.data.quorum || null;
@@ -394,13 +394,13 @@
 				<div class="space-y-4">
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Description</h4>
-						<p class="mt-1">{request.description || 'No description provided.'}</p>
+						<p class="mt-1">{(request as any).description || 'No description provided.'}</p>
 					</div>
 
-					{#if request.projectScope}
+					{#if (request as any).projectScope}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Project Scope</h4>
-							<p class="mt-1">{request.projectScope}</p>
+							<p class="mt-1">{(request as any).projectScope}</p>
 						</div>
 					{/if}
 
@@ -417,10 +417,10 @@
 								</span>
 							</p>
 						</div>
-						{#if request.estimatedCost}
+						{#if (request as any).estimatedCost}
 							<div>
 								<h4 class="text-sm font-medium text-surface-500">Estimated Cost</h4>
-								<p class="mt-1">{formatCurrency(typeof request.estimatedCost === 'string' ? parseFloat(request.estimatedCost) : request.estimatedCost ?? 0)}</p>
+								<p class="mt-1">{formatCurrency(typeof (request as any).estimatedCost === 'string' ? parseFloat((request as any).estimatedCost) : (request as any).estimatedCost ?? 0)}</p>
 							</div>
 						{/if}
 					</div>
@@ -433,7 +433,7 @@
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Unit</h4>
 						<p class="mt-1">
-							<a href="/app/cam/units/{request.unitId}" class="text-primary-500 hover:underline">
+							<a href="/app/cam/units/{(request as any).unitId}" class="text-primary-500 hover:underline">
 								Unit {request.unitNumber}
 							</a>
 						</p>
@@ -452,16 +452,16 @@
 						<h4 class="text-sm font-medium text-surface-500">Submitted</h4>
 						<p class="mt-1">{request.createdAt ? formatDate(request.createdAt) : '-'}</p>
 					</div>
-					{#if request.startDate}
+					{#if (request as any).startDate}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Planned Start</h4>
-							<p class="mt-1">{formatDate(request.startDate)}</p>
+							<p class="mt-1">{formatDate((request as any).startDate)}</p>
 						</div>
 					{/if}
-					{#if request.completionDate}
+					{#if (request as any).completionDate}
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Expected Completion</h4>
-							<p class="mt-1">{formatDate(request.completionDate)}</p>
+							<p class="mt-1">{formatDate((request as any).completionDate)}</p>
 						</div>
 					{/if}
 					<div>
@@ -471,10 +471,10 @@
 				</div>
 			</Card>
 
-			{#if request.conditions}
+			{#if (request as any).conditions}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Conditions / Stipulations</h3>
-					<p>{request.conditions}</p>
+					<p>{(request as any).conditions}</p>
 				</Card>
 			{/if}
 		</div>
@@ -504,7 +504,7 @@
 							<div class="flex items-center gap-3">
 								<FileImage class="h-8 w-8 text-primary-500" />
 								<div class="flex-1 min-w-0">
-									<p class="font-medium truncate">{doc.name}</p>
+									<p class="font-medium truncate">{doc.title}</p>
 									<p class="text-xs text-surface-500">{doc.category}</p>
 								</div>
 							</div>
@@ -546,7 +546,7 @@
 								<FileText class="h-5 w-5 text-surface-400" />
 							{/if}
 							<div class="flex-1">
-								<p class="font-medium">{doc.name}</p>
+								<p class="font-medium">{doc.title}</p>
 								<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 							</div>
 							<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">
@@ -578,7 +578,7 @@
 						<div class="flex items-center gap-3 py-3">
 							<ClipboardCheck class="h-5 w-5 text-success-500" />
 							<div class="flex-1">
-								<p class="font-medium">{doc.name}</p>
+								<p class="font-medium">{doc.title}</p>
 								<p class="text-sm text-surface-500">{formatDate(doc.createdAt)}</p>
 							</div>
 							<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">
@@ -924,7 +924,7 @@
 					<div class="flex items-center gap-3 py-3">
 						<FileText class="h-5 w-5 text-surface-400" />
 						<div class="flex-1">
-							<p class="font-medium">{doc.name}</p>
+							<p class="font-medium">{doc.title}</p>
 							<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 						</div>
 						<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">

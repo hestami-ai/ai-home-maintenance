@@ -27,8 +27,8 @@
 			entries.push({
 				id: `note-${note.id}`,
 				type: 'note',
-				noteType: note.noteType,
-				title: getNoteTypeLabel(note.noteType),
+				noteType: note.noteType as any,
+				title: getNoteTypeLabel(note.noteType as any),
 				content: note.content,
 				timestamp: note.createdAt
 			});

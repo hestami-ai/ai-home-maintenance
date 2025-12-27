@@ -79,22 +79,22 @@
 
 		try {
 			const response = await propertyApi.create({
+				associationId: $currentAssociation!.id,
 				name: formData.name,
-				address: formData.address,
-				propertyType: formData.propertyType,
-				status: formData.status,
+				addressLine1: formData.address,
+				city: '',
+				state: '',
+				postalCode: '',
+				propertyType: formData.propertyType as any,
 				yearBuilt: formData.yearBuilt ? parseInt(formData.yearBuilt) : undefined,
-				totalSquareFootage: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) : undefined,
-				parkingSpaces: formData.parkingSpaces ? parseInt(formData.parkingSpaces) : undefined,
-				amenities: formData.amenities.length > 0 ? formData.amenities : undefined,
-				idempotencyKey: crypto.randomUUID()
-			});
+				totalAcres: formData.totalSquareFootage ? parseInt(formData.totalSquareFootage) / 43560 : undefined
+			} as any);
 
-			if (response.ok && response.data?.property) {
-				goto(`/app/cam/properties/${response.data.property.id}`);
-			} else {
-				error = response.error?.message || 'Failed to create property';
+			if (!response.ok) {
+				error = 'Failed to create property';
+				return;
 			}
+			goto(`/app/cam/properties/${response.data.property.id}`);
 		} catch (e) {
 			error = 'Failed to create property';
 			console.error(e);

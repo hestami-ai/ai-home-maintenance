@@ -120,9 +120,9 @@
 		isLoading = true;
 		try {
 			const response = await governanceApi.meetings.list({
-				status: statusFilter !== 'all' ? statusFilter : undefined
+				status: statusFilter !== 'all' ? statusFilter as any : undefined
 			});
-			if (response.ok && response.data?.meetings) {
+			if (response.ok) {
 				meetings = response.data.meetings
 					.filter(m => typeFilter === 'all' || m.meetingType === typeFilter)
 					.map(m => ({
@@ -145,7 +145,7 @@
 		isLoadingDetail = true;
 		try {
 			const response = await governanceApi.meetings.get(meetingId);
-			if (response.ok && response.data?.meeting) {
+			if (response.ok) {
 				const m = response.data.meeting as Record<string, unknown>;
 				// Update selected meeting with full details
 				if (selectedMeeting) {
@@ -272,11 +272,10 @@
 		try {
 			const response = await governanceApi.meetings.create({
 				associationId: $currentAssociation.id,
-				type: data.meetingType,
+				type: data.meetingType as any,
 				title: data.title,
 				scheduledFor: `${data.scheduledDate}T${data.scheduledTime}:00`,
 				location: data.location,
-				virtualLink: data.virtualLink,
 				idempotencyKey: crypto.randomUUID()
 			});
 			if (response.ok) {

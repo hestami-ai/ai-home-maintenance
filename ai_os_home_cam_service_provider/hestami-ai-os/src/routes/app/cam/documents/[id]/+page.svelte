@@ -29,11 +29,11 @@
 
 		try {
 			const response = await documentApi.get(documentId);
-			if (response.ok && response.data?.document) {
-				document = response.data.document;
-			} else {
+			if (!response.ok) {
 				error = 'Document not found';
+				return;
 			}
+			document = response.data.document;
 		} catch (e) {
 			error = 'Failed to load document';
 			console.error(e);
@@ -45,9 +45,9 @@
 	async function loadHistory() {
 		if (!documentId) return;
 		try {
-			const response = await activityEventApi.list({ entityType: 'DOCUMENT', entityId: documentId });
-			if (response.ok && response.data?.events) {
-				history = response.data.events.map(e => ({
+			const response = await activityEventApi.getByEntity({ entityType: 'DOCUMENT', entityId: documentId });
+			if (response.ok) {
+				history = response.data.events.map((e: any) => ({
 					id: e.id,
 					action: e.action,
 					description: e.summary,
@@ -111,7 +111,7 @@
 </script>
 
 <svelte:head>
-	<title>{document?.name || 'Document'} | CAM | Hestami AI</title>
+	<title>{document?.title || 'Document'} | CAM | Hestami AI</title>
 </svelte:head>
 
 <div class="flex h-full flex-col">
@@ -130,7 +130,7 @@
 			{:else if document}
 				<div class="flex-1">
 					<p class="text-sm text-surface-500">{document.category.replace(/_/g, ' ')}</p>
-					<h1 class="mt-0.5 text-xl font-semibold">{document.name}</h1>
+					<h1 class="mt-0.5 text-xl font-semibold">{document.title}</h1>
 				</div>
 
 				<div class="flex gap-2">
@@ -176,7 +176,7 @@
 				<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">File Name</h4>
-						<p class="mt-1">{document.name}</p>
+						<p class="mt-1">{document.fileName}</p>
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Category</h4>
@@ -192,26 +192,26 @@
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">File Size</h4>
-						<p class="mt-1">{formatFileSize(document.size)}</p>
+						<p class="mt-1">{formatFileSize(document.fileSize)}</p>
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Uploaded By</h4>
-						<p class="mt-1">{document.uploadedBy}</p>
+						<p class="mt-1">{(document as any).uploadedBy || 'Unknown'}</p>
 					</div>
 				</div>
 			</Card>
 
-			{#if document.contextType && document.contextName}
+			{#if (document as any).contextType && (document as any).contextName}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Linked Context</h3>
 					<div class="grid gap-4 sm:grid-cols-2">
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Context Type</h4>
-							<p class="mt-1">{document.contextType.replace(/_/g, ' ')}</p>
+							<p class="mt-1">{(document as any).contextType?.replace(/_/g, ' ')}</p>
 						</div>
 						<div>
 							<h4 class="text-sm font-medium text-surface-500">Linked To</h4>
-							<p class="mt-1">{document.contextName}</p>
+							<p class="mt-1">{(document as any).contextName}</p>
 						</div>
 					</div>
 				</Card>
@@ -226,7 +226,7 @@
 					</div>
 					<div>
 						<h4 class="text-sm font-medium text-surface-500">Last Modified</h4>
-						<p class="mt-1">{formatDateTime(document.updatedAt)}</p>
+						<p class="mt-1">{formatDateTime((document as any).updatedAt)}</p>
 					</div>
 				</div>
 			</Card>
@@ -243,7 +243,7 @@
 				<div class="flex justify-center">
 					<img
 						src="/api/document/{document.id}/preview"
-						alt={document.name}
+						alt={document.title}
 						class="max-h-[600px] max-w-full rounded-lg"
 					/>
 				</div>
@@ -251,7 +251,7 @@
 				<div class="aspect-[8.5/11] w-full">
 					<iframe
 						src="/api/document/{document.id}/preview"
-						title={document.name}
+						title={document.title}
 						class="h-full w-full rounded-lg border border-surface-300-700"
 					></iframe>
 				</div>
