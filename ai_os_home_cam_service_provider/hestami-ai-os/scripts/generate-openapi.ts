@@ -8,16 +8,17 @@
 
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
+import 'dotenv/config'; // Load env vars
 
 // Dynamic import to handle ESM
 async function main() {
 	const { generateOpenAPISpec } = await import('../src/lib/server/api/openapi.js');
-	
+
 	const spec = await generateOpenAPISpec();
 	const outputPath = resolve(process.cwd(), 'openapi.json');
-	
+
 	writeFileSync(outputPath, JSON.stringify(spec, null, 2));
-	
+
 	console.log(`✅ OpenAPI spec generated: ${outputPath}`);
 	console.log(`   Version: ${spec.info?.version ?? 'unknown'}`);
 	console.log(`   Paths: ${Object.keys(spec.paths ?? {}).length}`);

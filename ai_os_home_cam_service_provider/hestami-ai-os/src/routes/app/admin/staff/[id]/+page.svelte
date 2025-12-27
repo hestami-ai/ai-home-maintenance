@@ -42,8 +42,10 @@
 	// Modal states
 	let showSuspendModal = $state(false);
 	let showDeactivateModal = $state(false);
+	let showCodeModal = $state(false);
 	let suspendReason = $state('');
 	let deactivateReason = $state('');
+	let generatedCode = $state('');
 
 	onMount(async () => {
 		await loadStaff();
@@ -127,6 +129,23 @@
 			}
 		} catch (e) {
 			actionError = e instanceof Error ? e.message : 'Failed to reactivate staff member';
+		} finally {
+			actionLoading = null;
+		}
+	}
+
+	async function handleRegenerateCode() {
+		if (!staff) return;
+		actionLoading = 'regenerate';
+		actionError = null;
+		try {
+			const response = await staffApi.regenerateActivationCode(staff.id);
+			if (response.ok) {
+				generatedCode = response.data.activationCode;
+				showCodeModal = true;
+			}
+		} catch (e) {
+			actionError = e instanceof Error ? e.message : 'Failed to regenerate activation code';
 		} finally {
 			actionLoading = null;
 		}
@@ -236,6 +255,18 @@
 								<UserCheck class="mr-2 h-4 w-4" />
 							{/if}
 							Activate
+						</button>
+						<button
+							onclick={handleRegenerateCode}
+							disabled={actionLoading !== null}
+							class="btn preset-outlined-warning-500"
+						>
+							{#if actionLoading === 'regenerate'}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							{:else}
+								<RefreshCw class="mr-2 h-4 w-4" />
+							{/if}
+							Regenerate Code
 						</button>
 					{/if}
 
@@ -511,6 +542,41 @@
 					{/if}
 					Deactivate
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Activation Code Modal -->
+{#if showCodeModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+		<div class="w-full max-w-md rounded-lg bg-surface-50-950 p-6 shadow-xl">
+			<div class="text-center">
+				<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success-500/10 text-success-600">
+					<RefreshCw class="h-6 w-6" />
+				</div>
+				<h3 class="text-lg font-semibold">New Activation Code</h3>
+				<p class="mt-2 text-sm text-surface-500">
+					A new activation code has been generated. This code is valid for 8 hours.
+				</p>
+				
+				<div class="mt-6 rounded-lg bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-4">
+					<div class="flex items-center justify-center gap-2">
+						<code class="text-2xl font-mono font-bold tracking-widest">{generatedCode}</code>
+					</div>
+				</div>
+
+				<div class="mt-6">
+					<button
+						onclick={() => {
+							showCodeModal = false;
+							generatedCode = '';
+						}}
+						class="btn preset-filled-primary-500 w-full"
+					>
+						Done
+					</button>
+				</div>
 			</div>
 		</div>
 	</div>

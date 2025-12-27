@@ -267,6 +267,8 @@ enum StaffRole {
   PLATFORM_ADMIN         // System configuration, permissions, access control
 }
 
+
+
 enum PillarAccess {
   CONCIERGE   // Concierge Operations pillar
   CAM         // CAM / Governance pillar
@@ -917,6 +919,10 @@ model Staff {
 
   // Pillar access permissions
   pillarAccess PillarAccess[]  @map("pillar_access")
+
+  // Onboarding & Activation (Phase 19)
+  activationCodeEncrypted String?   @map("activation_code_encrypted")
+  activationCodeExpiresAt DateTime? @map("activation_code_expires_at")
 
   // Case assignment eligibility
   canBeAssignedCases Boolean @default(true) @map("can_be_assigned_cases")

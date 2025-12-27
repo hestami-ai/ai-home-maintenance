@@ -548,6 +548,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/user/findUserByEmail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["user.findUserByEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/glAccount/create": {
         parameters: {
             query?: never;
@@ -10772,6 +10788,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/staff/regenerateActivationCode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.regenerateActivationCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/staff/activateWithCode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["staff.activateWithCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workQueue/list": {
         parameters: {
             query?: never;
@@ -12880,6 +12928,51 @@ export interface operations {
                         data: {
                             success: boolean;
                             deletedAt: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "user.findUserByEmail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            user: {
+                                id: string;
+                                email: string;
+                                name: string | null;
+                            } | null;
                         };
                         meta: {
                             requestId: string;
@@ -50080,8 +50173,11 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description User ID to link as staff */
-                    userId: string;
+                    /**
+                     * Format: email
+                     * @description User email to link as staff
+                     */
+                    email: string;
                     displayName: string;
                     title?: string;
                     /** @description At least one role required */
@@ -50798,6 +50894,89 @@ export interface operations {
                                 unassignedAt: string | null;
                                 justification: string | null;
                             }[];
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.regenerateActivationCode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    staffId: string;
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            activationCode: string;
+                            expiresAt: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    "staff.activateWithCode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            success: boolean;
                         };
                         meta: {
                             requestId: string;

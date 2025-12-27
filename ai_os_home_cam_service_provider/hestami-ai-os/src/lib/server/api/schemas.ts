@@ -38,6 +38,9 @@ import { WorkOrderCategorySchema as GeneratedWorkOrderCategorySchema } from '../
 import { WorkOrderOriginTypeSchema as GeneratedWorkOrderOriginTypeSchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderOriginTypeSchema.js';
 import { BidStatusSchema as GeneratedBidStatusSchema } from '../../../../generated/zod/inputTypeSchemas/BidStatusSchema.js';
 import { FundTypeSchema as GeneratedFundTypeSchema } from '../../../../generated/zod/inputTypeSchemas/FundTypeSchema.js';
+import { StaffStatusSchema as GeneratedStaffStatusSchema } from '../../../../generated/zod/inputTypeSchemas/StaffStatusSchema.js';
+import { StaffRoleSchema as GeneratedStaffRoleSchema } from '../../../../generated/zod/inputTypeSchemas/StaffRoleSchema.js';
+import { PillarAccessSchema as GeneratedPillarAccessSchema } from '../../../../generated/zod/inputTypeSchemas/PillarAccessSchema.js';
 
 // Re-export for convenience
 export { ResponseMetaSchema };
@@ -760,3 +763,16 @@ export const WorkOrderSummarySchema = z.object({
 	updatedAt: z.coerce.date()
 });
 export type WorkOrderSummary = z.infer<typeof WorkOrderSummarySchema>;
+
+// =============================================================================
+// Staff Domain Enum Schemas (re-exported from generated Zod schemas)
+// =============================================================================
+
+export const StaffStatusSchema = GeneratedStaffStatusSchema;
+export type StaffStatus = z.infer<typeof StaffStatusSchema>;
+
+export const StaffRoleSchema = GeneratedStaffRoleSchema;
+export type StaffRole = z.infer<typeof StaffRoleSchema>;
+
+export const PillarAccessSchema = GeneratedPillarAccessSchema;
+export type PillarAccess = z.infer<typeof PillarAccessSchema>;

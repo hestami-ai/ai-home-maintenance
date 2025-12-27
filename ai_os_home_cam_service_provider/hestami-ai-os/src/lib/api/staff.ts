@@ -77,7 +77,7 @@ export const STAFF_STATUS_COLORS: Record<StaffStatus, string> = {
 // =============================================================================
 
 export interface CreateStaffInput {
-	userId: string;
+	email: string;
 	displayName: string;
 	title?: string;
 	roles: StaffRole[];
@@ -98,7 +98,7 @@ export const staffApi = {
 	 */
 	async create(input: CreateStaffInput) {
 		return orpc.staff.create({
-			userId: input.userId,
+			email: input.email,
 			displayName: input.displayName,
 			title: input.title,
 			roles: input.roles,
@@ -136,7 +136,26 @@ export const staffApi = {
 	},
 
 	/**
-	 * Activate a staff member
+	 * Regenerate activation code (Admin only)
+	 */
+	async regenerateActivationCode(staffId: string) {
+		return orpc.staff.regenerateActivationCode({
+			staffId,
+			idempotencyKey: uuidv4()
+		});
+	},
+
+	/**
+	 * Activate account with code (Self-service)
+	 */
+	async activateWithCode(input: { code: string }) {
+		return orpc.staff.activateWithCode({
+			code: input.code
+		});
+	},
+
+	/**
+	 * Activate a staff member (Admin override - mostly for legacy or manual fix)
 	 */
 	async activate(staffId: string) {
 		return orpc.staff.activate({ staffId, idempotencyKey: uuidv4() });

@@ -13,6 +13,7 @@ import { ApiException } from '../errors.js';
 import { recordActivityEvent } from '../middleware/activityEvent.js';
 import { StaffStatusSchema, StaffRoleSchema, PillarAccessSchema } from '../../../../../generated/zod/index.js';
 import { createModuleLogger } from '../../logger.js';
+import { encrypt, decrypt, generateActivationCode } from '../../security/encryption.js';
 
 const log = createModuleLogger('StaffRoute');
 
@@ -69,7 +70,7 @@ export const staffRouter = {
 	create: authedProcedure
 		.input(
 			z.object({
-				userId: z.string().describe('User ID to link as staff'),
+				email: z.string().email().describe('User email to link as staff'),
 				displayName: z.string().min(1).max(255),
 				title: z.string().max(255).optional(),
 				roles: z.array(StaffRoleSchema).min(1).describe('At least one role required'),
@@ -88,34 +89,40 @@ export const staffRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
-			// Verify the user exists
 			const user = await prisma.user.findUnique({
-				where: { id: input.userId }
+				where: { email: input.email }
 			});
 
 			if (!user) {
-				throw ApiException.notFound('User');
+				throw ApiException.notFound('User with this email not found');
 			}
 
 			// Check if staff profile already exists for this user
 			const existingStaff = await prisma.staff.findUnique({
-				where: { userId: input.userId }
+				where: { userId: user.id }
 			});
 
 			if (existingStaff) {
 				throw ApiException.conflict('Staff profile already exists for this user');
 			}
 
+			// Generate activation code
+			const activationCode = generateActivationCode();
+			const activationCodeEncrypted = encrypt(activationCode);
+			const activationCodeExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+
 			// Create staff entity
 			const staff = await prisma.staff.create({
 				data: {
-					userId: input.userId,
+					userId: user.id,
 					displayName: input.displayName,
 					title: input.title,
 					roles: input.roles,
 					pillarAccess: input.pillarAccess,
 					canBeAssignedCases: input.canBeAssignedCases,
-					status: 'PENDING'
+					status: 'PENDING',
+					activationCodeEncrypted,
+					activationCodeExpiresAt
 				},
 				include: {
 					user: {
@@ -144,7 +151,8 @@ export const staffRouter = {
 					displayName: staff.displayName,
 					roles: staff.roles,
 					pillarAccess: staff.pillarAccess,
-					status: staff.status
+					status: staff.status,
+					activationCodeExpiresAt: staff.activationCodeExpiresAt?.toISOString()
 				}
 			});
 
@@ -1097,5 +1105,158 @@ export const staffRouter = {
 				},
 				context
 			);
+		}),
+
+	/**
+	 * Regenerate activation code for pending staff (Admin only)
+	 */
+	regenerateActivationCode: authedProcedure
+		.input(
+			z.object({
+				staffId: z.string(),
+				idempotencyKey: z.string().uuid()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					activationCode: z.string(),
+					expiresAt: z.string()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const staff = await prisma.staff.findUnique({
+				where: { id: input.staffId }
+			});
+
+			if (!staff) {
+				throw ApiException.notFound('Staff');
+			}
+
+			if (staff.status !== 'PENDING') {
+				throw ApiException.badRequest('Can only regenerate code for PENDING staff');
+			}
+
+			const activationCode = generateActivationCode();
+			const activationCodeEncrypted = encrypt(activationCode);
+			const activationCodeExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+
+			await prisma.staff.update({
+				where: { id: input.staffId },
+				data: {
+					activationCodeEncrypted,
+					activationCodeExpiresAt
+				}
+			});
+
+			// Record activity event
+			await recordActivityEvent({
+				organizationId: 'hestami-platform',
+				entityType: 'STAFF',
+				entityId: staff.id,
+				action: 'UPDATE',
+				eventCategory: 'EXECUTION',
+				summary: `Activation code regenerated for "${staff.displayName}"`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				newState: {
+					activationCodeExpiresAt: activationCodeExpiresAt.toISOString()
+				}
+			});
+
+			return successResponse(
+				{
+					activationCode,
+					expiresAt: activationCodeExpiresAt.toISOString()
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Activate account with code (Self-service)
+	 */
+	activateWithCode: authedProcedure
+		.input(
+			z.object({
+				code: z.string().length(8)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					success: z.boolean()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			// Get current user's staff profile
+			const staff = await prisma.staff.findUnique({
+				where: { userId: context.user!.id }
+			});
+
+			if (!staff) {
+				throw ApiException.forbidden('Not a staff member');
+			}
+
+			if (staff.status === 'ACTIVE') {
+				return successResponse({ success: true }, context);
+			}
+
+			if (staff.status !== 'PENDING') {
+				throw ApiException.forbidden('Account cannot be activated');
+			}
+
+			if (!staff.activationCodeEncrypted || !staff.activationCodeExpiresAt) {
+				throw ApiException.badRequest('No activation code found. Ask admin to regenerate.');
+			}
+
+			if (staff.activationCodeExpiresAt < new Date()) {
+				throw ApiException.badRequest('Activation code expired. Ask admin to regenerate.');
+			}
+
+			// Verify code
+			try {
+				const plainCode = decrypt(staff.activationCodeEncrypted);
+				if (plainCode !== input.code.toUpperCase()) { // Case insensitive check
+					throw ApiException.badRequest('Invalid activation code');
+				}
+			} catch (e) {
+				log.error('Decryption failed during activation', { error: e });
+				throw ApiException.badRequest('Invalid activation code');
+			}
+
+			// Activate
+			const now = new Date();
+			await prisma.staff.update({
+				where: { id: staff.id },
+				data: {
+					status: 'ACTIVE',
+					activatedAt: now,
+					activationCodeEncrypted: null,
+					activationCodeExpiresAt: null
+				}
+			});
+
+			// Record activity event
+			await recordActivityEvent({
+				organizationId: 'hestami-platform',
+				entityType: 'STAFF',
+				entityId: staff.id,
+				action: 'STATUS_CHANGE',
+				eventCategory: 'EXECUTION',
+				summary: `Staff member "${staff.displayName}" activated via self-service`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				previousState: { status: 'PENDING' },
+				newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
+			});
+
+			return successResponse({ success: true }, context);
 		})
 };

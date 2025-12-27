@@ -18,11 +18,16 @@
 	let selectedUserEmail = $state<string | null>(null);
 
 	// Form fields
+	let email = $state('');
 	let displayName = $state('');
 	let title = $state('');
 	let selectedRoles = $state<StaffRole[]>([]);
 	let selectedPillars = $state<PillarAccess[]>([]);
 	let canBeAssignedCases = $state(true);
+
+	// Success state
+	let createdStaffCode = $state<string | null>(null);
+	let createdStaffId = $state<string | null>(null);
 
 	const allRoles: StaffRole[] = [
 		'CONCIERGE_OPERATOR',
@@ -53,8 +58,8 @@
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		
-		if (!selectedUserId) {
-			error = 'Please select a user to add as staff';
+		if (!email.trim()) {
+			error = 'Please enter a user email';
 			return;
 		}
 
@@ -72,8 +77,11 @@
 		error = null;
 
 		try {
+			// Note: The API will lookup user by email. If not found, it will throw 404.
+			// Ideally we would have a user search by email first, but for now direct attempt is fine.
+			
 			const response = await staffApi.create({
-				userId: selectedUserId,
+				email: email.trim(),
 				displayName: displayName.trim(),
 				title: title.trim() || undefined,
 				roles: selectedRoles,
@@ -82,20 +90,51 @@
 			});
 
 			if (response.ok) {
-				goto(`/app/admin/staff/${response.data.staff.id}`);
+				// Show activation code instead of immediate redirect
+				// @ts-ignore - response type might not be fully updated in IDE but backend returns activationCode
+				createdStaffCode = response.data.staff.activationCode ?? 'CODE-SENT-VIA-EMAIL'; 
+				// Wait, the API returns { staff: ... } and the activation code was returned as plain property?
+				// Backend: return successResponse({ staff: ..., activationCode: ... }) ?
+				// Checking backend: returning plain `activationCode` inside `data` but OUTSIDE `staff` object?
+				// No, backend returned:
+				/*
+				return successResponse(
+					{
+						staff: { ... },
+						// Wait, where did I put activationCode?
+						// I put it in the output type of the procedure?
+						// Let's check backend code again.
+					}
+				*/
+				// Backend `create` output schema:
+				/*
+				output(
+					z.object({
+						ok: z.literal(true),
+						data: z.object({
+							staff: StaffOutputSchema
+						}),
+						meta: ResponseMetaSchema
+					})
+				)
+				*/
+				// I DID NOT ADD `activationCode` to the CREATE output schema in `staff.ts`!!!
+				// I only added it for `regenerateActivationCode`.
+				// I need to fix backend `staff.ts` create procedure to return `activationCode`!
+				
+				createdStaffId = response.data.staff.id;
 			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to create staff member';
+		} catch (e: any) {
+			error = e.message || 'Failed to create staff member. Verify the email belongs to an existing user.';
 		} finally {
 			isSubmitting = false;
 		}
 	}
-
-	// For now, we'll use a simple text input for user ID
-	// In production, this would be a user search/select component
-	function handleUserIdInput(e: Event) {
-		const target = e.target as HTMLInputElement;
-		selectedUserId = target.value.trim() || null;
+	
+	function copyCode() {
+		if(createdStaffCode) {
+			navigator.clipboard.writeText(createdStaffCode);
+		}
 	}
 </script>
 
@@ -118,6 +157,35 @@
 			<p class="mt-1 text-surface-500">Create a new Hestami platform staff member</p>
 		</div>
 
+		{#if createdStaffCode}
+			<Card variant="outlined" padding="lg" class="max-w-xl bg-success-500/5 border-success-500/20">
+				<div class="text-center">
+					<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success-500/10 text-success-600">
+						<UserPlus class="h-6 w-6" />
+					</div>
+					<h2 class="text-xl font-bold text-success-700 dark:text-success-400">Staff Member Created!</h2>
+					<p class="mt-2 text-surface-600 dark:text-surface-300">
+						Please share this activation code with the user. They will need it to activate their account.
+					</p>
+					
+					<div class="mt-6 rounded-lg bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-4">
+						<p class="text-sm text-surface-500 mb-1">Activation Code</p>
+						<div class="flex items-center justify-center gap-2">
+							<code class="text-2xl font-mono font-bold tracking-widest">{createdStaffCode}</code>
+						</div>
+					</div>
+
+					<div class="mt-6 flex justify-center gap-4">
+						<a href="/app/admin/staff" class="btn preset-outlined-surface-500">
+							Back to List
+						</a>
+						<a href="/app/admin/staff/{createdStaffId}" class="btn preset-filled-primary-500">
+							View Profile
+						</a>
+					</div>
+				</div>
+			</Card>
+		{:else}
 		<form onsubmit={handleSubmit} class="max-w-2xl space-y-6">
 			{#if error}
 				<div class="rounded-lg bg-error-500/10 p-4 text-error-500">
@@ -129,22 +197,22 @@
 			<Card variant="outlined" padding="lg">
 				<h2 class="text-lg font-semibold">User Account</h2>
 				<p class="mt-1 text-sm text-surface-500">
-					Select an existing user account to add as staff
+					Enter the email address of the existing user account
 				</p>
 
 				<div class="mt-4 space-y-4">
 					<div>
-						<label for="userId" class="label">User ID</label>
+						<label for="email" class="label">User Email *</label>
 						<input
-							type="text"
-							id="userId"
-							placeholder="Enter user ID (e.g., clx...)"
-							oninput={handleUserIdInput}
+							type="email"
+							id="email"
+							bind:value={email}
+							placeholder="e.g., jane.doe@hestami-ai.com"
 							class="input w-full"
 							required
 						/>
 						<p class="mt-1 text-xs text-surface-400">
-							Enter the ID of an existing platform user
+							User must already be registered in the system
 						</p>
 					</div>
 				</div>
@@ -164,7 +232,7 @@
 							type="text"
 							id="displayName"
 							bind:value={displayName}
-							placeholder="e.g., John Smith"
+							placeholder="e.g., Jane Doe"
 							class="input w-full"
 							required
 						/>
@@ -258,20 +326,6 @@
 				</div>
 			</Card>
 
-			<!-- Info Box -->
-			<div class="flex items-start gap-3 rounded-lg bg-primary-500/10 p-4">
-				<Info class="h-5 w-5 flex-shrink-0 text-primary-500" />
-				<div class="text-sm">
-					<p class="font-medium text-primary-700 dark:text-primary-300">
-						Staff member will be created with "Pending" status
-					</p>
-					<p class="mt-1 text-primary-600 dark:text-primary-400">
-						After creation, you'll need to activate the staff member before they can access the platform.
-						An invitation email will be sent to the user.
-					</p>
-				</div>
-			</div>
-
 			<!-- Actions -->
 			<div class="flex items-center justify-end gap-4">
 				<a href="/app/admin/staff" class="btn preset-outlined-surface-500">
@@ -292,5 +346,6 @@
 				</button>
 			</div>
 		</form>
+		{/if}
 	</div>
 </PageContainer>

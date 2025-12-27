@@ -5,6 +5,7 @@ import { propertyRouter } from './routes/property.js';
 import { unitRouter } from './routes/unit.js';
 import { partyRouter } from './routes/party.js';
 import { ownershipRouter } from './routes/ownership.js';
+import { userRouter } from './routes/user.js';
 
 // Phase 3: Accounting domain
 import {
@@ -142,6 +143,7 @@ export const appRouter = {
 	unit: unitRouter,
 	party: partyRouter,
 	ownership: ownershipRouter,
+	user: userRouter,
 
 	// Phase 3: Accounting domain
 	glAccount: glAccountRouter,
