@@ -19,7 +19,7 @@ volumes:
 
 services:
   traefik:
-    image: traefik:v3.2.1
+    image: traefik:v3.6.6
     container_name: traefik
     command:
       - "--api.insecure=false"

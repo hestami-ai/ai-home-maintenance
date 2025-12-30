@@ -1,30 +1,36 @@
 services:
   # Reverse Proxy
   traefik:
-    image: traefik:v3.2.1
+    image: traefik:v3.6.6
     container_name: hestami-traefik
     command:
       - "--api.insecure=false"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=hestami-ai-os_hestami-network"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.websecure.http.tls=true"
-      - "--providers.file.directory=/etc/traefik/certs"
+#      - "--entrypoints.websecure.address=:443"
+#      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.web.address=:80"
+#      - "--providers.file.directory=/etc/traefik/certs"
       - "--providers.file.watch=true"
       - "--log.level=DEBUG"
       - "--accesslog=true"
       - "--accesslog.filepath=/var/log/traefik/access.log"
       # Optimize for large file uploads
-      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
-      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
-      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=180s"
+#      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+#      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
+#      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=180s"
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.web.transport.respondingTimeouts.writeTimeout=300s"
+      - "--entrypoints.web.transport.respondingTimeouts.idleTimeout=180s"
       # Increase max request body size for file uploads (100MB)
-      - "--entrypoints.websecure.http.middlewares=upload-limit@docker"
+#      - "--entrypoints.websecure.http.middlewares=upload-limit@docker"
+#      - "--entrypoints.web.http.middlewares=upload-limit@docker"
       # HTTP/2 settings for large uploads
-      - "--entrypoints.websecure.http2.maxConcurrentStreams=250"
+#      - "--entrypoints.websecure.http2.maxConcurrentStreams=250"
     ports:
-      - "443:443"
+      #- "443:443"
+      - "8282:80"
       # Expose S3 Gateway and TUSD for local dev/testing if needed (via Traefik is preferred)
       # - "8333:8333" # SeaweedFS S3
       # - "1080:1080" # TUSD
@@ -45,9 +51,9 @@ services:
   seaweedfs-master:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-master
-    ports:
-      - "9333:9333"
-      - "19333:19333"
+    #ports:
+    #  - "9333:9333"
+    #  - "19333:19333"
     command: "master -ip=hestami-seaweedfs-master -volumeSizeLimitMB=1000 -defaultReplication=000"
     networks:
       - hestami-network
@@ -60,9 +66,9 @@ services:
   seaweedfs-volume:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-volume
-    ports:
-      - "8080:8080"
-      - "18080:18080"
+    #ports:
+    #  - "8080:8080"
+    #  - "18080:18080"
     command: "volume -mserver=hestami-seaweedfs-master:9333 -port=8080"
     volumes:
       - ./volumes/seaweedfs/data:/data
@@ -79,9 +85,9 @@ services:
   seaweedfs-filer:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-filer
-    ports:
-      - "8888:8888"
-      - "18888:18888"
+    #ports:
+    #  - "8888:8888"
+    #  - "18888:18888"
     command: "filer -master=hestami-seaweedfs-master:9333 -port=8888"
     depends_on:
       - seaweedfs-master
@@ -97,8 +103,8 @@ services:
   seaweedfs-s3:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-s3
-    ports:
-      - "8333:8333"
+    #ports:
+    #  - "8333:8333"
     command: "s3 -filer=hestami-seaweedfs-filer:8888 -port=8333 -config=/etc/seaweedfs/s3.json"
     volumes:
       - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
@@ -109,7 +115,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.s3.rule=Host(`dev-s3.hestami-ai.com`)"
-      - "traefik.http.routers.s3.tls=true"
       - "traefik.http.services.s3.loadbalancer.server.port=8333"
     networks:
       - hestami-network
@@ -122,23 +127,24 @@ services:
   tusd:
     image: tusproject/tusd:v2.8.0
     container_name: hestami-tusd
+    environment:
+      - AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY:-hestami_admin}
+      - AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY:-hestami_secret}
+      - AWS_REGION=us-east-1
     command:
       - "-s3-endpoint=http://hestami-seaweedfs-s3:8333"
       - "-s3-bucket=uploads"
-      - "-s3-access-key-id=${S3_ACCESS_KEY:-hestami_admin}"
-      - "-s3-secret-access-key=${S3_SECRET_KEY:-hestami_secret}"
       - "-s3-object-prefix="
       - "-behind-proxy"
       - "-hooks-http=http://hestami-app:3000/api/internal/tus-hook"
       - "-hooks-http-retry=3"
-      - "-hooks-http-backoff=1"
+      - "-hooks-http-backoff=1s"
     depends_on:
       - seaweedfs-s3
       - app # Needs app for hooks
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tusd.rule=Host(`dev-upload.hestami-ai.com`)"
-      - "traefik.http.routers.tusd.tls=true"
       - "traefik.http.services.tusd.loadbalancer.server.port=1080"
       - "traefik.http.routers.tusd.middlewares=upload-limit"
     networks:
@@ -220,9 +226,6 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  # NOTE: Jaeger removed - using SigNoz for distributed tracing
-  # SigNoz runs in separate docker-compose, connected via signoz-net network
-
   # Cerbos Policy Decision Point
   cerbos:
     image: cerbos/cerbos:0.48.0
@@ -231,9 +234,9 @@ services:
       - OTEL_SERVICE_NAME=cerbos
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-otel-collector:4318
       - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-    ports:
-      - "3593:3593"  # gRPC
-      - "3592:3592"  # HTTP (for debugging/playground)
+    #ports:
+    #  - "3593:3593"  # gRPC
+    #  - "3592:3592"  # HTTP (for debugging/playground)
     volumes:
       - ./cerbos/policies:/policies
       - ./cerbos/config.yaml:/config.yaml
@@ -262,9 +265,9 @@ services:
     container_name: hestami-app
     env_file:
       - ./.env
-    ports:
-      - "3000:3000" #SvelteKit Hestami AI OS App
-      - "3001:3001" #DBOS Admin -- https://docs.dbos.dev/production/self-hosting/admin-api
+    #ports:
+    #  - "3000:3000" #SvelteKit Hestami AI OS App
+    #  - "3001:3001" #DBOS Admin -- https://docs.dbos.dev/production/self-hosting/admin-api
     deploy:
       resources:
         limits:
@@ -281,7 +284,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`dev-platform.hestami-ai.com`)"
-      - "traefik.http.routers.frontend.tls=true"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
       # Define upload-limit middleware (referenced by entrypoint)
       - "traefik.http.middlewares.upload-limit.buffering.maxRequestBodyBytes=104857600"  # 100MB

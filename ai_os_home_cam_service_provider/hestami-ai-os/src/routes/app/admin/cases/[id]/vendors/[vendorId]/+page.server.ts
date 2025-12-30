@@ -1,28 +1,17 @@
 import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
-    const { organization } = await parent();
+    // Get staff, memberships, and organization from parent layout (already fetched via SECURITY DEFINER)
+    const { staff, memberships, organization } = await parent();
 
-    // Build context for direct server-side calling
-    let staffRoles: any[] = [];
-    let pillarAccess: any[] = [];
-    let orgRoles: Record<string, any> = {};
-
-    if (locals.user) {
-        const [staffProfile, memberships] = await Promise.all([
-            prisma.staff.findUnique({ where: { userId: locals.user.id } }),
-            prisma.userOrganization.findMany({ where: { userId: locals.user.id } })
-        ]);
-        if (staffProfile && staffProfile.status === 'ACTIVE') {
-            staffRoles = staffProfile.roles;
-            pillarAccess = staffProfile.pillarAccess;
-        }
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+    // Build context using data from parent layout
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
 
     const role = organization ? orgRoles[organization.id] : undefined;

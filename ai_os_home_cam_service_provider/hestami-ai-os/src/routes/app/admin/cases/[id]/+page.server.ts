@@ -45,7 +45,27 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                 deletedAt: null
             },
             include: {
-                property: true,
+                property: {
+                    include: {
+                        ownerOrg: {
+                            include: {
+                                memberships: {
+                                    where: { role: 'ADMIN' },
+                                    take: 1,
+                                    include: {
+                                        user: {
+                                            select: {
+                                                id: true,
+                                                name: true,
+                                                email: true
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 assignedConcierge: true,
                 statusHistory: {
                     orderBy: { createdAt: 'desc' },
@@ -70,6 +90,14 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         if (!conciergeCase) {
             throw error(404, 'Case not found');
         }
+
+        // Get owner contact info from the property's owner organization
+        const ownerMember = conciergeCase.property.ownerOrg?.memberships?.[0];
+        const ownerContact = ownerMember ? {
+            name: ownerMember.user.name,
+            email: ownerMember.user.email,
+            organizationName: conciergeCase.property.ownerOrg?.name ?? null
+        } : null;
 
         // Transform to the shape expected by the page
         return {
@@ -98,6 +126,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                     name: conciergeCase.property.name,
                     addressLine1: conciergeCase.property.addressLine1
                 },
+                ownerContact,
                 statusHistory: conciergeCase.statusHistory.map(h => ({
                     id: h.id,
                     fromStatus: h.fromStatus,

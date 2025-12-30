@@ -1,29 +1,30 @@
 import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
-    const { organization } = await parent();
-    
-    // Build context for direct server-side calling
-    let orgRoles: Record<string, any> = {};
-    if (locals.user) {
-        const memberships = await prisma.userOrganization.findMany({ where: { userId: locals.user.id } });
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+    // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
+    const { organization, memberships, staff } = await parent();
+
+    // Build context using data from parent layout
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
-    
-    // Pass organization through options (don't mutate locals)
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
     const role = organization ? orgRoles[organization.id] : undefined;
-    const context = buildServerContext(locals, { orgRoles, organization, role });
+
+    const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess, organization, role });
     const client = createDirectClient(context);
 
     try {
         const response = await client.job.list({ limit: 100 });
         if (!response.ok) {
-            throw error(500, 'Failed to fetch jobs for dispatch board');
+            const errResponse = response as any;
+            const status = errResponse.error?.status || 500;
+            const message = errResponse.error?.message || 'Failed to fetch jobs for dispatch board';
+            throw error(status, message);
         }
 
         return {

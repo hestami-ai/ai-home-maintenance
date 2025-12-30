@@ -35,6 +35,7 @@
 			organization: Organization | null;
 			properties: Property[];
 			serviceCalls: ServiceCall[];
+			documentCount: number;
 		};
 	}
 
@@ -127,17 +128,23 @@
 					</div>
 				</div>
 			</Card>
-			<Card variant="outlined" padding="md">
-				<div class="flex items-center gap-3">
-					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success-500/10">
-						<FileText class="h-5 w-5 text-success-500" />
+			<a href="/app/concierge/documents" class="group">
+				<Card variant="outlined" padding="md" class="transition-all group-hover:border-primary-500">
+					<div class="flex items-center gap-3">
+						<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-success-500/10">
+							<FileText class="h-5 w-5 text-success-500" />
+						</div>
+						<div>
+							{#if isLoading}
+								<Loader2 class="h-6 w-6 animate-spin text-surface-400" />
+							{:else}
+								<p class="text-2xl font-bold">{data.documentCount}</p>
+							{/if}
+							<p class="text-sm text-surface-500">Documents</p>
+						</div>
 					</div>
-					<div>
-						<p class="text-2xl font-bold">0</p>
-						<p class="text-sm text-surface-500">Documents</p>
-					</div>
-				</div>
-			</Card>
+				</Card>
+			</a>
 			<Card variant="outlined" padding="md">
 				<div class="flex items-center gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary-500/10">

@@ -1,5 +1,4 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
@@ -7,20 +6,19 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
     const { id } = params;
     if (!id) throw error(404, 'Violation ID required');
 
-    const { organization } = await parent();
+    // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
+    const { organization, memberships, staff } = await parent();
 
-    // Build context
-    let orgRoles: Record<string, any> = {};
-    if (locals.user) {
-        const memberships = await prisma.userOrganization.findMany({
-            where: { userId: locals.user.id }
-        });
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+    // Build context using data from parent layout
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
-
-    const context = buildServerContext(locals, { orgRoles });
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const role = orgRoles[organization?.id ?? ''];
+    
+    const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess, organization: organization ?? undefined, role });
     const client = createDirectClient(context);
 
     // Parallel fetching

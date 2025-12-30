@@ -1,9 +1,10 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
-    const { organization } = await parent();
+    // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
+    const { organization, memberships, staff } = await parent();
+    
     if (!organization) {
         return {
             associations: [],
@@ -12,20 +13,16 @@ export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
         };
     }
 
-    // Build context for direct server-side calling
-    let orgRoles: Record<string, any> = {};
-    if (locals.user) {
-        const memberships = await prisma.userOrganization.findMany({
-            where: { userId: locals.user.id }
-        });
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+    // Build context using data from parent layout
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
-
-    // Pass organization through options (don't mutate locals)
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
     const role = orgRoles[organization.id];
-    const context = buildServerContext(locals, { orgRoles, organization, role });
+    
+    const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess, organization, role });
     const client = createDirectClient(context);
 
     try {

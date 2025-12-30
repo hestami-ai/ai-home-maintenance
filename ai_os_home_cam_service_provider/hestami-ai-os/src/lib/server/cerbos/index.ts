@@ -223,8 +223,11 @@ export async function isAllowed(
 		log.debug('Authorization check', {
 			principalId: principal.id,
 			roles: principal.roles,
+			staffRoles: principal.attr.staffRoles,
+			pillarAccess: principal.attr.pillarAccess,
 			resourceKind: resource.kind,
 			resourceId: resource.id,
+			resourceAttr: resource.attr,
 			action,
 			allowed
 		});

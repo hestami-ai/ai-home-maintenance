@@ -1,18 +1,39 @@
 import type { PageServerLoad } from './$types';
-import { orpc } from '$lib/api';
+import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ params, parent }) => {
-    const { organization } = await parent();
+export const load: PageServerLoad = async ({ params, locals, parent }) => {
+    // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
+    const { organization, memberships, staff } = await parent();
     const caseId = params.id;
 
     if (!organization) {
         throw error(401, 'Organization context required');
     }
 
+    // Build context using data from parent layout
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
+    }
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const role = orgRoles[organization.id];
+
+    const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess, organization, role });
+    const client = createDirectClient(context);
+
     try {
         // Fetch core service call detail
-        const detailResult = await orpc.conciergeCase.getDetail({ id: caseId });
+        const detailResult = await client.conciergeCase.getDetail({ id: caseId });
+
+        if (!detailResult.ok) {
+            const errResponse = detailResult as any;
+            const status = errResponse.error?.status || 500;
+            const message = errResponse.error?.message || 'Service call not found';
+            throw error(status, message);
+        }
+
         const data = detailResult.data;
 
         // Fetch quotes if status indicates they might exist
@@ -20,8 +41,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
         if (['QUOTE_REQUESTED', 'QUOTE_RECEIVED', 'QUOTE_APPROVED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED'].includes(data.case.status)) {
             try {
-                const quotesResult = await orpc.vendorBid.listByCase({ caseId, limit: 20 });
-                quotes = quotesResult.data.bids.filter((b: any) => b.isCustomerFacing !== false);
+                const quotesResult = await client.vendorBid.listByCase({ caseId, limit: 20 });
+                if (quotesResult.ok) {
+                    quotes = quotesResult.data.bids.filter((b: any) => b.isCustomerFacing !== false);
+                }
             } catch (qErr) {
                 console.error('Failed to load quotes on server:', qErr);
             }

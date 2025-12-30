@@ -1,28 +1,19 @@
 import { error } from '@sveltejs/kit';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
-    // Build context for direct server-side calling
-    let staffRoles: any[] = [];
-    let pillarAccess: any[] = [];
-    let orgRoles: Record<string, any> = {};
-    
-    if (locals.user) {
-        const [staffProfile, memberships] = await Promise.all([
-            prisma.staff.findUnique({ where: { userId: locals.user.id } }),
-            prisma.userOrganization.findMany({ where: { userId: locals.user.id } })
-        ]);
-        if (staffProfile && staffProfile.status === 'ACTIVE') {
-            staffRoles = staffProfile.roles;
-            pillarAccess = staffProfile.pillarAccess;
-        }
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+export const load: PageServerLoad = async ({ params, locals, parent }) => {
+    // Get staff and memberships from parent layout (already fetched via SECURITY DEFINER)
+    const { staff, memberships } = await parent();
+
+    // Build context using data from parent layout
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
-    
+
     const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess });
     const client = createDirectClient(context);
 
@@ -32,7 +23,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
         });
 
         if (!response.ok) {
-            throw error(404, 'Staff member not found');
+            const errResponse = response as any;
+            const status = errResponse.error?.status || 500;
+            const message = errResponse.error?.message || 'Staff member not found';
+            throw error(status, message);
         }
 
         return {

@@ -233,6 +233,32 @@
 							</div>
 						</Card>
 
+						<!-- Owner Contact Information -->
+						{#if caseDetail.ownerContact}
+							<Card variant="outlined" padding="lg">
+								<h2 class="text-lg font-semibold">Owner Contact</h2>
+								<div class="mt-4 space-y-3">
+									<div class="flex items-start gap-3">
+										<User class="h-5 w-5 text-surface-400 mt-0.5" />
+										<div>
+											<p class="font-medium">{caseDetail.ownerContact.name || 'No name provided'}</p>
+											{#if caseDetail.ownerContact.organizationName}
+												<p class="text-sm text-surface-500">{caseDetail.ownerContact.organizationName}</p>
+											{/if}
+										</div>
+									</div>
+									{#if caseDetail.ownerContact.email}
+										<div class="flex items-center gap-3">
+											<Mail class="h-5 w-5 text-surface-400" />
+											<a href="mailto:{caseDetail.ownerContact.email}" class="text-primary-500 hover:underline">
+												{caseDetail.ownerContact.email}
+											</a>
+										</div>
+									{/if}
+								</div>
+							</Card>
+						{/if}
+
 						<!-- Status History -->
 						{#if caseDetail.statusHistory && caseDetail.statusHistory.length > 0}
 							<Card variant="outlined" padding="lg">

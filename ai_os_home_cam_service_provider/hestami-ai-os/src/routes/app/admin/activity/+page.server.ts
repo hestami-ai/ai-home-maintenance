@@ -1,28 +1,20 @@
 import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import { error } from '@sveltejs/kit';
+import { recordSpanError } from '$lib/server/api/middleware/tracing';
 
-export const load: PageServerLoad = async ({ url, locals }) => {
-    // Build context for direct server-side calling
-    let staffRoles: any[] = [];
-    let pillarAccess: any[] = [];
-    let orgRoles: Record<string, any> = {};
-    
-    if (locals.user) {
-        const [staffProfile, memberships] = await Promise.all([
-            prisma.staff.findUnique({ where: { userId: locals.user.id } }),
-            prisma.userOrganization.findMany({ where: { userId: locals.user.id } })
-        ]);
-        if (staffProfile && staffProfile.status === 'ACTIVE') {
-            staffRoles = staffProfile.roles;
-            pillarAccess = staffProfile.pillarAccess;
-        }
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+export const load: PageServerLoad = async ({ url, locals, parent }) => {
+    // Get staff and memberships from parent layout (already fetched via SECURITY DEFINER)
+    const { staff, memberships } = await parent();
+
+    // Build context using data from parent layout
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
-    
+
     const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess });
     const client = createDirectClient(context);
     const entityType = url.searchParams.get('entityType') as any;
@@ -54,7 +46,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
         }
 
         if (!result.ok) {
-            throw error(500, 'Failed to fetch activity events from server');
+            const errResponse = result as any;
+            const status = errResponse.error?.status || 500;
+            const message = errResponse.error?.message || 'Failed to fetch activity events from server';
+            throw error(status, message);
         }
 
         return {
@@ -71,7 +66,15 @@ export const load: PageServerLoad = async ({ url, locals }) => {
             }
         };
     } catch (err) {
+        const errorObj = err instanceof Error ? err : new Error(String(err));
         console.error('Failed to load admin activity on server:', err);
+
+        // Record error in trace for observability
+        await recordSpanError(errorObj, {
+            errorCode: 'ACTIVITY_LOAD_FAILED',
+            errorType: 'PAGE_LOAD_ERROR'
+        });
+
         return {
             events: [],
             pagination: { total: 0, hasMore: false, nextCursor: null },
@@ -83,7 +86,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
                 actorType: performedByType || '',
                 startDate: startDate || '',
                 endDate: endDate || ''
-            }
+            },
+            error: 'Failed to load activity events'
         };
     }
 };

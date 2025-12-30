@@ -25,15 +25,15 @@ model Technician {
 
   // Status & employment
   isActive        Boolean   @default(true) @map("is_active")
-  hireDate        DateTime? @map("hire_date")
-  terminationDate DateTime? @map("termination_date")
+  hireDate        DateTime? @db.Timestamptz(3) @map("hire_date")
+  terminationDate DateTime? @db.Timestamptz(3) @map("termination_date")
   timezone        String    @default("America/New_York")
 
   // Location/branch
   branchId String? @map("branch_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization   Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -78,8 +78,8 @@ model TechnicianSkill {
   level        Int                 @default(1) // 1-5 proficiency
   notes        String?             @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
@@ -95,12 +95,12 @@ model TechnicianCertification {
   name            String
   authority       String?
   certificationId String?   @map("certification_id")
-  issuedAt        DateTime? @map("issued_at")
-  expiresAt       DateTime? @map("expires_at")
+  issuedAt        DateTime? @db.Timestamptz(3) @map("issued_at")
+  expiresAt       DateTime? @db.Timestamptz(3) @map("expires_at")
   documentUrl     String?   @map("document_url")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
@@ -121,8 +121,8 @@ model TechnicianAvailability {
   saturday     Json?
   sunday       Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
@@ -133,12 +133,12 @@ model TechnicianAvailability {
 model TechnicianTimeOff {
   id           String   @id @default(cuid())
   technicianId String   @map("technician_id")
-  startsAt     DateTime @map("starts_at")
-  endsAt       DateTime @map("ends_at")
+  startsAt     DateTime  @db.Timestamptz(3) @map("starts_at")
+  endsAt       DateTime  @db.Timestamptz(3) @map("ends_at")
   reason       String?  @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
@@ -155,8 +155,8 @@ model TechnicianTerritory {
   serviceAreaId String  @map("service_area_id")
   isPrimary     Boolean @default(false) @map("is_primary")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   technician  Technician  @relation(fields: [technicianId], references: [id], onDelete: Cascade)
   serviceArea ServiceArea @relation(fields: [serviceAreaId], references: [id], onDelete: Cascade)
@@ -171,16 +171,16 @@ model TechnicianTerritory {
 model TechnicianKPI {
   id            String   @id @default(cuid())
   technicianId  String   @map("technician_id")
-  periodStart   DateTime @map("period_start")
-  periodEnd     DateTime @map("period_end")
+  periodStart   DateTime  @db.Timestamptz(3) @map("period_start")
+  periodEnd     DateTime  @db.Timestamptz(3) @map("period_end")
   jobsCompleted Int      @default(0) @map("jobs_completed")
   onTimeRate    Float    @default(0) @map("on_time_rate")
   callbackRate  Float    @default(0) @map("callback_rate")
   revenue       Decimal  @default(0) @map("revenue") @db.Decimal(12, 2)
   laborHours    Float    @default(0) @map("labor_hours")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   technician Technician @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
@@ -761,9 +761,9 @@ model Organization {
   externalContactEmail String? @map("external_contact_email") @db.Citext
   externalContactPhone String? @map("external_contact_phone")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   memberships         UserOrganization[]
@@ -871,8 +871,8 @@ model User {
   name          String?
   image         String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   memberships        UserOrganization[]
@@ -922,9 +922,9 @@ model Staff {
 
   // Status & lifecycle
   status             StaffStatus @default(PENDING)
-  activatedAt        DateTime?   @map("activated_at")
-  suspendedAt        DateTime?   @map("suspended_at")
-  deactivatedAt      DateTime?   @map("deactivated_at")
+  activatedAt        DateTime? @db.Timestamptz(3)   @map("activated_at")
+  suspendedAt        DateTime? @db.Timestamptz(3)   @map("suspended_at")
+  deactivatedAt      DateTime? @db.Timestamptz(3)   @map("deactivated_at")
   suspensionReason   String?     @map("suspension_reason") @db.Text
   deactivationReason String?     @map("deactivation_reason") @db.Text
 
@@ -936,14 +936,14 @@ model Staff {
 
   // Onboarding & Activation (Phase 19)
   activationCodeEncrypted String?   @map("activation_code_encrypted")
-  activationCodeExpiresAt DateTime? @map("activation_code_expires_at")
+  activationCodeExpiresAt DateTime? @db.Timestamptz(3) @map("activation_code_expires_at")
 
   // Case assignment eligibility
   canBeAssignedCases Boolean @default(true) @map("can_be_assigned_cases")
 
   // Timestamps
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -965,12 +965,12 @@ model StaffCaseAssignment {
 
   // Assignment details
   isPrimary     Boolean   @default(false) @map("is_primary")
-  assignedAt    DateTime  @default(now()) @map("assigned_at")
-  unassignedAt  DateTime? @map("unassigned_at")
+  assignedAt    DateTime  @db.Timestamptz(3)  @default(now()) @map("assigned_at")
+  unassignedAt  DateTime? @db.Timestamptz(3) @map("unassigned_at")
   justification String?   @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   staff Staff         @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -990,8 +990,8 @@ model UserOrganization {
   role           UserRole @default(OWNER)
   isDefault      Boolean  @default(false) @map("is_default")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1007,12 +1007,12 @@ model Session {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   token     String   @unique
-  expiresAt DateTime @map("expires_at")
+  expiresAt DateTime  @db.Timestamptz(3) @map("expires_at")
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1029,14 +1029,14 @@ model Account {
   providerId            String    @map("provider_id")
   accessToken           String?   @map("access_token")
   refreshToken          String?   @map("refresh_token")
-  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
-  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(3) @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3) @map("refresh_token_expires_at")
   scope                 String?
   idToken               String?   @map("id_token")
   password              String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1051,10 +1051,10 @@ model Verification {
   id         String   @id @default(cuid())
   identifier String
   value      String
-  expiresAt  DateTime @map("expires_at")
+  expiresAt  DateTime  @db.Timestamptz(3) @map("expires_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   @@map("verifications")
 }
@@ -1071,8 +1071,8 @@ model IdempotencyKey {
   response       Json?
   statusCode     Int?   @map("status_code")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  expiresAt DateTime @map("expires_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  expiresAt DateTime  @db.Timestamptz(3) @map("expires_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1097,7 +1097,7 @@ model ActivityEvent {
   // Actor information
   performedById   String?           @map("performed_by_id")
   performedByType ActivityActorType @map("performed_by_type")
-  performedAt     DateTime          @default(now()) @map("performed_at")
+  performedAt     DateTime  @db.Timestamptz(3)          @default(now()) @map("performed_at")
 
   // Request context
   ipAddress String? @map("ip_address")
@@ -1548,13 +1548,13 @@ model Association {
   legalName         String?           @map("legal_name")
   taxId             String?           @map("tax_id")
   status            AssociationStatus @default(ONBOARDING)
-  incorporationDate DateTime?         @map("incorporation_date")
+  incorporationDate DateTime? @db.Timestamptz(3)         @map("incorporation_date")
   fiscalYearEnd     Int               @default(12) @map("fiscal_year_end") // Month (1-12)
   settings          Json              @default("{}")
-  deletedAt         DateTime?         @map("deleted_at")
+  deletedAt         DateTime? @db.Timestamptz(3)         @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1653,9 +1653,9 @@ model Property {
   totalUnits Int    @default(0) @map("total_units")
   totalAcres Float? @map("total_acres")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1698,9 +1698,9 @@ model Unit {
   assessmentClass String? @map("assessment_class")
   votingWeight    Float   @default(1) @map("voting_weight")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1755,8 +1755,8 @@ model CommonArea {
   // Operating hours (JSON: { monday: { open: "09:00", close: "21:00" }, ... })
   operatingHours Json? @map("operating_hours")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -1797,9 +1797,9 @@ model Party {
   // Link to platform user (if registered)
   userId String? @map("user_id")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1869,8 +1869,8 @@ model ViolationType {
   warningTemplateId     String?           @map("warning_template_id")
   noticeTemplateId      String?           @map("notice_template_id")
   isActive              Boolean           @default(true) @map("is_active")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
+  createdAt             DateTime  @db.Timestamptz(3)          @default(now()) @map("created_at")
+  updatedAt             DateTime  @db.Timestamptz(3)          @updatedAt @map("updated_at")
 
   // Relations
   organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1900,11 +1900,11 @@ model Violation {
   description        String?           @db.Text
   severity           ViolationSeverity
   status             ViolationStatus   @default(DRAFT)
-  observedDate       DateTime          @map("observed_date")
-  reportedDate       DateTime          @default(now()) @map("reported_date")
-  curePeriodEnds     DateTime?         @map("cure_period_ends")
-  curedDate          DateTime?         @map("cured_date")
-  closedDate         DateTime?         @map("closed_date")
+  observedDate       DateTime  @db.Timestamptz(3)          @map("observed_date")
+  reportedDate       DateTime  @db.Timestamptz(3)          @default(now()) @map("reported_date")
+  curePeriodEnds     DateTime? @db.Timestamptz(3)         @map("cure_period_ends")
+  curedDate          DateTime? @db.Timestamptz(3)         @map("cured_date")
+  closedDate         DateTime? @db.Timestamptz(3)         @map("closed_date")
   responsiblePartyId String?           @map("responsible_party_id")
   reportedBy         String            @map("reported_by")
   reporterType       String?           @map("reporter_type")
@@ -1912,13 +1912,13 @@ model Violation {
   totalFinesPaid     Decimal           @default(0) @map("total_fines_paid") @db.Decimal(10, 2)
   totalFinesWaived   Decimal           @default(0) @map("total_fines_waived") @db.Decimal(10, 2)
   noticeCount        Int               @default(0) @map("notice_count")
-  lastNoticeDate     DateTime?         @map("last_notice_date")
+  lastNoticeDate     DateTime? @db.Timestamptz(3)         @map("last_notice_date")
   lastNoticeType     NoticeType?       @map("last_notice_type")
   resolutionNotes    String?           @map("resolution_notes") @db.Text
   closedBy           String?           @map("closed_by")
-  deletedAt          DateTime?         @map("deleted_at")
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
+  deletedAt          DateTime? @db.Timestamptz(3)         @map("deleted_at")
+  createdAt          DateTime  @db.Timestamptz(3)          @default(now()) @map("created_at")
+  updatedAt          DateTime  @db.Timestamptz(3)          @updatedAt @map("updated_at")
 
   // Relations
   organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -1958,13 +1958,13 @@ model ViolationEvidence {
   fileSize     Int?      @map("file_size")
   mimeType     String?   @map("mime_type")
   description  String?
-  capturedAt   DateTime? @map("captured_at")
+  capturedAt   DateTime? @db.Timestamptz(3) @map("captured_at")
   capturedBy   String?   @map("captured_by")
   gpsLatitude  Decimal?  @map("gps_latitude") @db.Decimal(10, 8)
   gpsLongitude Decimal?  @map("gps_longitude") @db.Decimal(11, 8)
   uploadedBy   String    @map("uploaded_by")
-  uploadedAt   DateTime  @default(now()) @map("uploaded_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  uploadedAt   DateTime  @db.Timestamptz(3)  @default(now()) @map("uploaded_at")
+  createdAt    DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
 
   // Relations
   violation Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
@@ -1985,15 +1985,15 @@ model ViolationNotice {
   recipientName     String               @map("recipient_name")
   recipientAddress  String?              @map("recipient_address")
   recipientEmail    String?              @map("recipient_email")
-  sentDate          DateTime             @map("sent_date")
-  deliveredDate     DateTime?            @map("delivered_date")
+  sentDate          DateTime  @db.Timestamptz(3)             @map("sent_date")
+  deliveredDate     DateTime? @db.Timestamptz(3)            @map("delivered_date")
   curePeriodDays    Int?                 @map("cure_period_days")
-  curePeriodEnds    DateTime?            @map("cure_period_ends")
+  curePeriodEnds    DateTime? @db.Timestamptz(3)            @map("cure_period_ends")
   trackingNumber    String?              @map("tracking_number")
   deliveryConfirmed Boolean              @default(false) @map("delivery_confirmed")
   sentBy            String               @map("sent_by")
-  createdAt         DateTime             @default(now()) @map("created_at")
-  updatedAt         DateTime             @updatedAt @map("updated_at")
+  createdAt         DateTime  @db.Timestamptz(3)             @default(now()) @map("created_at")
+  updatedAt         DateTime  @db.Timestamptz(3)             @updatedAt @map("updated_at")
 
   // Relations
   violation Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
@@ -2007,7 +2007,7 @@ model ViolationNotice {
 model ViolationHearing {
   id             String         @id @default(cuid())
   violationId    String         @map("violation_id")
-  hearingDate    DateTime       @map("hearing_date")
+  hearingDate    DateTime  @db.Timestamptz(3)       @map("hearing_date")
   hearingTime    String?        @map("hearing_time")
   location       String?
   hearingOfficer String?        @map("hearing_officer")
@@ -2016,13 +2016,13 @@ model ViolationHearing {
   outcomeNotes   String?        @map("outcome_notes")
   fineAssessed   Decimal?       @map("fine_assessed") @db.Decimal(10, 2)
   fineWaived     Decimal?       @map("fine_waived") @db.Decimal(10, 2)
-  appealDeadline DateTime?      @map("appeal_deadline")
+  appealDeadline DateTime? @db.Timestamptz(3)      @map("appeal_deadline")
   appealFiled    Boolean        @default(false) @map("appeal_filed")
-  appealDate     DateTime?      @map("appeal_date")
+  appealDate     DateTime? @db.Timestamptz(3)      @map("appeal_date")
   recordedBy     String?        @map("recorded_by")
-  recordedAt     DateTime?      @map("recorded_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
+  recordedAt     DateTime? @db.Timestamptz(3)      @map("recorded_at")
+  createdAt      DateTime  @db.Timestamptz(3)       @default(now()) @map("created_at")
+  updatedAt      DateTime  @db.Timestamptz(3)       @updatedAt @map("updated_at")
 
   // Relations
   violation Violation         @relation(fields: [violationId], references: [id], onDelete: Cascade)
@@ -2040,19 +2040,19 @@ model ViolationFine {
   fineNumber         Int       @map("fine_number")
   amount             Decimal   @db.Decimal(10, 2)
   reason             String?
-  assessedDate       DateTime  @map("assessed_date")
-  dueDate            DateTime  @map("due_date")
+  assessedDate       DateTime  @db.Timestamptz(3)  @map("assessed_date")
+  dueDate            DateTime  @db.Timestamptz(3)  @map("due_date")
   paidAmount         Decimal   @default(0) @map("paid_amount") @db.Decimal(10, 2)
   waivedAmount       Decimal   @default(0) @map("waived_amount") @db.Decimal(10, 2)
   balanceDue         Decimal   @map("balance_due") @db.Decimal(10, 2)
   waivedBy           String?   @map("waived_by")
-  waivedDate         DateTime? @map("waived_date")
+  waivedDate         DateTime? @db.Timestamptz(3) @map("waived_date")
   waiverReason       String?   @map("waiver_reason")
   assessmentChargeId String?   @map("assessment_charge_id")
   glPosted           Boolean   @default(false) @map("gl_posted")
   assessedBy         String    @map("assessed_by")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime  @updatedAt @map("updated_at")
+  createdAt          DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt          DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
 
   // Relations
   violation Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
@@ -2069,7 +2069,7 @@ model ViolationStatusHistory {
   fromStatus  ViolationStatus?
   toStatus    ViolationStatus
   changedBy   String           @map("changed_by")
-  changedAt   DateTime         @default(now()) @map("changed_at")
+  changedAt   DateTime  @db.Timestamptz(3)         @default(now()) @map("changed_at")
   notes       String?
 
   // Relations
@@ -2089,8 +2089,8 @@ model NoticeTemplate {
   bodyTemplate          String     @map("body_template") @db.Text // Supports {{variable}} placeholders
   defaultCurePeriodDays Int?       @map("default_cure_period_days")
   isActive              Boolean    @default(true) @map("is_active")
-  createdAt             DateTime   @default(now()) @map("created_at")
-  updatedAt             DateTime   @updatedAt @map("updated_at")
+  createdAt             DateTime  @db.Timestamptz(3)   @default(now()) @map("created_at")
+  updatedAt             DateTime  @db.Timestamptz(3)   @updatedAt @map("updated_at")
 
   // Relations
   association     Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -2112,8 +2112,8 @@ model NoticeSequenceConfig {
   description     String?
   isDefault       Boolean  @default(false) @map("is_default")
   isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt       DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   violationType ViolationType        @relation(fields: [violationTypeId], references: [id], onDelete: Cascade)
@@ -2134,7 +2134,7 @@ model NoticeSequenceStep {
   autoSend          Boolean  @default(false) @map("auto_send")
   assessFine        Boolean  @default(false) @map("assess_fine")
   fineAmount        Decimal? @map("fine_amount") @db.Decimal(10, 2)
-  createdAt         DateTime @default(now()) @map("created_at")
+  createdAt         DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   sequence NoticeSequenceConfig @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
@@ -2149,20 +2149,20 @@ model NoticeSequenceStep {
 model ViolationAppeal {
   id                    String       @id @default(cuid())
   hearingId             String       @map("hearing_id")
-  filedDate             DateTime     @map("filed_date")
+  filedDate             DateTime  @db.Timestamptz(3)     @map("filed_date")
   filedBy               String       @map("filed_by")
   reason                String       @db.Text
   documentsJson         String?      @map("documents_json") @db.Text
-  appealHearingDate     DateTime?    @map("appeal_hearing_date")
+  appealHearingDate     DateTime? @db.Timestamptz(3)    @map("appeal_hearing_date")
   appealHearingLocation String?      @map("appeal_hearing_location")
   status                AppealStatus @default(PENDING)
-  decisionDate          DateTime?    @map("decision_date")
+  decisionDate          DateTime? @db.Timestamptz(3)    @map("decision_date")
   decisionBy            String?      @map("decision_by")
   decisionNotes         String?      @map("decision_notes") @db.Text
   originalFineAmount    Decimal?     @map("original_fine_amount") @db.Decimal(10, 2)
   revisedFineAmount     Decimal?     @map("revised_fine_amount") @db.Decimal(10, 2)
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
+  createdAt             DateTime  @db.Timestamptz(3)     @default(now()) @map("created_at")
+  updatedAt             DateTime  @db.Timestamptz(3)     @updatedAt @map("updated_at")
 
   // Relations
   hearing ViolationHearing @relation(fields: [hearingId], references: [id], onDelete: Cascade)
@@ -2182,9 +2182,9 @@ model UserProfile {
   timezone        String  @default("UTC") @map("timezone")
   mailingAddress  Json?   @map("mailing_address")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -2203,9 +2203,9 @@ model ContactPreference {
   allowMarketing     Boolean                  @default(false) @map("allow_marketing")
   allowEmergency     Boolean                  @default(true) @map("allow_emergency")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -2222,9 +2222,9 @@ model NotificationSetting {
   channel   ContactPreferenceChannel
   isEnabled Boolean                  @default(true) @map("is_enabled")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   party Party @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -2249,9 +2249,9 @@ model OwnerRequest {
   attachments Json? // Array of file URLs/metadata
 
   // Tracking
-  submittedAt DateTime? @map("submitted_at")
-  resolvedAt  DateTime? @map("resolved_at")
-  closedAt    DateTime? @map("closed_at")
+  submittedAt DateTime? @db.Timestamptz(3) @map("submitted_at")
+  resolvedAt  DateTime? @db.Timestamptz(3) @map("resolved_at")
+  closedAt    DateTime? @db.Timestamptz(3) @map("closed_at")
 
   // Assignment
   assignedToUserId String? @map("assigned_to_user_id")
@@ -2262,9 +2262,9 @@ model OwnerRequest {
   // Conversion to work order
   workOrderId String? @map("work_order_id")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   association Association           @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -2292,7 +2292,7 @@ model OwnerRequestHistory {
   notes          String? @db.Text
   performedBy    String  @map("performed_by") // User ID
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   request OwnerRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -2320,9 +2320,9 @@ model StoredPaymentMethod {
   isDefault  Boolean @default(false) @map("is_default")
   isVerified Boolean @default(false) @map("is_verified")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   party           Party            @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -2347,9 +2347,9 @@ model AutoPaySetting {
   associationId    String? @map("association_id")
   assessmentTypeId String? @map("assessment_type_id")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   party         Party               @relation(fields: [partyId], references: [id], onDelete: Cascade)
@@ -2372,8 +2372,8 @@ model Ownership {
   percentage Float @default(100)
 
   // Dates
-  startDate DateTime  @map("start_date")
-  endDate   DateTime? @map("end_date")
+  startDate DateTime  @db.Timestamptz(3)  @map("start_date")
+  endDate   DateTime? @db.Timestamptz(3) @map("end_date")
 
   // Primary contact for this unit
   isPrimary Boolean @default(false) @map("is_primary")
@@ -2381,9 +2381,9 @@ model Ownership {
   // Mailing preferences
   mailingAddress Json? @map("mailing_address")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   unit  Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
@@ -2402,14 +2402,14 @@ model Tenancy {
   partyId String @map("party_id")
 
   // Lease dates
-  leaseStart DateTime  @map("lease_start")
-  leaseEnd   DateTime? @map("lease_end")
+  leaseStart DateTime  @db.Timestamptz(3)  @map("lease_start")
+  leaseEnd   DateTime? @db.Timestamptz(3) @map("lease_end")
 
   // Contact preferences
   isPrimary Boolean @default(false) @map("is_primary")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   unit  Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
@@ -2453,33 +2453,33 @@ model Document {
   supersededById   String? @map("superseded_by_id")
 
   // Effective dates (for governing docs, permits, etc.)
-  effectiveDate  DateTime? @map("effective_date")
-  expirationDate DateTime? @map("expiration_date")
+  effectiveDate  DateTime? @db.Timestamptz(3) @map("effective_date")
+  expirationDate DateTime? @db.Timestamptz(3) @map("expiration_date")
 
   // Upload metadata
   uploadedBy String   @map("uploaded_by") // User ID
   tags       String[] @default([])
 
   // Archive info
-  archivedAt    DateTime? @map("archived_at")
+  archivedAt    DateTime? @db.Timestamptz(3) @map("archived_at")
   archivedBy    String?   @map("archived_by")
   archiveReason String?   @map("archive_reason")
 
   // Processing status (malware scan, content moderation)
   malwareScanStatus       String?   @map("malware_scan_status") // PENDING, CLEAN, INFECTED, ERROR
   contentModerationStatus String?   @map("content_moderation_status") // PENDING, APPROVED, FLAGGED
-  processingCompletedAt   DateTime? @map("processing_completed_at")
+  processingCompletedAt   DateTime? @db.Timestamptz(3) @map("processing_completed_at")
 
   // Media-specific fields (for photos, videos, voice notes)
   latitude      Decimal?  @db.Decimal(10, 7)
   longitude     Decimal?  @db.Decimal(10, 7)
-  capturedAt    DateTime? @map("captured_at")
+  capturedAt    DateTime? @db.Timestamptz(3) @map("captured_at")
   transcription String?   @db.Text
   isTranscribed Boolean   @default(false) @map("is_transcribed")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -2510,7 +2510,7 @@ model DocumentContextBinding {
   isPrimary    Boolean @default(false) @map("is_primary") // Marks primary context
   bindingNotes String? @map("binding_notes")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
   createdBy String   @map("created_by") // User ID
 
   // Relations
@@ -2529,9 +2529,9 @@ model DocumentAccessGrant {
   partyId    String @map("party_id")
 
   grantedBy String    @map("granted_by") // User ID
-  grantedAt DateTime  @default(now()) @map("granted_at")
-  expiresAt DateTime? @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
+  grantedAt DateTime  @db.Timestamptz(3)  @default(now()) @map("granted_at")
+  expiresAt DateTime? @db.Timestamptz(3) @map("expires_at")
+  revokedAt DateTime? @db.Timestamptz(3) @map("revoked_at")
 
   // Relations
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -2549,7 +2549,7 @@ model DocumentDownloadLog {
   partyId    String? @map("party_id")
   userId     String  @map("user_id")
 
-  downloadedAt DateTime @default(now()) @map("downloaded_at")
+  downloadedAt DateTime  @db.Timestamptz(3) @default(now()) @map("downloaded_at")
   ipAddress    String?  @map("ip_address")
   userAgent    String?  @map("user_agent")
 
@@ -2580,7 +2580,7 @@ model ReserveComponent {
   // Lifecycle
   usefulLife          Int       @map("useful_life") // Years
   remainingLife       Int       @map("remaining_life") // Years
-  placedInServiceDate DateTime? @map("placed_in_service_date")
+  placedInServiceDate DateTime? @db.Timestamptz(3) @map("placed_in_service_date")
 
   // Costs
   currentReplacementCost Decimal  @map("current_replacement_cost") @db.Decimal(12, 2)
@@ -2593,12 +2593,12 @@ model ReserveComponent {
 
   // Condition
   conditionRating    Int?      @map("condition_rating") // 1-10 scale
-  lastInspectionDate DateTime? @map("last_inspection_date")
+  lastInspectionDate DateTime? @db.Timestamptz(3) @map("last_inspection_date")
   notes              String?   @db.Text
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   association    Association             @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -2615,9 +2615,9 @@ model ReserveStudy {
   associationId String @map("association_id")
 
   studyType      ReserveStudyType @map("study_type")
-  studyDate      DateTime         @map("study_date")
-  effectiveDate  DateTime         @map("effective_date")
-  expirationDate DateTime?        @map("expiration_date")
+  studyDate      DateTime  @db.Timestamptz(3)         @map("study_date")
+  effectiveDate  DateTime  @db.Timestamptz(3)         @map("effective_date")
+  expirationDate DateTime? @db.Timestamptz(3)        @map("expiration_date")
 
   // Preparer info
   preparerName        String  @map("preparer_name")
@@ -2638,9 +2638,9 @@ model ReserveStudy {
 
   notes String? @db.Text
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   association     Association              @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -2669,7 +2669,7 @@ model ReserveStudyComponent {
   fundedAmount  Decimal @map("funded_amount") @db.Decimal(12, 2)
   percentFunded Decimal @map("percent_funded") @db.Decimal(5, 2)
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   study     ReserveStudy     @relation(fields: [studyId], references: [id], onDelete: Cascade)
@@ -2691,7 +2691,7 @@ model ReserveFundingSchedule {
   projectedExpenditures   Decimal @map("projected_expenditures") @db.Decimal(12, 2)
   percentFunded           Decimal @map("percent_funded") @db.Decimal(5, 2)
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   study ReserveStudy @relation(fields: [studyId], references: [id], onDelete: Cascade)
@@ -2731,9 +2731,9 @@ model ComplianceRequirement {
 
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -2754,12 +2754,12 @@ model ComplianceDeadline {
   // Deadline info
   title        String
   description  String?   @db.Text
-  dueDate      DateTime  @map("due_date")
-  reminderDate DateTime? @map("reminder_date")
+  dueDate      DateTime  @db.Timestamptz(3)  @map("due_date")
+  reminderDate DateTime? @db.Timestamptz(3) @map("reminder_date")
 
   // Status
   status      ComplianceStatus @default(NOT_STARTED)
-  completedAt DateTime?        @map("completed_at")
+  completedAt DateTime? @db.Timestamptz(3)        @map("completed_at")
   completedBy String?          @map("completed_by")
 
   // Evidence
@@ -2770,8 +2770,8 @@ model ComplianceDeadline {
   fiscalYear      Int? @map("fiscal_year")
   recurrenceIndex Int? @map("recurrence_index")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association    Association               @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -2796,15 +2796,15 @@ model ComplianceChecklistItem {
 
   // Status
   isCompleted Boolean   @default(false) @map("is_completed")
-  completedAt DateTime? @map("completed_at")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
   completedBy String?   @map("completed_by")
 
   // Evidence
   evidenceDocumentId String? @map("evidence_document_id")
   notes              String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   deadline ComplianceDeadline @relation(fields: [deadlineId], references: [id], onDelete: Cascade)
@@ -2825,8 +2825,8 @@ model ManagementContract {
 
   // Contract details
   contractNumber String?   @map("contract_number")
-  startDate      DateTime  @map("start_date")
-  endDate        DateTime? @map("end_date")
+  startDate      DateTime  @db.Timestamptz(3)  @map("start_date")
+  endDate        DateTime? @db.Timestamptz(3) @map("end_date")
   autoRenew      Boolean   @default(false) @map("auto_renew")
 
   // Terms
@@ -2836,8 +2836,8 @@ model ManagementContract {
   // Service levels
   serviceLevels Json? @map("service_levels") // { tier: "premium", sla: {...} }
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association       Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -2867,15 +2867,15 @@ model ManagerAssignment {
 
   // Assignment details
   isPrimary Boolean   @default(false) @map("is_primary")
-  startDate DateTime  @map("start_date")
-  endDate   DateTime? @map("end_date")
+  startDate DateTime  @db.Timestamptz(3)  @map("start_date")
+  endDate   DateTime? @db.Timestamptz(3) @map("end_date")
 
   // Workload tracking
   maxUnits Int?    @map("max_units") // Max units this manager can handle
   notes    String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -3025,9 +3025,9 @@ model GLAccount {
   // Current balance (denormalized for performance)
   currentBalance Decimal @default(0) @map("current_balance") @db.Decimal(15, 2)
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3058,7 +3058,7 @@ model JournalEntry {
 
   // Entry identification
   entryNumber String   @map("entry_number")
-  entryDate   DateTime @map("entry_date") @db.Date
+  entryDate   DateTime  @db.Timestamptz(3) @map("entry_date")
 
   // Description
   description String
@@ -3077,14 +3077,14 @@ model JournalEntry {
 
   // Approval
   approvedBy String?   @map("approved_by")
-  approvedAt DateTime? @map("approved_at")
+  approvedAt DateTime? @db.Timestamptz(3) @map("approved_at")
 
   // Audit
   createdBy String    @map("created_by")
-  postedAt  DateTime? @map("posted_at")
+  postedAt  DateTime? @db.Timestamptz(3) @map("posted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association   Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -3120,7 +3120,7 @@ model JournalEntryLine {
   // Line order
   lineNumber Int @map("line_number")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   journalEntry JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
@@ -3156,14 +3156,14 @@ model BankAccount {
   // Balances
   bookBalance    Decimal   @default(0) @map("book_balance") @db.Decimal(15, 2)
   bankBalance    Decimal   @default(0) @map("bank_balance") @db.Decimal(15, 2)
-  lastReconciled DateTime? @map("last_reconciled")
+  lastReconciled DateTime? @db.Timestamptz(3) @map("last_reconciled")
 
   // Status
   isActive  Boolean @default(true) @map("is_active")
   isPrimary Boolean @default(false) @map("is_primary")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3213,8 +3213,8 @@ model AssessmentType {
   // Status
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3237,10 +3237,10 @@ model AssessmentCharge {
   assessmentTypeId String @map("assessment_type_id")
 
   // Charge details
-  chargeDate  DateTime  @map("charge_date") @db.Date
-  dueDate     DateTime  @map("due_date") @db.Date
-  periodStart DateTime? @map("period_start") @db.Date
-  periodEnd   DateTime? @map("period_end") @db.Date
+  chargeDate  DateTime  @db.Timestamptz(3)  @map("charge_date")
+  dueDate     DateTime  @db.Timestamptz(3)  @map("due_date")
+  periodStart DateTime? @db.Timestamptz(3) @map("period_start")
+  periodEnd   DateTime? @db.Timestamptz(3) @map("period_end")
 
   // Amounts
   amount        Decimal @db.Decimal(10, 2)
@@ -3254,7 +3254,7 @@ model AssessmentCharge {
 
   // Late fee tracking
   lateFeeApplied Boolean   @default(false) @map("late_fee_applied")
-  lateFeeDate    DateTime? @map("late_fee_date")
+  lateFeeDate    DateTime? @db.Timestamptz(3) @map("late_fee_date")
 
   // GL posting
   journalEntryId String? @map("journal_entry_id")
@@ -3262,8 +3262,8 @@ model AssessmentCharge {
   // Notes
   description String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association         Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -3290,7 +3290,7 @@ model Payment {
   unitId        String @map("unit_id")
 
   // Payment details
-  paymentDate DateTime @map("payment_date") @db.Date
+  paymentDate DateTime  @db.Timestamptz(3) @map("payment_date")
   amount      Decimal  @db.Decimal(10, 2)
 
   // Method
@@ -3317,8 +3317,8 @@ model Payment {
   // Notes
   memo String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association  Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -3344,9 +3344,9 @@ model PaymentApplication {
   amount Decimal @db.Decimal(10, 2)
 
   // Application date
-  appliedAt DateTime @default(now()) @map("applied_at")
+  appliedAt DateTime  @db.Timestamptz(3) @default(now()) @map("applied_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   payment Payment          @relation(fields: [paymentId], references: [id], onDelete: Cascade)
@@ -3397,20 +3397,20 @@ model Vendor {
 
   // Phase 2: Compliance fields
   approvalStatus     VendorApprovalStatus @default(PENDING) @map("approval_status")
-  approvedAt         DateTime?            @map("approved_at")
+  approvedAt         DateTime? @db.Timestamptz(3)            @map("approved_at")
   approvedBy         String?              @map("approved_by")
   insuranceVerified  Boolean              @default(false) @map("insurance_verified")
-  insuranceExpiresAt DateTime?            @map("insurance_expires_at")
+  insuranceExpiresAt DateTime? @db.Timestamptz(3)            @map("insurance_expires_at")
   licenseVerified    Boolean              @default(false) @map("license_verified")
-  licenseExpiresAt   DateTime?            @map("license_expires_at")
+  licenseExpiresAt   DateTime? @db.Timestamptz(3)            @map("license_expires_at")
   complianceNotes    String?              @map("compliance_notes") @db.Text
 
   // Status
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3442,8 +3442,8 @@ model APInvoice {
 
   // Invoice details
   invoiceNumber String   @map("invoice_number")
-  invoiceDate   DateTime @map("invoice_date") @db.Date
-  dueDate       DateTime @map("due_date") @db.Date
+  invoiceDate   DateTime  @db.Timestamptz(3) @map("invoice_date")
+  dueDate       DateTime  @db.Timestamptz(3) @map("due_date")
 
   // Amounts
   subtotal    Decimal @db.Decimal(10, 2)
@@ -3457,7 +3457,7 @@ model APInvoice {
 
   // Approval workflow
   approvedBy String?   @map("approved_by")
-  approvedAt DateTime? @map("approved_at")
+  approvedAt DateTime? @db.Timestamptz(3) @map("approved_at")
 
   // GL posting
   journalEntryId String? @map("journal_entry_id")
@@ -3469,8 +3469,8 @@ model APInvoice {
   // Work order link (if applicable)
   workOrderId String? @map("work_order_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association     @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -3502,7 +3502,7 @@ model APInvoiceLine {
   // Line order
   lineNumber Int @map("line_number")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   invoice APInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -3541,11 +3541,11 @@ model Asset {
   serialNumber String? @map("serial_number")
 
   // Dates
-  purchaseDate DateTime? @map("purchase_date") @db.Date
-  installDate  DateTime? @map("install_date") @db.Date
+  purchaseDate DateTime? @db.Timestamptz(3) @map("purchase_date")
+  installDate  DateTime? @db.Timestamptz(3) @map("install_date")
 
   // Warranty
-  warrantyExpires DateTime? @map("warranty_expires") @db.Date
+  warrantyExpires DateTime? @db.Timestamptz(3) @map("warranty_expires")
   warrantyDetails String?   @map("warranty_details")
 
   // Financial
@@ -3554,12 +3554,12 @@ model Asset {
 
   // Maintenance schedule
   maintenanceFrequencyDays Int?      @map("maintenance_frequency_days")
-  lastMaintenanceDate      DateTime? @map("last_maintenance_date") @db.Date
-  nextMaintenanceDate      DateTime? @map("next_maintenance_date") @db.Date
+  lastMaintenanceDate      DateTime? @db.Timestamptz(3) @map("last_maintenance_date")
+  nextMaintenanceDate      DateTime? @db.Timestamptz(3) @map("next_maintenance_date")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3583,7 +3583,7 @@ model AssetMaintenanceLog {
   assetId String @map("asset_id")
 
   // Maintenance details
-  maintenanceDate DateTime @map("maintenance_date") @db.Date
+  maintenanceDate DateTime  @db.Timestamptz(3) @map("maintenance_date")
   maintenanceType String   @map("maintenance_type") // Routine, Repair, Inspection, etc.
   description     String
   performedBy     String?  @map("performed_by") // Vendor name or internal
@@ -3597,7 +3597,7 @@ model AssetMaintenanceLog {
   // Notes
   notes String?
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
   createdBy String   @map("created_by")
 
   // Relations
@@ -3626,10 +3626,10 @@ model ServiceProviderProfile {
   serviceZipCodes   String[] @map("service_zip_codes")
 
   // Compliance
-  insuranceExpires DateTime? @map("insurance_expires") @db.Date
+  insuranceExpires DateTime? @db.Timestamptz(3) @map("insurance_expires")
   insuranceAmount  Decimal?  @map("insurance_amount") @db.Decimal(12, 2)
   licenseNumber    String?   @map("license_number")
-  licenseExpires   DateTime? @map("license_expires") @db.Date
+  licenseExpires   DateTime? @db.Timestamptz(3) @map("license_expires")
   bondedAmount     Decimal?  @map("bonded_amount") @db.Decimal(12, 2)
 
   // Ratings
@@ -3640,8 +3640,8 @@ model ServiceProviderProfile {
   isVerified Boolean @default(false) @map("is_verified")
   isActive   Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   associationRelationships AssociationServiceProvider[]
@@ -3662,14 +3662,14 @@ model AssociationServiceProvider {
   isBlocked   Boolean @default(false) @map("is_blocked")
 
   // Contract info
-  contractStartDate DateTime? @map("contract_start_date") @db.Date
-  contractEndDate   DateTime? @map("contract_end_date") @db.Date
+  contractStartDate DateTime? @db.Timestamptz(3) @map("contract_start_date")
+  contractEndDate   DateTime? @db.Timestamptz(3) @map("contract_end_date")
 
   // Notes
   notes String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association     Association            @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -3707,11 +3707,11 @@ model WorkOrder {
 
   // Requestor
   requestedBy String   @map("requested_by") // User ID
-  requestedAt DateTime @default(now()) @map("requested_at")
+  requestedAt DateTime  @db.Timestamptz(3) @default(now()) @map("requested_at")
 
   // Assignment
   assignedVendorId           String?   @map("assigned_vendor_id")
-  assignedAt                 DateTime? @map("assigned_at")
+  assignedAt                 DateTime? @db.Timestamptz(3) @map("assigned_at")
   assignedBy                 String?   @map("assigned_by")
   assignedTechnicianId       String?   @map("assigned_technician_id")
   assignedTechnicianBranchId String?   @map("assigned_technician_branch_id")
@@ -3719,15 +3719,15 @@ model WorkOrder {
   jobTemplateId              String?   @map("job_template_id")
 
   // Scheduling
-  scheduledStart DateTime? @map("scheduled_start")
-  scheduledEnd   DateTime? @map("scheduled_end")
+  scheduledStart DateTime? @db.Timestamptz(3) @map("scheduled_start")
+  scheduledEnd   DateTime? @db.Timestamptz(3) @map("scheduled_end")
 
   // Execution
-  startedAt   DateTime? @map("started_at")
-  completedAt DateTime? @map("completed_at")
+  startedAt   DateTime? @db.Timestamptz(3) @map("started_at")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
 
   // Closure
-  closedAt DateTime? @map("closed_at")
+  closedAt DateTime? @db.Timestamptz(3) @map("closed_at")
   closedBy String?   @map("closed_by")
 
   // Estimated vs actual
@@ -3743,7 +3743,7 @@ model WorkOrder {
   invoiceId String? @map("invoice_id")
 
   // SLA tracking
-  slaDeadline DateTime? @map("sla_deadline")
+  slaDeadline DateTime? @db.Timestamptz(3) @map("sla_deadline")
   slaMet      Boolean?  @map("sla_met")
 
   // Phase 9: Origin tracking (CAM Oversight)
@@ -3755,7 +3755,7 @@ model WorkOrder {
 
   // Phase 9: Authorization fields (CAM Oversight)
   authorizedBy           String?   @map("authorized_by")
-  authorizedAt           DateTime? @map("authorized_at")
+  authorizedAt           DateTime? @db.Timestamptz(3) @map("authorized_at")
   authorizationRationale String?   @map("authorization_rationale") @db.Text
   authorizingRole        String?   @map("authorizing_role") // 'MANAGER' | 'BOARD'
 
@@ -3770,8 +3770,8 @@ model WorkOrder {
   boardApprovalVoteId   String?              @map("board_approval_vote_id")
   boardApprovalStatus   BoardApprovalStatus? @map("board_approval_status")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -3835,16 +3835,16 @@ model WorkOrderBid {
   materialsCost     Decimal?  @map("materials_cost") @db.Decimal(10, 2)
   totalAmount       Decimal?  @map("total_amount") @db.Decimal(10, 2)
   estimatedHours    Decimal?  @map("estimated_hours") @db.Decimal(5, 2)
-  proposedStartDate DateTime? @map("proposed_start_date")
-  proposedEndDate   DateTime? @map("proposed_end_date")
-  validUntil        DateTime? @map("valid_until")
+  proposedStartDate DateTime? @db.Timestamptz(3) @map("proposed_start_date")
+  proposedEndDate   DateTime? @db.Timestamptz(3) @map("proposed_end_date")
+  validUntil        DateTime? @db.Timestamptz(3) @map("valid_until")
   notes             String?
-  requestedAt       DateTime  @default(now()) @map("requested_at")
-  submittedAt       DateTime? @map("submitted_at")
-  respondedAt       DateTime? @map("responded_at")
+  requestedAt       DateTime  @db.Timestamptz(3)  @default(now()) @map("requested_at")
+  submittedAt       DateTime? @db.Timestamptz(3) @map("submitted_at")
+  respondedAt       DateTime? @db.Timestamptz(3) @map("responded_at")
   respondedBy       String?   @map("responded_by")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  createdAt         DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt         DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
 
   // Relations
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
@@ -3864,7 +3864,7 @@ model WorkOrderStatusHistory {
   fromStatus  WorkOrderStatus? @map("from_status")
   toStatus    WorkOrderStatus  @map("to_status")
   changedBy   String           @map("changed_by")
-  changedAt   DateTime         @default(now()) @map("changed_at")
+  changedAt   DateTime  @db.Timestamptz(3)         @default(now()) @map("changed_at")
   notes       String?
 
   // Relations
@@ -3882,7 +3882,7 @@ model WorkOrderComment {
   comment     String
   isInternal  Boolean  @default(false) @map("is_internal")
   authorId    String   @map("author_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
@@ -3901,7 +3901,7 @@ model WorkOrderAttachment {
   fileUrl        String   @map("file_url")
   description    String?
   uploadedBy     String   @map("uploaded_by")
-  uploadedAt     DateTime @default(now()) @map("uploaded_at")
+  uploadedAt     DateTime  @db.Timestamptz(3) @default(now()) @map("uploaded_at")
   attachmentType String   @map("attachment_type")
 
   // Relations
@@ -3931,8 +3931,8 @@ model WorkOrderLineItem {
   unitOfMeasure String?
   trade         ContractorTradeType?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   workOrder     WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
@@ -3966,20 +3966,20 @@ model ARCRequest {
   category          ARCCategory
   status            ARCRequestStatus @default(DRAFT)
   estimatedCost     Decimal?         @map("estimated_cost") @db.Decimal(12, 2)
-  proposedStartDate DateTime?        @map("proposed_start_date")
-  proposedEndDate   DateTime?        @map("proposed_end_date")
+  proposedStartDate DateTime? @db.Timestamptz(3)        @map("proposed_start_date")
+  proposedEndDate   DateTime? @db.Timestamptz(3)        @map("proposed_end_date")
   conditions        String?          @db.Text // Conditions of approval
 
   // Timeline
-  submittedAt        DateTime? @map("submitted_at")
-  reviewedAt         DateTime? @map("reviewed_at")
-  decisionDate       DateTime? @map("decision_date")
-  expiresAt          DateTime? @map("expires_at")
-  withdrawnAt        DateTime? @map("withdrawn_at")
+  submittedAt        DateTime? @db.Timestamptz(3) @map("submitted_at")
+  reviewedAt         DateTime? @db.Timestamptz(3) @map("reviewed_at")
+  decisionDate       DateTime? @db.Timestamptz(3) @map("decision_date")
+  expiresAt          DateTime? @db.Timestamptz(3) @map("expires_at")
+  withdrawnAt        DateTime? @db.Timestamptz(3) @map("withdrawn_at")
   cancellationReason String?   @map("cancellation_reason")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -4020,9 +4020,9 @@ model ARCDocument {
   version      String? // Optional version label
 
   uploadedBy String   @map("uploaded_by") // User ID
-  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  uploadedAt DateTime  @db.Timestamptz(3) @default(now()) @map("uploaded_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   request ARCRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -4043,8 +4043,8 @@ model ARCCommittee {
   quorum            Int?
   isActive          Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -4065,8 +4065,8 @@ model ARCCommitteeMember {
 
   role     String?
   isChair  Boolean   @default(false) @map("is_chair")
-  joinedAt DateTime  @default(now()) @map("joined_at")
-  leftAt   DateTime? @map("left_at")
+  joinedAt DateTime  @db.Timestamptz(3)  @default(now()) @map("joined_at")
+  leftAt   DateTime? @db.Timestamptz(3) @map("left_at")
 
   // Relations
   committee ARCCommittee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
@@ -4085,9 +4085,9 @@ model ARCReview {
   action     ARCReviewAction
   notes      String?         @db.Text
   conditions String?         @db.Text
-  expiresAt  DateTime?       @map("expires_at") // For conditional approvals
-  decidedAt  DateTime        @default(now()) @map("decided_at")
-  createdAt  DateTime        @default(now()) @map("created_at")
+  expiresAt  DateTime? @db.Timestamptz(3)       @map("expires_at") // For conditional approvals
+  decidedAt  DateTime  @db.Timestamptz(3)        @default(now()) @map("decided_at")
+  createdAt  DateTime  @db.Timestamptz(3)        @default(now()) @map("created_at")
 
   // Relations
   request  ARCRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
@@ -4111,8 +4111,8 @@ model Board {
   name        String
   description String?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -4134,12 +4134,12 @@ model BoardMember {
   partyId String @map("party_id")
 
   role      BoardRole
-  termStart DateTime  @map("term_start")
-  termEnd   DateTime? @map("term_end")
+  termStart DateTime  @db.Timestamptz(3)  @map("term_start")
+  termEnd   DateTime? @db.Timestamptz(3) @map("term_end")
   isActive  Boolean   @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -4161,7 +4161,7 @@ model Meeting {
   status       MeetingStatus @default(SCHEDULED)
   title        String
   description  String?       @db.Text
-  scheduledFor DateTime      @map("scheduled_for")
+  scheduledFor DateTime  @db.Timestamptz(3)      @map("scheduled_for")
   location     String?
   virtualLink  String?       @map("virtual_link") // Video conference URL
 
@@ -4169,8 +4169,8 @@ model Meeting {
   quorumRequired Int? @map("quorum_required") // Minimum attendees for quorum
 
   createdBy String   @map("created_by") // User ID
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -4205,7 +4205,7 @@ model MeetingAgendaItem {
   workOrderId      String? @map("work_order_id")
   policyDocumentId String? @map("policy_document_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   meeting        Meeting         @relation(fields: [meetingId], references: [id], onDelete: Cascade)
@@ -4230,8 +4230,8 @@ model MeetingMinutes {
   recordedBy String @map("recorded_by") // User ID
   content    String @db.Text
 
-  recordedAt DateTime @default(now()) @map("recorded_at")
-  createdAt  DateTime @default(now()) @map("created_at")
+  recordedAt DateTime  @db.Timestamptz(3) @default(now()) @map("recorded_at")
+  createdAt  DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
@@ -4246,9 +4246,9 @@ model MeetingAttendance {
   partyId         String                  @map("party_id")
   status          MeetingAttendanceStatus @default(PRESENT)
   proxyForPartyId String?                 @map("proxy_for_party_id")
-  checkedInAt     DateTime?               @map("checked_in_at")
+  checkedInAt     DateTime? @db.Timestamptz(3)               @map("checked_in_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
@@ -4270,9 +4270,9 @@ model Vote {
   method         VoteMethod @default(IN_PERSON)
   createdBy      String     @map("created_by") // User ID
   quorumRequired Int?       @map("quorum_required")
-  closedAt       DateTime?  @map("closed_at")
+  closedAt       DateTime? @db.Timestamptz(3)  @map("closed_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   meeting    Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
@@ -4295,7 +4295,7 @@ model VoteBallot {
   voteId       String     @map("vote_id")
   voterPartyId String     @map("voter_party_id")
   choice       VoteChoice
-  castAt       DateTime   @default(now()) @map("cast_at")
+  castAt       DateTime  @db.Timestamptz(3)   @default(now()) @map("cast_at")
 
   // Phase 11: Conflict of interest tracking
   hasConflictOfInterest Boolean @default(false) @map("has_conflict_of_interest")
@@ -4331,15 +4331,15 @@ model BoardMotion {
   // Outcome
   outcome      BoardMotionOutcome?
   outcomeNotes String?             @map("outcome_notes") @db.Text
-  decidedAt    DateTime?           @map("decided_at")
+  decidedAt    DateTime? @db.Timestamptz(3)           @map("decided_at")
 
   // Effective dates for policies/rules
-  effectiveDate DateTime? @map("effective_date")
-  expiresAt     DateTime? @map("expires_at")
+  effectiveDate DateTime? @db.Timestamptz(3) @map("effective_date")
+  expiresAt     DateTime? @db.Timestamptz(3) @map("expires_at")
 
   createdBy String   @map("created_by") // User ID
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4398,7 +4398,7 @@ model BoardHistory {
   detail     Json?
   changedBy  String? @map("changed_by") // User ID
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -4416,15 +4416,15 @@ model Resolution {
   title          String
   summary        String?          @db.Text
   status         ResolutionStatus @default(PROPOSED)
-  effectiveDate  DateTime?        @map("effective_date")
+  effectiveDate  DateTime? @db.Timestamptz(3)        @map("effective_date")
   supersededById String?          @map("superseded_by_id")
 
-  adoptedAt  DateTime? @map("adopted_at")
+  adoptedAt  DateTime? @db.Timestamptz(3) @map("adopted_at")
   proposedBy String?   @map("proposed_by") // User ID
   adoptedBy  String?   @map("adopted_by") // User ID
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4456,8 +4456,8 @@ model PolicyDocument {
   currentVersion String?      @map("current_version")
   status         PolicyStatus @default(DRAFT)
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -4482,10 +4482,10 @@ model PolicyVersion {
   version          String
   content          String       @db.Text
   status           PolicyStatus @default(DRAFT)
-  approvedAt       DateTime?    @map("approved_at")
+  approvedAt       DateTime? @db.Timestamptz(3)    @map("approved_at")
   approvedBy       String?      @map("approved_by") // User ID
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   policyDocument PolicyDocument @relation(fields: [policyDocumentId], references: [id], onDelete: Cascade)
@@ -4513,8 +4513,8 @@ model CommunicationTemplate {
   currentVersion String?                   @map("current_version")
 
   createdBy String?  @map("created_by") // User ID
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association        Association                    @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4535,7 +4535,7 @@ model CommunicationTemplateVersion {
   variables  Json?
   status     TemplateVersionStatus @default(DRAFT)
   createdBy  String?               @map("created_by") // User ID
-  createdAt  DateTime              @default(now()) @map("created_at")
+  createdAt  DateTime  @db.Timestamptz(3)              @default(now()) @map("created_at")
 
   // Relations
   template CommunicationTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
@@ -4556,13 +4556,13 @@ model MassCommunication {
   body         String               @db.Text
   channel      CommunicationChannel
   status       CommunicationStatus  @default(DRAFT)
-  scheduledFor DateTime?            @map("scheduled_for")
-  sentAt       DateTime?            @map("sent_at")
+  scheduledFor DateTime? @db.Timestamptz(3)            @map("scheduled_for")
+  sentAt       DateTime? @db.Timestamptz(3)            @map("sent_at")
   targetFilter Json?                @map("target_filter") // e.g., audience selection
 
   createdBy String?  @map("created_by") // User ID
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association                 @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4582,10 +4582,10 @@ model MassCommunicationDelivery {
   recipient           String
   channel             CommunicationChannel
   status              DeliveryStatus       @default(PENDING)
-  sentAt              DateTime?            @map("sent_at")
+  sentAt              DateTime? @db.Timestamptz(3)            @map("sent_at")
   errorMessage        String?              @map("error_message")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   massCommunication MassCommunication @relation(fields: [massCommunicationId], references: [id], onDelete: Cascade)
@@ -4602,13 +4602,13 @@ model Announcement {
   title         String
   content       String             @db.Text
   status        AnnouncementStatus @default(DRAFT)
-  publishedAt   DateTime?          @map("published_at")
-  expiresAt     DateTime?          @map("expires_at")
+  publishedAt   DateTime? @db.Timestamptz(3)          @map("published_at")
+  expiresAt     DateTime? @db.Timestamptz(3)          @map("expires_at")
   audience      Json?
 
   createdBy String?  @map("created_by") // User ID
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4624,7 +4624,7 @@ model AnnouncementRead {
   id             String   @id @default(cuid())
   announcementId String   @map("announcement_id")
   partyId        String   @map("party_id")
-  readAt         DateTime @default(now()) @map("read_at")
+  readAt         DateTime  @db.Timestamptz(3) @default(now()) @map("read_at")
 
   // Relations
   announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
@@ -4642,16 +4642,16 @@ model CalendarEvent {
   type           CalendarEventType
   title          String
   description    String?           @db.Text
-  startsAt       DateTime          @map("starts_at")
-  endsAt         DateTime?         @map("ends_at")
+  startsAt       DateTime  @db.Timestamptz(3)          @map("starts_at")
+  endsAt         DateTime? @db.Timestamptz(3)         @map("ends_at")
   location       String?
   metadata       Json?
   recurrenceRule String?           @map("recurrence_rule")
-  notifyAt       DateTime?         @map("notify_at")
+  notifyAt       DateTime? @db.Timestamptz(3)         @map("notify_at")
 
   createdBy String?  @map("created_by") // User ID
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association   Association                 @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4667,15 +4667,15 @@ model CalendarEventNotification {
   id            String                @id @default(cuid())
   associationId String                @map("association_id")
   eventId       String                @map("event_id")
-  notifyAt      DateTime              @map("notify_at")
+  notifyAt      DateTime  @db.Timestamptz(3)              @map("notify_at")
   status        NotificationStatus    @default(PENDING)
   channel       CommunicationChannel?
   payload       Json?
-  sentAt        DateTime?             @map("sent_at")
+  sentAt        DateTime? @db.Timestamptz(3)             @map("sent_at")
   errorMessage  String?               @map("error_message")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association   @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4708,8 +4708,8 @@ model ServiceArea {
 
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   serviceProviderOrg    Organization          @relation("ServiceProviderAreas", fields: [serviceProviderOrgId], references: [id], onDelete: Cascade)
@@ -4730,15 +4730,15 @@ model ServiceProviderLink {
 
   // Link status
   status   ServiceProviderLinkStatus @default(PENDING)
-  linkedAt DateTime?                 @map("linked_at")
+  linkedAt DateTime? @db.Timestamptz(3)                 @map("linked_at")
   linkedBy String?                   @map("linked_by") // User who approved the link
 
   // Verification
   verificationCode    String?   @map("verification_code")
-  verificationExpires DateTime? @map("verification_expires")
+  verificationExpires DateTime? @db.Timestamptz(3) @map("verification_expires")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   serviceProviderOrg Organization @relation("ServiceProviderLinks", fields: [serviceProviderOrgId], references: [id], onDelete: Cascade)
@@ -4781,8 +4781,8 @@ model IndividualProperty {
   // Link to Phase 1 HOA unit if property is in a platform HOA
   linkedUnitId String? @map("linked_unit_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   ownerOrg            Organization                   @relation("IndividualProperties", fields: [ownerOrgId], references: [id], onDelete: Cascade)
@@ -4814,16 +4814,16 @@ model IndividualAsset {
   serialNumber String? @map("serial_number")
 
   // Dates
-  installDate     DateTime? @map("install_date")
-  warrantyExpires DateTime? @map("warranty_expires")
-  lastServiceDate DateTime? @map("last_service_date")
+  installDate     DateTime? @db.Timestamptz(3) @map("install_date")
+  warrantyExpires DateTime? @db.Timestamptz(3) @map("warranty_expires")
+  lastServiceDate DateTime? @db.Timestamptz(3) @map("last_service_date")
 
   // Status
   condition String? // e.g., "Good", "Fair", "Needs Attention"
   notes     String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   property IndividualProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -4848,9 +4848,9 @@ model IndividualMaintenanceRequest {
   status IndividualRequestStatus @default(SUBMITTED)
 
   // Scheduling
-  preferredDate DateTime? @map("preferred_date")
-  scheduledDate DateTime? @map("scheduled_date")
-  completedDate DateTime? @map("completed_date")
+  preferredDate DateTime? @db.Timestamptz(3) @map("preferred_date")
+  scheduledDate DateTime? @db.Timestamptz(3) @map("scheduled_date")
+  completedDate DateTime? @db.Timestamptz(3) @map("completed_date")
 
   // Vendor assignment
   assignedVendorOrgId String? @map("assigned_vendor_org_id")
@@ -4862,8 +4862,8 @@ model IndividualMaintenanceRequest {
   // Notes
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   property          IndividualProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -4904,8 +4904,8 @@ model ReportDefinition {
   isSystemReport Boolean @default(false) @map("is_system_report")
   isActive       Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association?      @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -4941,12 +4941,12 @@ model ReportSchedule {
 
   // Status
   isActive  Boolean   @default(true) @map("is_active")
-  lastRunAt DateTime? @map("last_run_at")
-  nextRunAt DateTime? @map("next_run_at")
+  lastRunAt DateTime? @db.Timestamptz(3) @map("last_run_at")
+  nextRunAt DateTime? @db.Timestamptz(3) @map("next_run_at")
 
   createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   report      ReportDefinition  @relation(fields: [reportId], references: [id], onDelete: Cascade)
@@ -4972,8 +4972,8 @@ model ReportExecution {
   format         ReportFormat
 
   // Timing
-  startedAt   DateTime? @map("started_at")
-  completedAt DateTime? @map("completed_at")
+  startedAt   DateTime? @db.Timestamptz(3) @map("started_at")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
 
   // Output
   outputUrl  String? @map("output_url") // S3/storage URL
@@ -4986,7 +4986,7 @@ model ReportExecution {
   // Who ran it
   executedBy String? @map("executed_by") // Null for scheduled
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   report      ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
@@ -5019,8 +5019,8 @@ model DashboardWidget {
 
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -5067,13 +5067,13 @@ model ContractorProfile {
 
   // Compliance summary (computed/cached)
   complianceScore     Int?      @map("compliance_score") // 0-100
-  lastComplianceCheck DateTime? @map("last_compliance_check")
+  lastComplianceCheck DateTime? @db.Timestamptz(3) @map("last_compliance_check")
 
   // Status
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5118,8 +5118,8 @@ model ContractorBranch {
   isActive  Boolean @default(true) @map("is_active")
   isPrimary Boolean @default(false) @map("is_primary")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5147,8 +5147,8 @@ model ContractorTrade {
   yearsExperience Int?                @map("years_experience")
   notes           String?             @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contractorProfile ContractorProfile @relation(fields: [contractorProfileId], references: [id], onDelete: Cascade)
@@ -5171,12 +5171,12 @@ model ContractorLicense {
   issuingState     String? @map("issuing_state")
 
   // Dates
-  issueDate      DateTime? @map("issue_date")
-  expirationDate DateTime? @map("expiration_date")
+  issueDate      DateTime? @db.Timestamptz(3) @map("issue_date")
+  expirationDate DateTime? @db.Timestamptz(3) @map("expiration_date")
 
   // Status
   status     LicenseStatus @default(ACTIVE)
-  verifiedAt DateTime?     @map("verified_at")
+  verifiedAt DateTime? @db.Timestamptz(3)     @map("verified_at")
   verifiedBy String?       @map("verified_by")
 
   // Document reference
@@ -5184,8 +5184,8 @@ model ContractorLicense {
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contractorProfile ContractorProfile @relation(fields: [contractorProfileId], references: [id], onDelete: Cascade)
@@ -5211,12 +5211,12 @@ model ContractorInsurance {
   deductible     Decimal? @db.Decimal(10, 2)
 
   // Dates
-  effectiveDate  DateTime @map("effective_date")
-  expirationDate DateTime @map("expiration_date")
+  effectiveDate  DateTime  @db.Timestamptz(3) @map("effective_date")
+  expirationDate DateTime  @db.Timestamptz(3) @map("expiration_date")
 
   // Status
   status     InsuranceStatus @default(ACTIVE)
-  verifiedAt DateTime?       @map("verified_at")
+  verifiedAt DateTime? @db.Timestamptz(3)       @map("verified_at")
   verifiedBy String?         @map("verified_by")
 
   // Certificate of Insurance
@@ -5227,8 +5227,8 @@ model ContractorInsurance {
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contractorProfile ContractorProfile @relation(fields: [contractorProfileId], references: [id], onDelete: Cascade)
@@ -5255,20 +5255,20 @@ model ContractorComplianceStatus {
   meetsMinCoverage  Boolean @default(false) @map("meets_min_coverage")
 
   // Expiration tracking
-  earliestLicenseExpiry   DateTime? @map("earliest_license_expiry")
-  earliestInsuranceExpiry DateTime? @map("earliest_insurance_expiry")
+  earliestLicenseExpiry   DateTime? @db.Timestamptz(3) @map("earliest_license_expiry")
+  earliestInsuranceExpiry DateTime? @db.Timestamptz(3) @map("earliest_insurance_expiry")
 
   // Blocking
   isBlocked   Boolean   @default(false) @map("is_blocked")
   blockReason String?   @map("block_reason") @db.Text
-  blockedAt   DateTime? @map("blocked_at")
+  blockedAt   DateTime? @db.Timestamptz(3) @map("blocked_at")
   blockedBy   String?   @map("blocked_by")
 
   // Last check
-  lastCheckedAt DateTime @default(now()) @map("last_checked_at")
+  lastCheckedAt DateTime  @db.Timestamptz(3) @default(now()) @map("last_checked_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   @@unique([vendorId])
   @@index([isCompliant])
@@ -5314,8 +5314,8 @@ model Pricebook {
   currency    String  @default("USD")
   isActive    Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5333,17 +5333,17 @@ model PricebookVersion {
   versionNumber Int    @map("version_number")
 
   status         PricebookVersionStatus @default(DRAFT)
-  effectiveStart DateTime?              @map("effective_start")
-  effectiveEnd   DateTime?              @map("effective_end")
+  effectiveStart DateTime? @db.Timestamptz(3)              @map("effective_start")
+  effectiveEnd   DateTime? @db.Timestamptz(3)              @map("effective_end")
   notes          String?                @db.Text
   metadata       Json?
 
-  publishedAt DateTime? @map("published_at")
+  publishedAt DateTime? @db.Timestamptz(3) @map("published_at")
   publishedBy String?   @map("published_by") // User ID who published
-  activatedAt DateTime? @map("activated_at")
+  activatedAt DateTime? @db.Timestamptz(3) @map("activated_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   pricebook    Pricebook       @relation(fields: [pricebookId], references: [id], onDelete: Cascade)
@@ -5377,8 +5377,8 @@ model PricebookItem {
   serviceAreaId String? @map("service_area_id")
   metadata      Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   pricebookVersion   PricebookVersion    @relation(fields: [pricebookVersionId], references: [id], onDelete: Cascade)
@@ -5419,8 +5419,8 @@ model PriceRule {
   associationId String?   @map("association_id")
   serviceAreaId String?   @map("service_area_id")
   minQuantity   Decimal?  @map("min_quantity") @db.Decimal(10, 2)
-  startsAt      DateTime? @map("starts_at")
-  endsAt        DateTime? @map("ends_at")
+  startsAt      DateTime? @db.Timestamptz(3) @map("starts_at")
+  endsAt        DateTime? @db.Timestamptz(3) @map("ends_at")
   conditionJson Json?
 
   // Adjustments
@@ -5428,8 +5428,8 @@ model PriceRule {
   amountAdjustment     Decimal? @map("amount_adjustment") @db.Decimal(12, 2)
   adjustmentJson       Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   pricebookVersion PricebookVersion @relation(fields: [pricebookVersionId], references: [id], onDelete: Cascade)
@@ -5459,8 +5459,8 @@ model JobTemplate {
   defaultServiceAreaId String?              @map("default_service_area_id")
   metadata             Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5485,8 +5485,8 @@ model JobTemplateItem {
   lineNumber Int     @default(1) @map("line_number")
   notes      String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   jobTemplate   JobTemplate   @relation(fields: [jobTemplateId], references: [id], onDelete: Cascade)
@@ -5565,10 +5565,10 @@ model Customer {
   referredBy String?  @map("referred_by")
 
   isActive  Boolean   @default(true) @map("is_active")
-  deletedAt DateTime? @map("deleted_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5625,23 +5625,23 @@ model Job {
   // Assignment
   assignedTechnicianId String?   @map("assigned_technician_id")
   assignedBranchId     String?   @map("assigned_branch_id")
-  assignedAt           DateTime? @map("assigned_at")
+  assignedAt           DateTime? @db.Timestamptz(3) @map("assigned_at")
   assignedBy           String?   @map("assigned_by")
 
   // Scheduling
-  scheduledStart DateTime? @map("scheduled_start")
-  scheduledEnd   DateTime? @map("scheduled_end")
+  scheduledStart DateTime? @db.Timestamptz(3) @map("scheduled_start")
+  scheduledEnd   DateTime? @db.Timestamptz(3) @map("scheduled_end")
   estimatedHours Decimal?  @map("estimated_hours") @db.Decimal(5, 2)
 
   // Execution
-  dispatchedAt DateTime? @map("dispatched_at")
-  startedAt    DateTime? @map("started_at")
-  completedAt  DateTime? @map("completed_at")
-  invoicedAt   DateTime? @map("invoiced_at")
-  paidAt       DateTime? @map("paid_at")
-  closedAt     DateTime? @map("closed_at")
+  dispatchedAt DateTime? @db.Timestamptz(3) @map("dispatched_at")
+  startedAt    DateTime? @db.Timestamptz(3) @map("started_at")
+  completedAt  DateTime? @db.Timestamptz(3) @map("completed_at")
+  invoicedAt   DateTime? @db.Timestamptz(3) @map("invoiced_at")
+  paidAt       DateTime? @db.Timestamptz(3) @map("paid_at")
+  closedAt     DateTime? @db.Timestamptz(3) @map("closed_at")
   closedBy     String?   @map("closed_by")
-  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledAt  DateTime? @db.Timestamptz(3) @map("cancelled_at")
 
   // Financials
   estimatedCost Decimal? @map("estimated_cost") @db.Decimal(12, 2)
@@ -5649,7 +5649,7 @@ model Job {
   actualHours   Decimal? @map("actual_hours") @db.Decimal(5, 2)
 
   // Warranty
-  warrantyEnds  DateTime? @map("warranty_ends")
+  warrantyEnds  DateTime? @db.Timestamptz(3) @map("warranty_ends")
   warrantyNotes String?   @map("warranty_notes") @db.Text
 
   // Resolution
@@ -5658,10 +5658,10 @@ model Job {
   customerFeedback String? @map("customer_feedback") @db.Text
 
   // Soft delete
-  deletedAt DateTime? @map("deleted_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5715,7 +5715,7 @@ model JobStatusHistory {
   fromStatus JobStatus? @map("from_status")
   toStatus   JobStatus  @map("to_status")
   changedBy  String     @map("changed_by")
-  changedAt  DateTime   @default(now()) @map("changed_at")
+  changedAt  DateTime  @db.Timestamptz(3)   @default(now()) @map("changed_at")
   notes      String?    @db.Text
 
   // Relations
@@ -5733,8 +5733,8 @@ model JobNote {
   content    String  @db.Text
   isInternal Boolean @default(false) @map("is_internal") // Internal vs customer-visible
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -5755,7 +5755,7 @@ model JobAttachment {
   description String?
 
   uploadedBy String   @map("uploaded_by")
-  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  uploadedAt DateTime  @db.Timestamptz(3) @default(now()) @map("uploaded_at")
 
   // Relations
   job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -5775,13 +5775,13 @@ model JobCheckpoint {
   isRequired  Boolean @default(true) @map("is_required")
 
   // Completion
-  completedAt DateTime? @map("completed_at")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
   completedBy String?   @map("completed_by")
   passed      Boolean?
   notes       String?   @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -5798,10 +5798,10 @@ model JobVisit {
   visitNumber Int @map("visit_number") // Sequence for this job
 
   // Scheduling
-  scheduledStart DateTime  @map("scheduled_start")
-  scheduledEnd   DateTime  @map("scheduled_end")
-  actualStart    DateTime? @map("actual_start")
-  actualEnd      DateTime? @map("actual_end")
+  scheduledStart DateTime  @db.Timestamptz(3)  @map("scheduled_start")
+  scheduledEnd   DateTime  @db.Timestamptz(3)  @map("scheduled_end")
+  actualStart    DateTime? @db.Timestamptz(3) @map("actual_start")
+  actualEnd      DateTime? @db.Timestamptz(3) @map("actual_end")
 
   // Assignment
   technicianId String? @map("technician_id")
@@ -5813,8 +5813,8 @@ model JobVisit {
   notes         String? @db.Text
   workPerformed String? @map("work_performed") @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -5867,21 +5867,21 @@ model DispatchAssignment {
 
   // Status tracking
   status        DispatchStatus @default(PENDING)
-  assignedAt    DateTime       @default(now()) @map("assigned_at")
+  assignedAt    DateTime  @db.Timestamptz(3)       @default(now()) @map("assigned_at")
   assignedBy    String         @map("assigned_by")
-  acceptedAt    DateTime?      @map("accepted_at")
-  declinedAt    DateTime?      @map("declined_at")
+  acceptedAt    DateTime? @db.Timestamptz(3)      @map("accepted_at")
+  declinedAt    DateTime? @db.Timestamptz(3)      @map("declined_at")
   declineReason String?        @map("decline_reason")
-  startedAt     DateTime?      @map("started_at")
-  completedAt   DateTime?      @map("completed_at")
-  cancelledAt   DateTime?      @map("cancelled_at")
+  startedAt     DateTime? @db.Timestamptz(3)      @map("started_at")
+  completedAt   DateTime? @db.Timestamptz(3)      @map("completed_at")
+  cancelledAt   DateTime? @db.Timestamptz(3)      @map("cancelled_at")
   cancelReason  String?        @map("cancel_reason")
 
   // Scheduling window
-  scheduledStart DateTime  @map("scheduled_start")
-  scheduledEnd   DateTime  @map("scheduled_end")
-  actualStart    DateTime? @map("actual_start")
-  actualEnd      DateTime? @map("actual_end")
+  scheduledStart DateTime  @db.Timestamptz(3)  @map("scheduled_start")
+  scheduledEnd   DateTime  @db.Timestamptz(3)  @map("scheduled_end")
+  actualStart    DateTime? @db.Timestamptz(3) @map("actual_start")
+  actualEnd      DateTime? @db.Timestamptz(3) @map("actual_end")
 
   // Travel estimates
   estimatedTravelMinutes Int?     @map("estimated_travel_minutes")
@@ -5892,8 +5892,8 @@ model DispatchAssignment {
   dispatchNotes String? @map("dispatch_notes") @db.Text
   techNotes     String? @map("tech_notes") @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5915,8 +5915,8 @@ model ScheduleSlot {
   technicianId   String @map("technician_id")
 
   // Time window
-  startTime DateTime @map("start_time")
-  endTime   DateTime @map("end_time")
+  startTime DateTime  @db.Timestamptz(3) @map("start_time")
+  endTime   DateTime  @db.Timestamptz(3) @map("end_time")
 
   // What this slot is for
   slotType String @map("slot_type") // AVAILABLE, JOB, BREAK, TRAVEL, BLOCKED
@@ -5928,8 +5928,8 @@ model ScheduleSlot {
   // Notes
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -5949,11 +5949,11 @@ model RoutePlan {
   technicianId   String @map("technician_id")
 
   // Date for this route
-  routeDate DateTime @map("route_date") @db.Date
+  routeDate DateTime  @db.Timestamptz(3) @map("route_date")
 
   // Route optimization
   isOptimized        Boolean   @default(false) @map("is_optimized")
-  optimizedAt        DateTime? @map("optimized_at")
+  optimizedAt        DateTime? @db.Timestamptz(3) @map("optimized_at")
   totalDistanceMiles Decimal?  @map("total_distance_miles") @db.Decimal(10, 2)
   totalTravelMinutes Int?      @map("total_travel_minutes")
   totalJobMinutes    Int?      @map("total_job_minutes")
@@ -5969,8 +5969,8 @@ model RoutePlan {
   // Route stops (ordered JSON array of stop details)
   stopsJson Json? @map("stops_json")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6005,8 +6005,8 @@ model SLAWindow {
   isDefault   Boolean @default(false) @map("is_default")
   isActive    Boolean @default(true) @map("is_active")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6025,12 +6025,12 @@ model SLARecord {
   slaWindowId    String @map("sla_window_id")
 
   // Deadlines
-  responseDue   DateTime @map("response_due")
-  resolutionDue DateTime @map("resolution_due")
+  responseDue   DateTime  @db.Timestamptz(3) @map("response_due")
+  resolutionDue DateTime  @db.Timestamptz(3) @map("resolution_due")
 
   // Actual times
-  respondedAt DateTime? @map("responded_at")
-  resolvedAt  DateTime? @map("resolved_at")
+  respondedAt DateTime? @db.Timestamptz(3) @map("responded_at")
+  resolvedAt  DateTime? @db.Timestamptz(3) @map("resolved_at")
 
   // Status
   responseBreached   Boolean @default(false) @map("response_breached")
@@ -6039,8 +6039,8 @@ model SLARecord {
   // Notes
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6098,11 +6098,11 @@ model JobChecklist {
 
   // Status
   isCompleted Boolean   @default(false) @map("is_completed")
-  completedAt DateTime? @map("completed_at")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
   completedBy String?   @map("completed_by")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6130,7 +6130,7 @@ model JobStep {
 
   // Completion
   status      ChecklistItemStatus @default(PENDING)
-  completedAt DateTime?           @map("completed_at")
+  completedAt DateTime? @db.Timestamptz(3)           @map("completed_at")
   completedBy String?             @map("completed_by")
   notes       String?             @db.Text
 
@@ -6139,8 +6139,8 @@ model JobStep {
   requiresSignature Boolean @default(false) @map("requires_signature")
   requiresNotes     Boolean @default(false) @map("requires_notes")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   checklist JobChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
@@ -6169,7 +6169,7 @@ model JobMedia {
   caption    String?   @db.Text
   latitude   Decimal?  @db.Decimal(10, 7)
   longitude  Decimal?  @db.Decimal(10, 7)
-  capturedAt DateTime? @map("captured_at")
+  capturedAt DateTime? @db.Timestamptz(3) @map("captured_at")
 
   // Voice note transcription
   transcription String? @db.Text
@@ -6177,13 +6177,13 @@ model JobMedia {
 
   // Upload status (for offline sync)
   isUploaded    Boolean   @default(false) @map("is_uploaded")
-  uploadedAt    DateTime? @map("uploaded_at")
+  uploadedAt    DateTime? @db.Timestamptz(3) @map("uploaded_at")
   uploadRetries Int       @default(0) @map("upload_retries")
 
   uploadedBy String @map("uploaded_by")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6206,8 +6206,8 @@ model JobTimeEntry {
 
   // Time tracking
   entryType TimeEntryType @map("entry_type")
-  startTime DateTime      @map("start_time")
-  endTime   DateTime?     @map("end_time")
+  startTime DateTime  @db.Timestamptz(3)      @map("start_time")
+  endTime   DateTime? @db.Timestamptz(3)     @map("end_time")
 
   // Calculated duration (in minutes)
   durationMinutes Int? @map("duration_minutes")
@@ -6221,11 +6221,11 @@ model JobTimeEntry {
 
   // Sync status (for offline)
   isSynced Boolean   @default(true) @map("is_synced")
-  syncedAt DateTime? @map("synced_at")
+  syncedAt DateTime? @db.Timestamptz(3) @map("synced_at")
   localId  String?   @map("local_id") // Client-side ID for offline records
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6253,7 +6253,7 @@ model JobSignature {
 
   // Signature data
   signatureData String   @map("signature_data") @db.Text // Base64 or SVG path
-  signedAt      DateTime @map("signed_at")
+  signedAt      DateTime  @db.Timestamptz(3) @map("signed_at")
 
   // Location
   latitude  Decimal? @db.Decimal(10, 7)
@@ -6269,7 +6269,7 @@ model JobSignature {
 
   capturedBy String @map("captured_by")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6295,14 +6295,14 @@ model OfflineSyncQueue {
 
   // Sync status
   attempts      Int       @default(0)
-  lastAttemptAt DateTime? @map("last_attempt_at")
+  lastAttemptAt DateTime? @db.Timestamptz(3) @map("last_attempt_at")
   errorMessage  String?   @map("error_message") @db.Text
   isSynced      Boolean   @default(false) @map("is_synced")
-  syncedAt      DateTime? @map("synced_at")
+  syncedAt      DateTime? @db.Timestamptz(3) @map("synced_at")
   syncedId      String?   @map("synced_id") // Server-side ID after sync
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6371,12 +6371,12 @@ model Estimate {
   status         EstimateStatus @default(DRAFT)
 
   // Dates
-  issueDate  DateTime  @default(now()) @map("issue_date")
-  validUntil DateTime? @map("valid_until")
-  sentAt     DateTime? @map("sent_at")
-  viewedAt   DateTime? @map("viewed_at")
-  acceptedAt DateTime? @map("accepted_at")
-  declinedAt DateTime? @map("declined_at")
+  issueDate  DateTime  @db.Timestamptz(3)  @default(now()) @map("issue_date")
+  validUntil DateTime? @db.Timestamptz(3) @map("valid_until")
+  sentAt     DateTime? @db.Timestamptz(3) @map("sent_at")
+  viewedAt   DateTime? @db.Timestamptz(3) @map("viewed_at")
+  acceptedAt DateTime? @db.Timestamptz(3) @map("accepted_at")
+  declinedAt DateTime? @db.Timestamptz(3) @map("declined_at")
 
   // Amounts
   subtotal    Decimal @default(0) @map("subtotal") @db.Decimal(12, 2)
@@ -6394,8 +6394,8 @@ model Estimate {
   previousVersionId String? @map("previous_version_id")
 
   createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6437,8 +6437,8 @@ model EstimateLine {
   // Grouping
   optionId String? @map("option_id") // If part of an option
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   estimate      Estimate        @relation(fields: [estimateId], references: [id], onDelete: Cascade)
@@ -6469,8 +6469,8 @@ model EstimateOption {
 
   sortOrder Int @default(0) @map("sort_order")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   estimate Estimate       @relation(fields: [estimateId], references: [id], onDelete: Cascade)
@@ -6492,19 +6492,19 @@ model Proposal {
   status         ProposalStatus @default(DRAFT)
 
   // Dates
-  issueDate  DateTime  @default(now()) @map("issue_date")
-  validUntil DateTime? @map("valid_until")
-  sentAt     DateTime? @map("sent_at")
-  viewedAt   DateTime? @map("viewed_at")
-  acceptedAt DateTime? @map("accepted_at")
-  declinedAt DateTime? @map("declined_at")
+  issueDate  DateTime  @db.Timestamptz(3)  @default(now()) @map("issue_date")
+  validUntil DateTime? @db.Timestamptz(3) @map("valid_until")
+  sentAt     DateTime? @db.Timestamptz(3) @map("sent_at")
+  viewedAt   DateTime? @db.Timestamptz(3) @map("viewed_at")
+  acceptedAt DateTime? @db.Timestamptz(3) @map("accepted_at")
+  declinedAt DateTime? @db.Timestamptz(3) @map("declined_at")
 
   // Content
   title         String?
   coverLetter   String?   @map("cover_letter") @db.Text
   terms         String?   @db.Text
   signatureData String?   @map("signature_data") @db.Text
-  signedAt      DateTime? @map("signed_at")
+  signedAt      DateTime? @db.Timestamptz(3) @map("signed_at")
   signedByName  String?   @map("signed_by_name")
   signedByEmail String?   @map("signed_by_email")
 
@@ -6512,8 +6512,8 @@ model Proposal {
   selectedOptionId String? @map("selected_option_id")
 
   createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6540,11 +6540,11 @@ model JobInvoice {
   status        JobInvoiceStatus @default(DRAFT)
 
   // Dates
-  issueDate DateTime  @default(now()) @map("issue_date")
-  dueDate   DateTime? @map("due_date")
-  sentAt    DateTime? @map("sent_at")
-  viewedAt  DateTime? @map("viewed_at")
-  paidAt    DateTime? @map("paid_at")
+  issueDate DateTime  @db.Timestamptz(3)  @default(now()) @map("issue_date")
+  dueDate   DateTime? @db.Timestamptz(3) @map("due_date")
+  sentAt    DateTime? @db.Timestamptz(3) @map("sent_at")
+  viewedAt  DateTime? @db.Timestamptz(3) @map("viewed_at")
+  paidAt    DateTime? @db.Timestamptz(3) @map("paid_at")
 
   // Amounts
   subtotal    Decimal @default(0) @db.Decimal(12, 2)
@@ -6562,8 +6562,8 @@ model JobInvoice {
   estimateId String? @map("estimate_id")
 
   createdBy String   @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6600,8 +6600,8 @@ model InvoiceLine {
   isTaxable Boolean @default(true) @map("is_taxable")
   taxRate   Decimal @default(0) @map("tax_rate") @db.Decimal(5, 4)
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   invoice       JobInvoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
@@ -6632,10 +6632,10 @@ model PaymentIntent {
   externalProvider String? @map("external_provider") // stripe, square, etc.
 
   // Timestamps
-  initiatedAt DateTime  @default(now()) @map("initiated_at")
-  processedAt DateTime? @map("processed_at")
-  failedAt    DateTime? @map("failed_at")
-  refundedAt  DateTime? @map("refunded_at")
+  initiatedAt DateTime  @db.Timestamptz(3)  @default(now()) @map("initiated_at")
+  processedAt DateTime? @db.Timestamptz(3) @map("processed_at")
+  failedAt    DateTime? @db.Timestamptz(3) @map("failed_at")
+  refundedAt  DateTime? @db.Timestamptz(3) @map("refunded_at")
 
   // Error tracking
   errorCode    String? @map("error_code")
@@ -6644,8 +6644,8 @@ model PaymentIntent {
   // Metadata
   metadata Json?
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6732,10 +6732,10 @@ model Supplier {
 
   notes     String?   @db.Text
   isActive  Boolean   @default(true) @map("is_active")
-  deletedAt DateTime? @map("deleted_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6781,10 +6781,10 @@ model InventoryItem {
   pricebookItemId String? @map("pricebook_item_id")
 
   isActive  Boolean   @default(true) @map("is_active")
-  deletedAt DateTime? @map("deleted_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6827,10 +6827,10 @@ model InventoryLocation {
   branchId String? @map("branch_id")
 
   isActive  Boolean   @default(true) @map("is_active")
-  deletedAt DateTime? @map("deleted_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6862,12 +6862,12 @@ model InventoryLevel {
   // Lot/serial tracking
   lotNumber      String?   @map("lot_number")
   serialNumber   String?   @map("serial_number")
-  expirationDate DateTime? @map("expiration_date")
+  expirationDate DateTime? @db.Timestamptz(3) @map("expiration_date")
 
-  lastCountedAt DateTime? @map("last_counted_at")
+  lastCountedAt DateTime? @db.Timestamptz(3) @map("last_counted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   item     InventoryItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -6891,16 +6891,16 @@ model InventoryTransfer {
   toLocationId   String @map("to_location_id")
 
   status      String    @default("PENDING") // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
-  requestedAt DateTime  @default(now()) @map("requested_at")
-  shippedAt   DateTime? @map("shipped_at")
-  receivedAt  DateTime? @map("received_at")
+  requestedAt DateTime  @db.Timestamptz(3)  @default(now()) @map("requested_at")
+  shippedAt   DateTime? @db.Timestamptz(3) @map("shipped_at")
+  receivedAt  DateTime? @db.Timestamptz(3) @map("received_at")
 
   notes String? @db.Text
 
   requestedBy String @map("requested_by")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6929,8 +6929,8 @@ model InventoryTransferLine {
   lotNumber    String? @map("lot_number")
   serialNumber String? @map("serial_number")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   transfer InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
@@ -6958,13 +6958,13 @@ model MaterialUsage {
   lotNumber    String? @map("lot_number")
   serialNumber String? @map("serial_number")
 
-  usedAt DateTime @default(now()) @map("used_at")
+  usedAt DateTime  @db.Timestamptz(3) @default(now()) @map("used_at")
   usedBy String   @map("used_by") // Technician who used it
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -6991,11 +6991,11 @@ model PurchaseOrder {
   status     PurchaseOrderStatus @default(DRAFT)
 
   // Dates
-  orderDate    DateTime  @default(now()) @map("order_date")
-  expectedDate DateTime? @map("expected_date")
-  submittedAt  DateTime? @map("submitted_at")
-  confirmedAt  DateTime? @map("confirmed_at")
-  receivedAt   DateTime? @map("received_at")
+  orderDate    DateTime  @db.Timestamptz(3)  @default(now()) @map("order_date")
+  expectedDate DateTime? @db.Timestamptz(3) @map("expected_date")
+  submittedAt  DateTime? @db.Timestamptz(3) @map("submitted_at")
+  confirmedAt  DateTime? @db.Timestamptz(3) @map("confirmed_at")
+  receivedAt   DateTime? @db.Timestamptz(3) @map("received_at")
 
   // Delivery location
   deliveryLocationId String? @map("delivery_location_id")
@@ -7011,8 +7011,8 @@ model PurchaseOrder {
 
   createdBy String @map("created_by")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -7043,8 +7043,8 @@ model PurchaseOrderLine {
 
   quantityReceived Int @default(0) @map("quantity_received")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -7061,7 +7061,7 @@ model PurchaseOrderReceipt {
   purchaseOrderId String @map("purchase_order_id")
 
   receiptNumber String   @map("receipt_number")
-  receivedAt    DateTime @default(now()) @map("received_at")
+  receivedAt    DateTime  @db.Timestamptz(3) @default(now()) @map("received_at")
   receivedBy    String   @map("received_by")
 
   // Delivery location
@@ -7069,8 +7069,8 @@ model PurchaseOrderReceipt {
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   purchaseOrder PurchaseOrder              @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
@@ -7091,12 +7091,12 @@ model PurchaseOrderReceiptLine {
 
   lotNumber      String?   @map("lot_number")
   serialNumber   String?   @map("serial_number")
-  expirationDate DateTime? @map("expiration_date")
+  expirationDate DateTime? @db.Timestamptz(3) @map("expiration_date")
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   receipt PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
@@ -7166,17 +7166,17 @@ model ServiceContract {
   unitId        String? @map("unit_id")
 
   // Contract terms
-  startDate       DateTime  @map("start_date") @db.Date
-  endDate         DateTime  @map("end_date") @db.Date
+  startDate       DateTime  @db.Timestamptz(3)  @map("start_date")
+  endDate         DateTime  @db.Timestamptz(3)  @map("end_date")
   autoRenew       Boolean   @default(false) @map("auto_renew")
   renewalTermDays Int?      @map("renewal_term_days") // Days before end to trigger renewal
-  renewalNoticeAt DateTime? @map("renewal_notice_at")
+  renewalNoticeAt DateTime? @db.Timestamptz(3) @map("renewal_notice_at")
 
   // Pricing
   contractValue    Decimal             @map("contract_value") @db.Decimal(12, 2)
   billingFrequency RecurrenceFrequency @map("billing_frequency")
   billingAmount    Decimal             @map("billing_amount") @db.Decimal(12, 2)
-  nextBillingDate  DateTime?           @map("next_billing_date") @db.Date
+  nextBillingDate  DateTime? @db.Timestamptz(3)           @map("next_billing_date")
 
   // Service scope
   description      String? @db.Text
@@ -7196,7 +7196,7 @@ model ServiceContract {
 
   // Documents
   documentUrl String?   @map("document_url")
-  signedAt    DateTime? @map("signed_at")
+  signedAt    DateTime? @db.Timestamptz(3) @map("signed_at")
   signedBy    String?   @map("signed_by")
 
   // Metadata
@@ -7204,10 +7204,10 @@ model ServiceContract {
   metadata Json?
 
   // Soft delete
-  deletedAt DateTime? @map("deleted_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
   createdBy String   @map("created_by")
 
   // Relations
@@ -7256,8 +7256,8 @@ model ContractServiceItem {
   estimatedDurationMinutes Int?    @map("estimated_duration_minutes")
   notes                    String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contract      ServiceContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -7279,24 +7279,24 @@ model ContractSchedule {
   isActive    Boolean             @default(true) @map("is_active")
 
   // Timing
-  startDate           DateTime  @map("start_date") @db.Date
-  endDate             DateTime? @map("end_date") @db.Date
+  startDate           DateTime  @db.Timestamptz(3)  @map("start_date")
+  endDate             DateTime? @db.Timestamptz(3) @map("end_date")
   preferredDayOfWeek  Int?      @map("preferred_day_of_week") // 0=Sun, 1=Mon, etc.
   preferredDayOfMonth Int?      @map("preferred_day_of_month") // 1-31
   preferredTimeStart  String?   @map("preferred_time_start") // HH:MM
   preferredTimeEnd    String?   @map("preferred_time_end") // HH:MM
 
   // Generation tracking
-  lastGeneratedAt DateTime? @map("last_generated_at")
-  nextGenerateAt  DateTime? @map("next_generate_at")
+  lastGeneratedAt DateTime? @db.Timestamptz(3) @map("last_generated_at")
+  nextGenerateAt  DateTime? @db.Timestamptz(3) @map("next_generate_at")
 
   // Assignment override
   technicianId String? @map("technician_id")
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contract        ServiceContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -7318,19 +7318,19 @@ model ScheduledVisit {
   status      ScheduledVisitStatus @default(SCHEDULED)
 
   // Scheduling
-  scheduledDate  DateTime  @map("scheduled_date") @db.Date
-  scheduledStart DateTime? @map("scheduled_start")
-  scheduledEnd   DateTime? @map("scheduled_end")
-  confirmedAt    DateTime? @map("confirmed_at")
+  scheduledDate  DateTime  @db.Timestamptz(3)  @map("scheduled_date")
+  scheduledStart DateTime? @db.Timestamptz(3) @map("scheduled_start")
+  scheduledEnd   DateTime? @db.Timestamptz(3) @map("scheduled_end")
+  confirmedAt    DateTime? @db.Timestamptz(3) @map("confirmed_at")
 
   // Execution
-  actualStart DateTime? @map("actual_start")
-  actualEnd   DateTime? @map("actual_end")
-  completedAt DateTime? @map("completed_at")
+  actualStart DateTime? @db.Timestamptz(3) @map("actual_start")
+  actualEnd   DateTime? @db.Timestamptz(3) @map("actual_end")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
 
   // Assignment
   technicianId String?   @map("technician_id")
-  assignedAt   DateTime? @map("assigned_at")
+  assignedAt   DateTime? @db.Timestamptz(3) @map("assigned_at")
 
   // Linked job (created when visit is executed)
   jobId String? @map("job_id")
@@ -7344,8 +7344,8 @@ model ScheduledVisit {
   rescheduledFrom  String? @map("rescheduled_from") // Original visit ID
   rescheduleReason String? @map("reschedule_reason") @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contract   ServiceContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -7369,8 +7369,8 @@ model ContractRenewal {
 
   // Renewal details
   renewalNumber   Int      @map("renewal_number")
-  previousEndDate DateTime @map("previous_end_date") @db.Date
-  newEndDate      DateTime @map("new_end_date") @db.Date
+  previousEndDate DateTime  @db.Timestamptz(3) @map("previous_end_date")
+  newEndDate      DateTime  @db.Timestamptz(3) @map("new_end_date")
 
   // Pricing changes
   previousValue Decimal  @map("previous_value") @db.Decimal(12, 2)
@@ -7378,14 +7378,14 @@ model ContractRenewal {
   changePercent Decimal? @map("change_percent") @db.Decimal(5, 2)
 
   // Approval
-  renewedAt  DateTime  @map("renewed_at")
+  renewedAt  DateTime  @db.Timestamptz(3)  @map("renewed_at")
   renewedBy  String    @map("renewed_by")
-  approvedAt DateTime? @map("approved_at")
+  approvedAt DateTime? @db.Timestamptz(3) @map("approved_at")
   approvedBy String?   @map("approved_by")
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   contract ServiceContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -7401,8 +7401,8 @@ model ContractSLARecord {
   contractId String @map("contract_id")
 
   // Period
-  periodStart DateTime @map("period_start") @db.Date
-  periodEnd   DateTime @map("period_end") @db.Date
+  periodStart DateTime  @db.Timestamptz(3) @map("period_start")
+  periodEnd   DateTime  @db.Timestamptz(3) @map("period_end")
 
   // Metrics
   totalRequests     Int @default(0) @map("total_requests")
@@ -7426,8 +7426,8 @@ model ContractSLARecord {
 
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   contract ServiceContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
@@ -7494,18 +7494,18 @@ model PropertyOwnership {
   isPrimaryContact    Boolean  @default(false) @map("is_primary_contact")
 
   // Verification
-  verifiedAt DateTime? @map("verified_at")
+  verifiedAt DateTime? @db.Timestamptz(3) @map("verified_at")
   verifiedBy String?   @map("verified_by") // User ID who verified
 
   // Effective dates
-  effectiveFrom DateTime  @default(now()) @map("effective_from")
-  effectiveTo   DateTime? @map("effective_to")
+  effectiveFrom DateTime  @db.Timestamptz(3)  @default(now()) @map("effective_from")
+  effectiveTo   DateTime? @db.Timestamptz(3) @map("effective_to")
 
   notes String? @db.Text
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   property             IndividualProperty   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -7534,18 +7534,18 @@ model DelegatedAuthority {
   scopeRestrictions Json?    @map("scope_restrictions") // Structured restrictions
 
   // Validity
-  grantedAt    DateTime  @default(now()) @map("granted_at")
-  acceptedAt   DateTime? @map("accepted_at")
-  expiresAt    DateTime? @map("expires_at")
-  revokedAt    DateTime? @map("revoked_at")
+  grantedAt    DateTime  @db.Timestamptz(3)  @default(now()) @map("granted_at")
+  acceptedAt   DateTime? @db.Timestamptz(3) @map("accepted_at")
+  expiresAt    DateTime? @db.Timestamptz(3) @map("expires_at")
+  revokedAt    DateTime? @db.Timestamptz(3) @map("revoked_at")
   revokedBy    String?   @map("revoked_by") // User ID who revoked
   revokeReason String?   @map("revoke_reason")
 
   // Audit
   grantedBy String @map("granted_by") // User ID who granted
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   propertyOwnership PropertyOwnership @relation("OwnershipDelegations", fields: [propertyOwnershipId], references: [id], onDelete: Cascade)
@@ -7574,9 +7574,9 @@ model PropertyPortfolio {
   // Status
   isActive Boolean @default(true) @map("is_active")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -7597,9 +7597,9 @@ model PortfolioProperty {
   displayOrder Int?    @map("display_order")
   notes        String? @db.Text
 
-  addedAt   DateTime  @default(now()) @map("added_at")
+  addedAt   DateTime  @db.Timestamptz(3)  @default(now()) @map("added_at")
   addedBy   String    @map("added_by") // User ID who added
-  removedAt DateTime? @map("removed_at")
+  removedAt DateTime? @db.Timestamptz(3) @map("removed_at")
 
   // Relations
   portfolio PropertyPortfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
@@ -7665,24 +7665,24 @@ model OwnerIntent {
   submittedByPartyId String? @map("submitted_by_party_id")
 
   // Lifecycle timestamps
-  submittedAt    DateTime? @map("submitted_at")
-  acknowledgedAt DateTime? @map("acknowledged_at")
+  submittedAt    DateTime? @db.Timestamptz(3) @map("submitted_at")
+  acknowledgedAt DateTime? @db.Timestamptz(3) @map("acknowledged_at")
   acknowledgedBy String?   @map("acknowledged_by") // User ID
 
   // Conversion to case
   convertedCaseId String?   @map("converted_case_id")
-  convertedAt     DateTime? @map("converted_at")
+  convertedAt     DateTime? @db.Timestamptz(3) @map("converted_at")
 
   // Decline/withdraw info
-  declinedAt     DateTime? @map("declined_at")
+  declinedAt     DateTime? @db.Timestamptz(3) @map("declined_at")
   declinedBy     String?   @map("declined_by")
   declineReason  String?   @map("decline_reason") @db.Text
-  withdrawnAt    DateTime? @map("withdrawn_at")
+  withdrawnAt    DateTime? @db.Timestamptz(3) @map("withdrawn_at")
   withdrawReason String?   @map("withdraw_reason") @db.Text
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -7707,7 +7707,7 @@ model IntentNote {
   createdBy  String  @map("created_by") // User ID
   isInternal Boolean @default(true) @map("is_internal") // Internal vs. visible to owner
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   intent OwnerIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
@@ -7780,12 +7780,12 @@ model ConciergeCase {
   assignedConciergeUserId String? @map("assigned_concierge_user_id")
 
   // Lifecycle timestamps
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  resolvedAt  DateTime? @map("resolved_at")
-  closedAt    DateTime? @map("closed_at")
-  cancelledAt DateTime? @map("cancelled_at")
-  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt   DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  resolvedAt  DateTime? @db.Timestamptz(3) @map("resolved_at")
+  closedAt    DateTime? @db.Timestamptz(3) @map("closed_at")
+  cancelledAt DateTime? @db.Timestamptz(3) @map("cancelled_at")
+  deletedAt   DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Resolution details
   resolutionSummary String? @map("resolution_summary") @db.Text
@@ -7845,13 +7845,13 @@ model CaseAvailabilitySlot {
   caseId String @map("case_id")
 
   // Time window
-  startTime DateTime @map("start_time")
-  endTime   DateTime @map("end_time")
+  startTime DateTime  @db.Timestamptz(3) @map("start_time")
+  endTime   DateTime  @db.Timestamptz(3) @map("end_time")
 
   // Optional notes for this specific slot
   notes String? @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -7871,7 +7871,7 @@ model CaseStatusHistory {
   reason     String?              @db.Text
   changedBy  String               @map("changed_by") // User ID
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -7899,7 +7899,7 @@ model CaseNote {
   createdBy  String       @map("created_by") // User ID
   isInternal Boolean      @default(true) @map("is_internal") // Internal vs. visible to owner
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -7940,17 +7940,17 @@ model CaseCommunication {
   threadId          String? @map("thread_id") // For grouping related messages
 
   // Status
-  sentAt        DateTime? @map("sent_at")
-  deliveredAt   DateTime? @map("delivered_at")
-  readAt        DateTime? @map("read_at")
-  failedAt      DateTime? @map("failed_at")
+  sentAt        DateTime? @db.Timestamptz(3) @map("sent_at")
+  deliveredAt   DateTime? @db.Timestamptz(3) @map("delivered_at")
+  readAt        DateTime? @db.Timestamptz(3) @map("read_at")
+  failedAt      DateTime? @db.Timestamptz(3) @map("failed_at")
   failureReason String?   @map("failure_reason")
 
   // Attachments
   attachmentIds Json? @map("attachment_ids") // Array of CaseAttachment IDs
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   case     ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -7991,10 +7991,10 @@ model CaseReview {
 
   // Metadata
   reviewedByUserId String   @map("reviewed_by_user_id")
-  reviewedAt       DateTime @map("reviewed_at")
+  reviewedAt       DateTime  @db.Timestamptz(3) @map("reviewed_at")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   case       ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -8028,10 +8028,10 @@ model CaseAttachment {
   versionNotes      String? @map("version_notes") @db.Text
 
   // Immutability
-  lockedAt       DateTime? @map("locked_at") // Set when case is closed
+  lockedAt       DateTime? @db.Timestamptz(3) @map("locked_at") // Set when case is closed
   lockedByUserId String?   @map("locked_by_user_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   case            ConciergeCase    @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -8083,8 +8083,8 @@ model CaseMilestone {
   status        MilestoneStatus @default(PENDING)
 
   // Timeline
-  targetDate        DateTime? @map("target_date")
-  completedAt       DateTime? @map("completed_at")
+  targetDate        DateTime? @db.Timestamptz(3) @map("target_date")
+  completedAt       DateTime? @db.Timestamptz(3) @map("completed_at")
   completedByUserId String?   @map("completed_by_user_id")
 
   // Ordering
@@ -8094,8 +8094,8 @@ model CaseMilestone {
   notes         String? @db.Text
   blockerReason String? @map("blocker_reason") @db.Text
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   case        ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -8121,15 +8121,15 @@ model CaseIssue {
   // Status
   status           String    @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
   resolution       String?   @db.Text
-  resolvedAt       DateTime? @map("resolved_at")
+  resolvedAt       DateTime? @db.Timestamptz(3) @map("resolved_at")
   resolvedByUserId String?   @map("resolved_by_user_id")
 
   // Assignment
   reportedByUserId String  @map("reported_by_user_id")
   assignedToUserId String? @map("assigned_to_user_id")
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   case       ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -8158,9 +8158,9 @@ model CaseParticipant {
   role  String // e.g., "owner", "co-owner", "hoa_contact", "vendor_contact"
   notes String? @db.Text
 
-  addedAt   DateTime  @default(now()) @map("added_at")
+  addedAt   DateTime  @db.Timestamptz(3)  @default(now()) @map("added_at")
   addedBy   String    @map("added_by") // User ID
-  removedAt DateTime? @map("removed_at")
+  removedAt DateTime? @db.Timestamptz(3) @map("removed_at")
 
   // Relations
   case  ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -8210,9 +8210,9 @@ model ConciergeAction {
   description String                @db.Text
 
   // Scheduling
-  plannedAt   DateTime? @map("planned_at")
-  startedAt   DateTime? @map("started_at")
-  completedAt DateTime? @map("completed_at")
+  plannedAt   DateTime? @db.Timestamptz(3) @map("planned_at")
+  startedAt   DateTime? @db.Timestamptz(3) @map("started_at")
+  completedAt DateTime? @db.Timestamptz(3) @map("completed_at")
 
   // Performer
   performedByUserId String @map("performed_by_user_id")
@@ -8225,9 +8225,9 @@ model ConciergeAction {
   relatedDocumentIds        Json? @map("related_document_ids") // Array of Document IDs
   relatedExternalContactIds Json? @map("related_external_contact_ids") // Array of external contact IDs
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   case        ConciergeCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
@@ -8253,7 +8253,7 @@ model ConciergeActionLog {
   description String?                @db.Text
   changedBy   String                 @map("changed_by") // User ID
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   action ConciergeAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
@@ -8294,9 +8294,9 @@ model ExternalHOAContext {
   notes         String? @db.Text
   documentsJson Json?   @map("documents_json") // Array of Document IDs
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -8318,18 +8318,18 @@ model ExternalHOAApproval {
   // Approval details
   approvalType      String // e.g., "architectural", "landscaping", "fence"
   status            ExternalApprovalStatus @default(PENDING)
-  submittedAt       DateTime?              @map("submitted_at")
-  responseAt        DateTime?              @map("response_at")
-  expiresAt         DateTime?              @map("expires_at")
+  submittedAt       DateTime? @db.Timestamptz(3)              @map("submitted_at")
+  responseAt        DateTime? @db.Timestamptz(3)              @map("response_at")
+  expiresAt         DateTime? @db.Timestamptz(3)              @map("expires_at")
   approvalReference String?                @map("approval_reference") // HOA reference number
 
   // Notes and documents
   notes              String? @db.Text
   relatedDocumentIds Json?   @map("related_document_ids") // Array of Document IDs
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   externalHoaContext ExternalHOAContext @relation(fields: [externalHoaContextId], references: [id], onDelete: Cascade)
@@ -8352,9 +8352,9 @@ model ExternalHOARule {
   sourceDocumentId String? @map("source_document_id") // Reference to Document
   notes            String? @db.Text
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   externalHoaContext ExternalHOAContext @relation(fields: [externalHoaContextId], references: [id], onDelete: Cascade)
@@ -8388,9 +8388,9 @@ model ExternalVendorContext {
   // Migration path to Phase 2
   linkedServiceProviderOrgId String? @map("linked_service_provider_org_id")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization          Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -8415,7 +8415,7 @@ model ExternalVendorInteraction {
 
   // Interaction details
   interactionType String // QUOTE, SCHEDULE, WORK, INVOICE, OTHER
-  interactionDate DateTime @map("interaction_date")
+  interactionDate DateTime  @db.Timestamptz(3) @map("interaction_date")
   description     String   @db.Text
   amount          Decimal? @db.Decimal(12, 2) // Optional monetary amount
 
@@ -8423,7 +8423,7 @@ model ExternalVendorInteraction {
   notes              String? @db.Text
   relatedDocumentIds Json?   @map("related_document_ids") // Array of Document IDs
 
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
   externalVendorContext ExternalVendorContext @relation(fields: [externalVendorContextId], references: [id], onDelete: Cascade)
@@ -8464,7 +8464,7 @@ model MaterialDecision {
 
   // Decision maker
   decidedByUserId String   @map("decided_by_user_id")
-  decidedAt       DateTime @map("decided_at")
+  decidedAt       DateTime  @db.Timestamptz(3) @map("decided_at")
 
   // Options considered (JSON array)
   optionsConsidered Json? @map("options_considered")
@@ -8472,15 +8472,15 @@ model MaterialDecision {
   // Impact and outcome
   estimatedImpact   String?   @map("estimated_impact") @db.Text
   actualOutcome     String?   @map("actual_outcome") @db.Text
-  outcomeRecordedAt DateTime? @map("outcome_recorded_at")
+  outcomeRecordedAt DateTime? @db.Timestamptz(3) @map("outcome_recorded_at")
 
   // Related entities
   relatedDocumentIds Json? @map("related_document_ids") // Array of Document IDs
   relatedActionIds   Json? @map("related_action_ids") // Array of ConciergeAction IDs
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -8530,13 +8530,13 @@ model VendorCandidate {
 
   // Status tracking
   status          VendorCandidateStatus @default(IDENTIFIED)
-  statusChangedAt DateTime?             @map("status_changed_at")
+  statusChangedAt DateTime? @db.Timestamptz(3)             @map("status_changed_at")
 
   // Provenance (where this vendor was found)
   sourceUrl            String?   @map("source_url") @db.Text
   sourceHtml           String?   @map("source_html") @db.Text
   sourcePlainText      String?   @map("source_plain_text") @db.Text
-  extractedAt          DateTime? @map("extracted_at")
+  extractedAt          DateTime? @db.Timestamptz(3) @map("extracted_at")
   extractionConfidence Float?    @map("extraction_confidence") // 0.0 to 1.0
 
   // Extraction metadata (field-level confidence)
@@ -8549,9 +8549,9 @@ model VendorCandidate {
   // Link to platform vendor (if they join)
   linkedExternalVendorId String? @map("linked_external_vendor_id")
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @db.Timestamptz(3)  @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3)  @updatedAt @map("updated_at")
+  deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
   organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -8576,7 +8576,7 @@ model VendorBid {
   scopeVersion String?   @map("scope_version") // Which scope version this bid is for
   amount       Decimal?  @db.Decimal(12, 2)
   currency     String    @default("USD")
-  validUntil   DateTime? @map("valid_until")
+  validUntil   DateTime? @db.Timestamptz(3) @map("valid_until")
 
   // Bid breakdown
   laborCost     Decimal? @map("labor_cost") @db.Decimal(12, 2)
@@ -8584,14 +8584,14 @@ model VendorBid {
   otherCosts    Decimal? @map("other_costs") @db.Decimal(12, 2)
 
   // Timeline
-  estimatedStartDate DateTime? @map("estimated_start_date")
+  estimatedStartDate DateTime? @db.Timestamptz(3) @map("estimated_start_date")
   estimatedDuration  Int?      @map("estimated_duration") // Days
-  estimatedEndDate   DateTime? @map("estimated_end_date")
+  estimatedEndDate   DateTime? @db.Timestamptz(3) @map("estimated_end_date")
 
   // Status
   status      String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
-  receivedAt  DateTime  @map("received_at")
-  respondedAt DateTime? @map("responded_at")
+  receivedAt  DateTime  @db.Timestamptz(3)  @map("received_at")
+  respondedAt DateTime? @db.Timestamptz(3) @map("responded_at")
 
   // Notes and attachments
   notes         String? @db.Text
@@ -8603,8 +8603,8 @@ model VendorBid {
   isRecommended           Boolean? @map("is_recommended") // Staff recommendation flag
   isCustomerFacing        Boolean  @default(false) @map("is_customer_facing") // Mark as customer-facing artifact
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
   vendorCandidate VendorCandidate @relation(fields: [vendorCandidateId], references: [id], onDelete: Cascade)
@@ -8615,3 +8615,4 @@ model VendorBid {
   @@index([status])
   @@map("vendor_bids")
 }
+

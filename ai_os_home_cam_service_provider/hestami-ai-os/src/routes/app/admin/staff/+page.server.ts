@@ -1,25 +1,16 @@
 import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 
-export const load: PageServerLoad = async ({ url, locals }) => {
-    // Build context for direct server-side calling
-    let staffRoles: any[] = [];
-    let pillarAccess: any[] = [];
-    let orgRoles: Record<string, any> = {};
+export const load: PageServerLoad = async ({ url, locals, parent }) => {
+    // Get staff and memberships from parent layout (already fetched via SECURITY DEFINER)
+    const { staff, memberships } = await parent();
     
-    if (locals.user) {
-        const [staffProfile, memberships] = await Promise.all([
-            prisma.staff.findUnique({ where: { userId: locals.user.id } }),
-            prisma.userOrganization.findMany({ where: { userId: locals.user.id } })
-        ]);
-        if (staffProfile && staffProfile.status === 'ACTIVE') {
-            staffRoles = staffProfile.roles;
-            pillarAccess = staffProfile.pillarAccess;
-        }
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+    // Build context using data from parent layout
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
     
     const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess });

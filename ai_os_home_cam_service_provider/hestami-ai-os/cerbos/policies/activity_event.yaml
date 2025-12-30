@@ -7,15 +7,24 @@ resourcePolicy:
     - common_roles
   rules:
     # Hestami platform admins have full cross-org access
+    # Uses both derivedRoles (condition-based) and roles (direct) for flexibility
     - actions: ["view", "export"]
       effect: EFFECT_ALLOW
       derivedRoles:
+        - hestami_platform_admin
+    - actions: ["view", "export"]
+      effect: EFFECT_ALLOW
+      roles:
         - hestami_platform_admin
 
     # Hestami staff have cross-org view access for activity log
     - actions: ["view"]
       effect: EFFECT_ALLOW
       derivedRoles:
+        - hestami_staff
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
         - hestami_staff
 
     # Admins and managers have full view and export access

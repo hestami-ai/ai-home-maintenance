@@ -1,0 +1,69 @@
+  traefik:
+    image: traefik:v3.2.1
+    container_name: traefik
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.websecure.http.tls.certResolver=default"
+      - "--providers.file.directory=/etc/traefik/certs"
+      - "--providers.file.watch=true"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+    labels:
+      - "traefik.enable=true"
+#      - "traefik.http.routers.dev_homeservices.rule=Host(`dev-homeservices.hestami-ai.com`)"
+#      - "traefik.http.routers.dev_homeservices.tls=true"
+#      - "traefik.http.routers.dev_homeservices.entrypoints=websecure"
+#      - "traefik.http.routers.dev_homeservices.service=dev_homeservices"
+#      - "traefik.http.services.dev_homeservices.loadbalancer.passhostheader=true"
+#      - "traefik.http.routers.dev_homeservices.service=dev_homeservices@file"
+
+      - "traefik.http.routers.dev_platform.rule=Host(`dev-platform.hestami-ai.com`)"
+      - "traefik.http.routers.dev_platform.tls=true"
+      - "traefik.http.routers.dev_platform.entrypoints=websecure"
+      - "traefik.http.routers.dev_platform.service=dev_platform"
+      - "traefik.http.services.dev_platform.loadbalancer.passhostheader=true"
+      - "traefik.http.routers.dev_platform.service=dev_platform@file"
+
+      - "traefik.http.routers.dev_s3.rule=Host(`dev-s3.hestami-ai.com`)"
+      - "traefik.http.routers.dev_s3.tls=true"
+      - "traefik.http.routers.dev_s3.entrypoints=websecure"
+      - "traefik.http.routers.dev_s3.service=dev_s3"
+      - "traefik.http.services.dev_s3.loadbalancer.passhostheader=true"
+      - "traefik.http.routers.dev_s3.service=dev_s3@file"
+
+      - "traefik.http.routers.dev_upload.rule=Host(`dev-upload.hestami-ai.com`)"
+      - "traefik.http.routers.dev_upload.tls=true"
+      - "traefik.http.routers.dev_upload.entrypoints=websecure"
+      - "traefik.http.routers.dev_upload.service=dev_upload"
+      - "traefik.http.services.dev_upload.loadbalancer.passhostheader=true"
+      - "traefik.http.routers.dev_upload.service=dev_upload@file"
+
+      - "traefik.http.routers.dev_static.rule=Host(`dev-static.hestami-ai.com`)"
+      - "traefik.http.routers.dev_static.tls=true"
+      - "traefik.http.routers.dev_static.entrypoints=websecure"
+      - "traefik.http.routers.dev_static.service=dev_static"
+      - "traefik.http.services.dev_static.loadbalancer.passhostheader=true"
+      - "traefik.http.routers.dev_static.service=dev_static@file"
+      
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "443:443"
+    volumes:
+      - "./volumes/common/traefik/certs:/etc/traefik/certs:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./volumes/common/traefik/logs:/var/log/traefik"
+    networks:
+      - traefik-public
+    restart: "unless-stopped"
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"

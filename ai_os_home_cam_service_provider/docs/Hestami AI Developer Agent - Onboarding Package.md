@@ -343,7 +343,100 @@ After any changes: run `npm run check` (must pass with 0 errors)
 * Use `ResponseMetaSchema` for response metadata — never use `z.any()`
 * Import from `../../schemas.ts` (relative path varies by file location)
 
-#### **i. Cerbos Authorization**
+#### **i. Row-Level Security (RLS) and SECURITY DEFINER Functions**
+
+Row-Level Security (RLS) is enabled on most tables to enforce multitenancy. However, some operations need to bypass RLS:
+
+**When to use SECURITY DEFINER functions:**
+- **Context bootstrapping**: Fetching user memberships before organization context is set (chicken-and-egg problem)
+- **Cross-organization staff access**: Staff work queue needs to see items across all organizations
+- **System-level operations**: Background jobs that need to access all data
+
+**Pattern for SECURITY DEFINER functions:**
+
+1. **Create the function in a Prisma migration** (`prisma/migrations/YYYYMMDDHHMMSS_function_name/migration.sql`):
+```sql
+-- Use TIMESTAMP(3) to match Prisma's default precision (not TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION get_user_memberships(p_user_id TEXT)
+RETURNS TABLE (
+  id TEXT,
+  user_id TEXT,
+  organization_id TEXT,
+  role TEXT,
+  is_default BOOLEAN,
+  created_at TIMESTAMP(3),  -- Match Prisma's timestamp precision
+  updated_at TIMESTAMP(3),
+  org_id TEXT,
+  org_name TEXT,
+  org_slug TEXT,
+  org_type TEXT,
+  org_status TEXT
+)
+SECURITY DEFINER  -- Runs as function owner (hestami), bypassing RLS
+SET search_path = public  -- Security best practice
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    uo.id::TEXT,
+    uo.user_id::TEXT,
+    uo.organization_id::TEXT,
+    uo.role::TEXT,
+    uo.is_default,
+    uo.created_at,
+    uo.updated_at,
+    o.id::TEXT AS org_id,
+    o.name::TEXT AS org_name,
+    o.slug::TEXT AS org_slug,
+    o.type::TEXT AS org_type,
+    o.status::TEXT AS org_status
+  FROM user_organizations uo
+  JOIN organizations o ON o.id = uo.organization_id
+  WHERE uo.user_id = p_user_id
+    AND o.deleted_at IS NULL
+  ORDER BY uo.is_default DESC, uo.created_at ASC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Grant execute to the RLS-enforced app user
+GRANT EXECUTE ON FUNCTION get_user_memberships(TEXT) TO hestami_app;
+```
+
+2. **Call from TypeScript using `prisma.$queryRaw`**:
+```typescript
+interface MembershipRow {
+  id: string;
+  user_id: string;
+  organization_id: string;
+  role: string;
+  is_default: boolean;
+  created_at: Date;
+  updated_at: Date;
+  org_id: string;
+  org_name: string;
+  org_slug: string;
+  org_type: string;
+  org_status: string;
+}
+
+const rows = await prisma.$queryRaw<MembershipRow[]>`
+  SELECT * FROM get_user_memberships(${userId})
+`;
+```
+
+**Critical: Timestamp Type Matching**
+- Prisma uses `TIMESTAMP(3) WITHOUT TIME ZONE` by default
+- PostgreSQL `TIMESTAMPTZ` will cause "structure of query does not match function result type" errors
+- Always use `TIMESTAMP(3)` in function return types to match Prisma's precision
+
+**Reference implementations:**
+- `prisma/migrations/20251228182900_staff_work_queue_functions/migration.sql` - Staff work queue functions
+- `prisma/migrations/20251230022800_user_memberships_function/migration.sql` - User context bootstrapping functions
+- `src/lib/server/api/routes/workQueue.ts` - Example of calling SECURITY DEFINER functions
+
+**Do NOT use `prismaAdmin` for RLS bypass** - Use SECURITY DEFINER functions instead. This keeps the bypass logic in the database layer and maintains proper audit trails.
+
+#### **j. Cerbos Authorization**
 
 * Policies are in `cerbos/policies/` with resource policies in `cerbos/policies/resource/`
 * Derived roles are defined in `cerbos/policies/derived_roles/common.yaml`
@@ -416,6 +509,8 @@ After any changes: run `npm run check` (must pass with 0 errors)
 
 * When adding Cerbos policies, verify no duplicate resource+version definitions exist.
 
+* Use TIMESTAMPZ for prisma and the backend database by default.
+
 ---
 
 ### **6\. Common Pitfalls**
@@ -437,6 +532,9 @@ After any changes: run `npm run check` (must pass with 0 errors)
 * **Missing activity events in workflows**: Not calling `recordWorkflowEvent()` after successful operations. This breaks the audit trail and activity timeline features.
 * **Using client side onMount**: onMount and client side loading for important values such as organization ID cause race conditions on pages.
 * **Using default `orpc` client in SSR**: The default `orpc` client and API wrappers (e.g., `workQueueApi`) use relative URLs that fail in server-side contexts. Always use `createDirectClient` with `buildServerContext` in `+page.server.ts` files.
+* **Direct Prisma queries for user context in page server loads**: Querying `prisma.staff.findUnique()` or `prisma.userOrganization.findMany()` directly in `+page.server.ts` files fails due to RLS blocking access before context is established. Always use `await parent()` to get `staff` and `memberships` from the root layout, which fetches them via SECURITY DEFINER functions.
+* **TIMESTAMP vs TIMESTAMPTZ in SECURITY DEFINER functions**: Function return types must match the actual column types. After migrating to TIMESTAMPTZ, all SECURITY DEFINER functions must return `TIMESTAMPTZ(3)`, not `TIMESTAMP(3)`. Mismatched types cause "structure of query does not match function result type" errors.
+* **Enum arrays in SECURITY DEFINER functions**: PostgreSQL enum arrays (e.g., `StaffRole[]`) must be cast to `TEXT[]` in function return types. Use `ARRAY(SELECT unnest(column)::TEXT)::TEXT[]` pattern.
 
 ---
 
@@ -492,28 +590,20 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
 **For staff/admin pages** that need staff roles for authorization:
 
 ```typescript
-// ✅ CORRECT - Admin page with staff authorization
+// ✅ CORRECT - Admin page using parent layout data (avoids RLS issues)
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
-import { prisma } from '$lib/server/db';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ url, locals }) => {
-    let staffRoles: any[] = [];
-    let pillarAccess: any[] = [];
-    let orgRoles: Record<string, any> = {};
+export const load: PageServerLoad = async ({ url, locals, parent }) => {
+    // Get staff and memberships from parent layout (fetched via SECURITY DEFINER)
+    const { staff, memberships } = await parent();
     
-    if (locals.user) {
-        const [staffProfile, memberships] = await Promise.all([
-            prisma.staff.findUnique({ where: { userId: locals.user.id, status: 'ACTIVE' } }),
-            prisma.userOrganization.findMany({ where: { userId: locals.user.id } })
-        ]);
-        if (staffProfile) {
-            staffRoles = staffProfile.roles;
-            pillarAccess = staffProfile.pillarAccess;
-        }
-        for (const m of memberships) {
-            orgRoles[m.organizationId] = m.role;
-        }
+    // Build context using data from parent layout
+    const staffRoles = staff?.roles ?? [];
+    const pillarAccess = staff?.pillarAccess ?? [];
+    const orgRoles: Record<string, any> = {};
+    for (const m of memberships ?? []) {
+        orgRoles[m.organization.id] = m.role;
     }
     
     const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess });
@@ -523,6 +613,10 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     return { staffList: response.data.staff };
 };
 ```
+
+**Why use `parent()` instead of direct Prisma queries?**
+
+The root layout (`+layout.server.ts`) fetches user memberships and staff profile using SECURITY DEFINER functions that bypass RLS. If you query `prisma.staff.findUnique()` or `prisma.userOrganization.findMany()` directly in a page server load, RLS will block the query because the user context isn't established yet (chicken-and-egg problem).
 
 ```typescript
 // ❌ WRONG - Will throw "Authentication required" or "Invalid URL" error

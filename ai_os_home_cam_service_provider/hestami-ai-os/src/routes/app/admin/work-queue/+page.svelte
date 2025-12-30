@@ -47,48 +47,34 @@
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	// Filters (initialized with defaults, synced via $effect)
-	let pillarFilter = $state<WorkQueuePillar>('ALL');
-	let urgencyFilter = $state<WorkQueueUrgency | ''>('');
-	let assignedToMe = $state(false);
-	let unassignedOnly = $state(false);
+	// Filters derived from server data - updates on navigation
+	let pillarFilter = $derived(data.filters.pillar);
+	let urgencyFilter = $derived(data.filters.urgency);
+	let assignedToMeFilter = $derived(data.filters.assignedToMe);
+	let unassignedOnlyFilter = $derived(data.filters.unassignedOnly);
 
-	// Sync filters from server data
-	$effect(() => {
-		pillarFilter = data.filters.pillar;
-		urgencyFilter = data.filters.urgency;
-		assignedToMe = data.filters.assignedToMe;
-		unassignedOnly = data.filters.unassignedOnly;
-	});
-
-	async function loadWorkQueue() {
-		// Use URL updates for filtering so server-side load handles it
+	// Navigate with new filter params
+	function applyFilter(filterName: string, value: string | boolean) {
 		const params = new URLSearchParams();
-		if (pillarFilter !== 'ALL') params.set('pillar', pillarFilter);
-		if (urgencyFilter) params.set('urgency', urgencyFilter);
-		if (assignedToMe) params.set('assignedToMe', 'true');
-		if (unassignedOnly) params.set('unassignedOnly', 'true');
+		
+		// Start with current filter values
+		const newPillar = filterName === 'pillar' ? value as string : pillarFilter;
+		const newUrgency = filterName === 'urgency' ? value as string : urgencyFilter;
+		const newAssignedToMe = filterName === 'assignedToMe' ? value as boolean : assignedToMeFilter;
+		const newUnassignedOnly = filterName === 'unassignedOnly' ? value as boolean : unassignedOnlyFilter;
+		
+		if (newPillar !== 'ALL') params.set('pillar', newPillar);
+		if (newUrgency) params.set('urgency', newUrgency);
+		if (newAssignedToMe) params.set('assignedToMe', 'true');
+		if (newUnassignedOnly) params.set('unassignedOnly', 'true');
 		
 		const url = `/app/admin/work-queue?${params.toString()}`;
 		window.location.href = url;
 	}
 
-	// Trigger reload on filter change (after initial sync)
-	let initialFilterSyncDone = false;
-	$effect(() => {
-		// Skip the first run which is the initial sync
-		if (!initialFilterSyncDone) {
-			initialFilterSyncDone = true;
-			return;
-		}
-		// Simple way: refresh the page with new params
-		if (pillarFilter !== data.filters.pillar || 
-			urgencyFilter !== data.filters.urgency || 
-			assignedToMe !== data.filters.assignedToMe || 
-			unassignedOnly !== data.filters.unassignedOnly) {
-			loadWorkQueue();
-		}
-	});
+	function refreshPage() {
+		window.location.reload();
+	}
 
 	function getUrgencyBadgeClass(urgency: WorkQueueUrgency): string {
 		const colorMap: Record<WorkQueueUrgency, string> = {
@@ -143,7 +129,7 @@
 				<h1 class="text-2xl font-bold">Work Queue</h1>
 				<p class="mt-1 text-surface-500">Items requiring attention across all pillars</p>
 			</div>
-			<button onclick={loadWorkQueue} class="btn preset-outlined-primary-500" disabled={isLoading}>
+			<button onclick={refreshPage} class="btn preset-outlined-primary-500" disabled={isLoading}>
 				{#if isLoading}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 				{:else}
@@ -220,13 +206,21 @@
 				<Filter class="h-4 w-4 text-surface-400" />
 				<span class="text-sm font-medium">Filters:</span>
 			</div>
-			<select bind:value={pillarFilter} class="select w-40">
+			<select 
+				value={pillarFilter} 
+				onchange={(e) => applyFilter('pillar', e.currentTarget.value)}
+				class="select w-40"
+			>
 				<option value="ALL">All Pillars</option>
 				<option value="CONCIERGE">Concierge</option>
 				<option value="CAM">CAM</option>
 				<option value="CONTRACTOR">Contractor</option>
 			</select>
-			<select bind:value={urgencyFilter} class="select w-36">
+			<select 
+				value={urgencyFilter} 
+				onchange={(e) => applyFilter('urgency', e.currentTarget.value)}
+				class="select w-36"
+			>
 				<option value="">All Urgency</option>
 				<option value="CRITICAL">Critical</option>
 				<option value="HIGH">High</option>
@@ -234,11 +228,21 @@
 				<option value="LOW">Low</option>
 			</select>
 			<label class="flex items-center gap-2">
-				<input type="checkbox" bind:checked={assignedToMe} class="checkbox" />
+				<input 
+					type="checkbox" 
+					checked={assignedToMeFilter} 
+					onchange={(e) => applyFilter('assignedToMe', e.currentTarget.checked)}
+					class="checkbox" 
+				/>
 				<span class="text-sm">Assigned to me</span>
 			</label>
 			<label class="flex items-center gap-2">
-				<input type="checkbox" bind:checked={unassignedOnly} class="checkbox" />
+				<input 
+					type="checkbox" 
+					checked={unassignedOnlyFilter} 
+					onchange={(e) => applyFilter('unassignedOnly', e.currentTarget.checked)}
+					class="checkbox" 
+				/>
 				<span class="text-sm">Unassigned only</span>
 			</label>
 		</div>
@@ -253,7 +257,7 @@
 				<Card variant="outlined" padding="lg">
 					<div class="text-center text-error-500">
 						<p>{error}</p>
-						<button onclick={loadWorkQueue} class="btn preset-outlined-primary-500 mt-4">
+						<button onclick={refreshPage} class="btn preset-outlined-primary-500 mt-4">
 							Try Again
 						</button>
 					</div>
