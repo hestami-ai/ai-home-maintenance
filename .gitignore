@@ -138,6 +138,7 @@ env.bak/
 venv.bak/
 .env.local
 .env.prod
+.env.backup
 
 # Spyder project settings
 .spyderproject

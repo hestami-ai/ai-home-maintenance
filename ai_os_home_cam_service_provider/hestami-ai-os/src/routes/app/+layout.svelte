@@ -3,10 +3,16 @@
 	import { Loader2 } from 'lucide-svelte';
 
 	interface Props {
+		data: {
+			session: any;
+			memberships: any[];
+			currentOrganization: any;
+		};
 		children: import('svelte').Snippet;
 	}
 
-	let { children }: Props = $props();
+	let { data, children }: Props = $props();
+
 
 	// Note: Authentication is enforced server-side in +layout.server.ts
 	// This layout only needs to wait for organization data to load

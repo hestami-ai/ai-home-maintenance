@@ -9,6 +9,7 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { VendorApprovalStatus } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('ContractorComplianceWorkflow');
@@ -238,8 +239,16 @@ async function contractorComplianceWorkflow(input: ContractorComplianceWorkflowI
 
 		return { success: true, entityId: input.vendorId, complianceData };
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[ContractorComplianceWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'CONTRACTOR_COMPLIANCE_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

@@ -83,7 +83,36 @@ export const activityEventApi = {
 	/**
 	 * Search activity events with filters
 	 */
-	search: (params?: SearchInput) => orpc.activityEvent.search(params ?? {})
+	search: (params?: SearchInput) => orpc.activityEvent.search(params ?? {}),
+
+	// =========================================================================
+	// STAFF CROSS-ORG ENDPOINTS
+	// =========================================================================
+
+	/**
+	 * Get all activity events across all organizations (staff only)
+	 */
+	staffList: (params?: {
+		entityType?: ActivityEntityType;
+		action?: ActivityActionType;
+		eventCategory?: ActivityEventCategory;
+		performedByType?: ActivityActorType;
+		organizationId?: string;
+		startDate?: string;
+		endDate?: string;
+		limit?: number;
+		cursor?: string;
+	}) => orpc.activityEvent.staffList(params ?? {}),
+
+	/**
+	 * Get activity events for a specific entity (staff cross-org access)
+	 */
+	staffGetByEntity: (params: {
+		entityType: ActivityEntityType;
+		entityId: string;
+		limit?: number;
+		cursor?: string;
+	}) => orpc.activityEvent.staffGetByEntity(params)
 };
 
 // =============================================================================
@@ -106,6 +135,7 @@ export const ENTITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
 	TECHNICIAN: 'Technician',
 	CONTRACTOR: 'Contractor',
 	INVENTORY: 'Inventory',
+	PURCHASE_ORDER: 'Purchase Order',
 	CONCIERGE_CASE: 'Concierge Case',
 	OWNER_INTENT: 'Owner Intent',
 	INDIVIDUAL_PROPERTY: 'Property',
@@ -114,10 +144,18 @@ export const ENTITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
 	EXTERNAL_HOA: 'External HOA',
 	EXTERNAL_VENDOR: 'External Vendor',
 	CONCIERGE_ACTION: 'Concierge Action',
+	MEETING: 'Meeting',
+	MOTION: 'Motion',
+	VOTE: 'Vote',
+	RESOLUTION: 'Resolution',
 	USER: 'User',
 	USER_ROLE: 'User Role',
 	ORGANIZATION: 'Organization',
 	DOCUMENT: 'Document',
+	STAFF: 'Staff',
+	STAFF_ASSIGNMENT: 'Staff Assignment',
+	VENDOR_CANDIDATE: 'Vendor Candidate',
+	VENDOR_BID: 'Vendor Bid',
 	OTHER: 'Other'
 };
 
@@ -125,42 +163,45 @@ export const ACTION_TYPE_LABELS: Record<ActivityActionType, string> = {
 	CREATE: 'Created',
 	UPDATE: 'Updated',
 	DELETE: 'Deleted',
-	ARCHIVE: 'Archived',
-	RESTORE: 'Restored',
 	STATUS_CHANGE: 'Status Changed',
-	ASSIGN: 'Assigned',
-	UNASSIGN: 'Unassigned',
 	APPROVE: 'Approved',
 	DENY: 'Denied',
+	ASSIGN: 'Assigned',
+	UNASSIGN: 'Unassigned',
 	SUBMIT: 'Submitted',
 	CANCEL: 'Cancelled',
 	COMPLETE: 'Completed',
+	SCHEDULE: 'Scheduled',
+	DISPATCH: 'Dispatched',
 	CLOSE: 'Closed',
 	REOPEN: 'Reopened',
 	ESCALATE: 'Escalated',
-	COMMENT: 'Commented',
-	ATTACH: 'Attached',
-	DETACH: 'Detached',
-	TRANSFER: 'Transferred',
-	SCHEDULE: 'Scheduled',
-	DISPATCH: 'Dispatched',
-	START: 'Started',
-	PAUSE: 'Paused',
-	RESUME: 'Resumed',
-	INVOICE: 'Invoiced',
-	PAY: 'Paid',
-	REFUND: 'Refunded',
-	ADJUST: 'Adjusted',
-	VERIFY: 'Verified',
-	REJECT: 'Rejected',
-	EXPIRE: 'Expired',
-	RENEW: 'Renewed',
+	ROLE_CHANGE: 'Role Changed',
 	LOGIN: 'Logged In',
 	LOGOUT: 'Logged Out',
-	PASSWORD_CHANGE: 'Password Changed',
-	ROLE_CHANGE: 'Role Changed',
-	PERMISSION_CHANGE: 'Permission Changed',
-	OTHER: 'Other'
+	WORKFLOW_INITIATED: 'Workflow Started',
+	WORKFLOW_COMPLETED: 'Workflow Completed',
+	WORKFLOW_FAILED: 'Workflow Failed',
+	CUSTOM: 'Custom Action',
+	CLASSIFY: 'Classified',
+	VERSION: 'Versioned',
+	SUPERSEDE: 'Superseded',
+	REFERENCED: 'Referenced',
+	START_SESSION: 'Session Started',
+	ADJOURN: 'Adjourned',
+	APPROVE_MINUTES: 'Minutes Approved',
+	ARCHIVE: 'Archived',
+	PROPOSE: 'Proposed',
+	SECOND: 'Seconded',
+	OPEN_VOTING: 'Voting Opened',
+	CLOSE_VOTING: 'Voting Closed',
+	TABLE: 'Tabled',
+	WITHDRAW: 'Withdrawn',
+	CAST_BALLOT: 'Vote Cast',
+	ADOPT: 'Adopted',
+	REQUEST_INFO: 'Info Requested',
+	RESPOND: 'Responded',
+	LINK: 'Linked'
 };
 
 export const ACTOR_TYPE_LABELS: Record<ActivityActorType, string> = {

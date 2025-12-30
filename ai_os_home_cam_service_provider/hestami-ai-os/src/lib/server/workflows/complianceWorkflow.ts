@@ -8,6 +8,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('ComplianceWorkflow');
@@ -203,7 +204,7 @@ async function updateRequirement(
 ): Promise<string> {
 	const id = data.id as string;
 	const updateData: Record<string, unknown> = {};
-	
+
 	if (data.name) updateData.name = data.name as string;
 	if (data.description !== undefined) updateData.description = data.description as string;
 	if (data.type) updateData.type = data.type;
@@ -229,7 +230,7 @@ async function createDeadline(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const requirementId = data.requirementId as string;
-	
+
 	// Get requirement for checklist template
 	const requirement = await prisma.complianceRequirement.findFirst({
 		where: { id: requirementId, organizationId }
@@ -380,8 +381,15 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 		}
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'COMPLIANCE_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,
@@ -405,9 +413,9 @@ export async function startComplianceWorkflow(
 
 export async function getComplianceWorkflowStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export async function getComplianceWorkflowError(

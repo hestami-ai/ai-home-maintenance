@@ -2,40 +2,26 @@
 	import { Building2, Search } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
-	import { camStore, currentAssociation, organizationStore } from '$lib/stores';
-	import { associationApi } from '$lib/api/cam';
+    import { enhance } from '$app/forms';
 
 	interface Association {
 		id: string;
 		name: string;
 		legalName?: string;
 		status: string;
-		fiscalYearEnd: number;
+		fiscalYearEnd?: number;
 		unitCount?: number;
 		createdAt?: string;
 	}
 
-	let associations = $state<Association[]>([]);
+    let { data } = $props();
+
+    // Data from layout
+	let associations = $derived(data.associations as Association[]);
+	
 	let selectedAssociation = $state<Association | null>(null);
-	let isLoading = $state(true);
+	let isLoading = $state(false); // No loading state needed for initial load
 	let searchQuery = $state('');
-
-	async function loadAssociations() {
-		const orgId = $organizationStore.current?.organization.id;
-		if (!orgId) return;
-
-		isLoading = true;
-		try {
-			const response = await associationApi.list({});
-			if (response.ok) {
-				associations = response.data.associations as any;
-			}
-		} catch (error) {
-			console.error('Failed to load associations:', error);
-		} finally {
-			isLoading = false;
-		}
-	}
 
 	function selectAssociation(association: Association) {
 		selectedAssociation = association;
@@ -56,10 +42,6 @@
 			(a.legalName && a.legalName.toLowerCase().includes(searchQuery.toLowerCase()))
 		)
 	);
-
-	$effect(() => {
-		loadAssociations();
-	});
 </script>
 
 <svelte:head>
@@ -144,21 +126,15 @@
 
 				{#snippet actions()}
 					{@const a = selectedAssociation!}
-					<button
-						type="button"
-						onclick={() => {
-							camStore.setCurrentAssociation({
-								id: a.id,
-								name: a.name,
-								legalName: a.legalName,
-								status: a.status,
-								fiscalYearEnd: a.fiscalYearEnd
-							});
-						}}
-						class="btn btn-sm preset-filled-primary-500"
-					>
-						Switch to This
-					</button>
+					<form action="/api/cam/switch" method="POST" use:enhance>
+						<input type="hidden" name="associationId" value={a.id} />
+						<button
+							type="submit"
+							class="btn btn-sm preset-filled-primary-500"
+						>
+							Switch to This
+						</button>
+					</form>
 					<a href="/app/cam/associations/{a.id}/edit" class="btn btn-sm preset-tonal-surface">
 						Edit
 					</a>

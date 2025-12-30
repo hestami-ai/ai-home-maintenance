@@ -3,12 +3,20 @@
 import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
+// Prisma 7 removed directUrl - use DATABASE_URL_ADMIN for migrations
+// Runtime: DATABASE_URL -> hestami_app (RLS enforced)
+// Migrations: DATABASE_URL_ADMIN -> hestami (BYPASSRLS)
+// Set DATABASE_URL_ADMIN when running migrations, DATABASE_URL for runtime
+const migrationUrl = env("DATABASE_URL_ADMIN");
+const runtimeUrl = env("DATABASE_URL");
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Use DATABASE_URL_ADMIN if set (for migrations), otherwise DATABASE_URL (runtime)
+    url: migrationUrl || runtimeUrl,
   },
 });

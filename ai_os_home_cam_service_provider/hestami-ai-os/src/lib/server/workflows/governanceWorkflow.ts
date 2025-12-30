@@ -9,6 +9,7 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('GovernanceWorkflow');
@@ -92,6 +93,7 @@ async function createBoard(
 
 	const board = await prisma.board.create({
 		data: {
+			organizationId,
 			associationId,
 			name,
 			description
@@ -123,6 +125,7 @@ async function createMeeting(
 
 	const meeting = await prisma.meeting.create({
 		data: {
+			organizationId,
 			associationId: associationId || board.associationId,
 			boardId,
 			title,
@@ -422,6 +425,7 @@ async function createPolicy(
 ): Promise<string> {
 	const policy = await prisma.policyDocument.create({
 		data: {
+			organizationId,
 			associationId: data.associationId as string,
 			resolutionId: data.resolutionId as string | undefined,
 			title: data.title as string,
@@ -691,7 +695,7 @@ async function updateMinutes(
 
 	// Update or create minutes
 	const existing = await prisma.meetingMinutes.findFirst({ where: { meetingId } });
-	
+
 	if (existing) {
 		await prisma.meetingMinutes.update({
 			where: { id: existing.id },
@@ -1036,8 +1040,16 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 
 		return { success: true, entityId };
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[GovernanceWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'GOVERNANCE_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { PurchaseOrderStatus } from '../../../../../../generated/prisma/client.js';
 import { startPurchaseOrderWorkflow } from '../../../workflows/purchaseOrderWorkflow.js';
@@ -128,6 +127,11 @@ export const purchaseOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -135,15 +139,15 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'purchase_order', 'new');
 
 			// Validate supplier
 			const supplier = await prisma.supplier.findFirst({
 				where: { id: input.supplierId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!supplier) throw ApiException.notFound('Supplier');
+			if (!supplier) throw errors.NOT_FOUND({ message: 'Supplier' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
@@ -165,7 +169,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create purchase order' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -178,6 +182,10 @@ export const purchaseOrderRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -185,8 +193,8 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'purchase_order', input.id);
 
 			const po = await prisma.purchaseOrder.findFirst({
@@ -194,7 +202,7 @@ export const purchaseOrderRouter = {
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
-			if (!po) throw ApiException.notFound('Purchase order');
+			if (!po) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			return successResponse({ purchaseOrder: formatPO(po, true) }, context);
 		}),
@@ -209,6 +217,9 @@ export const purchaseOrderRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -219,8 +230,8 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'purchase_order', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -267,6 +278,12 @@ export const purchaseOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -274,18 +291,18 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'purchase_order', input.id);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (!['DRAFT', 'SUBMITTED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only edit DRAFT or SUBMITTED purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT or SUBMITTED purchase orders' });
 			}
 
 			const taxAmount = input.taxAmount ?? Number(existing.taxAmount);
@@ -314,7 +331,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update purchase order' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -337,6 +354,12 @@ export const purchaseOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -344,18 +367,18 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'purchase_order', input.purchaseOrderId);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.purchaseOrderId, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only add lines to DRAFT purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only add lines to DRAFT purchase orders' });
 			}
 
 			const lineNumber = existing.lines.length + 1;
@@ -381,7 +404,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add line');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add line' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -394,6 +417,12 @@ export const purchaseOrderRouter = {
 
 	removeLine: orgProcedure
 		.input(z.object({ lineId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -401,21 +430,21 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const line = await prisma.purchaseOrderLine.findUnique({
 				where: { id: input.lineId },
 				include: { purchaseOrder: true }
 			});
 			if (!line || line.purchaseOrder.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Purchase order line');
+				throw errors.NOT_FOUND({ message: 'Purchase order line' });
 			}
 
 			await context.cerbos.authorize('edit', 'purchase_order', line.purchaseOrderId);
 
 			if (line.purchaseOrder.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only remove lines from DRAFT purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only remove lines from DRAFT purchase orders' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -432,7 +461,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to remove line');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove line' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -445,6 +474,12 @@ export const purchaseOrderRouter = {
 
 	submit: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -452,22 +487,22 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('submit', 'purchase_order', input.id);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only submit DRAFT purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only submit DRAFT purchase orders' });
 			}
 
 			if (existing.lines.length === 0) {
-				throw ApiException.badRequest('Cannot submit purchase order with no lines');
+				throw errors.BAD_REQUEST({ message: 'Cannot submit purchase order with no lines' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -483,7 +518,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to submit purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit purchase order' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -496,6 +531,12 @@ export const purchaseOrderRouter = {
 
 	confirm: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -503,17 +544,17 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('confirm', 'purchase_order', input.id);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (existing.status !== 'SUBMITTED') {
-				throw ApiException.badRequest('Can only confirm SUBMITTED purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only confirm SUBMITTED purchase orders' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -529,7 +570,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to confirm purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to confirm purchase order' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -559,6 +600,12 @@ export const purchaseOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -566,25 +613,25 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('receive', 'purchase_order', input.id);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (!['CONFIRMED', 'PARTIALLY_RECEIVED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only receive CONFIRMED or PARTIALLY_RECEIVED purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only receive CONFIRMED or PARTIALLY_RECEIVED purchase orders' });
 			}
 
 			// Validate location
 			const location = await prisma.inventoryLocation.findFirst({
 				where: { id: input.locationId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!location) throw ApiException.notFound('Location');
+			if (!location) throw errors.NOT_FOUND({ message: 'Location' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
@@ -610,7 +657,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to receive purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to receive purchase order' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -623,6 +670,12 @@ export const purchaseOrderRouter = {
 
 	cancel: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -630,17 +683,17 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('cancel', 'purchase_order', input.id);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (['RECEIVED', 'CANCELLED'].includes(existing.status)) {
-				throw ApiException.badRequest('Cannot cancel received or already cancelled purchase order');
+				throw errors.BAD_REQUEST({ message: 'Cannot cancel received or already cancelled purchase order' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -656,7 +709,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to cancel purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel purchase order' });
 			}
 
 			const po = await prisma.purchaseOrder.findUniqueOrThrow({
@@ -669,6 +722,12 @@ export const purchaseOrderRouter = {
 
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -676,17 +735,17 @@ export const purchaseOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'purchase_order', input.id);
 
 			const existing = await prisma.purchaseOrder.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Purchase order');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only delete DRAFT purchase orders');
+				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT purchase orders' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -702,7 +761,7 @@ export const purchaseOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete purchase order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete purchase order' });
 			}
 
 			return successResponse({ deleted: true }, context);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ContractorTradeType, PricebookItemType, PricebookVersionStatus, PriceRuleType } from '../../../../../../generated/prisma/client.js';
 import { startPricebookWorkflow } from '../../../workflows/pricebookWorkflow.js';
@@ -32,7 +31,7 @@ const pricebookVersionOutput = z.object({
 	effectiveStart: z.string().nullable(),
 	effectiveEnd: z.string().nullable(),
 	notes: z.string().nullable(),
-	metadata: z.any().nullable(),
+	metadata: JsonSchema.nullable(),
 	publishedAt: z.string().nullable(),
 	publishedBy: z.string().nullable(),
 	activatedAt: z.string().nullable(),
@@ -53,7 +52,7 @@ const pricebookItemOutput = z.object({
 	cost: z.string().nullable(),
 	isTaxable: z.boolean(),
 	serviceAreaId: z.string().nullable(),
-	metadata: z.any().nullable(),
+	metadata: JsonSchema.nullable(),
 	createdAt: z.string(),
 	updatedAt: z.string()
 });
@@ -71,10 +70,10 @@ const priceRuleOutput = z.object({
 	minQuantity: z.string().nullable(),
 	startsAt: z.string().nullable(),
 	endsAt: z.string().nullable(),
-	conditionJson: z.any().nullable(),
+	conditionJson: JsonSchema.nullable(),
 	percentageAdjustment: z.string().nullable(),
 	amountAdjustment: z.string().nullable(),
-	adjustmentJson: z.any().nullable(),
+	adjustmentJson: JsonSchema.nullable(),
 	createdAt: z.string(),
 	updatedAt: z.string()
 });
@@ -99,38 +98,38 @@ const jobTemplateOutput = z.object({
 	isActive: z.boolean(),
 	defaultTrade: z.nativeEnum(ContractorTradeType).nullable(),
 	defaultServiceAreaId: z.string().nullable(),
-	metadata: z.any().nullable(),
+	metadata: JsonSchema.nullable(),
 	items: z.array(jobTemplateItemOutput),
 	createdAt: z.string(),
 	updatedAt: z.string()
 });
 
-const ensureVersionMutable = async (versionId: string, orgId: string) => {
+const ensureVersionMutable = async (versionId: string, orgId: string, errors: any) => {
 	const version = await prisma.pricebookVersion.findFirst({
 		where: { id: versionId, pricebook: { organizationId: orgId } }
 	});
-	if (!version) throw ApiException.notFound('PricebookVersion');
+	if (!version) throw errors.NOT_FOUND({ message: 'Pricebook version not found' });
 	if (version.status !== 'DRAFT') {
-		throw ApiException.conflict('Version is immutable after publish/activate');
+		throw errors.CONFLICT({ message: 'Version is immutable after publish/activate' });
 	}
 	return version;
 };
 
-const ensureVersionScoped = async (versionId: string, orgId: string) => {
+const ensureVersionScoped = async (versionId: string, orgId: string, errors: any) => {
 	const version = await prisma.pricebookVersion.findFirst({
 		where: { id: versionId, pricebook: { organizationId: orgId } }
 	});
-	if (!version) throw ApiException.notFound('PricebookVersion');
+	if (!version) throw errors.NOT_FOUND({ message: 'Pricebook version not found' });
 	return version;
 };
 
-const ensureServiceAreaOwned = async (serviceAreaId: string | null | undefined, orgId: string) => {
+const ensureServiceAreaOwned = async (serviceAreaId: string | null | undefined, orgId: string, errors: any) => {
 	if (!serviceAreaId) return;
 	const sa = await prisma.serviceArea.findFirst({
 		where: { id: serviceAreaId, serviceProviderOrgId: orgId }
 	});
 	if (!sa) {
-		throw ApiException.forbidden('Service area not found for this organization');
+		throw errors.FORBIDDEN({ message: 'Service area not found for this organization' });
 	}
 };
 
@@ -150,9 +149,14 @@ export const pricebookRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ pricebook: pricebookOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'pricebook', input.id ?? 'new');
 
 			const { id, idempotencyKey, ...data } = input;
@@ -162,7 +166,7 @@ export const pricebookRouter = {
 				const existing = await prisma.pricebook.findFirst({
 					where: { id, organizationId: context.organization.id }
 				});
-				if (!existing) throw ApiException.notFound('Pricebook');
+				if (!existing) throw errors.NOT_FOUND({ message: 'Pricebook not found' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -178,7 +182,7 @@ export const pricebookRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to upsert pricebook');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert pricebook' });
 			}
 
 			const pricebook = await prisma.pricebook.findUniqueOrThrow({
@@ -190,18 +194,25 @@ export const pricebookRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ pricebook: pricebookOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const pb = await prisma.pricebook.findFirst({
 				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!pb) throw ApiException.notFound('Pricebook');
+			if (!pb) throw errors.NOT_FOUND({ message: 'Pricebook not found' });
 			await context.cerbos.authorize('view', 'pricebook', pb.id);
 			return successResponse({ pricebook: serializePricebook(pb) }, context);
 		}),
 
 	list: orgProcedure
 		.input(PaginationInputSchema)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -212,8 +223,8 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			const queryPlan = await context.cerbos.queryFilter('view', 'pricebook');
 			if (queryPlan.kind === 'always_denied') {
 				return successResponse(
@@ -256,10 +267,15 @@ export const pricebookRouter = {
 					effectiveStart: z.string().datetime().optional(),
 					effectiveEnd: z.string().datetime().optional(),
 					notes: z.string().optional(),
-					metadata: z.any().optional()
+					metadata: JsonSchema.optional()
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -267,12 +283,12 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			const pb = await prisma.pricebook.findFirst({
 				where: { id: input.pricebookId, organizationId: context.organization.id }
 			});
-			if (!pb) throw ApiException.notFound('Pricebook');
+			if (!pb) throw errors.NOT_FOUND({ message: 'Pricebook not found' });
 			await context.cerbos.authorize('edit', 'pricebook_version', 'new');
 
 			const nextNumber =
@@ -301,7 +317,7 @@ export const pricebookRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create version' });
 			}
 
 			const version = await prisma.pricebookVersion.findUniqueOrThrow({
@@ -321,6 +337,13 @@ export const pricebookRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -328,19 +351,19 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
-			const version = await ensureVersionScoped(input.versionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
+			const version = await ensureVersionScoped(input.versionId, context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'pricebook_version', version.id);
-			if (version.status !== 'DRAFT') throw ApiException.conflict('Only draft versions can be published');
+			if (version.status !== 'DRAFT') throw errors.CONFLICT({ message: 'Only draft versions can be published' });
 			if (input.effectiveStart && input.effectiveEnd) {
 				if (new Date(input.effectiveEnd) <= new Date(input.effectiveStart)) {
-					throw ApiException.badRequest('effectiveEnd must be after effectiveStart');
+					throw errors.BAD_REQUEST({ message: 'effectiveEnd must be after effectiveStart' });
 				}
 			}
 			const itemCount = await prisma.pricebookItem.count({ where: { pricebookVersionId: version.id } });
 			if (itemCount === 0) {
-				throw ApiException.badRequest('Cannot publish a version without items');
+				throw errors.BAD_REQUEST({ message: 'Cannot publish a version without items' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -359,7 +382,7 @@ export const pricebookRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to publish version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to publish version' });
 			}
 
 			const updatedVersion = await prisma.pricebookVersion.findUniqueOrThrow({
@@ -371,6 +394,12 @@ export const pricebookRouter = {
 
 	activateVersion: orgProcedure
 		.input(z.object({ versionId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -378,12 +407,12 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
-			const version = await ensureVersionScoped(input.versionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
+			const version = await ensureVersionScoped(input.versionId, context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'pricebook_version', version.id);
 			if (version.status !== 'PUBLISHED') {
-				throw ApiException.conflict('Only published versions can be activated');
+				throw errors.CONFLICT({ message: 'Only published versions can be activated' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -400,7 +429,7 @@ export const pricebookRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to activate version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate version' });
 			}
 
 			const updatedVersion = await prisma.pricebookVersion.findUniqueOrThrow({
@@ -412,6 +441,10 @@ export const pricebookRouter = {
 
 	listVersions: orgProcedure
 		.input(z.object({ pricebookId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -419,12 +452,12 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			const pb = await prisma.pricebook.findFirst({
 				where: { id: input.pricebookId, organizationId: context.organization.id }
 			});
-			if (!pb) throw ApiException.notFound('Pricebook');
+			if (!pb) throw errors.NOT_FOUND({ message: 'Pricebook not found' });
 			await context.cerbos.authorize('view', 'pricebook', pb.id);
 			const queryPlan = await context.cerbos.queryFilter('view', 'pricebook_version');
 			if (queryPlan.kind === 'always_denied') {
@@ -460,10 +493,16 @@ export const pricebookRouter = {
 					cost: z.number().nonnegative().optional(),
 					isTaxable: z.boolean().optional(),
 					serviceAreaId: z.string().optional(),
-					metadata: z.any().optional()
+					metadata: JsonSchema.optional()
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -471,11 +510,11 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
-			const version = await ensureVersionMutable(input.pricebookVersionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
+			const version = await ensureVersionMutable(input.pricebookVersionId, context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'pricebook_item', input.id ?? 'new');
-			await ensureServiceAreaOwned(input.serviceAreaId, context.organization.id);
+			await ensureServiceAreaOwned(input.serviceAreaId, context.organization.id, errors);
 
 			const { id, idempotencyKey, pricebookVersionId: _versionId, ...data } = input;
 
@@ -484,7 +523,7 @@ export const pricebookRouter = {
 				const existing = await prisma.pricebookItem.findFirst({
 					where: { id, pricebookVersionId: version.id }
 				});
-				if (!existing) throw ApiException.notFound('PricebookItem');
+				if (!existing) throw errors.NOT_FOUND({ message: 'Pricebook item not found' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -506,7 +545,7 @@ export const pricebookRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to upsert item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert item' });
 			}
 
 			const item = await prisma.pricebookItem.findUniqueOrThrow({
@@ -518,6 +557,10 @@ export const pricebookRouter = {
 
 	listItems: orgProcedure
 		.input(z.object({ pricebookVersionId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -525,8 +568,8 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'pricebook_version', version.id);
 			const queryPlan = await context.cerbos.queryFilter('view', 'pricebook_item');
 			if (queryPlan.kind === 'always_denied') {
@@ -561,13 +604,19 @@ export const pricebookRouter = {
 					minQuantity: z.number().nonnegative().optional(),
 					startsAt: z.string().datetime().optional(),
 					endsAt: z.string().datetime().optional(),
-					conditionJson: z.any().optional(),
+					conditionJson: JsonSchema.optional(),
 					percentageAdjustment: z.number().optional(),
 					amountAdjustment: z.number().optional(),
-					adjustmentJson: z.any().optional()
+					adjustmentJson: JsonSchema.optional()
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -575,17 +624,17 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
-			const version = await ensureVersionMutable(input.pricebookVersionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
+			const version = await ensureVersionMutable(input.pricebookVersionId, context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'price_rule', input.id ?? 'new');
-			await ensureServiceAreaOwned(input.serviceAreaId, context.organization.id);
+			await ensureServiceAreaOwned(input.serviceAreaId, context.organization.id, errors);
 
 			if (input.pricebookItemId) {
 				const item = await prisma.pricebookItem.findFirst({
 					where: { id: input.pricebookItemId, pricebookVersionId: version.id }
 				});
-				if (!item) throw ApiException.notFound('PricebookItem');
+				if (!item) throw errors.NOT_FOUND({ message: 'Pricebook item not found' });
 			}
 
 			const { id, idempotencyKey, pricebookVersionId: _versionId, ...data } = input;
@@ -595,7 +644,7 @@ export const pricebookRouter = {
 				const existing = await prisma.priceRule.findFirst({
 					where: { id, pricebookVersionId: version.id }
 				});
-				if (!existing) throw ApiException.notFound('PriceRule');
+				if (!existing) throw errors.NOT_FOUND({ message: 'Price rule not found' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -624,7 +673,7 @@ export const pricebookRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to upsert rule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert rule' });
 			}
 
 			const rule = await prisma.priceRule.findUniqueOrThrow({
@@ -636,6 +685,10 @@ export const pricebookRouter = {
 
 	listRules: orgProcedure
 		.input(z.object({ pricebookVersionId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -643,8 +696,8 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'pricebook_version', version.id);
 			const queryPlan = await context.cerbos.queryFilter('view', 'price_rule');
 			if (queryPlan.kind === 'always_denied') {
@@ -674,7 +727,7 @@ export const pricebookRouter = {
 					isActive: z.boolean().optional(),
 					defaultTrade: z.nativeEnum(ContractorTradeType).optional(),
 					defaultServiceAreaId: z.string().optional(),
-					metadata: z.any().optional(),
+					metadata: JsonSchema.optional(),
 					items: z
 						.array(
 							z.object({
@@ -689,6 +742,13 @@ export const pricebookRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -696,12 +756,12 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
-			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id);
-			if (version.status !== 'DRAFT') throw ApiException.conflict('Job templates can only be modified on draft versions');
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
+			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id, errors);
+			if (version.status !== 'DRAFT') throw errors.CONFLICT({ message: 'Job templates can only be modified on draft versions' });
 			await context.cerbos.authorize('edit', 'job_template', input.id ?? 'new');
-			await ensureServiceAreaOwned(input.defaultServiceAreaId, context.organization.id);
+			await ensureServiceAreaOwned(input.defaultServiceAreaId, context.organization.id, errors);
 
 			// Validate items belong to version
 			const itemIds = (input.items ?? []).map((i) => i.pricebookItemId);
@@ -709,7 +769,7 @@ export const pricebookRouter = {
 				const count = await prisma.pricebookItem.count({
 					where: { id: { in: itemIds }, pricebookVersionId: version.id }
 				});
-				if (count !== itemIds.length) throw ApiException.badRequest('All items must belong to the version');
+				if (count !== itemIds.length) throw errors.BAD_REQUEST({ message: 'All items must belong to the version' });
 			}
 
 			const { id, idempotencyKey, items, pricebookVersionId: _versionId, ...data } = input;
@@ -718,7 +778,7 @@ export const pricebookRouter = {
 				{
 					action: 'UPSERT_TEMPLATE',
 					organizationId: context.organization.id,
-					userId: context.user.id,
+					userId: context.user!.id,
 					versionId: version.id,
 					templateId: id,
 					data: {
@@ -733,7 +793,7 @@ export const pricebookRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to upsert job template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to upsert job template' });
 			}
 
 			const result = await prisma.jobTemplate.findUniqueOrThrow({
@@ -746,6 +806,10 @@ export const pricebookRouter = {
 
 	listJobTemplates: orgProcedure
 		.input(z.object({ pricebookVersionId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -753,8 +817,8 @@ export const pricebookRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'pricebook_version', version.id);
 			const queryPlan = await context.cerbos.queryFilter('view', 'job_template');
 			if (queryPlan.kind === 'always_denied') {

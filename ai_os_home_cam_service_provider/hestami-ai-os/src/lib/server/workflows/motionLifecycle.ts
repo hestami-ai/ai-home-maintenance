@@ -8,6 +8,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { BoardMotionStatus } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'motion_status';
@@ -287,8 +288,16 @@ async function motionTransitionWorkflow(input: TransitionInput): Promise<Transit
 			voteResults
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'MOTION_LIFECYCLE_ERROR'
+		});
 
 		return {
 			success: false,
@@ -319,9 +328,9 @@ export async function startMotionTransition(
 
 export async function getMotionTransitionStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export type { TransitionInput as MotionTransitionInput, TransitionResult as MotionTransitionResult };

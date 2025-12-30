@@ -2,8 +2,9 @@
 	import { Wrench, Plus, Search } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent, DecisionButton } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
-	import { currentAssociation } from '$lib/stores';
-	import { workOrderApi, type WorkOrder } from '$lib/api/cam';
+    import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
+	import type { WorkOrder } from '$lib/api/cam';
 
 	interface WorkOrderListItem extends WorkOrder {
 		locationDescription?: string;
@@ -11,12 +12,16 @@
 		vendorName?: string;
 	}
 
-	let workOrders = $state<WorkOrder[]>([]);
+    let { data } = $props();
+
+	let workOrders = $derived(data.workOrders as WorkOrderListItem[]);
 	let selectedWorkOrder = $state<WorkOrder | null>(null);
-	let isLoading = $state(true);
-	let searchQuery = $state('');
-	let statusFilter = $state<string>('');
-	let priorityFilter = $state<string>('');
+	let isLoading = $state(false); // No longer loading on mount
+	
+    // Filters derived from URL params - updates on navigation
+	let searchQuery = $derived(data.filters?.search || '');
+	let statusFilter = $derived(data.filters?.status || '');
+	let priorityFilter = $derived(data.filters?.priority || '');
 
 	// Phase 9: Updated status options with AUTHORIZED and REVIEW_REQUIRED
 	const statusOptions = [
@@ -55,26 +60,47 @@
 		{ value: 'LOW', label: 'Low' }
 	];
 
-	async function loadWorkOrders() {
-		if (!$currentAssociation?.id) return;
+    // Debounce search update
+    let searchTimeout: NodeJS.Timeout;
 
-		isLoading = true;
-		try {
-			const params: { status?: string; priority?: string; search?: string } = {};
-			if (statusFilter) params.status = statusFilter;
-			if (priorityFilter) params.priority = priorityFilter;
-			if (searchQuery) params.search = searchQuery;
+    function updateFilters() {
+        const query = new URLSearchParams($page.url.searchParams.toString());
+        
+        if (statusFilter) query.set('status', statusFilter);
+        else query.delete('status'); // Clean URL if empty
+        
+        if (priorityFilter) query.set('priority', priorityFilter);
+        else query.delete('priority');
 
-			const response = await workOrderApi.list(params as any);
-			if (response.ok) {
-				workOrders = response.data.workOrders as WorkOrderListItem[];
-			}
-		} catch (error) {
-			console.error('Failed to load work orders:', error);
-		} finally {
-			isLoading = false;
-		}
-	}
+        if (searchQuery) query.set('search', searchQuery);
+        else query.delete('search');
+
+        goto(`?${query.toString()}`, { keepFocus: true, noScroll: true });
+    }
+
+    // Trigger update when filters change
+    $effect(() => {
+        // Sync state from URL/data
+        if (data.filters) {
+            searchQuery = data.filters.search || '';
+            statusFilter = data.filters.status || '';
+            priorityFilter = data.filters.priority || '';
+        }
+        
+        // Debounce search
+        clearTimeout(searchTimeout);
+    });
+
+    function handleFilterChange() {
+        updateFilters();
+    }
+    
+    function handleSearchInput() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            updateFilters();
+        }, 300);
+    }
 
 	function selectWorkOrder(workOrder: WorkOrder) {
 		selectedWorkOrder = workOrder;
@@ -150,23 +176,10 @@
 		return new Date(dueDate) < new Date();
 	}
 
-	const filteredWorkOrders = $derived(
-		workOrders.filter((wo: any) =>
-			wo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			wo.workOrderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			(wo.unitNumber && wo.unitNumber.toLowerCase().includes(searchQuery.toLowerCase()))
-		)
-	);
-
-	$effect(() => {
-		if ($currentAssociation?.id) {
-			loadWorkOrders();
-		}
-	});
-
-	$effect(() => {
-		loadWorkOrders();
-	});
+    // Client-side filtering is no longer primary, but we're filtering the *already searched* list if we wanted to?
+    // Actually, we should rely on the server data `workOrders` which is already filtered by the API call in load function.
+    // So `filteredWorkOrders` is just `workOrders`.
+	const filteredWorkOrders = $derived(workOrders);
 </script>
 
 <svelte:head>
@@ -192,6 +205,7 @@
 							type="text"
 							placeholder="Search work orders..."
 							bind:value={searchQuery}
+                            oninput={handleSearchInput}
 							class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 py-2 pl-9 pr-3 text-sm placeholder:text-surface-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 						/>
 					</div>
@@ -199,6 +213,7 @@
 					<div class="flex gap-2">
 						<select
 							bind:value={statusFilter}
+                            onchange={handleFilterChange}
 							class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 						>
 							{#each statusOptions as option}
@@ -207,6 +222,7 @@
 						</select>
 						<select
 							bind:value={priorityFilter}
+                            onchange={handleFilterChange}
 							class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 						>
 							{#each priorityOptions as option}

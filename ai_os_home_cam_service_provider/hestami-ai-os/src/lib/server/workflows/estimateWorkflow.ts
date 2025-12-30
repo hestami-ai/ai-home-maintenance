@@ -8,6 +8,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { EstimateStatus, type EntityWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('EstimateWorkflow');
@@ -49,7 +50,7 @@ async function updateEstimate(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
-	
+
 	await prisma.estimate.update({
 		where: { id: estimateId },
 		data: updateData
@@ -308,19 +309,19 @@ async function generateFromPricebook(
 
 async function recalculateEstimateTotals(estimateId: string): Promise<void> {
 	const lines = await prisma.estimateLine.findMany({ where: { estimateId } });
-	
+
 	let subtotal = 0;
 	let taxAmount = 0;
-	
+
 	for (const line of lines) {
 		subtotal += Number(line.lineTotal);
 		if (line.isTaxable) {
 			taxAmount += Number(line.lineTotal) * (Number(line.taxRate) / 100);
 		}
 	}
-	
+
 	const totalAmount = subtotal + taxAmount;
-	
+
 	await prisma.estimate.update({
 		where: { id: estimateId },
 		data: { subtotal, taxAmount, totalAmount }
@@ -402,8 +403,16 @@ async function estimateWorkflow(input: EstimateWorkflowInput): Promise<EstimateW
 
 		return { success: true, entityId };
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[EstimateWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'ESTIMATE_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

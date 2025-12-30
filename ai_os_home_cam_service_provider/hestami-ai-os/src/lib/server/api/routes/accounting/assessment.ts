@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { postAssessmentChargeToGL } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
+import { recordSpanError } from '../../middleware/tracing.js';
 
 const log = createModuleLogger('AssessmentRoute');
 
@@ -36,6 +36,11 @@ export const assessmentRouter = {
 				prorateOnTransfer: z.boolean().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -51,15 +56,15 @@ export const assessmentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'assessment_type', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Validate revenue account
@@ -67,7 +72,7 @@ export const assessmentRouter = {
 				where: { id: input.revenueAccountId, associationId: association.id, accountType: 'REVENUE' }
 			});
 			if (!revenueAccount) {
-				throw ApiException.notFound('Revenue GL Account');
+				throw errors.NOT_FOUND({ message: 'Revenue GL Account not found' });
 			}
 
 			// Validate late fee account if provided
@@ -76,7 +81,7 @@ export const assessmentRouter = {
 					where: { id: input.lateFeeAccountId, associationId: association.id, accountType: 'REVENUE' }
 				});
 				if (!lateFeeAccount) {
-					throw ApiException.notFound('Late Fee GL Account');
+					throw errors.NOT_FOUND({ message: 'Late Fee GL Account not found' });
 				}
 			}
 
@@ -91,11 +96,12 @@ export const assessmentRouter = {
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Assessment type code already exists');
+				throw errors.CONFLICT({ message: 'Assessment type code already exists' });
 			}
 
 			const assessmentType = await prisma.assessmentType.create({
 				data: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					name: input.name,
 					description: input.description,
@@ -134,6 +140,10 @@ export const assessmentRouter = {
 				isActive: z.boolean().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -153,15 +163,15 @@ export const assessmentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'assessment_type', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.AssessmentTypeWhereInput = {
@@ -212,6 +222,10 @@ export const assessmentRouter = {
 				postToGL: z.boolean().default(true) // Auto-post to GL
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -226,15 +240,15 @@ export const assessmentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'assessment_charge', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Validate unit belongs to this association
@@ -243,8 +257,8 @@ export const assessmentRouter = {
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Unit');
+			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
 
 			// Validate assessment type
@@ -253,7 +267,7 @@ export const assessmentRouter = {
 			});
 
 			if (!assessmentType) {
-				throw ApiException.notFound('Assessment Type');
+				throw errors.NOT_FOUND({ message: 'Assessment Type not found' });
 			}
 
 			const charge = await prisma.assessmentCharge.create({
@@ -278,8 +292,13 @@ export const assessmentRouter = {
 				try {
 					await postAssessmentChargeToGL(charge.id, context.user!.id);
 				} catch (error) {
+					const errorObj = error instanceof Error ? error : new Error(String(error));
 					// Log but don't fail - GL posting can be done later
 					console.warn(`Failed to post charge ${charge.id} to GL:`, error);
+					await recordSpanError(errorObj, {
+						errorCode: 'GL_POSTING_FAILED',
+						errorType: 'AssessmentCharge_GL_Error'
+					});
 				}
 			}
 
@@ -308,6 +327,10 @@ export const assessmentRouter = {
 				toDate: z.string().datetime().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -329,15 +352,15 @@ export const assessmentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'assessment_charge', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.AssessmentChargeWhereInput = {
@@ -381,6 +404,10 @@ export const assessmentRouter = {
 	 */
 	getUnitBalance: orgProcedure
 		.input(z.object({ unitId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -394,15 +421,15 @@ export const assessmentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'assessment_charge', input.unitId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Get all charges for the unit

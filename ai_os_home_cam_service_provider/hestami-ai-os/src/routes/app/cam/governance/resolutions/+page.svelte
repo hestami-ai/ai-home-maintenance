@@ -46,7 +46,13 @@
 				status: statusFilter !== 'all' ? statusFilter as any : undefined
 			});
 			if (response.ok) {
-				resolutions = response.data.resolutions;
+				resolutions = response.data.resolutions.map(r => ({
+					id: r.id,
+					resolutionNumber: `RES-${r.id.slice(0, 8).toUpperCase()}`,
+					title: r.title,
+					status: r.status,
+					proposedDate: r.createdAt ? new Date(r.createdAt).toISOString() : undefined
+				}));
 			}
 		} catch (e) {
 			console.error('Failed to load resolutions:', e);

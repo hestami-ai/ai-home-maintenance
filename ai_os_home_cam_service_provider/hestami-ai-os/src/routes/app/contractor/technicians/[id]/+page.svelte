@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 	import {
 		ArrowLeft,
 		Loader2,
@@ -66,7 +65,7 @@
 		sunday: Array<{ start: string; end: string }> | null;
 	}
 
-	const technicianId = $derived($page.params.id as string);
+	const technicianId = $derived(page.params.id as string);
 
 	const weekDays = [
 		{ key: 'monday', label: 'Monday' },
@@ -78,30 +77,29 @@
 		{ key: 'sunday', label: 'Sunday' }
 	] as const;
 
+	interface Props {
+		data: {
+			technician: Technician;
+			skills: Skill[];
+			certifications: Certification[];
+			availability: Availability | null;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let technician = $state<Technician | null>(null);
 	let skills = $state<Skill[]>([]);
 	let certifications = $state<Certification[]>([]);
 	let availability = $state<Availability | null>(null);
 
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let isSaving = $state(false);
 	let error = $state<string | null>(null);
 	let successMessage = $state<string | null>(null);
-
-	// Form state
-	let firstName = $state('');
-	let lastName = $state('');
-	let email = $state('');
-	let phone = $state('');
-	let employeeId = $state('');
-	let hireDate = $state('');
-	let terminationDate = $state('');
-	let timezone = $state('America/New_York');
-	let isActive = $state(true);
-
-	// Active section
 	let activeSection = $state<'profile' | 'skills' | 'certifications' | 'availability'>('profile');
 
+	// Data for form selects
 	const timezones = [
 		'America/New_York',
 		'America/Chicago',
@@ -113,41 +111,38 @@
 	];
 
 	const tradeOptions = [
-		'PLUMBING',
-		'ELECTRICAL',
 		'HVAC',
-		'ROOFING',
-		'LANDSCAPING',
-		'PAINTING',
+		'ELECTRICAL',
+		'PLUMBING',
 		'CARPENTRY',
+		'PAINTING',
+		'ROOFING',
+		'FLOORING',
 		'GENERAL_MAINTENANCE',
-		'POOL_SPA',
+		'LANDSCAPING',
+		'APPLIANCE_REPAIR',
+		'LOCKSMITH',
 		'PEST_CONTROL',
 		'CLEANING',
-		'SECURITY',
-		'FIRE_SAFETY',
-		'ELEVATOR',
+		'POOL_SERVICE',
 		'OTHER'
 	];
 
-	async function loadTechnician() {
-		isLoading = true;
-		error = null;
+	// Form state
+	let firstName = $state('');
+	let lastName = $state('');
+	let email = $state('');
+	let phone = $state('');
+	let employeeId = $state('');
+	let hireDate = $state('');
+	let terminationDate = $state('');
+	let timezone = $state('');
+	let isActive = $state(false);
 
-		try {
-			const [techRes, skillsRes, certsRes, availRes] = await Promise.all([
-				orpc.technician.get({ id: technicianId! }),
-				orpc.technician.listSkills({ technicianId: technicianId! }),
-				orpc.technician.listCertifications({ technicianId: technicianId! }),
-				orpc.technician.getAvailability({ technicianId: technicianId! })
-			]);
-
-			if (!techRes.ok) {
-				error = 'Technician not found';
-				return;
-			}
-			technician = techRes.data.technician;
-			// Populate form
+	// Synchronize server data to local state
+	$effect(() => {
+		if (data.technician) {
+			technician = data.technician;
 			firstName = technician.firstName;
 			lastName = technician.lastName;
 			email = technician.email || '';
@@ -157,17 +152,12 @@
 			terminationDate = technician.terminationDate ? technician.terminationDate.split('T')[0] : '';
 			timezone = technician.timezone;
 			isActive = technician.isActive;
-
-			if (skillsRes.ok) skills = skillsRes.data.skills ?? [];
-			if (certsRes.ok) certifications = certsRes.data.certifications ?? [];
-			if (availRes.ok) availability = availRes.data.availability ?? null;
-		} catch (err) {
-			console.error('Failed to load technician:', err);
-			error = err instanceof Error ? err.message : 'Failed to load technician';
-		} finally {
-			isLoading = false;
 		}
-	}
+		if (data.skills) skills = data.skills;
+		if (data.certifications) certifications = data.certifications;
+		if (data.availability) availability = data.availability;
+	});
+
 
 	async function saveProfile() {
 		isSaving = true;
@@ -346,9 +336,6 @@
 		});
 	}
 
-	onMount(() => {
-		loadTechnician();
-	});
 
 	$effect(() => {
 		if (availability) {

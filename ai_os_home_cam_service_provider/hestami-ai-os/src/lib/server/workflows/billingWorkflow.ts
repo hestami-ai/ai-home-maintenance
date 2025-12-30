@@ -7,9 +7,11 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { EstimateStatus, InvoiceStatus, type EntityWorkflowResult } from './schemas.js';
 import type { ProposalStatus, JobPaymentStatus, JobInvoiceStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('BillingWorkflow');
@@ -72,36 +74,43 @@ async function createProposal(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const proposal = await prisma.proposal.create({
-		data: {
+	try {
+		const proposal = await orgTransaction(organizationId, async (tx) => {
+			return tx.proposal.create({
+				data: {
+					organizationId,
+					customerId: data.customerId as string,
+					estimateId: data.estimateId as string | undefined,
+					proposalNumber: data.proposalNumber as string,
+					title: data.title as string | undefined,
+					coverLetter: data.coverLetter as string | undefined,
+					terms: data.terms as string | undefined,
+					status: 'DRAFT',
+					validUntil: data.validUntil ? new Date(data.validUntil as string) : undefined,
+					createdBy: userId
+				}
+			});
+		}, { userId, reason: 'Creating proposal via workflow' });
+
+		await recordWorkflowEvent({
 			organizationId,
-			customerId: data.customerId as string,
-			estimateId: data.estimateId as string | undefined,
-			proposalNumber: data.proposalNumber as string,
-			title: data.title as string | undefined,
-			coverLetter: data.coverLetter as string | undefined,
-			terms: data.terms as string | undefined,
-			status: 'DRAFT',
-			validUntil: data.validUntil ? new Date(data.validUntil as string) : undefined,
-			createdBy: userId
-		}
-	});
+			entityType: 'JOB',
+			entityId: proposal.id,
+			action: 'CREATE',
+			eventCategory: 'EXECUTION',
+			summary: `Proposal created: ${proposal.title}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: 'CREATE_PROPOSAL',
+			workflowVersion: 'v1'
+		});
 
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId: proposal.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
-		summary: `Proposal created: ${proposal.title}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: 'CREATE_PROPOSAL',
-		workflowVersion: 'v1'
-	});
-
-	return { id: proposal.id };
+		log.info('CREATE_PROPOSAL completed', { proposalId: proposal.id, userId });
+		return { id: proposal.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function updateProposalStatus(
@@ -111,26 +120,33 @@ async function updateProposalStatus(
 	status: ProposalStatus,
 	step: string
 ): Promise<{ id: string }> {
-	const proposal = await prisma.proposal.update({
-		where: { id: proposalId },
-		data: { status }
-	});
+	try {
+		const proposal = await orgTransaction(organizationId, async (tx) => {
+			return tx.proposal.update({
+				where: { id: proposalId },
+				data: { status }
+			});
+		}, { userId, reason: `Updating proposal status to ${status} via workflow` });
 
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId: proposal.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
-		summary: `Proposal ${status.toLowerCase()}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: step,
-		workflowVersion: 'v1'
-	});
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'JOB',
+			entityId: proposal.id,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Proposal ${status.toLowerCase()}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: step,
+			workflowVersion: 'v1'
+		});
 
-	return { id: proposal.id };
+		log.info('UPDATE_PROPOSAL_STATUS completed', { proposalId, status, userId });
+		return { id: proposal.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Payment operations
@@ -139,33 +155,40 @@ async function createPaymentIntent(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const intent = await prisma.paymentIntent.create({
-		data: {
+	try {
+		const intent = await orgTransaction(organizationId, async (tx) => {
+			return tx.paymentIntent.create({
+				data: {
+					organizationId,
+					invoiceId: data.invoiceId as string,
+					customerId: data.customerId as string,
+					amount: data.amount as number,
+					status: 'PENDING',
+					paymentMethod: data.paymentMethod as string | undefined
+				}
+			});
+		}, { userId, reason: 'Creating payment intent via workflow' });
+
+		await recordWorkflowEvent({
 			organizationId,
-			invoiceId: data.invoiceId as string,
-			customerId: data.customerId as string,
-			amount: data.amount as number,
-			status: 'PENDING',
-			paymentMethod: data.paymentMethod as string | undefined
-		}
-	});
+			entityType: 'JOB',
+			entityId: intent.id,
+			action: 'CREATE',
+			eventCategory: 'EXECUTION',
+			summary: 'Payment intent created',
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: 'CREATE_PAYMENT_INTENT',
+			workflowVersion: 'v1',
+			jobId: data.jobId as string
+		});
 
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId: intent.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
-		summary: 'Payment intent created',
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: 'CREATE_PAYMENT_INTENT',
-		workflowVersion: 'v1',
-		jobId: data.jobId as string
-	});
-
-	return { id: intent.id };
+		log.info('CREATE_PAYMENT_INTENT completed', { intentId: intent.id, userId });
+		return { id: intent.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function updatePaymentStatus(
@@ -182,26 +205,33 @@ async function updatePaymentStatus(
 	if (additionalData?.failureReason) updateData.errorMessage = additionalData.failureReason as string;
 	if (additionalData?.refundedAt) updateData.refundedAt = new Date();
 
-	const payment = await prisma.paymentIntent.update({
-		where: { id: paymentId },
-		data: updateData
-	});
+	try {
+		const payment = await orgTransaction(organizationId, async (tx) => {
+			return tx.paymentIntent.update({
+				where: { id: paymentId },
+				data: updateData
+			});
+		}, { userId, reason: `Updating payment status to ${status} via workflow` });
 
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId: payment.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
-		summary: `Payment ${status.toLowerCase()}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: step,
-		workflowVersion: 'v1'
-	});
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'JOB',
+			entityId: payment.id,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Payment ${status.toLowerCase()}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: step,
+			workflowVersion: 'v1'
+		});
 
-	return { id: payment.id };
+		log.info('UPDATE_PAYMENT_STATUS completed', { paymentId, status, userId });
+		return { id: payment.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Estimate operations
@@ -212,27 +242,34 @@ async function updateEstimateStatus(
 	status: EstimateStatus,
 	step: string
 ): Promise<{ id: string }> {
-	const estimate = await prisma.estimate.update({
-		where: { id: estimateId },
-		data: { status }
-	});
+	try {
+		const estimate = await orgTransaction(organizationId, async (tx) => {
+			return tx.estimate.update({
+				where: { id: estimateId },
+				data: { status }
+			});
+		}, { userId, reason: `Updating estimate status to ${status} via workflow` });
 
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId: estimate.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
-		summary: `Estimate ${status.toLowerCase()}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: step,
-		workflowVersion: 'v1',
-		jobId: estimate.jobId
-	});
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'JOB',
+			entityId: estimate.id,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Estimate ${status.toLowerCase()}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: step,
+			workflowVersion: 'v1',
+			jobId: estimate.jobId
+		});
 
-	return { id: estimate.id };
+		log.info('UPDATE_ESTIMATE_STATUS completed', { estimateId, status, userId });
+		return { id: estimate.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Invoice operations
@@ -243,27 +280,34 @@ async function updateInvoiceStatus(
 	status: JobInvoiceStatus,
 	step: string
 ): Promise<{ id: string }> {
-	const invoice = await prisma.jobInvoice.update({
-		where: { id: invoiceId },
-		data: { status }
-	});
+	try {
+		const invoice = await orgTransaction(organizationId, async (tx) => {
+			return tx.jobInvoice.update({
+				where: { id: invoiceId },
+				data: { status }
+			});
+		}, { userId, reason: `Updating invoice status to ${status} via workflow` });
 
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId: invoice.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
-		summary: `Invoice ${status.toLowerCase()}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: step,
-		workflowVersion: 'v1',
-		jobId: invoice.jobId
-	});
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'JOB',
+			entityId: invoice.id,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Invoice ${status.toLowerCase()}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: step,
+			workflowVersion: 'v1',
+			jobId: invoice.jobId
+		});
 
-	return { id: invoice.id };
+		log.info('UPDATE_INVOICE_STATUS completed', { invoiceId, status, userId });
+		return { id: invoice.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function deleteEntity(
@@ -273,31 +317,34 @@ async function deleteEntity(
 	entityType: 'proposal' | 'invoice',
 	step: string
 ): Promise<{ id: string }> {
-	if (entityType === 'proposal') {
-		await prisma.proposal.delete({
-			where: { id: entityId }
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			if (entityType === 'proposal') {
+				return tx.proposal.delete({ where: { id: entityId } });
+			} else {
+				return tx.jobInvoice.delete({ where: { id: entityId } });
+			}
+		}, { userId, reason: `Deleting ${entityType} via workflow` });
+
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'JOB',
+			entityId,
+			action: 'DELETE',
+			eventCategory: 'EXECUTION',
+			summary: `${entityType} deleted`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'billingWorkflow_v1',
+			workflowStep: step,
+			workflowVersion: 'v1'
 		});
-	} else {
-		await prisma.jobInvoice.delete({
-			where: { id: entityId }
-		});
+
+		log.info('DELETE_ENTITY completed', { entityId, entityType, userId });
+		return { id: entityId };
+	} finally {
+		await clearOrgContext(userId);
 	}
-
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'JOB',
-		entityId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
-		summary: `${entityType} deleted`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'billingWorkflow_v1',
-		workflowStep: step,
-		workflowVersion: 'v1'
-	});
-
-	return { id: entityId };
 }
 
 // Invoice operations
@@ -307,7 +354,7 @@ async function createInvoiceFromEstimate(
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
 	const estimateId = data.estimateId as string;
-	
+
 	const estimate = await prisma.estimate.findFirst({
 		where: { id: estimateId, organizationId },
 		include: { lines: { orderBy: { lineNumber: 'asc' } } }
@@ -329,68 +376,72 @@ async function createInvoiceFromEstimate(
 	const seq = lastInvoice ? parseInt((lastInvoice.invoiceNumber.split('-')[2] ?? '0'), 10) + 1 : 1;
 	const invoiceNumber = `INV-${year}-${String(seq).padStart(6, '0')}`;
 
-	const invoice = await prisma.$transaction(async (tx) => {
-		const inv = await tx.jobInvoice.create({
-			data: {
-				organizationId,
-				jobId: estimate.jobId,
-				customerId: estimate.customerId,
-				invoiceNumber,
-				status: 'DRAFT',
-				issueDate: new Date(),
-				dueDate: data.dueDate ? new Date(data.dueDate as string) : null,
-				subtotal,
-				taxAmount,
-				discount,
-				totalAmount,
-				balanceDue: totalAmount,
-				notes: (data.notes as string) ?? estimate.notes,
-				terms: (data.terms as string) ?? estimate.terms,
-				estimateId: estimate.id,
-				createdBy: userId
-			}
-		});
-
-		// Copy lines
-		if (sourceLines.length > 0) {
-			await tx.invoiceLine.createMany({
-				data: sourceLines.map((line, idx) => ({
-					invoiceId: inv.id,
-					lineNumber: idx + 1,
-					description: line.description,
-					quantity: line.quantity,
-					unitPrice: line.unitPrice,
-					lineTotal: line.lineTotal,
-					pricebookItemId: line.pricebookItemId,
-					isTaxable: line.isTaxable,
-					taxRate: line.taxRate
-				}))
-			});
-		}
-
-		// Auto-transition job to INVOICED if in COMPLETED
-		const job = await tx.job.findUnique({ where: { id: estimate.jobId } });
-		if (job && job.status === 'COMPLETED') {
-			await tx.job.update({
-				where: { id: estimate.jobId },
-				data: { status: 'INVOICED', invoicedAt: new Date() }
-			});
-			await tx.jobStatusHistory.create({
+	try {
+		const invoice = await orgTransaction(organizationId, async (tx) => {
+			const inv = await tx.jobInvoice.create({
 				data: {
+					organizationId,
 					jobId: estimate.jobId,
-					fromStatus: 'COMPLETED',
-					toStatus: 'INVOICED',
-					changedBy: userId,
-					notes: `Auto-transitioned: Invoice ${inv.invoiceNumber} created`
+					customerId: estimate.customerId,
+					invoiceNumber,
+					status: 'DRAFT',
+					issueDate: new Date(),
+					dueDate: data.dueDate ? new Date(data.dueDate as string) : null,
+					subtotal,
+					taxAmount,
+					discount,
+					totalAmount,
+					balanceDue: totalAmount,
+					notes: (data.notes as string) ?? estimate.notes,
+					terms: (data.terms as string) ?? estimate.terms,
+					estimateId: estimate.id,
+					createdBy: userId
 				}
 			});
-		}
 
-		return inv;
-	});
+			// Copy lines
+			if (sourceLines.length > 0) {
+				await tx.invoiceLine.createMany({
+					data: sourceLines.map((line, idx) => ({
+						invoiceId: inv.id,
+						lineNumber: idx + 1,
+						description: line.description,
+						quantity: line.quantity,
+						unitPrice: line.unitPrice,
+						lineTotal: line.lineTotal,
+						pricebookItemId: line.pricebookItemId,
+						isTaxable: line.isTaxable,
+						taxRate: line.taxRate
+					}))
+				});
+			}
 
-	console.log(`[BillingWorkflow] CREATE_INVOICE_FROM_ESTIMATE invoice:${invoice.id} by user ${userId}`);
-	return { id: invoice.id };
+			// Auto-transition job to INVOICED if in COMPLETED
+			const job = await tx.job.findUnique({ where: { id: estimate.jobId } });
+			if (job && job.status === 'COMPLETED') {
+				await tx.job.update({
+					where: { id: estimate.jobId },
+					data: { status: 'INVOICED', invoicedAt: new Date() }
+				});
+				await tx.jobStatusHistory.create({
+					data: {
+						jobId: estimate.jobId,
+						fromStatus: 'COMPLETED',
+						toStatus: 'INVOICED',
+						changedBy: userId,
+						notes: `Auto-transitioned: Invoice ${inv.invoiceNumber} created`
+					}
+				});
+			}
+
+			return inv;
+		}, { userId, reason: 'Creating invoice from estimate via workflow' });
+
+		log.info('CREATE_INVOICE_FROM_ESTIMATE completed', { invoiceId: invoice.id, userId });
+		return { id: invoice.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function updateInvoice(
@@ -414,22 +465,28 @@ async function updateInvoice(
 	const taxAmount = existing.lines.reduce((sum, l) => l.isTaxable ? sum + (Number(l.lineTotal) * Number(l.taxRate) / 100) : sum, 0);
 	const totalAmount = subtotal + taxAmount - discount;
 
-	await prisma.jobInvoice.update({
-		where: { id: invoiceId },
-		data: {
-			dueDate: data.dueDate === null ? null : data.dueDate ? new Date(data.dueDate as string) : existing.dueDate,
-			notes: (data.notes as string) ?? existing.notes,
-			terms: (data.terms as string) ?? existing.terms,
-			discount,
-			subtotal,
-			taxAmount,
-			totalAmount,
-			balanceDue: totalAmount - Number(existing.amountPaid)
-		}
-	});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			return tx.jobInvoice.update({
+				where: { id: invoiceId },
+				data: {
+					dueDate: data.dueDate === null ? null : data.dueDate ? new Date(data.dueDate as string) : existing.dueDate,
+					notes: (data.notes as string) ?? existing.notes,
+					terms: (data.terms as string) ?? existing.terms,
+					discount,
+					subtotal,
+					taxAmount,
+					totalAmount,
+					balanceDue: totalAmount - Number(existing.amountPaid)
+				}
+			});
+		}, { userId, reason: 'Updating invoice via workflow' });
 
-	console.log(`[BillingWorkflow] UPDATE_INVOICE invoice:${invoiceId} by user ${userId}`);
-	return { id: invoiceId };
+		log.info('UPDATE_INVOICE completed', { invoiceId, userId });
+		return { id: invoiceId };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWorkflowResult> {
@@ -628,8 +685,15 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 			timestamp: new Date().toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'BILLING_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,

@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startUsageWorkflow } from '../../../workflows/usageWorkflow.js';
 
@@ -69,6 +68,11 @@ export const usageRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -76,27 +80,27 @@ export const usageRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'material_usage', 'new');
 
 			// Validate job
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Validate item
 			const item = await prisma.inventoryItem.findFirst({
 				where: { id: input.itemId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!item) throw ApiException.notFound('Inventory item');
+			if (!item) throw errors.NOT_FOUND({ message: 'Inventory item not found' });
 
 			// Validate location
 			const location = await prisma.inventoryLocation.findFirst({
 				where: { id: input.locationId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!location) throw ApiException.notFound('Inventory location');
+			if (!location) throw errors.NOT_FOUND({ message: 'Inventory location not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startUsageWorkflow(
@@ -120,7 +124,7 @@ export const usageRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record usage');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record usage' });
 			}
 
 			const usage = await prisma.materialUsage.findUniqueOrThrow({
@@ -135,6 +139,10 @@ export const usageRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -142,15 +150,15 @@ export const usageRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'material_usage', input.id);
 
 			const usage = await prisma.materialUsage.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
 
-			if (!usage) throw ApiException.notFound('Material usage');
+			if (!usage) throw errors.NOT_FOUND({ message: 'Material usage not found' });
 
 			return successResponse({ usage: formatMaterialUsage(usage) }, context);
 		}),
@@ -172,6 +180,9 @@ export const usageRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -182,8 +193,8 @@ export const usageRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'material_usage', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -229,6 +240,10 @@ export const usageRouter = {
 	 */
 	getJobSummary: orgProcedure
 		.input(z.object({ jobId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -240,15 +255,15 @@ export const usageRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'material_usage', 'list');
 
 			// Verify job
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			const usages = await prisma.materialUsage.findMany({
 				where: { jobId: input.jobId },
@@ -272,6 +287,11 @@ export const usageRouter = {
 	 */
 	reverse: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -279,14 +299,14 @@ export const usageRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'material_usage', input.id);
 
 			const existing = await prisma.materialUsage.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Material usage');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Material usage not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startUsageWorkflow(
@@ -301,7 +321,7 @@ export const usageRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to reverse usage');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reverse usage' });
 			}
 
 			return successResponse({ reversed: true }, context);

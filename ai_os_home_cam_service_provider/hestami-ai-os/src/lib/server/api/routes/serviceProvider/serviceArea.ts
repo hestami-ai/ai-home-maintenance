@@ -2,18 +2,17 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startServiceAreaWorkflow } from '../../../workflows/serviceAreaWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ServiceAreaRoute');
 
-const assertServiceProviderOrg = async (organizationId: string) => {
+const assertServiceProviderOrg = async (organizationId: string, errors: any) => {
 	const org = await prisma.organization.findFirst({
 		where: { id: organizationId, type: 'SERVICE_PROVIDER', deletedAt: null }
 	});
 	if (!org) {
-		throw ApiException.forbidden('This feature is only available for service provider organizations');
+		throw errors.FORBIDDEN({ message: 'This feature is only available for service provider organizations' });
 	}
 	return org;
 };
@@ -44,9 +43,13 @@ export const serviceAreaRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'service_area', 'new');
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceAreaWorkflow(
@@ -67,7 +70,7 @@ export const serviceAreaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create service area');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create service area' });
 			}
 
 			const serviceArea = await prisma.serviceArea.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -103,9 +106,12 @@ export const serviceAreaRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'service_area', '*');
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = { serviceProviderOrgId: org.id };
 			if (input?.isActive !== undefined) where.isActive = input.isActive;
@@ -153,9 +159,13 @@ export const serviceAreaRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'service_area', input.id);
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceAreaWorkflow(
@@ -178,7 +188,7 @@ export const serviceAreaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update service area');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update service area' });
 			}
 
 			const serviceArea = await prisma.serviceArea.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -205,9 +215,13 @@ export const serviceAreaRouter = {
 			data: z.object({ deleted: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'service_area', input.id);
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceAreaWorkflow(
@@ -222,7 +236,7 @@ export const serviceAreaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete service area');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete service area' });
 			}
 
 			return successResponse({ deleted: true }, context);

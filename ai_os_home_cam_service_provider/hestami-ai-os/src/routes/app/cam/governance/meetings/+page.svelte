@@ -124,12 +124,12 @@
 			});
 			if (response.ok) {
 				meetings = response.data.meetings
-					.filter(m => typeFilter === 'all' || m.meetingType === typeFilter)
+					.filter(m => typeFilter === 'all' || m.type === typeFilter)
 					.map(m => ({
 						id: m.id,
 						title: m.title,
-						type: m.meetingType as Meeting['type'],
-						date: m.scheduledDate,
+						type: m.type as Meeting['type'],
+						date: new Date(m.scheduledFor).toISOString(),
 						time: '',
 						status: m.status as Meeting['status']
 					}));

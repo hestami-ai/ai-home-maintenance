@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { SLAPriority } from '../../../../../../generated/prisma/client.js';
 import { startSLAWorkflow } from '../../../workflows/slaWorkflow.js';
@@ -96,6 +95,10 @@ export const slaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -103,8 +106,8 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'sla_window', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -128,7 +131,7 @@ export const slaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create SLA window');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create SLA window' });
 			}
 
 			const slaWindow = await prisma.sLAWindow.findUniqueOrThrow({
@@ -151,6 +154,9 @@ export const slaRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -161,8 +167,8 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'sla_window', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -200,6 +206,10 @@ export const slaRouter = {
 	 */
 	getWindow: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -207,15 +217,15 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'sla_window', input.id);
 
 			const slaWindow = await prisma.sLAWindow.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
 
-			if (!slaWindow) throw ApiException.notFound('SLA Window');
+			if (!slaWindow) throw errors.NOT_FOUND({ message: 'SLA Window not found' });
 
 			return successResponse({ slaWindow: formatSLAWindow(slaWindow) }, context);
 		}),
@@ -239,6 +249,11 @@ export const slaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -246,14 +261,14 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'sla_window', input.id);
 
 			const existing = await prisma.sLAWindow.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('SLA Window');
+			if (!existing) throw errors.NOT_FOUND({ message: 'SLA Window not found' });
 
 			const { id, idempotencyKey, ...data } = input;
 
@@ -270,7 +285,7 @@ export const slaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update SLA window');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update SLA window' });
 			}
 
 			const slaWindow = await prisma.sLAWindow.findUniqueOrThrow({
@@ -285,6 +300,11 @@ export const slaRouter = {
 	 */
 	deleteWindow: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -292,14 +312,14 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'sla_window', input.id);
 
 			const existing = await prisma.sLAWindow.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('SLA Window');
+			if (!existing) throw errors.NOT_FOUND({ message: 'SLA Window not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
@@ -314,7 +334,7 @@ export const slaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete SLA window');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete SLA window' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -333,6 +353,12 @@ export const slaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -340,22 +366,22 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'sla_record', 'new');
 
 			// Get job
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Check if SLA already exists
 			const existingSLA = await prisma.sLARecord.findUnique({
 				where: { jobId: input.jobId }
 			});
 			if (existingSLA) {
-				throw ApiException.badRequest('Job already has an SLA record');
+				throw errors.BAD_REQUEST({ message: 'Job already has an SLA record' });
 			}
 
 			// Get SLA window
@@ -384,7 +410,7 @@ export const slaRouter = {
 				});
 			}
 
-			if (!slaWindow) throw ApiException.notFound('SLA Window');
+			if (!slaWindow) throw errors.NOT_FOUND({ message: 'SLA Window not found' });
 
 			const now = new Date();
 			const responseDue = new Date(now.getTime() + slaWindow.responseTimeMinutes * 60000);
@@ -408,7 +434,7 @@ export const slaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create SLA record');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create SLA record' });
 			}
 
 			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
@@ -423,6 +449,9 @@ export const slaRouter = {
 	 */
 	getJobSLA: orgProcedure
 		.input(z.object({ jobId: z.string() }))
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -430,8 +459,8 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'sla_record', input.jobId);
 
 			const slaRecord = await prisma.sLARecord.findFirst({
@@ -449,6 +478,12 @@ export const slaRouter = {
 	 */
 	markResponse: orgProcedure
 		.input(z.object({ jobId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -456,17 +491,17 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'sla_record', input.jobId);
 
 			const existing = await prisma.sLARecord.findFirst({
 				where: { jobId: input.jobId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('SLA Record');
+			if (!existing) throw errors.NOT_FOUND({ message: 'SLA Record not found' });
 
 			if (existing.respondedAt) {
-				throw ApiException.badRequest('SLA response already recorded');
+				throw errors.BAD_REQUEST({ message: 'SLA response already recorded' });
 			}
 
 			const now = new Date();
@@ -485,7 +520,7 @@ export const slaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to mark SLA response');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark SLA response' });
 			}
 
 			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
@@ -500,6 +535,12 @@ export const slaRouter = {
 	 */
 	markResolution: orgProcedure
 		.input(z.object({ jobId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -507,17 +548,17 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'sla_record', input.jobId);
 
 			const existing = await prisma.sLARecord.findFirst({
 				where: { jobId: input.jobId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('SLA Record');
+			if (!existing) throw errors.NOT_FOUND({ message: 'SLA Record not found' });
 
 			if (existing.resolvedAt) {
-				throw ApiException.badRequest('SLA resolution already recorded');
+				throw errors.BAD_REQUEST({ message: 'SLA resolution already recorded' });
 			}
 
 			const now = new Date();
@@ -540,7 +581,7 @@ export const slaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to mark SLA resolution');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark SLA resolution' });
 			}
 
 			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
@@ -563,6 +604,9 @@ export const slaRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -573,8 +617,8 @@ export const slaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'sla_record', 'list');
 
 			const limit = input?.limit ?? 20;

@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import {
 	ViolationStatus,
@@ -16,6 +17,7 @@ import {
 	type EntityWorkflowResult
 } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 const log = createWorkflowLogger('ViolationWorkflow');
 
@@ -91,13 +93,19 @@ async function updateViolation(
 	if (data.responsiblePartyId !== undefined) updateData.responsiblePartyId = data.responsiblePartyId as string;
 	if (data.reporterType !== undefined) updateData.reporterType = data.reporterType as any;
 
-	await prisma.violation.update({
-		where: { id: violationId },
-		data: updateData
-	});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			return tx.violation.update({
+				where: { id: violationId },
+				data: updateData
+			});
+		}, { userId, reason: 'Updating violation via workflow' });
 
-	console.log(`[ViolationWorkflow] UPDATE_VIOLATION violation:${violationId} by user ${userId}`);
-	return violationId;
+		log.info('UPDATE_VIOLATION completed', { violationId, userId });
+		return violationId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function updateStatus(
@@ -114,25 +122,29 @@ async function updateStatus(
 
 	const oldStatus = violation.status;
 
-	await prisma.$transaction(async (tx) => {
-		await tx.violation.update({
-			where: { id: violationId },
-			data: { status: newStatus }
-		});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violation.update({
+				where: { id: violationId },
+				data: { status: newStatus }
+			});
 
-		await tx.violationStatusHistory.create({
-			data: {
-				violationId,
-				fromStatus: oldStatus,
-				toStatus: newStatus,
-				changedBy: userId,
-				notes
-			}
-		});
-	});
+			await tx.violationStatusHistory.create({
+				data: {
+					violationId,
+					fromStatus: oldStatus,
+					toStatus: newStatus,
+					changedBy: userId,
+					notes
+				}
+			});
+		}, { userId, reason: `Updating violation status from ${oldStatus} to ${newStatus}` });
 
-	console.log(`[ViolationWorkflow] UPDATE_STATUS violation:${violationId} ${oldStatus} -> ${newStatus} by user ${userId}`);
-	return violationId;
+		log.info('UPDATE_STATUS completed', { violationId, oldStatus, newStatus, userId });
+		return violationId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function scheduleHearing(
@@ -141,24 +153,32 @@ async function scheduleHearing(
 	violationId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const hearing = await prisma.violationHearing.create({
-		data: {
-			violationId,
-			hearingDate: new Date(data.hearingDate as string),
-			hearingTime: data.hearingTime as string | undefined,
-			location: data.location as string | undefined,
-			hearingOfficer: data.hearingOfficer as string | undefined
-		}
-	});
+	try {
+		const hearingId = await orgTransaction(organizationId, async (tx) => {
+			const hearing = await tx.violationHearing.create({
+				data: {
+					violationId,
+					hearingDate: new Date(data.hearingDate as string),
+					hearingTime: data.hearingTime as string | undefined,
+					location: data.location as string | undefined,
+					hearingOfficer: data.hearingOfficer as string | undefined
+				}
+			});
 
-	// Update violation status
-	await prisma.violation.update({
-		where: { id: violationId },
-		data: { status: 'HEARING_SCHEDULED' }
-	});
+			// Update violation status
+			await tx.violation.update({
+				where: { id: violationId },
+				data: { status: 'HEARING_SCHEDULED' }
+			});
 
-	console.log(`[ViolationWorkflow] SCHEDULE_HEARING hearing:${hearing.id} for violation:${violationId} by user ${userId}`);
-	return hearing.id;
+			return hearing.id;
+		}, { userId, reason: 'Scheduling violation hearing via workflow' });
+
+		log.info('SCHEDULE_HEARING completed', { hearingId, violationId, userId });
+		return hearingId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function recordHearingOutcome(
@@ -171,17 +191,7 @@ async function recordHearingOutcome(
 	const outcome = data.outcome as string;
 	const notes = data.notes as string | undefined;
 
-	await prisma.violationHearing.update({
-		where: { id: hearingId },
-		data: {
-			outcome: outcome as any,
-			outcomeNotes: notes,
-			recordedBy: userId,
-			recordedAt: new Date()
-		}
-	});
-
-	// Update violation status based on outcome
+	// Determine new violation status based on outcome
 	let newStatus: ViolationStatus = 'HEARING_HELD';
 	if (outcome === 'DISMISSED') {
 		newStatus = 'DISMISSED';
@@ -189,13 +199,29 @@ async function recordHearingOutcome(
 		newStatus = 'FINE_ASSESSED';
 	}
 
-	await prisma.violation.update({
-		where: { id: violationId },
-		data: { status: newStatus }
-	});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violationHearing.update({
+				where: { id: hearingId },
+				data: {
+					outcome: outcome as any,
+					outcomeNotes: notes,
+					recordedBy: userId,
+					recordedAt: new Date()
+				}
+			});
 
-	console.log(`[ViolationWorkflow] RECORD_HEARING_OUTCOME hearing:${hearingId} outcome:${outcome} by user ${userId}`);
-	return hearingId;
+			await tx.violation.update({
+				where: { id: violationId },
+				data: { status: newStatus }
+			});
+		}, { userId, reason: `Recording hearing outcome: ${outcome}` });
+
+		log.info('RECORD_HEARING_OUTCOME completed', { hearingId, outcome, userId });
+		return hearingId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function recordAppeal(
@@ -208,24 +234,32 @@ async function recordAppeal(
 	const reason = data.reason as string;
 	const filedBy = data.filedBy as string | undefined;
 
-	const appeal = await prisma.violationAppeal.create({
-		data: {
-			hearingId,
-			reason,
-			filedBy: filedBy || userId,
-			filedDate: new Date(),
-			status: 'PENDING'
-		}
-	});
+	try {
+		const appealId = await orgTransaction(organizationId, async (tx) => {
+			const appeal = await tx.violationAppeal.create({
+				data: {
+					hearingId,
+					reason,
+					filedBy: filedBy || userId,
+					filedDate: new Date(),
+					status: 'PENDING'
+				}
+			});
 
-	// Update violation status
-	await prisma.violation.update({
-		where: { id: violationId },
-		data: { status: 'APPEALED' }
-	});
+			// Update violation status
+			await tx.violation.update({
+				where: { id: violationId },
+				data: { status: 'APPEALED' }
+			});
 
-	console.log(`[ViolationWorkflow] RECORD_APPEAL appeal:${appeal.id} for violation:${violationId} by user ${userId}`);
-	return appeal.id;
+			return appeal.id;
+		}, { userId, reason: 'Recording appeal for violation via workflow' });
+
+		log.info('RECORD_APPEAL completed', { appealId, violationId, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function scheduleAppealHearing(
@@ -236,17 +270,23 @@ async function scheduleAppealHearing(
 ): Promise<string> {
 	const appealId = data.appealId as string;
 
-	await prisma.violationAppeal.update({
-		where: { id: appealId },
-		data: {
-			appealHearingDate: new Date(data.appealHearingDate as string),
-			appealHearingLocation: data.appealHearingLocation as string | undefined,
-			status: 'SCHEDULED'
-		}
-	});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			return tx.violationAppeal.update({
+				where: { id: appealId },
+				data: {
+					appealHearingDate: new Date(data.appealHearingDate as string),
+					appealHearingLocation: data.appealHearingLocation as string | undefined,
+					status: 'SCHEDULED'
+				}
+			});
+		}, { userId, reason: 'Scheduling appeal hearing via workflow' });
 
-	console.log(`[ViolationWorkflow] SCHEDULE_APPEAL_HEARING appeal:${appealId} by user ${userId}`);
-	return appealId;
+		log.info('SCHEDULE_APPEAL_HEARING completed', { appealId, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function recordAppealDecision(
@@ -261,25 +301,29 @@ async function recordAppealDecision(
 
 	const newStatus: ViolationStatus = decision === 'OVERTURNED' ? 'DISMISSED' : 'CLOSED';
 
-	await prisma.$transaction(async (tx) => {
-		await tx.violationAppeal.update({
-			where: { id: appealId },
-			data: {
-				decisionNotes: notes,
-				decisionDate: new Date(),
-				decisionBy: userId,
-				status: 'UPHELD'
-			}
-		});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violationAppeal.update({
+				where: { id: appealId },
+				data: {
+					decisionNotes: notes,
+					decisionDate: new Date(),
+					decisionBy: userId,
+					status: 'UPHELD'
+				}
+			});
 
-		await tx.violation.update({
-			where: { id: violationId },
-			data: { status: newStatus }
-		});
-	});
+			await tx.violation.update({
+				where: { id: violationId },
+				data: { status: newStatus }
+			});
+		}, { userId, reason: `Recording appeal decision: ${decision}` });
 
-	console.log(`[ViolationWorkflow] RECORD_APPEAL_DECISION appeal:${appealId} decision:${decision} by user ${userId}`);
-	return appealId;
+		log.info('RECORD_APPEAL_DECISION completed', { appealId, decision, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Main workflow function
@@ -343,8 +387,16 @@ async function violationWorkflow(input: ViolationWorkflowInput): Promise<Violati
 
 		return { success: true, entityId };
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[ViolationWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'VIOLATION_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

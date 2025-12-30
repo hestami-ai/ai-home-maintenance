@@ -41,9 +41,62 @@ import { FundTypeSchema as GeneratedFundTypeSchema } from '../../../../generated
 import { StaffStatusSchema as GeneratedStaffStatusSchema } from '../../../../generated/zod/inputTypeSchemas/StaffStatusSchema.js';
 import { StaffRoleSchema as GeneratedStaffRoleSchema } from '../../../../generated/zod/inputTypeSchemas/StaffRoleSchema.js';
 import { PillarAccessSchema as GeneratedPillarAccessSchema } from '../../../../generated/zod/inputTypeSchemas/PillarAccessSchema.js';
+import { ActivityEntityTypeSchema as GeneratedActivityEntityTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ActivityEntityTypeSchema.js';
+import { ActivityActionTypeSchema as GeneratedActivityActionTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ActivityActionTypeSchema.js';
+import { ActivityActorTypeSchema as GeneratedActivityActorTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ActivityActorTypeSchema.js';
+import { ActivityEventCategorySchema as GeneratedActivityEventCategorySchema } from '../../../../generated/zod/inputTypeSchemas/ActivityEventCategorySchema.js';
+import { OrganizationTypeSchema as GeneratedOrganizationTypeSchema } from '../../../../generated/zod/inputTypeSchemas/OrganizationTypeSchema.js';
+import { OrganizationStatusSchema as GeneratedOrganizationStatusSchema } from '../../../../generated/zod/inputTypeSchemas/OrganizationStatusSchema.js';
+import { UserRoleSchema as GeneratedUserRoleSchema } from '../../../../generated/zod/inputTypeSchemas/UserRoleSchema.js';
 
 // Re-export for convenience
 export { ResponseMetaSchema };
+
+// =============================================================================
+// Common Type Schemas (Decimal, JSON)
+// =============================================================================
+
+/**
+ * Schema for Prisma Decimal type.
+ * 
+ * Accepts string or number input, always outputs string for precision preservation.
+ * Use with .nullish() for optional decimal fields.
+ * 
+ * @example
+ * estimatedCost: DecimalSchema.nullish()
+ */
+export const DecimalSchema = z.union([z.string(), z.number()]).transform(String);
+export type Decimal = z.infer<typeof DecimalSchema>;
+
+/**
+ * Recursive JSON value type for Prisma Json fields.
+ */
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+/**
+ * Schema for Prisma Json type.
+ * 
+ * Validates arbitrary JSON structures (objects, arrays, primitives).
+ * Use with .nullish() for optional JSON fields.
+ * 
+ * Note: Uses z.unknown() with runtime JSON validation for Zod 4 compatibility.
+ * 
+ * @example
+ * metadata: JsonSchema.nullish()
+ */
+export const JsonSchema = z.unknown().transform((val): JsonValue => {
+	// Runtime validation for JSON-compatible types
+	if (val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+		return val;
+	}
+	if (Array.isArray(val)) {
+		return val as JsonValue[];
+	}
+	if (typeof val === 'object') {
+		return val as { [key: string]: JsonValue };
+	}
+	throw new Error('Invalid JSON value');
+});
 
 // =============================================================================
 // Base Response Helpers
@@ -97,10 +150,10 @@ export type ARCDocumentType = z.infer<typeof ARCDocumentTypeSchema>;
 
 /**
  * ARC Request base schema (matches Prisma ARCRequest model)
- * Note: estimatedCost is Decimal in Prisma, we use z.any() to accept it
  */
 export const ARCRequestSchema = z.object({
 	id: z.string(),
+	organizationId: z.string(),
 	associationId: z.string(),
 	committeeId: z.string().nullish(),
 	unitId: z.string().nullish(),
@@ -110,7 +163,7 @@ export const ARCRequestSchema = z.object({
 	description: z.string(),
 	category: ARCCategorySchema,
 	status: ARCRequestStatusSchema,
-	estimatedCost: z.any().nullish(), // Prisma Decimal type
+	estimatedCost: DecimalSchema.nullish(),
 	proposedStartDate: z.coerce.date().nullish(),
 	proposedEndDate: z.coerce.date().nullish(),
 	conditions: z.string().nullish(),
@@ -163,6 +216,7 @@ export type ARCReview = z.infer<typeof ARCReviewSchema>;
  */
 export const ARCCommitteeSchema = z.object({
 	id: z.string(),
+	organizationId: z.string(),
 	associationId: z.string(),
 	name: z.string(),
 	description: z.string().nullish(),
@@ -190,6 +244,7 @@ export type Association = z.infer<typeof AssociationSchema>;
 
 export const UnitSchema = z.object({
 	id: z.string(),
+	organizationId: z.string(),
 	propertyId: z.string(),
 	unitNumber: z.string(),
 	unitType: z.string().nullish(),
@@ -390,6 +445,7 @@ export type AppealStatus = z.infer<typeof AppealStatusSchema>;
  */
 export const ViolationTypeSchema = z.object({
 	id: z.string(),
+	organizationId: z.string(),
 	associationId: z.string(),
 	code: z.string(),
 	name: z.string(),
@@ -399,10 +455,10 @@ export const ViolationTypeSchema = z.object({
 	ruleReference: z.string().nullish(),
 	defaultSeverity: ViolationSeveritySchema,
 	defaultCurePeriodDays: z.number(),
-	firstFineAmount: z.any().nullish(), // Prisma Decimal
-	secondFineAmount: z.any().nullish(), // Prisma Decimal
-	subsequentFineAmount: z.any().nullish(), // Prisma Decimal
-	maxFineAmount: z.any().nullish(), // Prisma Decimal
+	firstFineAmount: DecimalSchema.nullish(),
+	secondFineAmount: DecimalSchema.nullish(),
+	subsequentFineAmount: DecimalSchema.nullish(),
+	maxFineAmount: DecimalSchema.nullish(),
 	warningTemplateId: z.string().nullish(),
 	noticeTemplateId: z.string().nullish(),
 	isActive: z.boolean(),
@@ -416,6 +472,7 @@ export type ViolationType = z.infer<typeof ViolationTypeSchema>;
  */
 export const ViolationSchema = z.object({
 	id: z.string(),
+	organizationId: z.string(),
 	associationId: z.string(),
 	violationNumber: z.string(),
 	violationTypeId: z.string(),
@@ -434,9 +491,9 @@ export const ViolationSchema = z.object({
 	responsiblePartyId: z.string().nullish(),
 	reportedBy: z.string(),
 	reporterType: z.string().nullish(),
-	totalFinesAssessed: z.any(), // Prisma Decimal
-	totalFinesPaid: z.any(), // Prisma Decimal
-	totalFinesWaived: z.any(), // Prisma Decimal
+	totalFinesAssessed: DecimalSchema,
+	totalFinesPaid: DecimalSchema,
+	totalFinesWaived: DecimalSchema,
 	noticeCount: z.number(),
 	lastNoticeDate: z.coerce.date().nullish(),
 	lastNoticeType: NoticeTypeSchema.nullish(),
@@ -462,8 +519,8 @@ export const ViolationEvidenceSchema = z.object({
 	description: z.string().nullish(),
 	capturedAt: z.coerce.date().nullish(),
 	capturedBy: z.string().nullish(),
-	gpsLatitude: z.any().nullish(), // Prisma Decimal
-	gpsLongitude: z.any().nullish(), // Prisma Decimal
+	gpsLatitude: DecimalSchema.nullish(),
+	gpsLongitude: DecimalSchema.nullish(),
 	uploadedBy: z.string(),
 	uploadedAt: z.coerce.date(),
 	createdAt: z.coerce.date()
@@ -490,7 +547,7 @@ export const ViolationNoticeSchema = z.object({
 	deliveredAt: z.coerce.date().nullish(),
 	curePeriodDays: z.number().nullish(),
 	curePeriodEnds: z.coerce.date().nullish(),
-	fineAmount: z.any().nullish(), // Prisma Decimal
+	fineAmount: DecimalSchema.nullish(),
 	createdBy: z.string(),
 	createdAt: z.coerce.date()
 });
@@ -508,8 +565,8 @@ export const ViolationHearingSchema = z.object({
 	scheduledBy: z.string(),
 	outcome: HearingOutcomeSchema.nullish(),
 	outcomeNotes: z.string().nullish(),
-	fineAmount: z.any().nullish(), // Prisma Decimal
-	reducedFineAmount: z.any().nullish(), // Prisma Decimal
+	fineAmount: DecimalSchema.nullish(),
+	reducedFineAmount: DecimalSchema.nullish(),
 	decidedAt: z.coerce.date().nullish(),
 	decidedBy: z.string().nullish(),
 	createdAt: z.coerce.date(),
@@ -524,12 +581,12 @@ export const ViolationFineSchema = z.object({
 	id: z.string(),
 	violationId: z.string(),
 	fineNumber: z.number(),
-	amount: z.any(), // Prisma Decimal
+	amount: DecimalSchema,
 	reason: z.string(),
 	dueDate: z.coerce.date(),
-	paidAmount: z.any(), // Prisma Decimal
+	paidAmount: DecimalSchema,
 	paidDate: z.coerce.date().nullish(),
-	waivedAmount: z.any(), // Prisma Decimal
+	waivedAmount: DecimalSchema,
 	waivedReason: z.string().nullish(),
 	waivedBy: z.string().nullish(),
 	waivedAt: z.coerce.date().nullish(),
@@ -638,7 +695,7 @@ export const DocumentSchema = z.object({
 	pageCount: z.number().nullish(),
 	thumbnailUrl: z.string().nullish(),
 	extractedText: z.string().nullish(),
-	metadata: z.any().nullish(),
+	metadata: JsonSchema.nullish(),
 	version: z.number(),
 	parentDocumentId: z.string().nullish(),
 	supersededById: z.string().nullish(),
@@ -652,8 +709,8 @@ export const DocumentSchema = z.object({
 	malwareScanStatus: z.string().nullish(),
 	contentModerationStatus: z.string().nullish(),
 	processingCompletedAt: z.coerce.date().nullish(),
-	latitude: z.any().nullish(),
-	longitude: z.any().nullish(),
+	latitude: DecimalSchema.nullish(),
+	longitude: DecimalSchema.nullish(),
 	capturedAt: z.coerce.date().nullish(),
 	transcription: z.string().nullish(),
 	isTranscribed: z.boolean(),
@@ -737,8 +794,8 @@ export const WorkOrderSchema = z.object({
 	status: WorkOrderStatusSchema,
 	originType: WorkOrderOriginTypeSchema.nullish(),
 	originId: z.string().nullish(),
-	estimatedCost: z.any().nullish(),
-	actualCost: z.any().nullish(),
+	estimatedCost: DecimalSchema.nullish(),
+	actualCost: DecimalSchema.nullish(),
 	scheduledStart: z.coerce.date().nullish(),
 	scheduledEnd: z.coerce.date().nullish(),
 	actualStart: z.coerce.date().nullish(),
@@ -776,3 +833,28 @@ export type StaffRole = z.infer<typeof StaffRoleSchema>;
 
 export const PillarAccessSchema = GeneratedPillarAccessSchema;
 export type PillarAccess = z.infer<typeof PillarAccessSchema>;
+
+// =============================================================================
+// Activity Event Domain Enum Schemas (re-exported from generated Zod schemas)
+// =============================================================================
+
+export const ActivityEntityTypeSchema = GeneratedActivityEntityTypeSchema;
+export type ActivityEntityType = z.infer<typeof ActivityEntityTypeSchema>;
+
+export const ActivityActionTypeSchema = GeneratedActivityActionTypeSchema;
+export type ActivityActionType = z.infer<typeof ActivityActionTypeSchema>;
+
+export const ActivityActorTypeSchema = GeneratedActivityActorTypeSchema;
+export type ActivityActorType = z.infer<typeof ActivityActorTypeSchema>;
+
+export const ActivityEventCategorySchema = GeneratedActivityEventCategorySchema;
+export type ActivityEventCategory = z.infer<typeof ActivityEventCategorySchema>;
+
+export const OrganizationTypeSchema = GeneratedOrganizationTypeSchema;
+export type OrganizationType = z.infer<typeof OrganizationTypeSchema>;
+
+export const OrganizationStatusSchema = GeneratedOrganizationStatusSchema;
+export type OrganizationStatus = z.infer<typeof OrganizationStatusSchema>;
+
+export const UserRoleSchema = GeneratedUserRoleSchema;
+export type UserRole = z.infer<typeof UserRoleSchema>;

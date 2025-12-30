@@ -14,6 +14,7 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { EstimateStatus } from '../../../../generated/prisma/client.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 const log = createWorkflowLogger('EstimateGenerationWorkflow');
 
@@ -254,8 +255,15 @@ async function estimateGenerationWorkflow(input: EstimateGenerationInput): Promi
 			jobId
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'ESTIMATE_GENERATION_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,
@@ -281,9 +289,9 @@ export async function startEstimateGeneration(
 
 export async function getEstimateGenerationStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export async function getEstimateGenerationError(

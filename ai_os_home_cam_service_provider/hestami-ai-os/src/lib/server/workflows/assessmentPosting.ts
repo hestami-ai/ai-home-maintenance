@@ -7,6 +7,8 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('AssessmentPostingWorkflow');
@@ -16,6 +18,7 @@ const WORKFLOW_STATUS_EVENT = 'assessment_posting_status';
 const WORKFLOW_ERROR_EVENT = 'assessment_posting_error';
 
 interface PostingInput {
+	organizationId: string;
 	associationId: string;
 	assessmentTypeId: string;
 	postingDate: Date;
@@ -99,61 +102,71 @@ async function getUnitsForCharging(associationId: string): Promise<Array<{
  * Step 3: Create assessment charges for units
  */
 async function createAssessmentCharges(
+	organizationId: string,
 	associationId: string,
 	units: Array<{ id: string; unitNumber: string }>,
 	assessmentType: { id: string; name: string; defaultAmount: string; revenueAccountId: string },
 	postingDate: Date,
-	dueDate: Date
+	dueDate: Date,
+	userId: string
 ): Promise<{ chargesCreated: number; totalAmount: number }> {
 	let chargesCreated = 0;
 	let totalAmount = 0;
 	const amount = parseFloat(assessmentType.defaultAmount);
 
-	for (const unit of units) {
-		// Check if charge already exists for this period
-		const existingCharge = await prisma.assessmentCharge.findFirst({
-			where: {
-				unitId: unit.id,
-				assessmentTypeId: assessmentType.id,
-				chargeDate: postingDate
-			}
-		});
+	try {
+		for (const unit of units) {
+			// Check if charge already exists for this period
+			const existingCharge = await prisma.assessmentCharge.findFirst({
+				where: {
+					unitId: unit.id,
+					assessmentTypeId: assessmentType.id,
+					chargeDate: postingDate
+				}
+			});
 
-		if (existingCharge) {
-			continue; // Skip if already charged
+			if (existingCharge) {
+				continue; // Skip if already charged
+			}
+
+			// Create the charge within RLS context
+			await orgTransaction(organizationId, async (tx) => {
+				return tx.assessmentCharge.create({
+					data: {
+						associationId,
+						unitId: unit.id,
+						assessmentTypeId: assessmentType.id,
+						chargeDate: postingDate,
+						dueDate,
+						amount,
+						lateFeeAmount: 0,
+						totalAmount: amount,
+						paidAmount: 0,
+						balanceDue: amount,
+						status: 'PENDING',
+						description: `${assessmentType.name} - ${postingDate.toISOString().split('T')[0]}`
+					}
+				});
+			}, { userId, reason: 'Creating assessment charge via workflow' });
+
+			chargesCreated++;
+			totalAmount += amount;
 		}
 
-		// Create the charge
-		await prisma.assessmentCharge.create({
-			data: {
-				associationId,
-				unitId: unit.id,
-				assessmentTypeId: assessmentType.id,
-				chargeDate: postingDate,
-				dueDate,
-				amount,
-				lateFeeAmount: 0,
-				totalAmount: amount,
-				paidAmount: 0,
-				balanceDue: amount,
-				status: 'PENDING',
-				description: `${assessmentType.name} - ${postingDate.toISOString().split('T')[0]}`
-			}
-		});
-
-		chargesCreated++;
-		totalAmount += amount;
+		return { chargesCreated, totalAmount };
+	} finally {
+		await clearOrgContext(userId);
 	}
-
-	return { chargesCreated, totalAmount };
 }
 
 /**
  * Step 4: Apply late fees to overdue charges
  */
 async function applyLateFees(
+	organizationId: string,
 	associationId: string,
-	graceDays: number
+	graceDays: number,
+	userId: string
 ): Promise<{ lateFeesApplied: number }> {
 	const cutoffDate = new Date();
 	cutoffDate.setDate(cutoffDate.getDate() - graceDays);
@@ -173,28 +186,34 @@ async function applyLateFees(
 
 	let lateFeesApplied = 0;
 
-	for (const charge of overdueCharges) {
-		// Calculate late fee from assessment type config or default 10%
-		const lateFeeAmount = charge.assessmentType.lateFeeAmount
-			? parseFloat(charge.assessmentType.lateFeeAmount.toString())
-			: parseFloat(charge.amount.toString()) * 0.1;
+	try {
+		for (const charge of overdueCharges) {
+			// Calculate late fee from assessment type config or default 10%
+			const lateFeeAmount = charge.assessmentType.lateFeeAmount
+				? parseFloat(charge.assessmentType.lateFeeAmount.toString())
+				: parseFloat(charge.amount.toString()) * 0.1;
 
-		// Update charge with late fee
-		await prisma.assessmentCharge.update({
-			where: { id: charge.id },
-			data: {
-				lateFeeApplied: true,
-				lateFeeAmount,
-				lateFeeDate: new Date(),
-				totalAmount: parseFloat(charge.amount.toString()) + lateFeeAmount,
-				balanceDue: parseFloat(charge.amount.toString()) + lateFeeAmount - parseFloat(charge.paidAmount.toString())
-			}
-		});
+			// Update charge with late fee within RLS context
+			await orgTransaction(organizationId, async (tx) => {
+				return tx.assessmentCharge.update({
+					where: { id: charge.id },
+					data: {
+						lateFeeApplied: true,
+						lateFeeAmount,
+						lateFeeDate: new Date(),
+						totalAmount: parseFloat(charge.amount.toString()) + lateFeeAmount,
+						balanceDue: parseFloat(charge.amount.toString()) + lateFeeAmount - parseFloat(charge.paidAmount.toString())
+					}
+				});
+			}, { userId, reason: 'Applying late fee via workflow' });
 
-		lateFeesApplied++;
+			lateFeesApplied++;
+		}
+
+		return { lateFeesApplied };
+	} finally {
+		await clearOrgContext(userId);
 	}
-
-	return { lateFeesApplied };
 }
 
 /**
@@ -243,11 +262,13 @@ async function assessmentPostingWorkflow(input: PostingInput): Promise<PostingRe
 		// Step 3: Create charges
 		const chargeResult = await DBOS.runStep(
 			() => createAssessmentCharges(
+				input.organizationId,
 				input.associationId,
 				units,
 				typeResult.assessmentType!,
 				input.postingDate,
-				input.dueDate
+				input.dueDate,
+				input.userId
 			),
 			{ name: 'createAssessmentCharges' }
 		);
@@ -257,7 +278,7 @@ async function assessmentPostingWorkflow(input: PostingInput): Promise<PostingRe
 		let lateFeesApplied = 0;
 		if (input.applyLateFees) {
 			const lateFeeResult = await DBOS.runStep(
-				() => applyLateFees(input.associationId, typeResult.assessmentType!.gracePeriodDays),
+				() => applyLateFees(input.organizationId, input.associationId, typeResult.assessmentType!.gracePeriodDays, input.userId),
 				{ name: 'applyLateFees' }
 			);
 			lateFeesApplied = lateFeeResult.lateFeesApplied;
@@ -280,8 +301,15 @@ async function assessmentPostingWorkflow(input: PostingInput): Promise<PostingRe
 			timestamp: new Date().toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'ASSESSMENT_POSTING_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,
@@ -313,9 +341,9 @@ export async function startAssessmentPosting(
 
 export async function getAssessmentPostingStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export type { PostingInput as AssessmentPostingInput, PostingResult as AssessmentPostingResult };

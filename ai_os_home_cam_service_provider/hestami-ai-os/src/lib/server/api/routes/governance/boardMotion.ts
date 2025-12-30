@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 
 const boardMotionCategoryEnum = z.enum([
@@ -40,11 +39,11 @@ const boardMotionOutcomeEnum = z.enum([
 	'AMENDED'
 ]);
 
-const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
+const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { id: associationId, organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -73,11 +72,14 @@ export const boardMotionRouter = {
 				pageSize: z.number().int().min(1).max(100).default(20)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					motions: z.array(z.any()),
+					motions: z.array(JsonSchema),
 					pagination: z.object({
 						page: z.number(),
 						pageSize: z.number(),
@@ -88,10 +90,10 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { associationId, meetingId, status, category, outcome, search, page, pageSize } = input;
 
-			await getAssociationOrThrow(associationId, context.organization.id);
+			await getAssociationOrThrow(associationId, context.organization.id, errors);
 
 			const where = {
 				associationId,
@@ -134,14 +136,18 @@ export const boardMotionRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ motion: z.any() }),
+				data: z.object({ motion: JsonSchema }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const motion = await prisma.boardMotion.findFirst({
 				where: { id: input.id },
 				include: {
@@ -150,9 +156,9 @@ export const boardMotionRouter = {
 				}
 			});
 
-			if (!motion) throw ApiException.notFound('Board motion');
+			if (!motion) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (motion.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			return successResponse({ motion }, context);
@@ -173,6 +179,10 @@ export const boardMotionRouter = {
 				expiresAt: z.string().datetime().optional()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -187,10 +197,10 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { associationId, idempotencyKey, ...data } = input;
 
-			await getAssociationOrThrow(associationId, context.organization.id);
+			await getAssociationOrThrow(associationId, context.organization.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
@@ -207,7 +217,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create motion');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create motion' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -234,14 +244,19 @@ export const boardMotionRouter = {
 				expiresAt: z.string().datetime().optional().nullable()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ motion: z.any() }),
+				data: z.object({ motion: JsonSchema }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, ...data } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -249,13 +264,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
-				throw ApiException.badRequest('Cannot update a decided motion');
+				throw errors.BAD_REQUEST({ message: 'Cannot update a decided motion' });
 			}
 
 			const motion = await prisma.boardMotion.update({
@@ -284,6 +299,12 @@ export const boardMotionRouter = {
 				secondedById: z.string()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -297,7 +318,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, secondedById, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -305,13 +326,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status !== 'PROPOSED') {
-				throw ApiException.badRequest('Motion must be in PROPOSED status to be seconded');
+				throw errors.BAD_REQUEST({ message: 'Motion must be in PROPOSED status to be seconded' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -327,7 +348,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to second motion');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to second motion' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -349,6 +370,12 @@ export const boardMotionRouter = {
 				notes: z.string().optional()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -362,7 +389,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, status, notes, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -370,13 +397,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
-				throw ApiException.badRequest('Cannot change status of a decided motion');
+				throw errors.BAD_REQUEST({ message: 'Cannot change status of a decided motion' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -392,7 +419,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update motion status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update motion status' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -414,6 +441,12 @@ export const boardMotionRouter = {
 				outcomeNotes: z.string().optional()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -428,7 +461,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, outcome, outcomeNotes, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -436,13 +469,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
-				throw ApiException.badRequest('Motion outcome already recorded');
+				throw errors.BAD_REQUEST({ message: 'Motion outcome already recorded' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -458,7 +491,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record motion outcome');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record motion outcome' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -480,6 +513,12 @@ export const boardMotionRouter = {
 				reason: z.string().optional()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -494,7 +533,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, reason, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -502,13 +541,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
-				throw ApiException.badRequest('Cannot withdraw a decided motion');
+				throw errors.BAD_REQUEST({ message: 'Cannot withdraw a decided motion' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -524,7 +563,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to withdraw motion');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to withdraw motion' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -549,6 +588,12 @@ export const boardMotionRouter = {
 				voteQuestion: z.string().optional()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -566,7 +611,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, meetingId, voteQuestion, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -574,13 +619,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status !== 'SECONDED' && existing.status !== 'UNDER_DISCUSSION') {
-				throw ApiException.badRequest('Motion must be SECONDED or UNDER_DISCUSSION to open voting');
+				throw errors.BAD_REQUEST({ message: 'Motion must be SECONDED or UNDER_DISCUSSION to open voting' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -596,7 +641,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to open voting');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to open voting' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -621,6 +666,12 @@ export const boardMotionRouter = {
 				id: z.string()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -641,7 +692,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -652,13 +703,13 @@ export const boardMotionRouter = {
 				}
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (existing.status !== 'UNDER_VOTE') {
-				throw ApiException.badRequest('Motion must be UNDER_VOTE to close voting');
+				throw errors.BAD_REQUEST({ message: 'Motion must be UNDER_VOTE to close voting' });
 			}
 
 			// Tally votes from all votes linked to this motion
@@ -682,7 +733,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to close voting');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to close voting' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -705,6 +756,12 @@ export const boardMotionRouter = {
 				reason: z.string().optional()
 			}).merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -719,7 +776,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, reason, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -727,14 +784,14 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!existing) throw ApiException.notFound('Board motion');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (existing.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			// Can table from any pre-decided state
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED' || existing.status === 'WITHDRAWN') {
-				throw ApiException.badRequest('Cannot table a motion that has already been decided');
+				throw errors.BAD_REQUEST({ message: 'Cannot table a motion that has already been decided' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -750,7 +807,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to table motion');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to table motion' });
 			}
 
 			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
@@ -774,6 +831,12 @@ export const boardMotionRouter = {
 				idempotencyKey: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				data: z.object({
@@ -790,7 +853,7 @@ export const boardMotionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { motionId, arcRequestId, idempotencyKey } = input;
 
 			// Verify motion exists and is decided
@@ -799,13 +862,13 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!motion) throw ApiException.notFound('Board motion');
+			if (!motion) throw errors.NOT_FOUND({ message: 'Board motion' });
 			if (motion.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied');
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			if (motion.status !== 'APPROVED' && motion.status !== 'DENIED') {
-				throw ApiException.badRequest('Motion must be approved or denied to apply to ARC request');
+				throw errors.BAD_REQUEST({ message: 'Motion must be approved or denied to apply to ARC request' });
 			}
 
 			// Verify ARC request exists
@@ -814,9 +877,9 @@ export const boardMotionRouter = {
 				include: { association: { select: { organizationId: true } } }
 			});
 
-			if (!arcRequest) throw ApiException.notFound('ARC request');
+			if (!arcRequest) throw errors.NOT_FOUND({ message: 'ARC request' });
 			if (arcRequest.association.organizationId !== context.organization.id) {
-				throw ApiException.forbidden('Access denied to ARC request');
+				throw errors.FORBIDDEN({ message: 'Access denied to ARC request' });
 			}
 
 			const previousStatus = arcRequest.status;
@@ -837,7 +900,7 @@ export const boardMotionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to apply motion to ARC request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to apply motion to ARC request' });
 			}
 
 			const updatedArc = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: arcRequestId } });

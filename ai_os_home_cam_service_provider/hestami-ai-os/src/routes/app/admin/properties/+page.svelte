@@ -20,14 +20,8 @@
 			<Card variant="outlined" padding="lg">
 				<EmptyState
 					title="Property Directory"
-					description="Property management features are coming soon. Properties are currently managed through the Concierge portal."
-				>
-					{#snippet actions()}
-						<a href="/app/concierge" class="btn preset-outlined-primary-500">
-							Go to Concierge Portal
-						</a>
-					{/snippet}
-				</EmptyState>
+					description="Property management features for staff are currently under development. Properties are currently accessible through individual case context in the Work Queue."
+				/>
 			</Card>
 		</div>
 	</div>

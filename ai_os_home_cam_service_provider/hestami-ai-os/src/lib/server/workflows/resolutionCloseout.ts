@@ -8,6 +8,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ResolutionStatus, WorkOrderStatus, WorkOrderPriority } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'resolution_status';
@@ -59,13 +60,15 @@ async function validateTransition(input: CloseoutInput): Promise<{
 	resolution?: {
 		id: string;
 		title: string;
+		organizationId: string;
 		associationId: string;
 		boardId: string | null;
 	};
 	error?: string;
 }> {
 	const resolution = await prisma.resolution.findUnique({
-		where: { id: input.resolutionId }
+		where: { id: input.resolutionId },
+		include: { association: { select: { organizationId: true } } }
 	});
 
 	if (!resolution) {
@@ -89,6 +92,7 @@ async function validateTransition(input: CloseoutInput): Promise<{
 		resolution: {
 			id: resolution.id,
 			title: resolution.title,
+			organizationId: resolution.association.organizationId,
 			associationId: resolution.associationId,
 			boardId: resolution.boardId
 		}
@@ -144,7 +148,7 @@ async function updateResolutionStatus(
  * Step 4: Create downstream work order if requested
  */
 async function createDownstreamWorkOrder(
-	resolution: { id: string; associationId: string },
+	resolution: { id: string; organizationId: string; associationId: string },
 	workOrderData: { title: string; description?: string; priority?: string },
 	userId: string
 ): Promise<string> {
@@ -160,6 +164,7 @@ async function createDownstreamWorkOrder(
 
 	const workOrder = await prisma.workOrder.create({
 		data: {
+			organizationId: resolution.organizationId,
 			associationId: resolution.associationId,
 			workOrderNumber,
 			title: workOrderData.title,
@@ -294,8 +299,16 @@ async function resolutionCloseoutWorkflow(input: CloseoutInput): Promise<Closeou
 			updatedPolicyId
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'RESOLUTION_CLOSEOUT_ERROR'
+		});
 
 		return {
 			success: false,
@@ -326,9 +339,9 @@ export async function startResolutionCloseout(
 
 export async function getResolutionCloseoutStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export type { CloseoutInput as ResolutionCloseoutInput, CloseoutResult as ResolutionCloseoutResult };

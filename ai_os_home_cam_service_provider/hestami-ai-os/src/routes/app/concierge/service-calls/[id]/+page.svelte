@@ -18,7 +18,7 @@
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import {
 		getServiceCallStatusLabel,
 		getServiceCallStatusColor,
@@ -80,62 +80,42 @@
 		receivedAt: string;
 	}
 
-	let serviceCall = $state<ServiceCall | null>(null);
-	let property = $state<Property | null>(null);
+	interface Props {
+		data: {
+			serviceCall: ServiceCall;
+			property: Property;
+			notes: Note[];
+			statusHistory: StatusHistory[];
+			quotes: Quote[];
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let serviceCall = $derived(data.serviceCall);
+	let property = $derived(data.property);
 	let notes = $state<Note[]>([]);
-	let statusHistory = $state<StatusHistory[]>([]);
+	let statusHistory = $derived(data.statusHistory);
 	let quotes = $state<Quote[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let isLoadingQuotes = $state(false);
 	let isRespondingToQuote = $state<string | null>(null);
 	let error = $state<string | null>(null);
+
+	const caseId = $derived(serviceCall.id);
+
 
 	// New note form
 	let newNoteContent = $state('');
 	let isSubmittingNote = $state(false);
 
-	const caseId = $page.params.id!;
-
-	onMount(async () => {
-		await loadServiceCall();
+	// Synchronize notes and quotes to local state for reactive updates
+	$effect(() => {
+		if (data.notes) notes = [...data.notes];
+		if (data.quotes) quotes = [...data.quotes];
 	});
 
-	async function loadServiceCall() {
-		isLoading = true;
-		error = null;
 
-		try {
-			const result = await orpc.conciergeCase.getDetail({ id: caseId });
-			const data = result.data;
-
-			serviceCall = {
-				id: data.case.id,
-				caseNumber: data.case.caseNumber,
-				title: data.case.title,
-				description: data.case.description,
-				status: data.case.status as ConciergeCaseStatus,
-				priority: data.case.priority as ConciergeCasePriority,
-				createdAt: data.case.createdAt,
-				updatedAt: data.case.updatedAt,
-				resolvedAt: data.case.resolvedAt ?? null,
-				resolutionSummary: data.case.resolutionSummary ?? null
-			};
-
-			property = data.property;
-			notes = data.notes.filter((n: Note) => !n.isInternal);
-			statusHistory = data.statusHistory;
-
-			// Load quotes if status indicates quotes may exist
-			if (['QUOTE_REQUESTED', 'QUOTE_RECEIVED', 'QUOTE_APPROVED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED'].includes(data.case.status)) {
-				await loadQuotes();
-			}
-		} catch (err) {
-			console.error('Failed to load service call:', err);
-			error = err instanceof Error ? err.message : 'Failed to load service call';
-		} finally {
-			isLoading = false;
-		}
-	}
 
 	async function loadQuotes() {
 		isLoadingQuotes = true;
@@ -158,7 +138,7 @@
 			// Reload quotes to get updated statuses
 			await loadQuotes();
 			// Reload service call to get updated status
-			await loadServiceCall();
+			await invalidateAll();
 		} catch (err) {
 			console.error('Failed to approve quote:', err);
 		} finally {
@@ -257,7 +237,7 @@
 							<ArrowLeft class="mr-2 h-4 w-4" />
 							Back to Dashboard
 						</a>
-						<button onclick={loadServiceCall} class="btn preset-tonal-primary">Try Again</button>
+						<button onclick={() => invalidateAll()} class="btn preset-tonal-primary">Try Again</button>
 					</div>
 				</div>
 			</Card>

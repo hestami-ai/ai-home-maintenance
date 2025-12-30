@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startStockWorkflow } from '../../../workflows/stockWorkflow.js';
 
@@ -48,6 +47,10 @@ export const stockRouter = {
 	 */
 	getItemStock: orgProcedure
 		.input(z.object({ itemId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -60,15 +63,15 @@ export const stockRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_level', 'list');
 
 			// Verify item belongs to org
 			const item = await prisma.inventoryItem.findFirst({
 				where: { id: input.itemId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!item) throw ApiException.notFound('Inventory item');
+			if (!item) throw errors.NOT_FOUND({ message: 'Inventory item not found' });
 
 			const levels = await prisma.inventoryLevel.findMany({
 				where: { itemId: input.itemId },
@@ -105,6 +108,10 @@ export const stockRouter = {
 				})
 				.merge(PaginationInputSchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -115,15 +122,15 @@ export const stockRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_level', 'list');
 
 			// Verify location belongs to org
 			const location = await prisma.inventoryLocation.findFirst({
 				where: { id: input.locationId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!location) throw ApiException.notFound('Inventory location');
+			if (!location) throw errors.NOT_FOUND({ message: 'Inventory location not found' });
 
 			const limit = input.limit ?? 20;
 			const cursor = input.cursor;
@@ -166,6 +173,11 @@ export const stockRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -173,8 +185,8 @@ export const stockRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
 			// Verify item and location belong to org
@@ -186,8 +198,8 @@ export const stockRouter = {
 					where: { id: input.locationId, organizationId: context.organization!.id, deletedAt: null }
 				})
 			]);
-			if (!item) throw ApiException.notFound('Inventory item');
-			if (!location) throw ApiException.notFound('Inventory location');
+			if (!item) throw errors.NOT_FOUND({ message: 'Inventory item not found' });
+			if (!location) throw errors.NOT_FOUND({ message: 'Inventory location not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startStockWorkflow(
@@ -209,7 +221,7 @@ export const stockRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to adjust stock');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to adjust stock' });
 			}
 
 			const level = await prisma.inventoryLevel.findUniqueOrThrow({
@@ -235,6 +247,10 @@ export const stockRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -242,8 +258,8 @@ export const stockRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -265,7 +281,7 @@ export const stockRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to reserve stock');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reserve stock' });
 			}
 
 			const level = await prisma.inventoryLevel.findUniqueOrThrow({
@@ -290,6 +306,10 @@ export const stockRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -297,8 +317,8 @@ export const stockRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -320,7 +340,7 @@ export const stockRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to release stock');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to release stock' });
 			}
 
 			const level = await prisma.inventoryLevel.findUniqueOrThrow({
@@ -345,6 +365,10 @@ export const stockRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -355,8 +379,8 @@ export const stockRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('adjust', 'inventory_level', 'new');
 
 			// Get existing level to calculate variance
@@ -391,7 +415,7 @@ export const stockRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record count');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record count' });
 			}
 
 			const level = await prisma.inventoryLevel.findUniqueOrThrow({

@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startReportExecutionWorkflow } from '../../../workflows/reportExecutionWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -11,11 +10,11 @@ const log = createModuleLogger('ReportExecutionRoute');
 const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 const executionStatusEnum = z.enum(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -42,9 +41,13 @@ export const reportExecutionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'report_execution', 'new');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportExecutionWorkflow(
@@ -63,7 +66,7 @@ export const reportExecutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to generate report');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to generate report' });
 			}
 
 			const execution = await prisma.reportExecution.findUniqueOrThrow({
@@ -110,9 +113,12 @@ export const reportExecutionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'report_execution', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = { associationId: association.id };
 			if (input?.reportId) where.reportId = input.reportId;
@@ -178,16 +184,19 @@ export const reportExecutionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association or Report execution not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'report_execution', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const execution = await prisma.reportExecution.findFirst({
 				where: { id: input.id, associationId: association.id },
 				include: { report: { select: { name: true } } }
 			});
 
-			if (!execution) throw ApiException.notFound('Report execution');
+			if (!execution) throw errors.NOT_FOUND({ message: 'Report execution' });
 
 			return successResponse({
 				execution: {
@@ -227,9 +236,13 @@ export const reportExecutionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'report_execution', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportExecutionWorkflow(
@@ -245,7 +258,7 @@ export const reportExecutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to cancel execution');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel execution' });
 			}
 
 			const execution = await prisma.reportExecution.findUniqueOrThrow({

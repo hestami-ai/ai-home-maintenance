@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		Users,
 		Plus,
@@ -22,42 +21,47 @@
 		type StaffRole
 	} from '$lib/api/staff';
 
-	let staffList = $state<StaffListItem[]>([]);
-	let isLoading = $state(true);
+	interface Props {
+		data: {
+			staffList: StaffListItem[];
+			filters: {
+				status: StaffStatus | '';
+				role: StaffRole | '';
+			};
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let staffList = $derived(data.staffList);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let statusFilter = $state<StaffStatus | ''>('');
 	let roleFilter = $state<StaffRole | ''>('');
 
-	onMount(async () => {
-		await loadStaff();
+	// Sync filters from server data
+	$effect(() => {
+		statusFilter = data.filters.status;
+		roleFilter = data.filters.role;
 	});
 
 	async function loadStaff() {
-		isLoading = true;
-		error = null;
-		try {
-			const params: Record<string, unknown> = {};
-			if (statusFilter) params.status = statusFilter;
-			if (roleFilter) params.role = roleFilter;
-
-			const response = await staffApi.list(params as Parameters<typeof staffApi.list>[0]);
-			if (response.ok) {
-				staffList = response.data.staff as StaffListItem[];
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load staff';
-		} finally {
-			isLoading = false;
-		}
+		const params = new URLSearchParams();
+		if (statusFilter) params.set('status', statusFilter);
+		if (roleFilter) params.set('role', roleFilter);
+		window.location.href = `/app/admin/staff?${params.toString()}`;
 	}
 
 	$effect(() => {
-		// Reload when filters change
-		if (statusFilter !== undefined || roleFilter !== undefined) {
+		// Reload when filters change (but only after initial sync)
+		if (statusFilter !== '' && statusFilter !== data.filters.status) {
+			loadStaff();
+		} else if (roleFilter !== '' && roleFilter !== data.filters.role) {
 			loadStaff();
 		}
 	});
+
 
 	const filteredStaff = $derived(
 		staffList.filter((staff) => {

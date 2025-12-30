@@ -14,7 +14,6 @@ import {
 	IdempotencyKeySchema
 } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import type { CommunicationChannel, CommunicationDirection } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
@@ -135,7 +134,10 @@ export const caseCommunicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ConciergeCase not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case exists and belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -146,7 +148,7 @@ export const caseCommunicationRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('create', 'case_communication', 'new');
@@ -199,7 +201,10 @@ export const caseCommunicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'CaseCommunication not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const communication = await prisma.caseCommunication.findFirst({
 				where: { id: input.id },
 				include: {
@@ -209,7 +214,7 @@ export const caseCommunicationRouter = {
 			});
 
 			if (!communication || communication.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('CaseCommunication');
+				throw errors.NOT_FOUND({ message: 'CaseCommunication' });
 			}
 
 			await context.cerbos.authorize('view', 'case_communication', communication.id);
@@ -239,7 +244,10 @@ export const caseCommunicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ConciergeCase not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -249,7 +257,7 @@ export const caseCommunicationRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('view', 'case_communication', 'list');
@@ -307,7 +315,10 @@ export const caseCommunicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'CaseCommunication not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.caseCommunication.findFirst({
 				where: { id: input.id },
 				include: {
@@ -316,7 +327,7 @@ export const caseCommunicationRouter = {
 			});
 
 			if (!existing || existing.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('CaseCommunication');
+				throw errors.NOT_FOUND({ message: 'CaseCommunication' });
 			}
 
 			await context.cerbos.authorize('update', 'case_communication', existing.id);
@@ -364,7 +375,10 @@ export const caseCommunicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ConciergeCase not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -374,7 +388,7 @@ export const caseCommunicationRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('view', 'case_communication', 'list');

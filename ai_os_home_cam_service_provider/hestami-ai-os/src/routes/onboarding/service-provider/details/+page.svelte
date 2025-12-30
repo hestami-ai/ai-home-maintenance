@@ -1,21 +1,17 @@
 <script lang="ts">
+	interface Props {
+		data: {
+			onboardingState: any;
+			user: any;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { serviceProviderOnboarding, auth } from '$lib/stores';
+	import { serviceProviderOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-
-	let name = $state($serviceProviderOnboarding.businessDetails.name);
-	let slug = $state($serviceProviderOnboarding.businessDetails.slug);
-	let businessType = $state($serviceProviderOnboarding.businessDetails.businessType);
-	let contactName = $state($serviceProviderOnboarding.businessDetails.contactName);
-	let contactEmail = $state($serviceProviderOnboarding.businessDetails.contactEmail);
-	let contactPhone = $state($serviceProviderOnboarding.businessDetails.contactPhone);
-	let website = $state($serviceProviderOnboarding.businessDetails.website);
-	let serviceCategories = $state<string[]>($serviceProviderOnboarding.businessDetails.serviceCategories);
-
-	let slugTouched = $state(false);
-	let slugError = $state<string | null>(null);
 
 	const businessTypes = [
 		{ value: 'sole_proprietor', label: 'Sole Proprietor' },
@@ -39,11 +35,28 @@
 		{ value: 'other', label: 'Other' }
 	];
 
-	onMount(() => {
-		serviceProviderOnboarding.setStep(0);
-		if (!contactName && $auth.user?.name) contactName = $auth.user.name;
-		if (!contactEmail && $auth.user?.email) contactEmail = $auth.user.email;
+	let name = $state($serviceProviderOnboarding.businessDetails.name);
+	let slug = $state($serviceProviderOnboarding.businessDetails.slug);
+	let businessType = $state($serviceProviderOnboarding.businessDetails.businessType);
+	let contactName = $state($serviceProviderOnboarding.businessDetails.contactName);
+	let contactEmail = $state($serviceProviderOnboarding.businessDetails.contactEmail);
+	let contactPhone = $state($serviceProviderOnboarding.businessDetails.contactPhone);
+	let website = $state($serviceProviderOnboarding.businessDetails.website);
+	let serviceCategories = $state<string[]>($serviceProviderOnboarding.businessDetails.serviceCategories);
+
+	let slugTouched = $state(false);
+	let slugError = $state<string | null>(null);
+
+	// Pre-fill with user data if empty (runs once)
+	let hasPreFilled = $state(false);
+	$effect(() => {
+		if (!hasPreFilled && data.user) {
+			if (!contactName && data.user.name) contactName = data.user.name;
+			if (!contactEmail && data.user.email) contactEmail = data.user.email;
+			hasPreFilled = true;
+		}
 	});
+
 
 	function generateSlug(fromName: string) {
 		if (!slugTouched) {

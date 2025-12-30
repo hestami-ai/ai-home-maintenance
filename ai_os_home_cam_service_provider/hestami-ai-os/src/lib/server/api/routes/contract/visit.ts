@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ScheduledVisitStatus } from '../../../../../../generated/prisma/client.js';
 import { startVisitWorkflow } from '../../../workflows/visitWorkflow.js';
@@ -78,6 +77,11 @@ export const scheduledVisitRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -85,16 +89,16 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'scheduled_visit', 'new');
 
 			const contract = await prisma.serviceContract.findFirst({
 				where: { id: input.contractId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!contract) throw ApiException.notFound('Service contract');
+			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-		const maxVisit = await prisma.scheduledVisit.findFirst({
+			const maxVisit = await prisma.scheduledVisit.findFirst({
 				where: { contractId: input.contractId },
 				orderBy: { visitNumber: 'desc' }
 			});
@@ -119,7 +123,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create visit' });
 			}
 
 			const visit = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -131,6 +135,10 @@ export const scheduledVisitRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -138,8 +146,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -148,7 +156,7 @@ export const scheduledVisitRouter = {
 			});
 
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			return successResponse({ visit: formatVisit(visit) }, context);
@@ -167,6 +175,9 @@ export const scheduledVisitRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -177,8 +188,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'scheduled_visit', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -227,6 +238,11 @@ export const scheduledVisitRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -234,8 +250,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -243,14 +259,14 @@ export const scheduledVisitRouter = {
 				include: { contract: true }
 			});
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			// Verify technician
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization!.id, isActive: true }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
@@ -265,7 +281,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to assign visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign visit' });
 			}
 
 			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -277,6 +293,12 @@ export const scheduledVisitRouter = {
 
 	confirm: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -284,8 +306,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('confirm', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -293,11 +315,11 @@ export const scheduledVisitRouter = {
 				include: { contract: true }
 			});
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			if (visit.status !== 'SCHEDULED') {
-				throw ApiException.badRequest('Can only confirm SCHEDULED visits');
+				throw errors.BAD_REQUEST({ message: 'Can only confirm SCHEDULED visits' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -313,7 +335,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to confirm visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to confirm visit' });
 			}
 
 			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -325,6 +347,12 @@ export const scheduledVisitRouter = {
 
 	start: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -332,8 +360,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('start', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -341,11 +369,11 @@ export const scheduledVisitRouter = {
 				include: { contract: true }
 			});
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			if (!['SCHEDULED', 'CONFIRMED'].includes(visit.status)) {
-				throw ApiException.badRequest('Can only start SCHEDULED or CONFIRMED visits');
+				throw errors.BAD_REQUEST({ message: 'Can only start SCHEDULED or CONFIRMED visits' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -361,7 +389,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to start visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to start visit' });
 			}
 
 			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -381,6 +409,12 @@ export const scheduledVisitRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -388,8 +422,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('complete', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -397,11 +431,11 @@ export const scheduledVisitRouter = {
 				include: { contract: true }
 			});
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			if (visit.status !== 'IN_PROGRESS') {
-				throw ApiException.badRequest('Can only complete IN_PROGRESS visits');
+				throw errors.BAD_REQUEST({ message: 'Can only complete IN_PROGRESS visits' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -417,7 +451,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to complete visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to complete visit' });
 			}
 
 			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -429,6 +463,12 @@ export const scheduledVisitRouter = {
 
 	cancel: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -436,8 +476,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('cancel', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -445,11 +485,11 @@ export const scheduledVisitRouter = {
 				include: { contract: true }
 			});
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			if (['COMPLETED', 'CANCELLED'].includes(visit.status)) {
-				throw ApiException.badRequest('Cannot cancel completed or already cancelled visits');
+				throw errors.BAD_REQUEST({ message: 'Cannot cancel completed or already cancelled visits' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -465,7 +505,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to cancel visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel visit' });
 			}
 
 			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -487,6 +527,12 @@ export const scheduledVisitRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -494,8 +540,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('reschedule', 'scheduled_visit', input.id);
 
 			const visit = await prisma.scheduledVisit.findUnique({
@@ -503,11 +549,11 @@ export const scheduledVisitRouter = {
 				include: { contract: true }
 			});
 			if (!visit || visit.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Scheduled visit');
+				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
 			if (!['SCHEDULED', 'CONFIRMED'].includes(visit.status)) {
-				throw ApiException.badRequest('Can only reschedule SCHEDULED or CONFIRMED visits');
+				throw errors.BAD_REQUEST({ message: 'Can only reschedule SCHEDULED or CONFIRMED visits' });
 			}
 
 			// Get next visit number
@@ -538,7 +584,7 @@ export const scheduledVisitRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to reschedule visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reschedule visit' });
 			}
 
 			const newVisit = await prisma.scheduledVisit.findUniqueOrThrow({
@@ -557,6 +603,9 @@ export const scheduledVisitRouter = {
 				})
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -564,8 +613,8 @@ export const scheduledVisitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'scheduled_visit', 'list');
 
 			const days = input?.days ?? 7;

@@ -1,3 +1,3 @@
 // Type-safe oRPC client (preferred)
-export { orpc, createOrgClient, type AppRouter } from './orpc.js';
+export { orpc, createOrgClient, createServerClient, type AppRouter } from './orpc.js';
 

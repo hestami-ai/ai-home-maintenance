@@ -17,6 +17,9 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ViolationStatus } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
+import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'violation_status';
@@ -80,23 +83,33 @@ async function validateTransition(input: TransitionInput): Promise<{
 	currentStatus: ViolationStatus;
 	severity?: string;
 	error?: string;
+	organizationId?: string; // Returning orgId for audit context
 }> {
 	const violation = await prisma.violation.findUnique({
-		where: { id: input.violationId }
+		where: { id: input.violationId },
+		select: {
+			status: true,
+			severity: true,
+			association: {
+				select: { organizationId: true }
+			}
+		}
 	});
 
 	if (!violation) {
-		return { valid: false, currentStatus: 'DRAFT', error: 'Violation not found' };
+		return { valid: false, currentStatus: 'DRAFT' as ViolationStatus, error: 'Violation not found' };
 	}
 
 	const currentStatus = violation.status as ViolationStatus;
 	const allowedTransitions = validTransitions[currentStatus] || [];
+	const organizationId = violation.association?.organizationId;
 
 	if (!allowedTransitions.includes(input.toStatus)) {
 		return {
 			valid: false,
 			currentStatus,
-			error: `Invalid transition from ${currentStatus} to ${input.toStatus}`
+			error: `Invalid transition from ${currentStatus} to ${input.toStatus}`,
+			organizationId
 		};
 	}
 
@@ -110,7 +123,8 @@ async function validateTransition(input: TransitionInput): Promise<{
 			return {
 				valid: false,
 				currentStatus,
-				error: 'At least one notice must be created before transitioning to NOTICE_SENT'
+				error: 'At least one notice must be created before transitioning to NOTICE_SENT',
+				organizationId
 			};
 		}
 	}
@@ -124,12 +138,18 @@ async function validateTransition(input: TransitionInput): Promise<{
 			return {
 				valid: false,
 				currentStatus,
-				error: 'A hearing must be scheduled before transitioning to HEARING_SCHEDULED'
+				error: 'A hearing must be scheduled before transitioning to HEARING_SCHEDULED',
+				organizationId
 			};
 		}
 	}
 
-	return { valid: true, currentStatus, severity: violation.severity };
+	return {
+		valid: true,
+		currentStatus,
+		severity: violation.severity,
+		organizationId
+	};
 }
 
 /**
@@ -231,14 +251,8 @@ async function queueNotifications(
 	// 2. Create notification records in the database
 	// 3. Trigger the notification delivery service
 
-	console.log(`[Workflow] Notification queued: Violation ${violationId} transitioned from ${fromStatus} to ${toStatus} by user ${userId}`);
-
-	// Example notification rules:
-	// - NOTICE_SENT: Notify owner/tenant
-	// - CURE_PERIOD: Notify owner with deadline
-	// - ESCALATED: Notify board/manager
-	// - HEARING_SCHEDULED: Notify owner with hearing details
-	// - FINE_ASSESSED: Notify owner with fine amount
+	// console.log(`[Workflow] Notification queued...`); 
+	// Removed console.log for standard compliance, handled by caller workflow logger
 }
 
 // ============================================================================
@@ -255,7 +269,8 @@ async function queueNotifications(
  * - Notification queueing
  */
 async function violationTransitionWorkflow(input: TransitionInput): Promise<TransitionResult> {
-	const workflowId = DBOS.workflowID;
+	const logger = createWorkflowLogger('violationLifecycle', DBOS.workflowID, `TRANSITION_TO_${input.toStatus}`);
+	const startTime = logWorkflowStart(logger, `TRANSITION_TO_${input.toStatus}`, input as any);
 
 	try {
 		// Step 1: Validate transition
@@ -266,7 +281,7 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'validated', ...validation });
 
 		if (!validation.valid) {
-			return {
+			const errorResult = {
 				success: false,
 				violationId: input.violationId,
 				fromStatus: validation.currentStatus,
@@ -274,6 +289,8 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 				timestamp: new Date().toISOString(),
 				error: validation.error
 			};
+			logWorkflowEnd(logger, `TRANSITION_TO_${input.toStatus}`, false, startTime, errorResult as any);
+			return errorResult;
 		}
 
 		// Step 2: Update database
@@ -281,6 +298,25 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 			() => updateViolationStatus(input, validation.currentStatus, validation.severity),
 			{ name: 'updateViolationStatus' }
 		);
+
+		if (validation.organizationId) {
+			await recordWorkflowEvent({
+				organizationId: validation.organizationId,
+				entityType: 'VIOLATION',
+				entityId: input.violationId,
+				action: 'STATUS_CHANGE',
+				eventCategory: 'EXECUTION',
+				summary: `Violation status changed to ${input.toStatus}`,
+				performedById: input.userId,
+				performedByType: 'HUMAN',
+				workflowId: 'violationLifecycle_v1',
+				workflowStep: 'STATUS_CHANGE',
+				workflowVersion: 'v1',
+				previousState: { status: validation.currentStatus },
+				newState: { status: input.toStatus }
+			});
+		}
+
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'updated', status: input.toStatus });
 
 		// Step 3: Check cure period compliance (if applicable)
@@ -307,10 +343,10 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Log escalation warning if applicable
 		if (cureStatus.shouldEscalate) {
-			console.warn(`[Workflow ${workflowId}] Violation ${input.violationId} cure period EXPIRED - should escalate`);
+			logger.warn(`Violation ${input.violationId} cure period EXPIRED - should escalate`);
 		}
 
-		return {
+		const successResult = {
 			success: true,
 			violationId: input.violationId,
 			fromStatus: validation.currentStatus,
@@ -318,18 +354,32 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 			timestamp: new Date().toISOString(),
 			curePeriodEnds: updateResult.curePeriodEnds?.toISOString()
 		};
+		logWorkflowEnd(logger, `TRANSITION_TO_${input.toStatus}`, true, startTime, successResult as any);
+		return successResult;
+
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
+		logger.error('Workflow failed', { error: errorMessage });
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
-		return {
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'VIOLATION_LIFECYCLE_ERROR'
+		});
+
+		const errorResult = {
 			success: false,
 			violationId: input.violationId,
-			fromStatus: 'DRAFT',
+			fromStatus: 'DRAFT' as ViolationStatus,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(logger, `TRANSITION_TO_${input.toStatus}`, false, startTime, errorResult as any);
+		return errorResult;
 	}
 }
 
@@ -357,9 +407,9 @@ export async function startViolationTransition(
  */
 export async function getViolationTransitionStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 /**

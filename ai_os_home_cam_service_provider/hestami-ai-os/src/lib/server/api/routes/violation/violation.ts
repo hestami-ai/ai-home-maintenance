@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import {
 	successResponseSchema,
 	ResponseMetaSchema,
@@ -37,36 +36,36 @@ const allowedTransitions: Record<ViolationStatus, ViolationStatus[]> = {
 	DISMISSED: []
 };
 
-const assertStatusChangeAllowed = (current: ViolationStatus, next: ViolationStatus) => {
+const assertStatusChangeAllowed = (current: ViolationStatus, next: ViolationStatus, errors: any) => {
 	if (current === next) return;
 	if (FINAL_STATUSES.includes(current)) {
-		throw ApiException.badRequest(`Cannot change status from final state ${current}`);
+		throw errors.BAD_REQUEST({ message: `Cannot change status from final state ${current}` });
 	}
 	if (!allowedTransitions[current]?.includes(next)) {
-		throw ApiException.badRequest(`Status change from ${current} to ${next} is not allowed`);
+		throw errors.BAD_REQUEST({ message: `Status change from ${current} to ${next} is not allowed` });
 	}
 };
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
 
 	if (!association) {
-		throw ApiException.notFound('Association');
+		throw errors.NOT_FOUND({ message: 'Association' });
 	}
 
 	return association;
 };
 
-const getViolationOrThrow = async (id: string, associationId: string) => {
+const getViolationOrThrow = async (id: string, associationId: string, errors: any) => {
 	const violation = await prisma.violation.findFirst({
 		where: { id, associationId, deletedAt: null },
 		include: { violationType: true }
 	});
 
 	if (!violation) {
-		throw ApiException.notFound('Violation');
+		throw errors.NOT_FOUND({ message: 'Violation' });
 	}
 
 	return violation;
@@ -102,6 +101,11 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -115,11 +119,11 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
 
 			// Get association for this organization
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Validate violation type before starting workflow
 			const violationType = await prisma.violationType.findFirst({
@@ -127,7 +131,7 @@ export const violationRouter = {
 			});
 
 			if (!violationType) {
-				throw ApiException.notFound('Violation Type');
+				throw errors.NOT_FOUND({ message: 'Violation Type' });
 			}
 
 			// Validate unit if provided
@@ -137,7 +141,7 @@ export const violationRouter = {
 					include: { property: { include: { association: true } } }
 				});
 				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-					throw ApiException.notFound('Unit');
+					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
 
@@ -147,7 +151,7 @@ export const violationRouter = {
 					where: { id: input.responsiblePartyId, organizationId: context.organization!.id }
 				});
 				if (!party) {
-					throw ApiException.notFound('Responsible Party');
+					throw errors.NOT_FOUND({ message: 'Responsible Party' });
 				}
 			}
 
@@ -178,7 +182,7 @@ export const violationRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create violation');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create violation' });
 			}
 
 			return successResponse(
@@ -200,6 +204,10 @@ export const violationRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().max(1000).optional() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -208,10 +216,10 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'violation', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(input.id, association.id, errors);
 
 			const deletedAt = new Date();
 
@@ -257,6 +265,10 @@ export const violationRouter = {
 				search: z.string().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -276,7 +288,7 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', '*');
 
 			const association = await prisma.association.findFirst({
@@ -284,7 +296,7 @@ export const violationRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const where: Prisma.ViolationWhereInput = {
@@ -333,6 +345,10 @@ export const violationRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -366,11 +382,11 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const v = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const v = await getViolationOrThrow(input.id, association.id, errors);
 
 			return successResponse(
 				{
@@ -425,6 +441,11 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -437,13 +458,13 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const { idempotencyKey, ...rest } = input;
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(rest.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(rest.id, association.id, errors);
 
 			// Validate unit if provided
 			if (rest.unitId) {
@@ -452,7 +473,7 @@ export const violationRouter = {
 					include: { property: { include: { association: true } } }
 				});
 				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-					throw ApiException.notFound('Unit');
+					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
 
@@ -462,7 +483,7 @@ export const violationRouter = {
 					where: { id: rest.responsiblePartyId, organizationId: context.organization!.id }
 				});
 				if (!party) {
-					throw ApiException.notFound('Responsible Party');
+					throw errors.NOT_FOUND({ message: 'Responsible Party' });
 				}
 			}
 
@@ -479,7 +500,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update violation');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update violation' });
 			}
 
 			const result = await prisma.violation.findUniqueOrThrow({ where: { id: rest.id } });
@@ -509,6 +530,12 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -522,15 +549,15 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const { idempotencyKey, ...rest } = input;
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const v = await getViolationOrThrow(rest.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const v = await getViolationOrThrow(rest.id, association.id, errors);
 
-			assertStatusChangeAllowed(v.status, rest.status);
+			assertStatusChangeAllowed(v.status, rest.status, errors);
 			const previousStatus = v.status;
 
 			// Use DBOS workflow for durable execution
@@ -546,7 +573,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update violation status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update violation status' });
 			}
 
 			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: rest.id } });
@@ -573,6 +600,11 @@ export const violationRouter = {
 				notes: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -584,13 +616,13 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const v = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const v = await getViolationOrThrow(input.id, association.id, errors);
 
-			assertStatusChangeAllowed(v.status, 'CURED');
+			assertStatusChangeAllowed(v.status, 'CURED', errors);
 
 			const now = new Date();
 
@@ -635,6 +667,11 @@ export const violationRouter = {
 				notes: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -646,13 +683,13 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const v = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const v = await getViolationOrThrow(input.id, association.id, errors);
 
-			assertStatusChangeAllowed(v.status, 'CLOSED');
+			assertStatusChangeAllowed(v.status, 'CLOSED', errors);
 
 			const now = new Date();
 
@@ -710,6 +747,10 @@ export const violationRouter = {
 				gpsLongitude: z.number().min(-180).max(180).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -721,7 +762,7 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
 			const association = await prisma.association.findFirst({
@@ -729,7 +770,7 @@ export const violationRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const violation = await prisma.violation.findFirst({
@@ -737,7 +778,7 @@ export const violationRouter = {
 			});
 
 			if (!violation) {
-				throw ApiException.notFound('Violation');
+				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
 			const evidence = await prisma.violationEvidence.create({
@@ -774,6 +815,10 @@ export const violationRouter = {
 	 */
 	listEvidence: orgProcedure
 		.input(z.object({ violationId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -789,10 +834,10 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id);
-			await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const evidence = await prisma.violationEvidence.findMany({
 				where: { violationId: input.violationId },
@@ -830,6 +875,11 @@ export const violationRouter = {
 				curePeriodDays: z.number().int().min(1).max(365).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -842,7 +892,7 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
 			const association = await prisma.association.findFirst({
@@ -850,7 +900,7 @@ export const violationRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const violation = await prisma.violation.findFirst({
@@ -859,14 +909,14 @@ export const violationRouter = {
 			});
 
 			if (!violation) {
-				throw ApiException.notFound('Violation');
+				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
 			const targetStatus: ViolationStatus =
 				(input.curePeriodDays ?? violation.violationType.defaultCurePeriodDays) > 0
 					? 'CURE_PERIOD'
 					: 'NOTICE_SENT';
-			assertStatusChangeAllowed(violation.status, targetStatus);
+			assertStatusChangeAllowed(violation.status, targetStatus, errors);
 
 			const now = new Date();
 			const curePeriodDays = input.curePeriodDays || violation.violationType.defaultCurePeriodDays;
@@ -937,6 +987,10 @@ export const violationRouter = {
 	 */
 	listNotices: orgProcedure
 		.input(z.object({ violationId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -952,10 +1006,10 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id);
-			await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const notices = await prisma.violationNotice.findMany({
 				where: { violationId: input.violationId },
@@ -989,6 +1043,11 @@ export const violationRouter = {
 				hearingOfficer: z.string().max(255).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' }
+		})
 		.output(
 			successResponseSchema(
 				z.object({
@@ -1000,11 +1059,11 @@ export const violationRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const result = await prisma.$transaction(async (tx) => {
 				const hearing = await tx.violationHearing.create({
@@ -1019,7 +1078,7 @@ export const violationRouter = {
 				});
 
 				const previousStatus = violation.status;
-				assertStatusChangeAllowed(previousStatus, 'HEARING_SCHEDULED');
+				assertStatusChangeAllowed(previousStatus, 'HEARING_SCHEDULED', errors);
 
 				await tx.violation.update({
 					where: { id: input.violationId },
@@ -1058,6 +1117,10 @@ export const violationRouter = {
 	 */
 	listHearings: orgProcedure
 		.input(z.object({ violationId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1074,10 +1137,10 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id);
-			await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const hearings = await prisma.violationHearing.findMany({
 				where: { violationId: input.violationId },
@@ -1111,6 +1174,10 @@ export const violationRouter = {
 				appealDeadlineDays: z.number().int().min(1).max(90).default(30)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1124,14 +1191,14 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const hearing = await prisma.violationHearing.findFirst({
 				where: { id: input.hearingId },
 				include: { violation: { include: { association: true } } }
 			});
 
 			if (!hearing || hearing.violation.association.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Hearing');
+				throw errors.NOT_FOUND({ message: 'Hearing' });
 			}
 
 			await context.cerbos.authorize('edit', 'violation', hearing.violationId);
@@ -1197,6 +1264,10 @@ export const violationRouter = {
 				dueDays: z.number().int().min(1).max(90).default(30)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1211,7 +1282,7 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
 			const association = await prisma.association.findFirst({
@@ -1219,7 +1290,7 @@ export const violationRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const violation = await prisma.violation.findFirst({
@@ -1228,7 +1299,7 @@ export const violationRouter = {
 			});
 
 			if (!violation) {
-				throw ApiException.notFound('Violation');
+				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
 			const now = new Date();
@@ -1297,6 +1368,11 @@ export const violationRouter = {
 				reason: z.string().min(1).max(500)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid waived amount' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1310,20 +1386,20 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const fine = await prisma.violationFine.findFirst({
 				where: { id: input.fineId },
 				include: { violation: { include: { association: true } } }
 			});
 
 			if (!fine || fine.violation.association.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Fine');
+				throw errors.NOT_FOUND({ message: 'Fine' });
 			}
 
 			await context.cerbos.authorize('edit', 'violation', fine.violationId);
 
 			if (input.waivedAmount > Number(fine.balanceDue)) {
-				throw ApiException.badRequest('Waived amount cannot exceed balance due');
+				throw errors.BAD_REQUEST({ message: 'Waived amount cannot exceed balance due' });
 			}
 
 			const newBalanceDue = Number(fine.balanceDue) - input.waivedAmount;
@@ -1369,6 +1445,10 @@ export const violationRouter = {
 	 */
 	listFines: orgProcedure
 		.input(z.object({ violationId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1387,10 +1467,10 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id);
-			await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const fines = await prisma.violationFine.findMany({
 				where: { violationId: input.violationId },
@@ -1417,6 +1497,10 @@ export const violationRouter = {
 	 */
 	getStatusHistory: orgProcedure
 		.input(z.object({ violationId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1435,7 +1519,7 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
 
 			const association = await prisma.association.findFirst({
@@ -1443,7 +1527,7 @@ export const violationRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const violation = await prisma.violation.findFirst({
@@ -1451,7 +1535,7 @@ export const violationRouter = {
 			});
 
 			if (!violation) {
-				throw ApiException.notFound('Violation');
+				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
 			const history = await prisma.violationStatusHistory.findMany({
@@ -1486,6 +1570,10 @@ export const violationRouter = {
 				limit: z.number().int().min(1).max(20).default(5)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1514,34 +1602,34 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const unitViolations = input.unitId
 				? await prisma.violation.findMany({
-						where: {
-							associationId: association.id,
-							unitId: input.unitId,
-							id: { not: input.violationId },
-							deletedAt: null
-						},
-						orderBy: { observedDate: 'desc' },
-						take: input.limit
-					})
+					where: {
+						associationId: association.id,
+						unitId: input.unitId,
+						id: { not: input.violationId },
+						deletedAt: null
+					},
+					orderBy: { observedDate: 'desc' },
+					take: input.limit
+				})
 				: [];
 
 			const typeViolations = input.violationTypeId
 				? await prisma.violation.findMany({
-						where: {
-							associationId: association.id,
-							violationTypeId: input.violationTypeId,
-							id: { not: input.violationId },
-							deletedAt: null
-						},
-						orderBy: { observedDate: 'desc' },
-						take: input.limit
-					})
+					where: {
+						associationId: association.id,
+						violationTypeId: input.violationTypeId,
+						id: { not: input.violationId },
+						deletedAt: null
+					},
+					orderBy: { observedDate: 'desc' },
+					take: input.limit
+				})
 				: [];
 
 			return successResponse(
@@ -1578,6 +1666,12 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1591,13 +1685,13 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(input.id, association.id, errors);
 
-			assertStatusChangeAllowed(violation.status, 'ESCALATED');
+			assertStatusChangeAllowed(violation.status, 'ESCALATED', errors);
 			const previousStatus = violation.status;
 
 			// Use DBOS workflow for durable execution
@@ -1613,7 +1707,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to escalate violation');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to escalate violation' });
 			}
 
 			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
@@ -1651,6 +1745,11 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1664,11 +1763,11 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(input.id, association.id, errors);
 			const previousStatus = violation.status;
 
 			// Use DBOS workflow for durable execution
@@ -1684,7 +1783,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to mark violation as invalid');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to mark violation as invalid' });
 			}
 
 			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
@@ -1722,6 +1821,12 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1736,13 +1841,13 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(input.id, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(input.id, association.id, errors);
 
-			assertStatusChangeAllowed(violation.status, 'CLOSED');
+			assertStatusChangeAllowed(violation.status, 'CLOSED', errors);
 			const previousStatus = violation.status;
 
 			// Use DBOS workflow for durable execution
@@ -1758,7 +1863,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to resolve violation');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to resolve violation' });
 			}
 
 			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
@@ -1799,6 +1904,12 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			CONFLICT: { message: 'Resource conflict' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1812,11 +1923,11 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const association = await getAssociationOrThrow(context.organization!.id);
-			const violation = await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
 
 			// Check if there's already a pending appeal
 			const existingAppeal = await prisma.violationAppeal.findFirst({
@@ -1827,7 +1938,7 @@ export const violationRouter = {
 			});
 
 			if (existingAppeal) {
-				throw ApiException.conflict('An appeal is already pending for this violation');
+				throw errors.CONFLICT({ message: 'An appeal is already pending for this violation' });
 			}
 
 			// Get or create a hearing to attach the appeal to
@@ -1866,7 +1977,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to file appeal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to file appeal' });
 			}
 
 			const result = await prisma.violationAppeal.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1898,6 +2009,10 @@ export const violationRouter = {
 	 */
 	getAppeal: orgProcedure
 		.input(z.object({ violationId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1920,10 +2035,10 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id);
-			await getViolationOrThrow(input.violationId, association.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const appeal = await prisma.violationAppeal.findFirst({
 				where: {
@@ -1980,6 +2095,11 @@ export const violationRouter = {
 				idempotencyKey: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1993,14 +2113,14 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const appeal = await prisma.violationAppeal.findFirst({
 				where: { id: input.appealId },
 				include: { hearing: { include: { violation: { include: { association: true } } } } }
 			});
 
 			if (!appeal || appeal.hearing.violation.association.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Appeal');
+				throw errors.NOT_FOUND({ message: 'Appeal' });
 			}
 
 			await context.cerbos.authorize('edit', 'violation', appeal.hearing.violationId);
@@ -2023,7 +2143,7 @@ export const violationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to record appeal decision');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to record appeal decision' });
 			}
 
 			const result = await prisma.violationAppeal.findUniqueOrThrow({ where: { id: input.appealId } });
@@ -2060,6 +2180,11 @@ export const violationRouter = {
 				idempotencyKey: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2077,8 +2202,8 @@ export const violationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const association = await getAssociationOrThrow(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startViolationFineWorkflow(
@@ -2094,7 +2219,7 @@ export const violationRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to convert fine to charge');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to convert fine to charge' });
 			}
 
 			const charge = await prisma.assessmentCharge.findUniqueOrThrow({

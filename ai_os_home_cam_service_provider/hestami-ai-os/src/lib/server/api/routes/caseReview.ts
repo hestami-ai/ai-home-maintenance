@@ -12,7 +12,6 @@ import {
 	IdempotencyKeySchema
 } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
 
@@ -104,7 +103,11 @@ export const caseReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ConciergeCase not found' },
+			BAD_REQUEST: { message: 'A review already exists for this case' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case exists and belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -115,7 +118,7 @@ export const caseReviewRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			// Check if review already exists
@@ -124,7 +127,7 @@ export const caseReviewRouter = {
 			});
 
 			if (existingReview) {
-				throw ApiException.badRequest('A review already exists for this case');
+				throw errors.BAD_REQUEST({ message: 'A review already exists for this case' });
 			}
 
 			await context.cerbos.authorize('create', 'case_review', 'new');
@@ -182,7 +185,10 @@ export const caseReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ConciergeCase not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -192,7 +198,7 @@ export const caseReviewRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('view', 'case_review', input.caseId);
@@ -237,14 +243,17 @@ export const caseReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'CaseReview not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.caseReview.findUnique({
 				where: { caseId: input.caseId },
 				include: { case: true }
 			});
 
 			if (!existing || existing.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('CaseReview');
+				throw errors.NOT_FOUND({ message: 'CaseReview' });
 			}
 
 			await context.cerbos.authorize('update', 'case_review', existing.id);

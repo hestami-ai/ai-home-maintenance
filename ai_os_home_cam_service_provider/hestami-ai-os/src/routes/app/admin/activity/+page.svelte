@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import {
 		Activity,
 		Filter,
@@ -17,10 +16,10 @@
 		AlertTriangle,
 		CheckCircle,
 		XCircle,
-		ArrowRight
+		ArrowRight,
+		Building2
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { organizationStore } from '$lib/stores';
 	import {
 		activityEventApi,
 		ENTITY_TYPE_LABELS,
@@ -36,17 +35,40 @@
 		type ActivityActorType
 	} from '$lib/api/activityEvent';
 
+	// Extended event type with organization name for staff view
+	interface StaffActivityEvent extends ActivityEvent {
+		organizationName?: string | null;
+	}
+
 	// URL params for filtering
 	const urlEntityType = $derived($page.url.searchParams.get('entityType') as ActivityEntityType | null);
 	const urlEntityId = $derived($page.url.searchParams.get('entityId'));
 
-	let events = $state<ActivityEvent[]>([]);
-	let isLoading = $state(true);
-	let error = $state<string | null>(null);
-	let hasMore = $state(false);
-	let nextCursor = $state<string | null>(null);
+	interface Props {
+		data: {
+			events: StaffActivityEvent[];
+			pagination: { total: number; hasMore: boolean; nextCursor: string | null };
+			filters: {
+				entityType: ActivityEntityType | '';
+				entityId: string;
+				action: ActivityActionType | '';
+				eventCategory: ActivityEventCategory | '';
+				actorType: ActivityActorType | '';
+				startDate: string;
+				endDate: string;
+			};
+		};
+	}
 
-	// Filters
+	let { data }: Props = $props();
+
+	let events = $state<StaffActivityEvent[]>([]);
+	let isLoading = $state(false);
+	let error = $state<string | null>(null);
+	let hasMore = $derived(data.pagination.hasMore);
+	let nextCursor = $derived(data.pagination.nextCursor);
+
+	// Filters (initialized with defaults, synced via $effect below)
 	let entityTypeFilter = $state<ActivityEntityType | ''>('');
 	let actionFilter = $state<ActivityActionType | ''>('');
 	let categoryFilter = $state<ActivityEventCategory | ''>('');
@@ -54,68 +76,62 @@
 	let startDate = $state('');
 	let endDate = $state('');
 
-	// Selected event for detail view
-	let selectedEvent = $state<ActivityEvent | null>(null);
-
-	const organizationId = $derived($organizationStore.current?.organization.id || '');
-
-	onMount(async () => {
-		if (urlEntityType) entityTypeFilter = urlEntityType;
-		await loadEvents();
+	// Synchronize server data to local state
+	$effect(() => {
+		if (data.events) {
+			events = [...data.events];
+		}
+		entityTypeFilter = data.filters.entityType;
+		actionFilter = data.filters.action;
+		categoryFilter = data.filters.eventCategory;
+		actorTypeFilter = data.filters.actorType;
+		startDate = data.filters.startDate;
+		endDate = data.filters.endDate;
 	});
 
+	// Selected event for detail view
+	let selectedEvent = $state<StaffActivityEvent | null>(null);
+
 	async function loadEvents(append = false) {
-		if (!organizationId) {
-			error = 'No organization selected';
-			isLoading = false;
+		if (!append) {
+			// Update URL for filtering
+			const params = new URLSearchParams();
+			if (entityTypeFilter) params.set('entityType', entityTypeFilter);
+			if (actionFilter) params.set('action', actionFilter);
+			if (categoryFilter) params.set('eventCategory', categoryFilter);
+			if (actorTypeFilter) params.set('actorType', actorTypeFilter);
+			if (startDate) params.set('startDate', startDate);
+			if (endDate) params.set('endDate', endDate);
+			
+			window.location.href = `/app/admin/activity?${params.toString()}`;
 			return;
 		}
 
-		if (!append) {
-			isLoading = true;
-			events = [];
-			nextCursor = null;
-		}
+		// Pagination still needs client-side fetch if we want to stay on page
+		isLoading = true;
 		error = null;
 
 		try {
-			// If filtering by specific entity
-			if (urlEntityType && urlEntityId) {
-				const response = await activityEventApi.getByEntity({
-						entityType: urlEntityType,
-						entityId: urlEntityId,
-						limit: 50,
-						cursor: append ? nextCursor || undefined : undefined
-					});
-				if (response.ok) {
-					events = append ? [...events, ...response.data.events] : response.data.events;
-					hasMore = response.data.pagination.hasMore;
-					nextCursor = response.data.pagination.nextCursor;
-				}
-			} else {
-				// General organization query with filters
-				const response = await activityEventApi.getByOrganization({
-						entityType: entityTypeFilter || undefined,
-						action: actionFilter || undefined,
-						eventCategory: categoryFilter || undefined,
-						performedByType: actorTypeFilter || undefined,
-						startDate: startDate ? new Date(startDate).toISOString() : undefined,
-						endDate: endDate ? new Date(endDate).toISOString() : undefined,
-						limit: 50,
-						cursor: append ? nextCursor || undefined : undefined
-					});
-				if (response.ok) {
-					events = append ? [...events, ...response.data.events] : response.data.events;
-					hasMore = response.data.pagination.hasMore;
-					nextCursor = response.data.pagination.nextCursor;
-				}
+			const response = await activityEventApi.staffList({
+				entityType: entityTypeFilter || undefined,
+				action: actionFilter || undefined,
+				eventCategory: categoryFilter || undefined,
+				performedByType: actorTypeFilter || undefined,
+				startDate: startDate ? new Date(startDate).toISOString() : undefined,
+				endDate: endDate ? new Date(endDate).toISOString() : undefined,
+				limit: 50,
+				cursor: nextCursor || undefined
+			});
+			if (response.ok) {
+				events = [...events, ...response.data.events];
 			}
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load activity events';
+			error = e instanceof Error ? e.message : 'Failed to load more activity events';
 		} finally {
 			isLoading = false;
 		}
 	}
+
 
 	function formatDate(dateString: string): string {
 		return new Date(dateString).toLocaleDateString('en-US', {
@@ -342,6 +358,12 @@
 											<ActorIcon class="h-3 w-3" />
 											{ACTOR_TYPE_LABELS[event.performedByType]}
 										</span>
+										{#if event.organizationName}
+											<span class="flex items-center gap-1">
+												<Building2 class="h-3 w-3" />
+												{event.organizationName}
+											</span>
+										{/if}
 										{#if event.entityId}
 											<span class="font-mono">
 												{event.entityId.slice(0, 8)}...

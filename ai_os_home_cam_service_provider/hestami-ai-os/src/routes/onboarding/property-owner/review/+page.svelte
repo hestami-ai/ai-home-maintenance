@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { ArrowLeft, Check, Loader2, Home, User, Building2, Sparkles, Wrench } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { propertyOwnerOnboarding, organizationStore } from '$lib/stores';
+	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
-	onMount(() => {
+	$effect.pre(() => {
 		propertyOwnerOnboarding.setStep(5);
 	});
 
@@ -30,18 +29,7 @@
 			// 2. Set as default organization
 			await orpc.organization.setDefault({ organizationId: org.id });
 
-			// 3. Update local store
-			organizationStore.addMembership({
-				organization: {
-					id: org.id,
-					name: org.name,
-					slug: org.slug,
-					type: org.type,
-					status: org.status
-				},
-				role: 'ADMIN',
-				isDefault: true
-			});
+			// 3. Update local store (REMOVED - we rely on server data after redirect)
 
 			// 4. Create default PropertyPortfolio
 			const portfolioResult = await orpc.propertyPortfolio.getOrCreateDefault({

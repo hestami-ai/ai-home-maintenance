@@ -9,7 +9,6 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { startContractSLAWorkflow } from '../../../workflows/contractSLAWorkflow.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 
 const slaRecordOutput = z.object({
@@ -84,14 +83,19 @@ export const contractSLARouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Service contract not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'contract_sla_record', 'new');
 
 			const contract = await prisma.serviceContract.findFirst({
 				where: { id: input.contractId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!contract) throw ApiException.notFound('Service contract');
+			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startContractSLAWorkflow(
@@ -119,7 +123,7 @@ export const contractSLARouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create SLA record');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create SLA record' });
 			}
 
 			const slaRecord = await prisma.contractSLARecord.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -136,8 +140,12 @@ export const contractSLARouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'SLA record not found' },
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'contract_sla_record', input.id);
 
 			const record = await prisma.contractSLARecord.findUnique({
@@ -146,7 +154,7 @@ export const contractSLARouter = {
 			});
 
 			if (!record || record.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('SLA record');
+				throw errors.NOT_FOUND({ message: 'SLA record' });
 			}
 
 			return successResponse({ slaRecord: formatSLARecord(record) }, context);
@@ -173,8 +181,11 @@ export const contractSLARouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'contract_sla_record', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -237,8 +248,13 @@ export const contractSLARouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'SLA record not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'contract_sla_record', input.id);
 
 			const existing = await prisma.contractSLARecord.findUnique({
@@ -246,7 +262,7 @@ export const contractSLARouter = {
 				include: { contract: true }
 			});
 			if (!existing || existing.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('SLA record');
+				throw errors.NOT_FOUND({ message: 'SLA record' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -273,7 +289,7 @@ export const contractSLARouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update SLA record');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update SLA record' });
 			}
 
 			const slaRecord = await prisma.contractSLARecord.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -298,14 +314,19 @@ export const contractSLARouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Service contract not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'contract_sla_record', 'new');
 
 			const contract = await prisma.serviceContract.findFirst({
 				where: { id: input.contractId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!contract) throw ApiException.notFound('Service contract');
+			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startContractSLAWorkflow(
@@ -323,7 +344,7 @@ export const contractSLARouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to calculate SLA');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to calculate SLA' });
 			}
 
 			const slaRecord = await prisma.contractSLARecord.findUniqueOrThrow({ where: { id: result.entityId } });

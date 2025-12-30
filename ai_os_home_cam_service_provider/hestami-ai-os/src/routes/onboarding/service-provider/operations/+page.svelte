@@ -3,7 +3,6 @@
 	import { Card } from '$lib/components/ui';
 	import { serviceProviderOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let businessHoursStart = $state($serviceProviderOnboarding.operations.businessHoursStart);
 	let businessHoursEnd = $state($serviceProviderOnboarding.operations.businessHoursEnd);
@@ -28,7 +27,7 @@
 		{ value: '20+', label: '20+ employees' }
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		serviceProviderOnboarding.setStep(3);
 	});
 

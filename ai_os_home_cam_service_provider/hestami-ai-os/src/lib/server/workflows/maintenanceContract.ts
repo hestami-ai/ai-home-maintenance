@@ -8,6 +8,9 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ServiceContractStatus, RecurrenceFrequency } from '../../../../generated/prisma/client.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
+import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 const WORKFLOW_STATUS_EVENT = 'contract_status';
 const WORKFLOW_ERROR_EVENT = 'contract_error';
@@ -275,7 +278,9 @@ async function checkContractExpiration(contractId: string): Promise<{ expired: b
 }
 
 async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promise<ContractWorkflowResult> {
-	const workflowId = DBOS.workflowID;
+	// Cast input to any to satisfy logger type compatibility
+	const log = createWorkflowLogger('maintenanceContractWorkflow', DBOS.workflowID, input.action);
+	const startTime = logWorkflowStart(log, input.action, input as any);
 
 	try {
 		const contract = await prisma.serviceContract.findUnique({
@@ -284,16 +289,20 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 		});
 
 		if (!contract) {
-			return {
+			const errorResult = {
 				success: false,
 				contractId: input.contractId,
 				action: input.action,
 				timestamp: new Date().toISOString(),
 				error: 'Contract not found'
 			};
+			logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+			return errorResult;
 		}
 
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'validated', action: input.action });
+
+		let successResult: ContractWorkflowResult;
 
 		switch (input.action) {
 			case 'GENERATE_VISITS': {
@@ -302,35 +311,70 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 					() => generateScheduledVisits(input.contractId, throughDate),
 					{ name: 'generateScheduledVisits' }
 				);
+
+				await recordWorkflowEvent({
+					organizationId: contract.organizationId,
+					entityType: 'JOB',
+					entityId: input.contractId,
+					action: 'CREATE',
+					eventCategory: 'SYSTEM',
+					summary: `Generated ${visitsGenerated} visits for contract`,
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'maintenanceContract_v1',
+					workflowStep: 'GENERATE_VISITS',
+					workflowVersion: 'v1'
+				});
+
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'visits_generated', count: visitsGenerated });
 
-				return {
+				successResult = {
 					success: true,
 					contractId: input.contractId,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					visitsGenerated
 				};
+				break;
 			}
 
 			case 'PROCESS_RENEWAL': {
 				if (!input.newEndDate) {
-					return {
+					const errorResult = {
 						success: false,
 						contractId: input.contractId,
 						action: input.action,
 						timestamp: new Date().toISOString(),
 						error: 'New end date is required for renewal'
 					};
+					logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+					return errorResult;
 				}
 
 				const renewed = await DBOS.runStep(
 					() => processContractRenewal(input.contractId, new Date(input.newEndDate!), input.newContractValue, input.userId),
 					{ name: 'processContractRenewal' }
 				);
+
+				if (renewed) {
+					await recordWorkflowEvent({
+						organizationId: contract.organizationId,
+						entityType: 'JOB',
+						entityId: input.contractId,
+						action: 'UPDATE', // RENEWAL is an update to contract status
+						eventCategory: 'EXECUTION',
+						summary: 'Contract renewed',
+						performedById: input.userId,
+						performedByType: 'HUMAN',
+						workflowId: 'maintenanceContract_v1',
+						workflowStep: 'PROCESS_RENEWAL',
+						workflowVersion: 'v1'
+					});
+				}
+
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'renewal_processed', renewed });
 
-				return {
+				successResult = {
 					success: renewed,
 					contractId: input.contractId,
 					action: input.action,
@@ -338,6 +382,7 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 					renewed,
 					error: renewed ? undefined : 'Contract cannot be renewed in current status'
 				};
+				break;
 			}
 
 			case 'CALCULATE_SLA': {
@@ -347,13 +392,14 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'sla_calculated', score: slaScore });
 
-				return {
+				successResult = {
 					success: true,
 					contractId: input.contractId,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					slaScore
 				};
+				break;
 			}
 
 			case 'CHECK_EXPIRATION': {
@@ -363,34 +409,51 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'expiration_checked', ...expirationStatus });
 
-				return {
+				successResult = {
 					success: true,
 					contractId: input.contractId,
 					action: input.action,
 					timestamp: new Date().toISOString()
 				};
+				break;
 			}
 
 			default:
-				return {
+				const errorResult = {
 					success: false,
 					contractId: input.contractId,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					error: `Unknown action: ${input.action}`
 				};
+				logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+				return errorResult;
 		}
+
+		logWorkflowEnd(log, input.action, true, startTime, successResult as any);
+		return successResult;
+
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+		log.error('Workflow failed', { action: input.action, error: errorMessage });
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
-		return {
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'MAINTENANCE_CONTRACT_WORKFLOW_ERROR'
+		});
+
+		const errorResult = {
 			success: false,
 			contractId: input.contractId,
 			action: input.action,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+		return errorResult;
 	}
 }
 
@@ -407,9 +470,9 @@ export async function startMaintenanceContractWorkflow(
 
 export async function getMaintenanceContractWorkflowStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export async function getMaintenanceContractWorkflowError(

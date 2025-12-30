@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -35,6 +34,11 @@ export const apInvoiceRouter = {
 				workOrderId: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -50,15 +54,15 @@ export const apInvoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'ap_invoice', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Validate vendor
@@ -67,7 +71,7 @@ export const apInvoiceRouter = {
 			});
 
 			if (!vendor) {
-				throw ApiException.notFound('Vendor');
+				throw errors.NOT_FOUND({ message: 'Vendor not found' });
 			}
 
 			// Check for duplicate invoice number for this vendor
@@ -82,7 +86,7 @@ export const apInvoiceRouter = {
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Invoice number already exists for this vendor');
+				throw errors.CONFLICT({ message: 'Invoice number already exists for this vendor' });
 			}
 
 			// Validate GL accounts
@@ -92,7 +96,7 @@ export const apInvoiceRouter = {
 			});
 
 			if (accounts.length !== new Set(glAccountIds).size) {
-				throw ApiException.notFound('One or more GL Accounts');
+				throw errors.NOT_FOUND({ message: 'One or more GL Accounts not found' });
 			}
 
 			// Calculate totals
@@ -153,6 +157,10 @@ export const apInvoiceRouter = {
 				toDate: z.string().datetime().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -174,15 +182,15 @@ export const apInvoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'ap_invoice', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.APInvoiceWhereInput = {
@@ -226,6 +234,10 @@ export const apInvoiceRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -262,15 +274,15 @@ export const apInvoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'ap_invoice', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const invoice = await prisma.aPInvoice.findFirst({
@@ -282,7 +294,7 @@ export const apInvoiceRouter = {
 			});
 
 			if (!invoice) {
-				throw ApiException.notFound('Invoice');
+				throw errors.NOT_FOUND({ message: 'Invoice not found' });
 			}
 
 			return successResponse(
@@ -323,6 +335,11 @@ export const apInvoiceRouter = {
 	 */
 	approve: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -336,15 +353,15 @@ export const apInvoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('approve', 'ap_invoice', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const invoice = await prisma.aPInvoice.findFirst({
@@ -352,11 +369,11 @@ export const apInvoiceRouter = {
 			});
 
 			if (!invoice) {
-				throw ApiException.notFound('Invoice');
+				throw errors.NOT_FOUND({ message: 'Invoice not found' });
 			}
 
 			if (invoice.status !== 'DRAFT' && invoice.status !== 'PENDING_APPROVAL') {
-				throw ApiException.conflict(`Cannot approve invoice with status: ${invoice.status}`);
+				throw errors.CONFLICT({ message: `Cannot approve invoice with status: ${invoice.status}` });
 			}
 
 			const now = new Date();
@@ -387,6 +404,11 @@ export const apInvoiceRouter = {
 	 */
 	void: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -394,15 +416,15 @@ export const apInvoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'ap_invoice', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const invoice = await prisma.aPInvoice.findFirst({
@@ -410,15 +432,15 @@ export const apInvoiceRouter = {
 			});
 
 			if (!invoice) {
-				throw ApiException.notFound('Invoice');
+				throw errors.NOT_FOUND({ message: 'Invoice not found' });
 			}
 
 			if (invoice.status === 'PAID') {
-				throw ApiException.conflict('Cannot void a paid invoice');
+				throw errors.CONFLICT({ message: 'Cannot void a paid invoice' });
 			}
 
 			if (invoice.status === 'VOIDED') {
-				throw ApiException.conflict('Invoice already voided');
+				throw errors.CONFLICT({ message: 'Invoice already voided' });
 			}
 
 			await prisma.aPInvoice.update({

@@ -2,7 +2,6 @@
 	import { ArrowLeft, ArrowRight, Shield, Users, Award } from 'lucide-svelte';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let selectedRole = $state<'ADMIN' | 'MANAGER' | 'BOARD_MEMBER'>($communityOnboarding.userRole);
 
@@ -33,7 +32,7 @@
 		}
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		communityOnboarding.setStep(4);
 	});
 

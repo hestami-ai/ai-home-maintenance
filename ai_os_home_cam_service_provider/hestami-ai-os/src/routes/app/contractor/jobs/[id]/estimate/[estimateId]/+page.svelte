@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import {
@@ -23,95 +22,101 @@
 	const jobId = $derived($page.params.id ?? '');
 	const estimateId = $derived($page.params.estimateId ?? '');
 
+	interface Props {
+		data: {
+			job: Job;
+			estimate: Estimate;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let job = $state<Job | null>(null);
 	let estimate = $state<Estimate | null>(null);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let isSaving = $state(false);
 	let isSending = $state(false);
 
-	// New line item form
-	let showAddLine = $state(false);
+	// New line item form state
 	let newLineDescription = $state('');
 	let newLineQuantity = $state(1);
 	let newLineUnitPrice = $state(0);
 	let newLineTaxable = $state(true);
 	let isAddingLine = $state(false);
+	let showAddLine = $state(false);
+
+	// Pricebook modal state
+	let showPricebook = $state(false);
+	let pricebookSearch = $state('');
+	let pricebookCategory = $state('All');
+	const pricebookCategories = ['All', 'Labor', 'Materials', 'Equipment', 'Services'];
+	
+	// Sample pricebook items (should come from API in real implementation)
+	interface PricebookItem {
+		id: string;
+		name: string;
+		description: string;
+		category: string;
+		unitPrice: number;
+		unit: string;
+	}
+	
+	const pricebookItems: PricebookItem[] = [
+		{ id: '1', name: 'Standard Labor', description: 'Standard hourly labor rate', category: 'Labor', unitPrice: 75, unit: 'hour' },
+		{ id: '2', name: 'Premium Labor', description: 'Premium hourly labor rate', category: 'Labor', unitPrice: 125, unit: 'hour' },
+		{ id: '3', name: 'Service Call', description: 'Standard service call fee', category: 'Services', unitPrice: 95, unit: 'visit' },
+	];
+	
+	const filteredPricebookItems = $derived.by(() => {
+		return pricebookItems.filter(item => {
+			const matchesSearch = item.name.toLowerCase().includes(pricebookSearch.toLowerCase()) ||
+				item.description.toLowerCase().includes(pricebookSearch.toLowerCase());
+			const matchesCategory = pricebookCategory === 'All' || item.category === pricebookCategory;
+			return matchesSearch && matchesCategory;
+		});
+	});
+	
+	async function addFromPricebook(item: PricebookItem) {
+		if (!estimate) return;
+		isAddingLine = true;
+		try {
+			const response = await estimateApi.addLine({
+				estimateId: estimate.id,
+				description: item.name,
+				quantity: 1,
+				unitPrice: item.unitPrice,
+				isTaxable: true,
+				idempotencyKey: crypto.randomUUID()
+			});
+			if (response.ok) {
+				estimate = response.data.estimate;
+				showPricebook = false;
+			}
+		} catch (e) {
+			console.error('Failed to add line item from pricebook:', e);
+		} finally {
+			isAddingLine = false;
+		}
+	}
 
 	// Edit fields
 	let editNotes = $state('');
 	let editTerms = $state('');
 
-	// Pricebook modal
-	let showPricebook = $state(false);
-	let pricebookSearch = $state('');
-	let pricebookCategory = $state('');
-
-	// Sample pricebook items (would come from API in production)
-	const pricebookItems = [
-		{ id: '1', name: 'HVAC Service Call', description: 'Standard service call fee', unitPrice: 95, category: 'HVAC', unit: 'each' },
-		{ id: '2', name: 'HVAC Filter Replacement', description: 'Replace standard air filter', unitPrice: 45, category: 'HVAC', unit: 'each' },
-		{ id: '3', name: 'AC Refrigerant Recharge', description: 'Recharge AC refrigerant (per lb)', unitPrice: 75, category: 'HVAC', unit: 'lb' },
-		{ id: '4', name: 'Plumbing Service Call', description: 'Standard service call fee', unitPrice: 85, category: 'Plumbing', unit: 'each' },
-		{ id: '5', name: 'Drain Cleaning', description: 'Clear clogged drain', unitPrice: 150, category: 'Plumbing', unit: 'each' },
-		{ id: '6', name: 'Water Heater Flush', description: 'Flush and maintain water heater', unitPrice: 125, category: 'Plumbing', unit: 'each' },
-		{ id: '7', name: 'Electrical Service Call', description: 'Standard service call fee', unitPrice: 90, category: 'Electrical', unit: 'each' },
-		{ id: '8', name: 'Outlet Installation', description: 'Install standard electrical outlet', unitPrice: 175, category: 'Electrical', unit: 'each' },
-		{ id: '9', name: 'Labor - Standard Rate', description: 'Standard labor rate', unitPrice: 85, category: 'Labor', unit: 'hour' },
-		{ id: '10', name: 'Labor - Emergency Rate', description: 'Emergency/after-hours labor', unitPrice: 125, category: 'Labor', unit: 'hour' }
-	];
-
-	const pricebookCategories = ['All', 'HVAC', 'Plumbing', 'Electrical', 'Labor'];
-
-	const filteredPricebookItems = $derived(
-		pricebookItems.filter(item => {
-			const matchesSearch = !pricebookSearch || 
-				item.name.toLowerCase().includes(pricebookSearch.toLowerCase()) ||
-				item.description.toLowerCase().includes(pricebookSearch.toLowerCase());
-			const matchesCategory = !pricebookCategory || pricebookCategory === 'All' || item.category === pricebookCategory;
-			return matchesSearch && matchesCategory;
-		})
-	);
-
-	function addFromPricebook(item: typeof pricebookItems[0]) {
-		newLineDescription = item.name;
-		newLineUnitPrice = item.unitPrice;
-		newLineQuantity = 1;
-		newLineTaxable = true;
-		showPricebook = false;
-		showAddLine = true;
-	}
-
-	onMount(async () => {
-		await loadData();
+	// Synchronize server data
+	$effect(() => {
+		if (data.estimate) {
+			estimate = data.estimate;
+			editNotes = estimate.notes || '';
+			editTerms = estimate.terms || '';
+		}
+		if (data.job) job = data.job;
 	});
 
 	async function loadData() {
-		if (!jobId || !estimateId) return;
-		isLoading = true;
-		error = null;
-		try {
-			const [jobRes, estimateRes] = await Promise.all([
-				jobApi.get(jobId),
-				estimateApi.get(estimateId)
-			]);
-
-			if (jobRes.ok) {
-				job = jobRes.data.job;
-			}
-
-			if (!estimateRes.ok) {
-				error = 'Failed to load estimate';
-				return;
-			}
-			estimate = estimateRes.data.estimate;
-			editNotes = estimate.notes || '';
-			editTerms = estimate.terms || '';
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load data';
-		} finally {
-			isLoading = false;
-		}
+		// Just refresh the page to get latest data
+		window.location.reload();
 	}
 
 	async function addLineItem() {

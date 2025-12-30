@@ -17,7 +17,6 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
-	import { onMount } from 'svelte';
 
 	interface Technician {
 		id: string;
@@ -92,11 +91,30 @@
 		updatedAt: string;
 	}
 
+	interface Props {
+		data: {
+			technicians: Technician[];
+			filters: {
+				status: string;
+			};
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let technicians = $state<Technician[]>([]);
 	let selectedTechnician = $state<Technician | null>(null);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let searchQuery = $state('');
-	let statusFilter = $state<'all' | 'active' | 'inactive'>('active');
+	let statusFilter = $state('');
+
+	// Synchronize server technicians to local state
+	$effect(() => {
+		if (data.technicians) {
+			technicians = [...data.technicians];
+		}
+		statusFilter = data.filters.status;
+	});
 
 	// Detail data
 	let skills = $state<Skill[]>([]);
@@ -126,25 +144,13 @@
 	];
 
 	async function loadTechnicians() {
-		isLoading = true;
-		try {
-			const response = await orpc.technician.list({
-				includeInactive: statusFilter === 'all' || statusFilter === 'inactive'
-			});
-			if (response.ok) {
-				let filtered = response.data.technicians;
-				if (statusFilter === 'active') {
-					filtered = filtered.filter((t) => t.isActive);
-				} else if (statusFilter === 'inactive') {
-					filtered = filtered.filter((t) => !t.isActive);
-				}
-				technicians = filtered;
-			}
-		} catch (error) {
-			console.error('Failed to load technicians:', error);
-		} finally {
-			isLoading = false;
-		}
+		if (statusFilter === data.filters.status) return;
+		
+		const params = new URLSearchParams();
+		if (statusFilter !== 'all') params.set('status', statusFilter);
+		
+		const newUrl = `/app/contractor/technicians${params.toString() ? '?' + params.toString() : ''}`;
+		window.location.href = newUrl;
 	}
 
 	async function loadTechnicianDetails(techId: string) {
@@ -213,15 +219,6 @@
 			);
 		})
 	);
-
-	onMount(() => {
-		loadTechnicians();
-	});
-
-	$effect(() => {
-		// Reload when status filter changes
-		loadTechnicians();
-	});
 </script>
 
 <svelte:head>

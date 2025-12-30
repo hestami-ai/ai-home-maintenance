@@ -3,13 +3,12 @@
 	import { Card } from '$lib/components/ui';
 	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let hasHoa = $state<'none' | 'external' | 'platform'>($propertyOwnerOnboarding.hoa.hasHoa);
 	let hoaName = $state($propertyOwnerOnboarding.hoa.hoaName);
 	let hoaContact = $state($propertyOwnerOnboarding.hoa.hoaContact);
 
-	onMount(() => {
+	$effect.pre(() => {
 		propertyOwnerOnboarding.setStep(3);
 	});
 

@@ -1,13 +1,15 @@
 <script lang="ts">
+	interface Props {
+		data: {
+			onboardingState: any;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	import { User, Building } from 'lucide-svelte';
-	import { Card } from '$lib/components/ui';
 	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-
-	onMount(() => {
-		propertyOwnerOnboarding.setStep(0);
-	});
 
 	function selectType(type: 'INDIVIDUAL_PROPERTY_OWNER' | 'TRUST_OR_LLC') {
 		propertyOwnerOnboarding.setOrganizationType(type);

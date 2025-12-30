@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		Briefcase,
 		Search,
@@ -12,44 +11,34 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { organizationStore } from '$lib/stores';
-	import { conciergeCaseApi, type ConciergeCase } from '$lib/api/cam';
+	import { invalidate } from '$app/navigation';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
-	let cases = $state<ConciergeCase[]>([]);
-	let isLoading = $state(true);
-	let error = $state<string | null>(null);
+	// Get data from server load function
+	let { data } = $props();
+	const cases = $derived(data.cases);
+
+	let isRefreshing = $state(false);
 	let searchQuery = $state('');
-	let statusFilter = $state('');
+	let statusFilter = $state($page.url.searchParams.get('status') || '');
 
-	const organizationId = $derived($organizationStore.current?.organization.id || '');
-
-	onMount(async () => {
-		await loadCases();
-	});
-
-	async function loadCases() {
-		if (!organizationId) {
-			isLoading = false;
-			return;
-		}
-		isLoading = true;
-		error = null;
+	async function refresh() {
+		isRefreshing = true;
 		try {
-			const response = await conciergeCaseApi.list({
-				status: (statusFilter || undefined) as any,
-				limit: 50
-			});
-			if (!response.ok) {
-				error = 'Failed to load cases';
-				return;
-			}
-			cases = response.data.cases;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load cases';
+			await invalidate('data');
 		} finally {
-			isLoading = false;
+			isRefreshing = false;
 		}
 	}
+
+	async function onStatusChange() {
+		// Navigate with query param to trigger server reload
+		const params = new URLSearchParams();
+		if (statusFilter) params.set('status', statusFilter);
+		await goto(`/app/admin/cases?${params.toString()}`, { invalidateAll: true });
+	}
+
 
 	function getStatusLabel(status: string): string {
 		const labels: Record<string, string> = {
@@ -139,8 +128,8 @@
 				<h1 class="text-2xl font-bold">Cases</h1>
 				<p class="mt-1 text-surface-500">All concierge cases across the platform</p>
 			</div>
-			<button onclick={loadCases} class="btn preset-outlined-primary-500" disabled={isLoading}>
-				{#if isLoading}
+			<button onclick={refresh} class="btn preset-outlined-primary-500" disabled={isRefreshing}>
+				{#if isRefreshing}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 				{:else}
 					<RefreshCw class="mr-2 h-4 w-4" />
@@ -163,7 +152,7 @@
 				</div>
 			</div>
 			<div>
-				<select bind:value={statusFilter} onchange={loadCases} class="select">
+				<select bind:value={statusFilter} onchange={onStatusChange} class="select">
 					{#each statuses as status}
 						<option value={status.value}>{status.label}</option>
 					{/each}
@@ -171,29 +160,15 @@
 			</div>
 		</div>
 
-		<!-- Content -->
 		<div class="mt-6">
-			{#if isLoading && cases.length === 0}
-				<div class="flex items-center justify-center py-12">
-					<Loader2 class="h-8 w-8 animate-spin text-primary-500" />
-				</div>
-			{:else if error}
-				<Card variant="outlined" padding="lg">
-					<div class="text-center text-error-500">
-						<p>{error}</p>
-						<button onclick={loadCases} class="btn preset-outlined-primary-500 mt-4">
-							Try Again
-						</button>
-					</div>
-				</Card>
-			{:else if filteredCases.length === 0}
+			{#if filteredCases.length === 0}
 				<Card variant="outlined" padding="lg">
 					<EmptyState
 						title="No cases found"
 						description={searchQuery ? 'Try adjusting your search criteria.' : 'No cases match the selected filters.'}
 					>
 						{#snippet actions()}
-							<button onclick={() => { searchQuery = ''; statusFilter = ''; loadCases(); }} class="btn preset-outlined-primary-500">
+							<button onclick={() => { searchQuery = ''; statusFilter = ''; refresh(); }} class="btn preset-outlined-primary-500">
 								Clear Filters
 							</button>
 						{/snippet}

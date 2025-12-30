@@ -8,6 +8,8 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
+import { createWorkflowLogger } from './workflowLogger.js';
 
 // Action types for the unified workflow
 export const ViolationFineAction = {
@@ -79,6 +81,7 @@ async function fineToCharge(
 
 		assessmentType = await prisma.assessmentType.create({
 			data: {
+				organizationId,
 				associationId,
 				name: 'Violation Fine',
 				code: 'FINE',
@@ -138,8 +141,16 @@ async function violationFineWorkflow(input: ViolationFineWorkflowInput): Promise
 				return { success: false, error: `Unknown action: ${input.action}` };
 		}
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[ViolationFineWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'VIOLATION_FINE_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

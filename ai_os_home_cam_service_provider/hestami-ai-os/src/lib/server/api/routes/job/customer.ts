@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startCustomerWorkflow } from '../../../workflows/customerWorkflow.js';
 
@@ -112,8 +111,12 @@ export const customerRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'customer', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -142,7 +145,7 @@ export const customerRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create customer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create customer' });
 			}
 
 			const customer = await prisma.customer.findUniqueOrThrow({
@@ -176,8 +179,11 @@ export const customerRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'customer', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -197,8 +203,8 @@ export const customerRouter = {
 				}),
 				...(input?.tags &&
 					input.tags.length > 0 && {
-						tags: { hasSome: input.tags }
-					})
+					tags: { hasSome: input.tags }
+				})
 			};
 
 			const customers = await prisma.customer.findMany({
@@ -234,8 +240,12 @@ export const customerRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Customer not found' },
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'customer', input.id);
 
 			const customer = await prisma.customer.findFirst({
@@ -247,7 +257,7 @@ export const customerRouter = {
 			});
 
 			if (!customer) {
-				throw ApiException.notFound('Customer');
+				throw errors.NOT_FOUND({ message: 'Customer' });
 			}
 
 			return successResponse({ customer: formatCustomer(customer) }, context);
@@ -287,8 +297,13 @@ export const customerRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Customer not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'customer', input.id);
 
 			const existing = await prisma.customer.findFirst({
@@ -300,7 +315,7 @@ export const customerRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Customer');
+				throw errors.NOT_FOUND({ message: 'Customer' });
 			}
 
 			const { id, idempotencyKey, ...data } = input;
@@ -332,7 +347,7 @@ export const customerRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update customer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update customer' });
 			}
 
 			const customer = await prisma.customer.findUniqueOrThrow({
@@ -354,8 +369,13 @@ export const customerRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Customer not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'customer', input.id);
 
 			const existing = await prisma.customer.findFirst({
@@ -367,7 +387,7 @@ export const customerRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Customer');
+				throw errors.NOT_FOUND({ message: 'Customer' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -383,7 +403,7 @@ export const customerRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete customer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete customer' });
 			}
 
 			return successResponse({ deleted: true }, context);

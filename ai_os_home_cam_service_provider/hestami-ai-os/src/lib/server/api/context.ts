@@ -1,4 +1,4 @@
-import type { User, Organization, UserRole } from '../../../../generated/prisma/client.js';
+import type { User, Organization, UserRole, StaffRole, PillarAccess } from '../../../../generated/prisma/client.js';
 
 /**
  * Request context available to all oRPC procedures
@@ -18,6 +18,12 @@ export interface RequestContext {
 	 * Used by Cerbos for authorization decisions
 	 */
 	orgRoles: Record<string, UserRole>;
+
+	/** Staff roles for Hestami platform staff (empty if not staff) */
+	staffRoles: StaffRole[];
+
+	/** Pillar access for Hestami platform staff (empty if not staff) */
+	pillarAccess: PillarAccess[];
 
 	/** Unique request ID for tracing */
 	requestId: string;
@@ -41,6 +47,8 @@ export function createEmptyContext(requestId: string): RequestContext {
 		organization: null,
 		role: null,
 		orgRoles: {},
+		staffRoles: [],
+		pillarAccess: [],
 		requestId,
 		traceId: null,
 		spanId: null,

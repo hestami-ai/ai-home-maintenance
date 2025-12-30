@@ -8,6 +8,9 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
+import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // Action types for the unified workflow
 export const SupplierAction = {
@@ -17,6 +20,9 @@ export const SupplierAction = {
 } as const;
 
 export type SupplierAction = (typeof SupplierAction)[keyof typeof SupplierAction];
+
+const WORKFLOW_STATUS_EVENT = 'supplier_status';
+const WORKFLOW_ERROR_EVENT = 'supplier_error';
 
 export interface SupplierWorkflowInput {
 	action: SupplierAction;
@@ -59,7 +65,6 @@ async function createSupplier(
 		}
 	});
 
-	console.log(`[SupplierWorkflow] CREATE_SUPPLIER supplier:${supplier.id} by user ${userId}`);
 	return supplier.id;
 }
 
@@ -76,7 +81,6 @@ async function updateSupplier(
 		data: updateData
 	});
 
-	console.log(`[SupplierWorkflow] UPDATE_SUPPLIER supplier:${supplierId} by user ${userId}`);
 	return supplierId;
 }
 
@@ -90,13 +94,17 @@ async function deleteSupplier(
 		data: { deletedAt: new Date() }
 	});
 
-	console.log(`[SupplierWorkflow] DELETE_SUPPLIER supplier:${supplierId} by user ${userId}`);
 	return supplierId;
 }
 
 // Main workflow function
 async function supplierWorkflow(input: SupplierWorkflowInput): Promise<SupplierWorkflowResult> {
+	const log = createWorkflowLogger('supplierWorkflow', DBOS.workflowID, input.action);
+	const startTime = logWorkflowStart(log, input.action, input as any);
+
 	try {
+		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
+
 		let entityId: string | undefined;
 
 		switch (input.action) {
@@ -105,6 +113,19 @@ async function supplierWorkflow(input: SupplierWorkflowInput): Promise<SupplierW
 					() => createSupplier(input.organizationId, input.userId, input.data),
 					{ name: 'createSupplier' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'EXTERNAL_VENDOR',
+					entityId: entityId,
+					action: 'CREATE',
+					eventCategory: 'EXECUTION',
+					summary: `Supplier created: ${input.data.name}`,
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'supplierWorkflow_v1',
+					workflowStep: 'CREATE_SUPPLIER',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'UPDATE_SUPPLIER':
@@ -112,6 +133,19 @@ async function supplierWorkflow(input: SupplierWorkflowInput): Promise<SupplierW
 					() => updateSupplier(input.organizationId, input.userId, input.supplierId!, input.data),
 					{ name: 'updateSupplier' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'EXTERNAL_VENDOR',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Supplier details updated',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'supplierWorkflow_v1',
+					workflowStep: 'UPDATE_SUPPLIER',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'DELETE_SUPPLIER':
@@ -119,17 +153,48 @@ async function supplierWorkflow(input: SupplierWorkflowInput): Promise<SupplierW
 					() => deleteSupplier(input.organizationId, input.userId, input.supplierId!),
 					{ name: 'deleteSupplier' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'EXTERNAL_VENDOR',
+					entityId: input.supplierId!,
+					action: 'DELETE',
+					eventCategory: 'EXECUTION',
+					summary: 'Supplier deleted (soft delete)',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'supplierWorkflow_v1',
+					workflowStep: 'DELETE_SUPPLIER',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			default:
-				return { success: false, error: `Unknown action: ${input.action}` };
+				const errorResult = { success: false, error: `Unknown action: ${input.action}` };
+				logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+				return errorResult;
 		}
 
-		return { success: true, entityId };
+		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'completed', entityId });
+
+		const successResult = { success: true, entityId };
+		logWorkflowEnd(log, input.action, true, startTime, successResult as any);
+		return successResult;
+
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[SupplierWorkflow] Error in ${input.action}:`, errorMessage);
-		return { success: false, error: errorMessage };
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+		log.error('Workflow failed', { action: input.action, error: errorMessage });
+		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'SUPPLIER_WORKFLOW_ERROR'
+		});
+
+		const errorResult = { success: false, error: errorMessage };
+		logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+		return errorResult;
 	}
 }
 

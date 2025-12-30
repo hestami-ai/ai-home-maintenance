@@ -44,7 +44,8 @@
 			caseDetail = response.data;
 		} catch (err) {
 			console.error('Failed to load case:', err);
-			error = 'An error occurred while loading the case';
+			// Preserve the actual error message for display
+			error = err instanceof Error ? err.message : 'An error occurred while loading the case';
 		} finally {
 			isLoading = false;
 		}

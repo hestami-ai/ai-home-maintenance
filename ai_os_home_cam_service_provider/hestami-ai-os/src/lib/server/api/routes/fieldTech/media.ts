@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { MediaType } from '../../../../../../generated/prisma/client.js';
 import { startMediaWorkflow } from '../../../workflows/mediaWorkflow.js';
@@ -83,6 +82,11 @@ export const mediaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -90,15 +94,15 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_media', 'new');
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
@@ -124,7 +128,7 @@ export const mediaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to register media');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to register media' });
 			}
 
 			const media = await prisma.jobMedia.findUniqueOrThrow({
@@ -146,6 +150,10 @@ export const mediaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -153,13 +161,13 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.jobMedia.findFirst({
 				where: { id: input.mediaId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Media');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Media not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
@@ -174,7 +182,7 @@ export const mediaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to mark media as uploaded');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark media as uploaded' });
 			}
 
 			const media = await prisma.jobMedia.findUniqueOrThrow({
@@ -204,6 +212,11 @@ export const mediaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -211,15 +224,15 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_media', 'new');
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
@@ -244,7 +257,7 @@ export const mediaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add voice note');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add voice note' });
 			}
 
 			const media = await prisma.jobMedia.findUniqueOrThrow({
@@ -266,6 +279,11 @@ export const mediaRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -273,16 +291,16 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.jobMedia.findFirst({
 				where: { id: input.mediaId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Media');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Media not found' });
 
 			if (existing.mediaType !== 'AUDIO') {
-				throw ApiException.badRequest('Transcription only applies to audio media');
+				throw errors.BAD_REQUEST({ message: 'Transcription only applies to audio media' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -298,7 +316,7 @@ export const mediaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update transcription');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update transcription' });
 			}
 
 			const media = await prisma.jobMedia.findUniqueOrThrow({
@@ -321,6 +339,9 @@ export const mediaRouter = {
 				})
 				.merge(PaginationInputSchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -331,8 +352,8 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_media', input.jobId);
 
 			const limit = input.limit ?? 50;
@@ -371,6 +392,10 @@ export const mediaRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -378,15 +403,15 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_media', input.id);
 
 			const media = await prisma.jobMedia.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
 
-			if (!media) throw ApiException.notFound('Media');
+			if (!media) throw errors.NOT_FOUND({ message: 'Media not found' });
 
 			return successResponse({ media: formatJobMedia(media) }, context);
 		}),
@@ -396,6 +421,11 @@ export const mediaRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -403,14 +433,14 @@ export const mediaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'job_media', input.id);
 
 			const existing = await prisma.jobMedia.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Media');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Media not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
@@ -425,7 +455,7 @@ export const mediaRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete media');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete media' });
 			}
 
 			return successResponse({ deleted: true }, context);

@@ -9,6 +9,9 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { MediaType } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
+import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // Action types for the unified workflow
 export const MediaAction = {
@@ -20,6 +23,9 @@ export const MediaAction = {
 } as const;
 
 export type MediaAction = (typeof MediaAction)[keyof typeof MediaAction];
+
+const WORKFLOW_STATUS_EVENT = 'media_status';
+const WORKFLOW_ERROR_EVENT = 'media_error';
 
 export interface MediaWorkflowInput {
 	action: MediaAction;
@@ -58,7 +64,6 @@ async function registerMedia(
 		}
 	});
 
-	console.log(`[MediaWorkflow] REGISTER_MEDIA media:${media.id} by user ${userId}`);
 	return media.id;
 }
 
@@ -77,7 +82,6 @@ async function markUploaded(
 		}
 	});
 
-	console.log(`[MediaWorkflow] MARK_UPLOADED media:${mediaId} by user ${userId}`);
 	return mediaId;
 }
 
@@ -106,7 +110,6 @@ async function addVoiceNote(
 		}
 	});
 
-	console.log(`[MediaWorkflow] ADD_VOICE_NOTE media:${media.id} by user ${userId}`);
 	return media.id;
 }
 
@@ -124,7 +127,6 @@ async function updateTranscription(
 		}
 	});
 
-	console.log(`[MediaWorkflow] UPDATE_TRANSCRIPTION media:${mediaId} by user ${userId}`);
 	return mediaId;
 }
 
@@ -134,14 +136,17 @@ async function deleteMedia(
 	mediaId: string
 ): Promise<string> {
 	await prisma.jobMedia.delete({ where: { id: mediaId } });
-
-	console.log(`[MediaWorkflow] DELETE_MEDIA media:${mediaId} by user ${userId}`);
 	return mediaId;
 }
 
 // Main workflow function
 async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowResult> {
+	const log = createWorkflowLogger('mediaWorkflow', DBOS.workflowID, input.action);
+	const startTime = logWorkflowStart(log, input.action, input as any);
+
 	try {
+		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
+
 		let entityId: string | undefined;
 
 		switch (input.action) {
@@ -150,6 +155,19 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 					() => registerMedia(input.organizationId, input.userId, input.data),
 					{ name: 'registerMedia' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'JOB', // Media is attached to jobs
+					entityId: entityId,
+					action: 'CREATE',
+					eventCategory: 'EXECUTION',
+					summary: `Registered media: ${input.data.fileName}`,
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'mediaWorkflow_v1',
+					workflowStep: 'REGISTER_MEDIA',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'MARK_UPLOADED':
@@ -157,6 +175,19 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 					() => markUploaded(input.organizationId, input.userId, input.mediaId!, input.data),
 					{ name: 'markUploaded' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'JOB',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'SYSTEM',
+					summary: 'Media upload confirmed',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'mediaWorkflow_v1',
+					workflowStep: 'MARK_UPLOADED',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'ADD_VOICE_NOTE':
@@ -164,6 +195,19 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 					() => addVoiceNote(input.organizationId, input.userId, input.data),
 					{ name: 'addVoiceNote' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'JOB',
+					entityId: entityId,
+					action: 'CREATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Voice note added',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'mediaWorkflow_v1',
+					workflowStep: 'ADD_VOICE_NOTE',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'UPDATE_TRANSCRIPTION':
@@ -171,6 +215,19 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 					() => updateTranscription(input.organizationId, input.userId, input.mediaId!, input.data),
 					{ name: 'updateTranscription' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'JOB',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'SYSTEM', // Usually done by AI/System
+					summary: 'Voice note transcription updated',
+					performedById: input.userId,
+					performedByType: 'SYSTEM',
+					workflowId: 'mediaWorkflow_v1',
+					workflowStep: 'UPDATE_TRANSCRIPTION',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'DELETE_MEDIA':
@@ -178,17 +235,48 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 					() => deleteMedia(input.organizationId, input.userId, input.mediaId!),
 					{ name: 'deleteMedia' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'JOB',
+					entityId: input.mediaId!,
+					action: 'DELETE',
+					eventCategory: 'EXECUTION',
+					summary: 'Media deleted',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'mediaWorkflow_v1',
+					workflowStep: 'DELETE_MEDIA',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			default:
-				return { success: false, error: `Unknown action: ${input.action}` };
+				const errorResult = { success: false, error: `Unknown action: ${input.action}` };
+				logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+				return errorResult;
 		}
 
-		return { success: true, entityId };
+		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'completed', entityId });
+
+		const successResult = { success: true, entityId };
+		logWorkflowEnd(log, input.action, true, startTime, successResult as any);
+		return successResult;
+
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[MediaWorkflow] Error in ${input.action}:`, errorMessage);
-		return { success: false, error: errorMessage };
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+		log.error('Workflow failed', { action: input.action, error: errorMessage });
+		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'MEDIA_WORKFLOW_ERROR'
+		});
+
+		const errorResult = { success: false, error: errorMessage };
+		logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+		return errorResult;
 	}
 }
 

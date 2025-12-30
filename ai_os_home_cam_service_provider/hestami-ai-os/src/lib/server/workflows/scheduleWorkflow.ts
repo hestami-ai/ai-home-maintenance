@@ -9,6 +9,8 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { RecurrenceFrequency } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 
 const WORKFLOW_STATUS_EVENT = 'schedule_status';
 const WORKFLOW_ERROR_EVENT = 'schedule_error';
@@ -221,6 +223,9 @@ async function generateVisits(
 }
 
 async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleWorkflowResult> {
+	const log = createWorkflowLogger('scheduleWorkflow', DBOS.workflowID, input.action);
+	const startTime = logWorkflowStart(log, input.action, input as any);
+
 	try {
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
@@ -265,28 +270,48 @@ async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleW
 				break;
 			}
 			default:
-				throw new Error(`Unknown action: ${input.action}`);
+				const errorResult = {
+					success: false,
+					action: input.action,
+					timestamp: new Date().toISOString(),
+					error: `Unknown action: ${input.action}`
+				};
+				logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+				return errorResult;
 		}
 
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'completed', entityId, generatedCount });
 
-		return {
+		const successResult = {
 			success: true,
 			action: input.action,
 			entityId,
 			generatedCount,
 			timestamp: new Date().toISOString()
 		};
+		logWorkflowEnd(log, input.action, true, startTime, successResult as any);
+		return successResult;
+
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+		log.error('Workflow failed', { action: input.action, error: errorMessage });
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
-		return {
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'SCHEDULE_WORKFLOW_ERROR'
+		});
+
+		const errorResult = {
 			success: false,
 			action: input.action,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+		return errorResult;
 	}
 }
 

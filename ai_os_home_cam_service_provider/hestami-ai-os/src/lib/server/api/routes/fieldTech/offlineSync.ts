@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startOfflineSyncWorkflow } from '../../../workflows/offlineSyncWorkflow.js';
 
@@ -19,7 +18,7 @@ const syncQueueItemOutput = z.object({
 	entityType: z.string(),
 	entityId: z.string(),
 	action: z.string(),
-	payload: z.any(),
+	payload: JsonSchema,
 	attempts: z.number(),
 	lastAttemptAt: z.string().nullable(),
 	errorMessage: z.string().nullable(),
@@ -60,10 +59,15 @@ export const offlineSyncRouter = {
 					entityType: z.string(), // JobTimeEntry, JobMedia, JobStep, etc.
 					entityId: z.string(), // Local/client-side ID
 					action: z.enum(['CREATE', 'UPDATE', 'DELETE']),
-					payload: z.any() // Full record data
+					payload: JsonSchema // Full record data
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -71,15 +75,15 @@ export const offlineSyncRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'offline_sync_queue', 'new');
 
 			// Validate technician
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization!.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
@@ -99,7 +103,7 @@ export const offlineSyncRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to queue item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to queue item' });
 			}
 
 			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
@@ -122,12 +126,17 @@ export const offlineSyncRouter = {
 							entityType: z.string(),
 							entityId: z.string(),
 							action: z.enum(['CREATE', 'UPDATE', 'DELETE']),
-							payload: z.any()
+							payload: JsonSchema
 						})
 					)
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -138,15 +147,15 @@ export const offlineSyncRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'offline_sync_queue', 'new');
 
 			// Validate technician
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization!.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
@@ -163,7 +172,7 @@ export const offlineSyncRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to batch queue items');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to batch queue items' });
 			}
 
 			const items = await prisma.offlineSyncQueue.findMany({
@@ -191,6 +200,9 @@ export const offlineSyncRouter = {
 				})
 				.merge(PaginationInputSchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -201,8 +213,8 @@ export const offlineSyncRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'offline_sync_queue', input.technicianId);
 
 			const limit = input.limit ?? 100;
@@ -248,6 +260,11 @@ export const offlineSyncRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -255,14 +272,14 @@ export const offlineSyncRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('sync', 'offline_sync_queue', input.queueItemId);
 
 			const existing = await prisma.offlineSyncQueue.findFirst({
 				where: { id: input.queueItemId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Queue item');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Queue item not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
@@ -277,7 +294,7 @@ export const offlineSyncRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to mark item as synced');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark item as synced' });
 			}
 
 			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
@@ -299,6 +316,10 @@ export const offlineSyncRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -306,13 +327,13 @@ export const offlineSyncRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.offlineSyncQueue.findFirst({
 				where: { id: input.queueItemId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Queue item');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Queue item not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
@@ -330,7 +351,7 @@ export const offlineSyncRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to mark item as failed');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark item as failed' });
 			}
 
 			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
@@ -352,6 +373,10 @@ export const offlineSyncRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -359,8 +384,8 @@ export const offlineSyncRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'offline_sync_queue', input.technicianId);
 
 			const cutoffDate = new Date();
@@ -381,7 +406,7 @@ export const offlineSyncRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to clear synced items');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to clear synced items' });
 			}
 
 			return successResponse({ deletedCount: result.deletedCount ?? 0 }, context);

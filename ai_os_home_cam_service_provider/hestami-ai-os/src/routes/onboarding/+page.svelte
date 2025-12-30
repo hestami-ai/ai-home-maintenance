@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { Home, Building2, Wrench, ArrowRight } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
-	import { auth, organizationStore } from '$lib/stores';
-	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
-	// Redirect if not authenticated
-	onMount(() => {
-		if (!$auth.isAuthenticated && !$auth.isLoading) {
-			goto('/login');
-		}
-	});
+	interface Props {
+		data: {
+			memberships: any[];
+		};
+	}
+
+	let { data }: Props = $props();
 
 	interface EntryVector {
 		id: string;
@@ -71,11 +69,11 @@
 		</div>
 
 		<!-- Existing Organizations -->
-		{#if $organizationStore.memberships.length > 0}
+		{#if data.memberships.length > 0}
 			<div class="mt-8">
 				<h2 class="text-lg font-semibold">Your Organizations</h2>
 				<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{#each $organizationStore.memberships as membership}
+					{#each data.memberships as membership}
 						<Card variant="outlined" padding="md">
 							<div class="flex items-center gap-3">
 								<div class="flex-1">

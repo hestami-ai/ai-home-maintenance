@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import {
 	ServiceContractStatus,
@@ -180,6 +179,10 @@ export const serviceContractRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -187,8 +190,8 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'service_contract', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -227,7 +230,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create contract' });
 			}
 
 			const contract = await prisma.serviceContract.findUniqueOrThrow({
@@ -240,6 +243,10 @@ export const serviceContractRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -247,8 +254,8 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'service_contract', input.id);
 
 			const contract = await prisma.serviceContract.findFirst({
@@ -256,7 +263,7 @@ export const serviceContractRouter = {
 				include: { serviceItems: true }
 			});
 
-			if (!contract) throw ApiException.notFound('Service contract');
+			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			return successResponse({ contract: formatContract(contract, true) }, context);
 		}),
@@ -274,6 +281,9 @@ export const serviceContractRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -284,8 +294,8 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'service_contract', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -348,6 +358,12 @@ export const serviceContractRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -355,17 +371,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'service_contract', input.id);
 
 			const existing = await prisma.serviceContract.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Service contract');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (!['DRAFT', 'ACTIVE'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only edit DRAFT or ACTIVE contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT or ACTIVE contracts' });
 			}
 
 			const { id, idempotencyKey, ...data } = input;
@@ -383,7 +399,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update contract' });
 			}
 
 			const contract = await prisma.serviceContract.findUniqueOrThrow({
@@ -396,6 +412,12 @@ export const serviceContractRouter = {
 
 	activate: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -403,17 +425,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('activate', 'service_contract', input.id);
 
 			const existing = await prisma.serviceContract.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Service contract');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (!['DRAFT', 'PENDING_APPROVAL', 'SUSPENDED'].includes(existing.status)) {
-				throw ApiException.badRequest('Cannot activate contract in current status');
+				throw errors.BAD_REQUEST({ message: 'Cannot activate contract in current status' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -429,7 +451,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to activate contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate contract' });
 			}
 
 			const contract = await prisma.serviceContract.findUniqueOrThrow({
@@ -442,6 +464,12 @@ export const serviceContractRouter = {
 
 	suspend: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -449,17 +477,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('suspend', 'service_contract', input.id);
 
 			const existing = await prisma.serviceContract.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Service contract');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (existing.status !== 'ACTIVE') {
-				throw ApiException.badRequest('Can only suspend ACTIVE contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only suspend ACTIVE contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -475,7 +503,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to suspend contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to suspend contract' });
 			}
 
 			const contract = await prisma.serviceContract.findUniqueOrThrow({
@@ -488,6 +516,12 @@ export const serviceContractRouter = {
 
 	cancel: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -495,17 +529,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('cancel', 'service_contract', input.id);
 
 			const existing = await prisma.serviceContract.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Service contract');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (['CANCELLED', 'EXPIRED'].includes(existing.status)) {
-				throw ApiException.badRequest('Contract is already cancelled or expired');
+				throw errors.BAD_REQUEST({ message: 'Contract is already cancelled or expired' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -521,7 +555,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to cancel contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel contract' });
 			}
 
 			const contract = await prisma.serviceContract.findUniqueOrThrow({
@@ -543,6 +577,12 @@ export const serviceContractRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -550,17 +590,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('renew', 'service_contract', input.id);
 
 			const existing = await prisma.serviceContract.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Service contract');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (!['ACTIVE', 'EXPIRED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only renew ACTIVE or EXPIRED contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only renew ACTIVE or EXPIRED contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -579,7 +619,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to renew contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to renew contract' });
 			}
 
 			const contract = await prisma.serviceContract.findUniqueOrThrow({
@@ -592,6 +632,12 @@ export const serviceContractRouter = {
 
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -599,17 +645,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'service_contract', input.id);
 
 			const existing = await prisma.serviceContract.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Service contract');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only delete DRAFT contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -625,7 +671,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete contract');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete contract' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -648,6 +694,12 @@ export const serviceContractRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -655,17 +707,17 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'service_contract', input.contractId);
 
 			const contract = await prisma.serviceContract.findFirst({
 				where: { id: input.contractId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!contract) throw ApiException.notFound('Service contract');
+			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
 			if (!['DRAFT', 'ACTIVE'].includes(contract.status)) {
-				throw ApiException.badRequest('Can only add items to DRAFT or ACTIVE contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only add items to DRAFT or ACTIVE contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -690,7 +742,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add service item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add service item' });
 			}
 
 			const serviceItem = await prisma.contractServiceItem.findUniqueOrThrow({
@@ -702,6 +754,12 @@ export const serviceContractRouter = {
 
 	removeServiceItem: orgProcedure
 		.input(z.object({ itemId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -709,21 +767,21 @@ export const serviceContractRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const item = await prisma.contractServiceItem.findUnique({
 				where: { id: input.itemId },
 				include: { contract: true }
 			});
 			if (!item || item.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Service item');
+				throw errors.NOT_FOUND({ message: 'Service item not found' });
 			}
 
 			await context.cerbos.authorize('edit', 'service_contract', item.contractId);
 
 			if (!['DRAFT', 'ACTIVE'].includes(item.contract.status)) {
-				throw ApiException.badRequest('Can only remove items from DRAFT or ACTIVE contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only remove items from DRAFT or ACTIVE contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -739,7 +797,7 @@ export const serviceContractRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to remove service item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove service item' });
 			}
 
 			return successResponse({ deleted: true }, context);

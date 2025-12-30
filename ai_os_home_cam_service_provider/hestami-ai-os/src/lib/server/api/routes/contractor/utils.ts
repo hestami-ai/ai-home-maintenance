@@ -1,7 +1,6 @@
-import { ApiException } from '../../errors.js';
 import { prisma } from '../../../db.js';
 
-export const assertContractorOrg = async (organizationId: string) => {
+export const assertContractorOrg = async (organizationId: string, errors: any) => {
 	const org = await prisma.organization.findFirst({
 		where: {
 			id: organizationId,
@@ -10,7 +9,7 @@ export const assertContractorOrg = async (organizationId: string) => {
 		}
 	});
 	if (!org) {
-		throw ApiException.forbidden('This feature is only available for contractor organizations');
+		throw errors.FORBIDDEN({ message: 'This feature is only available for contractor organizations' });
 	}
 	return org;
 };
@@ -19,14 +18,14 @@ export const assertContractorOrg = async (organizationId: string) => {
  * Enforce that a contractor organization has at least one active, unexpired license and insurance policy.
  * Intended to gate scheduling/dispatch/job creation.
  */
-export const assertContractorComplianceForScheduling = async (organizationId: string) => {
-	await assertContractorOrg(organizationId);
+export const assertContractorComplianceForScheduling = async (organizationId: string, errors: any) => {
+	await assertContractorOrg(organizationId, errors);
 
 	const profile = await prisma.contractorProfile.findUnique({
 		where: { organizationId }
 	});
 	if (!profile) {
-		throw ApiException.forbidden('Contractor profile is required before scheduling');
+		throw errors.FORBIDDEN({ message: 'Contractor profile is required before scheduling' });
 	}
 
 	const now = new Date();
@@ -39,7 +38,7 @@ export const assertContractorComplianceForScheduling = async (organizationId: st
 		}
 	});
 	if (!activeLicense) {
-		throw ApiException.forbidden('Contractor has no active license for scheduling or dispatch');
+		throw errors.FORBIDDEN({ message: 'Contractor has no active license for scheduling or dispatch' });
 	}
 
 	const activeInsurance = await prisma.contractorInsurance.findFirst({
@@ -50,7 +49,7 @@ export const assertContractorComplianceForScheduling = async (organizationId: st
 		}
 	});
 	if (!activeInsurance) {
-		throw ApiException.forbidden('Contractor has no active insurance for scheduling or dispatch');
+		throw errors.FORBIDDEN({ message: 'Contractor has no active insurance for scheduling or dispatch' });
 	}
 
 	return { license: activeLicense, insurance: activeInsurance };

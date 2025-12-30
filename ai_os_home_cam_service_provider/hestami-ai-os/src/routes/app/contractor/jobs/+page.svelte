@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
 		Wrench,
@@ -24,56 +23,57 @@
 		Truck
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { organizationStore } from '$lib/stores';
 	import { jobApi, type Job, type JobStatus, type JobSourceType } from '$lib/api/cam';
 
+	interface Props {
+		data: {
+			jobs: Job[];
+			filters: {
+				status: JobStatus | '';
+				sourceType: JobSourceType | '';
+				search: string;
+			};
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let jobs = $state<Job[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let statusFilter = $state<JobStatus | ''>('');
 	let sourceFilter = $state<JobSourceType | ''>('');
 	let selectedJobId = $state<string | null>(null);
 
-	const organizationId = $derived($organizationStore.current?.organization.id || '');
-
-	// Get selected job ID from URL
+	// Synchroniz	// Get selected job ID from URL
 	$effect(() => {
-		const urlJobId = $page.url.searchParams.get('id');
+		const urlJobId = page.url.searchParams.get('id');
 		if (urlJobId && urlJobId !== selectedJobId) {
 			selectedJobId = urlJobId;
 		}
 	});
 
-	onMount(async () => {
-		await loadJobs();
+
+	// Synchronize server jobs to local state
+	$effect(() => {
+		if (data.jobs) {
+			jobs = [...data.jobs];
+		}
+		searchQuery = data.filters.search;
+		statusFilter = data.filters.status;
+		sourceFilter = data.filters.sourceType;
 	});
 
 	async function loadJobs() {
-		if (!organizationId) {
-			isLoading = false;
-			return;
-		}
-		isLoading = true;
-		error = null;
-		try {
-			const response = await jobApi.list({
-				status: statusFilter || undefined,
-				sourceType: sourceFilter || undefined,
-				search: searchQuery || undefined,
-				limit: 50
-			});
-			if (!response.ok) {
-				error = 'Failed to load jobs';
-				return;
-			}
-			jobs = response.data.jobs;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load jobs';
-		} finally {
-			isLoading = false;
-		}
+		const params = new URLSearchParams();
+		if (statusFilter) params.set('status', statusFilter);
+		if (sourceFilter) params.set('sourceType', sourceFilter);
+		if (searchQuery) params.set('q', searchQuery);
+		
+		window.location.href = `/app/contractor/jobs?${params.toString()}`;
 	}
+
 
 	function selectJob(jobId: string) {
 		selectedJobId = jobId;

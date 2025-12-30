@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
 
@@ -48,7 +47,10 @@ export const ownershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'ownership', 'new');
 
@@ -59,7 +61,7 @@ export const ownershipRouter = {
 			});
 
 			if (!unit || unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Unit');
+				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
 			// Verify party belongs to this organization
@@ -68,7 +70,7 @@ export const ownershipRouter = {
 			});
 
 			if (!party) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party' });
 			}
 
 			// If setting as primary, unset other primaries for this unit
@@ -135,7 +137,10 @@ export const ownershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Ownership not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const ownership = await prisma.ownership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: {
@@ -145,7 +150,7 @@ export const ownershipRouter = {
 			});
 
 			if (!ownership || ownership.unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Ownership');
+				throw errors.NOT_FOUND({ message: 'Ownership' });
 			}
 
 			// Cerbos authorization
@@ -218,7 +223,10 @@ export const ownershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Unit not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify unit belongs to this organization
 			const unit = await prisma.unit.findFirst({
 				where: { id: input.unitId, deletedAt: null },
@@ -226,7 +234,7 @@ export const ownershipRouter = {
 			});
 
 			if (!unit || unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Unit');
+				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
 			// Cerbos authorization for viewing unit's ownerships
@@ -292,14 +300,17 @@ export const ownershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Ownership not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { unit: { include: { property: { include: { association: true } } } } }
 			});
 
 			if (!existing || existing.unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Ownership');
+				throw errors.NOT_FOUND({ message: 'Ownership' });
 			}
 
 			// Cerbos authorization
@@ -340,14 +351,17 @@ export const ownershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Ownership not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { unit: { include: { property: { include: { association: true } } } } }
 			});
 
 			if (!existing || existing.unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Ownership');
+				throw errors.NOT_FOUND({ message: 'Ownership' });
 			}
 
 			// Cerbos authorization

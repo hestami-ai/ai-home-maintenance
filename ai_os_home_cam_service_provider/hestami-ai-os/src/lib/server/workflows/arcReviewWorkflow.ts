@@ -7,8 +7,10 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
 import type { ARCReviewAction } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('ARCReviewWorkflow');
@@ -104,17 +106,23 @@ async function addMember(
 	});
 	if (existing) return existing.id;
 
-	const member = await prisma.aRCCommitteeMember.create({
-		data: {
-			committeeId,
-			partyId,
-			role: data.role as string | undefined,
-			isChair: (data.isChair as boolean) ?? false
-		}
-	});
+	try {
+		const member = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCCommitteeMember.create({
+				data: {
+					committeeId,
+					partyId,
+					role: data.role as string | undefined,
+					isChair: (data.isChair as boolean) ?? false
+				}
+			});
+		}, { userId, reason: 'Adding member to ARC committee via workflow' });
 
-	console.log(`[ARCReviewWorkflow] ADD_MEMBER member:${member.id} by user ${userId}`);
-	return member.id;
+		log.info('ADD_MEMBER completed', { memberId: member.id, userId });
+		return member.id;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function removeMember(
@@ -133,14 +141,20 @@ async function removeMember(
 		throw new Error('ARC Committee not found');
 	}
 
-	const leftAt = new Date();
-	await prisma.aRCCommitteeMember.updateMany({
-		where: { committeeId, partyId, leftAt: null },
-		data: { leftAt }
-	});
+	try {
+		const leftAt = new Date();
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.aRCCommitteeMember.updateMany({
+				where: { committeeId, partyId, leftAt: null },
+				data: { leftAt }
+			});
+		}, { userId, reason: 'Removing member from ARC committee via workflow' });
 
-	console.log(`[ARCReviewWorkflow] REMOVE_MEMBER committee:${committeeId} party:${partyId} by user ${userId}`);
-	return leftAt.toISOString();
+		log.info('REMOVE_MEMBER completed', { committeeId, partyId, userId });
+		return leftAt.toISOString();
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function assignCommittee(
@@ -165,13 +179,19 @@ async function assignCommittee(
 
 	await ensureCommitteeBelongs(committeeId, request.associationId);
 
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: { committeeId, status: 'UNDER_REVIEW', reviewedAt: null, decisionDate: null }
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: { committeeId, status: 'UNDER_REVIEW', reviewedAt: null, decisionDate: null }
+			});
+		}, { userId, reason: 'Assigning committee to ARC request via workflow' });
 
-	console.log(`[ARCReviewWorkflow] ASSIGN_COMMITTEE request:${requestId} committee:${committeeId} by user ${userId}`);
-	return { entityId: updated.id, status: updated.status };
+		log.info('ASSIGN_COMMITTEE completed', { requestId, committeeId, userId });
+		return { entityId: updated.id, status: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function submitReview(
@@ -197,28 +217,34 @@ async function submitReview(
 
 	await ensureCommitteeMember(request.committeeId, userId);
 
-	if (request.status === 'SUBMITTED') {
-		await prisma.aRCRequest.update({ where: { id: request.id }, data: { status: 'UNDER_REVIEW' } });
-	}
-
 	const existing = await prisma.aRCReview.findFirst({
 		where: { requestId, reviewerId: userId }
 	});
 	if (existing) return existing.id;
 
-	const review = await prisma.aRCReview.create({
-		data: {
-			requestId,
-			reviewerId: userId,
-			action: data.action as ARCReviewAction,
-			notes: data.notes as string | undefined,
-			conditions: data.conditions as string | undefined,
-			expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined
-		}
-	});
+	try {
+		const review = await orgTransaction(organizationId, async (tx) => {
+			if (request.status === 'SUBMITTED') {
+				await tx.aRCRequest.update({ where: { id: request.id }, data: { status: 'UNDER_REVIEW' } });
+			}
 
-	console.log(`[ARCReviewWorkflow] SUBMIT_REVIEW review:${review.id} by user ${userId}`);
-	return review.id;
+			return tx.aRCReview.create({
+				data: {
+					requestId,
+					reviewerId: userId,
+					action: data.action as ARCReviewAction,
+					notes: data.notes as string | undefined,
+					conditions: data.conditions as string | undefined,
+					expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined
+				}
+			});
+		}, { userId, reason: 'Submitting review on ARC request via workflow' });
+
+		log.info('SUBMIT_REVIEW completed', { reviewId: review.id, userId });
+		return review.id;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function recordDecision(
@@ -270,34 +296,36 @@ async function recordDecision(
 		}
 	}
 
-	const res = await prisma.$transaction(async (tx) => {
-		await tx.aRCReview.create({
-			data: {
-				requestId,
-				reviewerId: userId,
-				action,
-				notes: data.notes as string | undefined,
-				conditions: data.conditions as string | undefined,
-				expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined
-			}
-		});
+	try {
+		const res = await orgTransaction(organizationId, async (tx) => {
+			await tx.aRCReview.create({
+				data: {
+					requestId,
+					reviewerId: userId,
+					action,
+					notes: data.notes as string | undefined,
+					conditions: data.conditions as string | undefined,
+					expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined
+				}
+			});
 
-		const updated = await tx.aRCRequest.update({
-			where: { id: requestId },
-			data: {
-				status,
-				reviewedAt: decisionDate,
-				decisionDate,
-				conditions: data.conditions as string | undefined,
-				expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : request.expiresAt
-			}
-		});
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					status,
+					reviewedAt: decisionDate,
+					decisionDate,
+					conditions: data.conditions as string | undefined,
+					expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : request.expiresAt
+				}
+			});
+		}, { userId, reason: 'Recording decision on ARC request via workflow' });
 
-		return updated;
-	});
-
-	console.log(`[ARCReviewWorkflow] RECORD_DECISION request:${requestId} status:${status} by user ${userId}`);
-	return { entityId: res.id, status: res.status };
+		log.info('RECORD_DECISION completed', { requestId, status, userId });
+		return { entityId: res.id, status: res.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Main workflow function
@@ -348,8 +376,16 @@ async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCRevi
 				return { success: false, error: `Unknown action: ${input.action}` };
 		}
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[ARCReviewWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'ARC_REVIEW_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

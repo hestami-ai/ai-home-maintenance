@@ -1,5 +1,5 @@
 import type { UserRole } from '../../../../generated/prisma/client.js';
-import { ApiException } from './errors.js';
+
 
 /**
  * @deprecated This static permission system is deprecated.
@@ -214,19 +214,23 @@ export function getPermissionsForRole(role: UserRole): PermissionType[] {
 
 /**
  * @deprecated Use `context.cerbos.authorize()` instead
- * Throws ApiException if role doesn't have required permission
+ * Throws a forbidden error if role doesn't have required permission
  */
-export function requirePermission(role: UserRole | null, permission: PermissionType): void {
+export function requirePermission(role: UserRole | null, permission: PermissionType, errors: any): void {
 	if (!role || !hasPermission(role, permission)) {
-		throw ApiException.forbidden(`Permission denied: ${permission}`);
+		throw errors.FORBIDDEN({ message: `Permission denied: ${permission}` });
 	}
 }
 
 /**
- * Throws ApiException if role doesn't have all required permissions
+ * Throws forbidden error if role doesn't have all required permissions
  */
-export function requireAllPermissions(role: UserRole | null, permissions: PermissionType[]): void {
+export function requireAllPermissions(
+	role: UserRole | null,
+	permissions: PermissionType[],
+	errors: any
+): void {
 	if (!role || !hasAllPermissions(role, permissions)) {
-		throw ApiException.forbidden(`Permission denied: requires ${permissions.join(', ')}`);
+		throw errors.FORBIDDEN({ message: `Permission denied: requires ${permissions.join(', ')}` });
 	}
 }

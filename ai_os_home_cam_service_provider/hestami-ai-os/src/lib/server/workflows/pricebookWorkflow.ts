@@ -9,6 +9,7 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ContractorTradeType, PricebookItemType, PriceRuleType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
@@ -422,8 +423,15 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 			timestamp: new Date().toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'PRICEBOOK_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,

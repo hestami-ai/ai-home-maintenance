@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { ArrowLeft, Check, Loader2, Building2, Users, FileText } from 'lucide-svelte';
 	import { Card, RoleBadge } from '$lib/components/ui';
-	import { communityOnboarding, organizationStore } from '$lib/stores';
+	import { communityOnboarding } from '$lib/stores';
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
-	onMount(() => {
+	$effect.pre(() => {
 		communityOnboarding.setStep(5);
 	});
 
@@ -28,18 +27,8 @@
 			const org = result.data.organization;
 			await orpc.organization.setDefault({ organizationId: org.id });
 
-			organizationStore.addMembership({
-				organization: {
-					id: org.id,
-					name: org.name,
-					slug: org.slug,
-					type: org.type,
-					status: org.status
-				},
-				role: $communityOnboarding.userRole,
-				isDefault: true
-			});
-
+			// Client-side store removed - server data will refresh on redirect
+			
 			communityOnboarding.reset();
 			goto('/app/cam');
 		} catch (err) {

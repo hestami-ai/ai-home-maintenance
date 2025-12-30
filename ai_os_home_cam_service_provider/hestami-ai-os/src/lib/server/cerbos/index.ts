@@ -7,11 +7,11 @@
 
 import { GRPC } from '@cerbos/grpc';
 import type { Value } from '@cerbos/core';
-import { ApiException } from '../api/errors.js';
 import type { User, UserRole } from '../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../logger.js';
 
 const log = createModuleLogger('Cerbos');
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // ============================================================================
 // Types
@@ -28,6 +28,10 @@ export interface CerbosPrincipal {
 		orgRoles: Record<string, UserRole>;
 		/** Vendor ID if user is a vendor */
 		vendorId?: string;
+		/** Staff roles for Hestami platform staff (e.g., PLATFORM_ADMIN, CONCIERGE_OPERATOR) */
+		staffRoles?: string[];
+		/** Pillar access for Hestami platform staff (e.g., CONCIERGE, CAM, ADMIN) */
+		pillarAccess?: string[];
 	};
 	/** Scope for tenant-specific policies (organization slug) */
 	scope?: string;
@@ -120,17 +124,22 @@ export async function closeCerbos(): Promise<void> {
  * @param orgRoles - Map of organizationId -> UserRole for all user's memberships
  * @param currentOrgSlug - Current organization slug for scoped policies
  * @param vendorId - Optional vendor ID if user is a vendor
+ * @param currentOrgId - Current organization ID
+ * @param staffRoles - Staff roles for Hestami platform staff (e.g., PLATFORM_ADMIN)
+ * @param pillarAccess - Pillar access for Hestami platform staff (e.g., CONCIERGE, ADMIN)
  */
 export function buildPrincipal(
 	user: User,
 	orgRoles: Record<string, UserRole>,
 	currentOrgSlug?: string,
 	vendorId?: string,
-	currentOrgId?: string
+	currentOrgId?: string,
+	staffRoles?: string[],
+	pillarAccess?: string[]
 ): CerbosPrincipal {
 	// Build roles array - always include 'user', plus org-specific role if in org context
 	const roles: string[] = ['user'];
-	
+
 	// Add the current organization's role if we have org context
 	if (currentOrgId && orgRoles[currentOrgId]) {
 		const orgRole = orgRoles[currentOrgId];
@@ -139,12 +148,22 @@ export function buildPrincipal(
 		roles.push(cerbosRole);
 	}
 
+	// Add staff role if user is Hestami staff
+	if (staffRoles && staffRoles.length > 0) {
+		roles.push('hestami_staff');
+		if (staffRoles.includes('PLATFORM_ADMIN')) {
+			roles.push('hestami_platform_admin');
+		}
+	}
+
 	const principal: CerbosPrincipal = {
 		id: user.id,
 		roles,
 		attr: {
 			orgRoles,
-			...(vendorId && { vendorId })
+			...(vendorId && { vendorId }),
+			...(staffRoles && staffRoles.length > 0 && { staffRoles }),
+			...(pillarAccess && pillarAccess.length > 0 && { pillarAccess })
 		},
 		scope: currentOrgSlug
 	};
@@ -156,7 +175,9 @@ export function buildPrincipal(
 		scope: principal.scope,
 		orgRolesCount: Object.keys(orgRoles).length,
 		hasVendorId: !!vendorId,
-		currentOrgId
+		currentOrgId,
+		staffRoles: staffRoles ?? [],
+		pillarAccess: pillarAccess ?? []
 	});
 
 	return principal;
@@ -210,12 +231,19 @@ export async function isAllowed(
 
 		return allowed;
 	} catch (error) {
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+
+		await recordSpanError(errorObj, {
+			errorCode: 'AUTHORIZATION_FAILED',
+			errorType: 'AUTHORIZATION_ERROR'
+		});
+
 		log.error('Authorization check failed', {
 			principalId: principal.id,
 			resourceKind: resource.kind,
 			resourceId: resource.id,
 			action,
-			error: error instanceof Error ? error.message : String(error)
+			error: errorObj.message
 		});
 		throw error;
 	}
@@ -261,12 +289,12 @@ export async function checkResource(
 }
 
 /**
- * Require authorization - throws ApiException if not allowed
+ * Require authorization - throws Error if not allowed
  *
  * @param principal - The user principal
  * @param resource - The resource to check
  * @param action - The action to perform
- * @throws ApiException with 403 status if not allowed
+ * @throws Error with FORBIDDEN status if not allowed
  */
 export async function requireAuthorization(
 	principal: CerbosPrincipal,
@@ -275,7 +303,7 @@ export async function requireAuthorization(
 ): Promise<void> {
 	const allowed = await isAllowed(principal, resource, action);
 	if (!allowed) {
-		throw ApiException.forbidden(`Permission denied: ${action} on ${resource.kind}`);
+		throw new Error(`Permission denied: ${action} on ${resource.kind}`);
 	}
 }
 

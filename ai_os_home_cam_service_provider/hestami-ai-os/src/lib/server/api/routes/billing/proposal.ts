@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ProposalStatus } from '../../../../../../generated/prisma/client.js';
 import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
@@ -96,6 +95,11 @@ export const proposalRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -103,31 +107,31 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('create', 'proposal', 'new');
 
 			// Validate customer exists
 			const customer = await prisma.customer.findFirst({
-				where: { id: input.customerId, organizationId: context.organization!.id, deletedAt: null }
+				where: { id: input.customerId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!customer) throw ApiException.notFound('Customer');
+			if (!customer) throw errors.NOT_FOUND({ message: 'Customer not found' });
 
 			// Validate estimate if provided
 			if (input.estimateId) {
 				const estimate = await prisma.estimate.findFirst({
-					where: { id: input.estimateId, organizationId: context.organization!.id }
+					where: { id: input.estimateId, organizationId: context.organization.id }
 				});
-				if (!estimate) throw ApiException.notFound('Estimate');
+				if (!estimate) throw errors.NOT_FOUND({ message: 'Estimate not found' });
 			}
 
-			const proposalNumber = await generateProposalNumber(context.organization!.id);
+			const proposalNumber = await generateProposalNumber(context.organization.id);
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'CREATE_PROPOSAL',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
 						customerId: input.customerId,
@@ -143,7 +147,7 @@ export const proposalRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create proposal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create proposal' });
 			}
 
 			const proposal = await prisma.proposal.findUniqueOrThrow({
@@ -158,6 +162,10 @@ export const proposalRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -165,15 +173,15 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('view', 'proposal', input.id);
 
 			const proposal = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
-			if (!proposal) throw ApiException.notFound('Proposal');
+			if (!proposal) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
 		}),
@@ -192,6 +200,9 @@ export const proposalRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -202,15 +213,15 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('view', 'proposal', 'list');
 
 			const limit = input?.limit ?? 20;
 			const cursor = input?.cursor;
 
 			const where = {
-				organizationId: context.organization!.id,
+				organizationId: context.organization.id,
 				...(input?.customerId && { customerId: input.customerId }),
 				...(input?.estimateId && { estimateId: input.estimateId }),
 				...(input?.status && { status: input.status })
@@ -252,6 +263,12 @@ export const proposalRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -259,24 +276,24 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'proposal', input.id);
 
 			const existing = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Proposal');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only edit DRAFT proposals');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'UPDATE_PROPOSAL',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: { status: existing.status }
@@ -285,7 +302,7 @@ export const proposalRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update proposal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update proposal' });
 			}
 
 			const proposal = await prisma.proposal.findUniqueOrThrow({
@@ -300,6 +317,12 @@ export const proposalRouter = {
 	 */
 	send: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -307,24 +330,24 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('send', 'proposal', input.id);
 
 			const existing = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Proposal');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only send DRAFT proposals');
+				throw errors.BAD_REQUEST({ message: 'Can only send DRAFT proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'SEND_PROPOSAL',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -333,7 +356,7 @@ export const proposalRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to send proposal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send proposal' });
 			}
 
 			const proposal = await prisma.proposal.findUniqueOrThrow({
@@ -348,6 +371,10 @@ export const proposalRouter = {
 	 */
 	markViewed: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -355,13 +382,13 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 
 			const existing = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Proposal');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			if (existing.status !== 'SENT') {
 				return successResponse({ proposal: formatProposal(existing) }, context);
@@ -393,6 +420,12 @@ export const proposalRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -400,24 +433,24 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('accept', 'proposal', input.id);
 
 			const existing = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Proposal');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			if (!['SENT', 'VIEWED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only accept SENT or VIEWED proposals');
+				throw errors.BAD_REQUEST({ message: 'Can only accept SENT or VIEWED proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'ACCEPT_PROPOSAL',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -426,7 +459,7 @@ export const proposalRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to accept proposal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to accept proposal' });
 			}
 
 			const proposal = await prisma.proposal.findUniqueOrThrow({
@@ -441,6 +474,12 @@ export const proposalRouter = {
 	 */
 	decline: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -448,24 +487,24 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('decline', 'proposal', input.id);
 
 			const existing = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Proposal');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			if (!['SENT', 'VIEWED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only decline SENT or VIEWED proposals');
+				throw errors.BAD_REQUEST({ message: 'Can only decline SENT or VIEWED proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'DECLINE_PROPOSAL',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -474,7 +513,7 @@ export const proposalRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to decline proposal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to decline proposal' });
 			}
 
 			const proposal = await prisma.proposal.findUniqueOrThrow({
@@ -489,6 +528,12 @@ export const proposalRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -496,24 +541,24 @@ export const proposalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'proposal', input.id);
 
 			const existing = await prisma.proposal.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Proposal');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only delete DRAFT proposals');
+				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'DELETE_PROPOSAL',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -522,7 +567,7 @@ export const proposalRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete proposal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete proposal' });
 			}
 
 			return successResponse({ deleted: true }, context);

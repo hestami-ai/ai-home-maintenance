@@ -1,69 +1,117 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import {
 		ArrowLeft,
 		Loader2,
 		User,
 		Mail,
 		Calendar,
-		Shield,
 		CheckCircle,
-		XCircle,
-		AlertTriangle,
 		Clock,
-		Edit,
+		AlertTriangle,
+		XCircle,
 		UserCheck,
 		UserX,
 		RefreshCw,
+		Edit,
 		Briefcase
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
-	import {
-		staffApi,
-		STAFF_ROLE_LABELS,
-		STAFF_ROLE_DESCRIPTIONS,
-		PILLAR_ACCESS_LABELS,
-		STAFF_STATUS_LABELS,
-		type Staff,
-		type StaffRole,
-		type PillarAccess
-	} from '$lib/api/staff';
+	import { orpc } from '$lib/api';
 
-	const staffId = $derived($page.params.id ?? '');
+	interface Staff {
+		id: string;
+		userId: string;
+		displayName: string;
+		title: string | null;
+		roles: string[];
+		pillarAccess: string[];
+		status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED';
+		canBeAssignedCases: boolean;
+		activatedAt: string | null;
+		suspendedAt: string | null;
+		deactivatedAt: string | null;
+		createdAt: string;
+		updatedAt: string;
+		user?: {
+			email: string;
+			name?: string;
+		};
+	}
+
+	const STAFF_STATUS_LABELS: Record<string, string> = {
+		PENDING: 'Pending Activation',
+		ACTIVE: 'Active',
+		SUSPENDED: 'Suspended',
+		DEACTIVATED: 'Deactivated'
+	};
+
+	const STAFF_ROLE_LABELS: Record<string, string> = {
+		SUPER_ADMIN: 'Super Administrator',
+		ADMIN: 'Administrator',
+		SUPPORT: 'Support Staff',
+		OPERATOR: 'Operator',
+		VIEWER: 'Viewer'
+	};
+
+	const STAFF_ROLE_DESCRIPTIONS: Record<string, string> = {
+		SUPER_ADMIN: 'Full access to all system features and settings',
+		ADMIN: 'Can manage most system features except billing',
+		SUPPORT: 'Can assist users and manage cases',
+		OPERATOR: 'Can perform day-to-day operations',
+		VIEWER: 'Read-only access to assigned areas'
+	};
+
+	const PILLAR_ACCESS_LABELS: Record<string, string> = {
+		CAM: 'Community Management',
+		CONCIERGE: 'Concierge Services',
+		CONTRACTOR: 'Contractor Portal',
+		OWNER: 'Owner Portal',
+		ALL: 'All Pillars'
+	};
+
+	// Staff API wrapper
+	const staffApi = {
+		activate: (id: string) => orpc.staff.activate({ staffId: id, idempotencyKey: crypto.randomUUID() }),
+		suspend: (id: string, reason: string) => orpc.staff.suspend({ staffId: id, reason, idempotencyKey: crypto.randomUUID() }),
+		deactivate: (id: string, reason: string) => orpc.staff.deactivate({ staffId: id, reason, idempotencyKey: crypto.randomUUID() }),
+		reactivate: (id: string) => orpc.staff.reactivate({ staffId: id, idempotencyKey: crypto.randomUUID() }),
+		regenerateActivationCode: (id: string) => orpc.staff.regenerateActivationCode({ staffId: id, idempotencyKey: crypto.randomUUID() })
+	};
+
+	interface Props {
+		data: {
+			staff: Staff;
+		};
+	}
+
+	let { data }: Props = $props();
 
 	let staff = $state<Staff | null>(null);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let actionLoading = $state<string | null>(null);
 	let actionError = $state<string | null>(null);
 
-	// Modal states
+	// Modal state
 	let showSuspendModal = $state(false);
-	let showDeactivateModal = $state(false);
-	let showCodeModal = $state(false);
 	let suspendReason = $state('');
+	let showDeactivateModal = $state(false);
 	let deactivateReason = $state('');
+	let showCodeModal = $state(false);
 	let generatedCode = $state('');
 
-	onMount(async () => {
-		await loadStaff();
+	// Synchronize server data to local state
+	$effect(() => {
+		if (data.staff) {
+			staff = data.staff;
+		}
 	});
 
 	async function loadStaff() {
-		isLoading = true;
-		error = null;
-		try {
-			const response = await staffApi.get(staffId);
-			if (response.ok) {
-				staff = response.data.staff as Staff;
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load staff member';
-		} finally {
-			isLoading = false;
-		}
+		// No longer needed for mounting, but keeping as a refresh helper if needed
+		// or better, just use invalidateAll()
+		window.location.reload();
 	}
 
 	async function handleActivate() {

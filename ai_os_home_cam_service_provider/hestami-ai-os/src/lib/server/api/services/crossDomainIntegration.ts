@@ -856,6 +856,7 @@ export async function checkSchedulingConflicts(
 
 export interface CreateWorkOrderFromViolationInput {
 	violationId: string;
+	organizationId: string;
 	associationId: string;
 	userId: string;
 	title?: string;
@@ -919,6 +920,7 @@ export async function createWorkOrderFromViolation(
 
 	const workOrder = await prisma.workOrder.create({
 		data: {
+			organizationId: input.organizationId,
 			associationId: input.associationId,
 			workOrderNumber,
 			title: input.title ?? `Remediation: ${violation.violationType.name}`,
@@ -956,6 +958,7 @@ export async function createWorkOrderFromViolation(
 
 export interface CreateWorkOrderFromARCInput {
 	arcRequestId: string;
+	organizationId: string;
 	associationId: string;
 	userId: string;
 	title?: string;
@@ -1020,6 +1023,7 @@ export async function createWorkOrderFromARC(
 
 	const workOrder = await prisma.workOrder.create({
 		data: {
+			organizationId: input.organizationId,
 			associationId: input.associationId,
 			workOrderNumber,
 			title: input.title ?? arcRequest.title,
@@ -1057,6 +1061,7 @@ export async function createWorkOrderFromARC(
 
 export interface CreateWorkOrderFromResolutionInput {
 	resolutionId: string;
+	organizationId: string;
 	associationId: string;
 	userId: string;
 	title?: string;
@@ -1126,6 +1131,7 @@ export async function createWorkOrderFromResolution(
 	// Board directives are pre-authorized
 	const workOrder = await prisma.workOrder.create({
 		data: {
+			organizationId: input.organizationId,
 			associationId: input.associationId,
 			workOrderNumber,
 			title: input.title ?? resolution.title,

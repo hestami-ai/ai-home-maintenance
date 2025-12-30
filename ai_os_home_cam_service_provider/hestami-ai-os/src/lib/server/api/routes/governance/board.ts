@@ -1,41 +1,24 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
-import type { BoardRole, Prisma } from '../../../../../../generated/prisma/client.js';
+import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('BoardRoute');
 
 const boardRoleEnum = z.enum(['PRESIDENT', 'VICE_PRESIDENT', 'SECRETARY', 'TREASURER', 'DIRECTOR', 'MEMBER_AT_LARGE']);
 
-const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
+const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
-const ensurePartyBelongs = async (partyId: string, organizationId: string) => {
+const ensurePartyBelongs = async (partyId: string, organizationId: string, errors: any) => {
 	const party = await prisma.party.findFirst({ where: { id: partyId, organizationId, deletedAt: null } });
-	if (!party) throw ApiException.notFound('Party');
-};
-
-const recordBoardHistory = async (
-	boardId: string,
-	changeType: string,
-	detail: Prisma.InputJsonValue | undefined,
-	changedBy: string | undefined
-) => {
-	await prisma.boardHistory.create({
-		data: {
-			boardId,
-			changeType,
-			detail,
-			changedBy
-		}
-	});
+	if (!party) throw errors.NOT_FOUND({ message: 'Party' });
 };
 
 export const governanceBoardRouter = {
@@ -56,11 +39,15 @@ export const governanceBoardRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'governance_board', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			await getAssociationOrThrow(rest.associationId, context.organization.id);
+			await getAssociationOrThrow(rest.associationId, context.organization.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
@@ -74,7 +61,7 @@ export const governanceBoardRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create board');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create board' });
 			}
 
 			const board = await prisma.board.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -90,17 +77,20 @@ export const governanceBoardRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ board: z.any() }),
+				data: z.object({ board: JsonSchema }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Board not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const board = await prisma.board.findFirst({
 				where: { id: input.id },
 				include: { association: true, members: true }
 			});
 			if (!board || board.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Board');
+				throw errors.NOT_FOUND({ message: 'Board' });
 			}
 			await context.cerbos.authorize('view', 'governance_board', board.id);
 			return successResponse({ board }, context);
@@ -112,7 +102,7 @@ export const governanceBoardRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					boards: z.array(z.any()),
+					boards: z.array(JsonSchema),
 					pagination: PaginationOutputSchema
 				}),
 				meta: ResponseMetaSchema
@@ -161,7 +151,11 @@ export const governanceBoardRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_board', input.boardId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -170,9 +164,9 @@ export const governanceBoardRouter = {
 				include: { association: true }
 			});
 			if (!board || board.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Board');
+				throw errors.NOT_FOUND({ message: 'Board' });
 			}
-			await ensurePartyBelongs(rest.partyId, board.association.organizationId);
+			await ensurePartyBelongs(rest.partyId, board.association.organizationId, errors);
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGovernanceWorkflow(
@@ -192,7 +186,7 @@ export const governanceBoardRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to add board member');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to add board member' });
 			}
 
 			const member = await prisma.boardMember.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -219,7 +213,11 @@ export const governanceBoardRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Board not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_board', input.boardId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -228,7 +226,7 @@ export const governanceBoardRouter = {
 				include: { association: true }
 			});
 			if (!board || board.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Board');
+				throw errors.NOT_FOUND({ message: 'Board' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -246,7 +244,7 @@ export const governanceBoardRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to remove board member');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to remove board member' });
 			}
 
 			const member = await prisma.boardMember.findUniqueOrThrow({ where: { id: rest.memberId } });
@@ -255,8 +253,7 @@ export const governanceBoardRouter = {
 				{ member: { id: member.id, boardId: member.boardId, isActive: member.isActive } },
 				context
 			);
-		})
-	,
+		}),
 
 	listHistory: orgProcedure
 		.input(
@@ -268,13 +265,16 @@ export const governanceBoardRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					entries: z.array(z.any()),
+					entries: z.array(JsonSchema),
 					pagination: PaginationOutputSchema
 				}),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Board not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'governance_board', input.boardId);
 
 			const take = input.limit ?? 20;
@@ -283,7 +283,7 @@ export const governanceBoardRouter = {
 				include: { association: true }
 			});
 			if (!board || board.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Board');
+				throw errors.NOT_FOUND({ message: 'Board' });
 			}
 
 			const items = await prisma.boardHistory.findMany({

@@ -1,27 +1,31 @@
 <script lang="ts">
-	import { Home, Plus, MapPin, Building2, Wrench, Loader2, Search } from 'lucide-svelte';
+	import { Home, MapPin, Building2, Wrench, Plus, Search, Loader2 } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { orpc } from '$lib/api';
-	import { onMount } from 'svelte';
 
 	interface Property {
 		id: string;
 		name: string;
-		propertyType: string;
 		addressLine1: string;
-		addressLine2: string | null;
 		city: string;
 		state: string;
 		postalCode: string;
-		yearBuilt: number | null;
-		squareFeet: number | null;
+		propertyType: string;
 		hasExternalHoa: boolean;
 		activeCaseCount: number;
-		isActive: boolean;
+		squareFeet: number | null;
+		yearBuilt: number | null;
 	}
 
-	let properties = $state<Property[]>([]);
-	let isLoading = $state(true);
+	interface Props {
+		data: {
+			properties: Property[];
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let properties = $derived(data.properties);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 
@@ -46,25 +50,10 @@
 		COMMERCIAL: 'Commercial'
 	};
 
-	onMount(async () => {
-		await loadProperties();
-	});
-
-	async function loadProperties() {
-		isLoading = true;
-		error = null;
-
-		try {
-			const result = await orpc.individualProperty.list({
-				limit: 50
-			});
-			properties = result.data.properties as Property[];
-		} catch (err) {
-			console.error('Failed to load properties:', err);
-			error = err instanceof Error ? err.message : 'Failed to load properties';
-		} finally {
-			isLoading = false;
-		}
+	function loadProperties() {
+		// This is naturally handled by the parent load function on mount/navigation
+		// But we keep the function name for the "Try Again" button
+		window.location.reload();
 	}
 </script>
 

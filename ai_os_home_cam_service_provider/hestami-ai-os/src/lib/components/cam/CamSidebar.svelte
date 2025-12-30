@@ -15,14 +15,26 @@
 		ChevronLeft,
 		ChevronRight
 	} from 'lucide-svelte';
-	import { camStore, badgeCounts, isSidebarCollapsed } from '$lib/stores';
+
+	interface BadgeCounts {
+		violations: number;
+		arcRequests: number;
+		workOrders: number;
+	}
 
 	interface NavItem {
 		label: string;
 		href: string;
 		icon: typeof LayoutDashboard;
-		badgeKey?: 'violations' | 'arcRequests' | 'workOrders';
+		badgeKey?: keyof BadgeCounts;
 	}
+
+	interface Props {
+		badgeCounts: BadgeCounts;
+	}
+
+	let { badgeCounts }: Props = $props();
+	let isSidebarCollapsed = $state(false);
 
 	const navItems: NavItem[] = [
 		{ label: 'Dashboard', href: '/app/cam', icon: LayoutDashboard },
@@ -47,20 +59,20 @@
 	}
 
 	function toggleSidebar() {
-		camStore.toggleSidebar();
+		isSidebarCollapsed = !isSidebarCollapsed;
 	}
 </script>
 
 <aside
 	class="flex h-full flex-col border-r border-surface-300-700 bg-surface-50-950 transition-all duration-300"
-	class:w-64={!$isSidebarCollapsed}
-	class:w-16={$isSidebarCollapsed}
+	class:w-64={!isSidebarCollapsed}
+	class:w-16={isSidebarCollapsed}
 >
 	<nav class="flex-1 overflow-y-auto px-2 py-4">
 		<ul class="space-y-1">
 			{#each navItems as item}
 				{@const active = isActive(item.href)}
-				{@const badge = item.badgeKey ? $badgeCounts[item.badgeKey] : 0}
+				{@const badge = item.badgeKey ? badgeCounts[item.badgeKey] : 0}
 				<li>
 					<a
 						href={item.href}
@@ -69,10 +81,10 @@
 						class:text-white={active}
 						class:hover:bg-surface-200-800={!active}
 						class:text-surface-700-300={!active}
-						title={$isSidebarCollapsed ? item.label : undefined}
+						title={isSidebarCollapsed ? item.label : undefined}
 					>
 						<item.icon class="h-5 w-5 flex-shrink-0" />
-						{#if !$isSidebarCollapsed}
+						{#if !isSidebarCollapsed}
 							<span class="flex-1 truncate">{item.label}</span>
 							{#if badge > 0}
 								<span
@@ -103,9 +115,9 @@
 			type="button"
 			onclick={toggleSidebar}
 			class="flex w-full items-center justify-center rounded-lg p-2 text-surface-500 transition-colors hover:bg-surface-200-800 hover:text-surface-700-300"
-			title={$isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+			title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
 		>
-			{#if $isSidebarCollapsed}
+			{#if isSidebarCollapsed}
 				<ChevronRight class="h-5 w-5" />
 			{:else}
 				<ChevronLeft class="h-5 w-5" />

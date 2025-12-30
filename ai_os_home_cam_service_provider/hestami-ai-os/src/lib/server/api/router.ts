@@ -1,7 +1,7 @@
 import { os } from '@orpc/server';
 import { z } from 'zod';
 import type { RequestContext } from './context.js';
-import { ApiException, ResponseMetaSchema } from './errors.js';
+import { ResponseMetaSchema } from './errors.js';
 import {
 	buildPrincipal,
 	isAllowed,
@@ -17,6 +17,7 @@ import {
 } from '../cerbos/index.js';
 import type { User, Organization, UserRole } from '../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../logger.js';
+import { setOrgContext, clearOrgContext } from '../db/rls.js';
 
 const log = createModuleLogger('api:router');
 
@@ -33,17 +34,24 @@ export const publicProcedure = orpc;
 /**
  * Authenticated procedure - requires valid session
  */
-export const authedProcedure = orpc.use(async ({ context, next }) => {
-	if (!context.user) {
-		throw ApiException.unauthenticated();
-	}
-	return next({
-		context: {
-			...context,
-			user: context.user
+/**
+ * Authenticated procedure - requires valid session
+ */
+export const authedProcedure = orpc
+	.errors({
+		UNAUTHORIZED: { message: 'Authentication required' }
+	})
+	.use(async ({ context, next, errors }) => {
+		if (!context.user) {
+			throw errors.UNAUTHORIZED();
 		}
+		return next({
+			context: {
+				...context,
+				user: context.user
+			}
+		});
 	});
-});
 
 /**
  * Extended context for organization-scoped procedures with Cerbos helpers
@@ -100,132 +108,150 @@ export interface OrgContext extends RequestContext {
  * Organization-scoped procedure - requires auth + active org context
  * Includes Cerbos authorization helpers
  */
-export const orgProcedure = authedProcedure.use(async ({ context, next }) => {
-	if (!context.organization) {
-		throw ApiException.forbidden('Organization context required. Set X-Org-Id header.');
-	}
-
-	const user = context.user!;
-	const organization = context.organization;
-	const role = context.role!;
-
-	// Build Cerbos principal from context, including current org role
-	const principal = buildPrincipal(
-		user,
-		context.orgRoles,
-		organization.slug ?? undefined,
-		undefined, // vendorId
-		organization.id // currentOrgId - needed to add org role to principal
-	);
-
-	// Create Cerbos helper functions
-	const cerbosHelpers = {
-		principal,
-
-		can: async (
-			action: string,
-			resourceKind: string,
-			resourceId: string,
-			attrs?: Partial<CerbosResourceAttr>
-		): Promise<boolean> => {
-			const resource = createResource(
-				resourceKind,
-				resourceId,
-				organization.id,
-				attrs,
-				organization.slug ?? undefined
-			);
-			const allowed = await isAllowed(principal, resource, action);
-			log.debug('Authorization check', {
-				action,
-				resourceKind,
-				resourceId,
-				allowed,
-				userId: user.id,
-				orgId: organization.id
+export const orgProcedure = authedProcedure
+	.errors({
+		FORBIDDEN: { message: 'Organization context required or Permission denied' }
+	})
+	.use(async ({ context, next, errors }) => {
+		if (!context.organization) {
+			throw errors.FORBIDDEN({
+				message: 'Organization context required. Set X-Org-Id header.'
 			});
-			return allowed;
-		},
+		}
 
-		authorize: async (
-			action: string,
-			resourceKind: string,
-			resourceId: string,
-			attrs?: Partial<CerbosResourceAttr>
-		): Promise<void> => {
-			const resource = createResource(
-				resourceKind,
-				resourceId,
-				organization.id,
-				attrs,
-				organization.slug ?? undefined
-			);
-			try {
-				await requireAuthorization(principal, resource, action);
-				log.debug('Authorization granted', {
+		const user = context.user!;
+		const organization = context.organization;
+		const role = context.role!;
+
+		// Build Cerbos principal from context, including current org role and staff roles
+		const principal = buildPrincipal(
+			user,
+			context.orgRoles,
+			organization.slug ?? undefined,
+			undefined, // vendorId
+			organization.id, // currentOrgId - needed to add org role to principal
+			context.staffRoles,
+			context.pillarAccess
+		);
+
+		// Create Cerbos helper functions
+		const cerbosHelpers = {
+			principal,
+
+			can: async (
+				action: string,
+				resourceKind: string,
+				resourceId: string,
+				attrs?: Partial<CerbosResourceAttr>
+			): Promise<boolean> => {
+				const resource = createResource(
+					resourceKind,
+					resourceId,
+					organization.id,
+					attrs,
+					organization.slug ?? undefined
+				);
+				const allowed = await isAllowed(principal, resource, action);
+				log.debug('Authorization check', {
 					action,
 					resourceKind,
 					resourceId,
+					allowed,
 					userId: user.id,
 					orgId: organization.id
 				});
-			} catch (error) {
-				log.warn('Authorization denied', {
-					action,
+				return allowed;
+			},
+
+			authorize: async (
+				action: string,
+				resourceKind: string,
+				resourceId: string,
+				attrs?: Partial<CerbosResourceAttr>
+			): Promise<void> => {
+				const resource = createResource(
 					resourceKind,
 					resourceId,
+					organization.id,
+					attrs,
+					organization.slug ?? undefined
+				);
+				try {
+					await requireAuthorization(principal, resource, action);
+					log.debug('Authorization granted', {
+						action,
+						resourceKind,
+						resourceId,
+						userId: user.id,
+						orgId: organization.id
+					});
+				} catch (error) {
+					log.warn('Authorization denied', {
+						action,
+						resourceKind,
+						resourceId,
+						userId: user.id,
+						orgId: organization.id,
+						roles: principal.roles
+					});
+					throw errors.FORBIDDEN({
+						message: error instanceof Error ? error.message : 'Permission denied'
+					});
+				}
+			},
+
+			queryFilter: async (
+				action: string,
+				resourceKind: string,
+				fieldMapper?: Record<string, string>
+			): Promise<QueryPlanResult> => {
+				const plan = await planResources(
+					principal,
+					resourceKind,
+					action,
+					organization.slug ?? undefined
+				);
+				const result = queryPlanToPrismaWhere(
+					plan,
+					fieldMapper || STANDARD_FIELD_MAPPINGS,
+					user.id
+				);
+				log.debug('Query filter generated', {
+					action,
+					resourceKind,
+					filterKind: result.kind,
+					hasFilter: result.kind === 'conditional',
 					userId: user.id,
-					orgId: organization.id,
-					roles: principal.roles
+					orgId: organization.id
 				});
-				throw error;
+				return result;
 			}
-		},
+		};
 
-		queryFilter: async (
-			action: string,
-			resourceKind: string,
-			fieldMapper?: Record<string, string>
-		): Promise<QueryPlanResult> => {
-			const plan = await planResources(
-				principal,
-				resourceKind,
-				action,
-				organization.slug ?? undefined
-			);
-			const result = queryPlanToPrismaWhere(
-				plan,
-				fieldMapper || STANDARD_FIELD_MAPPINGS,
-				user.id
-			);
-			log.debug('Query filter generated', {
-				action,
-				resourceKind,
-				filterKind: result.kind,
-				hasFilter: result.kind === 'conditional',
-				userId: user.id,
-				orgId: organization.id
+		// Set RLS context before executing the procedure
+		await setOrgContext(organization.id, { userId: user.id });
+
+		try {
+			return await next({
+				context: {
+					...context,
+					organization,
+					role,
+					cerbos: cerbosHelpers
+				} as OrgContext
 			});
-			return result;
+		} finally {
+			// Always clear RLS context, even on error
+			await clearOrgContext(user.id);
 		}
-	};
-
-	return next({
-		context: {
-			...context,
-			organization,
-			role,
-			cerbos: cerbosHelpers
-		} as OrgContext
 	});
-});
 
 /**
  * Admin procedure - requires ADMIN role in org
  */
-export const adminProcedure = orgProcedure.use(async ({ context, next }) => {
+export const adminProcedure = orgProcedure.use(async ({ context, next, errors }) => {
 	if (context.role !== 'ADMIN') {
-		throw ApiException.forbidden('Admin access required');
+		throw errors.FORBIDDEN({ message: 'Admin access required' });
 	}
 	return next({ context });
 });

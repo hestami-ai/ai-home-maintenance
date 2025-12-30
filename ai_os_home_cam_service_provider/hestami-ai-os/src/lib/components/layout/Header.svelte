@@ -3,9 +3,27 @@
 	import Logo from '$lib/components/ui/Logo.svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import UserMenu from './UserMenu.svelte';
-	import { auth } from '$lib/stores';
+	import type { Organization } from '../../../../generated/prisma/client';
 
 	let mobileMenuOpen = $state(false);
+	
+	interface Props {
+		user: { id: string; email: string; name: string | null; image: string | null } | null;
+		memberships: Array<{
+			organization: Organization;
+			role: string;
+			isDefault: boolean;
+		}>;
+		currentOrganization: any | null;
+	}
+
+	let { user, memberships, currentOrganization }: Props = $props();
+
+	const currentMembership = $derived(
+		currentOrganization 
+			? memberships.find(m => m.organization.id === currentOrganization.id) ?? null
+			: null
+	);
 
 	function toggleMobileMenu() {
 		mobileMenuOpen = !mobileMenuOpen;
@@ -28,9 +46,13 @@
 			<div class="hidden items-center gap-3 md:flex">
 				<ThemeToggle />
 
-				{#if $auth.isAuthenticated}
-					<UserMenu />
-				{:else if !$auth.isLoading}
+				{#if user}
+					<UserMenu 
+						{user}
+						currentOrganization={currentMembership} 
+						{memberships} 
+					/>
+				{:else}
 					<a href="/login" class="btn btn-sm preset-tonal-surface">Log in</a>
 					<a href="/register" class="btn btn-sm preset-filled-primary-500">Sign up</a>
 				{/if}
@@ -59,10 +81,14 @@
 	{#if mobileMenuOpen}
 		<div class="border-t border-surface-300-700 md:hidden">
 			<div class="space-y-2 px-4 py-4">
-				{#if $auth.isAuthenticated}
+				{#if user}
 					<!-- User Menu handles everything on mobile too -->
-					<UserMenu />
-				{:else if !$auth.isLoading}
+					<UserMenu 
+						{user}
+						currentOrganization={currentOrganization} 
+						{memberships}
+					/>
+				{:else}
 					<a
 						href="/login"
 						onclick={closeMobileMenu}

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import {
 		ArrowLeft,
@@ -20,53 +19,48 @@
 	const invoiceId = $derived($page.params.invoiceId ?? '');
 	const actionParam = $derived($page.url.searchParams.get('action'));
 
+	interface Props {
+		data: {
+			job: Job;
+			invoice: JobInvoice;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let job = $state<Job | null>(null);
 	let invoice = $state<JobInvoice | null>(null);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let isSending = $state(false);
 
-	// Payment form
-	let showPaymentForm = $state(false);
+	// Payment form state
 	let paymentAmount = $state(0);
 	let paymentMethod = $state('');
 	let paymentReference = $state('');
 	let paymentNotes = $state('');
+	let showPaymentForm = $state(false);
 	let isRecordingPayment = $state(false);
 
-	onMount(async () => {
-		await loadData();
-		// Auto-show payment form if action=payment in URL
+	// Synchronize server data
+	$effect(() => {
+		if (data.invoice) {
+			invoice = data.invoice;
+			paymentAmount = Number(invoice.balanceDue);
+		}
+		if (data.job) job = data.job;
+	});
+
+	// Initial actions
+	$effect(() => {
 		if (actionParam === 'payment') {
 			showPaymentForm = true;
 		}
 	});
 
 	async function loadData() {
-		if (!jobId || !invoiceId) return;
-		isLoading = true;
-		error = null;
-		try {
-			const [jobRes, invoiceRes] = await Promise.all([
-				jobApi.get(jobId),
-				invoiceApi.get(invoiceId)
-			]);
-
-			if (jobRes.ok && jobRes.data) {
-				job = jobRes.data.job;
-			}
-
-			if (!invoiceRes.ok) {
-				error = 'Failed to load invoice';
-				return;
-			}
-			invoice = invoiceRes.data.invoice;
-			paymentAmount = Number(invoice.balanceDue);
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load data';
-		} finally {
-			isLoading = false;
-		}
+		// Just refresh the page to get latest data
+		window.location.reload();
 	}
 
 	async function sendInvoice() {

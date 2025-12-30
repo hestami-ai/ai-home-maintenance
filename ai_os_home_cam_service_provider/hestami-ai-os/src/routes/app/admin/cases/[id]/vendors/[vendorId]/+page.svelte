@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import {
 		ArrowLeft,
 		Building2,
@@ -23,7 +22,6 @@
 		Award
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { organizationStore } from '$lib/stores';
 	import {
 		vendorCandidateApi,
 		STATUS_LABELS,
@@ -32,38 +30,32 @@
 	} from '$lib/api/vendorCandidate';
 	import { vendorBidApi, formatCurrency, formatDuration, type VendorBidListItem } from '$lib/api/vendorBid';
 
-	const caseId = $derived($page.params.id ?? '');
-	const vendorId = $derived(($page.params as any).vendorId ?? '');
-	const organizationId = $derived($organizationStore.current?.organization.id || '');
+	const caseId = $derived(page.params.id ?? '');
+	const vendorId = $derived(page.params.vendorId ?? '');
+
+	interface Props {
+		data: {
+			vendorCandidate: VendorCandidate;
+			bids: VendorBidListItem[];
+		};
+	}
+
+	let { data }: Props = $props();
 
 	let vendor = $state<VendorCandidate | null>(null);
 	let bids = $state<VendorBidListItem[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	onMount(async () => {
-		await loadVendor();
+	// Synchronize server data
+	$effect(() => {
+		if (data.vendorCandidate) vendor = data.vendorCandidate;
+		if (data.bids) bids = data.bids;
 	});
 
 	async function loadVendor() {
-		if (!vendorId || !organizationId) return;
-		isLoading = true;
-		error = null;
-		try {
-			const response = await vendorCandidateApi.get(vendorId);
-			if (response.ok) {
-				vendor = response.data.vendorCandidate;
-				// Load bids for this vendor
-				const bidsResponse = await vendorBidApi.listByCase({ caseId });
-				if (bidsResponse.ok) {
-					bids = bidsResponse.data.bids.filter(b => b.vendorCandidateId === vendorId);
-				}
-			}
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load vendor';
-		} finally {
-			isLoading = false;
-		}
+		// Just refresh the page to get latest data
+		window.location.reload();
 	}
 
 	function getStatusIcon(status: string) {

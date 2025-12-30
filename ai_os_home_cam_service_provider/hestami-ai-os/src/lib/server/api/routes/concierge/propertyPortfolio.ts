@@ -7,7 +7,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 
 /**
  * Property Portfolio Schema for responses
@@ -37,6 +36,9 @@ export const propertyPortfolioRouter = {
 				description: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -85,6 +87,10 @@ export const propertyPortfolioRouter = {
 				portfolioId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -106,7 +112,7 @@ export const propertyPortfolioRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const portfolio = await prisma.propertyPortfolio.findFirst({
 				where: {
 					id: input.portfolioId,
@@ -123,7 +129,7 @@ export const propertyPortfolioRouter = {
 			});
 
 			if (!portfolio) {
-				throw ApiException.notFound('PropertyPortfolio');
+				throw errors.NOT_FOUND({ message: 'PropertyPortfolio not found' });
 			}
 
 			// Cerbos authorization
@@ -164,6 +170,9 @@ export const propertyPortfolioRouter = {
 				includeInactive: z.boolean().optional().default(false)
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -227,6 +236,10 @@ export const propertyPortfolioRouter = {
 				isActive: z.boolean().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -236,7 +249,7 @@ export const propertyPortfolioRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.propertyPortfolio.findFirst({
 				where: {
 					id: input.portfolioId,
@@ -246,7 +259,7 @@ export const propertyPortfolioRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('PropertyPortfolio');
+				throw errors.NOT_FOUND({ message: 'PropertyPortfolio not found' });
 			}
 
 			// Cerbos authorization
@@ -292,6 +305,10 @@ export const propertyPortfolioRouter = {
 				portfolioId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -301,7 +318,7 @@ export const propertyPortfolioRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.propertyPortfolio.findFirst({
 				where: {
 					id: input.portfolioId,
@@ -311,7 +328,7 @@ export const propertyPortfolioRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('PropertyPortfolio');
+				throw errors.NOT_FOUND({ message: 'PropertyPortfolio not found' });
 			}
 
 			// Cerbos authorization
@@ -331,6 +348,9 @@ export const propertyPortfolioRouter = {
 	 */
 	getOrCreateDefault: orgProcedure
 		.input(IdempotencyKeySchema)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),

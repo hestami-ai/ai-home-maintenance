@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { Prisma } from '../../../../../../generated/prisma/client.js';
@@ -64,16 +63,21 @@ type InsuranceInput = z.infer<typeof upsertInput>;
 export const insuranceRouter = {
 	createOrUpdate: orgProcedure
 		.input(upsertInput)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ insurance: insuranceOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'contractor_insurance', input.id ?? 'new');
 
 			const { id, idempotencyKey, ...data } = input;
 			const profile = await prisma.contractorProfile.findUnique({
 				where: { organizationId: context.organization.id }
 			});
-			if (!profile) throw ApiException.notFound('ContractorProfile');
+			if (!profile) throw errors.NOT_FOUND({ message: 'ContractorProfile' });
 
 			const normalized = normalizeInsuranceInput(data);
 
@@ -90,7 +94,7 @@ export const insuranceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create/update insurance');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update insurance' });
 			}
 
 			const insurance = await prisma.contractorInsurance.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -100,14 +104,18 @@ export const insuranceRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ insurance: insuranceOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const insurance = await prisma.contractorInsurance.findFirst({
 				where: { id: input.id, contractorProfile: { organizationId: context.organization.id } },
 				include: { contractorProfile: true }
 			});
-			if (!insurance) throw ApiException.notFound('ContractorInsurance');
-			await assertContractorOrg(insurance.contractorProfile.organizationId);
+			if (!insurance) throw errors.NOT_FOUND({ message: 'ContractorInsurance' });
+			await assertContractorOrg(insurance.contractorProfile.organizationId, errors);
 			await context.cerbos.authorize('view', 'contractor_insurance', insurance.id);
 
 			return successResponse({ insurance: serializeInsurance(insurance) }, context);
@@ -119,6 +127,10 @@ export const insuranceRouter = {
 				status: z.enum(['ACTIVE', 'EXPIRED', 'PENDING_VERIFICATION', 'CANCELLED']).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -126,12 +138,12 @@ export const insuranceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			const profile = await prisma.contractorProfile.findUnique({
 				where: { organizationId: context.organization.id }
 			});
-			if (!profile) throw ApiException.notFound('ContractorProfile');
+			if (!profile) throw errors.NOT_FOUND({ message: 'ContractorProfile' });
 
 			const queryPlan = await context.cerbos.queryFilter('view', 'contractor_insurance');
 			if (queryPlan.kind === 'always_denied') {

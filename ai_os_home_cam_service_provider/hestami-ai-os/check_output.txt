@@ -5,49 +5,331 @@
 Loading svelte-check in workspace: e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os
 Getting Svelte diagnostics...
 
-e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:439:8
-[33mWarn[39m: This element is implicitly closed by the following `</div>`, which can cause an unexpected DOM structure. Add an explicit `</p>` to avoid surprises.
-https://svelte.dev/e/element_implicitly_closed (svelte)
-[36m							<h4 class="text-sm font-medium text-surface-500">Actual Cost</h4>
-							[35m<p class="mt-1">[36m{formatCurrency(Number((workOrder as any).actualCost))}
-						</div>[39m
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\workOrder\workOrder.ts[39m:989:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m			// Compliance gate: ensure the contractor has active license/insurance before scheduling
+			await [35massertContractorComplianceForScheduling[36m(context.organization.id);[39m
 
-e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:508:36
-[31mError[39m: Property 'name' does not exist on type '{ id: string; title: string; category: string; status: string; visibility: string; fileName: string; fileSize: number; mimeType: string; version: number; createdAt: string; }'. (ts)
-[36m						<div class="flex-1">
-							<p class="font-medium">{doc.[35mname[36m}</p>
-							<p class="text-sm text-surface-500">{doc.category} ┬╖ {formatDate(doc.createdAt)}</p>[39m
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\job\customer.ts[39m:116:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'customer', 'new');[39m
 
-e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:290:22
-[31mError[39m: Argument of type 'string | null' is not assignable to parameter of type 'string | undefined'.
-  Type 'null' is not assignable to type 'string | undefined'. (ts)
-[36m						</span>
-						{#if isOverdue([35mworkOrder.slaDeadline[36m, workOrder.status)}
-							<span class="rounded-full bg-error-500 px-2 py-0.5 text-xs font-medium text-white">[39m
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\job\customer.ts[39m:180:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'customer', 'list');[39m
 
-e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\+page.svelte[39m:553:3
-[31mError[39m: Type '{ id: string; name: string; dba: string | null; contactName: string | null; email: string | null; phone: string | null; isActive: boolean; is1099Eligible: boolean; }[]' is not assignable to type 'Vendor[]'.
-  Type '{ id: string; name: string; dba: string | null; contactName: string | null; email: string | null; phone: string | null; isActive: boolean; is1099Eligible: boolean; }' is missing the following properties from type 'Vendor': trades, status (ts)
-[36m	open={showAssignVendorModal}
-	{[35mvendors[36m}
-	loading={isActionLoading}[39m
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\job\customer.ts[39m:238:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'customer', input.id);[39m
 
-e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\work-orders\[id]\edit\+page.svelte[39m:119:40
-[31mError[39m: Property 'update' does not exist on type '{ list: (params?: { status?: WorkOrderStatus | undefined; priority?: WorkOrderPriority | undefined; category?: WorkOrderCategory | undefined; unitId?: string | undefined; vendorId?: string | undefined; search?: string | undefined; } | undefined) => ClientPromiseResult<...>; ... 10 more ...; transitionStatus: (id: st...'. (ts)
-[36m		try {
-			const response = await workOrderApi.[35mupdate[36m(workOrder.id, {
-				unitId: formData.locationType === 'unit' ? formData.unitId : undefined,[39m
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\job\customer.ts[39m:291:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'customer', input.id);[39m
 
-e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:187:46
-[31mError[39m: Argument of type '{ jobId: string; idempotencyKey: `${string}-${string}-${string}-${string}-${string}`; }' is not assignable to parameter of type '{ jobId: string; customerId: string; title?: string | undefined; description?: string | undefined; notes?: string | undefined; terms?: string | undefined; validUntil?: string | undefined; discount?: number | undefined; lines?: { ...; }[] | undefined; idempotencyKey: string; }'.
-  Property 'customerId' is missing in type '{ jobId: string; idempotencyKey: `${string}-${string}-${string}-${string}-${string}`; }' but required in type '{ jobId: string; customerId: string; title?: string | undefined; description?: string | undefined; notes?: string | undefined; terms?: string | undefined; validUntil?: string | undefined; discount?: number | undefined; lines?: { ...; }[] | undefined; idempotencyKey: string; }'. (ts)
-[36m		try {
-			const response = await estimateApi.create([35m{
-				jobId: jobId,
-				idempotencyKey: crypto.randomUUID()
-			}[36m);
-			if (response.ok) {[39m
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\job\customer.ts[39m:358:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('delete', 'customer', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:107:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'proposal', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:169:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'proposal', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:206:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'proposal', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:263:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'proposal', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:311:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('send', 'proposal', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:359:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:404:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('accept', 'proposal', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:452:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('decline', 'proposal', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\proposal.ts[39m:500:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('delete', 'proposal', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:147:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'job_invoice', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:222:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'job_invoice', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:279:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'job_invoice', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:318:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'job_invoice', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:380:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'job_invoice', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:435:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('send', 'job_invoice', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:484:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:529:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'job_invoice', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:578:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('void', 'job_invoice', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\invoice.ts[39m:627:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('delete', 'job_invoice', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:87:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'payment_intent', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:145:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'payment_intent', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:182:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'payment_intent', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:229:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('process', 'payment_intent', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:285:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:340:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('refund', 'payment_intent', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\billing\payment.ts[39m:393:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\item.ts[39m:90:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'inventory_item', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\item.ts[39m:140:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'inventory_item', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\item.ts[39m:175:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'inventory_item', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\item.ts[39m:246:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'inventory_item', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\item.ts[39m:289:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('delete', 'inventory_item', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\item.ts[39m:334:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'inventory_item', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\transfer.ts[39m:113:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'inventory_transfer', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\transfer.ts[39m:170:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'inventory_transfer', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\transfer.ts[39m:205:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'inventory_transfer', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\transfer.ts[39m:261:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('ship', 'inventory_transfer', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\transfer.ts[39m:330:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('receive', 'inventory_transfer', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\inventory\transfer.ts[39m:387:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('cancel', 'inventory_transfer', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\schedule.ts[39m:129:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'contract_schedule', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\schedule.ts[39m:200:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'contract_schedule', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\schedule.ts[39m:236:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'contract_schedule', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\schedule.ts[39m:295:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'contract_schedule', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\schedule.ts[39m:348:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('delete', 'contract_schedule', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\schedule.ts[39m:395:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'contract_schedule', input.scheduleId);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\sla.ts[39m:88:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'contract_sla_record', 'new');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\sla.ts[39m:140:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'contract_sla_record', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\sla.ts[39m:177:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('view', 'contract_sla_record', 'list');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\sla.ts[39m:241:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('edit', 'contract_sla_record', input.id);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\api\routes\contract\sla.ts[39m:302:10
+[31mError[39m: Expected 2 arguments, but got 1. 
+[36m		.handler(async ({ input, context }) => {
+			await [35massertContractorOrg[36m(context.organization!.id);
+			await context.cerbos.authorize('create', 'contract_sla_record', 'new');[39m
 
 ====================================
-[31msvelte-check found 5 errors and 1 warning in 3 files
+[31msvelte-check found 55 errors and 0 warnings in 9 files
 [39m

@@ -12,7 +12,9 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import type { WorkOrderStatus } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('WorkOrderLifecycleWorkflow');
@@ -51,6 +53,7 @@ interface TransitionInput {
 	workOrderId: string;
 	toStatus: WorkOrderStatus;
 	userId: string;
+	organizationId: string;
 	notes?: string;
 	// Optional data for specific transitions
 	vendorId?: string;
@@ -122,59 +125,65 @@ async function updateWorkOrderStatus(
 	input: TransitionInput,
 	fromStatus: WorkOrderStatus
 ): Promise<void> {
-	await prisma.$transaction(async (tx) => {
-		// Build update data based on transition
-		const updateData: Record<string, unknown> = {
-			status: input.toStatus
-		};
+	try {
+		await orgTransaction(input.organizationId, async (tx) => {
+			// Build update data based on transition
+			const updateData: Record<string, unknown> = {
+				status: input.toStatus
+			};
 
-		// Handle specific transitions
-		switch (input.toStatus) {
-			case 'ASSIGNED':
-				if (input.vendorId) {
-					updateData.assignedVendorId = input.vendorId;
-					updateData.assignedAt = new Date();
-				}
-				break;
+			// Handle specific transitions
+			switch (input.toStatus) {
+				case 'ASSIGNED':
+					if (input.vendorId) {
+						updateData.assignedVendorId = input.vendorId;
+						updateData.assignedAt = new Date();
+					}
+					break;
 
-			case 'SCHEDULED':
-				if (input.scheduledStart) updateData.scheduledStart = input.scheduledStart;
-				if (input.scheduledEnd) updateData.scheduledEnd = input.scheduledEnd;
-				break;
+				case 'SCHEDULED':
+					if (input.scheduledStart) updateData.scheduledStart = input.scheduledStart;
+					if (input.scheduledEnd) updateData.scheduledEnd = input.scheduledEnd;
+					break;
 
-			case 'IN_PROGRESS':
-				updateData.actualStart = new Date();
-				break;
+				case 'IN_PROGRESS':
+					updateData.actualStart = new Date();
+					break;
 
-			case 'COMPLETED':
-				updateData.actualEnd = new Date();
-				if (input.actualCost !== undefined) updateData.actualCost = input.actualCost;
-				if (input.actualHours !== undefined) updateData.actualHours = input.actualHours;
-				break;
+				case 'COMPLETED':
+					updateData.actualEnd = new Date();
+					if (input.actualCost !== undefined) updateData.actualCost = input.actualCost;
+					if (input.actualHours !== undefined) updateData.actualHours = input.actualHours;
+					break;
 
-			case 'CANCELLED':
-				updateData.cancelledAt = new Date();
-				updateData.cancelledBy = input.userId;
-				break;
-		}
-
-		// Update the work order
-		await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: updateData
-		});
-
-		// Record status history
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: input.workOrderId,
-				fromStatus,
-				toStatus: input.toStatus,
-				changedBy: input.userId,
-				notes: input.notes
+				case 'CANCELLED':
+					updateData.cancelledAt = new Date();
+					updateData.cancelledBy = input.userId;
+					break;
 			}
-		});
-	});
+
+			// Update the work order
+			await tx.workOrder.update({
+				where: { id: input.workOrderId },
+				data: updateData
+			});
+
+			// Record status history
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: input.workOrderId,
+					fromStatus,
+					toStatus: input.toStatus,
+					changedBy: input.userId,
+					notes: input.notes
+				}
+			});
+		}, { userId: input.userId, reason: `Transitioning work order from ${fromStatus} to ${input.toStatus}` });
+
+		log.info('updateWorkOrderStatus completed', { workOrderId: input.workOrderId, fromStatus, toStatus: input.toStatus, userId: input.userId });
+	} finally {
+		await clearOrgContext(input.userId);
+	}
 }
 
 /**
@@ -301,8 +310,16 @@ async function workOrderTransitionWorkflow(input: TransitionInput): Promise<Tran
 			timestamp: new Date().toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'WORK_ORDER_LIFECYCLE_ERROR'
+		});
 
 		return {
 			success: false,
@@ -313,6 +330,17 @@ async function workOrderTransitionWorkflow(input: TransitionInput): Promise<Tran
 			error: errorMessage
 		};
 	}
+
+	// This path should be unreachable due to return in try/catch, 
+	// but kept for TypeScript safety if logic changes
+	return {
+		success: false,
+		workOrderId: input.workOrderId,
+		fromStatus: 'DRAFT',
+		toStatus: input.toStatus,
+		timestamp: new Date().toISOString(),
+		error: 'Unknown error occurred'
+	};
 }
 
 // Register the workflow with DBOS
@@ -339,9 +367,9 @@ export async function startWorkOrderTransition(
  */
 export async function getWorkOrderTransitionStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 /**

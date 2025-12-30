@@ -15,7 +15,6 @@ import {
 	IdempotencyKeySchema
 } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { recordIntent, recordExecution } from '../middleware/activityEvent.js';
 import type { VendorCandidateStatus } from '../../../../../generated/prisma/client.js';
 
@@ -161,7 +160,10 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Case not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case exists and belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -172,7 +174,7 @@ export const vendorCandidateRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			// Cerbos authorization
@@ -237,7 +239,10 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor candidate not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const vendorCandidate = await prisma.vendorCandidate.findFirst({
 				where: {
 					id: input.id,
@@ -247,7 +252,7 @@ export const vendorCandidateRouter = {
 			});
 
 			if (!vendorCandidate) {
-				throw ApiException.notFound('VendorCandidate');
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
 			}
 
 			await context.cerbos.authorize('view', 'vendor_candidate', vendorCandidate.id);
@@ -338,7 +343,10 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor candidate not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorCandidate.findFirst({
 				where: {
 					id: input.id,
@@ -348,7 +356,7 @@ export const vendorCandidateRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('VendorCandidate');
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
 			}
 
 			await context.cerbos.authorize('update', 'vendor_candidate', existing.id);
@@ -406,7 +414,11 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor candidate not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorCandidate.findFirst({
 				where: {
 					id: input.id,
@@ -416,15 +428,15 @@ export const vendorCandidateRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('VendorCandidate');
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
 			}
 
 			// Validate status transition
 			const validTransitions = VALID_STATUS_TRANSITIONS[existing.status] || [];
 			if (!validTransitions.includes(input.status)) {
-				throw ApiException.badRequest(
-					`Invalid status transition from ${existing.status} to ${input.status}`
-				);
+				throw errors.BAD_REQUEST({
+					message: `Invalid status transition from ${existing.status} to ${input.status}`
+				});
 			}
 
 			await context.cerbos.authorize('update_status', 'vendor_candidate', existing.id);
@@ -471,7 +483,10 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor candidate not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorCandidate.findFirst({
 				where: {
 					id: input.id,
@@ -481,7 +496,7 @@ export const vendorCandidateRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('VendorCandidate');
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
 			}
 
 			await context.cerbos.authorize('delete', 'vendor_candidate', existing.id);
@@ -538,7 +553,10 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Case not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case exists
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -549,7 +567,7 @@ export const vendorCandidateRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('create', 'vendor_candidate', 'new');

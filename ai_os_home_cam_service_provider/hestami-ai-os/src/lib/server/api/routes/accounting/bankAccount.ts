@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -28,6 +27,11 @@ export const bankAccountRouter = {
 				isPrimary: z.boolean().default(false)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -45,15 +49,15 @@ export const bankAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'bank_account', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Validate GL account exists and is a cash account
@@ -68,7 +72,7 @@ export const bankAccountRouter = {
 			});
 
 			if (!glAccount) {
-				throw ApiException.notFound('GL Cash Account');
+				throw errors.NOT_FOUND({ message: 'GL Cash Account not found' });
 			}
 
 			// Check if GL account is already linked to another bank account
@@ -77,7 +81,7 @@ export const bankAccountRouter = {
 			});
 
 			if (existingLink) {
-				throw ApiException.conflict('GL account is already linked to a bank account');
+				throw errors.CONFLICT({ message: 'GL account is already linked to a bank account' });
 			}
 
 			// If setting as primary, unset other primary accounts of same fund type
@@ -94,6 +98,7 @@ export const bankAccountRouter = {
 
 			const bankAccount = await prisma.bankAccount.create({
 				data: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					glAccountId: input.glAccountId,
 					bankName: input.bankName,
@@ -132,6 +137,10 @@ export const bankAccountRouter = {
 				isActive: z.boolean().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -158,15 +167,15 @@ export const bankAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'bank_account', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.BankAccountWhereInput = {
@@ -210,6 +219,10 @@ export const bankAccountRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -235,15 +248,15 @@ export const bankAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'bank_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const bankAccount = await prisma.bankAccount.findFirst({
@@ -252,7 +265,7 @@ export const bankAccountRouter = {
 			});
 
 			if (!bankAccount) {
-				throw ApiException.notFound('Bank Account');
+				throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 			}
 
 			return successResponse(
@@ -294,6 +307,10 @@ export const bankAccountRouter = {
 				isActive: z.boolean().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -309,15 +326,15 @@ export const bankAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'bank_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const existing = await prisma.bankAccount.findFirst({
@@ -325,7 +342,7 @@ export const bankAccountRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Bank Account');
+				throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 			}
 
 			// If setting as primary, unset other primary accounts of same fund type
@@ -367,6 +384,11 @@ export const bankAccountRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -374,15 +396,15 @@ export const bankAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'bank_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const bankAccount = await prisma.bankAccount.findFirst({
@@ -390,11 +412,11 @@ export const bankAccountRouter = {
 			});
 
 			if (!bankAccount) {
-				throw ApiException.notFound('Bank Account');
+				throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 			}
 
 			if (!bankAccount.isActive) {
-				throw ApiException.conflict('Bank account already deactivated');
+				throw errors.CONFLICT({ message: 'Bank account already deactivated' });
 			}
 
 			// Check for pending payments linked to this account
@@ -406,7 +428,7 @@ export const bankAccountRouter = {
 			});
 
 			if (pendingPayments) {
-				throw ApiException.conflict('Cannot deactivate bank account with pending payments');
+				throw errors.CONFLICT({ message: 'Cannot deactivate bank account with pending payments' });
 			}
 
 			await prisma.bankAccount.update({
@@ -428,6 +450,10 @@ export const bankAccountRouter = {
 				reconcileDate: z.string().datetime().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -443,15 +469,15 @@ export const bankAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'bank_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const existing = await prisma.bankAccount.findFirst({
@@ -459,7 +485,7 @@ export const bankAccountRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Bank Account');
+				throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 			}
 
 			const bankAccount = await prisma.bankAccount.update({

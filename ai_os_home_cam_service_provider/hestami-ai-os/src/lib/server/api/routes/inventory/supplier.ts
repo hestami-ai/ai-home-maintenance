@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startSupplierWorkflow } from '../../../workflows/supplierWorkflow.js';
 
@@ -84,6 +83,10 @@ export const supplierRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -91,8 +94,8 @@ export const supplierRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'supplier', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -124,7 +127,7 @@ export const supplierRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create supplier');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create supplier' });
 			}
 
 			const supplier = await prisma.supplier.findUniqueOrThrow({
@@ -136,6 +139,10 @@ export const supplierRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -143,15 +150,15 @@ export const supplierRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'supplier', input.id);
 
 			const supplier = await prisma.supplier.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!supplier) throw ApiException.notFound('Supplier');
+			if (!supplier) throw errors.NOT_FOUND({ message: 'Supplier not found' });
 
 			return successResponse({ supplier: formatSupplier(supplier) }, context);
 		}),
@@ -166,6 +173,9 @@ export const supplierRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -176,8 +186,8 @@ export const supplierRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'supplier', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -242,6 +252,11 @@ export const supplierRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -249,14 +264,14 @@ export const supplierRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'supplier', input.id);
 
 			const existing = await prisma.supplier.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Supplier');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Supplier not found' });
 
 			const { id, idempotencyKey, ...data } = input;
 
@@ -273,7 +288,7 @@ export const supplierRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update supplier');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update supplier' });
 			}
 
 			const supplier = await prisma.supplier.findUniqueOrThrow({
@@ -285,6 +300,11 @@ export const supplierRouter = {
 
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -292,14 +312,14 @@ export const supplierRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'supplier', input.id);
 
 			const existing = await prisma.supplier.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Supplier');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Supplier not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startSupplierWorkflow(
@@ -314,7 +334,7 @@ export const supplierRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete supplier');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete supplier' });
 			}
 
 			return successResponse({ deleted: true }, context);

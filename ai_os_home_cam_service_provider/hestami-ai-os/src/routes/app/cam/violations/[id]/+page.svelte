@@ -4,7 +4,7 @@
 	import { ArrowLeft, AlertTriangle, FileText, Clock, Send, TrendingUp, CheckCircle, Calendar, Pencil, DollarSign, ClipboardCheck, MessageSquare, Wrench, XCircle, Scale, AlertOctagon, Timer, Image, BookOpen } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, RationaleModal, SendNoticeModal, ScheduleHearingModal, AssessFineModal, AppealModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { currentAssociation, refreshBadgeCounts } from '$lib/stores';
+	import { refreshBadgeCounts } from '$lib/stores'; // Keeping only refreshBadgeCounts action
 	import { violationApi, documentApi, activityEventApi, type ViolationDetail, type Document } from '$lib/api/cam';
 
 	interface PriorViolation {
@@ -45,14 +45,19 @@
 		acknowledged: boolean;
 	}
 
-	let violation = $state<ViolationDetail | null>(null);
-	let documents = $state<Document[]>([]);
-	let history = $state<ViolationHistoryEvent[]>([]);
-	let notices = $state<ViolationNotice[]>([]);
-	let ownerResponses = $state<OwnerResponse[]>([]);
+    let { data } = $props();
+
+    // Derive state from props - updates when navigating between violations
+	let violation = $derived<ViolationDetail | null>(data.violation);
+	let documents = $derived<Document[]>(data.documents);
+	let history = $derived<ViolationHistoryEvent[]>(data.history);
+	let notices = $derived<ViolationNotice[]>(data.notices);
+	let ownerResponses = $derived<OwnerResponse[]>(data.ownerResponses);
+	
+    // Secondary data (client-side fetch for now)
 	let priorUnitViolations = $state<PriorViolation[]>([]);
 	let priorTypeViolations = $state<PriorViolation[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
 	let showRationaleModal = $state(false);
@@ -68,93 +73,57 @@
 
 	const violationId = $derived(($page.params as Record<string, string>).id);
 
+    // Re-assign if data changes (e.g. navigation)
+    $effect(() => {
+        violation = data.violation;
+        documents = data.documents;
+        history = data.history;
+        notices = data.notices;
+        ownerResponses = data.ownerResponses;
+    });
+
+    // Helper to reload data manually if needed (for actions that don't fully reload page)
+    // Ideally we should use `invalidateAll()` but existing methods below update state manually too.
+    // We will keep existing methods but update them to use direct API or removed functions.
+    // Actually, the original methods like `loadViolation` were called after actions. 
+    // We should replace them with `invalidateAll` OR re-implement them to just update local state if we want to avoid full reload.
+    // For now, I will keep `loadViolation` etc BUT make them valid functions again (copying logic back?) 
+    // OR better: use `invalidateAll()` to refresh `data` prop.
+    // The original code had specific loading functions. Let's reimplement them simply to wrap `invalidateAll` or specific refetch if we want to keep the "client-side refresh" pattern after an action without full page load.
+    
+    // HOWEVER, the implementation plan said "Remove loadViolation, loadDocuments".
+    // So I should replace calls to `loadViolation()` with `goto($page.url, { invalidateAll: true })` or similar.
+    // But wait, `data` prop updates automatically on invalidate.
+    
+    // Let's re-add local loaders if we want to support the "update after action" flow without full reload if possible,
+    // OR just rely on `invalidateAll()`. `invalidateAll` is cleaner for SSR.
+    
+    // But I need to define the functions because the action handlers call them.
+    
+    async function refreshData() {
+        // This is a simple way to refresh the data prop
+        await goto($page.url, {  invalidateAll: true, replaceState: true, noScroll: true });
+    }
+
 	async function loadViolation() {
-		if (!violationId) return;
-
-		isLoading = true;
-		error = null;
-
-		try {
-			const response = await violationApi.get(violationId);
-			if (!response.ok) {
-				error = 'Violation not found';
-				return;
-			}
-			violation = response.data.violation;
-		} catch (e) {
-			error = 'Failed to load violation';
-			console.error(e);
-		} finally {
-			isLoading = false;
-		}
+        await refreshData();
 	}
 
 	async function loadDocuments() {
-		if (!violationId) return;
-		try {
-			const response = await documentApi.list({ contextType: 'VIOLATION', contextId: violationId });
-			if (response.ok) {
-				documents = response.data.documents;
-			}
-		} catch (e) {
-			console.error('Failed to load documents:', e);
-		}
+        // We can just refresh all data
+        await refreshData();
 	}
 
 	async function loadHistory() {
-		if (!violationId) return;
-		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'VIOLATION', entityId: violationId });
-			if (response.ok) {
-				history = response.data.events.map((e: any) => ({
-					id: e.id,
-					action: e.action,
-					description: e.summary,
-					performedBy: e.performedBy,
-					createdAt: e.createdAt
-				}));
-			}
-		} catch (e) {
-			console.error('Failed to load history:', e);
-		}
+        await refreshData();
 	}
 
-	async function loadNotices() {
-		if (!violationId) return;
-		try {
-			const response = await violationApi.getNotices(violationId);
-			if (response.ok) {
-				notices = response.data.notices.map((n: any) => ({
-					id: n.id,
-					noticeType: n.noticeType,
-					sentDate: n.sentAt,
-					recipient: '',
-					deliveryStatus: n.deliveryMethod
-				}));
-			}
-		} catch (e) {
-			console.error('Failed to load notices:', e);
-		}
-	}
+    // loadNotices didn't exist in original code usages shown in previous turn? 
+    // Wait, line 122 defined loadNotices.
+    // I will stub them to just refresh data.
 
-	async function loadOwnerResponses() {
-		if (!violationId) return;
-		try {
-			const response = await (violationApi as any).getResponses(violationId);
-			if (response.ok) {
-				ownerResponses = response.data.responses.map((r: any) => ({
-					id: r.id,
-					submittedDate: r.submittedAt,
-					content: r.content,
-					submittedBy: r.responseType,
-					hasAttachments: false,
-					acknowledged: false
-				}));
-			}
-		} catch (e) {
-			console.error('Failed to load owner responses:', e);
-		}
-	}
+	async function loadNotices() { await refreshData(); }
+	async function loadOwnerResponses() { await refreshData(); }
 
 	async function loadPriorViolations() {
 		if (!violation?.unitId) return;

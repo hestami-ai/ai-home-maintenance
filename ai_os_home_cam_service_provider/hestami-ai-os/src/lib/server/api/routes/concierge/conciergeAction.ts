@@ -8,10 +8,9 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { ConciergeActionTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeActionTypeSchema.js';
 import { ConciergeActionStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeActionStatusSchema.js';
-import type { ConciergeActionStatus, Prisma } from '../../../../../../generated/prisma/client.js';
+import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -36,12 +35,12 @@ function isValidActionStatusTransition(from: string, to: string): boolean {
 /**
  * Ensure case exists and belongs to organization
  */
-async function ensureCase(caseId: string, organizationId: string) {
+async function ensureCase(caseId: string, organizationId: string, errors: any) {
 	const caseRecord = await prisma.conciergeCase.findFirst({
 		where: { id: caseId, organizationId, deletedAt: null }
 	});
 	if (!caseRecord) {
-		throw ApiException.notFound('ConciergeCase');
+		throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 	}
 	return caseRecord;
 }
@@ -65,6 +64,10 @@ export const conciergeActionRouter = {
 				relatedExternalContactIds: z.array(z.string()).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -82,8 +85,8 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureCase(input.caseId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureCase(input.caseId, context.organization.id, errors);
 			await context.cerbos.authorize('create', 'concierge_action', 'new');
 
 			const action = await prisma.conciergeAction.create({
@@ -146,6 +149,10 @@ export const conciergeActionRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -182,7 +189,7 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: {
@@ -192,7 +199,7 @@ export const conciergeActionRouter = {
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('view', 'concierge_action', action.id);
@@ -241,6 +248,10 @@ export const conciergeActionRouter = {
 				actionType: ConciergeActionTypeSchema.optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -263,8 +274,8 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureCase(input.caseId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureCase(input.caseId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'concierge_action', 'list');
 
 			const where: Prisma.ConciergeActionWhereInput = {
@@ -311,6 +322,11 @@ export const conciergeActionRouter = {
 	 */
 	start: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -324,20 +340,20 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { case: true }
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
 			if (!isValidActionStatusTransition(action.status, 'IN_PROGRESS')) {
-				throw ApiException.badRequest(`Cannot start action in status ${action.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot start action in status ${action.status}` });
 			}
 
 			const now = new Date();
@@ -394,6 +410,11 @@ export const conciergeActionRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -408,20 +429,20 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { case: true }
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
 			if (!isValidActionStatusTransition(action.status, 'COMPLETED')) {
-				throw ApiException.badRequest(`Cannot complete action in status ${action.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot complete action in status ${action.status}` });
 			}
 
 			const now = new Date();
@@ -480,6 +501,11 @@ export const conciergeActionRouter = {
 				reason: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -492,20 +518,20 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { case: true }
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
 			if (!isValidActionStatusTransition(action.status, 'BLOCKED')) {
-				throw ApiException.badRequest(`Cannot block action in status ${action.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot block action in status ${action.status}` });
 			}
 
 			const updated = await prisma.conciergeAction.update({
@@ -559,6 +585,11 @@ export const conciergeActionRouter = {
 				reason: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -571,20 +602,20 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { case: true }
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('delete', 'concierge_action', action.id);
 
 			if (!isValidActionStatusTransition(action.status, 'CANCELLED')) {
-				throw ApiException.badRequest(`Cannot cancel action in status ${action.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot cancel action in status ${action.status}` });
 			}
 
 			const updated = await prisma.conciergeAction.update({
@@ -635,6 +666,11 @@ export const conciergeActionRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -647,20 +683,20 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { case: true }
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
 			if (action.status !== 'BLOCKED') {
-				throw ApiException.badRequest('Can only resume blocked actions');
+				throw errors.BAD_REQUEST({ message: 'Can only resume blocked actions' });
 			}
 
 			const updated = await prisma.conciergeAction.update({
@@ -715,6 +751,10 @@ export const conciergeActionRouter = {
 				description: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -730,14 +770,14 @@ export const conciergeActionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const action = await prisma.conciergeAction.findFirst({
 				where: { id: input.actionId, deletedAt: null },
 				include: { case: true }
 			});
 
 			if (!action || action.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ConciergeAction');
+				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);

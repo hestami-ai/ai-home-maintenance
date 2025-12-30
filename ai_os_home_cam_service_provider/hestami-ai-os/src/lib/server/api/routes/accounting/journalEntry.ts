@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -33,6 +32,11 @@ export const journalEntryRouter = {
 				lines: z.array(journalLineSchema).min(2)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -50,15 +54,15 @@ export const journalEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'journal_entry', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Validate double-entry: debits must equal credits
@@ -67,10 +71,10 @@ export const journalEntryRouter = {
 
 			for (const line of input.lines) {
 				if (line.debitAmount && line.creditAmount) {
-					throw ApiException.badRequest('Line cannot have both debit and credit amounts');
+					throw errors.BAD_REQUEST({ message: 'Line cannot have both debit and credit amounts' });
 				}
 				if (!line.debitAmount && !line.creditAmount) {
-					throw ApiException.badRequest('Line must have either debit or credit amount');
+					throw errors.BAD_REQUEST({ message: 'Line must have either debit or credit amount' });
 				}
 				totalDebits += line.debitAmount || 0;
 				totalCredits += line.creditAmount || 0;
@@ -78,9 +82,9 @@ export const journalEntryRouter = {
 
 			// Allow small rounding differences (0.01)
 			if (Math.abs(totalDebits - totalCredits) > 0.01) {
-				throw ApiException.badRequest(
-					`Debits (${totalDebits.toFixed(2)}) must equal credits (${totalCredits.toFixed(2)})`
-				);
+				throw errors.BAD_REQUEST({
+					message: `Debits (${totalDebits.toFixed(2)}) must equal credits (${totalCredits.toFixed(2)})`
+				});
 			}
 
 			// Validate all accounts exist and belong to this association
@@ -90,7 +94,7 @@ export const journalEntryRouter = {
 			});
 
 			if (accounts.length !== new Set(accountIds).size) {
-				throw ApiException.notFound('One or more GL Accounts');
+				throw errors.NOT_FOUND({ message: 'One or more GL Accounts not found' });
 			}
 
 			// Generate entry number
@@ -154,6 +158,10 @@ export const journalEntryRouter = {
 				toDate: z.string().datetime().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -172,15 +180,15 @@ export const journalEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'journal_entry', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.JournalEntryWhereInput = {
@@ -220,6 +228,10 @@ export const journalEntryRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -249,15 +261,15 @@ export const journalEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'journal_entry', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const entry = await prisma.journalEntry.findFirst({
@@ -271,7 +283,7 @@ export const journalEntryRouter = {
 			});
 
 			if (!entry) {
-				throw ApiException.notFound('Journal Entry');
+				throw errors.NOT_FOUND({ message: 'Journal Entry not found' });
 			}
 
 			return successResponse(
@@ -305,6 +317,11 @@ export const journalEntryRouter = {
 	 */
 	post: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -318,15 +335,15 @@ export const journalEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('post', 'journal_entry', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const entry = await prisma.journalEntry.findFirst({
@@ -335,11 +352,11 @@ export const journalEntryRouter = {
 			});
 
 			if (!entry) {
-				throw ApiException.notFound('Journal Entry');
+				throw errors.NOT_FOUND({ message: 'Journal Entry not found' });
 			}
 
 			if (entry.status !== 'DRAFT' && entry.status !== 'PENDING_APPROVAL') {
-				throw ApiException.conflict(`Cannot post entry with status: ${entry.status}`);
+				throw errors.CONFLICT({ message: `Cannot post entry with status: ${entry.status}` });
 			}
 
 			// Update GL account balances
@@ -398,6 +415,11 @@ export const journalEntryRouter = {
 				reversalDate: z.string().datetime()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -410,15 +432,15 @@ export const journalEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('reverse', 'journal_entry', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const entry = await prisma.journalEntry.findFirst({
@@ -427,11 +449,11 @@ export const journalEntryRouter = {
 			});
 
 			if (!entry) {
-				throw ApiException.notFound('Journal Entry');
+				throw errors.NOT_FOUND({ message: 'Journal Entry not found' });
 			}
 
 			if (entry.status !== 'POSTED') {
-				throw ApiException.conflict('Can only reverse posted entries');
+				throw errors.CONFLICT({ message: 'Can only reverse posted entries' });
 			}
 
 			// Generate reversal entry number

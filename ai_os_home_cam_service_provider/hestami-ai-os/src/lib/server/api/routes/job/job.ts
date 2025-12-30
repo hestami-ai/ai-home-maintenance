@@ -8,12 +8,12 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobStatus, JobSourceType, CheckpointType } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
 import { startJobCreateWorkflow } from '../../../workflows/jobCreateWorkflow.js';
 import { startJobWorkflow } from '../../../workflows/jobWorkflow.js';
+import { recordSpanError } from '../../middleware/tracing.js';
 
 // Phase 15.7: CAM & Concierge Integration - Propagate job status to linked entities
 async function propagateJobStatusToLinkedEntities(
@@ -81,7 +81,12 @@ async function propagateJobStatusToLinkedEntities(
 			}
 		}
 	} catch (err) {
+		const errorObj = err instanceof Error ? err : new Error(String(err));
 		console.error('Failed to propagate job status to linked entities:', err);
+		await recordSpanError(errorObj, {
+			errorCode: 'STATUS_PROPAGATION_FAILED',
+			errorType: 'Job_Status_Propagation_Error'
+		});
 	}
 }
 
@@ -320,11 +325,11 @@ const formatVisit = (v: any) => ({
 	updatedAt: v.updatedAt.toISOString()
 });
 
-async function getJobOrThrow(jobId: string, organizationId: string) {
+async function getJobOrThrow(jobId: string, organizationId: string, errors: any) {
 	const job = await prisma.job.findFirst({
 		where: { id: jobId, organizationId, deletedAt: null }
 	});
-	if (!job) throw ApiException.notFound('Job');
+	if (!job) throw errors.NOT_FOUND({ message: 'Job' });
 	return job;
 }
 
@@ -359,6 +364,10 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -366,8 +375,8 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job', 'new');
 
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
@@ -404,7 +413,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create job');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create job' });
 			}
 
 			// Fetch the created job for the response
@@ -431,6 +440,10 @@ export const jobRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -441,11 +454,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			try {
 				console.log(`[Job.list] Request from user ${context.user?.id} for org ${context.organization?.id}`);
 
-				await assertContractorOrg(context.organization!.id);
+				await assertContractorOrg(context.organization!.id, errors);
 				await context.cerbos.authorize('view', 'job', 'list');
 
 				const limit = input?.limit ?? 20;
@@ -488,9 +501,19 @@ export const jobRouter = {
 					context
 				);
 			} catch (error) {
+				const errorObj = error instanceof Error ? error : new Error(String(error));
 				console.error('[Job.list] Error:', error);
-				if (error instanceof ApiException) throw error;
-				throw ApiException.internal(error instanceof Error ? error.message : 'Unknown error during job listing');
+
+				await recordSpanError(errorObj, {
+					errorCode: 'JOB_LIST_FAILED',
+					errorType: 'Job_List_Error'
+				});
+
+				// If it's already one of our typed errors, just rethrow
+				if (typeof error === 'object' && error !== null && 'code' in error && 'status' in error) {
+					throw error;
+				}
+				throw errors.INTERNAL_SERVER_ERROR({ message: error instanceof Error ? error.message : 'Unknown error during job listing' });
 			}
 		}),
 
@@ -499,6 +522,10 @@ export const jobRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -506,11 +533,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job', input.id);
 
-			const job = await getJobOrThrow(input.id, context.organization!.id);
+			const job = await getJobOrThrow(input.id, context.organization!.id, errors);
 			return successResponse({ job: formatJob(job) }, context);
 		}),
 
@@ -539,6 +566,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -546,11 +578,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'job', input.id);
 
-			await getJobOrThrow(input.id, context.organization!.id);
+			await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			const { id, idempotencyKey, ...data } = input;
 
@@ -567,7 +599,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update job');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update job' });
 			}
 
 			const job = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -588,6 +620,12 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status transition' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -595,18 +633,16 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('transition_status', 'job', input.id);
 
-			const job = await getJobOrThrow(input.id, context.organization!.id);
+			const job = await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			// Validate transition
 			const allowedTransitions = JOB_TRANSITIONS[job.status];
 			if (!allowedTransitions.includes(input.toStatus)) {
-				throw ApiException.badRequest(
-					`Cannot transition from ${job.status} to ${input.toStatus}`
-				);
+				throw errors.BAD_REQUEST({ message: `Cannot transition from ${job.status} to ${input.toStatus}` });
 			}
 
 			// Phase 15: Additional validation guards for specific transitions
@@ -616,14 +652,14 @@ export const jobRouter = {
 					where: { jobId: input.id, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } }
 				});
 				if (estimateCount === 0) {
-					throw ApiException.badRequest('Cannot send estimate: no estimate exists for this job');
+					throw errors.BAD_REQUEST({ message: 'Cannot send estimate: no estimate exists for this job' });
 				}
 			}
 
 			if (input.toStatus === 'DISPATCHED') {
 				// Validate technician is assigned
 				if (!job.assignedTechnicianId) {
-					throw ApiException.badRequest('Cannot dispatch: no technician assigned to this job');
+					throw errors.BAD_REQUEST({ message: 'Cannot dispatch: no technician assigned to this job' });
 				}
 			}
 
@@ -633,7 +669,7 @@ export const jobRouter = {
 					where: { jobId: input.id, status: { not: 'VOID' } }
 				});
 				if (invoiceCount === 0) {
-					throw ApiException.badRequest('Cannot mark as invoiced: no invoice exists for this job');
+					throw errors.BAD_REQUEST({ message: 'Cannot mark as invoiced: no invoice exists for this job' });
 				}
 			}
 
@@ -647,7 +683,7 @@ export const jobRouter = {
 					}
 				});
 				if (unpaidInvoices) {
-					throw ApiException.badRequest('Cannot mark as paid: outstanding invoice balance exists');
+					throw errors.BAD_REQUEST({ message: 'Cannot mark as paid: outstanding invoice balance exists' });
 				}
 			}
 
@@ -664,7 +700,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to transition job status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to transition job status' });
 			}
 
 			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -694,6 +730,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -701,11 +742,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('assign', 'job', input.id);
 
-			await getJobOrThrow(input.id, context.organization!.id);
+			await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			// Validate technician if provided
 			if (input.technicianId) {
@@ -716,7 +757,7 @@ export const jobRouter = {
 						isActive: true
 					}
 				});
-				if (!tech) throw ApiException.notFound('Technician');
+				if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -732,7 +773,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to assign technician');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign technician' });
 			}
 
 			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -769,6 +810,12 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -776,15 +823,15 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('schedule', 'job', input.id);
 
-			const job = await getJobOrThrow(input.id, context.organization!.id);
+			const job = await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			// Validate job is in a schedulable state
 			if (!['JOB_CREATED', 'SCHEDULED', 'ON_HOLD'].includes(job.status)) {
-				throw ApiException.badRequest(`Cannot schedule job in ${job.status} status`);
+				throw errors.BAD_REQUEST({ message: `Cannot schedule job in ${job.status} status` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -800,7 +847,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to schedule job');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to schedule job' });
 			}
 
 			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -813,6 +860,10 @@ export const jobRouter = {
 	 */
 	getStatusHistory: orgProcedure
 		.input(z.object({ jobId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -831,11 +882,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job', input.jobId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const history = await prisma.jobStatusHistory.findMany({
 				where: { jobId: input.jobId },
@@ -870,6 +921,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -877,11 +933,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_note', 'new');
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
@@ -896,7 +952,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add note');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add note' });
 			}
 
 			const note = await prisma.jobNote.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -909,6 +965,10 @@ export const jobRouter = {
 	 */
 	listNotes: orgProcedure
 		.input(z.object({ jobId: z.string(), includeInternal: z.boolean().default(true) }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -916,11 +976,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_note', input.jobId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const notes = await prisma.jobNote.findMany({
 				where: {
@@ -949,6 +1009,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -956,11 +1021,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_attachment', 'new');
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
@@ -981,7 +1046,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add attachment');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add attachment' });
 			}
 
 			const attachment = await prisma.jobAttachment.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -994,6 +1059,10 @@ export const jobRouter = {
 	 */
 	listAttachments: orgProcedure
 		.input(z.object({ jobId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1001,11 +1070,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_attachment', input.jobId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const attachments = await prisma.jobAttachment.findMany({
 				where: { jobId: input.jobId },
@@ -1020,6 +1089,11 @@ export const jobRouter = {
 	 */
 	deleteAttachment: orgProcedure
 		.input(z.object({ jobId: z.string(), attachmentId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1027,16 +1101,16 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'job_attachment', input.attachmentId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const attachment = await prisma.jobAttachment.findFirst({
 				where: { id: input.attachmentId, jobId: input.jobId }
 			});
-			if (!attachment) throw ApiException.notFound('Attachment');
+			if (!attachment) throw errors.NOT_FOUND({ message: 'Attachment' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
@@ -1051,7 +1125,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete attachment');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete attachment' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -1072,6 +1146,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1079,11 +1158,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_checkpoint', 'new');
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
@@ -1098,7 +1177,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add checkpoint');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add checkpoint' });
 			}
 
 			const checkpoint = await prisma.jobCheckpoint.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -1120,6 +1199,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1127,16 +1211,16 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('complete', 'job_checkpoint', input.checkpointId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const checkpoint = await prisma.jobCheckpoint.findFirst({
 				where: { id: input.checkpointId, jobId: input.jobId }
 			});
-			if (!checkpoint) throw ApiException.notFound('Checkpoint');
+			if (!checkpoint) throw errors.NOT_FOUND({ message: 'Checkpoint' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
@@ -1151,7 +1235,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to complete checkpoint');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to complete checkpoint' });
 			}
 
 			const updated = await prisma.jobCheckpoint.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -1164,6 +1248,10 @@ export const jobRouter = {
 	 */
 	listCheckpoints: orgProcedure
 		.input(z.object({ jobId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1171,11 +1259,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_checkpoint', input.jobId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const checkpoints = await prisma.jobCheckpoint.findMany({
 				where: { jobId: input.jobId },
@@ -1200,6 +1288,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1207,11 +1300,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_visit', 'new');
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			// Validate technician if provided
 			if (input.technicianId) {
@@ -1222,7 +1315,7 @@ export const jobRouter = {
 						isActive: true
 					}
 				});
-				if (!tech) throw ApiException.notFound('Technician');
+				if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
 			}
 
 			// Get next visit number
@@ -1251,7 +1344,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add visit' });
 			}
 
 			const visit = await prisma.jobVisit.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -1275,6 +1368,11 @@ export const jobRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1282,16 +1380,16 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'job_visit', input.visitId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const visit = await prisma.jobVisit.findFirst({
 				where: { id: input.visitId, jobId: input.jobId }
 			});
-			if (!visit) throw ApiException.notFound('Visit');
+			if (!visit) throw errors.NOT_FOUND({ message: 'Visit' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
@@ -1311,7 +1409,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update visit');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update visit' });
 			}
 
 			const updated = await prisma.jobVisit.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -1324,6 +1422,10 @@ export const jobRouter = {
 	 */
 	listVisits: orgProcedure
 		.input(z.object({ jobId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1331,11 +1433,11 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_visit', input.jobId);
 
-			await getJobOrThrow(input.jobId, context.organization!.id);
+			await getJobOrThrow(input.jobId, context.organization!.id, errors);
 
 			const visits = await prisma.jobVisit.findMany({
 				where: { jobId: input.jobId },
@@ -1350,6 +1452,12 @@ export const jobRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid status for deletion' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1357,15 +1465,15 @@ export const jobRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'job', input.id);
 
-			const job = await getJobOrThrow(input.id, context.organization!.id);
+			const job = await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			// Only allow deletion of jobs in certain states
 			if (!['LEAD', 'TICKET', 'CANCELLED'].includes(job.status)) {
-				throw ApiException.badRequest(`Cannot delete job in ${job.status} status`);
+				throw errors.BAD_REQUEST({ message: `Cannot delete job in ${job.status} status` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -1381,7 +1489,7 @@ export const jobRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete job');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete job' });
 			}
 
 			return successResponse({ deleted: true }, context);

@@ -8,7 +8,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -35,6 +34,10 @@ export const externalVendorRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -48,14 +51,14 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// If propertyId provided, verify it belongs to org
 			if (input.propertyId) {
 				const property = await prisma.individualProperty.findFirst({
 					where: { id: input.propertyId, ownerOrgId: context.organization.id }
 				});
 				if (!property) {
-					throw ApiException.notFound('IndividualProperty');
+					throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 				}
 			}
 
@@ -102,6 +105,10 @@ export const externalVendorRouter = {
 	 */
 	getContext: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -133,7 +140,7 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const vendorContext = await prisma.externalVendorContext.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: {
@@ -142,7 +149,7 @@ export const externalVendorRouter = {
 			});
 
 			if (!vendorContext) {
-				throw ApiException.notFound('ExternalVendorContext');
+				throw errors.NOT_FOUND({ message: 'ExternalVendorContext not found' });
 			}
 
 			await context.cerbos.authorize('view', 'external_vendor_context', vendorContext.id);
@@ -185,6 +192,9 @@ export const externalVendorRouter = {
 				tradeCategory: z.string().optional()
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -203,7 +213,7 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'external_vendor_context', 'list');
 
 			const where: Prisma.ExternalVendorContextWhereInput = {
@@ -256,6 +266,10 @@ export const externalVendorRouter = {
 				notes: z.string().nullable().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -269,13 +283,13 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.externalVendorContext.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ExternalVendorContext');
+				throw errors.NOT_FOUND({ message: 'ExternalVendorContext not found' });
 			}
 
 			await context.cerbos.authorize('update', 'external_vendor_context', existing.id);
@@ -315,6 +329,10 @@ export const externalVendorRouter = {
 				serviceProviderOrgId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -327,13 +345,13 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.externalVendorContext.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ExternalVendorContext');
+				throw errors.NOT_FOUND({ message: 'ExternalVendorContext not found' });
 			}
 
 			// Verify service provider org exists
@@ -342,7 +360,7 @@ export const externalVendorRouter = {
 			});
 
 			if (!serviceProviderOrg) {
-				throw ApiException.notFound('ServiceProviderOrganization');
+				throw errors.NOT_FOUND({ message: 'ServiceProviderOrganization not found' });
 			}
 
 			await context.cerbos.authorize('update', 'external_vendor_context', existing.id);
@@ -389,6 +407,10 @@ export const externalVendorRouter = {
 				relatedDocumentIds: z.array(z.string()).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -403,13 +425,13 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const vendorContext = await prisma.externalVendorContext.findFirst({
 				where: { id: input.externalVendorContextId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!vendorContext) {
-				throw ApiException.notFound('ExternalVendorContext');
+				throw errors.NOT_FOUND({ message: 'ExternalVendorContext not found' });
 			}
 
 			await context.cerbos.authorize('create', 'external_vendor_interaction', 'new');
@@ -461,6 +483,10 @@ export const externalVendorRouter = {
 				interactionType: z.enum(['QUOTE', 'SCHEDULE', 'WORK', 'INVOICE', 'OTHER']).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -481,13 +507,13 @@ export const externalVendorRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const vendorContext = await prisma.externalVendorContext.findFirst({
 				where: { id: input.externalVendorContextId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!vendorContext) {
-				throw ApiException.notFound('ExternalVendorContext');
+				throw errors.NOT_FOUND({ message: 'ExternalVendorContext not found' });
 			}
 
 			await context.cerbos.authorize('view', 'external_vendor_interaction', 'list');

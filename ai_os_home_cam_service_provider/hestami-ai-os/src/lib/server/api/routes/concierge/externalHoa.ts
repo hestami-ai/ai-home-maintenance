@@ -8,7 +8,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { ExternalApprovalStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ExternalApprovalStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordIntent } from '../../middleware/activityEvent.js';
@@ -36,6 +35,10 @@ export const externalHoaRouter = {
 				documentsJson: z.array(z.string()).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -50,13 +53,13 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify property belongs to org
 			const property = await prisma.individualProperty.findFirst({
 				where: { id: input.propertyId, ownerOrgId: context.organization.id }
 			});
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			await context.cerbos.authorize('create', 'external_hoa_context', 'new');
@@ -103,6 +106,10 @@ export const externalHoaRouter = {
 	 */
 	getContext: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -141,7 +148,7 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const hoaContext = await prisma.externalHOAContext.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: {
@@ -151,7 +158,7 @@ export const externalHoaRouter = {
 			});
 
 			if (!hoaContext) {
-				throw ApiException.notFound('ExternalHOAContext');
+				throw errors.NOT_FOUND({ message: 'ExternalHOAContext not found' });
 			}
 
 			await context.cerbos.authorize('view', 'external_hoa_context', hoaContext.id);
@@ -198,6 +205,9 @@ export const externalHoaRouter = {
 				propertyId: z.string()
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -265,6 +275,10 @@ export const externalHoaRouter = {
 				documentsJson: z.array(z.string()).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -278,13 +292,13 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.externalHOAContext.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ExternalHOAContext');
+				throw errors.NOT_FOUND({ message: 'ExternalHOAContext not found' });
 			}
 
 			await context.cerbos.authorize('update', 'external_hoa_context', existing.id);
@@ -327,6 +341,10 @@ export const externalHoaRouter = {
 				relatedDocumentIds: z.array(z.string()).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -341,13 +359,13 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const hoaContext = await prisma.externalHOAContext.findFirst({
 				where: { id: input.externalHoaContextId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!hoaContext) {
-				throw ApiException.notFound('ExternalHOAContext');
+				throw errors.NOT_FOUND({ message: 'ExternalHOAContext not found' });
 			}
 
 			await context.cerbos.authorize('create', 'external_hoa_approval', 'new');
@@ -402,6 +420,10 @@ export const externalHoaRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -415,14 +437,14 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const approval = await prisma.externalHOAApproval.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { externalHoaContext: true }
 			});
 
 			if (!approval || approval.externalHoaContext.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ExternalHOAApproval');
+				throw errors.NOT_FOUND({ message: 'ExternalHOAApproval not found' });
 			}
 
 			await context.cerbos.authorize('update', 'external_hoa_approval', approval.id);
@@ -476,6 +498,10 @@ export const externalHoaRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -490,13 +516,13 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const hoaContext = await prisma.externalHOAContext.findFirst({
 				where: { id: input.externalHoaContextId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!hoaContext) {
-				throw ApiException.notFound('ExternalHOAContext');
+				throw errors.NOT_FOUND({ message: 'ExternalHOAContext not found' });
 			}
 
 			await context.cerbos.authorize('create', 'external_hoa_rule', 'new');
@@ -529,6 +555,10 @@ export const externalHoaRouter = {
 	 */
 	deleteRule: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -536,14 +566,14 @@ export const externalHoaRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const rule = await prisma.externalHOARule.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { externalHoaContext: true }
 			});
 
 			if (!rule || rule.externalHoaContext.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ExternalHOARule');
+				throw errors.NOT_FOUND({ message: 'ExternalHOARule not found' });
 			}
 
 			await context.cerbos.authorize('delete', 'external_hoa_rule', rule.id);

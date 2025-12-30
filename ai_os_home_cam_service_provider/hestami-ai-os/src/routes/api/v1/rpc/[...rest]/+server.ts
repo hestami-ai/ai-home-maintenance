@@ -11,6 +11,7 @@ import {
 	logRequestEnd,
 	logRequestError
 } from '$server/api/middleware/logging';
+import { recordSpanError } from '$server/api/middleware/tracing';
 
 /**
  * oRPC handler for /api/v1/rpc/*
@@ -57,15 +58,26 @@ async function createContext(
 	// Get organization context from header
 	const orgId = request.headers.get('X-Org-Id');
 	if (context.user) {
-		// Get ALL user's organization memberships for Cerbos authorization
-		const memberships = await prisma.userOrganization.findMany({
-			where: { userId: context.user.id },
-			include: { organization: true }
-		});
+		// Get ALL user's organization memberships and staff profile for Cerbos authorization
+		const [memberships, staffProfile] = await Promise.all([
+			prisma.userOrganization.findMany({
+				where: { userId: context.user.id },
+				include: { organization: true }
+			}),
+			prisma.staff.findUnique({
+				where: { userId: context.user.id, status: 'ACTIVE' }
+			})
+		]);
 
 		// Build orgRoles map for Cerbos principal
 		for (const membership of memberships) {
 			context.orgRoles[membership.organizationId] = membership.role;
+		}
+
+		// Set staff roles and pillar access if user is active Hestami staff
+		if (staffProfile) {
+			context.staffRoles = staffProfile.roles;
+			context.pillarAccess = staffProfile.pillarAccess;
 		}
 
 		// Set current organization context if X-Org-Id header is provided
@@ -105,12 +117,28 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 		if (result.matched) {
 			const statusCode = result.response.status;
 
-			// Log error responses with body for debugging
+			// Log error responses with body for debugging and record on span
 			if (statusCode >= 400) {
 				const clonedResponse = result.response.clone();
 				try {
 					const body = await clonedResponse.json();
-					logRequestError(logContext, new Error(JSON.stringify(body)));
+					// Extract oRPC error structure for better logging
+					const errorInfo = body?.json || body;
+					const errorMessage = errorInfo.message || 'Unknown error';
+					const error = new Error(errorMessage);
+					
+					logRequestError(logContext, error, {
+						errorCode: errorInfo.code,
+						errorDefined: errorInfo.defined,
+						errorData: errorInfo.data
+					});
+					
+					// Record error on the active span for trace visibility
+					await recordSpanError(error, {
+						errorCode: errorInfo.code,
+						httpStatus: statusCode,
+						errorType: errorInfo.code || 'API_ERROR'
+					});
 				} catch {
 					// Non-JSON error response
 				}
@@ -124,7 +152,17 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 		return new Response('Not Found', { status: 404 });
 	} catch (error) {
 		const durationMs = Date.now() - startTime;
-		logRequestError(logContext, error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		
+		logRequestError(logContext, errorObj);
+		
+		// Record unhandled error on span
+		await recordSpanError(errorObj, {
+			errorCode: 'INTERNAL_SERVER_ERROR',
+			httpStatus: 500,
+			errorType: 'UNHANDLED_ERROR'
+		});
+		
 		logRequestEnd(logContext, 500, durationMs);
 		throw error;
 	}

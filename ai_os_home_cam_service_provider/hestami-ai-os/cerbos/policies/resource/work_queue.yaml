@@ -1,0 +1,19 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "work_queue"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Platform admins can view the work queue (cross-org access)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # Hestami staff can view work queue (cross-org access)
+    # Work queue is the primary staff landing page
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

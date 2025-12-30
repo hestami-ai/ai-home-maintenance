@@ -8,7 +8,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { OwnerIntentCategorySchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentCategorySchema.js';
 import { OwnerIntentPrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentPrioritySchema.js';
 import { OwnerIntentStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentStatusSchema.js';
@@ -55,7 +54,10 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'owner_intent', 'new');
 
@@ -65,7 +67,7 @@ export const ownerIntentRouter = {
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty' });
 			}
 
 			// Verify submitter party if provided
@@ -74,7 +76,7 @@ export const ownerIntentRouter = {
 					where: { id: input.submittedByPartyId, organizationId: context.organization.id }
 				});
 				if (!party) {
-					throw ApiException.notFound('Party');
+					throw errors.NOT_FOUND({ message: 'Party' });
 				}
 			}
 
@@ -172,7 +174,10 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const intent = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -186,7 +191,7 @@ export const ownerIntentRouter = {
 			});
 
 			if (!intent) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			// Cerbos authorization
@@ -232,9 +237,9 @@ export const ownerIntentRouter = {
 					},
 					submittedByParty: intent.submittedByParty
 						? {
-								id: intent.submittedByParty.id,
-								displayName: submitterDisplayName!
-							}
+							id: intent.submittedByParty.id,
+							displayName: submitterDisplayName!
+						}
 						: null
 				},
 				context
@@ -351,7 +356,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -361,12 +370,12 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			// Can only update while in DRAFT status
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only update intents in DRAFT status');
+				throw errors.BAD_REQUEST({ message: 'Can only update intents in DRAFT status' });
 			}
 
 			// Cerbos authorization
@@ -379,16 +388,16 @@ export const ownerIntentRouter = {
 					...(input.description !== undefined && { description: input.description }),
 					...(input.category !== undefined && { category: input.category }),
 					...(input.priority !== undefined && { priority: input.priority }),
-					...(input.constraints !== undefined && { 
-					constraints: input.constraints === null 
-						? Prisma.DbNull 
-						: (input.constraints as Prisma.InputJsonValue) 
-				}),
-					...(input.attachments !== undefined && { 
-					attachments: input.attachments === null 
-						? Prisma.DbNull 
-						: (input.attachments as Prisma.InputJsonValue) 
-				})
+					...(input.constraints !== undefined && {
+						constraints: input.constraints === null
+							? Prisma.DbNull
+							: (input.constraints as Prisma.InputJsonValue)
+					}),
+					...(input.attachments !== undefined && {
+						attachments: input.attachments === null
+							? Prisma.DbNull
+							: (input.attachments as Prisma.InputJsonValue)
+					})
 				}
 			});
 
@@ -428,7 +437,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -438,11 +451,11 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only submit intents in DRAFT status');
+				throw errors.BAD_REQUEST({ message: 'Can only submit intents in DRAFT status' });
 			}
 
 			// Cerbos authorization
@@ -504,7 +517,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -514,11 +531,11 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			if (existing.status !== 'SUBMITTED') {
-				throw ApiException.badRequest('Can only acknowledge intents in SUBMITTED status');
+				throw errors.BAD_REQUEST({ message: 'Can only acknowledge intents in SUBMITTED status' });
 			}
 
 			// Cerbos authorization - requires concierge/admin role
@@ -584,7 +601,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -594,13 +615,13 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			if (!['SUBMITTED', 'ACKNOWLEDGED'].includes(existing.status)) {
-				throw ApiException.badRequest(
-					'Can only convert intents in SUBMITTED or ACKNOWLEDGED status'
-				);
+				throw errors.BAD_REQUEST({
+					message: 'Can only convert intents in SUBMITTED or ACKNOWLEDGED status'
+				});
 			}
 
 			// Cerbos authorization - requires concierge/admin role
@@ -666,7 +687,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -676,13 +701,13 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			if (!['SUBMITTED', 'ACKNOWLEDGED'].includes(existing.status)) {
-				throw ApiException.badRequest(
-					'Can only decline intents in SUBMITTED or ACKNOWLEDGED status'
-				);
+				throw errors.BAD_REQUEST({
+					message: 'Can only decline intents in SUBMITTED or ACKNOWLEDGED status'
+				});
 			}
 
 			// Cerbos authorization - requires concierge/admin role
@@ -747,7 +772,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -757,11 +786,11 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			if (!['DRAFT', 'SUBMITTED', 'ACKNOWLEDGED'].includes(existing.status)) {
-				throw ApiException.badRequest('Cannot withdraw intent in current status');
+				throw errors.BAD_REQUEST({ message: 'Cannot withdraw intent in current status' });
 			}
 
 			// Cerbos authorization
@@ -828,7 +857,10 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const intent = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.intentId,
@@ -838,7 +870,7 @@ export const ownerIntentRouter = {
 			});
 
 			if (!intent) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			// Cerbos authorization
@@ -895,7 +927,10 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const intent = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.intentId,
@@ -905,7 +940,7 @@ export const ownerIntentRouter = {
 			});
 
 			if (!intent) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			// Cerbos authorization
@@ -952,7 +987,10 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownerIntent.findFirst({
 				where: {
 					id: input.id,
@@ -962,7 +1000,7 @@ export const ownerIntentRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('OwnerIntent');
+				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
 			// Cerbos authorization

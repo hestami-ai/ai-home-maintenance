@@ -20,6 +20,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { JobStatus } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 
 const WORKFLOW_STATUS_EVENT = 'job_status';
@@ -29,25 +30,25 @@ const validTransitions: Record<JobStatus, JobStatus[]> = {
 	// Initial states
 	LEAD: ['TICKET', 'CANCELLED'],
 	TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
-	
+
 	// Estimate workflow
 	ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
 	ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'], // Can revise estimate
 	ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
-	
+
 	// Job execution
 	JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
 	SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
 	DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'], // Can reschedule
 	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
 	ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
-	
+
 	// Completion & payment
 	COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
 	INVOICED: ['PAID', 'CANCELLED'],
 	PAID: ['WARRANTY', 'CLOSED'],
 	WARRANTY: ['CLOSED', 'IN_PROGRESS'], // Can reopen for warranty work
-	
+
 	// Terminal states
 	CLOSED: [],
 	CANCELLED: []
@@ -350,17 +351,23 @@ async function jobTransitionWorkflow(input: JobTransitionInput): Promise<JobTran
 		logWorkflowEnd(log, `transition_to_${input.toStatus}`, true, startTime, successResult);
 		return successResult;
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		const errorStack = error instanceof Error ? error.stack : undefined;
-		
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
 		log.error('Workflow failed', {
 			jobId: input.jobId,
 			toStatus: input.toStatus,
 			error: errorMessage,
-			stack: errorStack
+			stack: errorObj.stack
 		});
-		
+
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'JOB_LIFECYCLE_ERROR'
+		});
 
 		const errorResult = {
 			success: false,
@@ -388,9 +395,9 @@ export async function startJobTransition(
 
 export async function getJobTransitionStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 export async function getJobTransitionError(

@@ -3,15 +3,14 @@ import {
 	orgProcedure,
 	successResponse,
 	PaginationInputSchema,
-	PaginationOutputSchema,
-	type OrgContext
+	PaginationOutputSchema
 } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { ResponseMetaSchema } from '../schemas.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../accounting/index.js';
 import { recordExecution } from '../middleware/activityEvent.js';
+import { recordSpanError } from '../middleware/tracing.js';
 import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('AssociationRoute');
@@ -67,9 +66,15 @@ export const associationRouter = {
 
 			// Seed default chart of accounts for the new association
 			try {
-				await seedDefaultChartOfAccounts(association.id);
+				await seedDefaultChartOfAccounts(context.organization.id, association.id);
 			} catch (error) {
+				const errorObj = error instanceof Error ? error : new Error(String(error));
 				console.warn(`Failed to seed chart of accounts for association ${association.id}:`, error);
+				// Record non-fatal error but don't fail the request
+				await recordSpanError(errorObj, {
+					errorCode: 'SEEDING_FAILED',
+					errorType: 'ASSOCIATION_SETUP_ERROR'
+				});
 			}
 
 			// Record activity event
@@ -121,7 +126,10 @@ export const associationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const association = await prisma.association.findFirst({
 				where: {
 					id: input.id,
@@ -130,7 +138,7 @@ export const associationRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			// Cerbos authorization - check if user can view this specific association
@@ -265,13 +273,16 @@ export const associationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.association.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			// Cerbos authorization - check if user can edit this association
@@ -318,13 +329,16 @@ export const associationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.association.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			// Cerbos authorization - check if user can delete this association

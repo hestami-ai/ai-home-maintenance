@@ -13,6 +13,7 @@ export {
 	currentRole,
 	hasOrganizations,
 	isOrgLoading,
+	waitForOrganization,
 	type Organization,
 	type OrganizationMembership,
 	type OrganizationState

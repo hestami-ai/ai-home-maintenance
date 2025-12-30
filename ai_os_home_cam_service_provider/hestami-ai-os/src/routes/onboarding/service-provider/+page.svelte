@@ -1,13 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-	import { serviceProviderOnboarding } from '$lib/stores';
-
-	onMount(() => {
-		serviceProviderOnboarding.reset();
-		serviceProviderOnboarding.setStep(0);
-		goto('/onboarding/service-provider/details');
-	});
+	// This page immediately redirects via +page.server.ts
+	// It only renders briefly if the redirect hasn't completed yet
 </script>
 
 <div class="flex items-center justify-center py-12">

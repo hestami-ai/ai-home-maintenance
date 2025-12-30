@@ -23,11 +23,36 @@
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import {
 		getServiceCallStatusLabel,
 		getServiceCallStatusColor
 	} from '$lib/utils/serviceCallTerminology';
+
+	// Derive propertyId from route params
+	const propertyId = $derived($page.params.id);
+
+	// Label mappings
+	const propertyTypeLabels: Record<string, string> = {
+		SINGLE_FAMILY: 'Single Family',
+		CONDO: 'Condominium',
+		TOWNHOUSE: 'Townhouse',
+		MULTI_FAMILY: 'Multi-Family',
+		APARTMENT: 'Apartment',
+		COMMERCIAL: 'Commercial',
+		LAND: 'Land',
+		OTHER: 'Other'
+	};
+
+	const categoryLabels: Record<string, string> = {
+		PROPERTY_DEED: 'Property Deed',
+		INSURANCE: 'Insurance',
+		WARRANTY: 'Warranty',
+		INSPECTION: 'Inspection',
+		RECEIPT: 'Receipt',
+		CONTRACT: 'Contract',
+		PHOTO: 'Photo',
+		OTHER: 'Other'
+	};
 
 	interface ExternalHoa {
 		id: string;
@@ -82,11 +107,19 @@
 		createdAt: string;
 	}
 
+	interface Props {
+		data: {
+			property: Property;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let property = $state<Property | null>(null);
 	let documents = $state<Document[]>([]);
 	let mediaItems = $state<Document[]>([]);
 	let serviceCalls = $state<ServiceCall[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let isLoadingDocs = $state(false);
 	let isLoadingMedia = $state(false);
 	let isLoadingHistory = $state(false);
@@ -94,47 +127,16 @@
 	let activeTab = $state<'overview' | 'documents' | 'media' | 'history' | 'systems'>('overview');
 	let selectedImage = $state<Document | null>(null);
 
-	const propertyId = $page.params.id!
-
-	const propertyTypeLabels: Record<string, string> = {
-		SINGLE_FAMILY: 'Single Family Home',
-		CONDOMINIUM: 'Condominium',
-		TOWNHOUSE: 'Townhouse',
-		COOPERATIVE: 'Cooperative',
-		MIXED_USE: 'Mixed Use',
-		COMMERCIAL: 'Commercial'
-	};
-
-	const categoryLabels: Record<string, string> = {
-		PROPERTY_DEED: 'Property Deed',
-		INSURANCE: 'Insurance',
-		WARRANTY: 'Warranty',
-		INSPECTION: 'Inspection',
-		RECEIPT: 'Receipt',
-		CONTRACT: 'Contract',
-		PHOTO: 'Photo',
-		OTHER: 'Other'
-	};
-
-	onMount(async () => {
-		await loadProperty();
+	// Synchronize server data to local state
+	$effect(() => {
+		if (data.property) {
+			property = data.property;
+		}
 	});
 
 	async function loadProperty() {
-		isLoading = true;
-		error = null;
-
-		try {
-			const result = await orpc.individualProperty.get({
-				propertyId: propertyId
-			});
-			property = result.data.property as Property;
-		} catch (err) {
-			console.error('Failed to load property:', err);
-			error = err instanceof Error ? err.message : 'Failed to load property';
-		} finally {
-			isLoading = false;
-		}
+		// Just refresh the data
+		window.location.reload();
 	}
 
 	async function loadDocuments() {

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import {
@@ -40,101 +39,88 @@
 	type TabType = typeof validTabs[number];
 	const urlTab = $derived($page.url.searchParams.get('tab') as TabType | null);
 	
+	interface Props {
+		data: {
+			job: Job;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let job = $state<Job | null>(null);
 	let notes = $state<JobNote[]>([]);
 	let statusHistory = $state<JobStatusHistoryItem[]>([]);
 	let estimates = $state<Estimate[]>([]);
 	let invoices = $state<JobInvoice[]>([]);
 	let technicians = $state<Technician[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let activeTab = $state<TabType>('overview');
-	
-	// Sync tab from URL on mount and URL changes
-	$effect(() => {
-		if (urlTab && validTabs.includes(urlTab)) {
-			activeTab = urlTab;
-		}
-	});
-	
-	function setActiveTab(tab: TabType) {
-		activeTab = tab;
-		const url = new URL(window.location.href);
-		url.searchParams.set('tab', tab);
-		goto(url.toString(), { replaceState: true, noScroll: true });
-	}
-	
-	// Note form
+
+	// Note form state
 	let newNoteContent = $state('');
 	let isNoteInternal = $state(false);
 	let isAddingNote = $state(false);
-	
-	// Estimate form
+
+	// Estimate/Invoice action state
 	let isCreatingEstimate = $state(false);
 	let isSendingEstimate = $state(false);
-	
-	// Invoice form
 	let isCreatingInvoice = $state(false);
-	
-	// Scheduling form
-	let showScheduleForm = $state(false);
-	let scheduleStart = $state('');
-	let scheduleEnd = $state('');
+
+	// Technician assignment state
 	let selectedTechnicianId = $state('');
-	let isScheduling = $state(false);
 	let isAssigningTechnician = $state(false);
 
-	onMount(async () => {
-		if (jobId) {
-			await loadJob();
+	// Schedule form state
+	let scheduleStart = $state('');
+	let scheduleEnd = $state('');
+	let isScheduling = $state(false);
+	let showScheduleForm = $state(false);
+
+	// Tab navigation helper
+	function setActiveTab(tabId: TabType) {
+		activeTab = tabId;
+	}
+
+	// Synchronize server data
+	$effect(() => {
+		if (data.job) {
+			job = data.job;
+			selectedTechnicianId = job.assignedTechnicianId || '';
 		}
 	});
 
-	async function loadJob() {
-		if (!jobId) return;
-		isLoading = true;
-		error = null;
+	// Initial data loading for related items (can stay client-side for now as they are secondary or the API is structured this way)
+	$effect(() => {
+		if (jobId) {
+			loadRelatedData();
+		}
+	});
+
+	async function loadRelatedData() {
 		try {
-			const [jobRes, notesRes, historyRes, estimatesRes, invoicesRes, techniciansRes] = await Promise.all([
-				jobApi.get(jobId),
+			const [notesRes, historyRes, estimatesRes, invoicesRes, techniciansRes] = await Promise.all([
 				jobApi.listNotes({ jobId: jobId, includeInternal: true }),
 				jobApi.getStatusHistory(jobId),
 				estimateApi.list({ jobId: jobId }),
 				invoiceApi.list({ jobId: jobId }),
 				technicianApi.list({ isActive: true })
 			]);
-			
-			if (!jobRes.ok) {
-				error = 'Failed to load job';
-				return;
-			}
-			job = jobRes.data.job;
-			selectedTechnicianId = job.assignedTechnicianId || '';
-			
-			if (notesRes.ok) {
-				notes = notesRes.data.notes;
-			}
-			
-			if (historyRes.ok) {
-				statusHistory = historyRes.data.history;
-			}
-			
-			if (estimatesRes.ok) {
-				estimates = estimatesRes.data.estimates;
-			}
-			
-			if (invoicesRes.ok) {
-				invoices = invoicesRes.data.invoices;
-			}
-			
-			if (techniciansRes.ok) {
-				technicians = techniciansRes.data.technicians;
-			}
+
+			if (notesRes.ok) notes = notesRes.data.notes;
+			if (historyRes.ok) statusHistory = historyRes.data.history;
+			if (estimatesRes.ok) estimates = estimatesRes.data.estimates;
+			if (invoicesRes.ok) invoices = invoicesRes.data.invoices;
+			if (techniciansRes.ok) technicians = techniciansRes.data.technicians;
 		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load job';
-		} finally {
-			isLoading = false;
+			console.error('Failed to load related job data:', e);
 		}
+	}
+
+	async function loadJob() {
+		// Used for refreshing after actions
+		loadRelatedData();
+		// In a real SvelteKit app, we might use invalidateAll() or similar
 	}
 
 	async function addNote() {

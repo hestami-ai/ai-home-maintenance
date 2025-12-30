@@ -13,7 +13,7 @@
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
-	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	interface Document {
 		id: string;
@@ -28,8 +28,16 @@
 		createdAt: string;
 	}
 
-	let documents = $state<Document[]>([]);
-	let isLoading = $state(true);
+	interface Props {
+		data: {
+			documents: Document[];
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let documents = $derived(data.documents);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let selectedCategory = $state<string>('');
@@ -69,26 +77,7 @@
 		})
 	);
 
-	onMount(async () => {
-		await loadDocuments();
-	});
 
-	async function loadDocuments() {
-		isLoading = true;
-		error = null;
-
-		try {
-			const result = await orpc.document.listDocuments({
-				limit: 100
-			});
-			documents = result.data.documents;
-		} catch (err) {
-			console.error('Failed to load documents:', err);
-			error = err instanceof Error ? err.message : 'Failed to load documents';
-		} finally {
-			isLoading = false;
-		}
-	}
 
 	function formatFileSize(bytes: number): string {
 		if (bytes < 1024) return `${bytes} B`;
@@ -109,6 +98,7 @@
 		if (mimeType.includes('pdf')) return FileText;
 		return File;
 	}
+
 </script>
 
 <svelte:head>
@@ -157,7 +147,7 @@
 				<Card variant="outlined" padding="md">
 					<div class="text-center text-error-500">
 						<p>{error}</p>
-						<button onclick={loadDocuments} class="btn preset-tonal-primary mt-4">
+						<button onclick={() => invalidateAll()} class="btn preset-tonal-primary mt-4">
 							Try Again
 						</button>
 					</div>

@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { RecurrenceFrequency } from '../../../../../../generated/prisma/client.js';
 import { startScheduleWorkflow } from '../../../workflows/scheduleWorkflow.js';
@@ -125,18 +124,24 @@ export const contractScheduleRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Service contract not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'contract_schedule', 'new');
 
 			// Verify contract
 			const contract = await prisma.serviceContract.findFirst({
 				where: { id: input.contractId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!contract) throw ApiException.notFound('Service contract');
+			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract' });
 
 			if (!['DRAFT', 'ACTIVE'].includes(contract.status)) {
-				throw ApiException.badRequest('Can only add schedules to DRAFT or ACTIVE contracts');
+				throw errors.BAD_REQUEST({ message: 'Can only add schedules to DRAFT or ACTIVE contracts' });
 			}
 
 			const createSchedule = async () => {
@@ -172,7 +177,7 @@ export const contractScheduleRouter = {
 				);
 
 				if (!result.success) {
-					throw ApiException.internal(result.error || 'Failed to create schedule');
+					throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create schedule' });
 				}
 
 				return prisma.contractSchedule.findUniqueOrThrow({
@@ -180,9 +185,7 @@ export const contractScheduleRouter = {
 				});
 			};
 
-			const schedule = input.idempotencyKey
-				? await createSchedule()
-				: await createSchedule();
+			const schedule = await createSchedule();
 
 			return successResponse({ schedule: formatSchedule(schedule) }, context);
 		}),
@@ -196,8 +199,12 @@ export const contractScheduleRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Contract schedule not found' },
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'contract_schedule', input.id);
 
 			const schedule = await prisma.contractSchedule.findUnique({
@@ -206,7 +213,7 @@ export const contractScheduleRouter = {
 			});
 
 			if (!schedule || schedule.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Contract schedule');
+				throw errors.NOT_FOUND({ message: 'Contract schedule' });
 			}
 
 			return successResponse({ schedule: formatSchedule(schedule) }, context);
@@ -232,8 +239,11 @@ export const contractScheduleRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'contract_schedule', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -291,8 +301,13 @@ export const contractScheduleRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Contract schedule not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'contract_schedule', input.id);
 
 			const existing = await prisma.contractSchedule.findUnique({
@@ -300,7 +315,7 @@ export const contractScheduleRouter = {
 				include: { contract: true }
 			});
 			if (!existing || existing.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Contract schedule');
+				throw errors.NOT_FOUND({ message: 'Contract schedule' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -325,7 +340,7 @@ export const contractScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update schedule' });
 			}
 
 			const schedule = await prisma.contractSchedule.findUniqueOrThrow({
@@ -344,8 +359,13 @@ export const contractScheduleRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Contract schedule not found' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'contract_schedule', input.id);
 
 			const existing = await prisma.contractSchedule.findUnique({
@@ -353,7 +373,7 @@ export const contractScheduleRouter = {
 				include: { contract: true }
 			});
 			if (!existing || existing.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Contract schedule');
+				throw errors.NOT_FOUND({ message: 'Contract schedule' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -369,7 +389,7 @@ export const contractScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete schedule' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -391,8 +411,14 @@ export const contractScheduleRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Contract schedule not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Forbidden' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'contract_schedule', input.scheduleId);
 
 			const schedule = await prisma.contractSchedule.findUnique({
@@ -400,11 +426,11 @@ export const contractScheduleRouter = {
 				include: { contract: true }
 			});
 			if (!schedule || schedule.contract.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Contract schedule');
+				throw errors.NOT_FOUND({ message: 'Contract schedule' });
 			}
 
 			if (!schedule.isActive) {
-				throw ApiException.badRequest('Schedule is not active');
+				throw errors.BAD_REQUEST({ message: 'Schedule is not active' });
 			}
 
 			// Get current max visit number
@@ -430,7 +456,7 @@ export const contractScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to generate visits');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to generate visits' });
 			}
 
 			return successResponse({ visitsCreated: result.generatedCount ?? 0 }, context);

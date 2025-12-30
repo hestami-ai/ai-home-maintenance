@@ -8,6 +8,19 @@
 
 import { orpc } from './index';
 import type { operations } from './types.generated';
+import { waitForOrganization } from '$lib/stores';
+
+/**
+ * Helper to ensure organization context is loaded before making API calls.
+ * Wraps an async function to wait for organization first.
+ */
+async function withOrgContext<T>(fn: () => Promise<T>): Promise<T> {
+	const org = await waitForOrganization();
+	if (!org) {
+		throw new Error('No organization context available. Please select an organization.');
+	}
+	return fn();
+}
 
 // ============================================================================
 // Types - Extracted from types.generated.ts
@@ -966,11 +979,11 @@ export const conciergeCaseApi = {
 		assignedConciergeId?: string;
 		cursor?: string;
 		limit?: number;
-	}) => orpc.conciergeCase.list(params || {}),
+	}) => withOrgContext(() => orpc.conciergeCase.list(params || {})),
 
-	get: (id: string) => orpc.conciergeCase.get({ id }),
+	get: (id: string) => withOrgContext(() => orpc.conciergeCase.get({ id })),
 
-	getDetail: (id: string) => orpc.conciergeCase.getDetail({ id }),
+	getDetail: (id: string) => withOrgContext(() => orpc.conciergeCase.getDetail({ id })),
 
 	create: (data: {
 		propertyId: string;
@@ -979,26 +992,26 @@ export const conciergeCaseApi = {
 		priority?: ConciergeCasePriority;
 		originIntentId?: string;
 		idempotencyKey: string;
-	}) => orpc.conciergeCase.create(data),
+	}) => withOrgContext(() => orpc.conciergeCase.create(data)),
 
 	updateStatus: (data: {
 		id: string;
 		status: ConciergeCaseStatus;
 		reason?: string;
 		idempotencyKey: string;
-	}) => orpc.conciergeCase.updateStatus(data),
+	}) => withOrgContext(() => orpc.conciergeCase.updateStatus(data)),
 
 	assign: (data: { caseId: string; conciergeId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.assign({ id: data.caseId, assignedConciergeUserId: data.conciergeId, idempotencyKey: data.idempotencyKey }),
+		withOrgContext(() => orpc.conciergeCase.assign({ id: data.caseId, assignedConciergeUserId: data.conciergeId, idempotencyKey: data.idempotencyKey })),
 
 	resolve: (data: { caseId: string; resolutionSummary: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.resolve({ id: data.caseId, resolutionSummary: data.resolutionSummary, idempotencyKey: data.idempotencyKey }),
+		withOrgContext(() => orpc.conciergeCase.resolve({ id: data.caseId, resolutionSummary: data.resolutionSummary, idempotencyKey: data.idempotencyKey })),
 
 	close: (data: { caseId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.close({ id: data.caseId, idempotencyKey: data.idempotencyKey }),
+		withOrgContext(() => orpc.conciergeCase.close({ id: data.caseId, idempotencyKey: data.idempotencyKey })),
 
 	cancel: (data: { caseId: string; reason: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.cancel({ id: data.caseId, reason: data.reason, idempotencyKey: data.idempotencyKey }),
+		withOrgContext(() => orpc.conciergeCase.cancel({ id: data.caseId, reason: data.reason, idempotencyKey: data.idempotencyKey })),
 
 	addNote: (data: {
 		caseId: string;
@@ -1006,31 +1019,31 @@ export const conciergeCaseApi = {
 		noteType?: CaseNoteType;
 		isInternal?: boolean;
 		idempotencyKey: string;
-	}) => orpc.conciergeCase.addNote(data),
+	}) => withOrgContext(() => orpc.conciergeCase.addNote(data)),
 
 	listNotes: (params: { caseId: string }) =>
-		orpc.conciergeCase.listNotes(params),
+		withOrgContext(() => orpc.conciergeCase.listNotes(params)),
 
 	requestClarification: (data: { caseId: string; question: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.requestClarification(data),
+		withOrgContext(() => orpc.conciergeCase.requestClarification(data)),
 
 	respondToClarification: (data: { caseId: string; response: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.respondToClarification(data),
+		withOrgContext(() => orpc.conciergeCase.respondToClarification(data)),
 
 	linkToArc: (data: { caseId: string; arcRequestId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.linkToArc(data),
+		withOrgContext(() => orpc.conciergeCase.linkToArc(data)),
 
 	linkToWorkOrder: (data: { caseId: string; workOrderId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.linkToWorkOrder(data),
+		withOrgContext(() => orpc.conciergeCase.linkToWorkOrder(data)),
 
 	linkToUnit: (data: { caseId: string; unitId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.linkToUnit(data),
+		withOrgContext(() => orpc.conciergeCase.linkToUnit(data)),
 
 	linkToJob: (data: { caseId: string; jobId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.linkToJob(data),
+		withOrgContext(() => orpc.conciergeCase.linkToJob(data)),
 
 	getStatusHistory: (caseId: string) =>
-		orpc.conciergeCase.getStatusHistory({ caseId }),
+		withOrgContext(() => orpc.conciergeCase.getStatusHistory({ caseId })),
 
 	addParticipant: (data: {
 		caseId: string;
@@ -1041,15 +1054,15 @@ export const conciergeCaseApi = {
 		role: string;
 		notes?: string;
 		idempotencyKey: string;
-	}) => orpc.conciergeCase.addParticipant(data),
+	}) => withOrgContext(() => orpc.conciergeCase.addParticipant(data)),
 
 	listParticipants: (caseId: string) =>
-		orpc.conciergeCase.listParticipants({ caseId }),
+		withOrgContext(() => orpc.conciergeCase.listParticipants({ caseId })),
 
 	removeParticipant: (data: { caseId: string; participantId: string; idempotencyKey: string }) =>
-		orpc.conciergeCase.removeParticipant(data),
+		withOrgContext(() => orpc.conciergeCase.removeParticipant(data)),
 
-	listConcierges: () => orpc.conciergeCase.listConcierges({})
+	listConcierges: () => withOrgContext(() => orpc.conciergeCase.listConcierges({}))
 };
 
 // ============================================================================

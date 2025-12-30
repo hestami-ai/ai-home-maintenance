@@ -9,11 +9,10 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
 import { startTechnicianWorkflow } from '../../../workflows/technicianWorkflow.js';
 
-const assertServiceProviderOrg = async (organizationId: string) => {
+const assertServiceProviderOrg = async (organizationId: string, errors: any) => {
 	const org = await prisma.organization.findFirst({
 		where: {
 			id: organizationId,
@@ -21,16 +20,16 @@ const assertServiceProviderOrg = async (organizationId: string) => {
 			deletedAt: null
 		}
 	});
-	if (!org) throw ApiException.forbidden('This feature is only available for service provider organizations');
+	if (!org) throw errors.FORBIDDEN({ message: 'This feature is only available for service provider organizations' });
 	return org;
 };
 
-const assertBranchBelongsToOrg = async (branchId: string, organizationId: string) => {
+const assertBranchBelongsToOrg = async (branchId: string, organizationId: string, errors: any) => {
 	const branch = await prisma.contractorBranch.findFirst({
 		where: { id: branchId, organizationId, isActive: true }
 	});
 	if (!branch) {
-		throw ApiException.forbidden('Branch not found for this organization');
+		throw errors.FORBIDDEN({ message: 'Branch not found for this organization' });
 	}
 	return branch;
 };
@@ -241,15 +240,20 @@ export const technicianRouter = {
 	// Technician CRUD
 	upsert: orgProcedure
 		.input(technicianUpsertInput)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ technician: technicianOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertServiceProviderOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertServiceProviderOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'technician', input.id ?? 'new');
 
 			const { id, idempotencyKey, hireDate, terminationDate, branchId, ...rest } = input;
 
 			if (branchId) {
-				await assertBranchBelongsToOrg(branchId, context.organization.id);
+				await assertBranchBelongsToOrg(branchId, context.organization.id, errors);
 			}
 
 			const parsedHire = hireDate ? new Date(hireDate) : undefined;
@@ -260,7 +264,7 @@ export const technicianRouter = {
 				const existing = await prisma.technician.findFirst({
 					where: { id, organizationId: context.organization.id }
 				});
-				if (!existing) throw ApiException.notFound('Technician');
+				if (!existing) throw errors.NOT_FOUND({ message: 'Technician' });
 			}
 
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
@@ -276,7 +280,7 @@ export const technicianRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to upsert technician');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert technician' });
 			}
 
 			// Fetch the technician for the response
@@ -289,13 +293,17 @@ export const technicianRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ technician: technicianOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician', tech.id);
 			return successResponse({ technician: serializeTechnician(tech) }, context);
 		}),
@@ -307,9 +315,12 @@ export const technicianRouter = {
 				branchId: z.string().optional()
 			}).optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: technicianListOutput, meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertServiceProviderOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertServiceProviderOrg(context.organization.id, errors);
 			await context.cerbos.authorize('view', 'technician', '*');
 
 			const limit = input?.limit ?? 50;
@@ -356,13 +367,18 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ skill: skillOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('edit', 'technician_skill', input.id ?? 'new');
 
 			const { id, idempotencyKey, technicianId: _ignoredTechId, ...data } = input;
@@ -380,7 +396,7 @@ export const technicianRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to upsert skill');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert skill' });
 			}
 
 			const skill = await prisma.technicianSkill.findUniqueOrThrow({
@@ -391,13 +407,17 @@ export const technicianRouter = {
 
 	listSkills: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ skills: z.array(skillOutput) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician_skill', '*');
 
 			const skills = await prisma.technicianSkill.findMany({ where: { technicianId: tech.id } });
@@ -420,13 +440,18 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ certification: certificationOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('edit', 'technician_certification', input.id ?? 'new');
 
 			const { id, idempotencyKey, technicianId: _ignoredTechId, issuedAt, expiresAt, ...data } = input;
@@ -444,7 +469,7 @@ export const technicianRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to upsert certification');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert certification' });
 			}
 
 			const certification = await prisma.technicianCertification.findUniqueOrThrow({
@@ -455,13 +480,17 @@ export const technicianRouter = {
 
 	listCertifications: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ certifications: z.array(certificationOutput) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician_certification', '*');
 
 			const certs = await prisma.technicianCertification.findMany({ where: { technicianId: tech.id } });
@@ -484,13 +513,20 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid time range format' },
+			CONFLICT: { message: 'Overlapping time ranges' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ availability: availabilityOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('edit', 'technician_availability', tech.id);
 
 			const { idempotencyKey, technicianId: _ignoredTechId, ...data } = input;
@@ -514,19 +550,19 @@ export const technicianRouter = {
 						em < 0 ||
 						em > 59
 					) {
-						throw ApiException.badRequest(`Invalid time format for ${dayName} entry ${idx + 1} (HH:MM expected)`);
+						throw errors.BAD_REQUEST({ message: `Invalid time format for ${dayName} entry ${idx + 1} (HH:MM expected)` });
 					}
 					const startMinutes = sh * 60 + sm;
 					const endMinutes = eh * 60 + em;
 					if (endMinutes <= startMinutes) {
-						throw ApiException.badRequest(`Availability end must be after start for ${dayName} entry ${idx + 1}`);
+						throw errors.BAD_REQUEST({ message: `Availability end must be after start for ${dayName} entry ${idx + 1}` });
 					}
 					return { startMinutes, endMinutes };
 				});
 				const sorted = parsed.toSorted((a, b) => a.startMinutes - b.startMinutes);
 				for (let i = 1; i < sorted.length; i++) {
 					if (sorted[i].startMinutes < sorted[i - 1].endMinutes) {
-						throw ApiException.conflict(`Availability overlaps on ${dayName}`);
+						throw errors.CONFLICT({ message: `Availability overlaps on ${dayName}` });
 					}
 				}
 			};
@@ -552,7 +588,7 @@ export const technicianRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to set availability');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to set availability' });
 			}
 
 			const availability = await prisma.technicianAvailability.findUniqueOrThrow({
@@ -563,13 +599,17 @@ export const technicianRouter = {
 
 	getAvailability: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ availability: availabilityOutput.nullable() }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician_availability', tech.id);
 
 			const avail = await prisma.technicianAvailability.findUnique({ where: { technicianId: tech.id } });
@@ -588,20 +628,27 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid time range' },
+			CONFLICT: { message: 'Time off overlaps' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ timeOff: timeOffOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('edit', 'technician_time_off', tech.id);
 
 			const { idempotencyKey, technicianId: _ignoredTechId, ...data } = input;
 			const newStart = new Date(data.startsAt);
 			const newEnd = new Date(data.endsAt);
 			if (newEnd <= newStart) {
-				throw ApiException.badRequest('Time off end must be after start');
+				throw errors.BAD_REQUEST({ message: 'Time off end must be after start' });
 			}
 
 			const overlap = await prisma.technicianTimeOff.findFirst({
@@ -612,7 +659,7 @@ export const technicianRouter = {
 				}
 			});
 			if (overlap) {
-				throw ApiException.conflict('Time off overlaps an existing entry');
+				throw errors.CONFLICT({ message: 'Time off overlaps an existing entry' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -628,7 +675,7 @@ export const technicianRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add time off');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add time off' });
 			}
 
 			const timeOff = await prisma.technicianTimeOff.findUniqueOrThrow({
@@ -639,13 +686,17 @@ export const technicianRouter = {
 
 	listTimeOff: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ timeOff: z.array(timeOffOutput) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician_time_off', tech.id);
 
 			const items = await prisma.technicianTimeOff.findMany({
@@ -666,20 +717,25 @@ export const technicianRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ territory: territoryOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('edit', 'technician_territory', input.serviceAreaId);
 
 			// ensure service area belongs to same org
 			const area = await prisma.serviceArea.findFirst({
 				where: { id: input.serviceAreaId, serviceProviderOrgId: tech.organizationId }
 			});
-			if (!area) throw ApiException.forbidden('Service area not found for this organization');
+			if (!area) throw errors.FORBIDDEN({ message: 'Service area not found for this organization' });
 
 			const { idempotencyKey, technicianId: _ignoredTechId, isPrimary = false, ...data } = input;
 
@@ -696,7 +752,7 @@ export const technicianRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to assign territory');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign territory' });
 			}
 
 			const territory = await prisma.technicianTerritory.findUniqueOrThrow({
@@ -707,13 +763,17 @@ export const technicianRouter = {
 
 	listTerritories: orgProcedure
 		.input(z.object({ technicianId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ territories: z.array(territoryOutput) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician_territory', '*');
 
 			const territories = await prisma.technicianTerritory.findMany({
@@ -730,13 +790,17 @@ export const technicianRouter = {
 				technicianId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ kpis: z.array(kpiOutput), pagination: PaginationOutputSchema }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
-			await assertServiceProviderOrg(tech.organizationId);
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician' });
+			await assertServiceProviderOrg(tech.organizationId, errors);
 			await context.cerbos.authorize('view', 'technician_kpi', '*');
 
 			const limit = input.limit ?? 50;

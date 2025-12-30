@@ -8,7 +8,7 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
+import { setOrgContextForWorkItem, clearOrgContext } from '../../../db/rls.js';
 import { ConciergeCaseStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCaseStatusSchema.js';
 import { ConciergeCasePrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCasePrioritySchema.js';
 import { CaseNoteTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/CaseNoteTypeSchema.js';
@@ -17,9 +17,45 @@ import type { ConciergeCaseStatus } from '../../../../../../generated/prisma/cli
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { DBOS } from '../../../dbos.js';
 import { caseLifecycleWorkflow_v1 } from '../../../workflows/caseLifecycleWorkflow.js';
+import { recordSpanError } from '../../middleware/tracing.js';
 import { createLogger, createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ConciergeCaseRoute');
+
+/**
+ * Check if the user has cross-organization access for concierge cases.
+ * This is determined by:
+ * - Being a PLATFORM_ADMIN staff member, OR
+ * - Being a staff member with CONCIERGE pillar access
+ * 
+ * @param staffRoles - User's staff roles (empty if not staff)
+ * @param pillarAccess - User's pillar access (empty if not staff)
+ * @returns true if user can access cases across all organizations
+ */
+function hasCrossOrgAccess(staffRoles: string[], pillarAccess: string[]): boolean {
+	// Platform admins have full cross-org access
+	if (staffRoles.includes('PLATFORM_ADMIN')) {
+		return true;
+	}
+	// Staff with CONCIERGE pillar access have cross-org access for concierge cases
+	if (staffRoles.length > 0 && pillarAccess.includes('CONCIERGE')) {
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Build organization filter for queries.
+ * Users with cross-org access can query without org filter.
+ * Regular users are restricted to their own organization.
+ */
+function buildOrgFilter(
+	orgId: string,
+	staffRoles: string[],
+	pillarAccess: string[]
+): { organizationId?: string } {
+	return hasCrossOrgAccess(staffRoles, pillarAccess) ? {} : { organizationId: orgId };
+}
 
 // Schema for availability time slots
 const AvailabilitySlotSchema = z.object({
@@ -63,6 +99,11 @@ export const conciergeCaseRouter = {
 				availabilitySlots: z.array(AvailabilitySlotSchema).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -80,9 +121,9 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const reqLog = createLogger(context).child({ handler: 'create' });
-			
+
 			reqLog.info('Creating concierge case', {
 				propertyId: input.propertyId,
 				title: input.title,
@@ -101,7 +142,7 @@ export const conciergeCaseRouter = {
 
 				if (!property) {
 					reqLog.warn('Property not found', { propertyId: input.propertyId });
-					throw ApiException.notFound('IndividualProperty');
+					throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 				}
 
 				// Use DBOS workflow for durable execution with idempotencyKey as workflowID
@@ -109,26 +150,26 @@ export const conciergeCaseRouter = {
 				const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 					workflowID: input.idempotencyKey
 				})({
-				action: 'CREATE_CASE',
-				organizationId: context.organization.id,
-				userId: context.user.id,
-				propertyId: input.propertyId,
-				title: input.title,
-				description: input.description,
-				priority: input.priority,
-				intentId: input.originIntentId,
-				assigneeUserId: input.assignedConciergeUserId,
-				availabilityType: input.availabilityType,
-				availabilityNotes: input.availabilityNotes,
-				availabilitySlots: input.availabilitySlots
-			});
+					action: 'CREATE_CASE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId: input.propertyId,
+					title: input.title,
+					description: input.description,
+					priority: input.priority,
+					intentId: input.originIntentId,
+					assigneeUserId: input.assignedConciergeUserId,
+					availabilityType: input.availabilityType,
+					availabilityNotes: input.availabilityNotes,
+					availabilitySlots: input.availabilitySlots
+				});
 
 				// Wait for the workflow to complete and get the result
 				const result = await handle.getResult();
 
 				if (!result.success) {
 					reqLog.error('Case creation workflow failed', { error: result.error });
-					throw ApiException.internal(result.error || 'Failed to create case');
+					throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create case' });
 				}
 
 				// Fetch the created case for the response
@@ -157,7 +198,15 @@ export const conciergeCaseRouter = {
 					context
 				);
 			} catch (error) {
-				reqLog.exception(error instanceof Error ? error : new Error(String(error)));
+				const errorObj = error instanceof Error ? error : new Error(String(error));
+				reqLog.exception(errorObj);
+
+				// Record error on span for trace visibility
+				await recordSpanError(errorObj, {
+					errorCode: 'CASE_CREATION_FAILED',
+					errorType: 'ConciergeCase_Create_Error'
+				});
+
 				throw error;
 			}
 		}),
@@ -167,6 +216,10 @@ export const conciergeCaseRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -199,55 +252,79 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const conciergeCase = await prisma.conciergeCase.findFirst({
-				where: {
-					id: input.id,
-					organizationId: context.organization.id,
-					deletedAt: null
-				},
-				include: {
-					property: true,
-					assignedConcierge: true
-				}
-			});
+		.handler(async ({ input, context, errors }) => {
+			let staffOrgContextSet = false;
 
-			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
-			}
-
-			// Cerbos authorization
-			await context.cerbos.authorize('view', 'concierge_case', conciergeCase.id);
-
-			return successResponse(
-				{
-					case: {
-						id: conciergeCase.id,
-						caseNumber: conciergeCase.caseNumber,
-						propertyId: conciergeCase.propertyId,
-						title: conciergeCase.title,
-						description: conciergeCase.description,
-						status: conciergeCase.status,
-						priority: conciergeCase.priority,
-						originIntentId: conciergeCase.originIntentId,
-						assignedConciergeUserId: conciergeCase.assignedConciergeUserId,
-						assignedConciergeName: conciergeCase.assignedConcierge?.name ?? null,
-						resolvedAt: conciergeCase.resolvedAt?.toISOString() ?? null,
-						resolutionSummary: conciergeCase.resolutionSummary,
-						closedAt: conciergeCase.closedAt?.toISOString() ?? null,
-						cancelledAt: conciergeCase.cancelledAt?.toISOString() ?? null,
-						cancelReason: conciergeCase.cancelReason,
-						createdAt: conciergeCase.createdAt.toISOString(),
-						updatedAt: conciergeCase.updatedAt.toISOString()
-					},
-					property: {
-						id: conciergeCase.property.id,
-						name: conciergeCase.property.name,
-						addressLine1: conciergeCase.property.addressLine1
+			try {
+				// For staff with cross-org access, set RLS context to the case's org
+				if (hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
+					const orgId = await setOrgContextForWorkItem(
+						context.user.id,
+						'CONCIERGE_CASE',
+						input.id
+					);
+					if (!orgId) {
+						throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 					}
-				},
-				context
-			);
+					staffOrgContextSet = true;
+				}
+				// For regular users, middleware already set context to their org
+
+				const conciergeCase = await prisma.conciergeCase.findFirst({
+					where: {
+						id: input.id,
+						deletedAt: null
+					},
+					include: {
+						property: true,
+						assignedConcierge: true
+					}
+				});
+
+				if (!conciergeCase) {
+					throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+				}
+
+				// Cerbos authorization - uses case's actual organizationId for policy check
+				await context.cerbos.authorize('view', 'concierge_case', conciergeCase.id, {
+					organizationId: conciergeCase.organizationId
+				});
+
+				return successResponse(
+					{
+						case: {
+							id: conciergeCase.id,
+							caseNumber: conciergeCase.caseNumber,
+							propertyId: conciergeCase.propertyId,
+							title: conciergeCase.title,
+							description: conciergeCase.description,
+							status: conciergeCase.status,
+							priority: conciergeCase.priority,
+							originIntentId: conciergeCase.originIntentId,
+							assignedConciergeUserId: conciergeCase.assignedConciergeUserId,
+							assignedConciergeName: conciergeCase.assignedConcierge?.name ?? null,
+							resolvedAt: conciergeCase.resolvedAt?.toISOString() ?? null,
+							resolutionSummary: conciergeCase.resolutionSummary,
+							closedAt: conciergeCase.closedAt?.toISOString() ?? null,
+							cancelledAt: conciergeCase.cancelledAt?.toISOString() ?? null,
+							cancelReason: conciergeCase.cancelReason,
+							createdAt: conciergeCase.createdAt.toISOString(),
+							updatedAt: conciergeCase.updatedAt.toISOString()
+						},
+						property: {
+							id: conciergeCase.property.id,
+							name: conciergeCase.property.name,
+							addressLine1: conciergeCase.property.addressLine1
+						}
+					},
+					context
+				);
+			} finally {
+				// Clear staff cross-org context if it was set
+				if (staffOrgContextSet) {
+					await clearOrgContext(context.user.id);
+				}
+			}
 		}),
 
 	/**
@@ -263,6 +340,9 @@ export const conciergeCaseRouter = {
 				includeClosedCancelled: z.boolean().default(false)
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -285,13 +365,63 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization for listing
 			await context.cerbos.authorize('view', 'concierge_case', 'list');
 
+			// Staff with cross-org access: use staff view (no RLS filtering)
+			if (hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
+				// Use Prisma's safe parameterized query for staff view
+				const staffCases = await prisma.$queryRaw<Array<{
+					id: string;
+					case_number: string;
+					title: string;
+					status: string;
+					priority: string;
+					organization_id: string;
+					organization_name: string;
+					created_at: Date;
+					assigned_concierge_user_id: string | null;
+				}>>`
+					SELECT id, case_number, title, status, priority, organization_id, 
+						   organization_name, created_at, assigned_concierge_user_id
+					FROM staff_concierge_cases_list
+					WHERE (${input.status}::text IS NULL OR status = ${input.status})
+					  AND (${input.priority}::text IS NULL OR priority = ${input.priority})
+					  AND (${input.assignedConciergeUserId}::text IS NULL OR assigned_concierge_user_id = ${input.assignedConciergeUserId})
+					  AND (${input.includeClosedCancelled}::boolean = true OR status NOT IN ('CLOSED', 'CANCELLED'))
+					ORDER BY priority DESC, created_at DESC
+					LIMIT ${input.limit + 1}
+				`;
+
+				const hasMore = staffCases.length > input.limit;
+				const items = hasMore ? staffCases.slice(0, -1) : staffCases;
+
+				return successResponse(
+					{
+						cases: items.map((c) => ({
+							id: c.id,
+							caseNumber: c.case_number,
+							propertyId: '', // Not available in staff view
+							propertyName: c.organization_name, // Use org name for staff view
+							title: c.title,
+							status: c.status,
+							priority: c.priority,
+							assignedConciergeName: null, // Would need join to get this
+							createdAt: c.created_at.toISOString()
+						})),
+						pagination: {
+							nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
+							hasMore
+						}
+					},
+					context
+				);
+			}
+
+			// Regular users: RLS filters to their org automatically
 			const cases = await prisma.conciergeCase.findMany({
 				where: {
-					organizationId: context.organization.id,
 					deletedAt: null,
 					...(input.propertyId && { propertyId: input.propertyId }),
 					...(input.status && { status: input.status }),
@@ -348,6 +478,11 @@ export const conciergeCaseRouter = {
 				reason: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -361,7 +496,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.id,
@@ -371,15 +506,15 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Validate status transition
 			const validTransitions = VALID_STATUS_TRANSITIONS[existing.status] || [];
 			if (!validTransitions.includes(input.status)) {
-				throw ApiException.badRequest(
-					`Invalid status transition from ${existing.status} to ${input.status}`
-				);
+				throw errors.BAD_REQUEST({
+					message: `Invalid status transition from ${existing.status} to ${input.status}`
+				});
 			}
 
 			// Cerbos authorization
@@ -450,6 +585,10 @@ export const conciergeCaseRouter = {
 				assignedConciergeUserId: z.string().nullable()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -463,7 +602,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.id,
@@ -473,7 +612,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization
@@ -485,7 +624,7 @@ export const conciergeCaseRouter = {
 					where: { id: input.assignedConciergeUserId }
 				});
 				if (!user) {
-					throw ApiException.notFound('User');
+					throw errors.NOT_FOUND({ message: 'User not found' });
 				}
 			}
 
@@ -531,6 +670,11 @@ export const conciergeCaseRouter = {
 				resolutionSummary: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -545,7 +689,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.id,
@@ -555,13 +699,13 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Validate status transition
 			const validTransitions = VALID_STATUS_TRANSITIONS[existing.status] || [];
 			if (!validTransitions.includes('RESOLVED')) {
-				throw ApiException.badRequest(`Cannot resolve case in ${existing.status} status`);
+				throw errors.BAD_REQUEST({ message: `Cannot resolve case in ${existing.status} status` });
 			}
 
 			// Cerbos authorization
@@ -626,6 +770,11 @@ export const conciergeCaseRouter = {
 				id: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -639,7 +788,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.id,
@@ -649,11 +798,11 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			if (existing.status !== 'RESOLVED') {
-				throw ApiException.badRequest('Can only close cases in RESOLVED status');
+				throw errors.BAD_REQUEST({ message: 'Can only close cases in RESOLVED status' });
 			}
 
 			// Cerbos authorization
@@ -715,6 +864,11 @@ export const conciergeCaseRouter = {
 				reason: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -728,7 +882,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.id,
@@ -738,12 +892,12 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cannot cancel closed cases
 			if (existing.status === 'CLOSED') {
-				throw ApiException.badRequest('Cannot cancel a closed case');
+				throw errors.BAD_REQUEST({ message: 'Cannot cancel a closed case' });
 			}
 
 			// Cerbos authorization
@@ -803,6 +957,10 @@ export const conciergeCaseRouter = {
 	 */
 	getStatusHistory: orgProcedure
 		.input(z.object({ caseId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -821,7 +979,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -831,7 +989,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization
@@ -869,6 +1027,10 @@ export const conciergeCaseRouter = {
 				isInternal: z.boolean().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -886,7 +1048,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -896,7 +1058,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization
@@ -939,6 +1101,10 @@ export const conciergeCaseRouter = {
 				includeInternal: z.boolean().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -957,7 +1123,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -967,7 +1133,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization
@@ -1012,6 +1178,11 @@ export const conciergeCaseRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1028,7 +1199,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -1038,14 +1209,14 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Must provide either partyId or external contact info
 			if (!input.partyId && !input.externalContactName) {
-				throw ApiException.badRequest(
-					'Must provide either partyId or external contact information'
-				);
+				throw errors.BAD_REQUEST({
+					message: 'Must provide either partyId or external contact information'
+				});
 			}
 
 			// Verify party if provided
@@ -1054,7 +1225,7 @@ export const conciergeCaseRouter = {
 					where: { id: input.partyId, organizationId: context.organization.id }
 				});
 				if (!party) {
-					throw ApiException.notFound('Party');
+					throw errors.NOT_FOUND({ message: 'Party not found' });
 				}
 			}
 
@@ -1094,6 +1265,10 @@ export const conciergeCaseRouter = {
 	 */
 	listParticipants: orgProcedure
 		.input(z.object({ caseId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1115,7 +1290,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -1125,7 +1300,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization
@@ -1171,6 +1346,10 @@ export const conciergeCaseRouter = {
 				participantId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1181,14 +1360,14 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const participant = await prisma.caseParticipant.findFirst({
 				where: { id: input.participantId, removedAt: null },
 				include: { case: true }
 			});
 
 			if (!participant || participant.case.organizationId !== context.organization.id) {
-				throw ApiException.notFound('CaseParticipant');
+				throw errors.NOT_FOUND({ message: 'CaseParticipant not found' });
 			}
 
 			// Cerbos authorization
@@ -1219,6 +1398,10 @@ export const conciergeCaseRouter = {
 				unitId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1229,13 +1412,13 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: { id: input.caseId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
@@ -1243,7 +1426,7 @@ export const conciergeCaseRouter = {
 			// Verify unit exists (Phase 1 unit)
 			const unit = await prisma.unit.findUnique({ where: { id: input.unitId } });
 			if (!unit) {
-				throw ApiException.notFound('Unit');
+				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
 
 			await prisma.conciergeCase.update({
@@ -1270,6 +1453,10 @@ export const conciergeCaseRouter = {
 				jobId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1280,13 +1467,13 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: { id: input.caseId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
@@ -1294,7 +1481,7 @@ export const conciergeCaseRouter = {
 			// Verify job exists (Phase 2 job)
 			const job = await prisma.job.findUnique({ where: { id: input.jobId } });
 			if (!job) {
-				throw ApiException.notFound('Job');
+				throw errors.NOT_FOUND({ message: 'Job not found' });
 			}
 
 			await prisma.conciergeCase.update({
@@ -1321,6 +1508,10 @@ export const conciergeCaseRouter = {
 				unlinkType: z.enum(['unit', 'job', 'all'])
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1331,13 +1522,13 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: { id: input.caseId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
@@ -1385,6 +1576,10 @@ export const conciergeCaseRouter = {
 				question: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1404,7 +1599,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -1414,7 +1609,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization
@@ -1497,6 +1692,10 @@ export const conciergeCaseRouter = {
 				response: z.string().min(1)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1512,7 +1711,7 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: {
 					id: input.caseId,
@@ -1522,7 +1721,7 @@ export const conciergeCaseRouter = {
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			// Cerbos authorization - owners can respond to clarifications
@@ -1568,6 +1767,12 @@ export const conciergeCaseRouter = {
 	 */
 	getDetail: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: {
+				message: 'Case not found',
+				data: z.object({ resourceType: z.string() })
+			}
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1679,151 +1884,180 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const conciergeCase = await prisma.conciergeCase.findFirst({
-				where: {
-					id: input.id,
-					organizationId: context.organization.id,
-					deletedAt: null
-				},
-				include: {
-					property: true,
-					assignedConcierge: true,
-					statusHistory: { orderBy: { createdAt: 'desc' } },
-					notes: { orderBy: { createdAt: 'desc' } },
-					participants: {
-						where: { removedAt: null },
-						include: { party: true },
-						orderBy: { addedAt: 'asc' }
-					},
-					actions: {
-						where: { deletedAt: null },
-						orderBy: { createdAt: 'desc' }
-					},
-					decisions: {
-						where: { deletedAt: null },
-						orderBy: { decidedAt: 'desc' }
-					},
-					attachments: { orderBy: { createdAt: 'desc' } }
+		.handler(async ({ input, context, errors }) => {
+			const reqLog = createLogger(context).child({ handler: 'getDetail', caseId: input.id });
+			let staffOrgContextSet = false;
+
+			try {
+				// For staff with cross-org access, set RLS context to the case's org
+				if (hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
+					const orgId = await setOrgContextForWorkItem(
+						context.user.id,
+						'CONCIERGE_CASE',
+						input.id
+					);
+					if (!orgId) {
+						throw errors.NOT_FOUND({ data: { resourceType: 'ConciergeCase' } });
+					}
+					staffOrgContextSet = true;
 				}
-			});
+				// For regular users, middleware already set context to their org
 
-			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
-			}
-
-			// Cerbos authorization
-			await context.cerbos.authorize('view', 'concierge_case', conciergeCase.id);
-
-			// Fetch origin intent if exists
-			let originIntent = null;
-			if (conciergeCase.originIntentId) {
-				const intent = await prisma.ownerIntent.findUnique({
-					where: { id: conciergeCase.originIntentId }
+				const conciergeCase = await prisma.conciergeCase.findFirst({
+					where: {
+						id: input.id,
+						deletedAt: null
+					},
+					include: {
+						property: true,
+						assignedConcierge: true,
+						statusHistory: { orderBy: { createdAt: 'desc' } },
+						notes: { orderBy: { createdAt: 'desc' } },
+						participants: {
+							where: { removedAt: null },
+							include: { party: true },
+							orderBy: { addedAt: 'asc' }
+						},
+						actions: {
+							where: { deletedAt: null },
+							orderBy: { createdAt: 'desc' }
+						},
+						decisions: {
+							where: { deletedAt: null },
+							orderBy: { decidedAt: 'desc' }
+						},
+						attachments: { orderBy: { createdAt: 'desc' } }
+					}
 				});
-				if (intent) {
-					originIntent = {
-						id: intent.id,
-						title: intent.title,
-						description: intent.description,
-						status: intent.status,
-						createdAt: intent.createdAt.toISOString()
-					};
+
+				if (!conciergeCase) {
+					throw errors.NOT_FOUND({ data: { resourceType: 'ConciergeCase' } });
+				}
+
+				// Cerbos authorization - uses case's actual organizationId for policy check
+				await context.cerbos.authorize('view', 'concierge_case', conciergeCase.id, {
+					organizationId: conciergeCase.organizationId
+				});
+
+				// Fetch origin intent if exists
+				let originIntent = null;
+				if (conciergeCase.originIntentId) {
+					const intent = await prisma.ownerIntent.findUnique({
+						where: { id: conciergeCase.originIntentId }
+					});
+					if (intent) {
+						originIntent = {
+							id: intent.id,
+							title: intent.title,
+							description: intent.description,
+							status: intent.status,
+							createdAt: intent.createdAt.toISOString()
+						};
+					}
+				}
+
+				return successResponse(
+					{
+						case: {
+							id: conciergeCase.id,
+							caseNumber: conciergeCase.caseNumber,
+							propertyId: conciergeCase.propertyId,
+							title: conciergeCase.title,
+							description: conciergeCase.description,
+							status: conciergeCase.status,
+							priority: conciergeCase.priority,
+							originIntentId: conciergeCase.originIntentId,
+							assignedConciergeUserId: conciergeCase.assignedConciergeUserId,
+							assignedConciergeName: conciergeCase.assignedConcierge?.name ?? null,
+							linkedUnitId: conciergeCase.linkedUnitId,
+							linkedJobId: conciergeCase.linkedJobId,
+							linkedArcRequestId: conciergeCase.linkedArcRequestId ?? null,
+							linkedWorkOrderId: conciergeCase.linkedWorkOrderId ?? null,
+							resolvedAt: conciergeCase.resolvedAt?.toISOString() ?? null,
+							resolutionSummary: conciergeCase.resolutionSummary,
+							closedAt: conciergeCase.closedAt?.toISOString() ?? null,
+							cancelledAt: conciergeCase.cancelledAt?.toISOString() ?? null,
+							cancelReason: conciergeCase.cancelReason,
+							createdAt: conciergeCase.createdAt.toISOString(),
+							updatedAt: conciergeCase.updatedAt.toISOString()
+						},
+						property: {
+							id: conciergeCase.property.id,
+							name: conciergeCase.property.name,
+							addressLine1: conciergeCase.property.addressLine1,
+							city: conciergeCase.property.city,
+							state: conciergeCase.property.state,
+							postalCode: conciergeCase.property.postalCode
+						},
+						originIntent,
+						statusHistory: conciergeCase.statusHistory.map((h) => ({
+							id: h.id,
+							fromStatus: h.fromStatus,
+							toStatus: h.toStatus,
+							reason: h.reason,
+							changedBy: h.changedBy,
+							createdAt: h.createdAt.toISOString()
+						})),
+						notes: conciergeCase.notes.map((n) => ({
+							id: n.id,
+							content: n.content,
+							noteType: n.noteType,
+							isInternal: n.isInternal,
+							createdBy: n.createdBy,
+							createdAt: n.createdAt.toISOString()
+						})),
+						participants: conciergeCase.participants.map((p) => ({
+							id: p.id,
+							partyId: p.partyId,
+							partyName: p.party
+								? p.party.partyType === 'INDIVIDUAL'
+									? `${p.party.firstName ?? ''} ${p.party.lastName ?? ''}`.trim()
+									: p.party.entityName ?? ''
+								: null,
+							externalContactName: p.externalContactName,
+							externalContactEmail: p.externalContactEmail,
+							role: p.role,
+							addedAt: p.addedAt.toISOString()
+						})),
+						actions: conciergeCase.actions.map((a) => ({
+							id: a.id,
+							actionType: a.actionType,
+							status: a.status,
+							description: a.description,
+							plannedAt: a.plannedAt?.toISOString() ?? null,
+							completedAt: a.completedAt?.toISOString() ?? null,
+							createdAt: a.createdAt.toISOString()
+						})),
+						decisions: conciergeCase.decisions.map((d) => ({
+							id: d.id,
+							category: d.category,
+							title: d.title,
+							rationale: d.rationale,
+							decidedAt: d.decidedAt.toISOString(),
+							hasOutcome: d.actualOutcome !== null
+						})),
+						attachments: conciergeCase.attachments.map((a) => ({
+							id: a.id,
+							fileName: a.fileName,
+							fileSize: a.fileSize,
+							mimeType: a.mimeType,
+							fileUrl: a.fileUrl,
+							uploadedBy: a.uploadedBy,
+							createdAt: a.createdAt.toISOString()
+						}))
+					},
+					context
+				);
+			} catch (error) {
+				reqLog.error('Failed to get case detail', { error: error instanceof Error ? error.message : String(error) });
+				reqLog.exception(error instanceof Error ? error : new Error(String(error)));
+				throw error;
+			} finally {
+				// Clear staff cross-org context if it was set
+				if (staffOrgContextSet) {
+					await clearOrgContext(context.user.id);
 				}
 			}
-
-			return successResponse(
-				{
-					case: {
-						id: conciergeCase.id,
-						caseNumber: conciergeCase.caseNumber,
-						propertyId: conciergeCase.propertyId,
-						title: conciergeCase.title,
-						description: conciergeCase.description,
-						status: conciergeCase.status,
-						priority: conciergeCase.priority,
-						originIntentId: conciergeCase.originIntentId,
-						assignedConciergeUserId: conciergeCase.assignedConciergeUserId,
-						assignedConciergeName: conciergeCase.assignedConcierge?.name ?? null,
-						linkedUnitId: conciergeCase.linkedUnitId,
-						linkedJobId: conciergeCase.linkedJobId,
-						linkedArcRequestId: (conciergeCase as any).linkedArcRequestId ?? null,
-						linkedWorkOrderId: (conciergeCase as any).linkedWorkOrderId ?? null,
-						resolvedAt: conciergeCase.resolvedAt?.toISOString() ?? null,
-						resolutionSummary: conciergeCase.resolutionSummary,
-						closedAt: conciergeCase.closedAt?.toISOString() ?? null,
-						cancelledAt: conciergeCase.cancelledAt?.toISOString() ?? null,
-						cancelReason: conciergeCase.cancelReason,
-						createdAt: conciergeCase.createdAt.toISOString(),
-						updatedAt: conciergeCase.updatedAt.toISOString()
-					},
-					property: {
-						id: conciergeCase.property.id,
-						name: conciergeCase.property.name,
-						addressLine1: conciergeCase.property.addressLine1,
-						city: conciergeCase.property.city,
-						state: conciergeCase.property.state,
-						postalCode: conciergeCase.property.postalCode
-					},
-					originIntent,
-					statusHistory: conciergeCase.statusHistory.map((h) => ({
-						id: h.id,
-						fromStatus: h.fromStatus,
-						toStatus: h.toStatus,
-						reason: h.reason,
-						changedBy: h.changedBy,
-						createdAt: h.createdAt.toISOString()
-					})),
-					notes: conciergeCase.notes.map((n) => ({
-						id: n.id,
-						content: n.content,
-						noteType: n.noteType,
-						isInternal: n.isInternal,
-						createdBy: n.createdBy,
-						createdAt: n.createdAt.toISOString()
-					})),
-					participants: conciergeCase.participants.map((p) => ({
-						id: p.id,
-						partyId: p.partyId,
-						partyName: p.party
-							? p.party.partyType === 'INDIVIDUAL'
-								? `${p.party.firstName ?? ''} ${p.party.lastName ?? ''}`.trim()
-								: p.party.entityName ?? ''
-							: null,
-						externalContactName: p.externalContactName,
-						externalContactEmail: p.externalContactEmail,
-						role: p.role,
-						addedAt: p.addedAt.toISOString()
-					})),
-					actions: conciergeCase.actions.map((a) => ({
-						id: a.id,
-						actionType: a.actionType,
-						status: a.status,
-						description: a.description,
-						plannedAt: a.plannedAt?.toISOString() ?? null,
-						completedAt: a.completedAt?.toISOString() ?? null,
-						createdAt: a.createdAt.toISOString()
-					})),
-					decisions: conciergeCase.decisions.map((d) => ({
-						id: d.id,
-						category: d.category,
-						title: d.title,
-						rationale: d.rationale,
-						decidedAt: d.decidedAt.toISOString(),
-						hasOutcome: d.actualOutcome !== null
-					})),
-					attachments: conciergeCase.attachments.map((a) => ({
-						id: a.id,
-						fileName: a.fileName,
-						fileSize: a.fileSize,
-						mimeType: a.mimeType,
-						fileUrl: a.fileUrl,
-						uploadedBy: a.uploadedBy,
-						createdAt: a.createdAt.toISOString()
-					}))
-				},
-				context
-			);
 		}),
 
 	/**
@@ -1836,6 +2070,10 @@ export const conciergeCaseRouter = {
 				arcRequestId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1846,13 +2084,13 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: { id: input.caseId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
@@ -1860,7 +2098,7 @@ export const conciergeCaseRouter = {
 			// Verify ARC request exists
 			const arcRequest = await prisma.aRCRequest.findUnique({ where: { id: input.arcRequestId } });
 			if (!arcRequest) {
-				throw ApiException.notFound('ARCRequest');
+				throw errors.NOT_FOUND({ message: 'ARCRequest not found' });
 			}
 
 			await prisma.conciergeCase.update({
@@ -1898,6 +2136,10 @@ export const conciergeCaseRouter = {
 				workOrderId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1908,13 +2150,13 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const conciergeCase = await prisma.conciergeCase.findFirst({
 				where: { id: input.caseId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!conciergeCase) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
@@ -1922,7 +2164,7 @@ export const conciergeCaseRouter = {
 			// Verify work order exists
 			const workOrder = await prisma.workOrder.findUnique({ where: { id: input.workOrderId } });
 			if (!workOrder) {
-				throw ApiException.notFound('WorkOrder');
+				throw errors.NOT_FOUND({ message: 'WorkOrder not found' });
 			}
 
 			await prisma.conciergeCase.update({

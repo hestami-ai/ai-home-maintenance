@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import {
 	successResponseSchema,
 	ResponseMetaSchema,
@@ -9,15 +8,16 @@ import {
 	DocumentContextTypeSchema,
 	DocumentVisibilitySchema,
 	DocumentStatusSchema,
-	StorageProviderSchema
+	StorageProviderSchema,
+	JsonSchema
 } from '../schemas.js';
 import { startDocumentWorkflow } from '../../workflows/documentWorkflow.js';
 import { recordActivityFromContext } from '../middleware/activityEvent.js';
-import type { RequestContext } from '../context.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { createHash } from 'crypto';
+import { recordSpanError } from '../middleware/tracing.js';
 import { createLogger, createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('DocumentRoute');
@@ -53,27 +53,27 @@ const saveFileToLocal = async (
 ): Promise<{ storagePath: string; fileUrl: string; checksum: string }> => {
 	const uploadDir = getUploadDir();
 	const orgDir = join(uploadDir, organizationId, contextType.toLowerCase(), contextId);
-	
+
 	// Ensure directory exists
 	await mkdir(orgDir, { recursive: true });
-	
+
 	// Generate unique filename
 	const timestamp = Date.now();
 	const safeFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
 	const fileName = `${timestamp}-${safeFileName}`;
 	const filePath = join(orgDir, fileName);
-	
+
 	// Read file content and compute checksum
 	const buffer = await file.arrayBuffer();
 	const checksum = await computeChecksum(buffer);
-	
+
 	// Write file to disk
 	await writeFile(filePath, Buffer.from(buffer));
-	
+
 	// Return relative path for storage
 	const storagePath = join(organizationId, contextType.toLowerCase(), contextId, fileName);
 	const fileUrl = `/uploads/${storagePath.replace(/\\/g, '/')}`;
-	
+
 	return { storagePath, fileUrl, checksum };
 };
 
@@ -120,9 +120,12 @@ export const documentRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const reqLog = createLogger(context).child({ handler: 'uploadWithFile' });
-			
+
 			reqLog.info('Document upload started', {
 				fileName: input.file.name,
 				fileSize: input.file.size,
@@ -173,7 +176,7 @@ export const documentRouter = {
 
 				if (!workflowResult.success) {
 					reqLog.error('Document workflow failed', { error: workflowResult.error });
-					throw ApiException.internal(workflowResult.error || 'Failed to create document');
+					throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document' });
 				}
 
 				reqLog.debug('Document workflow completed', { documentId: workflowResult.entityId });
@@ -204,9 +207,15 @@ export const documentRouter = {
 					context
 				);
 			} catch (error) {
-				reqLog.exception(error instanceof Error ? error : new Error(String(error)), {
+				const errorObj = error instanceof Error ? error : new Error(String(error));
+				reqLog.exception(errorObj, {
 					fileName: input.file.name,
 					category: input.category
+				});
+				// Record error on span for trace visibility
+				await recordSpanError(errorObj, {
+					errorCode: 'UPLOAD_FAILED',
+					errorType: 'DOCUMENT_UPLOAD_ERROR'
 				});
 				throw error;
 			}
@@ -239,7 +248,12 @@ export const documentRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Get parent document
 			const parent = await prisma.document.findFirst({
 				where: {
@@ -252,7 +266,7 @@ export const documentRouter = {
 			});
 
 			if (!parent) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', parent.id);
@@ -260,7 +274,7 @@ export const documentRouter = {
 			// Get primary context binding
 			const primaryBinding = parent.contextBindings.find(b => b.isPrimary);
 			if (!primaryBinding) {
-				throw ApiException.badRequest('Document has no primary context binding');
+				throw errors.BAD_REQUEST({ message: 'Document has no primary context binding' });
 			}
 
 			// Save file to local storage first (non-idempotent file operation)
@@ -291,7 +305,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create document version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document version' });
 			}
 
 			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -353,7 +367,10 @@ export const documentRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'document', 'new');
 
 			// Use DBOS workflow for durable database execution
@@ -382,7 +399,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create document');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document' });
 			}
 
 			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -455,12 +472,15 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
-				where: { 
-					id: input.id, 
+				where: {
+					id: input.id,
 					organizationId: context.organization.id,
-					deletedAt: null 
+					deletedAt: null
 				},
 				include: {
 					childVersions: { where: { deletedAt: null }, orderBy: { version: 'desc' } },
@@ -469,7 +489,7 @@ export const documentRouter = {
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('view', 'document', document.id);
@@ -607,7 +627,15 @@ export const documentRouter = {
 					context
 				);
 			} catch (error) {
+				const errorObj = error instanceof Error ? error : new Error(String(error));
 				console.error('[document.listDocuments] Error:', error);
+
+				// Record error on span for trace visibility
+				await recordSpanError(errorObj, {
+					errorCode: 'LIST_FAILED',
+					errorType: 'DOCUMENT_LIST_ERROR'
+				});
+
 				throw error;
 			}
 		}),
@@ -643,13 +671,17 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
@@ -672,7 +704,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update document');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update document' });
 			}
 
 			const updated = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
@@ -696,7 +728,7 @@ export const documentRouter = {
 				pageCount: z.number().int().positive().optional(),
 				thumbnailUrl: z.string().optional(),
 				extractedText: z.string().optional(),
-				metadata: z.record(z.string(), z.any()).optional()
+				metadata: z.record(z.string(), JsonSchema).optional()
 			})
 		)
 		.output(
@@ -706,13 +738,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
@@ -760,13 +795,17 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const parent = await prisma.document.findFirst({
 				where: { id: input.parentDocumentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!parent) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', parent.id);
@@ -791,7 +830,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create document version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document version' });
 			}
 
 			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -829,13 +868,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('view', 'document', document.id);
@@ -886,20 +928,24 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const current = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!current) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			const target = await prisma.document.findFirst({
 				where: { id: input.targetVersionId, deletedAt: null }
 			});
 
-			if (!target) throw ApiException.notFound('Target version');
+			if (!target) throw errors.NOT_FOUND({ message: 'Target version' });
 
 			await context.cerbos.authorize('update', 'document', current.id);
 
@@ -918,7 +964,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to restore document version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to restore document version' });
 			}
 
 			const reverted = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -952,13 +998,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('delete', 'document', document.id);
@@ -986,13 +1035,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, status: 'ARCHIVED', deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
@@ -1030,13 +1082,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await prisma.documentDownloadLog.create({
@@ -1076,13 +1131,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('view', 'document', document.id);
@@ -1142,14 +1200,18 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: { contextBindings: true }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
@@ -1177,7 +1239,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to change document category');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to change document category' });
 			}
 
 			const updated = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
@@ -1237,13 +1299,17 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
@@ -1265,7 +1331,7 @@ export const documentRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to link document to context');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to link document to context' });
 			}
 
 			const binding = await prisma.documentContextBinding.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1312,13 +1378,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('update', 'document', document.id);
@@ -1359,13 +1428,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('view', 'document', document.id);
@@ -1420,8 +1492,8 @@ export const documentRouter = {
 							performedById: z.string().nullable(),
 							performedByType: z.string(),
 							performedAt: z.string(),
-							previousState: z.any(),
-							newState: z.any()
+							previousState: JsonSchema,
+							newState: JsonSchema
 						})
 					),
 					pagination: PaginationOutputSchema
@@ -1429,13 +1501,16 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Document not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('view', 'document', document.id);

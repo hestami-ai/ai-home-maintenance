@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startTransferWorkflow } from '../../../workflows/transferWorkflow.js';
 
@@ -72,17 +71,6 @@ const formatTransfer = (t: any, includeLines = false) => ({
 	...(includeLines && t.lines && { lines: t.lines.map(formatTransferLine) })
 });
 
-async function generateTransferNumber(organizationId: string): Promise<string> {
-	const year = new Date().getFullYear();
-	const count = await prisma.inventoryTransfer.count({
-		where: {
-			organizationId,
-			transferNumber: { startsWith: `TRF-${year}-` }
-		}
-	});
-	return `TRF-${year}-${String(count + 1).padStart(6, '0')}`;
-}
-
 export const transferRouter = {
 	create: orgProcedure
 		.input(
@@ -102,6 +90,12 @@ export const transferRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -109,8 +103,8 @@ export const transferRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'inventory_transfer', 'new');
 
 			// Validate locations
@@ -122,11 +116,11 @@ export const transferRouter = {
 					where: { id: input.toLocationId, organizationId: context.organization!.id, deletedAt: null }
 				})
 			]);
-			if (!fromLoc) throw ApiException.notFound('From location');
-			if (!toLoc) throw ApiException.notFound('To location');
+			if (!fromLoc) throw errors.NOT_FOUND({ message: 'From location not found' });
+			if (!toLoc) throw errors.NOT_FOUND({ message: 'To location not found' });
 
 			if (input.fromLocationId === input.toLocationId) {
-				throw ApiException.badRequest('Cannot transfer to same location');
+				throw errors.BAD_REQUEST({ message: 'Cannot transfer to same location' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -146,7 +140,7 @@ export const transferRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create transfer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create transfer' });
 			}
 
 			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
@@ -159,6 +153,10 @@ export const transferRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -166,8 +164,8 @@ export const transferRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_transfer', input.id);
 
 			const transfer = await prisma.inventoryTransfer.findFirst({
@@ -175,7 +173,7 @@ export const transferRouter = {
 				include: { lines: true }
 			});
 
-			if (!transfer) throw ApiException.notFound('Transfer');
+			if (!transfer) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
 			return successResponse({ transfer: formatTransfer(transfer, true) }, context);
 		}),
@@ -191,6 +189,9 @@ export const transferRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -201,8 +202,8 @@ export const transferRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_transfer', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -250,6 +251,12 @@ export const transferRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -257,18 +264,18 @@ export const transferRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('ship', 'inventory_transfer', input.id);
 
 			const existing = await prisma.inventoryTransfer.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Transfer');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
 			if (existing.status !== 'PENDING') {
-				throw ApiException.badRequest('Transfer is not pending');
+				throw errors.BAD_REQUEST({ message: 'Transfer is not pending' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -294,7 +301,7 @@ export const transferRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to ship transfer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to ship transfer' });
 			}
 
 			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
@@ -319,6 +326,12 @@ export const transferRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -326,18 +339,18 @@ export const transferRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('receive', 'inventory_transfer', input.id);
 
 			const existing = await prisma.inventoryTransfer.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Transfer');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
 			if (existing.status !== 'IN_TRANSIT') {
-				throw ApiException.badRequest('Transfer is not in transit');
+				throw errors.BAD_REQUEST({ message: 'Transfer is not in transit' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -363,7 +376,7 @@ export const transferRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to receive transfer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to receive transfer' });
 			}
 
 			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
@@ -376,6 +389,12 @@ export const transferRouter = {
 
 	cancel: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -383,17 +402,17 @@ export const transferRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('cancel', 'inventory_transfer', input.id);
 
 			const existing = await prisma.inventoryTransfer.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Transfer');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
 			if (!['PENDING', 'IN_TRANSIT'].includes(existing.status)) {
-				throw ApiException.badRequest('Cannot cancel completed or already cancelled transfer');
+				throw errors.BAD_REQUEST({ message: 'Cannot cancel completed or already cancelled transfer' });
 			}
 
 			// Get lines if in transit (needed for stock return)
@@ -426,7 +445,7 @@ export const transferRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to cancel transfer');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel transfer' });
 			}
 
 			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({

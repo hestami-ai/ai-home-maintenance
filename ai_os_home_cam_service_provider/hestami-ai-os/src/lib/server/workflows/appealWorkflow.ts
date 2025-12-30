@@ -7,7 +7,9 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { AppealStatus, type EntityWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('AppealWorkflow');
@@ -74,33 +76,41 @@ async function fileAppeal(
 		throw new Error('An appeal has already been filed for this hearing');
 	}
 
-	// Create appeal and update hearing
-	const [appeal] = await prisma.$transaction([
-		prisma.violationAppeal.create({
-			data: {
-				hearingId,
-				filedDate: new Date(),
-				filedBy: userId,
-				reason,
-				documentsJson,
-				originalFineAmount: hearing.fineAssessed
-			}
-		}),
-		prisma.violationHearing.update({
-			where: { id: hearingId },
-			data: {
-				appealFiled: true,
-				appealDate: new Date()
-			}
-		}),
-		prisma.violation.update({
-			where: { id: hearing.violationId },
-			data: { status: 'APPEALED' }
-		})
-	]);
+	try {
+		// Create appeal and update hearing within RLS transaction
+		const appealId = await orgTransaction(organizationId, async (tx) => {
+			const appeal = await tx.violationAppeal.create({
+				data: {
+					hearingId,
+					filedDate: new Date(),
+					filedBy: userId,
+					reason,
+					documentsJson,
+					originalFineAmount: hearing.fineAssessed
+				}
+			});
 
-	console.log(`[AppealWorkflow] FILE_APPEAL appeal:${appeal.id} by user ${userId}`);
-	return appeal.id;
+			await tx.violationHearing.update({
+				where: { id: hearingId },
+				data: {
+					appealFiled: true,
+					appealDate: new Date()
+				}
+			});
+
+			await tx.violation.update({
+				where: { id: hearing.violationId },
+				data: { status: 'APPEALED' }
+			});
+
+			return appeal.id;
+		}, { userId, reason: 'Filing violation appeal via workflow' });
+
+		log.info('FILE_APPEAL completed', { appealId, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function scheduleHearing(
@@ -126,17 +136,23 @@ async function scheduleHearing(
 		throw new Error('Can only schedule hearing for pending appeals');
 	}
 
-	await prisma.violationAppeal.update({
-		where: { id: appealId },
-		data: {
-			status: 'SCHEDULED',
-			appealHearingDate: new Date(appealHearingDate),
-			appealHearingLocation
-		}
-	});
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			return tx.violationAppeal.update({
+				where: { id: appealId },
+				data: {
+					status: 'SCHEDULED',
+					appealHearingDate: new Date(appealHearingDate),
+					appealHearingLocation
+				}
+			});
+		}, { userId, reason: 'Scheduling appeal hearing via workflow' });
 
-	console.log(`[AppealWorkflow] SCHEDULE_HEARING appeal:${appealId} by user ${userId}`);
-	return appealId;
+		log.info('SCHEDULE_HEARING completed', { appealId, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function recordDecision(
@@ -163,29 +179,34 @@ async function recordDecision(
 		throw new Error('Appeal decision has already been recorded');
 	}
 
-	// Update appeal and violation status
-	await prisma.$transaction([
-		prisma.violationAppeal.update({
-			where: { id: appealId },
-			data: {
-				status,
-				decisionDate: new Date(),
-				decisionBy: userId,
-				decisionNotes,
-				revisedFineAmount
-			}
-		}),
-		// Update violation status based on appeal outcome
-		prisma.violation.update({
-			where: { id: appeal.hearing.violationId },
-			data: {
-				status: status === 'REVERSED' ? 'DISMISSED' : 'CLOSED'
-			}
-		})
-	]);
+	try {
+		// Update appeal and violation status within RLS transaction
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violationAppeal.update({
+				where: { id: appealId },
+				data: {
+					status,
+					decisionDate: new Date(),
+					decisionBy: userId,
+					decisionNotes,
+					revisedFineAmount
+				}
+			});
 
-	console.log(`[AppealWorkflow] RECORD_DECISION appeal:${appealId} status:${status} by user ${userId}`);
-	return appealId;
+			// Update violation status based on appeal outcome
+			await tx.violation.update({
+				where: { id: appeal.hearing.violationId },
+				data: {
+					status: status === 'REVERSED' ? 'DISMISSED' : 'CLOSED'
+				}
+			});
+		}, { userId, reason: 'Recording appeal decision via workflow' });
+
+		log.info('RECORD_DECISION completed', { appealId, status, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function withdrawAppeal(
@@ -207,20 +228,25 @@ async function withdrawAppeal(
 		throw new Error('Cannot withdraw appeal after decision');
 	}
 
-	// Update appeal and revert violation status
-	await prisma.$transaction([
-		prisma.violationAppeal.update({
-			where: { id: appealId },
-			data: { status: 'WITHDRAWN' }
-		}),
-		prisma.violation.update({
-			where: { id: appeal.hearing.violationId },
-			data: { status: 'FINE_ASSESSED' }
-		})
-	]);
+	try {
+		// Update appeal and revert violation status within RLS transaction
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violationAppeal.update({
+				where: { id: appealId },
+				data: { status: 'WITHDRAWN' }
+			});
 
-	console.log(`[AppealWorkflow] WITHDRAW_APPEAL appeal:${appealId} by user ${userId}`);
-	return appealId;
+			await tx.violation.update({
+				where: { id: appeal.hearing.violationId },
+				data: { status: 'FINE_ASSESSED' }
+			});
+		}, { userId, reason: 'Withdrawing appeal via workflow' });
+
+		log.info('WITHDRAW_APPEAL completed', { appealId, userId });
+		return appealId;
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Main workflow function
@@ -263,8 +289,16 @@ async function appealWorkflow(input: AppealWorkflowInput): Promise<AppealWorkflo
 
 		return { success: true, entityId };
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[AppealWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'APPEAL_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

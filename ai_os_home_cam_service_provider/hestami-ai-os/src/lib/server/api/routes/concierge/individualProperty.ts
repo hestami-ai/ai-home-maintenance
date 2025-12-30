@@ -7,7 +7,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { PropertyTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyTypeSchema.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -89,6 +88,10 @@ export const individualPropertyRouter = {
 					.optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -99,7 +102,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'individual_property', 'new');
 
@@ -113,7 +116,7 @@ export const individualPropertyRouter = {
 					}
 				});
 				if (!portfolio) {
-					throw ApiException.notFound('PropertyPortfolio');
+					throw errors.NOT_FOUND({ message: 'PropertyPortfolio not found' });
 				}
 			}
 
@@ -196,14 +199,14 @@ export const individualPropertyRouter = {
 					},
 					externalHoa: result.externalHoa
 						? {
-								id: result.externalHoa.id,
-								hoaName: result.externalHoa.hoaName,
-								hoaContactName: result.externalHoa.hoaContactName,
-								hoaContactEmail: result.externalHoa.hoaContactEmail,
-								hoaContactPhone: result.externalHoa.hoaContactPhone,
-								hoaAddress: result.externalHoa.hoaAddress,
-								notes: result.externalHoa.notes
-							}
+							id: result.externalHoa.id,
+							hoaName: result.externalHoa.hoaName,
+							hoaContactName: result.externalHoa.hoaContactName,
+							hoaContactEmail: result.externalHoa.hoaContactEmail,
+							hoaContactPhone: result.externalHoa.hoaContactPhone,
+							hoaAddress: result.externalHoa.hoaAddress,
+							notes: result.externalHoa.notes
+						}
 						: null
 				},
 				context
@@ -219,6 +222,10 @@ export const individualPropertyRouter = {
 				propertyId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -237,7 +244,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const property = await prisma.individualProperty.findFirst({
 				where: {
 					id: input.propertyId,
@@ -266,7 +273,7 @@ export const individualPropertyRouter = {
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Cerbos authorization
@@ -298,14 +305,14 @@ export const individualPropertyRouter = {
 						updatedAt: property.updatedAt.toISOString(),
 						externalHoa: externalHoa
 							? {
-									id: externalHoa.id,
-									hoaName: externalHoa.hoaName,
-									hoaContactName: externalHoa.hoaContactName,
-									hoaContactEmail: externalHoa.hoaContactEmail,
-									hoaContactPhone: externalHoa.hoaContactPhone,
-									hoaAddress: externalHoa.hoaAddress,
-									notes: externalHoa.notes
-								}
+								id: externalHoa.id,
+								hoaName: externalHoa.hoaName,
+								hoaContactName: externalHoa.hoaContactName,
+								hoaContactEmail: externalHoa.hoaContactEmail,
+								hoaContactPhone: externalHoa.hoaContactPhone,
+								hoaAddress: externalHoa.hoaAddress,
+								notes: externalHoa.notes
+							}
 							: null,
 						portfolios: property.portfolioMemberships.map((pm) => ({
 							id: pm.portfolio.id,
@@ -329,6 +336,9 @@ export const individualPropertyRouter = {
 				includeInactive: z.boolean().optional().default(false)
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -440,6 +450,10 @@ export const individualPropertyRouter = {
 				isActive: z.boolean().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -449,7 +463,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.individualProperty.findFirst({
 				where: {
 					id: input.propertyId,
@@ -458,7 +472,7 @@ export const individualPropertyRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Cerbos authorization
@@ -513,6 +527,11 @@ export const individualPropertyRouter = {
 				propertyId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -522,7 +541,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.individualProperty.findFirst({
 				where: {
 					id: input.propertyId,
@@ -531,7 +550,7 @@ export const individualPropertyRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Cerbos authorization
@@ -548,9 +567,9 @@ export const individualPropertyRouter = {
 			});
 
 			if (activeCases > 0) {
-				throw ApiException.badRequest(
-					'Cannot delete property with active service calls. Please resolve or cancel them first.'
-				);
+				throw errors.BAD_REQUEST({
+					message: 'Cannot delete property with active service calls. Please resolve or cancel them first.'
+				});
 			}
 
 			await prisma.individualProperty.update({
@@ -571,6 +590,10 @@ export const individualPropertyRouter = {
 				portfolioId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -580,7 +603,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify property belongs to org
 			const property = await prisma.individualProperty.findFirst({
 				where: {
@@ -590,7 +613,7 @@ export const individualPropertyRouter = {
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Verify portfolio belongs to org
@@ -603,7 +626,7 @@ export const individualPropertyRouter = {
 			});
 
 			if (!portfolio) {
-				throw ApiException.notFound('PropertyPortfolio');
+				throw errors.NOT_FOUND({ message: 'PropertyPortfolio not found' });
 			}
 
 			// Check if already in portfolio
@@ -640,6 +663,9 @@ export const individualPropertyRouter = {
 				portfolioId: z.string()
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -688,6 +714,10 @@ export const individualPropertyRouter = {
 				notes: z.string().max(1000).nullable().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -697,7 +727,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify property belongs to org
 			const property = await prisma.individualProperty.findFirst({
 				where: {
@@ -707,7 +737,7 @@ export const individualPropertyRouter = {
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Cerbos authorization

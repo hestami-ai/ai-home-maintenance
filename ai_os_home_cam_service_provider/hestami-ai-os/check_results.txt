@@ -1,0 +1,1724 @@
+
+> hestami-ai-os@0.0.1 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os
+Getting Svelte diagnostics...
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\activity\+page.svelte[39m:79:57
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	// Filters
+	let entityTypeFilter = $state<ActivityEntityType | ''>([35mdata[36m.filters.entityType);
+	let actionFilter = $state<ActivityActionType | ''>(data.filters.action);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\activity\+page.svelte[39m:80:53
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let entityTypeFilter = $state<ActivityEntityType | ''>(data.filters.entityType);
+	let actionFilter = $state<ActivityActionType | ''>([35mdata[36m.filters.action);
+	let categoryFilter = $state<ActivityEventCategory | ''>(data.filters.eventCategory);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\activity\+page.svelte[39m:81:58
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let actionFilter = $state<ActivityActionType | ''>(data.filters.action);
+	let categoryFilter = $state<ActivityEventCategory | ''>([35mdata[36m.filters.eventCategory);
+	let actorTypeFilter = $state<ActivityActorType | ''>(data.filters.actorType);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\activity\+page.svelte[39m:82:55
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let categoryFilter = $state<ActivityEventCategory | ''>(data.filters.eventCategory);
+	let actorTypeFilter = $state<ActivityActorType | ''>([35mdata[36m.filters.actorType);
+	let startDate = $state(data.filters.startDate);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\activity\+page.svelte[39m:83:25
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let actorTypeFilter = $state<ActivityActorType | ''>(data.filters.actorType);
+	let startDate = $state([35mdata[36m.filters.startDate);
+	let endDate = $state(data.filters.endDate);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\activity\+page.svelte[39m:84:23
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let startDate = $state(data.filters.startDate);
+	let endDate = $state([35mdata[36m.filters.endDate);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\cases\[id]\vendors\+page.svelte[39m:50:50
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let caseDetail = $derived(data.caseDetail);
+	let vendors = $state<VendorCandidateListItem[]>([35mdata[36m.vendors);
+	let isLoading = $state(false);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\cases\[id]\vendors\[vendorId]\+page.svelte[39m:47:46
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let vendor = $state<VendorCandidate | null>([35mdata[36m.vendorCandidate);
+	let bids = $state<VendorBidListItem[]>(data.bids);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\cases\[id]\vendors\[vendorId]\+page.svelte[39m:48:41
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let vendor = $state<VendorCandidate | null>(data.vendorCandidate);
+	let bids = $state<VendorBidListItem[]>([35mdata[36m.bids);
+	let isLoading = $state(false);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\documents\+page.svelte[39m:20:27
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let documents = $derived(data.documents);
+	let searchQuery = $state([35mdata[36m.filters.q);
+	let filterType = $state(data.filters.type);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\documents\+page.svelte[39m:21:26
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let searchQuery = $state(data.filters.q);
+	let filterType = $state([35mdata[36m.filters.type);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\permissions\+page.svelte[39m:51:53
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let stats = $derived(data.stats);
+	let organizations = $state<OrganizationListItem[]>([35mdata[36m.organizations);
+	let recentChanges = $derived(data.recentChanges);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\permissions\+page.svelte[39m:57:25
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	// Organization filters
+	let orgSearch = $state([35mdata[36m.filters.orgSearch);
+	let orgTypeFilter = $state<OrganizationType | ''>(data.filters.orgType);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\permissions\+page.svelte[39m:58:52
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let orgSearch = $state(data.filters.orgSearch);
+	let orgTypeFilter = $state<OrganizationType | ''>([35mdata[36m.filters.orgType);
+	let orgStatusFilter = $state<OrganizationStatus | ''>(data.filters.orgStatus);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\permissions\+page.svelte[39m:59:56
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let orgTypeFilter = $state<OrganizationType | ''>(data.filters.orgType);
+	let orgStatusFilter = $state<OrganizationStatus | ''>([35mdata[36m.filters.orgStatus);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\+page.svelte[39m:40:46
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let searchQuery = $state('');
+	let statusFilter = $state<StaffStatus | ''>([35mdata[36m.filters.status);
+	let roleFilter = $state<StaffRole | ''>(data.filters.role);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\+page.svelte[39m:41:42
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let statusFilter = $state<StaffStatus | ''>(data.filters.status);
+	let roleFilter = $state<StaffRole | ''>([35mdata[36m.filters.role);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:435:18
+[31mError[39m: Can only bind to state or props
+https://svelte.dev/e/bind_invalid_value (svelte)
+[36m					id="suspendReason"
+					bind:value={[35msuspendReason[36m}
+					placeholder="Enter the reason for suspension..."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:5:11
+[31mError[39m: Cannot find name 'Staff'. (ts)
+[36m		data: {
+			staff: [35mStaff[36m;
+		};[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:11:21
+[31mError[39m: Cannot find name 'Staff'. (ts)
+[36m
+	let staff = $state<[35mStaff[36m | null>(data.staff);
+	let isLoading = $state(false);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:35:27
+[31mError[39m: Cannot find name 'staffApi'. (ts)
+[36m		try {
+			const response = await [35mstaffApi[36m.activate(staff.id);
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:37:36
+[31mError[39m: Cannot find name 'Staff'. (ts)
+[36m			if (response.ok) {
+				staff = response.data.staff as [35mStaff[36m;
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:47:18
+[31mError[39m: Cannot find name 'suspendReason'. (ts)
+[36m	async function handleSuspend() {
+		if (!staff || ![35msuspendReason[36m.trim()) return;
+		actionLoading = 'suspend';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:51:27
+[31mError[39m: Cannot find name 'staffApi'. (ts)
+[36m		try {
+			const response = await [35mstaffApi[36m.suspend(staff.id, suspendReason.trim());
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:51:54
+[31mError[39m: Cannot find name 'suspendReason'. (ts)
+[36m		try {
+			const response = await staffApi.suspend(staff.id, [35msuspendReason[36m.trim());
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:53:36
+[31mError[39m: Cannot find name 'Staff'. (ts)
+[36m			if (response.ok) {
+				staff = response.data.staff as [35mStaff[36m;
+				showSuspendModal = false;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:54:5
+[31mError[39m: Cannot find name 'showSuspendModal'. (ts)
+[36m				staff = response.data.staff as Staff;
+				[35mshowSuspendModal[36m = false;
+				suspendReason = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:55:5
+[31mError[39m: Cannot find name 'suspendReason'. (ts)
+[36m				showSuspendModal = false;
+				[35msuspendReason[36m = '';
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:65:18
+[31mError[39m: Cannot find name 'deactivateReason'. (ts)
+[36m	async function handleDeactivate() {
+		if (!staff || ![35mdeactivateReason[36m.trim()) return;
+		actionLoading = 'deactivate';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:69:27
+[31mError[39m: Cannot find name 'staffApi'. (ts)
+[36m		try {
+			const response = await [35mstaffApi[36m.deactivate(staff.id, deactivateReason.trim());
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:69:57
+[31mError[39m: Cannot find name 'deactivateReason'. (ts)
+[36m		try {
+			const response = await staffApi.deactivate(staff.id, [35mdeactivateReason[36m.trim());
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:71:36
+[31mError[39m: Cannot find name 'Staff'. (ts)
+[36m			if (response.ok) {
+				staff = response.data.staff as [35mStaff[36m;
+				showDeactivateModal = false;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:72:5
+[31mError[39m: Cannot find name 'showDeactivateModal'. (ts)
+[36m				staff = response.data.staff as Staff;
+				[35mshowDeactivateModal[36m = false;
+				deactivateReason = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:73:5
+[31mError[39m: Cannot find name 'deactivateReason'. (ts)
+[36m				showDeactivateModal = false;
+				[35mdeactivateReason[36m = '';
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:87:27
+[31mError[39m: Cannot find name 'staffApi'. (ts)
+[36m		try {
+			const response = await [35mstaffApi[36m.reactivate(staff.id);
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:89:36
+[31mError[39m: Cannot find name 'Staff'. (ts)
+[36m			if (response.ok) {
+				staff = response.data.staff as [35mStaff[36m;
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:103:27
+[31mError[39m: Cannot find name 'staffApi'. (ts)
+[36m		try {
+			const response = await [35mstaffApi[36m.regenerateActivationCode(staff.id);
+			if (response.ok) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:105:5
+[31mError[39m: Cannot find name 'generatedCode'. (ts)
+[36m			if (response.ok) {
+				[35mgeneratedCode[36m = response.data.activationCode;
+				showCodeModal = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:106:5
+[31mError[39m: Cannot find name 'showCodeModal'. (ts)
+[36m				generatedCode = response.data.activationCode;
+				[35mshowCodeModal[36m = true;
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:118:12
+[31mError[39m: Cannot find name 'CheckCircle'. (ts)
+[36m			case 'ACTIVE':
+				return [35mCheckCircle[36m;
+			case 'PENDING':[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:120:12
+[31mError[39m: Cannot find name 'Clock'. (ts)
+[36m			case 'PENDING':
+				return [35mClock[36m;
+			case 'SUSPENDED':[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:122:12
+[31mError[39m: Cannot find name 'AlertTriangle'. (ts)
+[36m			case 'SUSPENDED':
+				return [35mAlertTriangle[36m;
+			case 'DEACTIVATED':[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:124:12
+[31mError[39m: Cannot find name 'XCircle'. (ts)
+[36m			case 'DEACTIVATED':
+				return [35mXCircle[36m;
+			default:[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:126:12
+[31mError[39m: Cannot find name 'Clock'. (ts)
+[36m			default:
+				return [35mClock[36m;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:150:2
+[31mError[39m: Cannot find name 'PageContainer'. (ts)
+[36m
+<[35mPageContainer[36m>
+	<div class="py-6">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:158:6
+[31mError[39m: Cannot find name 'ArrowLeft'. (ts)
+[36m			>
+				<[35mArrowLeft[36m class="h-4 w-4" />
+				Back to Staff List[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:165:6
+[31mError[39m: Cannot find name 'Loader2'. (ts)
+[36m			<div class="flex items-center justify-center py-12">
+				<[35mLoader2[36m class="h-8 w-8 animate-spin text-primary-500" />
+			</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:168:5
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m		{:else if error}
+			<[35mCard[36m variant="outlined" padding="lg">
+				<div class="text-center text-error-500">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:175:6
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m				</div>
+			</[35mCard[36m>
+		{:else if staff}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:181:8
+[31mError[39m: Cannot find name 'User'. (ts)
+[36m					<div class="flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/10">
+						<[35mUser[36m class="h-8 w-8 text-primary-500" />
+					</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:190:10
+[31mError[39m: Cannot find name 'CheckCircle'. (ts)
+[36m							{#if staff.status === 'ACTIVE'}
+								<[35mCheckCircle[36m class="h-4 w-4 text-success-500" />
+							{:else if staff.status === 'PENDING'}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:192:10
+[31mError[39m: Cannot find name 'Clock'. (ts)
+[36m							{:else if staff.status === 'PENDING'}
+								<[35mClock[36m class="h-4 w-4 text-warning-500" />
+							{:else if staff.status === 'SUSPENDED'}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:194:10
+[31mError[39m: Cannot find name 'AlertTriangle'. (ts)
+[36m							{:else if staff.status === 'SUSPENDED'}
+								<[35mAlertTriangle[36m class="h-4 w-4 text-error-500" />
+							{:else}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:196:10
+[31mError[39m: Cannot find name 'XCircle'. (ts)
+[36m							{:else}
+								<[35mXCircle[36m class="h-4 w-4 text-surface-500" />
+							{/if}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:199:10
+[31mError[39m: Cannot find name 'STAFF_STATUS_LABELS'. (ts)
+[36m							<span class="text-sm font-medium {getStatusColor(staff.status)}">
+								{[35mSTAFF_STATUS_LABELS[36m[staff.status]}
+							</span>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:214:10
+[31mError[39m: Cannot find name 'Loader2'. (ts)
+[36m							{#if actionLoading === 'activate'}
+								<[35mLoader2[36m class="mr-2 h-4 w-4 animate-spin" />
+							{:else}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:216:10
+[31mError[39m: Cannot find name 'UserCheck'. (ts)
+[36m							{:else}
+								<[35mUserCheck[36m class="mr-2 h-4 w-4" />
+							{/if}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:226:10
+[31mError[39m: Cannot find name 'Loader2'. (ts)
+[36m							{#if actionLoading === 'regenerate'}
+								<[35mLoader2[36m class="mr-2 h-4 w-4 animate-spin" />
+							{:else}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:228:10
+[31mError[39m: Cannot find name 'RefreshCw'. (ts)
+[36m							{:else}
+								<[35mRefreshCw[36m class="mr-2 h-4 w-4" />
+							{/if}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:236:24
+[31mError[39m: Cannot find name 'showSuspendModal'. (ts)
+[36m						<button
+							onclick={() => ([35mshowSuspendModal[36m = true)}
+							disabled={actionLoading !== null}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:240:9
+[31mError[39m: Cannot find name 'AlertTriangle'. (ts)
+[36m						>
+							<[35mAlertTriangle[36m class="mr-2 h-4 w-4" />
+							Suspend[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:244:24
+[31mError[39m: Cannot find name 'showDeactivateModal'. (ts)
+[36m						<button
+							onclick={() => ([35mshowDeactivateModal[36m = true)}
+							disabled={actionLoading !== null}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:248:9
+[31mError[39m: Cannot find name 'UserX'. (ts)
+[36m						>
+							<[35mUserX[36m class="mr-2 h-4 w-4" />
+							Deactivate[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:260:10
+[31mError[39m: Cannot find name 'Loader2'. (ts)
+[36m							{#if actionLoading === 'reactivate'}
+								<[35mLoader2[36m class="mr-2 h-4 w-4 animate-spin" />
+							{:else}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:262:10
+[31mError[39m: Cannot find name 'RefreshCw'. (ts)
+[36m							{:else}
+								<[35mRefreshCw[36m class="mr-2 h-4 w-4" />
+							{/if}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:269:8
+[31mError[39m: Cannot find name 'Edit'. (ts)
+[36m					<a href="/app/admin/staff/{staff.id}/edit" class="btn preset-outlined-primary-500">
+						<[35mEdit[36m class="mr-2 h-4 w-4" />
+						Edit[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:286:7
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m					<!-- Contact Info -->
+					<[35mCard[36m variant="outlined" padding="lg">
+						<h2 class="text-lg font-semibold">Contact Information</h2>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:290:10
+[31mError[39m: Cannot find name 'Mail'. (ts)
+[36m							<div class="flex items-center gap-3">
+								<[35mMail[36m class="h-5 w-5 text-surface-400" />
+								<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:297:10
+[31mError[39m: Cannot find name 'User'. (ts)
+[36m							<div class="flex items-center gap-3">
+								<[35mUser[36m class="h-5 w-5 text-surface-400" />
+								<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:304:8
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m						</div>
+					</[35mCard[36m>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:307:7
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m					<!-- Roles -->
+					<[35mCard[36m variant="outlined" padding="lg">
+						<div class="flex items-center justify-between">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:320:11
+[31mError[39m: Cannot find name 'Briefcase'. (ts)
+[36m								<div class="flex items-start gap-3 rounded-lg border border-surface-300-700 p-3">
+									<[35mBriefcase[36m class="h-5 w-5 text-primary-500 mt-0.5" />
+									<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:322:35
+[31mError[39m: Cannot find name 'STAFF_ROLE_LABELS'. (ts)
+[36m									<div>
+										<p class="font-medium">{[35mSTAFF_ROLE_LABELS[36m[role]}</p>
+										<p class="text-sm text-surface-500">{STAFF_ROLE_DESCRIPTIONS[role]}</p>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:323:48
+[31mError[39m: Cannot find name 'STAFF_ROLE_DESCRIPTIONS'. (ts)
+[36m										<p class="font-medium">{STAFF_ROLE_LABELS[role]}</p>
+										<p class="text-sm text-surface-500">{[35mSTAFF_ROLE_DESCRIPTIONS[36m[role]}</p>
+									</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:328:8
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m						</div>
+					</[35mCard[36m>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:331:7
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m					<!-- Pillar Access -->
+					<[35mCard[36m variant="outlined" padding="lg">
+						<div class="flex items-center justify-between">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:344:11
+[31mError[39m: Cannot find name 'PILLAR_ACCESS_LABELS'. (ts)
+[36m								<span class="badge preset-filled-primary-500">
+									{[35mPILLAR_ACCESS_LABELS[36m[pillar]}
+								</span>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:348:8
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m						</div>
+					</[35mCard[36m>
+				</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:354:7
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m					<!-- Status & Dates -->
+					<[35mCard[36m variant="outlined" padding="lg">
+						<h2 class="text-lg font-semibold">Status & Timeline</h2>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:358:10
+[31mError[39m: Cannot find name 'Calendar'. (ts)
+[36m							<div class="flex items-center gap-3">
+								<[35mCalendar[36m class="h-5 w-5 text-surface-400" />
+								<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:368:11
+[31mError[39m: Cannot find name 'CheckCircle'. (ts)
+[36m								<div class="flex items-center gap-3">
+									<[35mCheckCircle[36m class="h-5 w-5 text-success-500" />
+									<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:379:11
+[31mError[39m: Cannot find name 'AlertTriangle'. (ts)
+[36m								<div class="flex items-center gap-3">
+									<[35mAlertTriangle[36m class="h-5 w-5 text-error-500" />
+									<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:390:11
+[31mError[39m: Cannot find name 'XCircle'. (ts)
+[36m								<div class="flex items-center gap-3">
+									<[35mXCircle[36m class="h-5 w-5 text-surface-500" />
+									<div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:400:8
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m						</div>
+					</[35mCard[36m>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:403:7
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m					<!-- Case Assignment -->
+					<[35mCard[36m variant="outlined" padding="lg">
+						<h2 class="text-lg font-semibold">Case Assignment</h2>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:408:11
+[31mError[39m: Cannot find name 'CheckCircle'. (ts)
+[36m								{#if staff.canBeAssignedCases}
+									<[35mCheckCircle[36m class="h-5 w-5 text-success-500" />
+									<span class="text-sm">Can be assigned cases</span>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:411:11
+[31mError[39m: Cannot find name 'XCircle'. (ts)
+[36m								{:else}
+									<[35mXCircle[36m class="h-5 w-5 text-surface-400" />
+									<span class="text-sm text-surface-500">Cannot be assigned cases</span>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:416:8
+[31mError[39m: Cannot find name 'Card'. (ts)
+[36m						</div>
+					</[35mCard[36m>
+				</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:421:3
+[31mError[39m: Cannot find name 'PageContainer'. (ts)
+[36m	</div>
+</[35mPageContainer[36m>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:424:6
+[31mError[39m: Cannot find name 'showSuspendModal'. (ts)
+[36m<!-- Suspend Modal -->
+{#if [35mshowSuspendModal[36m}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:435:18
+[31mError[39m: Cannot find name 'suspendReason'. (ts)
+[36m					id="suspendReason"
+					bind:value={[35msuspendReason[36m}
+					placeholder="Enter the reason for suspension..."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:445:7
+[31mError[39m: Cannot find name 'showSuspendModal'. (ts)
+[36m					onclick={() => {
+						[35mshowSuspendModal[36m = false;
+						suspendReason = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:446:7
+[31mError[39m: Cannot find name 'suspendReason'. (ts)
+[36m						showSuspendModal = false;
+						[35msuspendReason[36m = '';
+					}}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:454:17
+[31mError[39m: Cannot find name 'suspendReason'. (ts)
+[36m					onclick={handleSuspend}
+					disabled={![35msuspendReason[36m.trim() || actionLoading === 'suspend'}
+					class="btn preset-filled-error-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:458:8
+[31mError[39m: Cannot find name 'Loader2'. (ts)
+[36m					{#if actionLoading === 'suspend'}
+						<[35mLoader2[36m class="mr-2 h-4 w-4 animate-spin" />
+					{/if}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:468:6
+[31mError[39m: Cannot find name 'showDeactivateModal'. (ts)
+[36m<!-- Deactivate Modal -->
+{#if [35mshowDeactivateModal[36m}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:479:18
+[31mError[39m: Cannot find name 'deactivateReason'. (ts)
+[36m					id="deactivateReason"
+					bind:value={[35mdeactivateReason[36m}
+					placeholder="Enter the reason for deactivation..."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:489:7
+[31mError[39m: Cannot find name 'showDeactivateModal'. (ts)
+[36m					onclick={() => {
+						[35mshowDeactivateModal[36m = false;
+						deactivateReason = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:490:7
+[31mError[39m: Cannot find name 'deactivateReason'. (ts)
+[36m						showDeactivateModal = false;
+						[35mdeactivateReason[36m = '';
+					}}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:498:17
+[31mError[39m: Cannot find name 'deactivateReason'. (ts)
+[36m					onclick={handleDeactivate}
+					disabled={![35mdeactivateReason[36m.trim() || actionLoading === 'deactivate'}
+					class="btn preset-filled-surface-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:502:8
+[31mError[39m: Cannot find name 'Loader2'. (ts)
+[36m					{#if actionLoading === 'deactivate'}
+						<[35mLoader2[36m class="mr-2 h-4 w-4 animate-spin" />
+					{/if}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:512:6
+[31mError[39m: Cannot find name 'showCodeModal'. (ts)
+[36m<!-- Activation Code Modal -->
+{#if [35mshowCodeModal[36m}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:517:7
+[31mError[39m: Cannot find name 'RefreshCw'. (ts)
+[36m				<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-success-500/10 text-success-600">
+					<[35mRefreshCw[36m class="h-6 w-6" />
+				</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:526:67
+[31mError[39m: Cannot find name 'generatedCode'. (ts)
+[36m					<div class="flex items-center justify-center gap-2">
+						<code class="text-2xl font-mono font-bold tracking-widest">{[35mgeneratedCode[36m}</code>
+					</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:533:8
+[31mError[39m: Cannot find name 'showCodeModal'. (ts)
+[36m						onclick={() => {
+							[35mshowCodeModal[36m = false;
+							generatedCode = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\staff\[id]\+page.svelte[39m:534:8
+[31mError[39m: Cannot find name 'generatedCode'. (ts)
+[36m							showCodeModal = false;
+							[35mgeneratedCode[36m = '';
+						}}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\work-queue\+page.svelte[39m:51:45
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	// Filters
+	let pillarFilter = $state<WorkQueuePillar>([35mdata[36m.filters.pillar);
+	let urgencyFilter = $state<WorkQueueUrgency | ''>(data.filters.urgency);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\work-queue\+page.svelte[39m:52:52
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let pillarFilter = $state<WorkQueuePillar>(data.filters.pillar);
+	let urgencyFilter = $state<WorkQueueUrgency | ''>([35mdata[36m.filters.urgency);
+	let assignedToMe = $state(data.filters.assignedToMe);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\work-queue\+page.svelte[39m:53:28
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let urgencyFilter = $state<WorkQueueUrgency | ''>(data.filters.urgency);
+	let assignedToMe = $state([35mdata[36m.filters.assignedToMe);
+	let unassignedOnly = $state(data.filters.unassignedOnly);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\admin\work-queue\+page.svelte[39m:54:30
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let assignedToMe = $state(data.filters.assignedToMe);
+	let unassignedOnly = $state([35mdata[36m.filters.unassignedOnly);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\+page.svelte[39m:149:24
+[31mError[39m: Cannot find name 'loadDocuments'. (ts)
+[36m						<p>{error}</p>
+						<button onclick={[35mloadDocuments[36m} class="btn preset-tonal-primary mt-4">
+							Try Again[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\[id]\+page.svelte[39m:85:4
+[31mError[39m: Cannot find name 'goto'. (ts)
+[36m			// For now, redirect back to documents list
+			[35mgoto[36m('/app/concierge/documents');
+	}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\[id]\+page.svelte[39m:130:24
+[31mError[39m: Cannot find name 'loadDocument'. (ts)
+[36m						</a>
+						<button onclick={[35mloadDocument[36m} class="btn preset-tonal-primary">Try Again</button>
+					</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\upload\+page.svelte[39m:15:16
+[31mError[39m: Cannot find name 'Property'. (ts)
+[36m		data: {
+			properties: [35mProperty[36m[];
+		};[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\upload\+page.svelte[39m:81:8
+[31mError[39m: Cannot find name 'allowedTypes'. (ts)
+[36m
+		if (![35mallowedTypes[36m.includes(file.type)) {
+			error = 'File type not supported. Please upload PDF, images, or Word documents.';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\upload\+page.svelte[39m:86:19
+[31mError[39m: Cannot find name 'maxFileSize'. (ts)
+[36m
+		if (file.size > [35mmaxFileSize[36m) {
+			error = 'File is too large. Maximum size is 10MB.';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\upload\+page.svelte[39m:117:8
+[31mError[39m: Cannot find name 'isValid'. (ts)
+[36m		e.preventDefault();
+		if (![35misValid[36m || isSubmitting || !selectedFile) return;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\upload\+page.svelte[39m:264:16
+[31mError[39m: Cannot find name 'categories'. (ts)
+[36m							<select id="category" bind:value={category} class="select w-full">
+								{#each [35mcategories[36m as cat}
+									<option value={cat.value}>{cat.label}</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\documents\upload\+page.svelte[39m:313:18
+[31mError[39m: Cannot find name 'isValid'. (ts)
+[36m						class="btn preset-filled-primary-500"
+						disabled={![35misValid[36m || isSubmitting || properties.length === 0}
+					>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\notifications\+page.svelte[39m:196:24
+[31mError[39m: Cannot find name 'loadNotifications'. (ts)
+[36m						<p>{error}</p>
+						<button onclick={[35mloadNotifications[36m} class="btn preset-tonal-primary mt-4">
+							Try Again[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\+page.svelte[39m:92:41
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let property = $state<Property | null>([35mdata[36m.property);
+	let documents = $state<Document[]>([]);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\+page.svelte[39m:122:16
+[31mError[39m: Cannot find name 'propertyId'. (ts)
+[36m				contextType: 'PROPERTY',
+				contextId: [35mpropertyId[36m,
+				limit: 100[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\+page.svelte[39m:142:16
+[31mError[39m: Cannot find name 'propertyId'. (ts)
+[36m				contextType: 'PROPERTY',
+				contextId: [35mpropertyId[36m,
+				limit: 100[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\+page.svelte[39m:161:17
+[31mError[39m: Cannot find name 'propertyId'. (ts)
+[36m			const result = await orpc.conciergeCase.list({
+				propertyId: [35mpropertyId[36m,
+				limit: 50[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\+page.svelte[39m:313:11
+[31mError[39m: Cannot find name 'propertyTypeLabels'. (ts)
+[36m								<dd class="font-medium">
+									{[35mpropertyTypeLabels[36m[property.propertyType] || property.propertyType}
+								</dd>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\+page.svelte[39m:478:12
+[31mError[39m: Cannot find name 'categoryLabels'. (ts)
+[36m									<span class="rounded-full bg-surface-500/10 px-2 py-0.5 text-xs font-medium">
+										{[35mcategoryLabels[36m[doc.category] || doc.category}
+									</span>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\edit\+page.svelte[39m:78:8
+[31mError[39m: Cannot find name 'isValid'. (ts)
+[36m		e.preventDefault();
+		if (![35misValid[36m || isSubmitting) return;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\edit\+page.svelte[39m:199:17
+[31mError[39m: Cannot find name 'propertyTypes'. (ts)
+[36m								<select id="propertyType" bind:value={propertyType} class="select w-full">
+									{#each [35mpropertyTypes[36m as type}
+										<option value={type.value}>{type.label}</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\edit\+page.svelte[39m:258:17
+[31mError[39m: Cannot find name 'usStates'. (ts)
+[36m									<option value="">Select State</option>
+									{#each [35musStates[36m as st}
+										<option value={st.value}>{st.label}</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\properties\[id]\edit\+page.svelte[39m:450:19
+[31mError[39m: Cannot find name 'isValid'. (ts)
+[36m							class="btn preset-filled-primary-500"
+							disabled={![35misValid[36m || isSubmitting}
+						>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\service-calls\[id]\+page.svelte[39m:140:10
+[31mError[39m: Cannot find name 'loadServiceCall'. (ts)
+[36m			// Reload service call to get updated status
+			await [35mloadServiceCall[36m();
+		} catch (err) {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\concierge\service-calls\[id]\+page.svelte[39m:239:24
+[31mError[39m: Cannot find name 'loadServiceCall'. (ts)
+[36m						</a>
+						<button onclick={[35mloadServiceCall[36m} class="btn preset-tonal-primary">Try Again</button>
+					</div>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\dispatch\+page.svelte[39m:26:27
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let jobs = $state<Job[]>([35mdata[36m.jobs);
+	let isLoading = $state(false);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\+page.svelte[39m:42:27
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let jobs = $state<Job[]>([35mdata[36m.jobs);
+	let isLoading = $state(false);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\+page.svelte[39m:45:27
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let error = $state<string | null>(null);
+	let searchQuery = $state([35mdata[36m.filters.search);
+	let statusFilter = $state<JobStatus | ''>(data.filters.status);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\+page.svelte[39m:46:44
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let searchQuery = $state(data.filters.search);
+	let statusFilter = $state<JobStatus | ''>([35mdata[36m.filters.status);
+	let sourceFilter = $state<JobSourceType | ''>(data.filters.sourceType);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\+page.svelte[39m:47:48
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let statusFilter = $state<JobStatus | ''>(data.filters.status);
+	let sourceFilter = $state<JobSourceType | ''>([35mdata[36m.filters.sourceType);
+	let selectedJobId = $state<string | null>(null);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:499:23
+[31mError[39m: Can only bind to state or props
+https://svelte.dev/e/bind_invalid_value (svelte)
+[36m									<textarea
+										bind:value={[35mnewNoteContent[36m}
+										placeholder="Add a note..."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:64:4
+[31mError[39m: Cannot find name 'selectedTechnicianId'. (ts)
+[36m			job = data.job;
+			[35mselectedTechnicianId[36m = job.assignedTechnicianId || '';
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:102:8
+[31mError[39m: Cannot find name 'newNoteContent'. (ts)
+[36m	async function addNote() {
+		if (![35mnewNoteContent[36m.trim()) return;
+		isAddingNote = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:103:3
+[31mError[39m: Cannot find name 'isAddingNote'. (ts)
+[36m		if (!newNoteContent.trim()) return;
+		[35misAddingNote[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:107:14
+[31mError[39m: Cannot find name 'newNoteContent'. (ts)
+[36m				jobId: jobId,
+				content: [35mnewNoteContent[36m,
+				isInternal: isNoteInternal,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:108:17
+[31mError[39m: Cannot find name 'isNoteInternal'. (ts)
+[36m				content: newNoteContent,
+				isInternal: [35misNoteInternal[36m,
+				idempotencyKey: crypto.randomUUID()[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:113:5
+[31mError[39m: Cannot find name 'newNoteContent'. (ts)
+[36m				notes = [response.data.note, ...notes];
+				[35mnewNoteContent[36m = '';
+				isNoteInternal = false;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:114:5
+[31mError[39m: Cannot find name 'isNoteInternal'. (ts)
+[36m				newNoteContent = '';
+				[35misNoteInternal[36m = false;
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:119:4
+[31mError[39m: Cannot find name 'isAddingNote'. (ts)
+[36m		} finally {
+			[35misAddingNote[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:146:3
+[31mError[39m: Cannot find name 'isCreatingEstimate'. (ts)
+[36m		if (!job) return;
+		[35misCreatingEstimate[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:160:4
+[31mError[39m: Cannot find name 'isCreatingEstimate'. (ts)
+[36m		} finally {
+			[35misCreatingEstimate[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:165:3
+[31mError[39m: Cannot find name 'isSendingEstimate'. (ts)
+[36m	async function sendEstimate(estimateId: string) {
+		[35misSendingEstimate[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:176:4
+[31mError[39m: Cannot find name 'isSendingEstimate'. (ts)
+[36m		} finally {
+			[35misSendingEstimate[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:181:3
+[31mError[39m: Cannot find name 'isCreatingInvoice'. (ts)
+[36m	async function createInvoiceFromEstimate(estimateId: string) {
+		[35misCreatingInvoice[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:195:4
+[31mError[39m: Cannot find name 'isCreatingInvoice'. (ts)
+[36m		} finally {
+			[35misCreatingInvoice[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:212:3
+[31mError[39m: Cannot find name 'isAssigningTechnician'. (ts)
+[36m		if (!job) return;
+		[35misAssigningTechnician[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:216:19
+[31mError[39m: Cannot find name 'selectedTechnicianId'. (ts)
+[36m				id: jobId,
+				technicianId: [35mselectedTechnicianId[36m || '',
+				idempotencyKey: crypto.randomUUID()[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:225:4
+[31mError[39m: Cannot find name 'isAssigningTechnician'. (ts)
+[36m		} finally {
+			[35misAssigningTechnician[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:230:16
+[31mError[39m: Cannot find name 'scheduleStart'. (ts)
+[36m	async function scheduleJob() {
+		if (!job || ![35mscheduleStart[36m || !scheduleEnd) return;
+		isScheduling = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:230:34
+[31mError[39m: Cannot find name 'scheduleEnd'. (ts)
+[36m	async function scheduleJob() {
+		if (!job || !scheduleStart || ![35mscheduleEnd[36m) return;
+		isScheduling = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:231:3
+[31mError[39m: Cannot find name 'isScheduling'. (ts)
+[36m		if (!job || !scheduleStart || !scheduleEnd) return;
+		[35misScheduling[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:235:30
+[31mError[39m: Cannot find name 'scheduleStart'. (ts)
+[36m				id: jobId,
+				scheduledStart: new Date([35mscheduleStart[36m).toISOString(),
+				scheduledEnd: new Date(scheduleEnd).toISOString(),[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:236:28
+[31mError[39m: Cannot find name 'scheduleEnd'. (ts)
+[36m				scheduledStart: new Date(scheduleStart).toISOString(),
+				scheduledEnd: new Date([35mscheduleEnd[36m).toISOString(),
+				idempotencyKey: crypto.randomUUID()[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:241:5
+[31mError[39m: Cannot find name 'showScheduleForm'. (ts)
+[36m				job = response.data.job;
+				[35mshowScheduleForm[36m = false;
+				// Auto-transition to SCHEDULED if in JOB_CREATED or ESTIMATE_APPROVED[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:250:4
+[31mError[39m: Cannot find name 'isScheduling'. (ts)
+[36m		} finally {
+			[35misScheduling[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:468:23
+[31mError[39m: Cannot find name 'setActiveTab'. (ts)
+[36m						<button
+							onclick={() => [35msetActiveTab[36m(tab.id)}
+							class="flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors {activeTab === tab.id ? 'border-primary-500 text-primary-500' : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'}"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:499:23
+[31mError[39m: Cannot find name 'newNoteContent'. (ts)
+[36m									<textarea
+										bind:value={[35mnewNoteContent[36m}
+										placeholder="Add a note..."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:506:49
+[31mError[39m: Cannot find name 'isNoteInternal'. (ts)
+[36m										<label class="flex items-center gap-2 text-sm">
+											<input type="checkbox" bind:checked={[35misNoteInternal[36m} class="checkbox" />
+											Internal note (not visible to customer)[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:511:23
+[31mError[39m: Cannot find name 'newNoteContent'. (ts)
+[36m											onclick={addNote}
+											disabled={![35mnewNoteContent[36m.trim() || isAddingNote}
+											class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:511:48
+[31mError[39m: Cannot find name 'isAddingNote'. (ts)
+[36m											onclick={addNote}
+											disabled={!newNoteContent.trim() || [35misAddingNote[36m}
+											class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:514:17
+[31mError[39m: Cannot find name 'isAddingNote'. (ts)
+[36m										>
+											{#if [35misAddingNote[36m}
+												<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:715:19
+[31mError[39m: Cannot find name 'isCreatingEstimate'. (ts)
+[36m								onclick={createEstimate}
+								disabled={[35misCreatingEstimate[36m}
+								class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:718:14
+[31mError[39m: Cannot find name 'isCreatingEstimate'. (ts)
+[36m							>
+								{#if [35misCreatingEstimate[36m}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:736:22
+[31mError[39m: Cannot find name 'isCreatingEstimate'. (ts)
+[36m											onclick={createEstimate}
+											disabled={[35misCreatingEstimate[36m}
+											class="btn preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:780:25
+[31mError[39m: Cannot find name 'isSendingEstimate'. (ts)
+[36m														onclick={() => sendEstimate(estimate.id)}
+														disabled={[35misSendingEstimate[36m}
+														class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:783:20
+[31mError[39m: Cannot find name 'isSendingEstimate'. (ts)
+[36m													>
+														{#if [35misSendingEstimate[36m}
+															<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:792:25
+[31mError[39m: Cannot find name 'isCreatingInvoice'. (ts)
+[36m														onclick={() => createInvoiceFromEstimate(estimate.id)}
+														disabled={[35misCreatingInvoice[36m}
+														class="btn btn-sm preset-filled-success-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:795:20
+[31mError[39m: Cannot find name 'isCreatingInvoice'. (ts)
+[36m													>
+														{#if [35misCreatingInvoice[36m}
+															<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:857:26
+[31mError[39m: Cannot find name 'showScheduleForm'. (ts)
+[36m									<button
+										onclick={() => [35mshowScheduleForm[36m = !showScheduleForm}
+										class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:857:46
+[31mError[39m: Cannot find name 'showScheduleForm'. (ts)
+[36m									<button
+										onclick={() => showScheduleForm = ![35mshowScheduleForm[36m}
+										class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:867:13
+[31mError[39m: Cannot find name 'showScheduleForm'. (ts)
+[36m							<!-- Schedule Form -->
+							{#if [35mshowScheduleForm[36m}
+								<div class="mb-4 p-4 rounded-lg bg-surface-100-900 border border-surface-300-700">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:876:25
+[31mError[39m: Cannot find name 'scheduleStart'. (ts)
+[36m												type="datetime-local"
+												bind:value={[35mscheduleStart[36m}
+												class="input w-full"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:885:25
+[31mError[39m: Cannot find name 'scheduleEnd'. (ts)
+[36m												type="datetime-local"
+												bind:value={[35mscheduleEnd[36m}
+												class="input w-full"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:891:34
+[31mError[39m: Cannot find name 'showScheduleForm'. (ts)
+[36m									<div class="mt-4 flex justify-end gap-2">
+										<button onclick={() => [35mshowScheduleForm[36m = false} class="btn btn-sm preset-outlined-surface-500">
+											Cancel[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:896:23
+[31mError[39m: Cannot find name 'scheduleStart'. (ts)
+[36m											onclick={scheduleJob}
+											disabled={![35mscheduleStart[36m || !scheduleEnd || isScheduling}
+											class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:896:41
+[31mError[39m: Cannot find name 'scheduleEnd'. (ts)
+[36m											onclick={scheduleJob}
+											disabled={!scheduleStart || ![35mscheduleEnd[36m || isScheduling}
+											class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:896:56
+[31mError[39m: Cannot find name 'isScheduling'. (ts)
+[36m											onclick={scheduleJob}
+											disabled={!scheduleStart || !scheduleEnd || [35misScheduling[36m}
+											class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:899:17
+[31mError[39m: Cannot find name 'isScheduling'. (ts)
+[36m										>
+											{#if [35misScheduling[36m}
+												<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:1018:23
+[31mError[39m: Cannot find name 'selectedTechnicianId'. (ts)
+[36m									<select
+										bind:value={[35mselectedTechnicianId[36m}
+										class="select flex-1"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:1028:21
+[31mError[39m: Cannot find name 'isAssigningTechnician'. (ts)
+[36m										onclick={assignTechnician}
+										disabled={[35misAssigningTechnician[36m || selectedTechnicianId === (job.assignedTechnicianId || '')}
+										class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:1028:46
+[31mError[39m: Cannot find name 'selectedTechnicianId'. (ts)
+[36m										onclick={assignTechnician}
+										disabled={isAssigningTechnician || [35mselectedTechnicianId[36m === (job.assignedTechnicianId || '')}
+										class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\+page.svelte[39m:1031:16
+[31mError[39m: Cannot find name 'isAssigningTechnician'. (ts)
+[36m									>
+										{#if [35misAssigningTechnician[36m}
+											<Loader2 class="h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:268:22
+[31mError[39m: Can only bind to state or props
+https://svelte.dev/e/bind_invalid_value (svelte)
+[36m									type="text"
+									bind:value={[35mnewLineDescription[36m}
+									placeholder="Item description"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:61:21
+[31mError[39m: Cannot find name 'newLineDescription'. (ts)
+[36m	async function addLineItem() {
+		if (!estimate || ![35mnewLineDescription[36m.trim()) return;
+		isAddingLine = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:62:3
+[31mError[39m: Cannot find name 'isAddingLine'. (ts)
+[36m		if (!estimate || !newLineDescription.trim()) return;
+		[35misAddingLine[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:66:18
+[31mError[39m: Cannot find name 'newLineDescription'. (ts)
+[36m				estimateId: estimate.id,
+				description: [35mnewLineDescription[36m.trim(),
+				quantity: newLineQuantity,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:67:15
+[31mError[39m: Cannot find name 'newLineQuantity'. (ts)
+[36m				description: newLineDescription.trim(),
+				quantity: [35mnewLineQuantity[36m,
+				unitPrice: newLineUnitPrice,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:68:16
+[31mError[39m: Cannot find name 'newLineUnitPrice'. (ts)
+[36m				quantity: newLineQuantity,
+				unitPrice: [35mnewLineUnitPrice[36m,
+				isTaxable: newLineTaxable,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:69:16
+[31mError[39m: Cannot find name 'newLineTaxable'. (ts)
+[36m				unitPrice: newLineUnitPrice,
+				isTaxable: [35mnewLineTaxable[36m,
+				idempotencyKey: crypto.randomUUID()[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:75:5
+[31mError[39m: Cannot find name 'newLineDescription'. (ts)
+[36m				// Reset form
+				[35mnewLineDescription[36m = '';
+				newLineQuantity = 1;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:76:5
+[31mError[39m: Cannot find name 'newLineQuantity'. (ts)
+[36m				newLineDescription = '';
+				[35mnewLineQuantity[36m = 1;
+				newLineUnitPrice = 0;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:77:5
+[31mError[39m: Cannot find name 'newLineUnitPrice'. (ts)
+[36m				newLineQuantity = 1;
+				[35mnewLineUnitPrice[36m = 0;
+				newLineTaxable = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:78:5
+[31mError[39m: Cannot find name 'newLineTaxable'. (ts)
+[36m				newLineUnitPrice = 0;
+				[35mnewLineTaxable[36m = true;
+				showAddLine = false;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:79:5
+[31mError[39m: Cannot find name 'showAddLine'. (ts)
+[36m				newLineTaxable = true;
+				[35mshowAddLine[36m = false;
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:84:4
+[31mError[39m: Cannot find name 'isAddingLine'. (ts)
+[36m		} finally {
+			[35misAddingLine[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:241:25
+[31mError[39m: Cannot find name 'showPricebook'. (ts)
+[36m								<button
+									onclick={() => [35mshowPricebook[36m = true}
+									class="btn btn-sm preset-outlined-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:248:25
+[31mError[39m: Cannot find name 'showAddLine'. (ts)
+[36m								<button
+									onclick={() => [35mshowAddLine[36m = !showAddLine}
+									class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:248:40
+[31mError[39m: Cannot find name 'showAddLine'. (ts)
+[36m								<button
+									onclick={() => showAddLine = ![35mshowAddLine[36m}
+									class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:260:10
+[31mError[39m: Cannot find name 'showAddLine'. (ts)
+[36m				<!-- Add Line Form -->
+				{#if [35mshowAddLine[36m && estimate.status === 'DRAFT'}
+					<div class="border-b border-surface-300-700 bg-surface-100-900 p-4">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:268:22
+[31mError[39m: Cannot find name 'newLineDescription'. (ts)
+[36m									type="text"
+									bind:value={[35mnewLineDescription[36m}
+									placeholder="Item description"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:278:22
+[31mError[39m: Cannot find name 'newLineQuantity'. (ts)
+[36m									type="number"
+									bind:value={[35mnewLineQuantity[36m}
+									min="1"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:289:22
+[31mError[39m: Cannot find name 'newLineUnitPrice'. (ts)
+[36m									type="number"
+									bind:value={[35mnewLineUnitPrice[36m}
+									min="0"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:298:46
+[31mError[39m: Cannot find name 'newLineTaxable'. (ts)
+[36m							<label class="flex items-center gap-2 text-sm">
+								<input type="checkbox" bind:checked={[35mnewLineTaxable[36m} class="checkbox" />
+								Taxable[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:303:25
+[31mError[39m: Cannot find name 'showAddLine'. (ts)
+[36m								<button
+									onclick={() => [35mshowAddLine[36m = false}
+									class="btn btn-sm preset-outlined-surface-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:310:21
+[31mError[39m: Cannot find name 'newLineDescription'. (ts)
+[36m									onclick={addLineItem}
+									disabled={![35mnewLineDescription[36m.trim() || isAddingLine}
+									class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:310:50
+[31mError[39m: Cannot find name 'isAddingLine'. (ts)
+[36m									onclick={addLineItem}
+									disabled={!newLineDescription.trim() || [35misAddingLine[36m}
+									class="btn btn-sm preset-filled-primary-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:313:15
+[31mError[39m: Cannot find name 'isAddingLine'. (ts)
+[36m								>
+									{#if [35misAddingLine[36m}
+										<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:522:6
+[31mError[39m: Cannot find name 'showPricebook'. (ts)
+[36m<!-- Pricebook Modal -->
+{#if [35mshowPricebook[36m}
+	<div[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:525:18
+[31mError[39m: Cannot find name 'showPricebook'. (ts)
+[36m		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" 
+		onclick={() => [35mshowPricebook[36m = false}
+		onkeydown={(e) => e.key === 'Escape' && (showPricebook = false)}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:526:44
+[31mError[39m: Cannot find name 'showPricebook'. (ts)
+[36m		onclick={() => showPricebook = false}
+		onkeydown={(e) => e.key === 'Escape' && ([35mshowPricebook[36m = false)}
+		role="dialog"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:539:28
+[31mError[39m: Cannot find name 'showPricebook'. (ts)
+[36m				</h2>
+				<button onclick={() => [35mshowPricebook[36m = false} class="btn-icon preset-outlined-surface-500">
+					<X class="h-4 w-4" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:550:20
+[31mError[39m: Cannot find name 'pricebookSearch'. (ts)
+[36m							type="text"
+							bind:value={[35mpricebookSearch[36m}
+							placeholder="Search items..."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:555:26
+[31mError[39m: Cannot find name 'pricebookCategory'. (ts)
+[36m					</div>
+					<select bind:value={[35mpricebookCategory[36m} class="select w-40">
+						{#each pricebookCategories as cat}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:556:14
+[31mError[39m: Cannot find name 'pricebookCategories'. (ts)
+[36m					<select bind:value={pricebookCategory} class="select w-40">
+						{#each [35mpricebookCategories[36m as cat}
+							<option value={cat}>{cat}</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:564:10
+[31mError[39m: Cannot find name 'filteredPricebookItems'. (ts)
+[36m			<div class="overflow-y-auto max-h-[50vh]">
+				{#if [35mfilteredPricebookItems[36m.length === 0}
+					<div class="p-8 text-center text-surface-400">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:570:14
+[31mError[39m: Cannot find name 'filteredPricebookItems'. (ts)
+[36m					<div class="divide-y divide-surface-200-800">
+						{#each [35mfilteredPricebookItems[36m as item}
+							<button[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\estimate\[estimateId]\+page.svelte[39m:572:24
+[31mError[39m: Cannot find name 'addFromPricebook'. (ts)
+[36m							<button
+								onclick={() => [35maddFromPricebook[36m(item)}
+								class="w-full px-6 py-4 text-left hover:bg-surface-100-900 transition-colors"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:219:22
+[31mError[39m: Can only bind to state or props
+https://svelte.dev/e/bind_invalid_value (svelte)
+[36m									type="number"
+									bind:value={[35mpaymentAmount[36m}
+									min="0.01"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:41:4
+[31mError[39m: Cannot find name 'paymentAmount'. (ts)
+[36m			invoice = data.invoice;
+			[35mpaymentAmount[36m = Number(invoice.balanceDue);
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:49:4
+[31mError[39m: Cannot find name 'showPaymentForm'. (ts)
+[36m		if (actionParam === 'payment') {
+			[35mshowPaymentForm[36m = true;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:77:19
+[31mError[39m: Cannot find name 'paymentAmount'. (ts)
+[36m	async function recordPayment() {
+		if (!invoice || [35mpaymentAmount[36m <= 0) return;
+		isRecordingPayment = true;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:78:3
+[31mError[39m: Cannot find name 'isRecordingPayment'. (ts)
+[36m		if (!invoice || paymentAmount <= 0) return;
+		[35misRecordingPayment[36m = true;
+		try {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:82:13
+[31mError[39m: Cannot find name 'paymentAmount'. (ts)
+[36m				id: invoice.id,
+				amount: [35mpaymentAmount[36m,
+				paymentMethod: paymentMethod || undefined,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:83:20
+[31mError[39m: Cannot find name 'paymentMethod'. (ts)
+[36m				amount: paymentAmount,
+				paymentMethod: [35mpaymentMethod[36m || undefined,
+				referenceNumber: paymentReference || undefined,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:84:22
+[31mError[39m: Cannot find name 'paymentReference'. (ts)
+[36m				paymentMethod: paymentMethod || undefined,
+				referenceNumber: [35mpaymentReference[36m || undefined,
+				notes: paymentNotes || undefined,[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:85:12
+[31mError[39m: Cannot find name 'paymentNotes'. (ts)
+[36m				referenceNumber: paymentReference || undefined,
+				notes: [35mpaymentNotes[36m || undefined,
+				idempotencyKey: crypto.randomUUID()[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:90:5
+[31mError[39m: Cannot find name 'showPaymentForm'. (ts)
+[36m				invoice = response.data.invoice;
+				[35mshowPaymentForm[36m = false;
+				paymentAmount = Number(invoice.balanceDue);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:91:5
+[31mError[39m: Cannot find name 'paymentAmount'. (ts)
+[36m				showPaymentForm = false;
+				[35mpaymentAmount[36m = Number(invoice.balanceDue);
+				paymentMethod = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:92:5
+[31mError[39m: Cannot find name 'paymentMethod'. (ts)
+[36m				paymentAmount = Number(invoice.balanceDue);
+				[35mpaymentMethod[36m = '';
+				paymentReference = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:93:5
+[31mError[39m: Cannot find name 'paymentReference'. (ts)
+[36m				paymentMethod = '';
+				[35mpaymentReference[36m = '';
+				paymentNotes = '';[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:94:5
+[31mError[39m: Cannot find name 'paymentNotes'. (ts)
+[36m				paymentReference = '';
+				[35mpaymentNotes[36m = '';
+			}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:99:4
+[31mError[39m: Cannot find name 'isRecordingPayment'. (ts)
+[36m		} finally {
+			[35misRecordingPayment[36m = false;
+		}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:197:23
+[31mError[39m: Cannot find name 'showPaymentForm'. (ts)
+[36m						<button
+							onclick={() => [35mshowPaymentForm[36m = !showPaymentForm}
+							class="btn preset-filled-success-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:197:42
+[31mError[39m: Cannot find name 'showPaymentForm'. (ts)
+[36m						<button
+							onclick={() => showPaymentForm = ![35mshowPaymentForm[36m}
+							class="btn preset-filled-success-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:208:9
+[31mError[39m: Cannot find name 'showPaymentForm'. (ts)
+[36m			<!-- Payment Form -->
+			{#if [35mshowPaymentForm[36m}
+				<Card variant="outlined" padding="md" class="border-success-500">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:219:22
+[31mError[39m: Cannot find name 'paymentAmount'. (ts)
+[36m									type="number"
+									bind:value={[35mpaymentAmount[36m}
+									min="0.01"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:230:47
+[31mError[39m: Cannot find name 'paymentMethod'. (ts)
+[36m							<label for="paymentMethod" class="label mb-1 text-sm">Payment Method</label>
+							<select id="paymentMethod" bind:value={[35mpaymentMethod[36m} class="select w-full">
+								<option value="">Select method...</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:242:21
+[31mError[39m: Cannot find name 'paymentReference'. (ts)
+[36m								type="text"
+								bind:value={[35mpaymentReference[36m}
+								placeholder="Check #, transaction ID, etc."[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:252:21
+[31mError[39m: Cannot find name 'paymentNotes'. (ts)
+[36m								type="text"
+								bind:value={[35mpaymentNotes[36m}
+								placeholder="Optional notes"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:259:30
+[31mError[39m: Cannot find name 'showPaymentForm'. (ts)
+[36m					<div class="mt-4 flex justify-end gap-2">
+						<button onclick={() => [35mshowPaymentForm[36m = false} class="btn preset-outlined-surface-500">
+							Cancel[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:264:18
+[31mError[39m: Cannot find name 'paymentAmount'. (ts)
+[36m							onclick={recordPayment}
+							disabled={[35mpaymentAmount[36m <= 0 || isRecordingPayment}
+							class="btn preset-filled-success-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:264:40
+[31mError[39m: Cannot find name 'isRecordingPayment'. (ts)
+[36m							onclick={recordPayment}
+							disabled={paymentAmount <= 0 || [35misRecordingPayment[36m}
+							class="btn preset-filled-success-500"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\jobs\[id]\invoice\[invoiceId]\+page.svelte[39m:267:13
+[31mError[39m: Cannot find name 'isRecordingPayment'. (ts)
+[36m						>
+							{#if [35misRecordingPayment[36m}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\+page.svelte[39m:105:41
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let technicians = $state<Technician[]>([35mdata[36m.technicians);
+	let selectedTechnician = $state<Technician | null>(null);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\+page.svelte[39m:109:28
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let searchQuery = $state('');
+	let statusFilter = $state([35mdata[36m.filters.status);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\+page.svelte[39m:145:22
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let initialStatus = [35mdata[36m.filters.status;[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:91:45
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m
+	let technician = $state<Technician | null>([35mdata[36m.technician);
+	let skills = $state<Skill[]>(data.skills);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:92:31
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let technician = $state<Technician | null>(data.technician);
+	let skills = $state<Skill[]>([35mdata[36m.skills);
+	let certifications = $state<Certification[]>(data.certifications);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:93:47
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let skills = $state<Skill[]>(data.skills);
+	let certifications = $state<Certification[]>([35mdata[36m.certifications);
+	let availability = $state<Availability | null>(data.availability);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:94:49
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let certifications = $state<Certification[]>(data.certifications);
+	let availability = $state<Availability | null>([35mdata[36m.availability);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:102:25
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	// Form state
+	let firstName = $state([35mdata[36m.technician.firstName);
+	let lastName = $state(data.technician.lastName);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:103:24
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let firstName = $state(data.technician.firstName);
+	let lastName = $state([35mdata[36m.technician.lastName);
+	let email = $state(data.technician.email || '');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:104:21
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let lastName = $state(data.technician.lastName);
+	let email = $state([35mdata[36m.technician.email || '');
+	let phone = $state(data.technician.phone || '');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:105:21
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let email = $state(data.technician.email || '');
+	let phone = $state([35mdata[36m.technician.phone || '');
+	let employeeId = $state(data.technician.employeeId || '');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:106:26
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let phone = $state(data.technician.phone || '');
+	let employeeId = $state([35mdata[36m.technician.employeeId || '');
+	let hireDate = $state(data.technician.hireDate ? data.technician.hireDate.split('T')[0] : '');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:107:24
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let employeeId = $state(data.technician.employeeId || '');
+	let hireDate = $state([35mdata[36m.technician.hireDate ? data.technician.hireDate.split('T')[0] : '');
+	let terminationDate = $state(data.technician.terminationDate ? data.technician.terminationDate.split('T')[0] : '');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:107:51
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let employeeId = $state(data.technician.employeeId || '');
+	let hireDate = $state(data.technician.hireDate ? [35mdata[36m.technician.hireDate.split('T')[0] : '');
+	let terminationDate = $state(data.technician.terminationDate ? data.technician.terminationDate.split('T')[0] : '');[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:108:31
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let hireDate = $state(data.technician.hireDate ? data.technician.hireDate.split('T')[0] : '');
+	let terminationDate = $state([35mdata[36m.technician.terminationDate ? data.technician.terminationDate.split('T')[0] : '');
+	let timezone = $state(data.technician.timezone);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:108:65
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let hireDate = $state(data.technician.hireDate ? data.technician.hireDate.split('T')[0] : '');
+	let terminationDate = $state(data.technician.terminationDate ? [35mdata[36m.technician.terminationDate.split('T')[0] : '');
+	let timezone = $state(data.technician.timezone);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:109:24
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let terminationDate = $state(data.technician.terminationDate ? data.technician.terminationDate.split('T')[0] : '');
+	let timezone = $state([35mdata[36m.technician.timezone);
+	let isActive = $state(data.technician.isActive);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:110:24
+[33mWarn[39m: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+[36m	let timezone = $state(data.technician.timezone);
+	let isActive = $state([35mdata[36m.technician.isActive);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:386:24
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m							type="button"
+							onclick={() => ([35mactiveSection[36m = tab.id as typeof activeSection)}
+							class="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:386:57
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m							type="button"
+							onclick={() => (activeSection = tab.id as typeof [35mactiveSection[36m)}
+							class="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors"[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:388:34
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m							class="whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+							class:border-primary-500={[35mactiveSection[36m === tab.id}
+							class:text-primary-500={activeSection === tab.id}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:389:32
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m							class:border-primary-500={activeSection === tab.id}
+							class:text-primary-500={[35mactiveSection[36m === tab.id}
+							class:border-transparent={activeSection !== tab.id}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:390:34
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m							class:text-primary-500={activeSection === tab.id}
+							class:border-transparent={[35mactiveSection[36m !== tab.id}
+							class:text-surface-500={activeSection !== tab.id}[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:391:32
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m							class:border-transparent={activeSection !== tab.id}
+							class:text-surface-500={[35mactiveSection[36m !== tab.id}
+						>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:405:9
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m			<!-- Profile Section -->
+			{#if [35mactiveSection[36m === 'profile'}
+				<form onsubmit={(e) => { e.preventDefault(); saveProfile(); }} class="mt-6">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:482:18
+[31mError[39m: Cannot find name 'timezones'. (ts)
+[36m									>
+										{#each [35mtimezones[36m as tz}
+											<option value={tz}>{tz.replace(/_/g, ' ')}</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:542:9
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m			<!-- Skills Section -->
+			{#if [35mactiveSection[36m === 'skills'}
+				<div class="mt-6 space-y-6">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:556:17
+[31mError[39m: Cannot find name 'tradeOptions'. (ts)
+[36m									<option value="">Select trade...</option>
+									{#each [35mtradeOptions[36m as trade}
+										<option value={trade}>{formatTrade(trade)}</option>[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:636:9
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m			<!-- Certifications Section -->
+			{#if [35mactiveSection[36m === 'certifications'}
+				<div class="mt-6 space-y-6">[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\contractor\technicians\[id]\+page.svelte[39m:753:9
+[31mError[39m: Cannot find name 'activeSection'. (ts)
+[36m			<!-- Availability Section -->
+			{#if [35mactiveSection[36m === 'availability'}
+				<div class="mt-6">[39m
+
+====================================
+[31msvelte-check found 235 errors and 45 warnings in 22 files
+[39m

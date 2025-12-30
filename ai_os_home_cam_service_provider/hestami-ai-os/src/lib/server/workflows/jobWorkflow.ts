@@ -9,6 +9,7 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { JobStatus, type EntityWorkflowResult } from './schemas.js';
 import type { CheckpointType } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('JobWorkflow');
@@ -65,7 +66,7 @@ async function updateJob(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const { idempotencyKey, id, ...updateData } = data;
-	
+
 	const job = await prisma.job.update({
 		where: { id: jobId },
 		data: updateData
@@ -447,8 +448,16 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 
 		return { success: true, entityId };
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[JobWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'JOB_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

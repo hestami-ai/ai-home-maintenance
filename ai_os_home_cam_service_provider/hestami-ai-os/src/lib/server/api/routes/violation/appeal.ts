@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { AppealStatus } from '../../../../../../generated/prisma/client.js';
 import { startAppealWorkflow } from '../../../workflows/appealWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -13,11 +12,11 @@ const appealStatusEnum = z.enum([
 	'PENDING', 'SCHEDULED', 'UPHELD', 'MODIFIED', 'REVERSED', 'WITHDRAWN'
 ]);
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -44,9 +43,13 @@ export const appealRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'violation_appeal', 'new');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
@@ -65,7 +68,7 @@ export const appealRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to file appeal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to file appeal' });
 			}
 
 			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
@@ -107,9 +110,12 @@ export const appealRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation_appeal', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const appeal = await prisma.violationAppeal.findFirst({
 				where: { id: input.id },
@@ -117,7 +123,7 @@ export const appealRouter = {
 			});
 
 			if (!appeal || appeal.hearing.violation.associationId !== association.id) {
-				throw ApiException.notFound('Appeal');
+				throw errors.NOT_FOUND({ message: 'Appeal' });
 			}
 
 			return successResponse({
@@ -160,9 +166,12 @@ export const appealRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation_appeal', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = {};
 			if (input?.hearingId) where.hearingId = input.hearingId;
@@ -216,9 +225,13 @@ export const appealRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
@@ -237,7 +250,7 @@ export const appealRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to schedule hearing');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to schedule hearing' });
 			}
 
 			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
@@ -276,9 +289,13 @@ export const appealRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
@@ -298,7 +315,7 @@ export const appealRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record decision');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record decision' });
 			}
 
 			const appeal = await prisma.violationAppeal.findUniqueOrThrow({
@@ -333,9 +350,13 @@ export const appealRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation_appeal', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
@@ -351,7 +372,7 @@ export const appealRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to withdraw appeal');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to withdraw appeal' });
 			}
 
 			const appeal = await prisma.violationAppeal.findUniqueOrThrow({

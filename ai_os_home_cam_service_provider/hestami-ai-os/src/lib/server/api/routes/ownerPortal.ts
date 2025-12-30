@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../schemas.js';
 import { orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
 import { PaginationInputSchema, PaginationOutputSchema, IdempotencyKeySchema } from '../router.js';
@@ -43,14 +42,16 @@ const OwnerRequestCategoryEnum = z.enum([
 	'OTHER'
 ]);
 
-const JsonRecord = z.record(z.string(), z.any());
+const JsonRecord = z.record(z.string(), JsonSchema);
 
 
-const ensureParty = async (partyId: string, organizationId: string) => {
+const ensureParty = async (partyId: string, organizationId: string, errors: any) => {
 	const party = await prisma.party.findFirst({
 		where: { id: partyId, organizationId, deletedAt: null }
 	});
-	if (!party) throw ApiException.notFound('Party');
+	if (!party) {
+		throw errors.NOT_FOUND({ message: 'Party' });
+	}
 	return party;
 };
 
@@ -66,6 +67,10 @@ export const ownerPortalRouter = {
 				mailingAddress: JsonRecord.optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -83,8 +88,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'userProfile', input.partyId);
 
 			const { mailingAddress, partyId, ...rest } = input;
@@ -123,6 +128,10 @@ export const ownerPortalRouter = {
 
 	getUserProfile: orgProcedure
 		.input(z.object({ partyId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -140,15 +149,15 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'userProfile', input.partyId);
 
 			const profile = await prisma.userProfile.findFirst({
 				where: { partyId: input.partyId, deletedAt: null }
 			});
 
-			if (!profile) throw ApiException.notFound('UserProfile');
+			if (!profile) throw errors.NOT_FOUND({ message: 'UserProfile' });
 
 			return successResponse(
 				{
@@ -168,6 +177,10 @@ export const ownerPortalRouter = {
 
 	deleteUserProfile: orgProcedure
 		.input(z.object({ partyId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -178,8 +191,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'userProfile', input.partyId);
 
 			const now = new Date();
@@ -188,7 +201,7 @@ export const ownerPortalRouter = {
 				data: { deletedAt: now }
 			});
 
-			if (updated.count === 0) throw ApiException.notFound('UserProfile');
+			if (updated.count === 0) throw errors.NOT_FOUND({ message: 'UserProfile' });
 
 			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
 		}),
@@ -204,6 +217,10 @@ export const ownerPortalRouter = {
 				allowEmergency: z.boolean().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -221,8 +238,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'contactPreference', input.partyId);
 
 			const preference = await prisma.contactPreference.upsert({
@@ -254,6 +271,10 @@ export const ownerPortalRouter = {
 
 	listContactPreferences: orgProcedure
 		.input(z.object({ partyId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -274,8 +295,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'contactPreference', input.partyId);
 
 			const preferences = await prisma.contactPreference.findMany({
@@ -306,6 +327,10 @@ export const ownerPortalRouter = {
 				channel: ContactPreferenceChannelEnum
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -316,8 +341,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'contactPreference', input.partyId);
 
 			const now = new Date();
@@ -330,7 +355,7 @@ export const ownerPortalRouter = {
 				data: { deletedAt: now }
 			});
 
-			if (result.count === 0) throw ApiException.notFound('ContactPreference');
+			if (result.count === 0) throw errors.NOT_FOUND({ message: 'ContactPreference' });
 
 			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
 		}),
@@ -344,6 +369,10 @@ export const ownerPortalRouter = {
 				isEnabled: z.boolean().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -359,8 +388,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'notificationSetting', input.partyId);
 
 			const setting = await prisma.notificationSetting.upsert({
@@ -391,6 +420,10 @@ export const ownerPortalRouter = {
 
 	listNotificationSettings: orgProcedure
 		.input(z.object({ partyId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -407,8 +440,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'notificationSetting', input.partyId);
 
 			const settings = await prisma.notificationSetting.findMany({
@@ -436,6 +469,10 @@ export const ownerPortalRouter = {
 				channel: ContactPreferenceChannelEnum
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -446,8 +483,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'notificationSetting', input.partyId);
 
 			const now = new Date();
@@ -461,7 +498,7 @@ export const ownerPortalRouter = {
 				data: { deletedAt: now }
 			});
 
-			if (result.count === 0) throw ApiException.notFound('NotificationSetting');
+			if (result.count === 0) throw errors.NOT_FOUND({ message: 'NotificationSetting' });
 
 			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
 		}),
@@ -480,9 +517,14 @@ export const ownerPortalRouter = {
 				category: OwnerRequestCategoryEnum,
 				subject: z.string().max(255),
 				description: z.string(),
-				attachments: z.array(z.record(z.string(), z.any())).optional()
+				attachments: z.array(z.record(z.string(), JsonSchema)).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -499,14 +541,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('create', 'ownerRequest', 'new');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			if (input.unitId) {
 				const unit = await prisma.unit.findFirst({
@@ -514,7 +556,7 @@ export const ownerPortalRouter = {
 					include: { property: true }
 				});
 				if (!unit || unit.property.associationId !== input.associationId) {
-					throw ApiException.notFound('Unit');
+					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
 
@@ -538,7 +580,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create owner request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create owner request' });
 			}
 
 			const request = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -569,6 +611,10 @@ export const ownerPortalRouter = {
 
 	getRequest: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -580,7 +626,7 @@ export const ownerPortalRouter = {
 						category: OwnerRequestCategoryEnum,
 						subject: z.string(),
 						description: z.string(),
-						attachments: z.array(z.record(z.string(), z.any())).nullable(),
+						attachments: z.array(z.record(z.string(), JsonSchema)).nullable(),
 						submittedAt: z.string().nullable(),
 						resolvedAt: z.string().nullable(),
 						closedAt: z.string().nullable(),
@@ -595,7 +641,7 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.ownerRequest.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: {
@@ -606,7 +652,7 @@ export const ownerPortalRouter = {
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('OwnerRequest');
+				throw errors.NOT_FOUND({ message: 'OwnerRequest' });
 			}
 
 			await context.cerbos.authorize('view', 'ownerRequest', request.id);
@@ -723,6 +769,12 @@ export const ownerPortalRouter = {
 				id: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -736,18 +788,18 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.ownerRequest.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('OwnerRequest');
+				throw errors.NOT_FOUND({ message: 'OwnerRequest' });
 			}
 
 			if (request.status !== 'DRAFT') {
-				throw ApiException.badRequest('Request must be in DRAFT status to submit');
+				throw errors.BAD_REQUEST({ message: 'Request must be in DRAFT status to submit' });
 			}
 
 			await context.cerbos.authorize('submit', 'ownerRequest', request.id);
@@ -765,7 +817,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to submit owner request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to submit owner request' });
 			}
 
 			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
@@ -802,6 +854,11 @@ export const ownerPortalRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -816,14 +873,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.ownerRequest.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('OwnerRequest');
+				throw errors.NOT_FOUND({ message: 'OwnerRequest' });
 			}
 
 			await context.cerbos.authorize('update', 'ownerRequest', request.id);
@@ -844,7 +901,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update request status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update request status' });
 			}
 
 			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
@@ -881,6 +938,11 @@ export const ownerPortalRouter = {
 				workOrderId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -893,14 +955,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.ownerRequest.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('OwnerRequest');
+				throw errors.NOT_FOUND({ message: 'OwnerRequest' });
 			}
 
 			await context.cerbos.authorize('update', 'ownerRequest', request.id);
@@ -911,7 +973,7 @@ export const ownerPortalRouter = {
 			});
 
 			if (!workOrder || workOrder.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('WorkOrder');
+				throw errors.NOT_FOUND({ message: 'WorkOrder' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -929,7 +991,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to link work order');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to link work order' });
 			}
 
 			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
@@ -956,6 +1018,10 @@ export const ownerPortalRouter = {
 
 	getRequestHistory: orgProcedure
 		.input(z.object({ requestId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -975,14 +1041,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.ownerRequest.findFirst({
 				where: { id: input.requestId, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('OwnerRequest');
+				throw errors.NOT_FOUND({ message: 'OwnerRequest' });
 			}
 
 			await context.cerbos.authorize('view', 'ownerRequest', request.id);
@@ -1028,6 +1094,9 @@ export const ownerPortalRouter = {
 				isDefault: z.boolean().optional()
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1044,8 +1113,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('create', 'paymentMethod', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -1069,7 +1138,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to add payment method');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to add payment method' });
 			}
 
 			const method = await prisma.storedPaymentMethod.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1091,6 +1160,10 @@ export const ownerPortalRouter = {
 
 	listPaymentMethods: orgProcedure
 		.input(z.object({ partyId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1113,8 +1186,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'paymentMethod', input.partyId);
 
 			const methods = await prisma.storedPaymentMethod.findMany({
@@ -1149,6 +1222,11 @@ export const ownerPortalRouter = {
 				paymentMethodId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1156,14 +1234,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'paymentMethod', input.paymentMethodId);
 
 			const method = await prisma.storedPaymentMethod.findFirst({
 				where: { id: input.paymentMethodId, partyId: input.partyId, deletedAt: null }
 			});
-			if (!method) throw ApiException.notFound('PaymentMethod');
+			if (!method) throw errors.NOT_FOUND({ message: 'PaymentMethod' });
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
@@ -1180,7 +1258,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to set default payment method');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to set default payment method' });
 			}
 
 			return successResponse({ success: true }, context);
@@ -1193,6 +1271,10 @@ export const ownerPortalRouter = {
 				paymentMethodId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1200,14 +1282,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'paymentMethod', input.paymentMethodId);
 
 			const method = await prisma.storedPaymentMethod.findFirst({
 				where: { id: input.paymentMethodId, partyId: input.partyId, deletedAt: null }
 			});
-			if (!method) throw ApiException.notFound('PaymentMethod');
+			if (!method) throw errors.NOT_FOUND({ message: 'PaymentMethod' });
 
 			const now = new Date();
 			await prisma.storedPaymentMethod.update({
@@ -1231,6 +1313,11 @@ export const ownerPortalRouter = {
 				associationId: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1247,14 +1334,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'autoPay', input.partyId);
 
 			const method = await prisma.storedPaymentMethod.findFirst({
 				where: { id: input.paymentMethodId, partyId: input.partyId, deletedAt: null }
 			});
-			if (!method) throw ApiException.notFound('PaymentMethod');
+			if (!method) throw errors.NOT_FOUND({ message: 'PaymentMethod' });
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
@@ -1275,7 +1362,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to configure auto-pay');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to configure auto-pay' });
 			}
 
 			const autoPay = await prisma.autoPaySetting.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1302,6 +1389,10 @@ export const ownerPortalRouter = {
 				associationId: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1321,8 +1412,8 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'autoPay', input.partyId);
 
 			const autoPay = await prisma.autoPaySetting.findFirst({
@@ -1338,14 +1429,14 @@ export const ownerPortalRouter = {
 				{
 					autoPay: autoPay
 						? {
-								id: autoPay.id,
-								paymentMethodId: autoPay.paymentMethodId,
-								isEnabled: autoPay.isEnabled,
-								frequency: autoPay.frequency,
-								dayOfMonth: autoPay.dayOfMonth ?? null,
-								maxAmount: autoPay.maxAmount?.toString() ?? null,
-								createdAt: autoPay.createdAt.toISOString()
-							}
+							id: autoPay.id,
+							paymentMethodId: autoPay.paymentMethodId,
+							isEnabled: autoPay.isEnabled,
+							frequency: autoPay.frequency,
+							dayOfMonth: autoPay.dayOfMonth ?? null,
+							maxAmount: autoPay.maxAmount?.toString() ?? null,
+							createdAt: autoPay.createdAt.toISOString()
+						}
 						: null
 				},
 				context
@@ -1359,6 +1450,10 @@ export const ownerPortalRouter = {
 				autoPayId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1366,14 +1461,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await ensureParty(input.partyId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'autoPay', input.autoPayId);
 
 			const autoPay = await prisma.autoPaySetting.findFirst({
 				where: { id: input.autoPayId, partyId: input.partyId, deletedAt: null }
 			});
-			if (!autoPay) throw ApiException.notFound('AutoPaySetting');
+			if (!autoPay) throw errors.NOT_FOUND({ message: 'AutoPaySetting' });
 
 			const now = new Date();
 			await prisma.autoPaySetting.update({
@@ -1407,6 +1502,10 @@ export const ownerPortalRouter = {
 				partyId: z.string().optional() // For visibility filtering
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1432,13 +1531,13 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'document', 'list');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			// Build visibility filter based on party role
 			const visibilityFilter: string[] = ['PUBLIC'];
@@ -1506,6 +1605,10 @@ export const ownerPortalRouter = {
 
 	getDocument: orgProcedure
 		.input(z.object({ id: z.string(), partyId: z.string().optional() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1532,14 +1635,14 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: { accessGrants: true }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await context.cerbos.authorize('view', 'document', document.id);
@@ -1602,6 +1705,10 @@ export const ownerPortalRouter = {
 				userAgent: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1609,13 +1716,13 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			await prisma.documentDownloadLog.create({
@@ -1640,6 +1747,11 @@ export const ownerPortalRouter = {
 				expiresAt: z.string().datetime().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1655,7 +1767,7 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('update', 'document', input.documentId);
 
 			const document = await prisma.document.findFirst({
@@ -1663,10 +1775,10 @@ export const ownerPortalRouter = {
 			});
 
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
-			await ensureParty(input.partyId, context.organization.id);
+			await ensureParty(input.partyId, context.organization.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
@@ -1685,7 +1797,7 @@ export const ownerPortalRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to grant document access');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to grant document access' });
 			}
 
 			const grant = await prisma.documentAccessGrant.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1711,6 +1823,10 @@ export const ownerPortalRouter = {
 				partyId: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1718,7 +1834,7 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('update', 'document', input.documentId);
 
 			const grant = await prisma.documentAccessGrant.findFirst({
@@ -1731,7 +1847,7 @@ export const ownerPortalRouter = {
 			});
 
 			if (!grant) {
-				throw ApiException.notFound('DocumentAccessGrant');
+				throw errors.NOT_FOUND({ message: 'DocumentAccessGrant' });
 			}
 
 			const now = new Date();

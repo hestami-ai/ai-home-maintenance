@@ -2,10 +2,6 @@ import { z } from 'zod';
 import { authedProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import { ResponseMetaSchema } from '../schemas.js';
-import { createModuleLogger } from '../../logger.js';
-import { ApiException } from '../errors.js';
-
-const log = createModuleLogger('UserRoute');
 
 export const userRouter = {
     /**

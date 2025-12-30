@@ -1,5 +1,4 @@
 import { prisma } from '../../db.js';
-import { ApiException, ErrorCode, ErrorType } from '../errors.js';
 import type { RequestContext } from '../context.js';
 import { createModuleLogger } from '../../logger.js';
 
@@ -25,7 +24,8 @@ export interface IdempotencyResult {
  */
 export async function checkIdempotencyKey(
 	key: string,
-	organizationId: string
+	organizationId: string,
+	errors: any
 ): Promise<IdempotencyResult> {
 	const existing = await prisma.idempotencyKey.findUnique({
 		where: {
@@ -59,15 +59,10 @@ export async function checkIdempotencyKey(
 	}
 
 	// Key exists but no response yet - request is in progress
-	throw new ApiException(
-		ErrorCode.IDEMPOTENCY_CONFLICT,
-		ErrorType.CONFLICT,
-		409,
-		'Request with this idempotency key is already in progress',
-		undefined,
-		undefined,
-		true
-	);
+	// Key exists but no response yet - request is in progress
+	throw errors.CONFLICT({
+		message: 'Request with this idempotency key is already in progress'
+	});
 }
 
 /**
@@ -109,7 +104,8 @@ export async function storeIdempotencyResponse(
  */
 export async function reserveIdempotencyKey(
 	key: string,
-	organizationId: string
+	organizationId: string,
+	errors: any
 ): Promise<void> {
 	const expiresAt = new Date(Date.now() + IDEMPOTENCY_TTL_MS);
 
@@ -123,17 +119,11 @@ export async function reserveIdempotencyKey(
 		});
 	} catch (error) {
 		// Key already exists - check if it's a duplicate request
-		const result = await checkIdempotencyKey(key, organizationId);
+		const result = await checkIdempotencyKey(key, organizationId, errors);
 		if (!result.isNew) {
-			throw new ApiException(
-				ErrorCode.IDEMPOTENCY_CONFLICT,
-				ErrorType.CONFLICT,
-				409,
-				'Duplicate request detected',
-				undefined,
-				undefined,
-				false
-			);
+			throw errors.CONFLICT({
+				message: 'Duplicate request detected'
+			});
 		}
 	}
 }
@@ -160,16 +150,17 @@ export async function cleanupExpiredIdempotencyKeys(): Promise<number> {
 export async function withIdempotency<T>(
 	key: string,
 	context: RequestContext,
+	errors: any,
 	operation: () => Promise<T>
 ): Promise<{ result: T; fromCache: boolean }> {
 	if (!context.organization) {
-		throw ApiException.forbidden('Organization context required for idempotent operations');
+		throw errors.FORBIDDEN({ message: 'Organization context required for idempotent operations' });
 	}
 
 	const organizationId = context.organization.id;
 
 	// Check for existing response
-	const check = await checkIdempotencyKey(key, organizationId);
+	const check = await checkIdempotencyKey(key, organizationId, errors);
 	if (!check.isNew && check.cachedResponse !== undefined) {
 		return {
 			result: check.cachedResponse as T,
@@ -178,7 +169,7 @@ export async function withIdempotency<T>(
 	}
 
 	// Reserve the key
-	await reserveIdempotencyKey(key, organizationId);
+	await reserveIdempotencyKey(key, organizationId, errors);
 
 	try {
 		// Execute the operation
@@ -188,14 +179,38 @@ export async function withIdempotency<T>(
 		await storeIdempotencyResponse(key, organizationId, result, 200);
 
 		return { result, fromCache: false };
-	} catch (error) {
-		// Store error response if it's an ApiException
-		if (error instanceof ApiException) {
+	} catch (error: any) {
+		// Store error response if it's an error object with a code
+		if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
+			const statusMap: Record<string, number> = {
+				BAD_REQUEST: 400,
+				UNAUTHORIZED: 401,
+				FORBIDDEN: 403,
+				NOT_FOUND: 404,
+				CONFLICT: 409,
+				INTERNAL_SERVER_ERROR: 500,
+				TIMEOUT: 408,
+				PRECONDITION_FAILED: 412,
+				PAYLOAD_TOO_LARGE: 413,
+				UNSUPPORTED_MEDIA_TYPE: 415,
+				UNPROCESSABLE_CONTENT: 422,
+				TOO_MANY_REQUESTS: 429,
+				CLIENT_CLOSED_REQUEST: 499
+			};
+			const statusCode = statusMap[error.code] ?? 500;
+
 			await storeIdempotencyResponse(
 				key,
 				organizationId,
-				{ error: error.toApiError() },
-				error.httpStatus
+				{
+					error: {
+						code: error.code,
+						message: error.message,
+						data: error.data,
+						type: 'ORPC_ERROR'
+					}
+				},
+				statusCode
 			);
 		}
 		throw error;

@@ -2,17 +2,16 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('WorkOrderViewRoute');
 
-const assertServiceProviderOrg = async (organizationId: string) => {
+const assertServiceProviderOrg = async (organizationId: string, errors: any) => {
 	const org = await prisma.organization.findFirst({
 		where: { id: organizationId, type: 'SERVICE_PROVIDER', deletedAt: null }
 	});
 	if (!org) {
-		throw ApiException.forbidden('This feature is only available for service provider organizations');
+		throw errors.FORBIDDEN({ message: 'This feature is only available for service provider organizations' });
 	}
 	return org;
 };
@@ -24,7 +23,7 @@ export const workOrderViewRouter = {
 	listAssigned: orgProcedure
 		.input(z.object({
 			status: z.enum([
-				'DRAFT', 'OPEN', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS', 
+				'DRAFT', 'OPEN', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS',
 				'ON_HOLD', 'COMPLETED', 'INVOICED', 'CLOSED', 'CANCELLED'
 			]).optional(),
 			priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
@@ -61,9 +60,12 @@ export const workOrderViewRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', '*');
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			// Get all vendor records linked to this service provider org
 			const links = await prisma.serviceProviderLink.findMany({
@@ -181,9 +183,13 @@ export const workOrderViewRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Work order not found' },
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', input.id);
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			// Get vendor IDs for this service provider
 			const links = await prisma.serviceProviderLink.findMany({
@@ -211,7 +217,7 @@ export const workOrderViewRouter = {
 			});
 
 			if (!workOrder) {
-				throw ApiException.notFound('Work order');
+				throw errors.NOT_FOUND({ message: 'Work order' });
 			}
 
 			return successResponse({
@@ -259,9 +265,12 @@ export const workOrderViewRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', '*');
-			const org = await assertServiceProviderOrg(context.organization!.id);
+			const org = await assertServiceProviderOrg(context.organization!.id, errors);
 
 			// Get vendor IDs
 			const links = await prisma.serviceProviderLink.findMany({

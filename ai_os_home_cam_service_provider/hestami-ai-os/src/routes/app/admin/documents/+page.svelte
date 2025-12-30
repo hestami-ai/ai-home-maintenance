@@ -1,21 +1,30 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { FileText, Search, Filter, Upload, Loader2, Calendar, User, Tag } from 'lucide-svelte';
-	import { organizationStore } from '$lib/stores';
 
-	let isLoading = $state(true);
-	let documents = $state<any[]>([]);
+	interface Props {
+		data: {
+			documents: any[];
+			filters: {
+				q: string;
+				type: string;
+			};
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let isLoading = $state(false);
+	let documents = $derived(data.documents);
 	let searchQuery = $state('');
 	let filterType = $state('');
 
-	const organizationId = $derived($organizationStore.current?.organization.id || '');
-
-	onMount(async () => {
-		// Documents API would be called here
-		// For now, show empty state
-		isLoading = false;
+	// Sync filters from server data
+	$effect(() => {
+		searchQuery = data.filters.q;
+		filterType = data.filters.type;
 	});
+
 
 	const documentTypes = [
 		{ value: '', label: 'All Types' },

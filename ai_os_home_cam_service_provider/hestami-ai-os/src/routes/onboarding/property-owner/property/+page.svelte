@@ -3,7 +3,6 @@
 	import { Card } from '$lib/components/ui';
 	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let propertyName = $state($propertyOwnerOnboarding.property.name);
 	let addressLine1 = $state($propertyOwnerOnboarding.property.addressLine1);
@@ -33,7 +32,7 @@
 		'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		propertyOwnerOnboarding.setStep(2);
 	});
 

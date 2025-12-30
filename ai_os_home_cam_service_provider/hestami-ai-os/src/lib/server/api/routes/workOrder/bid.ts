@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('BidRoute');
@@ -43,28 +42,29 @@ export const bidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			CONFLICT: { message: 'Conflict' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const workOrder = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
 
-			if (!workOrder) {
-				throw ApiException.notFound('Work Order');
-			}
+			if (!workOrder) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			// Work order must be in TRIAGED status to request bids
 			if (workOrder.status !== 'TRIAGED') {
-				throw ApiException.badRequest('Work order must be triaged before requesting bids');
+				throw errors.BAD_REQUEST({ message: 'Work order must be triaged before requesting bids' });
 			}
 
 			// Validate all vendors exist and belong to this association
@@ -77,7 +77,7 @@ export const bidRouter = {
 			});
 
 			if (vendors.length !== input.vendorIds.length) {
-				throw ApiException.badRequest('One or more vendors not found or inactive');
+				throw errors.BAD_REQUEST({ message: 'One or more vendors not found or inactive' });
 			}
 
 			// Check for existing bids
@@ -92,7 +92,7 @@ export const bidRouter = {
 			const newVendorIds = input.vendorIds.filter(id => !existingVendorIds.has(id));
 
 			if (newVendorIds.length === 0) {
-				throw ApiException.conflict('Bids already requested from all specified vendors');
+				throw errors.CONFLICT({ message: 'Bids already requested from all specified vendors' });
 			}
 
 			// Create bid requests
@@ -150,13 +150,17 @@ export const bidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const bid = await prisma.workOrderBid.findFirst({
@@ -165,7 +169,7 @@ export const bidRouter = {
 			});
 
 			if (!bid || bid.workOrder.associationId !== association.id) {
-				throw ApiException.notFound('Bid');
+				throw errors.NOT_FOUND({ message: 'Bid' });
 			}
 
 			// Check authorization - must be the vendor or an admin/manager
@@ -173,7 +177,7 @@ export const bidRouter = {
 
 			// Bid must be in REQUESTED or PENDING status
 			if (!['REQUESTED', 'PENDING'].includes(bid.status)) {
-				throw ApiException.badRequest('Bid cannot be submitted in current status');
+				throw errors.BAD_REQUEST({ message: 'Bid cannot be submitted in current status' });
 			}
 
 			// Check if bid has expired
@@ -182,7 +186,7 @@ export const bidRouter = {
 					where: { id: input.bidId },
 					data: { status: 'EXPIRED' }
 				});
-				throw ApiException.badRequest('Bid has expired');
+				throw errors.BAD_REQUEST({ message: 'Bid has expired' });
 			}
 
 			const totalAmount = input.laborCost + input.materialsCost;
@@ -244,24 +248,23 @@ export const bidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const workOrder = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
 
-			if (!workOrder) {
-				throw ApiException.notFound('Work Order');
-			}
+			if (!workOrder) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			const bids = await prisma.workOrderBid.findMany({
 				where: { workOrderId: input.workOrderId },
@@ -318,14 +321,16 @@ export const bidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const bid = await prisma.workOrderBid.findFirst({
 				where: { id: input.bidId },
@@ -333,14 +338,14 @@ export const bidRouter = {
 			});
 
 			if (!bid || bid.workOrder.associationId !== association.id) {
-				throw ApiException.notFound('Bid');
+				throw errors.NOT_FOUND({ message: 'Bid' });
 			}
 
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
 			// Bid must be SUBMITTED or UNDER_REVIEW
 			if (!['SUBMITTED', 'UNDER_REVIEW'].includes(bid.status)) {
-				throw ApiException.badRequest('Bid must be submitted to accept');
+				throw errors.BAD_REQUEST({ message: 'Bid must be submitted to accept' });
 			}
 
 			const result = await prisma.$transaction(async (tx) => {
@@ -433,14 +438,16 @@ export const bidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const bid = await prisma.workOrderBid.findFirst({
 				where: { id: input.bidId },
@@ -448,14 +455,14 @@ export const bidRouter = {
 			});
 
 			if (!bid || bid.workOrder.associationId !== association.id) {
-				throw ApiException.notFound('Bid');
+				throw errors.NOT_FOUND({ message: 'Bid' });
 			}
 
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
 			// Can only reject submitted bids
 			if (!['SUBMITTED', 'UNDER_REVIEW'].includes(bid.status)) {
-				throw ApiException.badRequest('Bid must be submitted to reject');
+				throw errors.BAD_REQUEST({ message: 'Bid must be submitted to reject' });
 			}
 
 			const updated = await prisma.workOrderBid.update({
@@ -501,14 +508,16 @@ export const bidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!association) {
-				throw ApiException.notFound('Association');
-			}
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const bid = await prisma.workOrderBid.findFirst({
 				where: { id: input.bidId },
@@ -516,12 +525,12 @@ export const bidRouter = {
 			});
 
 			if (!bid || bid.workOrder.associationId !== association.id) {
-				throw ApiException.notFound('Bid');
+				throw errors.NOT_FOUND({ message: 'Bid' });
 			}
 
 			// Can only withdraw pending or submitted bids
 			if (!['REQUESTED', 'PENDING', 'SUBMITTED'].includes(bid.status)) {
-				throw ApiException.badRequest('Bid cannot be withdrawn in current status');
+				throw errors.BAD_REQUEST({ message: 'Bid cannot be withdrawn in current status' });
 			}
 
 			const updated = await prisma.workOrderBid.update({

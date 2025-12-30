@@ -14,7 +14,7 @@
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
-	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	interface Notification {
 		id: string;
@@ -27,10 +27,25 @@
 		entityId?: string;
 	}
 
+	interface Props {
+		data: {
+			notifications: Notification[];
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let notifications = $state<Notification[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let filterType = $state<string>('all');
+
+	// Synchronize server data to local state for reactive mark-as-read
+	$effect(() => {
+		if (data.notifications) {
+			notifications = [...data.notifications];
+		}
+	});
 
 	const notificationTypes = [
 		{ value: 'all', label: 'All Notifications' },
@@ -48,43 +63,7 @@
 
 	const unreadCount = $derived(notifications.filter((n) => !n.isRead).length);
 
-	onMount(async () => {
-		await loadNotifications();
-	});
 
-	async function loadNotifications() {
-		isLoading = true;
-		error = null;
-
-		try {
-			// For now, we'll generate mock notifications based on recent activity
-			// In production, this would fetch from a dedicated notifications API
-			const [casesResult] = await Promise.all([
-				orpc.conciergeCase.list({ limit: 10 })
-			]);
-
-			// Transform recent cases into notifications
-			const caseNotifications: Notification[] = casesResult.data.cases.map((c) => ({
-				id: `case-${c.id}`,
-				type: 'service_call' as const,
-				title: getStatusNotificationTitle(c.status),
-				message: `${c.title} - ${getStatusMessage(c.status)}`,
-				isRead: false,
-				createdAt: c.createdAt,
-				linkUrl: `/app/concierge/service-calls/${c.id}`,
-				entityId: c.id
-			}));
-
-			notifications = caseNotifications.sort(
-				(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-			);
-		} catch (err) {
-			console.error('Failed to load notifications:', err);
-			error = err instanceof Error ? err.message : 'Failed to load notifications';
-		} finally {
-			isLoading = false;
-		}
-	}
 
 	function getStatusNotificationTitle(status: string): string {
 		const titles: Record<string, string> = {
@@ -161,6 +140,7 @@
 	function markAllAsRead() {
 		notifications = notifications.map((n) => ({ ...n, isRead: true }));
 	}
+
 </script>
 
 <svelte:head>
@@ -214,7 +194,7 @@
 				<Card variant="outlined" padding="md">
 					<div class="text-center text-error-500">
 						<p>{error}</p>
-						<button onclick={loadNotifications} class="btn preset-tonal-primary mt-4">
+						<button onclick={() => invalidateAll()} class="btn preset-tonal-primary mt-4">
 							Try Again
 						</button>
 					</div>

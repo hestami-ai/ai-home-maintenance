@@ -2,11 +2,10 @@
 	import { ArrowLeft, ArrowRight, Sparkles, Wrench } from 'lucide-svelte';
 	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let mode = $state<'concierge' | 'diy'>($propertyOwnerOnboarding.preferences.mode);
 
-	onMount(() => {
+	$effect.pre(() => {
 		propertyOwnerOnboarding.setStep(4);
 	});
 

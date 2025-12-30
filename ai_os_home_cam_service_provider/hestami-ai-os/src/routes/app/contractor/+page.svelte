@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Wrench, Users, Calendar, DollarSign, ClipboardList, TrendingUp, AlertCircle } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { auth, organizationStore } from '$lib/stores';
+	import type { Organization } from '../../../../generated/prisma/client';
 
 	const quickActions = [
 		{ label: 'View All Jobs', icon: Wrench, href: '/app/contractor/jobs' },
@@ -13,6 +13,15 @@
 
 	// Check if compliance is complete (placeholder)
 	const complianceComplete = false;
+
+	interface Props {
+		data: {
+			user: { id: string; email: string; name: string | null; image: string | null } | null;
+			organization: Organization | null;
+		};
+	}
+
+	let { data }: Props = $props();
 </script>
 
 <svelte:head>
@@ -43,10 +52,10 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<h1 class="text-2xl font-bold">
-					Welcome back, {$auth.user?.name?.split(' ')[0] || 'there'}!
+					Welcome back, {data.user?.name?.split(' ')[0] || 'there'}!
 				</h1>
 				<p class="mt-1 text-surface-500">
-					{$organizationStore.current?.organization.name || 'Contractor Dashboard'}
+					{data.organization?.name || 'Contractor Dashboard'}
 				</p>
 			</div>
 			<a href="/app/contractor/jobs/new" class="btn preset-filled-primary-500">

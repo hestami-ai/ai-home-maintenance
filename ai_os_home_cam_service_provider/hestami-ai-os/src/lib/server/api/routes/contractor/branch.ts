@@ -3,7 +3,6 @@ import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { startContractorBranchWorkflow } from '../../../workflows/contractorBranchWorkflow.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from './utils.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -56,9 +55,14 @@ const upsertInput = z
 export const branchRouter = {
 	createOrUpdate: orgProcedure
 		.input(upsertInput)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'contractor_branch', input.id ?? 'new');
 			const { id, idempotencyKey, ...data } = input;
 
@@ -75,7 +79,7 @@ export const branchRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create/update branch');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update branch' });
 			}
 
 			const branch = await prisma.contractorBranch.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -90,13 +94,17 @@ export const branchRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const branch = await prisma.contractorBranch.findFirst({
 				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!branch) throw ApiException.notFound('ContractorBranch');
-			await assertContractorOrg(branch.organizationId);
+			if (!branch) throw errors.NOT_FOUND({ message: 'ContractorBranch' });
+			await assertContractorOrg(branch.organizationId, errors);
 			await context.cerbos.authorize('view', 'contractor_branch', branch.id);
 
 			return successResponse({ branch: serializeBranch(branch) }, context);
@@ -108,6 +116,9 @@ export const branchRouter = {
 				includeInactive: z.boolean().optional()
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -118,8 +129,8 @@ export const branchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			const queryPlan = await context.cerbos.queryFilter('view', 'contractor_branch');
 			if (queryPlan.kind === 'always_denied') {
 				return successResponse(
@@ -161,10 +172,14 @@ export const branchRouter = {
 
 	archive: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ branch: branchOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const { id, idempotencyKey } = input;
-			await assertContractorOrg(context.organization.id);
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'contractor_branch', id);
 
 			// Use DBOS workflow for durable execution
@@ -180,7 +195,7 @@ export const branchRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to archive branch');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to archive branch' });
 			}
 
 			const branch = await prisma.contractorBranch.findUniqueOrThrow({ where: { id: result.entityId } });

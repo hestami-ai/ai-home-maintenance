@@ -5,7 +5,23 @@ resourcePolicy:
   importDerivedRoles:
     - common_roles
   rules:
-    # Admins and managers can perform all actions
+    # Platform admins can perform all actions on any case (cross-org access)
+    - actions: ["view", "create", "edit", "update", "delete", "update_status", "assign", "resolve", "close", "cancel", "add_note", "add_participant", "remove_participant", "request_clarification", "link_arc", "link_work_order"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # Hestami staff with CONCIERGE pillar access can view and manage cases (cross-org access)
+    - actions: ["view", "edit", "update", "update_status", "assign", "resolve", "close", "cancel", "add_note", "add_participant", "remove_participant", "request_clarification", "link_arc", "link_work_order"]
+      effect: EFFECT_ALLOW
+      condition:
+        match:
+          expr: >-
+            has(P.attr.pillarAccess) && "CONCIERGE" in P.attr.pillarAccess
+      derivedRoles:
+        - hestami_staff
+
+    # Org admins and managers can perform all actions on their org's cases
     - actions: ["view", "create", "edit", "update", "delete", "update_status", "assign", "resolve", "close", "cancel", "add_note", "add_participant", "remove_participant", "request_clarification", "link_arc", "link_work_order"]
       effect: EFFECT_ALLOW
       derivedRoles:

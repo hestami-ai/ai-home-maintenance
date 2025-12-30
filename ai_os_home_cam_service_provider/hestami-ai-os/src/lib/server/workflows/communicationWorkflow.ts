@@ -10,6 +10,7 @@ import {
 	type EntityWorkflowResult
 } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 const log = createWorkflowLogger('CommunicationWorkflow');
 
@@ -452,9 +453,17 @@ async function communicationWorkflow(input: CommunicationWorkflowInput): Promise
 
 		return { success: true, entityId };
 	} catch (error) {
-		const message = error instanceof Error ? error.message : 'Unknown error';
-		console.error(`[CommunicationWorkflow] Error in ${input.action}:`, message);
-		return { success: false, error: message };
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+		console.error(`[CommunicationWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'COMMUNICATION_WORKFLOW_ERROR'
+		});
+
+		return { success: false, error: errorMessage };
 	}
 }
 

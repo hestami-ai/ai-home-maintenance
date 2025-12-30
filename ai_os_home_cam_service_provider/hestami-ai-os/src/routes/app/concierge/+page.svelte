@@ -1,76 +1,59 @@
 <script lang="ts">
 	import { Home, Plus, FileText, Wrench, Bell, Loader2, ArrowRight } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { auth, organizationStore } from '$lib/stores';
-	import { orpc } from '$lib/api';
-	import { onMount } from 'svelte';
-	import {
-		getServiceCallStatusLabel,
-		getServiceCallStatusColor,
-		getServiceCallStatusDotColor
+	import type { Organization } from '../../../../generated/prisma/client';
+	import { 
+		getServiceCallStatusLabel, 
+		getServiceCallStatusColor, 
+		getServiceCallStatusDotColor 
 	} from '$lib/utils/serviceCallTerminology';
-	import type { ConciergeCaseStatus } from '$lib/api/cam';
+	import type { ConciergeCaseStatus, ConciergeCasePriority } from '$lib/api/cam';
 
 	interface Property {
 		id: string;
 		name: string;
 		addressLine1: string;
+		city: string | null;
+		state: string | null;
+		postalCode: string | null;
 	}
 
 	interface ServiceCall {
 		id: string;
 		caseNumber: string;
 		title: string;
+		description: string;
 		status: ConciergeCaseStatus;
+		priority: ConciergeCasePriority;
 		createdAt: string;
+		updatedAt: string;
 	}
 
-	let properties = $state<Property[]>([]);
-	let serviceCalls = $state<ServiceCall[]>([]);
-	let isLoading = $state(true);
+	interface Props {
+		data: {
+			user: { id: string; email: string; name: string | null; image: string | null } | null;
+			organization: Organization | null;
+			properties: Property[];
+			serviceCalls: ServiceCall[];
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let properties = $derived(data.properties);
+	let serviceCalls = $derived(data.serviceCalls);
+	let isLoading = $state(false); 
+
+	const activeCallCount = $derived(serviceCalls.filter(c => c.status !== 'RESOLVED' && c.status !== 'CLOSED').length);
 
 	const quickActions = [
-		{ label: 'New Service Call', icon: Wrench, href: '/app/concierge/service-calls' },
-		{ label: 'View Documents', icon: FileText, href: '/app/concierge/documents' },
-		{ label: 'Manage Properties', icon: Home, href: '/app/concierge/properties' },
-		{ label: 'Notifications', icon: Bell, href: '/app/concierge/notifications' }
+		{ label: 'Add Property', href: '/app/concierge/properties/new', icon: Home },
+		{ label: 'Submit Service Call', href: '/app/concierge/service-calls/new', icon: Wrench },
+		{ label: 'View Documents', href: '/app/concierge/documents', icon: FileText },
+		{ label: 'Notifications', href: '/app/concierge/notifications', icon: Bell }
 	];
 
-	const activeCallCount = $derived(
-		serviceCalls.filter((c) => !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(c.status)).length
-	);
 
-	onMount(async () => {
-		await loadDashboardData();
-	});
-
-	async function loadDashboardData() {
-		isLoading = true;
-		try {
-			const [propertiesResult, casesResult] = await Promise.all([
-				orpc.individualProperty.list({ limit: 50 }),
-				orpc.conciergeCase.list({ limit: 10 })
-			]);
-
-			properties = propertiesResult.data.properties.map((p) => ({
-				id: p.id,
-				name: p.name,
-				addressLine1: p.addressLine1
-			}));
-
-			serviceCalls = casesResult.data.cases.map((c: { id: string; caseNumber: string; title: string; status: string; createdAt: string }) => ({
-				id: c.id,
-				caseNumber: c.caseNumber,
-				title: c.title,
-				status: c.status as ConciergeCaseStatus,
-				createdAt: c.createdAt
-			}));
-		} catch (err) {
-			console.error('Failed to load dashboard data:', err);
-		} finally {
-			isLoading = false;
-		}
-	}
 
 	function formatRelativeTime(dateString: string): string {
 		const date = new Date(dateString);
@@ -98,10 +81,10 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<h1 class="text-2xl font-bold">
-					Welcome back, {$auth.user?.name?.split(' ')[0] || 'there'}!
+					Welcome back, {data.user?.name?.split(' ')[0] || 'there'}!
 				</h1>
 				<p class="mt-1 text-surface-500">
-					{$organizationStore.current?.organization.name || 'Your Property Dashboard'}
+					{data.organization?.name || 'Your Property Dashboard'}
 				</p>
 			</div>
 			<a href="/app/concierge/service-calls" class="btn preset-filled-primary-500">

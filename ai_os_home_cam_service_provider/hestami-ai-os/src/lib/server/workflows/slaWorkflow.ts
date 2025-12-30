@@ -7,8 +7,9 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { SLAPriority } from '../../../../generated/prisma/client.js';
+import { type SLAPriority } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 const WORKFLOW_STATUS_EVENT = 'sla_status';
 const WORKFLOW_ERROR_EVENT = 'sla_error';
@@ -291,8 +292,15 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 			timestamp: new Date().toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'SLA_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,

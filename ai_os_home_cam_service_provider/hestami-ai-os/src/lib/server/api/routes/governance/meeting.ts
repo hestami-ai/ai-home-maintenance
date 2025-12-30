@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type {
 	MeetingType,
@@ -21,21 +20,21 @@ const attendanceStatusEnum = z.enum(['PRESENT', 'ABSENT', 'EXCUSED']);
 const voteMethodEnum = z.enum(['IN_PERSON', 'PROXY', 'ELECTRONIC']);
 const voteChoiceEnum = z.enum(['YES', 'NO', 'ABSTAIN']);
 
-const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
+const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
-const ensureBoardBelongs = async (boardId: string | null | undefined, associationId: string) => {
+const ensureBoardBelongs = async (boardId: string | null | undefined, associationId: string, errors: any) => {
 	if (!boardId) return;
 	const board = await prisma.board.findFirst({ where: { id: boardId, associationId } });
-	if (!board) throw ApiException.notFound('Board');
+	if (!board) throw errors.NOT_FOUND({ message: 'Board' });
 };
 
-const ensurePartyBelongs = async (partyId: string, organizationId: string) => {
+const ensurePartyBelongs = async (partyId: string, organizationId: string, errors: any) => {
 	const party = await prisma.party.findFirst({ where: { id: partyId, organizationId, deletedAt: null } });
-	if (!party) throw ApiException.notFound('Party');
+	if (!party) throw errors.NOT_FOUND({ message: 'Party' });
 };
 
 const getVoteResults = async (voteId: string) => {
@@ -97,6 +96,10 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -104,12 +107,12 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'governance_meeting', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			await getAssociationOrThrow(rest.associationId, context.organization.id);
-			await ensureBoardBelongs(rest.boardId, rest.associationId);
+			await getAssociationOrThrow(rest.associationId, context.organization.id, errors);
+			await ensureBoardBelongs(rest.boardId, rest.associationId, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
@@ -130,7 +133,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create meeting');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create meeting' });
 			}
 
 			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -143,14 +146,17 @@ export const governanceMeetingRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ meeting: z.any() }),
+				data: z.object({ meeting: z.object({ id: z.string(), type: z.string(), title: z.string(), status: z.string(), scheduledFor: z.coerce.date(), description: z.string().nullable() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const meeting = await prisma.meeting.findFirst({
 				where: { id: input.id },
 				include: {
@@ -163,7 +169,7 @@ export const governanceMeetingRouter = {
 				}
 			});
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 			await context.cerbos.authorize('view', 'governance_meeting', meeting.id);
 			return successResponse({ meeting }, context);
@@ -176,10 +182,13 @@ export const governanceMeetingRouter = {
 				status: meetingStatusEnum.optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ meetings: z.array(z.any()), pagination: PaginationOutputSchema }),
+				data: z.object({ meetings: z.array(z.object({ id: z.string(), type: z.string(), title: z.string(), status: z.string(), scheduledFor: z.coerce.date() })), pagination: PaginationOutputSchema }),
 				meta: ResponseMetaSchema
 			})
 		)
@@ -229,6 +238,10 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -236,7 +249,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -245,7 +258,7 @@ export const governanceMeetingRouter = {
 				include: { association: true }
 			});
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -265,7 +278,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add agenda item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add agenda item' });
 			}
 
 			const agendaItem = await prisma.meetingAgendaItem.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -282,6 +295,10 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -289,7 +306,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -298,7 +315,7 @@ export const governanceMeetingRouter = {
 				include: { association: true }
 			});
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			// Check if minutes already exist
@@ -322,7 +339,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record minutes');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record minutes' });
 			}
 
 			const minutes = await prisma.meetingMinutes.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -342,6 +359,10 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -349,7 +370,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -358,11 +379,11 @@ export const governanceMeetingRouter = {
 				include: { association: true }
 			});
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
-			await ensurePartyBelongs(rest.partyId, meeting.association.organizationId);
+			await ensurePartyBelongs(rest.partyId, meeting.association.organizationId, errors);
 			if (rest.proxyForPartyId) {
-				await ensurePartyBelongs(rest.proxyForPartyId, meeting.association.organizationId);
+				await ensurePartyBelongs(rest.proxyForPartyId, meeting.association.organizationId, errors);
 			}
 
 			// Use DBOS workflow for durable execution
@@ -381,7 +402,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record attendance');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record attendance' });
 			}
 
 			const attendance = await prisma.meetingAttendance.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -404,6 +425,10 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -418,7 +443,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -427,13 +452,13 @@ export const governanceMeetingRouter = {
 				include: { association: true }
 			});
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 			if (rest.agendaItemId) {
 				const agendaItem = await prisma.meetingAgendaItem.findFirst({
 					where: { id: rest.agendaItemId, meetingId: rest.meetingId }
 				});
-				if (!agendaItem) throw ApiException.notFound('Agenda item');
+				if (!agendaItem) throw errors.NOT_FOUND({ message: 'Agenda item' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -454,7 +479,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to open vote');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to open vote' });
 			}
 
 			const vote = await prisma.vote.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -484,6 +509,11 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -499,7 +529,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('vote', 'governance_vote', input.voteId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -508,20 +538,20 @@ export const governanceMeetingRouter = {
 				include: { meeting: { include: { association: true } } }
 			});
 			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Vote');
+				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 			if (vote.closedAt) {
-				throw ApiException.badRequest('Vote is closed');
+				throw errors.BAD_REQUEST({ message: 'Vote is closed' });
 			}
 
-			await ensurePartyBelongs(rest.voterPartyId, vote.meeting.association.organizationId);
+			await ensurePartyBelongs(rest.voterPartyId, vote.meeting.association.organizationId, errors);
 
 			// Enforce vote immutability - once cast, cannot be changed
 			const existing = await prisma.voteBallot.findFirst({
 				where: { voteId: rest.voteId, voterPartyId: rest.voterPartyId }
 			});
 			if (existing) {
-				throw ApiException.badRequest('Ballot already cast and cannot be changed');
+				throw errors.BAD_REQUEST({ message: 'Ballot already cast and cannot be changed' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -540,7 +570,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to cast ballot');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cast ballot' });
 			}
 
 			const ballot = await prisma.voteBallot.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -561,23 +591,28 @@ export const governanceMeetingRouter = {
 
 	getEligibleVoters: orgProcedure
 		.input(z.object({ voteId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					eligibleVoters: z.array(z.object({
-						partyId: z.string(),
-						name: z.string().nullable(),
-						hasVoted: z.boolean(),
-						attendanceStatus: z.string()
-					})),
+					eligibleVoters: z.array(
+						z.object({
+							partyId: z.string(),
+							name: z.string().nullable(),
+							hasVoted: z.boolean(),
+							attendanceStatus: z.string()
+						})
+					),
 					totalEligible: z.number(),
 					totalVoted: z.number()
 				}),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'governance_vote', input.voteId);
 
 			const vote = await prisma.vote.findFirst({
@@ -597,7 +632,7 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Vote');
+				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 
 			const votedPartyIds = new Set(vote.ballots.map((b: { voterPartyId: string }) => b.voterPartyId));
@@ -620,6 +655,9 @@ export const governanceMeetingRouter = {
 
 	tallyVote: orgProcedure
 		.input(z.object({ voteId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -638,7 +676,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'governance_vote', input.voteId);
 
 			const vote = await prisma.vote.findFirst({
@@ -646,11 +684,11 @@ export const governanceMeetingRouter = {
 				include: { meeting: { include: { association: true } } }
 			});
 			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Vote');
+				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 
 			const results = await getVoteResults(input.voteId);
-			if (!results) throw ApiException.notFound('Vote');
+			if (!results) throw errors.NOT_FOUND({ message: 'Vote' });
 
 			return successResponse({ results }, context);
 		}),
@@ -663,6 +701,11 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -685,7 +728,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_vote', input.voteId);
 			const { idempotencyKey, voteId } = input;
 
@@ -694,7 +737,7 @@ export const governanceMeetingRouter = {
 				include: { meeting: { include: { association: true } } }
 			});
 			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Vote');
+				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 			if (vote.closedAt) {
 				const results = await getVoteResults(vote.id);
@@ -711,9 +754,9 @@ export const governanceMeetingRouter = {
 			}
 
 			const results = await getVoteResults(vote.id);
-			if (!results) throw ApiException.notFound('Vote');
+			if (!results) throw errors.NOT_FOUND({ message: 'Vote' });
 			if (results.quorumRequired !== null && !results.quorumMet) {
-				throw ApiException.badRequest('Quorum not met');
+				throw errors.BAD_REQUEST({ message: 'Quorum not met' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -729,7 +772,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to close vote');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to close vote' });
 			}
 
 			const updatedVote = await prisma.vote.findUniqueOrThrow({ where: { id: voteId } });
@@ -750,6 +793,11 @@ export const governanceMeetingRouter = {
 
 	startSession: orgProcedure
 		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string() })))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -760,7 +808,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('start_session', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
@@ -774,15 +822,15 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			if (meeting.status !== 'SCHEDULED') {
-				throw ApiException.badRequest(`Cannot start session from status ${meeting.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot start session from status ${meeting.status}` });
 			}
 
 			if (meeting.agendaItems.length === 0) {
-				throw ApiException.badRequest('Meeting must have at least one agenda item before starting session');
+				throw errors.BAD_REQUEST({ message: 'Meeting must have at least one agenda item before starting session' });
 			}
 
 			const presentCount = meeting.attendance.length;
@@ -790,7 +838,7 @@ export const governanceMeetingRouter = {
 			const quorumMet = quorumRequired === null || presentCount >= quorumRequired;
 
 			if (!quorumMet) {
-				throw ApiException.badRequest(`Quorum not met: ${presentCount} present, ${quorumRequired} required`);
+				throw errors.BAD_REQUEST({ message: `Quorum not met: ${presentCount} present, ${quorumRequired} required` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -806,7 +854,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to start meeting session');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to start meeting session' });
 			}
 
 			const updated = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
@@ -822,6 +870,11 @@ export const governanceMeetingRouter = {
 
 	adjourn: orgProcedure
 		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string(), notes: z.string().optional() })))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -829,7 +882,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('adjourn', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
@@ -839,11 +892,11 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			if (existing.status !== 'IN_SESSION') {
-				throw ApiException.badRequest(`Cannot adjourn from status ${existing.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot adjourn from status ${existing.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -859,7 +912,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to adjourn meeting');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to adjourn meeting' });
 			}
 
 			// Create minutes placeholder if not exists
@@ -884,6 +937,11 @@ export const governanceMeetingRouter = {
 				})
 			)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -891,7 +949,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId, content } = input;
 
@@ -901,11 +959,11 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			if (existing.status !== 'ADJOURNED') {
-				throw ApiException.badRequest(`Cannot submit minutes draft from status ${existing.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot submit minutes draft from status ${existing.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -921,7 +979,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to submit minutes draft');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit minutes draft' });
 			}
 
 			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
@@ -931,6 +989,11 @@ export const governanceMeetingRouter = {
 
 	approveMinutes: orgProcedure
 		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string() })))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -938,7 +1001,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('approve_minutes', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
@@ -948,15 +1011,15 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			if (existing.status !== 'MINUTES_DRAFT') {
-				throw ApiException.badRequest(`Cannot approve minutes from status ${existing.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot approve minutes from status ${existing.status}` });
 			}
 
 			if (!existing.minutes || !existing.minutes.content) {
-				throw ApiException.badRequest('Minutes content is required before approval');
+				throw errors.BAD_REQUEST({ message: 'Minutes content is required before approval' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -972,7 +1035,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to approve minutes');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to approve minutes' });
 			}
 
 			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
@@ -982,6 +1045,11 @@ export const governanceMeetingRouter = {
 
 	archive: orgProcedure
 		.input(IdempotencyKeySchema.merge(z.object({ meetingId: z.string() })))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -989,7 +1057,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('archive', 'governance_meeting', input.meetingId);
 			const { idempotencyKey, meetingId } = input;
 
@@ -999,11 +1067,11 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			if (existing.status !== 'MINUTES_APPROVED') {
-				throw ApiException.badRequest(`Cannot archive from status ${existing.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot archive from status ${existing.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -1019,7 +1087,7 @@ export const governanceMeetingRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to archive meeting');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to archive meeting' });
 			}
 
 			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
@@ -1029,6 +1097,9 @@ export const governanceMeetingRouter = {
 
 	getQuorumStatus: orgProcedure
 		.input(z.object({ meetingId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1041,7 +1112,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'governance_meeting', input.meetingId);
 
 			const meeting = await prisma.meeting.findFirst({
@@ -1053,7 +1124,7 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			const presentCount = meeting.attendance.filter(a => a.status !== 'ABSENT').length;
@@ -1081,6 +1152,9 @@ export const governanceMeetingRouter = {
 				includeVotes: z.boolean().optional().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1098,7 +1172,7 @@ export const governanceMeetingRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 
 			const meeting = await prisma.meeting.findFirst({
@@ -1107,12 +1181,12 @@ export const governanceMeetingRouter = {
 			});
 
 			if (!meeting || meeting.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			// Import and use the minutes generation service
 			const { generateMinutesDraft } = await import('../../../services/minutesGenerationService.js');
-			
+
 			const result = await generateMinutesDraft({
 				meetingId: input.meetingId,
 				includeAttendance: input.includeAttendance,

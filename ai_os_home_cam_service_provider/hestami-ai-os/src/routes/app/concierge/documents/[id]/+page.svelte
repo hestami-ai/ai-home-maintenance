@@ -12,10 +12,7 @@
 		Tag
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
-	import { orpc } from '$lib/api';
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
 
 	interface Document {
 		id: string;
@@ -49,14 +46,21 @@
 		isPrimary: boolean;
 	}
 
-	let document = $state<Document | null>(null);
-	let contextBindings = $state<ContextBinding[]>([]);
-	let isLoading = $state(true);
+	interface Props {
+		data: {
+			document: Document;
+			contextBindings: ContextBinding[];
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let document = $derived(data.document);
+	let contextBindings = $derived(data.contextBindings);
+	let isLoading = $state(false);
 	let isDeleting = $state(false);
 	let error = $state<string | null>(null);
 	let showDeleteConfirm = $state(false);
-
-	const documentId = $page.params.id!;
 
 	const categoryLabels: Record<string, string> = {
 		PROPERTY_DEED: 'Property Deed',
@@ -69,25 +73,7 @@
 		OTHER: 'Other'
 	};
 
-	onMount(async () => {
-		await loadDocument();
-	});
 
-	async function loadDocument() {
-		isLoading = true;
-		error = null;
-
-		try {
-			const result = await orpc.document.getDocument({ id: documentId });
-			document = result.data.document;
-			contextBindings = result.data.contextBindings;
-		} catch (err) {
-			console.error('Failed to load document:', err);
-			error = err instanceof Error ? err.message : 'Failed to load document';
-		} finally {
-			isLoading = false;
-		}
-	}
 
 	async function handleDelete() {
 		if (isDeleting || !document) return;
@@ -142,7 +128,7 @@
 							<ArrowLeft class="mr-2 h-4 w-4" />
 							Back to Documents
 						</a>
-						<button onclick={loadDocument} class="btn preset-tonal-primary">Try Again</button>
+						<button onclick={() => invalidateAll()} class="btn preset-tonal-primary">Try Again</button>
 					</div>
 				</div>
 			</Card>

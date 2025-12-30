@@ -9,6 +9,7 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { ContractorTradeType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('TechnicianWorkflow');
@@ -16,7 +17,7 @@ const log = createWorkflowLogger('TechnicianWorkflow');
 const WORKFLOW_STATUS_EVENT = 'technician_status';
 const WORKFLOW_ERROR_EVENT = 'technician_error';
 
-type TechnicianAction = 
+type TechnicianAction =
 	| 'UPSERT_TECHNICIAN'
 	| 'ADD_SKILL'
 	| 'ADD_CERTIFICATION'
@@ -351,8 +352,15 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 			timestamp: new Date().toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'TECHNICIAN_WORKFLOW_ERROR'
+		});
 
 		return {
 			success: false,

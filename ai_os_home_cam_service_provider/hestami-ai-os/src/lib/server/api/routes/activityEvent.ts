@@ -6,14 +6,23 @@
  */
 
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../schemas.js';
 import {
+	ResponseMetaSchema,
+	JsonSchema,
+	ActivityEntityTypeSchema,
+	ActivityActionTypeSchema,
+	ActivityActorTypeSchema,
+	ActivityEventCategorySchema
+} from '../schemas.js';
+import {
+	authedProcedure,
 	orgProcedure,
 	successResponse,
 	PaginationInputSchema,
 	PaginationOutputSchema
 } from '../router.js';
 import { prisma } from '../../db.js';
+import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
 import type {
 	ActivityEntityType,
 	ActivityActionType,
@@ -29,27 +38,11 @@ const log = createModuleLogger('ActivityEventRoute');
 // SCHEMAS
 // =============================================================================
 
-const activityEntityTypeEnum = z.enum([
-	'ASSOCIATION', 'UNIT', 'OWNER', 'VIOLATION', 'ARC_REQUEST', 'ASSESSMENT',
-	'GOVERNING_DOCUMENT', 'BOARD_ACTION', 'JOB', 'WORK_ORDER', 'ESTIMATE',
-	'INVOICE', 'TECHNICIAN', 'CONTRACTOR', 'INVENTORY', 'CONCIERGE_CASE',
-	'OWNER_INTENT', 'INDIVIDUAL_PROPERTY', 'PROPERTY_DOCUMENT', 'MATERIAL_DECISION',
-	'EXTERNAL_HOA', 'EXTERNAL_VENDOR', 'CONCIERGE_ACTION', 'USER', 'USER_ROLE',
-	'ORGANIZATION', 'DOCUMENT', 'OTHER'
-]);
-
-const activityActionTypeEnum = z.enum([
-	'CREATE', 'UPDATE', 'DELETE', 'ARCHIVE', 'RESTORE', 'STATUS_CHANGE',
-	'ASSIGN', 'UNASSIGN', 'APPROVE', 'DENY', 'SUBMIT', 'CANCEL', 'COMPLETE',
-	'CLOSE', 'REOPEN', 'ESCALATE', 'COMMENT', 'ATTACH', 'DETACH', 'TRANSFER',
-	'SCHEDULE', 'DISPATCH', 'START', 'PAUSE', 'RESUME', 'INVOICE', 'PAY',
-	'REFUND', 'ADJUST', 'VERIFY', 'REJECT', 'EXPIRE', 'RENEW', 'LOGIN',
-	'LOGOUT', 'PASSWORD_CHANGE', 'ROLE_CHANGE', 'PERMISSION_CHANGE', 'OTHER'
-]);
-
-const activityActorTypeEnum = z.enum(['HUMAN', 'AI', 'SYSTEM']);
-
-const activityEventCategoryEnum = z.enum(['INTENT', 'DECISION', 'EXECUTION', 'SYSTEM']);
+// Use generated enum schemas from schemas.ts (sourced from Prisma/Zod generation)
+const activityEntityTypeEnum = ActivityEntityTypeSchema;
+const activityActionTypeEnum = ActivityActionTypeSchema;
+const activityActorTypeEnum = ActivityActorTypeSchema;
+const activityEventCategoryEnum = ActivityEventCategorySchema;
 
 const activityEventOutput = z.object({
 	id: z.string(),
@@ -61,9 +54,9 @@ const activityEventOutput = z.object({
 	performedById: z.string().nullable(),
 	performedByType: activityActorTypeEnum,
 	performedAt: z.string(),
-	previousState: z.any().nullable(),
-	newState: z.any().nullable(),
-	metadata: z.any().nullable(),
+	previousState: JsonSchema.nullable(),
+	newState: JsonSchema.nullable(),
+	metadata: JsonSchema.nullable(),
 	// Context fields
 	caseId: z.string().nullable(),
 	intentId: z.string().nullable(),
@@ -195,11 +188,11 @@ export const activityEventRouter = {
 				...(input.performedByType && { performedByType: input.performedByType as ActivityActorType }),
 				...(input.startDate || input.endDate
 					? {
-							performedAt: {
-								...(input.startDate && { gte: new Date(input.startDate) }),
-								...(input.endDate && { lte: new Date(input.endDate) })
-							}
+						performedAt: {
+							...(input.startDate && { gte: new Date(input.startDate) }),
+							...(input.endDate && { lte: new Date(input.endDate) })
 						}
+					}
 					: {})
 			};
 
@@ -434,11 +427,11 @@ export const activityEventRouter = {
 				}),
 				...(input.startDate || input.endDate
 					? {
-							performedAt: {
-								...(input.startDate && { gte: new Date(input.startDate) }),
-								...(input.endDate && { lte: new Date(input.endDate) })
-							}
+						performedAt: {
+							...(input.startDate && { gte: new Date(input.startDate) }),
+							...(input.endDate && { lte: new Date(input.endDate) })
 						}
+					}
 					: {})
 			};
 
@@ -514,6 +507,191 @@ export const activityEventRouter = {
 					events: events.map(serializeEvent),
 					exportedAt: new Date().toISOString(),
 					recordCount: events.length
+				},
+				context
+			);
+		}),
+
+	// =========================================================================
+	// STAFF CROSS-ORG ENDPOINTS
+	// These use authedProcedure (not orgProcedure) for cross-org staff access
+	// =========================================================================
+
+	/**
+	 * Get all activity events across all organizations (staff only)
+	 * Uses authedProcedure for cross-org access without requiring org context
+	 */
+	staffList: authedProcedure
+		.errors({
+			FORBIDDEN: { message: 'Staff access required' },
+			INTERNAL_SERVER_ERROR: { message: 'Database error' }
+		})
+		.input(
+			PaginationInputSchema.extend({
+				entityType: activityEntityTypeEnum.optional(),
+				action: activityActionTypeEnum.optional(),
+				eventCategory: activityEventCategoryEnum.optional(),
+				performedByType: activityActorTypeEnum.optional(),
+				organizationId: z.string().uuid().optional(),
+				startDate: z.string().datetime().optional(),
+				endDate: z.string().datetime().optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					events: z.array(activityEventOutput.extend({
+						organizationName: z.string().nullable()
+					})),
+					pagination: PaginationOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Cerbos authorization - verify user is staff with activity log access
+			const principal = buildPrincipal(
+				context.user!,
+				context.orgRoles ?? {},
+				undefined, // no current org
+				undefined, // no vendorId
+				undefined, // no currentOrgId
+				context.staffRoles,
+				context.pillarAccess
+			);
+			const resource = createResource('activity_event', 'staff-list', 'global');
+			try {
+				await requireAuthorization(principal, resource, 'view');
+			} catch (error) {
+				throw errors.FORBIDDEN({
+					message: error instanceof Error ? error.message : 'Staff access required for activity log'
+				});
+			}
+
+			const limit = input.limit ?? 50;
+			const where: Prisma.ActivityEventWhereInput = {
+				...(input.organizationId && { organizationId: input.organizationId }),
+				...(input.entityType && { entityType: input.entityType as ActivityEntityType }),
+				...(input.action && { action: input.action as ActivityActionType }),
+				...(input.eventCategory && { eventCategory: input.eventCategory as ActivityEventCategory }),
+				...(input.performedByType && { performedByType: input.performedByType as ActivityActorType }),
+				...(input.startDate || input.endDate
+					? {
+						performedAt: {
+							...(input.startDate && { gte: new Date(input.startDate) }),
+							...(input.endDate && { lte: new Date(input.endDate) })
+						}
+					}
+					: {})
+			};
+
+			// Fetch events with organization name
+			const events = await prisma.activityEvent.findMany({
+				where,
+				include: {
+					organization: {
+						select: { name: true }
+					}
+				},
+				orderBy: { performedAt: 'desc' },
+				take: limit + 1,
+				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 })
+			});
+
+			const hasMore = events.length > limit;
+			const items = hasMore ? events.slice(0, -1) : events;
+
+			return successResponse(
+				{
+					events: items.map(e => ({
+						...serializeEvent(e),
+						organizationName: e.organization?.name ?? null
+					})),
+					pagination: {
+						hasMore,
+						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Get activity events for a specific entity (staff cross-org access)
+	 */
+	staffGetByEntity: authedProcedure
+		.errors({
+			FORBIDDEN: { message: 'Staff access required' },
+			INTERNAL_SERVER_ERROR: { message: 'Database error' }
+		})
+		.input(
+			z.object({
+				entityType: activityEntityTypeEnum,
+				entityId: z.string()
+			}).merge(PaginationInputSchema)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					events: z.array(activityEventOutput.extend({
+						organizationName: z.string().nullable()
+					})),
+					pagination: PaginationOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Cerbos authorization - verify user is staff
+			const principal = buildPrincipal(
+				context.user!,
+				context.orgRoles ?? {},
+				undefined,
+				undefined,
+				undefined,
+				context.staffRoles,
+				context.pillarAccess
+			);
+			const resource = createResource('activity_event', input.entityId, 'global');
+			try {
+				await requireAuthorization(principal, resource, 'view');
+			} catch (error) {
+				throw errors.FORBIDDEN({
+					message: error instanceof Error ? error.message : 'Staff access required'
+				});
+			}
+
+			const limit = input.limit ?? 50;
+			const events = await prisma.activityEvent.findMany({
+				where: {
+					entityType: input.entityType as ActivityEntityType,
+					entityId: input.entityId
+				},
+				include: {
+					organization: {
+						select: { name: true }
+					}
+				},
+				orderBy: { performedAt: 'desc' },
+				take: limit + 1,
+				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 })
+			});
+
+			const hasMore = events.length > limit;
+			const items = hasMore ? events.slice(0, -1) : events;
+
+			return successResponse(
+				{
+					events: items.map(e => ({
+						...serializeEvent(e),
+						organizationName: e.organization?.name ?? null
+					})),
+					pagination: {
+						hasMore,
+						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null
+					}
 				},
 				context
 			);

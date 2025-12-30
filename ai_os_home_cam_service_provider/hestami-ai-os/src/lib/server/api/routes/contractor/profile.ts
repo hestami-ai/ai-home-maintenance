@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
@@ -59,9 +58,13 @@ export const profileRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ profile: profileOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'contractor_profile', context.organization.id);
 			const { idempotencyKey, ...data } = input;
 
@@ -77,7 +80,7 @@ export const profileRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create/update profile');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update profile' });
 			}
 
 			const profile = await prisma.contractorProfile.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -124,10 +127,13 @@ export const profileRouter = {
 
 	get: orgProcedure
 		.input(z.object({ organizationId: z.string().optional() }))
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ profile: profileOutput.nullable() }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const organizationId = input.organizationId ?? context.organization.id;
-			await assertContractorOrg(organizationId);
+			await assertContractorOrg(organizationId, errors);
 
 			const profile = await prisma.contractorProfile.findUnique({
 				where: { organizationId }
@@ -141,29 +147,29 @@ export const profileRouter = {
 				{
 					profile: profile
 						? {
-								id: profile.id,
-								organizationId: profile.organizationId,
-								legalName: profile.legalName,
-								dba: profile.dba,
-								primaryContactName: profile.primaryContactName,
-								primaryContactEmail: profile.primaryContactEmail,
-								primaryContactPhone: profile.primaryContactPhone,
-								addressLine1: profile.addressLine1,
-								addressLine2: profile.addressLine2,
-								city: profile.city,
-								state: profile.state,
-								postalCode: profile.postalCode,
-								country: profile.country,
-								operatingHoursJson: profile.operatingHoursJson,
-								timezone: profile.timezone,
-								maxTechnicians: profile.maxTechnicians,
-								maxServiceRadius: profile.maxServiceRadius,
-								complianceScore: profile.complianceScore,
-								lastComplianceCheck: profile.lastComplianceCheck?.toISOString() ?? null,
-								isActive: profile.isActive,
-								createdAt: profile.createdAt.toISOString(),
-								updatedAt: profile.updatedAt.toISOString()
-						  }
+							id: profile.id,
+							organizationId: profile.organizationId,
+							legalName: profile.legalName,
+							dba: profile.dba,
+							primaryContactName: profile.primaryContactName,
+							primaryContactEmail: profile.primaryContactEmail,
+							primaryContactPhone: profile.primaryContactPhone,
+							addressLine1: profile.addressLine1,
+							addressLine2: profile.addressLine2,
+							city: profile.city,
+							state: profile.state,
+							postalCode: profile.postalCode,
+							country: profile.country,
+							operatingHoursJson: profile.operatingHoursJson,
+							timezone: profile.timezone,
+							maxTechnicians: profile.maxTechnicians,
+							maxServiceRadius: profile.maxServiceRadius,
+							complianceScore: profile.complianceScore,
+							lastComplianceCheck: profile.lastComplianceCheck?.toISOString() ?? null,
+							isActive: profile.isActive,
+							createdAt: profile.createdAt.toISOString(),
+							updatedAt: profile.updatedAt.toISOString()
+						}
 						: null
 				},
 				context

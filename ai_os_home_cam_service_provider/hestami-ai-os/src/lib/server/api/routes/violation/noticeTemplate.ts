@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startNoticeTemplateWorkflow } from '../../../workflows/noticeTemplateWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -13,11 +12,11 @@ const noticeTypeEnum = z.enum([
 	'FINE_NOTICE', 'HEARING_NOTICE', 'CURE_CONFIRMATION'
 ]);
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -46,9 +45,13 @@ export const noticeTemplateRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'notice_template', 'new');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startNoticeTemplateWorkflow(
@@ -69,7 +72,7 @@ export const noticeTemplateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create notice template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create notice template' });
 			}
 
 			const template = await prisma.noticeTemplate.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -106,9 +109,12 @@ export const noticeTemplateRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'notice_template', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = { associationId: association.id };
 			if (input?.noticeType) where.noticeType = input.noticeType;
@@ -153,15 +159,18 @@ export const noticeTemplateRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'notice_template', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const template = await prisma.noticeTemplate.findFirst({
 				where: { id: input.id, associationId: association.id }
 			});
 
-			if (!template) throw ApiException.notFound('Notice template');
+			if (!template) throw errors.NOT_FOUND({ message: 'Notice template' });
 
 			return successResponse({
 				template: {
@@ -202,9 +211,13 @@ export const noticeTemplateRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'notice_template', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startNoticeTemplateWorkflow(
@@ -226,7 +239,7 @@ export const noticeTemplateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update notice template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update notice template' });
 			}
 
 			const template = await prisma.noticeTemplate.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -253,9 +266,13 @@ export const noticeTemplateRouter = {
 			data: z.object({ deleted: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'notice_template', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startNoticeTemplateWorkflow(
@@ -271,7 +288,7 @@ export const noticeTemplateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete notice template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete notice template' });
 			}
 
 			return successResponse({ deleted: true }, context);

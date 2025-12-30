@@ -22,6 +22,7 @@
 		"db:seed": "tsx prisma/seed.ts",
 		"db:studio": "prisma studio",
 		"db:reset": "prisma migrate reset",
+		"db:init-admin": "tsx scripts/init-platform-admin.ts",
 		"openapi:generate": "tsx scripts/generate-openapi.ts",
 		"types:generate": "openapi-typescript ./openapi.json -o ./src/lib/api/types.generated.ts",
 		"prebuild": "npm run openapi:generate && npm run types:generate"

@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { EstimateStatus } from '../../../../../../generated/prisma/client.js';
 import { startEstimateCreateWorkflow } from '../../../workflows/estimateCreateWorkflow.js';
@@ -190,6 +189,11 @@ export const estimateRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -197,21 +201,21 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'estimate', 'new');
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job' });
 
 			// Validate customer exists
 			const customer = await prisma.customer.findFirst({
 				where: { id: input.customerId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!customer) throw ApiException.notFound('Customer');
+			if (!customer) throw errors.NOT_FOUND({ message: 'Customer' });
 
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
 			const result = await startEstimateCreateWorkflow(
@@ -232,7 +236,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create estimate' });
 			}
 
 			// Fetch the created estimate with relations for the response
@@ -264,6 +268,11 @@ export const estimateRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -271,8 +280,8 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'estimate', 'new');
 
 			// Validate job and customer
@@ -284,8 +293,8 @@ export const estimateRouter = {
 					where: { id: input.customerId, organizationId: context.organization!.id, deletedAt: null }
 				})
 			]);
-			if (!job) throw ApiException.notFound('Job');
-			if (!customer) throw ApiException.notFound('Customer');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job' });
+			if (!customer) throw errors.NOT_FOUND({ message: 'Customer' });
 
 			// Get pricebook items
 			const pricebookItems = await prisma.pricebookItem.findMany({
@@ -296,7 +305,7 @@ export const estimateRouter = {
 			// Validate all items belong to org's pricebooks
 			for (const item of pricebookItems) {
 				if (item.pricebookVersion.pricebook.organizationId !== context.organization!.id) {
-					throw ApiException.forbidden();
+					throw errors.FORBIDDEN({ message: 'Access denied' });
 				}
 			}
 
@@ -320,7 +329,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to generate estimate from pricebook');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to generate estimate from pricebook' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -339,6 +348,10 @@ export const estimateRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -346,8 +359,8 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'estimate', input.id);
 
 			const estimate = await prisma.estimate.findFirst({
@@ -358,7 +371,7 @@ export const estimateRouter = {
 				}
 			});
 
-			if (!estimate) throw ApiException.notFound('Estimate');
+			if (!estimate) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
 		}),
@@ -377,6 +390,9 @@ export const estimateRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -387,8 +403,8 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'estimate', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -439,6 +455,12 @@ export const estimateRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -446,18 +468,18 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'estimate', input.id);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only edit DRAFT estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -480,7 +502,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update estimate' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -512,6 +534,12 @@ export const estimateRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -519,18 +547,18 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'estimate', input.estimateId);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.estimateId, organizationId: context.organization!.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only edit DRAFT estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT estimates' });
 			}
 
 			const lineNumber = existing.lines.length + 1;
@@ -559,7 +587,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add line');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add line' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -585,6 +613,12 @@ export const estimateRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -592,17 +626,17 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'estimate', input.estimateId);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.estimateId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only edit DRAFT estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -619,7 +653,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to remove line');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove line' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -638,6 +672,12 @@ export const estimateRouter = {
 	 */
 	send: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -645,17 +685,17 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('send', 'estimate', input.id);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (!['DRAFT', 'REVISED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only send DRAFT or REVISED estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only send DRAFT or REVISED estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -671,7 +711,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to send estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send estimate' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -690,6 +730,10 @@ export const estimateRouter = {
 	 */
 	markViewed: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -697,13 +741,13 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (existing.status !== 'SENT') {
 				return successResponse({ estimate: formatEstimate(existing) }, context);
@@ -729,6 +773,12 @@ export const estimateRouter = {
 	 */
 	accept: orgProcedure
 		.input(z.object({ id: z.string(), selectedOptionId: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -736,17 +786,17 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { options: true }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (!['SENT', 'VIEWED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only accept SENT or VIEWED estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only accept SENT or VIEWED estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -762,7 +812,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to accept estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to accept estimate' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -781,6 +831,12 @@ export const estimateRouter = {
 	 */
 	decline: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -788,16 +844,16 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (!['SENT', 'VIEWED'].includes(existing.status)) {
-				throw ApiException.badRequest('Can only decline SENT or VIEWED estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only decline SENT or VIEWED estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -813,7 +869,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to decline estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to decline estimate' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -832,6 +888,11 @@ export const estimateRouter = {
 	 */
 	revise: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -839,15 +900,15 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('revise', 'estimate', input.id);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id },
 				include: { lines: true, options: { include: { lines: true } } }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
@@ -862,7 +923,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to revise estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to revise estimate' });
 			}
 
 			const estimate = await prisma.estimate.findUniqueOrThrow({
@@ -881,6 +942,12 @@ export const estimateRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -888,17 +955,17 @@ export const estimateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'estimate', input.id);
 
 			const existing = await prisma.estimate.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Estimate');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only delete DRAFT estimates');
+				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -914,7 +981,7 @@ export const estimateRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete estimate' });
 			}
 
 			return successResponse({ deleted: true }, context);

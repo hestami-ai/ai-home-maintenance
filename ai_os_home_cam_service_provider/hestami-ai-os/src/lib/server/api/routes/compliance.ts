@@ -2,10 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { startComplianceWorkflow } from '../../workflows/complianceWorkflow.js';
-import type { RequestContext } from '../context.js';
-import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('ComplianceRoute');
@@ -83,7 +80,10 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'complianceRequirement', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -111,7 +111,7 @@ export const complianceRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create requirement');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create requirement' });
 			}
 
 			const requirement = await prisma.complianceRequirement.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -148,7 +148,7 @@ export const complianceRouter = {
 						evidenceTypes: z.array(z.string()),
 						statutoryReference: z.string().nullable(),
 						penaltyDescription: z.string().nullable(),
-						checklistTemplate: z.any().nullable(),
+						checklistTemplate: z.array(z.object({ title: z.string(), description: z.string().optional() })).nullable(),
 						isActive: z.boolean(),
 						createdAt: z.string()
 					})
@@ -156,12 +156,15 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Compliance Requirement not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const requirement = await prisma.complianceRequirement.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!requirement) throw ApiException.notFound('ComplianceRequirement');
+			if (!requirement) throw errors.NOT_FOUND({ message: 'ComplianceRequirement' });
 
 			await context.cerbos.authorize('view', 'complianceRequirement', requirement.id);
 
@@ -180,7 +183,7 @@ export const complianceRouter = {
 						evidenceTypes: requirement.evidenceTypes,
 						statutoryReference: requirement.statutoryReference ?? null,
 						penaltyDescription: requirement.penaltyDescription ?? null,
-						checklistTemplate: requirement.checklistTemplate ?? null,
+						checklistTemplate: (requirement.checklistTemplate as { title: string; description?: string }[] | null) ?? null,
 						isActive: requirement.isActive,
 						createdAt: requirement.createdAt.toISOString()
 					}
@@ -285,12 +288,16 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Compliance Requirement not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const requirement = await prisma.complianceRequirement.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
-			if (!requirement) throw ApiException.notFound('ComplianceRequirement');
+			if (!requirement) throw errors.NOT_FOUND({ message: 'ComplianceRequirement' });
 
 			await context.cerbos.authorize('update', 'complianceRequirement', requirement.id);
 
@@ -320,7 +327,7 @@ export const complianceRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update requirement');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update requirement' });
 			}
 
 			const updated = await prisma.complianceRequirement.findUniqueOrThrow({ where: { id: input.id } });
@@ -369,18 +376,22 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'complianceDeadline', 'new');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const requirement = await prisma.complianceRequirement.findFirst({
 				where: { id: input.requirementId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!requirement) throw ApiException.notFound('ComplianceRequirement');
+			if (!requirement) throw errors.NOT_FOUND({ message: 'ComplianceRequirement' });
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startComplianceWorkflow(
@@ -403,7 +414,7 @@ export const complianceRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create deadline');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create deadline' });
 			}
 
 			const deadline = await prisma.complianceDeadline.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -457,7 +468,10 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Compliance Deadline not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const deadline = await prisma.complianceDeadline.findFirst({
 				where: { id: input.id },
 				include: {
@@ -468,7 +482,7 @@ export const complianceRouter = {
 			});
 
 			if (!deadline || deadline.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ComplianceDeadline');
+				throw errors.NOT_FOUND({ message: 'ComplianceDeadline' });
 			}
 
 			await context.cerbos.authorize('view', 'complianceDeadline', deadline.id);
@@ -535,13 +549,16 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'complianceDeadline', 'list');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const deadlines = await prisma.complianceDeadline.findMany({
 				where: {
@@ -607,14 +624,17 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Compliance Deadline not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const deadline = await prisma.complianceDeadline.findFirst({
 				where: { id: input.id },
 				include: { association: true }
 			});
 
 			if (!deadline || deadline.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ComplianceDeadline');
+				throw errors.NOT_FOUND({ message: 'ComplianceDeadline' });
 			}
 
 			await context.cerbos.authorize('update', 'complianceDeadline', deadline.id);
@@ -656,14 +676,17 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const deadline = await prisma.complianceDeadline.findFirst({
 				where: { id: input.deadlineId },
 				include: { association: true }
 			});
 
 			if (!deadline || deadline.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ComplianceDeadline');
+				throw errors.NOT_FOUND({ message: 'ComplianceDeadline' });
 			}
 
 			await context.cerbos.authorize('update', 'complianceDeadline', deadline.id);
@@ -673,7 +696,7 @@ export const complianceRouter = {
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
 			if (!document) {
-				throw ApiException.notFound('Document');
+				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
 			// Add document ID if not already present
@@ -715,14 +738,17 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Checklist Item not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const item = await prisma.complianceChecklistItem.findFirst({
 				where: { id: input.id },
 				include: { deadline: { include: { association: true } } }
 			});
 
 			if (!item || item.deadline.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ComplianceChecklistItem');
+				throw errors.NOT_FOUND({ message: 'ComplianceChecklistItem' });
 			}
 
 			await context.cerbos.authorize('update', 'complianceDeadline', item.deadline.id);
@@ -775,13 +801,16 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'complianceDeadline', 'list');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const now = new Date();
 			const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);

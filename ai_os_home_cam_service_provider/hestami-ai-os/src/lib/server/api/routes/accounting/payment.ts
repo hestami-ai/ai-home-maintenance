@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { postPaymentToGL, reversePaymentGL } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
+import { recordSpanError } from '../../middleware/tracing.js';
 
 const log = createModuleLogger('PaymentRoute');
 
@@ -33,6 +33,10 @@ export const paymentRouter = {
 				postToGL: z.boolean().default(true) // Auto-post to GL
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -48,15 +52,15 @@ export const paymentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'payment', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Validate unit
@@ -65,8 +69,8 @@ export const paymentRouter = {
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-				throw ApiException.notFound('Unit');
+			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
 
 			// Validate bank account if provided
@@ -75,7 +79,7 @@ export const paymentRouter = {
 					where: { id: input.bankAccountId, associationId: association.id }
 				});
 				if (!bankAccount) {
-					throw ApiException.notFound('Bank Account');
+					throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 				}
 			}
 
@@ -168,8 +172,13 @@ export const paymentRouter = {
 				try {
 					await postPaymentToGL(result.id, context.user!.id);
 				} catch (error) {
+					const errorObj = error instanceof Error ? error : new Error(String(error));
 					// Log but don't fail - GL posting can be done later
 					console.warn(`Failed to post payment ${result.id} to GL:`, error);
+					await recordSpanError(errorObj, {
+						errorCode: 'GL_POSTING_FAILED',
+						errorType: 'Payment_GL_Error'
+					});
 				}
 			}
 
@@ -199,6 +208,10 @@ export const paymentRouter = {
 				toDate: z.string().datetime().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -220,15 +233,15 @@ export const paymentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'payment', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.PaymentWhereInput = {
@@ -271,6 +284,10 @@ export const paymentRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -299,15 +316,15 @@ export const paymentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'payment', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const payment = await prisma.payment.findFirst({
@@ -316,7 +333,7 @@ export const paymentRouter = {
 			});
 
 			if (!payment) {
-				throw ApiException.notFound('Payment');
+				throw errors.NOT_FOUND({ message: 'Payment not found' });
 			}
 
 			return successResponse(
@@ -349,6 +366,11 @@ export const paymentRouter = {
 	 */
 	void: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -356,15 +378,15 @@ export const paymentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'payment', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const payment = await prisma.payment.findFirst({
@@ -373,11 +395,11 @@ export const paymentRouter = {
 			});
 
 			if (!payment) {
-				throw ApiException.notFound('Payment');
+				throw errors.NOT_FOUND({ message: 'Payment not found' });
 			}
 
 			if (payment.status === 'VOIDED') {
-				throw ApiException.conflict('Payment already voided');
+				throw errors.CONFLICT({ message: 'Payment already voided' });
 			}
 
 			// Reverse all applications
@@ -422,7 +444,12 @@ export const paymentRouter = {
 			try {
 				await reversePaymentGL(input.id, context.user!.id);
 			} catch (error) {
+				const errorObj = error instanceof Error ? error : new Error(String(error));
 				console.warn(`Failed to reverse GL for payment ${input.id}:`, error);
+				await recordSpanError(errorObj, {
+					errorCode: 'GL_REVERSAL_FAILED',
+					errorType: 'Payment_Void_Error'
+				});
 			}
 
 			return successResponse({ success: true }, context);

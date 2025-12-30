@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { startSignatureWorkflow } from '../../../workflows/signatureWorkflow.js';
 
@@ -76,6 +75,11 @@ export const signatureRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -83,15 +87,15 @@ export const signatureRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_signature', 'new');
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startSignatureWorkflow(
@@ -119,7 +123,7 @@ export const signatureRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to capture signature');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to capture signature' });
 			}
 
 			const signature = await prisma.jobSignature.findUniqueOrThrow({
@@ -142,6 +146,9 @@ export const signatureRouter = {
 				})
 				.merge(PaginationInputSchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -152,8 +159,8 @@ export const signatureRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_signature', input.jobId);
 
 			const limit = input.limit ?? 50;
@@ -192,6 +199,10 @@ export const signatureRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -199,15 +210,15 @@ export const signatureRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_signature', input.id);
 
 			const signature = await prisma.jobSignature.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
 
-			if (!signature) throw ApiException.notFound('Signature');
+			if (!signature) throw errors.NOT_FOUND({ message: 'Signature not found' });
 
 			return successResponse({ signature: formatJobSignature(signature) }, context);
 		}),
@@ -217,6 +228,11 @@ export const signatureRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -224,14 +240,14 @@ export const signatureRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'job_signature', input.id);
 
 			const existing = await prisma.jobSignature.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Signature');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Signature not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startSignatureWorkflow(
@@ -246,7 +262,7 @@ export const signatureRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete signature');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete signature' });
 			}
 
 			return successResponse({ deleted: true }, context);

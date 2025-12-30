@@ -1,37 +1,26 @@
 <script lang="ts">
 	import { Home, Plus, Briefcase, Bell, Clock } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { auth, organizationStore } from '$lib/stores';
-	import { conciergeCaseApi, type ConciergeCase } from '$lib/api/cam';
+	import type { Organization } from '../../../../generated/prisma/client';
+	import type { ConciergeCase } from '$lib/api/cam'; // Keeping for status types if needed, or remove if unused. It was used in filter
 
-	let cases = $state<ConciergeCase[]>([]);
-	let isLoading = $state(true);
-	let activeCaseCount = $state(0);
-	let pendingClarificationCount = $state(0);
-
-	async function loadDashboardData() {
-		isLoading = true;
-		try {
-			const response = await conciergeCaseApi.list({ limit: 5 });
-			if (response.ok) {
-				cases = response.data.cases;
-				activeCaseCount = response.data.cases.filter(
-					(c: ConciergeCase) => !['CLOSED', 'CANCELLED', 'RESOLVED'].includes(c.status)
-				).length;
-				pendingClarificationCount = response.data.cases.filter(
-					(c: ConciergeCase) => c.status === 'PENDING_OWNER'
-				).length;
-			}
-		} catch (error) {
-			console.error('Failed to load dashboard data:', error);
-		} finally {
-			isLoading = false;
-		}
+	interface Props {
+		data: {
+			user: { id: string; email: string; name: string | null; image: string | null } | null;
+			organization: Organization | null;
+			cases: any[]; // Using any to avoid Date vs string conflicts, or define proper shape
+		};
 	}
 
-	$effect(() => {
-		loadDashboardData();
-	});
+	let { data }: Props = $props();
+	
+	let cases = $derived(data.cases);
+	let activeCaseCount = $derived(cases.filter(
+		c => !['CLOSED', 'CANCELLED', 'RESOLVED'].includes(c.status)
+	).length);
+	let pendingClarificationCount = $derived(cases.filter(
+		c => c.status === 'PENDING_OWNER'
+	).length);
 
 	function getStatusLabel(status: string): string {
 		const labels: Record<string, string> = {
@@ -74,10 +63,10 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<h1 class="text-2xl font-bold">
-					Welcome back, {$auth.user?.name?.split(' ')[0] || 'there'}!
+					Welcome back, {data.user?.name?.split(' ')[0] || 'there'}!
 				</h1>
 				<p class="mt-1 text-surface-500">
-					{$organizationStore.current?.organization.name || 'Your Property Dashboard'}
+					{data.organization?.name || 'Your Property Dashboard'}
 				</p>
 			</div>
 			<a href="/app/owner/cases/new" class="btn preset-filled-primary-500">
@@ -146,9 +135,7 @@
 						</a>
 					</div>
 					<div class="divide-y divide-surface-300-700">
-						{#if isLoading}
-							<div class="p-6 text-center text-surface-500">Loading...</div>
-						{:else if cases.length === 0}
+						{#if cases.length === 0}
 							<div class="p-6">
 								<EmptyState
 									title="No cases yet"

@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -14,11 +13,11 @@ const reportCategoryEnum = z.enum([
 
 const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -51,9 +50,13 @@ export const reportDefinitionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'report_definition', 'new');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportDefinitionWorkflow(
@@ -78,7 +81,7 @@ export const reportDefinitionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create report');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create report' });
 			}
 
 			const report = await prisma.reportDefinition.findUniqueOrThrow({
@@ -124,9 +127,12 @@ export const reportDefinitionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'report_definition', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = {
 				OR: [
@@ -193,9 +199,12 @@ export const reportDefinitionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association or Report definition not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'report_definition', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const report = await prisma.reportDefinition.findFirst({
 				where: {
@@ -207,7 +216,7 @@ export const reportDefinitionRouter = {
 				}
 			});
 
-			if (!report) throw ApiException.notFound('Report definition');
+			if (!report) throw errors.NOT_FOUND({ message: 'Report definition' });
 
 			return successResponse({
 				report: {
@@ -254,9 +263,13 @@ export const reportDefinitionRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'report_definition', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportDefinitionWorkflow(
@@ -281,7 +294,7 @@ export const reportDefinitionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update report');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update report' });
 			}
 
 			const report = await prisma.reportDefinition.findUniqueOrThrow({
@@ -310,9 +323,13 @@ export const reportDefinitionRouter = {
 			data: z.object({ deleted: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'report_definition', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportDefinitionWorkflow(
@@ -328,7 +345,7 @@ export const reportDefinitionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete report');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete report' });
 			}
 
 			return successResponse({ deleted: true }, context);

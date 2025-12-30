@@ -4,9 +4,15 @@
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
+	interface Props {
+		data: {
+			property: any;
+		};
+	}
 
-	let isLoading = $state(true);
+	let { data }: Props = $props();
+
+	let isLoading = $state(false);
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 	let error = $state<string | null>(null);
@@ -14,36 +20,19 @@
 
 	const propertyId = $page.params.id;
 
-	// Form state
-	let name = $state('');
-	let propertyType = $state('SINGLE_FAMILY');
-	let addressLine1 = $state('');
-	let addressLine2 = $state('');
-	let city = $state('');
-	let usState = $state('');
-	let postalCode = $state('');
-	let yearBuilt = $state('');
-	let squareFeet = $state('');
-	let bedrooms = $state('');
-	let bathrooms = $state('');
-
-	// HOA state
-	let hasHoa = $state(false);
-	let hoaName = $state('');
-	let hoaContactName = $state('');
-	let hoaContactEmail = $state('');
-	let hoaContactPhone = $state('');
-	let existingHoaId = $state<string | null>(null);
-
+	// Property types for select
 	const propertyTypes = [
-		{ value: 'SINGLE_FAMILY', label: 'Single Family Home' },
-		{ value: 'CONDOMINIUM', label: 'Condominium' },
+		{ value: 'SINGLE_FAMILY', label: 'Single Family' },
+		{ value: 'CONDO', label: 'Condominium' },
 		{ value: 'TOWNHOUSE', label: 'Townhouse' },
-		{ value: 'COOPERATIVE', label: 'Cooperative' },
-		{ value: 'MIXED_USE', label: 'Mixed Use' },
-		{ value: 'COMMERCIAL', label: 'Commercial' }
+		{ value: 'MULTI_FAMILY', label: 'Multi-Family' },
+		{ value: 'APARTMENT', label: 'Apartment' },
+		{ value: 'COMMERCIAL', label: 'Commercial' },
+		{ value: 'LAND', label: 'Land' },
+		{ value: 'OTHER', label: 'Other' }
 	];
 
+	// US states for select
 	const usStates = [
 		{ value: 'AL', label: 'Alabama' },
 		{ value: 'AK', label: 'Alaska' },
@@ -95,58 +84,70 @@
 		{ value: 'WV', label: 'West Virginia' },
 		{ value: 'WI', label: 'Wisconsin' },
 		{ value: 'WY', label: 'Wyoming' },
-		{ value: 'DC', label: 'District of Columbia' }
+		{ value: 'DC', label: 'Washington DC' }
 	];
 
+	// Form state
+	let name = $state('');
+	let propertyType = $state('SINGLE_FAMILY');
+	let addressLine1 = $state('');
+	let addressLine2 = $state('');
+	let city = $state('');
+	let usState = $state('');
+	let postalCode = $state('');
+	let yearBuilt = $state('');
+	let squareFeet = $state('');
+	let bedrooms = $state('');
+	let bathrooms = $state('');
+
+	// HOA state
+	let hasHoa = $state(false);
+	let hoaName = $state('');
+	let hoaContactName = $state('');
+	let hoaContactEmail = $state('');
+	let hoaContactPhone = $state('');
+	let existingHoaId = $state<string | null>(null);
+
+	// Form validation
 	const isValid = $derived(
 		name.trim() !== '' &&
-			addressLine1.trim() !== '' &&
-			city.trim() !== '' &&
-			usState !== '' &&
-			postalCode.trim() !== '' &&
-			(!hasHoa || hoaName.trim() !== '')
+		addressLine1.trim() !== '' &&
+		city.trim() !== '' &&
+		usState !== '' &&
+		postalCode.trim() !== '' &&
+		(!hasHoa || hoaName.trim() !== '')
 	);
 
-	onMount(async () => {
-		await loadProperty();
+	// Synchronize server data to local state
+	$effect(() => {
+		if (data.property) {
+			const p = data.property;
+			name = p.name;
+			propertyType = p.propertyType;
+			addressLine1 = p.addressLine1;
+			addressLine2 = p.addressLine2 || '';
+			city = p.city;
+			usState = p.state;
+			postalCode = p.postalCode;
+			yearBuilt = p.yearBuilt?.toString() || '';
+			squareFeet = p.squareFeet?.toString() || '';
+			bedrooms = p.bedrooms?.toString() || '';
+			bathrooms = p.bathrooms?.toString() || '';
+
+			if (p.externalHoa) {
+				hasHoa = true;
+				existingHoaId = p.externalHoa.id;
+				hoaName = p.externalHoa.hoaName;
+				hoaContactName = p.externalHoa.hoaContactName || '';
+				hoaContactEmail = p.externalHoa.hoaContactEmail || '';
+				hoaContactPhone = p.externalHoa.hoaContactPhone || '';
+			}
+		}
 	});
 
 	async function loadProperty() {
-		isLoading = true;
-		error = null;
-
-		try {
-			const result = await orpc.individualProperty.get({ propertyId: propertyId! });
-			const property = result.data.property;
-
-			// Populate form
-			name = property.name;
-			propertyType = property.propertyType;
-			addressLine1 = property.addressLine1;
-			addressLine2 = property.addressLine2 || '';
-			city = property.city;
-			usState = property.state;
-			postalCode = property.postalCode;
-			yearBuilt = property.yearBuilt?.toString() || '';
-			squareFeet = property.squareFeet?.toString() || '';
-			bedrooms = property.bedrooms?.toString() || '';
-			bathrooms = property.bathrooms?.toString() || '';
-
-			// HOA info
-			if (property.externalHoa) {
-				hasHoa = true;
-				existingHoaId = property.externalHoa.id;
-				hoaName = property.externalHoa.hoaName;
-				hoaContactName = property.externalHoa.hoaContactName || '';
-				hoaContactEmail = property.externalHoa.hoaContactEmail || '';
-				hoaContactPhone = property.externalHoa.hoaContactPhone || '';
-			}
-		} catch (err) {
-			console.error('Failed to load property:', err);
-			error = err instanceof Error ? err.message : 'Failed to load property';
-		} finally {
-			isLoading = false;
-		}
+		// Just refresh the data
+		window.location.reload();
 	}
 
 	async function handleSubmit(e: Event) {

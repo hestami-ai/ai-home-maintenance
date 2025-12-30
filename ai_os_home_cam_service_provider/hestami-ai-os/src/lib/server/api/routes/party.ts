@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('PartyRoute');
@@ -104,13 +103,16 @@ export const partyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Party not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const party = await prisma.party.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!party) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party' });
 			}
 
 			// Cerbos authorization
@@ -259,13 +261,16 @@ export const partyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Party not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.party.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party' });
 			}
 
 			// Cerbos authorization
@@ -307,13 +312,16 @@ export const partyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Party not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.party.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party' });
 			}
 
 			// Cerbos authorization

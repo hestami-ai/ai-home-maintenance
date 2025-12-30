@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startCommunicationWorkflow } from '../../../workflows/communicationWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -33,17 +32,17 @@ const eventTypeEnum = z.enum(['MEETING', 'MAINTENANCE', 'AMENITY_CLOSURE', 'OTHE
 const deliveryStatusEnum = z.enum(['PENDING', 'SENT', 'FAILED']);
 const notificationStatusEnum = z.enum(['PENDING', 'SENT', 'FAILED', 'CANCELLED']);
 
-const ensureAssociation = async (associationId: string, organizationId: string) => {
+const ensureAssociation = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { id: associationId, organizationId }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
-const ensurePartyBelongs = async (partyId: string, organizationId: string) => {
+const ensurePartyBelongs = async (partyId: string, organizationId: string, errors: any) => {
 	const party = await prisma.party.findFirst({ where: { id: partyId, organizationId, deletedAt: null } });
-	if (!party) throw ApiException.notFound('Party');
+	if (!party) throw errors.NOT_FOUND({ message: 'Party' });
 };
 
 export const communicationRouter = {
@@ -58,7 +57,7 @@ export const communicationRouter = {
 					channel: channelEnum,
 					subject: z.string().max(500).optional(),
 					body: z.string().min(1),
-					variables: z.record(z.string(), z.any()).optional()
+					variables: z.record(z.string(), JsonSchema).optional()
 				})
 			)
 		)
@@ -77,9 +76,13 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'communication_template', input.associationId);
-			await ensureAssociation(input.associationId, context.organization.id);
+			await ensureAssociation(input.associationId, context.organization.id, errors);
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
@@ -100,7 +103,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create template' });
 			}
 
 			const template = await prisma.communicationTemplate.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -125,7 +128,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					templates: z.array(z.any()),
+					templates: z.array(z.object({ id: z.string(), name: z.string(), type: z.string(), channel: z.string(), createdAt: z.coerce.date() })),
 					pagination: PaginationOutputSchema
 				}),
 				meta: ResponseMetaSchema
@@ -157,11 +160,14 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ template: z.any() }),
+				data: z.object({ template: z.object({ id: z.string(), name: z.string(), type: z.string(), channel: z.string(), body: z.string(), subject: z.string().nullable(), currentVersion: z.string().nullable() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const template = await prisma.communicationTemplate.findFirst({
 				where: { id: input.id },
 				include: {
@@ -170,7 +176,7 @@ export const communicationRouter = {
 				}
 			});
 			if (!template || template.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Template');
+				throw errors.NOT_FOUND({ message: 'Template' });
 			}
 			await context.cerbos.authorize('view', 'communication_template', template.id);
 			return successResponse({ template }, context);
@@ -185,7 +191,7 @@ export const communicationRouter = {
 					version: z.string().min(1),
 					subject: z.string().max(500).optional(),
 					body: z.string().min(1),
-					variables: z.record(z.string(), z.any()).optional(),
+					variables: z.record(z.string(), JsonSchema).optional(),
 					status: z.enum(['DRAFT', 'ACTIVE', 'RETIRED']).default('DRAFT')
 				})
 			)
@@ -204,7 +210,11 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'communication_template', input.templateId);
 
 			const template = await prisma.communicationTemplate.findFirst({
@@ -212,7 +222,7 @@ export const communicationRouter = {
 				include: { association: true }
 			});
 			if (!template || template.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Template');
+				throw errors.NOT_FOUND({ message: 'Template' });
 			}
 
 			const workflowResult = await startCommunicationWorkflow(
@@ -233,7 +243,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create template version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create template version' });
 			}
 
 			const version = await prisma.communicationTemplateVersion.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -272,7 +282,11 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'communication_template', input.templateId);
 
 			const tpl = await prisma.communicationTemplate.findFirst({
@@ -280,13 +294,13 @@ export const communicationRouter = {
 				include: { association: true }
 			});
 			if (!tpl || tpl.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Template');
+				throw errors.NOT_FOUND({ message: 'Template' });
 			}
 
 			const targetVersion = await prisma.communicationTemplateVersion.findFirst({
 				where: { templateId: input.templateId, version: input.version }
 			});
-			if (!targetVersion) throw ApiException.notFound('Template version');
+			if (!targetVersion) throw errors.NOT_FOUND({ message: 'Template version' });
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
@@ -302,7 +316,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to activate template version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to activate template version' });
 			}
 
 			const template = await prisma.communicationTemplate.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -330,7 +344,7 @@ export const communicationRouter = {
 					channel: channelEnum,
 					status: commStatusEnum.default('DRAFT'),
 					scheduledFor: z.string().datetime().optional(),
-					targetFilter: z.record(z.string(), z.any()).optional()
+					targetFilter: z.record(z.string(), JsonSchema).optional()
 				})
 			)
 		)
@@ -348,15 +362,19 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'communication_mass', input.associationId);
-			await ensureAssociation(input.associationId, context.organization.id);
+			await ensureAssociation(input.associationId, context.organization.id, errors);
 
 			if (input.templateId) {
 				const template = await prisma.communicationTemplate.findFirst({
 					where: { id: input.templateId, associationId: input.associationId }
 				});
-				if (!template) throw ApiException.notFound('Template');
+				if (!template) throw errors.NOT_FOUND({ message: 'Template' });
 			}
 
 			const workflowResult = await startCommunicationWorkflow(
@@ -379,7 +397,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create mass communication');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create mass communication' });
 			}
 
 			const comm = await prisma.massCommunication.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -408,7 +426,7 @@ export const communicationRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					communications: z.array(z.any()),
+					communications: z.array(z.object({ id: z.string(), associationId: z.string(), status: z.string(), channel: z.string(), createdAt: z.coerce.date() })),
 					pagination: PaginationOutputSchema
 				}),
 				meta: ResponseMetaSchema
@@ -444,11 +462,14 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ communication: z.any() }),
+				data: z.object({ communication: z.object({ id: z.string(), associationId: z.string(), status: z.string(), channel: z.string(), body: z.string(), subject: z.string().nullable() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const comm = await prisma.massCommunication.findFirst({
 				where: { id: input.id },
 				include: {
@@ -458,7 +479,7 @@ export const communicationRouter = {
 				}
 			});
 			if (!comm || comm.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Mass communication');
+				throw errors.NOT_FOUND({ message: 'Mass communication' });
 			}
 			await context.cerbos.authorize('view', 'communication_mass', comm.id);
 			return successResponse({ communication: comm }, context);
@@ -491,7 +512,11 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'communication_mass', input.massCommunicationId);
 
 			const comm = await prisma.massCommunication.findFirst({
@@ -499,7 +524,7 @@ export const communicationRouter = {
 				include: { association: true }
 			});
 			if (!comm || comm.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Mass communication');
+				throw errors.NOT_FOUND({ message: 'Mass communication' });
 			}
 
 			const workflowResult = await startCommunicationWorkflow(
@@ -520,7 +545,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create delivery log');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create delivery log' });
 			}
 
 			const delivery = await prisma.massCommunicationDelivery.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -561,7 +586,11 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.massCommunicationDelivery.findFirst({
 				where: { id: input.deliveryId },
 				include: { massCommunication: { include: { association: true } } }
@@ -570,7 +599,7 @@ export const communicationRouter = {
 				!existing ||
 				existing.massCommunication.association.organizationId !== context.organization.id
 			) {
-				throw ApiException.notFound('Delivery');
+				throw errors.NOT_FOUND({ message: 'Delivery' });
 			}
 
 			await context.cerbos.authorize('edit', 'communication_mass', existing.massCommunication.id);
@@ -591,7 +620,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update delivery status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update delivery status' });
 			}
 
 			const delivery = await prisma.massCommunicationDelivery.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -619,7 +648,7 @@ export const communicationRouter = {
 					status: announcementStatusEnum.default('DRAFT'),
 					publishedAt: z.string().datetime().optional(),
 					expiresAt: z.string().datetime().optional(),
-					audience: z.record(z.string(), z.any()).optional()
+					audience: z.record(z.string(), JsonSchema).optional()
 				})
 			)
 		)
@@ -630,9 +659,13 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'communication_announcement', input.associationId);
-			await ensureAssociation(input.associationId, context.organization.id);
+			await ensureAssociation(input.associationId, context.organization.id, errors);
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
@@ -653,7 +686,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create announcement');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create announcement' });
 			}
 
 			const ann = await prisma.announcement.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -674,7 +707,7 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ announcements: z.array(z.any()), pagination: PaginationOutputSchema }),
+				data: z.object({ announcements: z.array(z.object({ id: z.string(), associationId: z.string(), title: z.string(), status: z.string(), createdAt: z.coerce.date() })), pagination: PaginationOutputSchema }),
 				meta: ResponseMetaSchema
 			})
 		)
@@ -708,17 +741,20 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ announcement: z.any() }),
+				data: z.object({ announcement: z.object({ id: z.string(), associationId: z.string(), title: z.string(), content: z.string(), status: z.string() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const ann = await prisma.announcement.findFirst({
 				where: { id: input.id },
 				include: { association: true, reads: true }
 			});
 			if (!ann || ann.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Announcement');
+				throw errors.NOT_FOUND({ message: 'Announcement' });
 			}
 			await context.cerbos.authorize('view', 'communication_announcement', ann.id);
 			return successResponse({ announcement: ann }, context);
@@ -747,7 +783,11 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'communication_announcement', input.announcementId);
 
 			const ann = await prisma.announcement.findFirst({
@@ -755,9 +795,9 @@ export const communicationRouter = {
 				include: { association: true }
 			});
 			if (!ann || ann.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Announcement');
+				throw errors.NOT_FOUND({ message: 'Announcement' });
 			}
-			await ensurePartyBelongs(input.partyId, ann.association.organizationId);
+			await ensurePartyBelongs(input.partyId, ann.association.organizationId, errors);
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
@@ -773,7 +813,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to mark announcement read');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to mark announcement read' });
 			}
 
 			const read = await prisma.announcementRead.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -805,7 +845,7 @@ export const communicationRouter = {
 					location: z.string().max(500).optional(),
 					recurrenceRule: z.string().max(2000).optional(),
 					notifyAt: z.string().datetime().optional(),
-					metadata: z.record(z.string(), z.any()).optional()
+					metadata: z.record(z.string(), JsonSchema).optional()
 				})
 			)
 		)
@@ -816,9 +856,13 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'communication_event', input.associationId);
-			await ensureAssociation(input.associationId, context.organization.id);
+			await ensureAssociation(input.associationId, context.organization.id, errors);
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
@@ -842,7 +886,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create event');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create event' });
 			}
 
 			const ev = await prisma.calendarEvent.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -863,7 +907,7 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ events: z.array(z.any()), pagination: PaginationOutputSchema }),
+				data: z.object({ events: z.array(z.object({ id: z.string(), associationId: z.string(), type: z.string(), title: z.string(), startsAt: z.coerce.date() })), pagination: PaginationOutputSchema }),
 				meta: ResponseMetaSchema
 			})
 		)
@@ -897,17 +941,20 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ event: z.any() }),
+				data: z.object({ event: z.object({ id: z.string(), associationId: z.string(), type: z.string(), title: z.string(), description: z.string().nullable(), startsAt: z.coerce.date() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const ev = await prisma.calendarEvent.findFirst({
 				where: { id: input.id },
 				include: { association: true }
 			});
 			if (!ev || ev.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Event');
+				throw errors.NOT_FOUND({ message: 'Event' });
 			}
 			await context.cerbos.authorize('view', 'communication_event', ev.id);
 			return successResponse({ event: ev }, context);
@@ -921,7 +968,7 @@ export const communicationRouter = {
 					eventId: z.string(),
 					notifyAt: z.string().datetime().optional(),
 					channel: channelEnum.optional(),
-					payload: z.record(z.string(), z.any()).optional()
+					payload: z.record(z.string(), JsonSchema).optional()
 				})
 			)
 		)
@@ -939,7 +986,11 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'communication_event', input.eventId);
 
 			const event = await prisma.calendarEvent.findFirst({
@@ -947,7 +998,7 @@ export const communicationRouter = {
 				include: { association: true }
 			});
 			if (!event || event.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Event');
+				throw errors.NOT_FOUND({ message: 'Event' });
 			}
 
 			const workflowResult = await startCommunicationWorkflow(
@@ -967,7 +1018,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create event notification');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create event notification' });
 			}
 
 			const notification = await prisma.calendarEventNotification.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1009,13 +1060,17 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.calendarEventNotification.findFirst({
 				where: { id: input.notificationId },
 				include: { association: true, event: true }
 			});
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Notification');
+				throw errors.NOT_FOUND({ message: 'Notification' });
 			}
 			await context.cerbos.authorize('edit', 'communication_event', existing.eventId);
 
@@ -1035,7 +1090,7 @@ export const communicationRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update notification status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update notification status' });
 			}
 
 			const notif = await prisma.calendarEventNotification.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -1063,7 +1118,7 @@ export const communicationRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ notifications: z.array(z.any()), pagination: PaginationOutputSchema }),
+				data: z.object({ notifications: z.array(z.object({ id: z.string(), eventId: z.string(), status: z.string(), notifyAt: z.coerce.date() })), pagination: PaginationOutputSchema }),
 				meta: ResponseMetaSchema
 			})
 		)

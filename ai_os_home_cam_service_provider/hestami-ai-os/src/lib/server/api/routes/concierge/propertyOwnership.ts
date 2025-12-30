@@ -8,7 +8,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { PropertyOwnershipRoleSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipRoleSchema.js';
 import { PropertyOwnershipStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipStatusSchema.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -35,6 +34,12 @@ export const propertyOwnershipRouter = {
 				notes: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Resource already exists' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -55,7 +60,7 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'property_ownership', 'new');
 
@@ -65,7 +70,7 @@ export const propertyOwnershipRouter = {
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Verify party belongs to this organization
@@ -74,7 +79,7 @@ export const propertyOwnershipRouter = {
 			});
 
 			if (!party) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party not found' });
 			}
 
 			// Check if ownership already exists for this property/party/role combination
@@ -88,7 +93,7 @@ export const propertyOwnershipRouter = {
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Property ownership already exists for this party and role');
+				throw errors.CONFLICT({ message: 'Property ownership already exists for this party and role' });
 			}
 
 			// Validate: at least one OWNER must exist (or this is creating the first OWNER)
@@ -103,7 +108,7 @@ export const propertyOwnershipRouter = {
 				});
 
 				if (!ownerExists) {
-					throw ApiException.badRequest('Cannot add non-owner role without an existing owner');
+					throw errors.BAD_REQUEST({ message: 'Cannot add non-owner role without an existing owner' });
 				}
 			}
 
@@ -155,6 +160,10 @@ export const propertyOwnershipRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -191,7 +200,7 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const propertyOwnership = await prisma.propertyOwnership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: {
@@ -201,7 +210,7 @@ export const propertyOwnershipRouter = {
 			});
 
 			if (!propertyOwnership || propertyOwnership.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization
@@ -263,6 +272,10 @@ export const propertyOwnershipRouter = {
 				includeTerminated: z.boolean().default(false)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -286,14 +299,14 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify property belongs to this organization
 			const property = await prisma.individualProperty.findFirst({
 				where: { id: input.propertyId, ownerOrgId: context.organization.id }
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Cerbos authorization for viewing property's ownerships
@@ -355,6 +368,10 @@ export const propertyOwnershipRouter = {
 				includeTerminated: z.boolean().default(false)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -378,14 +395,14 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify party belongs to this organization
 			const party = await prisma.party.findFirst({
 				where: { id: input.partyId, organizationId: context.organization.id }
 			});
 
 			if (!party) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party not found' });
 			}
 
 			// Cerbos authorization for viewing party's ownerships
@@ -447,6 +464,10 @@ export const propertyOwnershipRouter = {
 				notes: z.string().optional().nullable()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -462,14 +483,14 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.propertyOwnership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: true }
 			});
 
 			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization
@@ -524,6 +545,10 @@ export const propertyOwnershipRouter = {
 				id: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -538,14 +563,14 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.propertyOwnership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: true }
 			});
 
 			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization - requires admin or concierge role
@@ -584,6 +609,11 @@ export const propertyOwnershipRouter = {
 				effectiveTo: z.coerce.date().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -597,14 +627,14 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.propertyOwnership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: true }
 			});
 
 			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization
@@ -623,7 +653,7 @@ export const propertyOwnershipRouter = {
 				});
 
 				if (otherOwners === 0) {
-					throw ApiException.badRequest('Cannot terminate the last owner of a property');
+					throw errors.BAD_REQUEST({ message: 'Cannot terminate the last owner of a property' });
 				}
 			}
 
@@ -672,6 +702,11 @@ export const propertyOwnershipRouter = {
 				id: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -682,14 +717,14 @@ export const propertyOwnershipRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.propertyOwnership.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: true }
 			});
 
 			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization
@@ -708,7 +743,7 @@ export const propertyOwnershipRouter = {
 				});
 
 				if (otherOwners === 0) {
-					throw ApiException.badRequest('Cannot delete the last owner of a property');
+					throw errors.BAD_REQUEST({ message: 'Cannot delete the last owner of a property' });
 				}
 			}
 

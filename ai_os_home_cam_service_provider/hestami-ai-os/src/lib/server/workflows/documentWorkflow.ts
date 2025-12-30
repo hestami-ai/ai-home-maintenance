@@ -16,6 +16,7 @@ import {
 	type EntityWorkflowResult
 } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // Action types for document operations
 export const DocumentAction = {
@@ -550,6 +551,13 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 			documentId: input.documentId
 		});
 		logWorkflowEnd(log, input.action, false, startTime, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(error instanceof Error ? error : new Error(errorMessage), {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'DOCUMENT_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

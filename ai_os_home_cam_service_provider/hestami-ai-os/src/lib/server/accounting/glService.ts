@@ -16,7 +16,7 @@ const log = createModuleLogger('GLService');
 /**
  * Seed the default chart of accounts for a new association
  */
-export async function seedDefaultChartOfAccounts(associationId: string): Promise<void> {
+export async function seedDefaultChartOfAccounts(organizationId: string, associationId: string): Promise<void> {
 	// Check if accounts already exist
 	const existingCount = await prisma.gLAccount.count({
 		where: { associationId }
@@ -33,12 +33,12 @@ export async function seedDefaultChartOfAccounts(associationId: string): Promise
 	await prisma.$transaction(async (tx) => {
 		for (const parentDef of defaultChartOfAccounts) {
 			// Create parent account
-			const parent = await createAccountFromDefinition(tx, associationId, parentDef, null);
+			const parent = await createAccountFromDefinition(tx, organizationId, associationId, parentDef, null);
 
 			// Create child accounts
 			if (parentDef.children) {
 				for (const childDef of parentDef.children) {
-					await createAccountFromDefinition(tx, associationId, childDef, parent.id);
+					await createAccountFromDefinition(tx, organizationId, associationId, childDef, parent.id);
 				}
 			}
 		}
@@ -53,6 +53,7 @@ export async function seedDefaultChartOfAccounts(associationId: string): Promise
 
 async function createAccountFromDefinition(
 	tx: Prisma.TransactionClient,
+	organizationId: string,
 	associationId: string,
 	def: Omit<DefaultAccountDefinition, 'children'>,
 	parentId: string | null
@@ -62,6 +63,7 @@ async function createAccountFromDefinition(
 
 	return tx.gLAccount.create({
 		data: {
+			organizationId,
 			associationId,
 			accountNumber: def.accountNumber,
 			name: def.name,

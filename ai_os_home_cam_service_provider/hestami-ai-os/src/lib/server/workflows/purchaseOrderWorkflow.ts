@@ -9,6 +9,9 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import type { PurchaseOrderStatus } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
+import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 
 // Action types for the unified workflow
 export const PurchaseOrderAction = {
@@ -24,6 +27,9 @@ export const PurchaseOrderAction = {
 } as const;
 
 export type PurchaseOrderAction = (typeof PurchaseOrderAction)[keyof typeof PurchaseOrderAction];
+
+const WORKFLOW_STATUS_EVENT = 'po_status';
+const WORKFLOW_ERROR_EVENT = 'po_error';
 
 export interface PurchaseOrderWorkflowInput {
 	action: PurchaseOrderAction;
@@ -104,7 +110,6 @@ async function createPO(
 		});
 	}
 
-	console.log(`[PurchaseOrderWorkflow] CREATE_PO po:${po.id} by user ${userId}`);
 	return po.id;
 }
 
@@ -115,13 +120,12 @@ async function updatePO(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
-	
+
 	await prisma.purchaseOrder.update({
 		where: { id: poId },
 		data: updateData
 	});
 
-	console.log(`[PurchaseOrderWorkflow] UPDATE_PO on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -146,7 +150,6 @@ async function addLine(
 	// Recalculate PO total
 	await recalculatePOTotal(poId);
 
-	console.log(`[PurchaseOrderWorkflow] ADD_LINE on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -161,7 +164,6 @@ async function removeLine(
 	// Recalculate PO total
 	await recalculatePOTotal(poId);
 
-	console.log(`[PurchaseOrderWorkflow] REMOVE_LINE on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -178,7 +180,6 @@ async function submitPO(
 		}
 	});
 
-	console.log(`[PurchaseOrderWorkflow] SUBMIT_PO on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -195,7 +196,6 @@ async function confirmPO(
 		}
 	});
 
-	console.log(`[PurchaseOrderWorkflow] CONFIRM_PO on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -320,7 +320,6 @@ async function receivePO(
 		}
 	});
 
-	console.log(`[PurchaseOrderWorkflow] RECEIVE_PO on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -336,7 +335,6 @@ async function cancelPO(
 		}
 	});
 
-	console.log(`[PurchaseOrderWorkflow] CANCEL_PO on po:${poId} by user ${userId}`);
 	return poId;
 }
 
@@ -346,19 +344,17 @@ async function deletePO(
 	poId: string
 ): Promise<string> {
 	await prisma.purchaseOrder.delete({ where: { id: poId } });
-
-	console.log(`[PurchaseOrderWorkflow] DELETE_PO on po:${poId} by user ${userId}`);
 	return poId;
 }
 
 async function recalculatePOTotal(poId: string): Promise<void> {
 	const lines = await prisma.purchaseOrderLine.findMany({ where: { purchaseOrderId: poId } });
-	
+
 	let totalAmount = 0;
 	for (const line of lines) {
 		totalAmount += Number(line.lineTotal);
 	}
-	
+
 	await prisma.purchaseOrder.update({
 		where: { id: poId },
 		data: { totalAmount }
@@ -367,7 +363,12 @@ async function recalculatePOTotal(poId: string): Promise<void> {
 
 // Main workflow function
 async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise<PurchaseOrderWorkflowResult> {
+	const log = createWorkflowLogger('purchaseOrderWorkflow', DBOS.workflowID, input.action);
+	const startTime = logWorkflowStart(log, input.action, input as any);
+
 	try {
+		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
+
 		let entityId: string | undefined;
 
 		switch (input.action) {
@@ -376,6 +377,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => createPO(input.organizationId, input.userId, input.data),
 					{ name: 'createPO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'CREATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order created',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'CREATE_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'UPDATE_PO':
@@ -383,6 +397,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => updatePO(input.organizationId, input.userId, input.purchaseOrderId!, input.data),
 					{ name: 'updatePO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order updated',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'UPDATE_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'ADD_LINE':
@@ -390,6 +417,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => addLine(input.organizationId, input.userId, input.purchaseOrderId!, input.data),
 					{ name: 'addLine' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order line item added',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'ADD_LINE',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'REMOVE_LINE':
@@ -397,6 +437,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => removeLine(input.organizationId, input.userId, input.purchaseOrderId!, input.lineId!),
 					{ name: 'removeLine' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order line item removed',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'REMOVE_LINE',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'SUBMIT_PO':
@@ -404,6 +457,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => submitPO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'submitPO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order submitted',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'SUBMIT_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'CONFIRM_PO':
@@ -411,6 +477,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => confirmPO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'confirmPO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION', // Confirmation by vendor/human
+					summary: 'Purchase Order confirmed',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'CONFIRM_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'RECEIVE_PO':
@@ -418,6 +497,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => receivePO(input.organizationId, input.userId, input.purchaseOrderId!, input.data),
 					{ name: 'receivePO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order items received',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'RECEIVE_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'CANCEL_PO':
@@ -425,6 +517,19 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => cancelPO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'cancelPO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: entityId,
+					action: 'UPDATE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order cancelled',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'CANCEL_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			case 'DELETE_PO':
@@ -432,17 +537,47 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 					() => deletePO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'deletePO' }
 				);
+				await recordWorkflowEvent({
+					organizationId: input.organizationId,
+					entityType: 'PURCHASE_ORDER',
+					entityId: input.purchaseOrderId!,
+					action: 'DELETE',
+					eventCategory: 'EXECUTION',
+					summary: 'Purchase Order deleted',
+					performedById: input.userId,
+					performedByType: 'HUMAN',
+					workflowId: 'purchaseOrderWorkflow_v1',
+					workflowStep: 'DELETE_PO',
+					workflowVersion: 'v1'
+				});
 				break;
 
 			default:
-				return { success: false, error: `Unknown action: ${input.action}` };
+				const errorResult = { success: false, error: `Unknown action: ${input.action}` };
+				logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+				return errorResult;
 		}
 
-		return { success: true, entityId };
+		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'completed', entityId });
+
+		const successResult = { success: true, entityId };
+		logWorkflowEnd(log, input.action, true, startTime, successResult as any);
+		return successResult;
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[PurchaseOrderWorkflow] Error in ${input.action}:`, errorMessage);
-		return { success: false, error: errorMessage };
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+		log.error('Workflow failed', { action: input.action, error: errorMessage });
+		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'PURCHASE_ORDER_WORKFLOW_ERROR'
+		});
+
+		const errorResult = { success: false, error: errorMessage };
+		logWorkflowEnd(log, input.action, false, startTime, errorResult as any);
+		return errorResult;
 	}
 }
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		Inbox,
 		AlertTriangle,
@@ -28,41 +27,68 @@
 		type WorkQueueSummary
 	} from '$lib/api/workQueue';
 
-	let items = $state<WorkQueueItem[]>([]);
-	let summary = $state<WorkQueueSummary | null>(null);
-	let isLoading = $state(true);
+	interface Props {
+		data: {
+			items: WorkQueueItem[];
+			summary: WorkQueueSummary | null;
+			filters: {
+				pillar: WorkQueuePillar;
+				urgency: WorkQueueUrgency | '';
+				assignedToMe: boolean;
+				unassignedOnly: boolean;
+			};
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let items = $derived(data.items);
+	let summary = $derived(data.summary);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	// Filters
+	// Filters (initialized with defaults, synced via $effect)
 	let pillarFilter = $state<WorkQueuePillar>('ALL');
 	let urgencyFilter = $state<WorkQueueUrgency | ''>('');
 	let assignedToMe = $state(false);
 	let unassignedOnly = $state(false);
 
-	onMount(async () => {
-		await loadWorkQueue();
+	// Sync filters from server data
+	$effect(() => {
+		pillarFilter = data.filters.pillar;
+		urgencyFilter = data.filters.urgency;
+		assignedToMe = data.filters.assignedToMe;
+		unassignedOnly = data.filters.unassignedOnly;
 	});
 
 	async function loadWorkQueue() {
-		isLoading = true;
-		error = null;
-		try {
-			const response = await workQueueApi.list({
-				pillar: pillarFilter,
-				urgency: urgencyFilter || undefined,
-				assignedToMe,
-				unassignedOnly
-			});
-			if (response.ok) {
-				items = response.data.items;
-				summary = response.data.summary;
-			}
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load work queue';
-		} finally {
-			isLoading = false;
-		}
+		// Use URL updates for filtering so server-side load handles it
+		const params = new URLSearchParams();
+		if (pillarFilter !== 'ALL') params.set('pillar', pillarFilter);
+		if (urgencyFilter) params.set('urgency', urgencyFilter);
+		if (assignedToMe) params.set('assignedToMe', 'true');
+		if (unassignedOnly) params.set('unassignedOnly', 'true');
+		
+		const url = `/app/admin/work-queue?${params.toString()}`;
+		window.location.href = url;
 	}
+
+	// Trigger reload on filter change (after initial sync)
+	let initialFilterSyncDone = false;
+	$effect(() => {
+		// Skip the first run which is the initial sync
+		if (!initialFilterSyncDone) {
+			initialFilterSyncDone = true;
+			return;
+		}
+		// Simple way: refresh the page with new params
+		if (pillarFilter !== data.filters.pillar || 
+			urgencyFilter !== data.filters.urgency || 
+			assignedToMe !== data.filters.assignedToMe || 
+			unassignedOnly !== data.filters.unassignedOnly) {
+			loadWorkQueue();
+		}
+	});
 
 	function getUrgencyBadgeClass(urgency: WorkQueueUrgency): string {
 		const colorMap: Record<WorkQueueUrgency, string> = {
@@ -102,10 +128,7 @@
 		}
 	}
 
-	$effect(() => {
-		// Reload when filters change
-		loadWorkQueue();
-	});
+
 </script>
 
 <svelte:head>

@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { propertyOwnerOnboarding, auth } from '$lib/stores';
+	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+
+	let { data } = $props();
 
 	let name = $state($propertyOwnerOnboarding.organizationDetails.name);
 	let slug = $state($propertyOwnerOnboarding.organizationDetails.slug);
@@ -13,16 +14,23 @@
 	let slugTouched = $state(false);
 	let slugError = $state<string | null>(null);
 
-	onMount(() => {
+	// Set step and pre-fill on component init
+	$effect.pre(() => {
 		propertyOwnerOnboarding.setStep(1);
+	});
 
-		// Pre-fill with user data if empty
-		if (!name && $auth.user?.name) {
-			name = $auth.user.name;
-			generateSlug(name);
-		}
-		if (!contactEmail && $auth.user?.email) {
-			contactEmail = $auth.user.email;
+	// Pre-fill with user data if empty (runs once)
+	let hasPreFilled = $state(false);
+	$effect(() => {
+		if (!hasPreFilled && data.user) {
+			if (!name && data.user.name) {
+				name = data.user.name;
+				generateSlug(name);
+			}
+			if (!contactEmail && data.user.email) {
+				contactEmail = data.user.email;
+			}
+			hasPreFilled = true;
 		}
 	});
 

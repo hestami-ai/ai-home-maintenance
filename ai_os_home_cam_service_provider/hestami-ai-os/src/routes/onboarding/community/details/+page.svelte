@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { communityOnboarding, auth } from '$lib/stores';
+	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+
+	let { data } = $props();
 
 	let name = $state($communityOnboarding.organizationDetails.name);
 	let slug = $state($communityOnboarding.organizationDetails.slug);
@@ -26,10 +27,16 @@
 		'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		communityOnboarding.setStep(1);
-		if (!contactEmail && $auth.user?.email) {
-			contactEmail = $auth.user.email;
+	});
+
+	// Pre-fill contact email from auth (once)
+	let hasPreFilled = $state(false);
+	$effect(() => {
+		if (!hasPreFilled && data.user?.email && !contactEmail) {
+			contactEmail = data.user.email;
+			hasPreFilled = true;
 		}
 	});
 

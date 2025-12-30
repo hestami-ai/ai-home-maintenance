@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ViolationTypeRoute');
@@ -47,7 +46,11 @@ export const violationTypeRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
 
 			const association = await prisma.association.findFirst({
@@ -55,7 +58,7 @@ export const violationTypeRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			// Check for duplicate code
@@ -64,11 +67,12 @@ export const violationTypeRouter = {
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Violation type code already exists');
+				throw errors.CONFLICT({ message: 'Violation type code already exists' });
 			}
 
 			const violationType = await prisma.violationType.create({
 				data: {
+					organizationId: context.organization!.id,
 					associationId: association.id,
 					code: input.code,
 					name: input.name,
@@ -128,7 +132,10 @@ export const violationTypeRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', '*');
 
 			const association = await prisma.association.findFirst({
@@ -136,7 +143,7 @@ export const violationTypeRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const violationTypes = await prisma.violationType.findMany({
@@ -194,7 +201,10 @@ export const violationTypeRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -202,7 +212,7 @@ export const violationTypeRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const vt = await prisma.violationType.findFirst({
@@ -210,7 +220,7 @@ export const violationTypeRouter = {
 			});
 
 			if (!vt) {
-				throw ApiException.notFound('Violation Type');
+				throw errors.NOT_FOUND({ message: 'Violation Type' });
 			}
 
 			return successResponse(
@@ -270,7 +280,10 @@ export const violationTypeRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -278,7 +291,7 @@ export const violationTypeRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const existing = await prisma.violationType.findFirst({
@@ -286,7 +299,7 @@ export const violationTypeRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Violation Type');
+				throw errors.NOT_FOUND({ message: 'Violation Type' });
 			}
 
 			const { id, ...updateData } = input;

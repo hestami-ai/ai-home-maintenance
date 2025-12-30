@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { assertContractorComplianceForScheduling } from '../contractor/utils.js';
-import { ApiException } from '../../errors.js';
+
 import {
 	ResponseMetaSchema,
 	WorkOrderStatusSchema,
@@ -68,6 +68,7 @@ const assertTechnicianEligibleForSchedule = async (
 	orgId: string,
 	start: Date,
 	end: Date,
+	errors: any,
 	options?: {
 		requiredTrade?: ContractorTradeType;
 		serviceAreaId?: string;
@@ -85,19 +86,19 @@ const assertTechnicianEligibleForSchedule = async (
 		}
 	});
 	if (!tech) {
-		throw ApiException.forbidden('Technician not found or inactive for this organization');
+		throw errors.FORBIDDEN({ message: 'Technician not found or inactive for this organization' });
 	}
 
 	const hasSkills = await prisma.technicianSkill.count({ where: { technicianId: tech.id } });
 	if (hasSkills === 0) {
-		throw ApiException.conflict('Technician has no recorded skills');
+		throw errors.CONFLICT({ message: 'Technician has no recorded skills' });
 	}
 	if (options?.requiredTrade) {
 		const skill = await prisma.technicianSkill.findFirst({
 			where: { technicianId: tech.id, trade: options.requiredTrade }
 		});
 		if (!skill) {
-			throw ApiException.conflict('Technician lacks required trade/skill for this job');
+			throw errors.CONFLICT({ message: 'Technician lacks required trade/skill for this job' });
 		}
 	}
 
@@ -106,7 +107,7 @@ const assertTechnicianEligibleForSchedule = async (
 			where: { technicianId: tech.id, serviceAreaId: options.serviceAreaId }
 		});
 		if (!territory) {
-			throw ApiException.conflict('Technician is not assigned to the required service area');
+			throw errors.CONFLICT({ message: 'Technician is not assigned to the required service area' });
 		}
 	}
 
@@ -115,13 +116,13 @@ const assertTechnicianEligibleForSchedule = async (
 			where: { id: tech.branchId, organizationId: orgId, isActive: true }
 		});
 		if (!branch) {
-			throw ApiException.forbidden('Technician branch is not active for this organization');
+			throw errors.FORBIDDEN({ message: 'Technician branch is not active for this organization' });
 		}
 	}
 
 	// Ensure same-day scheduling for availability check
 	if (start.toDateString() !== end.toDateString()) {
-		throw ApiException.badRequest('Scheduling window must be within a single day for technician availability checks');
+		throw errors.BAD_REQUEST({ message: 'Scheduling window must be within a single day for technician availability checks' });
 	}
 
 	const availability = await prisma.technicianAvailability.findUnique({
@@ -144,7 +145,7 @@ const assertTechnicianEligibleForSchedule = async (
 			return rangeStart <= windowStart && rangeEnd >= windowEnd;
 		});
 		if (!fits) {
-			throw ApiException.conflict('Technician is not available in the requested window');
+			throw errors.CONFLICT({ message: 'Technician is not available in the requested window' });
 		}
 	}
 
@@ -156,13 +157,13 @@ const assertTechnicianEligibleForSchedule = async (
 		}
 	});
 	if (timeOff) {
-		throw ApiException.conflict('Technician is on time off during the requested window');
+		throw errors.CONFLICT({ message: 'Technician is on time off during the requested window' });
 	}
 
 	return tech;
 };
 
-const assertTechnicianActiveForOrg = async (technicianId: string, orgId: string) => {
+const assertTechnicianActiveForOrg = async (technicianId: string, orgId: string, errors: any) => {
 	const tech = await prisma.technician.findFirst({
 		where: {
 			id: technicianId,
@@ -175,14 +176,14 @@ const assertTechnicianActiveForOrg = async (technicianId: string, orgId: string)
 		}
 	});
 	if (!tech) {
-		throw ApiException.forbidden('Technician not found or inactive for this organization');
+		throw errors.FORBIDDEN({ message: 'Technician not found or inactive for this organization' });
 	}
 	if (tech.branchId) {
 		const branch = await prisma.contractorBranch.findFirst({
 			where: { id: tech.branchId, organizationId: orgId, isActive: true }
 		});
 		if (!branch) {
-			throw ApiException.forbidden('Technician branch is not active for this organization');
+			throw errors.FORBIDDEN({ message: 'Technician branch is not active for this organization' });
 		}
 	}
 	return tech;
@@ -226,6 +227,9 @@ export const workOrderRouter = {
 				constraints: z.string().max(2000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -241,7 +245,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'work_order', 'new');
 
 			const association = await prisma.association.findFirst({
@@ -249,7 +253,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			// Validate unit if provided
@@ -259,7 +263,7 @@ export const workOrderRouter = {
 					include: { property: { include: { association: true } } }
 				});
 				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-					throw ApiException.notFound('Unit');
+					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
 
@@ -269,7 +273,7 @@ export const workOrderRouter = {
 					where: { id: input.assetId, associationId: association.id, deletedAt: null }
 				});
 				if (!asset) {
-					throw ApiException.notFound('Asset');
+					throw errors.NOT_FOUND({ message: 'Asset' });
 				}
 			}
 
@@ -299,7 +303,7 @@ export const workOrderRouter = {
 					where: { id: input.violationId, associationId: association.id }
 				});
 				if (!violation) {
-					throw ApiException.notFound('Violation');
+					throw errors.NOT_FOUND({ message: 'Violation' });
 				}
 			}
 			if (input.arcRequestId) {
@@ -307,7 +311,7 @@ export const workOrderRouter = {
 					where: { id: input.arcRequestId, associationId: association.id }
 				});
 				if (!arcRequest) {
-					throw ApiException.notFound('ARC Request');
+					throw errors.NOT_FOUND({ message: 'ARC Request' });
 				}
 			}
 			if (input.resolutionId) {
@@ -315,13 +319,14 @@ export const workOrderRouter = {
 					where: { id: input.resolutionId, associationId: association.id }
 				});
 				if (!resolution) {
-					throw ApiException.notFound('Resolution');
+					throw errors.NOT_FOUND({ message: 'Resolution' });
 				}
 			}
 
 			const workOrder = await prisma.$transaction(async (tx) => {
 				const wo = await tx.workOrder.create({
 					data: {
+						organizationId: context.organization.id,
 						associationId: association.id,
 						workOrderNumber,
 						title: input.title,
@@ -414,6 +419,9 @@ export const workOrderRouter = {
 				search: z.string().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -436,7 +444,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', '*');
 
 			const association = await prisma.association.findFirst({
@@ -444,7 +452,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const where: Prisma.WorkOrderWhereInput = {
@@ -496,6 +504,9 @@ export const workOrderRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -532,7 +543,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -540,7 +551,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -548,7 +559,7 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			return successResponse(
@@ -598,6 +609,10 @@ export const workOrderRouter = {
 				notes: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -611,7 +626,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -619,7 +634,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -627,15 +642,15 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			// Validate transition
 			const allowed = validTransitions[wo.status];
 			if (!allowed.includes(input.status)) {
-				throw ApiException.badRequest(
-					`Cannot transition from ${wo.status} to ${input.status}`
-				);
+				throw errors.BAD_REQUEST({
+					message: `Cannot transition from ${wo.status} to ${input.status}`
+				});
 			}
 
 			const previousStatus = wo.status;
@@ -709,6 +724,10 @@ export const workOrderRouter = {
 				notes: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -722,7 +741,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -730,7 +749,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -738,7 +757,7 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			// Validate vendor
@@ -747,12 +766,12 @@ export const workOrderRouter = {
 			});
 
 			if (!vendor) {
-				throw ApiException.notFound('Vendor');
+				throw errors.NOT_FOUND({ message: 'Vendor' });
 			}
 
 			// Phase 9: Must be in AUTHORIZED status to assign (or already ASSIGNED)
 			if (wo.status !== 'AUTHORIZED' && wo.status !== 'ASSIGNED') {
-				throw ApiException.badRequest('Work order must be authorized before assigning vendor');
+				throw errors.BAD_REQUEST({ message: 'Work order must be authorized before assigning vendor' });
 			}
 
 			const previousStatus = wo.status;
@@ -812,6 +831,10 @@ export const workOrderRouter = {
 				notes: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -825,7 +848,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -833,7 +856,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -841,15 +864,15 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			// Validate technician
-			const tech = await assertTechnicianActiveForOrg(input.technicianId, context.organization!.id);
+			const tech = await assertTechnicianActiveForOrg(input.technicianId, context.organization!.id, errors);
 
 			// Phase 9: Must be in AUTHORIZED/ASSIGNED/SCHEDULED to assign technician
 			if (!['AUTHORIZED', 'ASSIGNED', 'SCHEDULED'].includes(wo.status)) {
-				throw ApiException.badRequest('Work order must be authorized or assigned before assigning technician');
+				throw errors.BAD_REQUEST({ message: 'Work order must be authorized or assigned before assigning technician' });
 			}
 
 			const previousStatus = wo.status;
@@ -912,6 +935,10 @@ export const workOrderRouter = {
 				notes: z.string().max(1000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -925,7 +952,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -933,7 +960,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -941,26 +968,26 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			if (!wo.assignedVendorId) {
-				throw ApiException.badRequest('Work order must have a vendor assigned before scheduling');
+				throw errors.BAD_REQUEST({ message: 'Work order must have a vendor assigned before scheduling' });
 			}
 
 			// Compliance gate: ensure the contractor has active license/insurance before scheduling
-			await assertContractorComplianceForScheduling(context.organization.id);
+			await assertContractorComplianceForScheduling(context.organization.id, errors);
 
 			const start = new Date(input.scheduledStart);
 			const end = input.scheduledEnd ? new Date(input.scheduledEnd) : new Date(start.getTime() + 30 * 60 * 1000);
 			if (end <= start) {
-				throw ApiException.badRequest('scheduledEnd must be after scheduledStart');
+				throw errors.BAD_REQUEST({ message: 'scheduledEnd must be after scheduledStart' });
 			}
 
 			const technicianId = input.technicianId ?? wo.assignedTechnicianId;
 			let technicianBranchId: string | null | undefined = wo.assignedTechnicianBranchId;
 			if (technicianId) {
-				const tech = await assertTechnicianEligibleForSchedule(technicianId, context.organization.id, start, end);
+				const tech = await assertTechnicianEligibleForSchedule(technicianId, context.organization.id, start, end, errors);
 				technicianBranchId = tech.branchId ?? null;
 			}
 
@@ -1017,6 +1044,10 @@ export const workOrderRouter = {
 				resolutionNotes: z.string().max(2000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1031,7 +1062,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -1039,7 +1070,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1047,11 +1078,11 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			if (wo.status !== 'IN_PROGRESS') {
-				throw ApiException.badRequest('Work order must be in progress to complete');
+				throw errors.BAD_REQUEST({ message: 'Work order must be in progress to complete' });
 			}
 
 			const now = new Date();
@@ -1141,6 +1172,10 @@ export const workOrderRouter = {
 				constraints: z.string().max(2000).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1155,7 +1190,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('authorize', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1163,7 +1198,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1171,12 +1206,12 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			// Must be in TRIAGED status to authorize
 			if (wo.status !== 'TRIAGED') {
-				throw ApiException.badRequest('Work order must be triaged before authorization');
+				throw errors.BAD_REQUEST({ message: 'Work order must be triaged before authorization' });
 			}
 
 			// Phase 9: Validate required artifacts before authorization
@@ -1188,9 +1223,9 @@ export const workOrderRouter = {
 			if (!wo.description) missingArtifacts.push('Scope description');
 
 			if (missingArtifacts.length > 0) {
-				throw ApiException.badRequest(
-					`Cannot authorize: missing required artifacts: ${missingArtifacts.join(', ')}`
-				);
+				throw errors.BAD_REQUEST({
+					message: `Cannot authorize: missing required artifacts: ${missingArtifacts.join(', ')}`
+				});
 			}
 
 			// Check if board approval is required based on threshold
@@ -1276,6 +1311,10 @@ export const workOrderRouter = {
 				actualCost: z.number().min(0).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1289,7 +1328,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('accept', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1297,7 +1336,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1305,12 +1344,12 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			// Must be in COMPLETED or REVIEW_REQUIRED status
 			if (wo.status !== 'COMPLETED' && wo.status !== 'REVIEW_REQUIRED') {
-				throw ApiException.badRequest('Work order must be completed before accepting');
+				throw errors.BAD_REQUEST({ message: 'Work order must be completed before accepting' });
 			}
 
 			const now = new Date();
@@ -1381,6 +1420,10 @@ export const workOrderRouter = {
 				question: z.string().max(500).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1398,7 +1441,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('request_board_approval', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1406,7 +1449,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1414,15 +1457,15 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			if (!wo.requiresBoardApproval) {
-				throw ApiException.badRequest('Work order does not require board approval');
+				throw errors.BAD_REQUEST({ message: 'Work order does not require board approval' });
 			}
 
 			if (wo.boardApprovalVoteId) {
-				throw ApiException.badRequest('Board approval vote already exists for this work order');
+				throw errors.BAD_REQUEST({ message: 'Board approval vote already exists for this work order' });
 			}
 
 			// Validate meeting exists and belongs to association
@@ -1432,10 +1475,10 @@ export const workOrderRouter = {
 			});
 
 			if (!meeting || !meeting.board || meeting.board.associationId !== association.id) {
-				throw ApiException.notFound('Meeting');
+				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			const question = input.question ?? 
+			const question = input.question ??
 				`Approve work order ${wo.workOrderNumber}: ${wo.title} (Budget: $${wo.approvedAmount?.toString() ?? 'TBD'})`;
 
 			// Create vote for board approval
@@ -1499,6 +1542,10 @@ export const workOrderRouter = {
 				rationale: z.string().min(1).max(2000)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1513,7 +1560,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('record_board_decision', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1521,7 +1568,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1529,15 +1576,15 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			if (!wo.requiresBoardApproval) {
-				throw ApiException.badRequest('Work order does not require board approval');
+				throw errors.BAD_REQUEST({ message: 'Work order does not require board approval' });
 			}
 
 			if (wo.boardApprovalStatus !== 'PENDING') {
-				throw ApiException.badRequest('Board decision has already been recorded');
+				throw errors.BAD_REQUEST({ message: 'Board decision has already been recorded' });
 			}
 
 			const now = new Date();
@@ -1571,7 +1618,7 @@ export const workOrderRouter = {
 						fromStatus: wo.status,
 						toStatus: newStatus,
 						changedBy: context.user!.id,
-						notes: input.approved 
+						notes: input.approved
 							? `Board approved: ${input.rationale}`
 							: `Board denied: ${input.rationale}`
 					}
@@ -1585,7 +1632,7 @@ export const workOrderRouter = {
 				entityType: 'WORK_ORDER',
 				entityId: updated.id,
 				action: input.approved ? 'APPROVE' : 'DENY',
-				summary: input.approved 
+				summary: input.approved
 					? `Board approved work order: ${input.rationale}`
 					: `Board denied work order: ${input.rationale}`,
 				workOrderId: updated.id,
@@ -1621,6 +1668,9 @@ export const workOrderRouter = {
 				isInternal: z.boolean().default(false)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1634,7 +1684,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1642,7 +1692,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1650,7 +1700,7 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			const comment = await prisma.workOrderComment.create({
@@ -1679,6 +1729,9 @@ export const workOrderRouter = {
 	 */
 	getStatusHistory: orgProcedure
 		.input(z.object({ workOrderId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1697,7 +1750,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1705,7 +1758,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1713,7 +1766,7 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			const history = await prisma.workOrderStatusHistory.findMany({
@@ -1753,6 +1806,11 @@ export const workOrderRouter = {
 				glAccountId: z.string() // Expense account for the invoice
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			CONFLICT: { message: 'Resource conflict' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1771,7 +1829,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
@@ -1779,7 +1837,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1788,19 +1846,19 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			if (!wo.assignedVendorId || !wo.assignedVendor) {
-				throw ApiException.badRequest('Work order must have an assigned vendor');
+				throw errors.BAD_REQUEST({ message: 'Work order must have an assigned vendor' });
 			}
 
 			if (wo.status !== 'COMPLETED') {
-				throw ApiException.badRequest('Work order must be completed before creating invoice');
+				throw errors.BAD_REQUEST({ message: 'Work order must be completed before creating invoice' });
 			}
 
 			if (wo.invoiceId) {
-				throw ApiException.conflict('Invoice already created for this work order');
+				throw errors.CONFLICT({ message: 'Invoice already created for this work order' });
 			}
 
 			// Validate GL account
@@ -1814,7 +1872,7 @@ export const workOrderRouter = {
 			});
 
 			if (!glAccount) {
-				throw ApiException.notFound('GL Expense Account');
+				throw errors.NOT_FOUND({ message: 'GL Expense Account' });
 			}
 
 			const subtotal = input.laborAmount + input.materialsAmount;
@@ -1922,6 +1980,9 @@ export const workOrderRouter = {
 				actualHours: z.number().min(0).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1932,7 +1993,7 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			// Verify work order exists and belongs to org
@@ -1941,7 +2002,7 @@ export const workOrderRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const wo = await prisma.workOrder.findFirst({
@@ -1949,7 +2010,7 @@ export const workOrderRouter = {
 			});
 
 			if (!wo) {
-				throw ApiException.notFound('Work Order');
+				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
 			// Start the durable workflow
@@ -1957,6 +2018,7 @@ export const workOrderRouter = {
 				workOrderId: input.workOrderId,
 				toStatus: input.toStatus as WorkOrderStatus,
 				userId: context.user!.id,
+				organizationId: context.organization!.id,
 				notes: input.notes,
 				vendorId: input.vendorId,
 				scheduledStart: input.scheduledStart ? new Date(input.scheduledStart) : undefined,
@@ -1983,8 +2045,8 @@ export const workOrderRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					status: z.any().nullable(),
-					error: z.any().nullable()
+					status: z.object({ step: z.string() }).passthrough().nullable(),
+					error: z.object({ error: z.string() }).passthrough().nullable()
 				}),
 				meta: ResponseMetaSchema
 			})
@@ -2019,6 +2081,10 @@ export const workOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2032,18 +2098,18 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
-			if (!wo) throw ApiException.notFound('Work Order');
+			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			// Validate pricebook version if provided
 			if (input.pricebookVersionId) {
@@ -2051,7 +2117,7 @@ export const workOrderRouter = {
 					where: { id: input.pricebookVersionId, status: { in: ['ACTIVE', 'PUBLISHED'] } },
 					include: { pricebook: true }
 				});
-				if (!version) throw ApiException.notFound('PricebookVersion');
+				if (!version) throw errors.NOT_FOUND({ message: 'PricebookVersion' });
 			}
 
 			// Validate job template if provided
@@ -2059,7 +2125,7 @@ export const workOrderRouter = {
 				const template = await prisma.jobTemplate.findFirst({
 					where: { id: input.jobTemplateId, isActive: true }
 				});
-				if (!template) throw ApiException.notFound('JobTemplate');
+				if (!template) throw errors.NOT_FOUND({ message: 'JobTemplate' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -2078,7 +2144,7 @@ export const workOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to set pricebook/template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to set pricebook/template' });
 			}
 
 			const updatedWO = await prisma.workOrder.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -2116,6 +2182,10 @@ export const workOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2132,18 +2202,18 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
-			if (!wo) throw ApiException.notFound('Work Order');
+			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
 			const result = await startAddLineItemWorkflow(
@@ -2165,7 +2235,7 @@ export const workOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add line item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add line item' });
 			}
 
 			// Fetch the created line item for the response
@@ -2193,6 +2263,9 @@ export const workOrderRouter = {
 	 */
 	listLineItems: orgProcedure
 		.input(z.object({ workOrderId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2220,18 +2293,18 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
-			if (!wo) throw ApiException.notFound('Work Order');
+			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			const lineItems = await prisma.workOrderLineItem.findMany({
 				where: { workOrderId: input.workOrderId },
@@ -2276,6 +2349,10 @@ export const workOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2283,23 +2360,23 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
-			if (!wo) throw ApiException.notFound('Work Order');
+			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			const lineItem = await prisma.workOrderLineItem.findFirst({
 				where: { id: input.lineItemId, workOrderId: input.workOrderId }
 			});
-			if (!lineItem) throw ApiException.notFound('LineItem');
+			if (!lineItem) throw errors.NOT_FOUND({ message: 'LineItem' });
 
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
 			const result = await startRemoveLineItemWorkflow(
@@ -2313,7 +2390,7 @@ export const workOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to remove line item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove line item' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -2332,6 +2409,10 @@ export const workOrderRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2345,24 +2426,24 @@ export const workOrderRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
 				where: { id: input.workOrderId, associationId: association.id }
 			});
-			if (!wo) throw ApiException.notFound('Work Order');
+			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			const template = await prisma.jobTemplate.findFirst({
 				where: { id: input.jobTemplateId, isActive: true },
 				include: { items: { include: { pricebookItem: true } } }
 			});
-			if (!template) throw ApiException.notFound('JobTemplate');
+			if (!template) throw errors.NOT_FOUND({ message: 'JobTemplate' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startWorkOrderConfigWorkflow(
@@ -2380,7 +2461,7 @@ export const workOrderRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to apply job template');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to apply job template' });
 			}
 
 			const updatedWO = await prisma.workOrder.findUniqueOrThrow({ where: { id: result.entityId } });

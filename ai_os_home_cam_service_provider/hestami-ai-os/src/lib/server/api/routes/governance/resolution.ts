@@ -8,23 +8,22 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type { ResolutionStatus, PolicyStatus } from '../../../../../../generated/prisma/client.js';
 
 const resolutionStatusEnum = z.enum(['PROPOSED', 'ADOPTED', 'SUPERSEDED', 'ARCHIVED']);
 const policyStatusEnum = z.enum(['DRAFT', 'ACTIVE', 'RETIRED']);
 
-const ensureAssociation = async (associationId: string, organizationId: string) => {
+const ensureAssociation = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
-const ensureBoardBelongs = async (boardId: string | null | undefined, associationId: string) => {
+const ensureBoardBelongs = async (boardId: string | null | undefined, associationId: string, errors: any) => {
 	if (!boardId) return;
 	const board = await prisma.board.findFirst({ where: { id: boardId, associationId } });
-	if (!board) throw ApiException.notFound('Board');
+	if (!board) throw errors.NOT_FOUND({ message: 'Board' });
 };
 
 export const governanceResolutionRouter = {
@@ -55,12 +54,16 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'governance_resolution', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			await ensureAssociation(rest.associationId, context.organization.id);
-			await ensureBoardBelongs(rest.boardId, rest.associationId);
+			await ensureAssociation(rest.associationId, context.organization.id, errors);
+			await ensureBoardBelongs(rest.boardId, rest.associationId, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
@@ -79,7 +82,7 @@ export const governanceResolutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create resolution');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create resolution' });
 			}
 
 			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -102,17 +105,20 @@ export const governanceResolutionRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ resolution: z.any() }),
+				data: z.object({ resolution: z.object({ id: z.string(), associationId: z.string(), title: z.string(), status: z.string(), boardId: z.string().nullable() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const resolution = await prisma.resolution.findFirst({
 				where: { id: input.id },
 				include: { association: true, board: true, policyDocuments: true, supersedes: true, supersededBy: true }
 			});
 			if (!resolution || resolution.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Resolution');
+				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 			await context.cerbos.authorize('view', 'governance_resolution', resolution.id);
 			return successResponse({ resolution }, context);
@@ -129,7 +135,7 @@ export const governanceResolutionRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					resolutions: z.array(z.any()),
+					resolutions: z.array(z.object({ id: z.string(), associationId: z.string(), title: z.string(), status: z.string(), createdAt: z.coerce.date() })),
 					pagination: PaginationOutputSchema
 				}),
 				meta: ResponseMetaSchema
@@ -178,7 +184,11 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_resolution', input.id);
 			const { idempotencyKey, ...rest } = input;
 
@@ -187,14 +197,14 @@ export const governanceResolutionRouter = {
 				include: { association: true }
 			});
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Resolution');
+				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 
 			if (rest.supersededById) {
 				const sup = await prisma.resolution.findFirst({
 					where: { id: rest.supersededById, associationId: existing.associationId }
 				});
-				if (!sup) throw ApiException.notFound('Superseding resolution');
+				if (!sup) throw errors.NOT_FOUND({ message: 'Superseding resolution' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -210,7 +220,7 @@ export const governanceResolutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update resolution status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update resolution status' });
 			}
 
 			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: rest.id } });
@@ -244,16 +254,20 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'governance_policy', input.associationId);
 			const { idempotencyKey, ...rest } = input;
 
-			await ensureAssociation(rest.associationId, context.organization.id);
+			await ensureAssociation(rest.associationId, context.organization.id, errors);
 			if (rest.resolutionId) {
 				const res = await prisma.resolution.findFirst({
 					where: { id: rest.resolutionId, associationId: rest.associationId }
 				});
-				if (!res) throw ApiException.notFound('Resolution');
+				if (!res) throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -273,7 +287,7 @@ export const governanceResolutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create policy document');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create policy document' });
 			}
 
 			const policy = await prisma.policyDocument.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -296,17 +310,20 @@ export const governanceResolutionRouter = {
 		.output(
 			z.object({
 				ok: z.literal(true),
-				data: z.object({ policy: z.any() }),
+				data: z.object({ policy: z.object({ id: z.string(), associationId: z.string(), title: z.string(), status: z.string(), description: z.string().nullable() }).passthrough() }),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const policy = await prisma.policyDocument.findFirst({
 				where: { id: input.id },
 				include: { association: true, resolution: true, versions: true }
 			});
 			if (!policy || policy.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Policy');
+				throw errors.NOT_FOUND({ message: 'Policy' });
 			}
 			await context.cerbos.authorize('view', 'governance_policy', policy.id);
 			return successResponse({ policy }, context);
@@ -323,7 +340,7 @@ export const governanceResolutionRouter = {
 			z.object({
 				ok: z.literal(true),
 				data: z.object({
-					policies: z.array(z.any()),
+					policies: z.array(z.object({ id: z.string(), associationId: z.string(), title: z.string(), status: z.string(), createdAt: z.coerce.date() })),
 					pagination: PaginationOutputSchema
 				}),
 				meta: ResponseMetaSchema
@@ -374,7 +391,11 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_policy', input.policyDocumentId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -383,7 +404,7 @@ export const governanceResolutionRouter = {
 				include: { association: true }
 			});
 			if (!policy || policy.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Policy');
+				throw errors.NOT_FOUND({ message: 'Policy' });
 			}
 
 			// Check if version already exists
@@ -419,7 +440,7 @@ export const governanceResolutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create policy version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create policy version' });
 			}
 
 			const version = await prisma.policyVersion.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -455,7 +476,11 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_policy', input.policyDocumentId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -464,13 +489,13 @@ export const governanceResolutionRouter = {
 				include: { association: true }
 			});
 			if (!policy || policy.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Policy');
+				throw errors.NOT_FOUND({ message: 'Policy' });
 			}
 
 			const version = await prisma.policyVersion.findFirst({
 				where: { policyDocumentId: rest.policyDocumentId, version: rest.version }
 			});
-			if (!version) throw ApiException.notFound('Policy version');
+			if (!version) throw errors.NOT_FOUND({ message: 'Policy version' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
@@ -487,7 +512,7 @@ export const governanceResolutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to activate policy version');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate policy version' });
 			}
 
 			const updatedPolicy = await prisma.policyDocument.findUniqueOrThrow({ where: { id: rest.policyDocumentId } });
@@ -528,7 +553,11 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'governance_resolution', input.resolutionId);
 			const { idempotencyKey, resolutionId, motionId } = input;
 
@@ -537,7 +566,7 @@ export const governanceResolutionRouter = {
 				include: { association: true }
 			});
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Resolution');
+				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 
 			const motion = await prisma.boardMotion.findFirst({
@@ -545,7 +574,7 @@ export const governanceResolutionRouter = {
 				include: { association: true }
 			});
 			if (!motion || motion.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Motion');
+				throw errors.NOT_FOUND({ message: 'Motion' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -561,7 +590,7 @@ export const governanceResolutionRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to link resolution to motion');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link resolution to motion' });
 			}
 
 			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: resolutionId } });
@@ -592,7 +621,10 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'governance_resolution', input.resolutionId);
 
 			const resolution = await prisma.resolution.findFirst({
@@ -606,7 +638,7 @@ export const governanceResolutionRouter = {
 			});
 
 			if (!resolution || resolution.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Resolution');
+				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 
 			return successResponse(

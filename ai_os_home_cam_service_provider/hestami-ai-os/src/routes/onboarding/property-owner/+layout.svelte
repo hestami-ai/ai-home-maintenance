@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { PageContainer, StepIndicator } from '$lib/components/ui';
 	import { propertyOwnerOnboarding } from '$lib/stores';
-	import { onMount } from 'svelte';
 
 	interface Props {
 		children: import('svelte').Snippet;
@@ -18,10 +17,6 @@
 		{ label: 'Review' }
 	];
 
-	onMount(() => {
-		// Reset wizard state when entering
-		// propertyOwnerOnboarding.reset();
-	});
 </script>
 
 <svelte:head>

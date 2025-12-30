@@ -7,24 +7,20 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException, ResponseMetaSchema } from '../../errors.js';
 import {
+	ResponseMetaSchema,
 	successResponseSchema,
 	ARCRequestDetailSchema,
 	ARCRequestSummarySchema,
-	ARCPrecedentSchema,
 	ARCCategorySchema,
 	ARCRequestStatusSchema,
-	ARCDocumentTypeSchema,
-	ARCReviewActionSchema
+	ARCDocumentTypeSchema
 } from '../../schemas.js';
 import { startARCRequestWorkflow } from '../../../workflows/arcRequestWorkflow.js';
 import type {
 	Prisma,
 	ARCRequestStatus,
-	ARCReviewAction,
-	ARCCategory,
-	ARCDocumentType
+	ARCCategory
 } from '../../../../../../generated/prisma/client.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -35,48 +31,36 @@ const log = createModuleLogger('ARCRequestRoute');
 const arcCategoryEnum = ARCCategorySchema;
 const arcRequestStatusEnum = ARCRequestStatusSchema;
 const arcDocumentTypeEnum = ARCDocumentTypeSchema;
-const arcReviewActionEnum = ARCReviewActionSchema;
 const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
-const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
 
-const getAssociationOrThrow = async (associationId: string, organizationId: string) => {
+const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { id: associationId, organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
-const ensureUnitBelongs = async (unitId: string, associationId: string) => {
+const ensureUnitBelongs = async (unitId: string, associationId: string, errors: any) => {
 	const unit = await prisma.unit.findFirst({
 		where: { id: unitId, deletedAt: null },
 		include: { property: true }
 	});
 	if (!unit || unit.property.associationId !== associationId) {
-		throw ApiException.notFound('Unit');
+		throw errors.NOT_FOUND({ message: 'Unit' });
 	}
 };
 
-const ensureCommitteeBelongs = async (committeeId: string, associationId: string) => {
+const ensureCommitteeBelongs = async (committeeId: string, associationId: string, errors: any) => {
 	const committee = await prisma.aRCCommittee.findFirst({
 		where: { id: committeeId, associationId, isActive: true }
 	});
-	if (!committee) throw ApiException.notFound('ARC Committee');
+	if (!committee) throw errors.NOT_FOUND({ message: 'ARC Committee' });
 };
 
-const ensurePartyBelongs = async (partyId: string, organizationId: string) => {
+const ensurePartyBelongs = async (partyId: string, organizationId: string, errors: any) => {
 	const party = await prisma.party.findFirst({ where: { id: partyId, organizationId, deletedAt: null } });
-	if (!party) throw ApiException.notFound('Party');
-};
-
-const generateRequestNumber = async (associationId: string) => {
-	const year = new Date().getFullYear();
-	const last = await prisma.aRCRequest.findFirst({
-		where: { associationId, requestNumber: { startsWith: `ARC-${year}-` } },
-		orderBy: { createdAt: 'desc' }
-	});
-	const seq = last ? parseInt((last.requestNumber.split('-')[2] ?? '0'), 10) + 1 : 1;
-	return `ARC-${year}-${String(seq).padStart(6, '0')}`;
+	if (!party) throw errors.NOT_FOUND({ message: 'Party' });
 };
 
 export const arcRequestRouter = {
@@ -110,14 +94,18 @@ export const arcRequestRouter = {
 				})
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'arc_request', 'new');
 			const { idempotencyKey, ...rest } = input;
 
-			await getAssociationOrThrow(rest.associationId, context.organization.id);
-			if (rest.unitId) await ensureUnitBelongs(rest.unitId, rest.associationId);
-			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, rest.associationId);
-			await ensurePartyBelongs(rest.requesterPartyId, context.organization.id);
+			await getAssociationOrThrow(rest.associationId, context.organization.id, errors);
+			if (rest.unitId) await ensureUnitBelongs(rest.unitId, rest.associationId, errors);
+			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, rest.associationId, errors);
+			await ensurePartyBelongs(rest.requesterPartyId, context.organization.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
@@ -142,7 +130,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to create ARC request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create ARC request' });
 			}
 
 			const result = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -185,7 +173,10 @@ export const arcRequestRouter = {
 				z.object({ request: ARCRequestDetailSchema })
 			)
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.aRCRequest.findFirst({
 				where: { id: input.id },
 				include: {
@@ -199,12 +190,18 @@ export const arcRequestRouter = {
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			await context.cerbos.authorize('view', 'arc_request', request.id);
 
-			return successResponse({ request }, context);
+			// Serialize Decimal fields to strings for schema compatibility
+			const serializedRequest = {
+				...request,
+				estimatedCost: request.estimatedCost?.toString() ?? null
+			};
+
+			return successResponse({ request: serializedRequest }, context);
 		}),
 
 	list: orgProcedure
@@ -276,7 +273,12 @@ export const arcRequestRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const { idempotencyKey, ...rest } = input;
 
@@ -285,15 +287,15 @@ export const arcRequestRouter = {
 				include: { association: true }
 			});
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			if (terminalStatuses.includes(existing.status as ARCRequestStatus)) {
-				throw ApiException.badRequest('Cannot update a finalized ARC request');
+				throw errors.BAD_REQUEST({ message: 'Cannot update a finalized ARC request' });
 			}
 
-			if (rest.unitId) await ensureUnitBelongs(rest.unitId, existing.associationId);
-			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, existing.associationId);
+			if (rest.unitId) await ensureUnitBelongs(rest.unitId, existing.associationId, errors);
+			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, existing.associationId, errors);
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
@@ -315,7 +317,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to update ARC request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update ARC request' });
 			}
 
 			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: rest.id } });
@@ -326,18 +328,23 @@ export const arcRequestRouter = {
 	submit: orgProcedure
 		.input(IdempotencyKeySchema.merge(z.object({ id: z.string() })))
 		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string(), submittedAt: z.string().nullable() }) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const existing = await prisma.aRCRequest.findFirst({
 				where: { id: input.id },
 				include: { association: true }
 			});
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			if (terminalStatuses.includes(existing.status as ARCRequestStatus)) {
-				throw ApiException.badRequest('Cannot submit a finalized ARC request');
+				throw errors.BAD_REQUEST({ message: 'Cannot submit a finalized ARC request' });
 			}
 			if (existing.status === 'SUBMITTED' || existing.status === 'UNDER_REVIEW') {
 				return successResponse({ request: { id: existing.id, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null } }, context);
@@ -356,7 +363,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to submit ARC request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to submit ARC request' });
 			}
 
 			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: input.id } });
@@ -381,21 +388,26 @@ export const arcRequestRouter = {
 			)
 		)
 		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string(), withdrawnAt: z.string().nullable() }) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const existing = await prisma.aRCRequest.findFirst({
 				where: { id: input.id },
 				include: { association: true }
 			});
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			if (existing.status === 'WITHDRAWN') {
 				return successResponse({ request: { id: existing.id, status: existing.status, withdrawnAt: existing.withdrawnAt?.toISOString() ?? null } }, context);
 			}
 			if (terminalStatuses.includes(existing.status as ARCRequestStatus)) {
-				throw ApiException.badRequest('Cannot withdraw a finalized ARC request');
+				throw errors.BAD_REQUEST({ message: 'Cannot withdraw a finalized ARC request' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -411,7 +423,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to withdraw ARC request');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to withdraw ARC request' });
 			}
 
 			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: input.id } });
@@ -445,7 +457,12 @@ export const arcRequestRouter = {
 			)
 		)
 		.output(z.object({ ok: z.literal(true), data: z.object({ document: z.object({ id: z.string(), requestId: z.string() }) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -454,11 +471,11 @@ export const arcRequestRouter = {
 				include: { association: true }
 			});
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
-				throw ApiException.badRequest('Cannot add documents to a finalized ARC request');
+				throw errors.BAD_REQUEST({ message: 'Cannot add documents to a finalized ARC request' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -481,7 +498,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to add document');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to add document' });
 			}
 
 			const document = await prisma.aRCDocument.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
@@ -504,7 +521,7 @@ export const arcRequestRouter = {
 			IdempotencyKeySchema.merge(
 				z.object({
 					requestId: z.string(),
-					action: arcReviewActionEnum,
+					action: z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']),
 					notes: z.string().max(5000).optional(),
 					conditions: z.string().max(5000).optional(),
 					expiresAt: z.string().datetime().optional()
@@ -512,7 +529,11 @@ export const arcRequestRouter = {
 			)
 		)
 		.output(z.object({ ok: z.literal(true), data: z.object({ request: z.object({ id: z.string(), status: z.string() }) }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -521,7 +542,7 @@ export const arcRequestRouter = {
 				include: { association: true }
 			});
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			const previousStatus = request.status;
@@ -544,7 +565,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!workflowResult.success) {
-				throw ApiException.internal(workflowResult.error || 'Failed to record decision');
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to record decision' });
 			}
 
 			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: rest.requestId } });
@@ -610,7 +631,10 @@ export const arcRequestRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'arc_request', input.requestId);
 
 			const request = await prisma.aRCRequest.findFirst({
@@ -619,35 +643,35 @@ export const arcRequestRouter = {
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			// Get precedents for the same unit
 			const unitPrecedents = input.unitId
 				? await prisma.aRCRequest.findMany({
-						where: {
-							associationId: request.associationId,
-							unitId: input.unitId,
-							id: { not: input.requestId },
-							status: { in: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED'] }
-						},
-						orderBy: { decisionDate: 'desc' },
-						take: input.limit
-					})
+					where: {
+						associationId: request.associationId,
+						unitId: input.unitId,
+						id: { not: input.requestId },
+						status: { in: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED'] }
+					},
+					orderBy: { decisionDate: 'desc' },
+					take: input.limit
+				})
 				: [];
 
 			// Get precedents for the same category
 			const categoryPrecedents = input.category
 				? await prisma.aRCRequest.findMany({
-						where: {
-							associationId: request.associationId,
-							category: input.category as ARCCategory,
-							id: { not: input.requestId },
-							status: { in: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED'] }
-						},
-						orderBy: { decisionDate: 'desc' },
-						take: input.limit
-					})
+					where: {
+						associationId: request.associationId,
+						category: input.category as ARCCategory,
+						id: { not: input.requestId },
+						status: { in: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED'] }
+					},
+					orderBy: { decisionDate: 'desc' },
+					take: input.limit
+				})
 				: [];
 
 			return successResponse(
@@ -693,7 +717,10 @@ export const arcRequestRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -710,7 +737,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to request info');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to request info' });
 			}
 
 			const updated = { id: result.entityId!, status: result.newStatus! };
@@ -751,7 +778,10 @@ export const arcRequestRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -768,7 +798,7 @@ export const arcRequestRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to submit info');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit info' });
 			}
 
 			const updated = { id: result.entityId!, status: result.newStatus! };

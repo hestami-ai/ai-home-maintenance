@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { InventoryLocationType } from '../../../../../../generated/prisma/client.js';
 import { startInventoryLocationWorkflow } from '../../../workflows/inventoryLocationWorkflow.js';
@@ -70,6 +69,11 @@ export const inventoryLocationRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -77,8 +81,8 @@ export const inventoryLocationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'inventory_location', 'new');
 
 			// Validate technician if provided
@@ -86,7 +90,7 @@ export const inventoryLocationRouter = {
 				const tech = await prisma.technician.findFirst({
 					where: { id: input.technicianId, organizationId: context.organization!.id }
 				});
-				if (!tech) throw ApiException.notFound('Technician');
+				if (!tech) throw errors.NOT_FOUND({ message: 'Technician not found' });
 			}
 
 			// Validate branch if provided
@@ -94,7 +98,7 @@ export const inventoryLocationRouter = {
 				const branch = await prisma.contractorBranch.findFirst({
 					where: { id: input.branchId, organizationId: context.organization!.id }
 				});
-				if (!branch) throw ApiException.notFound('Branch');
+				if (!branch) throw errors.NOT_FOUND({ message: 'Branch not found' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -121,7 +125,7 @@ export const inventoryLocationRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create location');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create location' });
 			}
 
 			const location = await prisma.inventoryLocation.findUniqueOrThrow({
@@ -133,6 +137,10 @@ export const inventoryLocationRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -140,15 +148,15 @@ export const inventoryLocationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_location', input.id);
 
 			const location = await prisma.inventoryLocation.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!location) throw ApiException.notFound('Inventory location');
+			if (!location) throw errors.NOT_FOUND({ message: 'Inventory location not found' });
 
 			return successResponse({ location: formatLocation(location) }, context);
 		}),
@@ -165,6 +173,9 @@ export const inventoryLocationRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -175,8 +186,8 @@ export const inventoryLocationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_location', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -231,6 +242,11 @@ export const inventoryLocationRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -238,14 +254,14 @@ export const inventoryLocationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'inventory_location', input.id);
 
 			const existing = await prisma.inventoryLocation.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Inventory location');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Inventory location not found' });
 
 			const { id, idempotencyKey, ...data } = input;
 
@@ -262,7 +278,7 @@ export const inventoryLocationRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update location');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update location' });
 			}
 
 			const location = await prisma.inventoryLocation.findUniqueOrThrow({
@@ -274,6 +290,12 @@ export const inventoryLocationRouter = {
 
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -281,21 +303,21 @@ export const inventoryLocationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'inventory_location', input.id);
 
 			const existing = await prisma.inventoryLocation.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Inventory location');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Inventory location not found' });
 
 			// Check if location has inventory
 			const hasInventory = await prisma.inventoryLevel.findFirst({
 				where: { locationId: input.id, quantityOnHand: { gt: 0 } }
 			});
 			if (hasInventory) {
-				throw ApiException.badRequest('Cannot delete location with inventory. Transfer stock first.');
+				throw errors.BAD_REQUEST({ message: 'Cannot delete location with inventory. Transfer stock first.' });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -311,7 +333,7 @@ export const inventoryLocationRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete location');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete location' });
 			}
 
 			return successResponse({ deleted: true }, context);

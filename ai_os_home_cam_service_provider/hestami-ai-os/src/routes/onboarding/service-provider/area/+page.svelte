@@ -3,7 +3,6 @@
 	import { Card } from '$lib/components/ui';
 	import { serviceProviderOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let zipCodes = $state<string[]>([...$serviceProviderOnboarding.serviceArea.zipCodes]);
 	let serviceRadius = $state($serviceProviderOnboarding.serviceArea.serviceRadius);
@@ -30,7 +29,7 @@
 		{ code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' }
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		serviceProviderOnboarding.setStep(2);
 	});
 

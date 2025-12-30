@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import {
 		ArrowLeft,
 		Plus,
@@ -21,8 +19,8 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { organizationStore } from '$lib/stores';
 	import { conciergeCaseApi, type ConciergeCaseDetail } from '$lib/api/cam';
+	import { page } from '$app/state';
 	import {
 		vendorCandidateApi,
 		STATUS_LABELS,
@@ -35,56 +33,32 @@
 		type ExtractedVendorData
 	} from '$lib/api/vendorCandidate';
 
-	const caseId = $derived($page.params.id ?? '');
-	const organizationId = $derived($organizationStore.current?.organization.id || '');
+	const caseId = $derived(page.params.id ?? '');
 
-	let caseDetail = $state<ConciergeCaseDetail | null>(null);
+	interface Props {
+		data: {
+			caseDetail: ConciergeCaseDetail;
+			vendors: VendorCandidateListItem[];
+		};
+	}
+
+	let { data }: Props = $props();
+
+	let caseDetail = $derived(data.caseDetail);
 	let vendors = $state<VendorCandidateListItem[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let isLoadingVendors = $state(false);
 	let error = $state<string | null>(null);
 
-	// Capture form state
-	let showCaptureForm = $state(false);
-	let sourceUrl = $state('');
-	let sourceHtml = $state('');
-	let sourcePlainText = $state('');
-	let isExtracting = $state(false);
-	let extractedData = $state<ExtractedVendorData | null>(null);
-	let extractionError = $state<string | null>(null);
-
-	// Manual entry form state
-	let showManualForm = $state(false);
-	let manualVendorName = $state('');
-	let manualContactName = $state('');
-	let manualContactEmail = $state('');
-	let manualContactPhone = $state('');
-	let manualAddress = $state('');
-	let manualWebsite = $state('');
-	let manualServiceCategories = $state('');
-	let manualNotes = $state('');
-	let isSubmitting = $state(false);
-
-	onMount(async () => {
-		await Promise.all([loadCaseDetail(), loadVendors()]);
+	// Synchronize server vendors to local state
+	$effect(() => {
+		if (data.vendors) {
+			vendors = [...data.vendors];
+		}
 	});
 
-	async function loadCaseDetail() {
-		if (!caseId) return;
-		try {
-			const response = await conciergeCaseApi.getDetail(caseId);
-			if (response.ok) {
-				caseDetail = response.data;
-			}
-		} catch (err) {
-			console.error('Failed to load case:', err);
-		} finally {
-			isLoading = false;
-		}
-	}
-
 	async function loadVendors() {
-		if (!caseId || !organizationId) return;
+		if (!caseId) return;
 		isLoadingVendors = true;
 		try {
 			const response = await vendorCandidateApi.listByCase({ caseId });
@@ -97,6 +71,7 @@
 			isLoadingVendors = false;
 		}
 	}
+
 
 	async function extractVendorInfo() {
 		if (!sourceUrl && !sourceHtml && !sourcePlainText) {
@@ -199,6 +174,27 @@
 			isSubmitting = false;
 		}
 	}
+
+	// Capture form state
+	let showCaptureForm = $state(false);
+	let sourceUrl = $state('');
+	let sourceHtml = $state('');
+	let sourcePlainText = $state('');
+	let isExtracting = $state(false);
+	let extractedData = $state<ExtractedVendorData | null>(null);
+	let extractionError = $state<string | null>(null);
+
+	// Manual entry form state
+	let showManualForm = $state(false);
+	let manualVendorName = $state('');
+	let manualContactName = $state('');
+	let manualContactEmail = $state('');
+	let manualContactPhone = $state('');
+	let manualAddress = $state('');
+	let manualWebsite = $state('');
+	let manualServiceCategories = $state('');
+	let manualNotes = $state('');
+	let isSubmitting = $state(false);
 
 	function resetCaptureForm() {
 		showCaptureForm = false;

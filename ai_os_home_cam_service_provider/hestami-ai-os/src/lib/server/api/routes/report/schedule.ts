@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startReportScheduleWorkflow } from '../../../workflows/reportScheduleWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -12,11 +11,11 @@ const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
 const scheduleFrequencyEnum = z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY', 'CUSTOM']);
 const deliveryMethodEnum = z.enum(['EMAIL', 'PORTAL', 'BOTH']);
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -76,9 +75,13 @@ export const reportScheduleRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'report_schedule', 'new');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
@@ -102,7 +105,7 @@ export const reportScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create schedule' });
 			}
 
 			const schedule = await prisma.reportSchedule.findUniqueOrThrow({
@@ -150,9 +153,12 @@ export const reportScheduleRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'report_schedule', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = { associationId: association.id };
 			if (input?.reportId) where.reportId = input.reportId;
@@ -219,16 +225,19 @@ export const reportScheduleRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association or Report schedule not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'report_schedule', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const schedule = await prisma.reportSchedule.findFirst({
 				where: { id: input.id, associationId: association.id },
 				include: { report: { select: { name: true } } }
 			});
 
-			if (!schedule) throw ApiException.notFound('Report schedule');
+			if (!schedule) throw errors.NOT_FOUND({ message: 'Report schedule' });
 
 			return successResponse({
 				schedule: {
@@ -278,9 +287,13 @@ export const reportScheduleRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'report_schedule', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
@@ -305,7 +318,7 @@ export const reportScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update schedule' });
 			}
 
 			const schedule = await prisma.reportSchedule.findUniqueOrThrow({
@@ -335,9 +348,13 @@ export const reportScheduleRouter = {
 			data: z.object({ deleted: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'report_schedule', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
@@ -353,7 +370,7 @@ export const reportScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete schedule' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -377,9 +394,13 @@ export const reportScheduleRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'report_schedule', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
@@ -395,7 +416,7 @@ export const reportScheduleRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to run schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to run schedule' });
 			}
 
 			const execution = await prisma.reportExecution.findUniqueOrThrow({

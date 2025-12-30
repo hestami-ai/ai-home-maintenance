@@ -61,8 +61,8 @@ model Technician {
   inventoryLocations InventoryLocation[]
 
   // Maintenance Contracts
-  serviceContracts   ServiceContract[]    @relation("PrimaryTechnician")
-  scheduledVisits    ScheduledVisit[]     @relation("ScheduledVisitTechnician")
+  serviceContracts ServiceContract[] @relation("PrimaryTechnician")
+  scheduledVisits  ScheduledVisit[]  @relation("ScheduledVisitTechnician")
 
   @@index([organizationId])
   @@index([branchId])
@@ -230,7 +230,8 @@ enum OrganizationType {
   EXTERNAL_SERVICE_PROVIDER // Phase 2: External (non-platform) service providers
   COMMERCIAL_CLIENT
   INDIVIDUAL_PROPERTY_OWNER // Phase 3: Property owner (individual person)
-  TRUST_OR_LLC              // Phase 3: Property owner (trust, LLC, or other entity)
+  TRUST_OR_LLC // Phase 3: Property owner (trust, LLC, or other entity)
+  PLATFORM_OPERATOR // Hestami staff organization
 }
 
 enum OrganizationStatus {
@@ -253,28 +254,26 @@ enum UserRole {
 // -----------------------------------------------------------------------------
 
 enum StaffStatus {
-  PENDING    // Invitation sent, awaiting activation
-  ACTIVE     // Active staff member
-  SUSPENDED  // Emergency suspension (security/policy)
+  PENDING // Invitation sent, awaiting activation
+  ACTIVE // Active staff member
+  SUSPENDED // Emergency suspension (security/policy)
   DEACTIVATED // Normal deactivation (left company, role change)
 }
 
 enum StaffRole {
-  CONCIERGE_OPERATOR     // Manages property issue resolution, vendor discovery
+  CONCIERGE_OPERATOR // Manages property issue resolution, vendor discovery
   OPERATIONS_COORDINATOR // Oversees case queues, escalations, SLA risks
-  CAM_SPECIALIST         // Manages HOA governance workflows, compliance
-  VENDOR_LIAISON         // Manages vendor entities, credentials, performance
-  PLATFORM_ADMIN         // System configuration, permissions, access control
+  CAM_SPECIALIST // Manages HOA governance workflows, compliance
+  VENDOR_LIAISON // Manages vendor entities, credentials, performance
+  PLATFORM_ADMIN // System configuration, permissions, access control
 }
 
-
-
 enum PillarAccess {
-  CONCIERGE   // Concierge Operations pillar
-  CAM         // CAM / Governance pillar
-  CONTRACTOR  // Contractor Operations pillar
-  VENDOR      // Vendor Management pillar
-  ADMIN       // System Administration pillar
+  CONCIERGE // Concierge Operations pillar
+  CAM // CAM / Governance pillar
+  CONTRACTOR // Contractor Operations pillar
+  VENDOR // Vendor Management pillar
+  ADMIN // System Administration pillar
 }
 
 // -----------------------------------------------------------------------------
@@ -770,6 +769,21 @@ model Organization {
   memberships         UserOrganization[]
   idempotencyKeys     IdempotencyKey[]
   associations        Association[]
+  properties          Property[]
+  units               Unit[]
+  workOrders          WorkOrder[]
+  arcRequests         ARCRequest[]
+  arcCommittees       ARCCommittee[]
+  violations          Violation[]
+  violationTypes      ViolationType[]
+  vendors             Vendor[]
+  assets              Asset[]
+  glAccounts          GLAccount[]
+  bankAccounts        BankAccount[]
+  assessmentTypes     AssessmentType[]
+  boards              Board[]
+  meetings            Meeting[]
+  policyDocuments     PolicyDocument[]
   parties             Party[]
   managedAssociations ManagementContract[] // For management companies
 
@@ -812,12 +826,12 @@ model Organization {
   paymentIntents PaymentIntent[]
 
   // Phase 2: Inventory, Materials & Procurement
-  suppliers           Supplier[]
-  inventoryItems      InventoryItem[]
-  inventoryLocations  InventoryLocation[]
-  inventoryTransfers  InventoryTransfer[]
-  materialUsages      MaterialUsage[]
-  purchaseOrders      PurchaseOrder[]
+  suppliers          Supplier[]
+  inventoryItems     InventoryItem[]
+  inventoryLocations InventoryLocation[]
+  inventoryTransfers InventoryTransfer[]
+  materialUsages     MaterialUsage[]
+  purchaseOrders     PurchaseOrder[]
 
   // Phase 2: Maintenance Contracts
   serviceContracts ServiceContract[]
@@ -840,7 +854,7 @@ model Organization {
   materialDecisions      MaterialDecision[]
 
   // Phase 16.5: Vendor Discovery
-  vendorCandidates       VendorCandidate[]
+  vendorCandidates VendorCandidate[]
 
   @@map("organizations")
 }
@@ -870,8 +884,8 @@ model User {
   arcReviews         ARCReview[]
 
   // Phase 3: Concierge Cases
-  assignedConciergeCases ConciergeCase[] @relation("AssignedConciergeCases")
-  performedActions       ConciergeAction[] @relation("ActionPerformer")
+  assignedConciergeCases ConciergeCase[]    @relation("AssignedConciergeCases")
+  performedActions       ConciergeAction[]  @relation("ActionPerformer")
   materialDecisions      MaterialDecision[] @relation("DecisionMaker")
 
   // Phase 16: Staff Management
@@ -881,7 +895,7 @@ model User {
   sentCommunications CaseCommunication[] @relation("CommunicationSender")
 
   // Phase 16.11: Case Reviews
-  caseReviews        CaseReview[] @relation("CaseReviewer")
+  caseReviews CaseReview[] @relation("CaseReviewer")
 
   // Phase 16.10: Milestones & Issues
   completedMilestones CaseMilestone[] @relation("MilestoneCompleter")
@@ -907,18 +921,18 @@ model Staff {
   title       String?
 
   // Status & lifecycle
-  status       StaffStatus @default(PENDING)
-  activatedAt  DateTime?   @map("activated_at")
-  suspendedAt  DateTime?   @map("suspended_at")
-  deactivatedAt DateTime?  @map("deactivated_at")
-  suspensionReason String? @map("suspension_reason") @db.Text
-  deactivationReason String? @map("deactivation_reason") @db.Text
+  status             StaffStatus @default(PENDING)
+  activatedAt        DateTime?   @map("activated_at")
+  suspendedAt        DateTime?   @map("suspended_at")
+  deactivatedAt      DateTime?   @map("deactivated_at")
+  suspensionReason   String?     @map("suspension_reason") @db.Text
+  deactivationReason String?     @map("deactivation_reason") @db.Text
 
   // Roles (staff can have multiple roles)
   roles StaffRole[]
 
   // Pillar access permissions
-  pillarAccess PillarAccess[]  @map("pillar_access")
+  pillarAccess PillarAccess[] @map("pillar_access")
 
   // Onboarding & Activation (Phase 19)
   activationCodeEncrypted String?   @map("activation_code_encrypted")
@@ -945,13 +959,13 @@ model Staff {
 /// @description Staff case assignment tracking
 /// Tracks assignment history with timestamps and justification
 model StaffCaseAssignment {
-  id        String @id @default(cuid())
-  staffId   String @map("staff_id")
-  caseId    String @map("case_id")
-  
+  id      String @id @default(cuid())
+  staffId String @map("staff_id")
+  caseId  String @map("case_id")
+
   // Assignment details
-  isPrimary     Boolean @default(false) @map("is_primary")
-  assignedAt    DateTime @default(now()) @map("assigned_at")
+  isPrimary     Boolean   @default(false) @map("is_primary")
+  assignedAt    DateTime  @default(now()) @map("assigned_at")
   unassignedAt  DateTime? @map("unassigned_at")
   justification String?   @db.Text
 
@@ -1078,7 +1092,7 @@ model ActivityEvent {
   entityId      String                @map("entity_id")
   action        ActivityActionType
   eventCategory ActivityEventCategory @map("event_category")
-  summary       String                // Human-readable description
+  summary       String // Human-readable description
 
   // Actor information
   performedById   String?           @map("performed_by_id")
@@ -1157,6 +1171,7 @@ enum ActivityEntityType {
   TECHNICIAN
   CONTRACTOR
   INVENTORY
+  PURCHASE_ORDER
 
   // Phase 3 - Concierge
   CONCIERGE_CASE
@@ -1250,10 +1265,10 @@ enum ActivityActorType {
 
 /// @description Event category for intent vs decision vs execution distinction
 enum ActivityEventCategory {
-  INTENT     // User requested/expressed desire
-  DECISION   // Determination made (human or AI)
-  EXECUTION  // Action taken
-  SYSTEM     // Background/automated
+  INTENT // User requested/expressed desire
+  DECISION // Determination made (human or AI)
+  EXECUTION // Action taken
+  SYSTEM // Background/automated
 }
 
 // =============================================================================
@@ -1615,10 +1630,11 @@ model Association {
 
 /// @description Property/Community managed by an association
 model Property {
-  id            String       @id @default(cuid())
-  associationId String       @map("association_id")
-  name          String
-  propertyType  PropertyType @map("property_type")
+  id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
+  associationId  String       @map("association_id")
+  name           String
+  propertyType   PropertyType @map("property_type")
 
   // Address
   addressLine1 String  @map("address_line_1")
@@ -1642,24 +1658,27 @@ model Property {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  association Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  units       Unit[]
-  commonAreas CommonArea[]
-  jobs        Job[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  units        Unit[]
+  commonAreas  CommonArea[]
+  jobs         Job[]
 
   // Maintenance Contracts
   serviceContracts ServiceContract[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@map("properties")
 }
 
 /// @description Individual unit/lot within a property
 model Unit {
-  id         String   @id @default(cuid())
-  propertyId String   @map("property_id")
-  unitNumber String   @map("unit_number")
-  unitType   UnitType @map("unit_type")
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  propertyId     String   @map("property_id")
+  unitNumber     String   @map("unit_number")
+  unitType       UnitType @map("unit_type")
 
   // Address (if different from property)
   addressLine1 String? @map("address_line_1")
@@ -1684,9 +1703,10 @@ model Unit {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  property   Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  ownerships Ownership[]
-  tenancies  Tenancy[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property     Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownerships   Ownership[]
+  tenancies    Tenancy[]
 
   // Accounting relations
   assessmentCharges AssessmentCharge[]
@@ -1712,6 +1732,7 @@ model Unit {
   serviceContracts ServiceContract[]
 
   @@unique([propertyId, unitNumber])
+  @@index([organizationId])
   @@index([propertyId])
   @@map("units")
 }
@@ -1813,10 +1834,10 @@ model Party {
   documentDownloadLogs DocumentDownloadLog[]
 
   // Phase 3: Property Ownership
-  propertyOwnerships    PropertyOwnership[]
-  delegatedAuthorities  DelegatedAuthority[] @relation("DelegatedAuthorities")
-  submittedIntents      OwnerIntent[]        @relation("IntentSubmitter")
-  caseParticipations    CaseParticipant[]    @relation("CaseParticipants")
+  propertyOwnerships   PropertyOwnership[]
+  delegatedAuthorities DelegatedAuthority[] @relation("DelegatedAuthorities")
+  submittedIntents     OwnerIntent[]        @relation("IntentSubmitter")
+  caseParticipations   CaseParticipant[]    @relation("CaseParticipants")
 
   @@index([organizationId])
   @@index([userId])
@@ -1831,6 +1852,7 @@ model Party {
 /// @description Configurable violation type for an association
 model ViolationType {
   id                    String            @id @default(cuid())
+  organizationId        String            @map("organization_id")
   associationId         String            @map("association_id")
   code                  String
   name                  String
@@ -1851,6 +1873,7 @@ model ViolationType {
   updatedAt             DateTime          @updatedAt @map("updated_at")
 
   // Relations
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association     Association            @relation(fields: [associationId], references: [id], onDelete: Cascade)
   warningTemplate NoticeTemplate?        @relation("ViolationTypeWarningTemplate", fields: [warningTemplateId], references: [id], onDelete: SetNull)
   noticeTemplate  NoticeTemplate?        @relation("ViolationTypeNoticeTemplate", fields: [noticeTemplateId], references: [id], onDelete: SetNull)
@@ -1858,6 +1881,7 @@ model ViolationType {
   sequenceConfigs NoticeSequenceConfig[]
 
   @@unique([associationId, code])
+  @@index([organizationId])
   @@index([associationId])
   @@map("violation_types")
 }
@@ -1865,6 +1889,7 @@ model ViolationType {
 /// @description Violation instance
 model Violation {
   id                 String            @id @default(cuid())
+  organizationId     String            @map("organization_id")
   associationId      String            @map("association_id")
   violationNumber    String            @map("violation_number")
   violationTypeId    String            @map("violation_type_id")
@@ -1896,6 +1921,7 @@ model Violation {
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
   // Relations
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association      Association              @relation(fields: [associationId], references: [id], onDelete: Cascade)
   violationType    ViolationType            @relation(fields: [violationTypeId], references: [id], onDelete: Restrict)
   unit             Unit?                    @relation(fields: [unitId], references: [id], onDelete: SetNull)
@@ -1912,6 +1938,7 @@ model Violation {
   // Phase 11: Governance - agenda items linked to this violation
   agendaItems MeetingAgendaItem[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@index([violationTypeId])
   @@index([unitId])
@@ -2079,12 +2106,12 @@ model NoticeTemplate {
 
 /// @description Notice sequence configuration per violation type
 model NoticeSequenceConfig {
-  id              String  @id @default(cuid())
-  violationTypeId String  @map("violation_type_id")
+  id              String   @id @default(cuid())
+  violationTypeId String   @map("violation_type_id")
   name            String
   description     String?
-  isDefault       Boolean @default(false) @map("is_default")
-  isActive        Boolean @default(true) @map("is_active")
+  isDefault       Boolean  @default(false) @map("is_default")
+  isActive        Boolean  @default(true) @map("is_active")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -2439,9 +2466,9 @@ model Document {
   archiveReason String?   @map("archive_reason")
 
   // Processing status (malware scan, content moderation)
-  malwareScanStatus        String?   @map("malware_scan_status") // PENDING, CLEAN, INFECTED, ERROR
-  contentModerationStatus  String?   @map("content_moderation_status") // PENDING, APPROVED, FLAGGED
-  processingCompletedAt    DateTime? @map("processing_completed_at")
+  malwareScanStatus       String?   @map("malware_scan_status") // PENDING, CLEAN, INFECTED, ERROR
+  contentModerationStatus String?   @map("content_moderation_status") // PENDING, APPROVED, FLAGGED
+  processingCompletedAt   DateTime? @map("processing_completed_at")
 
   // Media-specific fields (for photos, videos, voice notes)
   latitude      Decimal?  @db.Decimal(10, 7)
@@ -2455,14 +2482,14 @@ model Document {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  parentDocument Document?               @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
-  childVersions  Document[]              @relation("DocumentVersions")
-  supersededBy   Document?               @relation("SupersededDocuments", fields: [supersededById], references: [id])
-  supersedes     Document[]              @relation("SupersededDocuments")
+  organization    Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentDocument  Document?                @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  childVersions   Document[]               @relation("DocumentVersions")
+  supersededBy    Document?                @relation("SupersededDocuments", fields: [supersededById], references: [id])
+  supersedes      Document[]               @relation("SupersededDocuments")
   contextBindings DocumentContextBinding[]
-  accessGrants   DocumentAccessGrant[]
-  downloadLogs   DocumentDownloadLog[]
+  accessGrants    DocumentAccessGrant[]
+  downloadLogs    DocumentDownloadLog[]
 
   @@index([organizationId])
   @@index([category])
@@ -2971,8 +2998,9 @@ enum InvoiceStatus {
 
 /// @description General Ledger Account
 model GLAccount {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   // Account identification
   accountNumber String  @map("account_number")
@@ -3002,6 +3030,7 @@ model GLAccount {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association     Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
   parent          GLAccount?         @relation("AccountHierarchy", fields: [parentId], references: [id])
   children        GLAccount[]        @relation("AccountHierarchy")
@@ -3011,6 +3040,7 @@ model GLAccount {
   lateFeeAccount  AssessmentType[]   @relation("LateFeeAccount")
 
   @@unique([associationId, accountNumber])
+  @@index([organizationId])
   @@index([associationId])
   @@index([parentId])
   @@index([accountType])
@@ -3108,9 +3138,10 @@ model JournalEntryLine {
 
 /// @description Bank Account linked to GL
 model BankAccount {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
-  glAccountId   String @map("gl_account_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
+  glAccountId    String @map("gl_account_id")
 
   // Bank details
   bankName      String  @map("bank_name")
@@ -3135,10 +3166,12 @@ model BankAccount {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  glAccount   GLAccount   @relation(fields: [glAccountId], references: [id])
-  payments    Payment[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  glAccount    GLAccount    @relation(fields: [glAccountId], references: [id])
+  payments     Payment[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@index([glAccountId])
   @@map("bank_accounts")
@@ -3150,8 +3183,9 @@ model BankAccount {
 
 /// @description Assessment type configuration
 model AssessmentType {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   // Type details
   name        String
@@ -3183,12 +3217,14 @@ model AssessmentType {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association    Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
   revenueAccount GLAccount          @relation("AssessmentRevenueAccount", fields: [revenueAccountId], references: [id])
   lateFeeAccount GLAccount?         @relation("LateFeeAccount", fields: [lateFeeAccountId], references: [id])
   charges        AssessmentCharge[]
 
   @@unique([associationId, code])
+  @@index([organizationId])
   @@index([associationId])
   @@map("assessment_types")
 }
@@ -3327,8 +3363,9 @@ model PaymentApplication {
 
 /// @description Vendor (service provider for AP)
 model Vendor {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   // Vendor details
   name String
@@ -3376,8 +3413,9 @@ model Vendor {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  invoices    APInvoice[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  invoices     APInvoice[]
 
   // Phase 4: Work Orders
   workOrders WorkOrder[]
@@ -3389,6 +3427,7 @@ model Vendor {
   // Phase 2: Inventory & Procurement
   suppliers Supplier[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@index([email])
   @@index([approvalStatus])
@@ -3478,8 +3517,9 @@ model APInvoiceLine {
 
 /// @description Physical asset (equipment, systems, common area items)
 model Asset {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   // Asset identification
   assetNumber String  @map("asset_number")
@@ -3522,12 +3562,14 @@ model Asset {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association        Association           @relation(fields: [associationId], references: [id], onDelete: Cascade)
   unit               Unit?                 @relation(fields: [unitId], references: [id])
   workOrders         WorkOrder[]
   maintenanceHistory AssetMaintenanceLog[]
 
   @@unique([associationId, assetNumber])
+  @@index([organizationId])
   @@index([associationId])
   @@index([unitId])
   @@index([category])
@@ -3641,8 +3683,9 @@ model AssociationServiceProvider {
 
 /// @description Work order for maintenance, repairs, and services
 model WorkOrder {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   // Work order identification
   workOrderNumber String @map("work_order_number")
@@ -3722,15 +3765,16 @@ model WorkOrder {
   spendToDate    Decimal?  @map("spend_to_date") @db.Decimal(12, 2)
 
   // Phase 9: Constraints and Board Approval (CAM Oversight)
-  constraints           String?             @map("constraints") @db.Text // HOA rules, conditions
-  requiresBoardApproval Boolean             @default(false) @map("requires_board_approval")
-  boardApprovalVoteId   String?             @map("board_approval_vote_id")
+  constraints           String?              @map("constraints") @db.Text // HOA rules, conditions
+  requiresBoardApproval Boolean              @default(false) @map("requires_board_approval")
+  boardApprovalVoteId   String?              @map("board_approval_vote_id")
   boardApprovalStatus   BoardApprovalStatus? @map("board_approval_status")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
+  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association        Association              @relation(fields: [associationId], references: [id], onDelete: Cascade)
   unit               Unit?                    @relation(fields: [unitId], references: [id])
   asset              Asset?                   @relation(fields: [assetId], references: [id])
@@ -3761,6 +3805,7 @@ model WorkOrder {
   agendaItems MeetingAgendaItem[]
 
   @@unique([associationId, workOrderNumber])
+  @@index([organizationId])
   @@index([associationId])
   @@index([unitId])
   @@index([assetId])
@@ -3906,6 +3951,7 @@ model WorkOrderLineItem {
 /// @description Architectural change request
 model ARCRequest {
   id               String  @id @default(cuid())
+  organizationId   String  @map("organization_id")
   associationId    String  @map("association_id")
   committeeId      String? @map("committee_id")
   unitId           String? @map("unit_id")
@@ -3936,6 +3982,7 @@ model ARCRequest {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association    Association   @relation(fields: [associationId], references: [id], onDelete: Cascade)
   committee      ARCCommittee? @relation(fields: [committeeId], references: [id])
   unit           Unit?         @relation(fields: [unitId], references: [id])
@@ -3950,6 +3997,7 @@ model ARCRequest {
   agendaItems MeetingAgendaItem[]
 
   @@unique([associationId, requestNumber])
+  @@index([organizationId])
   @@index([associationId])
   @@index([committeeId])
   @@index([unitId])
@@ -3985,8 +4033,9 @@ model ARCDocument {
 
 /// @description ARC committee configuration
 model ARCCommittee {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   name              String
   description       String?
@@ -3998,10 +4047,12 @@ model ARCCommittee {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  association Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  members     ARCCommitteeMember[]
-  requests    ARCRequest[]
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association          @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  members      ARCCommitteeMember[]
+  requests     ARCRequest[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@map("arc_committees")
 }
@@ -4053,8 +4104,9 @@ model ARCReview {
 
 /// @description Board for an association
 model Board {
-  id            String @id @default(cuid())
-  associationId String @map("association_id")
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
 
   name        String
   description String?
@@ -4063,12 +4115,14 @@ model Board {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  association Association    @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  members     BoardMember[]
-  meetings    Meeting[]
-  resolutions Resolution[]
-  history     BoardHistory[]
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association    @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  members      BoardMember[]
+  meetings     Meeting[]
+  resolutions  Resolution[]
+  history      BoardHistory[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@map("boards")
 }
@@ -4098,9 +4152,10 @@ model BoardMember {
 
 /// @description Meetings for governance (board, annual, special)
 model Meeting {
-  id            String  @id @default(cuid())
-  associationId String  @map("association_id")
-  boardId       String? @map("board_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
+  associationId  String  @map("association_id")
+  boardId        String? @map("board_id")
 
   type         MeetingType
   status       MeetingStatus @default(SCHEDULED)
@@ -4118,6 +4173,7 @@ model Meeting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   association  Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
   board        Board?              @relation(fields: [boardId], references: [id])
   agendaItems  MeetingAgendaItem[]
@@ -4126,6 +4182,7 @@ model Meeting {
   votes        Vote[]
   boardMotions BoardMotion[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@index([boardId])
   @@index([scheduledFor])
@@ -4137,10 +4194,10 @@ model MeetingAgendaItem {
   id        String @id @default(cuid())
   meetingId String @map("meeting_id")
 
-  title          String
-  description    String? @db.Text
-  order          Int     @default(0)
-  timeAllotment  Int?    @map("time_allotment") // Minutes allocated for this item
+  title         String
+  description   String? @db.Text
+  order         Int     @default(0)
+  timeAllotment Int?    @map("time_allotment") // Minutes allocated for this item
 
   // Cross-domain links (Phase 11: Governance)
   arcRequestId     String? @map("arc_request_id")
@@ -4255,26 +4312,26 @@ model VoteBallot {
 
 /// @description Board motion - formal proposal made during a meeting
 model BoardMotion {
-  id            String            @id @default(cuid())
-  associationId String            @map("association_id")
-  meetingId     String?           @map("meeting_id")
-  voteId        String?           @map("vote_id")
+  id            String  @id @default(cuid())
+  associationId String  @map("association_id")
+  meetingId     String? @map("meeting_id")
+  voteId        String? @map("vote_id")
 
-  motionNumber String            @map("motion_number")
+  motionNumber String              @map("motion_number")
   title        String
-  description  String?           @db.Text
+  description  String?             @db.Text
   category     BoardMotionCategory
-  status       BoardMotionStatus @default(PROPOSED)
+  status       BoardMotionStatus   @default(PROPOSED)
 
   // Motion details
-  movedById    String?  @map("moved_by_id") // Party ID of person who made the motion
-  secondedById String?  @map("seconded_by_id") // Party ID of person who seconded
-  rationale    String?  @db.Text
+  movedById    String? @map("moved_by_id") // Party ID of person who made the motion
+  secondedById String? @map("seconded_by_id") // Party ID of person who seconded
+  rationale    String? @db.Text
 
   // Outcome
-  outcome       BoardMotionOutcome?
-  outcomeNotes  String?            @db.Text @map("outcome_notes")
-  decidedAt     DateTime?          @map("decided_at")
+  outcome      BoardMotionOutcome?
+  outcomeNotes String?             @map("outcome_notes") @db.Text
+  decidedAt    DateTime?           @map("decided_at")
 
   // Effective dates for policies/rules
   effectiveDate DateTime? @map("effective_date")
@@ -4391,6 +4448,7 @@ model Resolution {
 /// @description Policy documents with version history
 model PolicyDocument {
   id             String       @id @default(cuid())
+  organizationId String       @map("organization_id")
   associationId  String       @map("association_id")
   resolutionId   String?      @map("resolution_id")
   title          String
@@ -4402,13 +4460,15 @@ model PolicyDocument {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  association Association     @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  resolution  Resolution?     @relation(fields: [resolutionId], references: [id])
-  versions    PolicyVersion[]
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association     @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  resolution   Resolution?     @relation(fields: [resolutionId], references: [id])
+  versions     PolicyVersion[]
 
   // Phase 11: Governance - agenda items linked to this policy document
   agendaItems MeetingAgendaItem[]
 
+  @@index([organizationId])
   @@index([associationId])
   @@index([resolutionId])
   @@index([status])
@@ -4730,11 +4790,11 @@ model IndividualProperty {
   assets              IndividualAsset[]
 
   // Phase 3: Property Ownership
-  propertyOwnerships PropertyOwnership[]
-  portfolioMemberships PortfolioProperty[]
-  ownerIntents         OwnerIntent[]
-  conciergeCases       ConciergeCase[]
-  externalHoaContexts  ExternalHOAContext[]
+  propertyOwnerships     PropertyOwnership[]
+  portfolioMemberships   PortfolioProperty[]
+  ownerIntents           OwnerIntent[]
+  conciergeCases         ConciergeCase[]
+  externalHoaContexts    ExternalHOAContext[]
   externalVendorContexts ExternalVendorContext[]
 
   @@index([ownerOrgId])
@@ -5445,28 +5505,28 @@ enum JobStatus {
   LEAD
   TICKET
   ESTIMATE_REQUIRED
-  ESTIMATE_SENT       // Estimate sent to customer, awaiting response
-  ESTIMATE_APPROVED   // Customer approved estimate
+  ESTIMATE_SENT // Estimate sent to customer, awaiting response
+  ESTIMATE_APPROVED // Customer approved estimate
   JOB_CREATED
   SCHEDULED
-  DISPATCHED          // Technician notified/en route
+  DISPATCHED // Technician notified/en route
   IN_PROGRESS
   ON_HOLD
   COMPLETED
-  INVOICED            // Invoice created and sent
-  PAID                // Full payment received
+  INVOICED // Invoice created and sent
+  PAID // Full payment received
   WARRANTY
   CLOSED
   CANCELLED
 }
 
 enum JobSourceType {
-  WORK_ORDER      // HOA-originated via WorkOrder
-  VIOLATION       // Violation remediation
-  ARC_REQUEST     // Architectural request
+  WORK_ORDER // HOA-originated via WorkOrder
+  VIOLATION // Violation remediation
+  ARC_REQUEST // Architectural request
   DIRECT_CUSTOMER // Off-platform customer
-  LEAD            // Marketing/referral lead
-  RECURRING       // From maintenance contract
+  LEAD // Marketing/referral lead
+  RECURRING // From maintenance contract
 }
 
 enum CheckpointType {
@@ -5499,10 +5559,10 @@ model Customer {
   country      String? @default("US")
 
   // Additional info
-  notes       String? @db.Text
-  tags        String[] // e.g., ["VIP", "Commercial"]
-  source      String? // How they found us
-  referredBy  String? @map("referred_by")
+  notes      String?  @db.Text
+  tags       String[] // e.g., ["VIP", "Commercial"]
+  source     String? // How they found us
+  referredBy String?  @map("referred_by")
 
   isActive  Boolean   @default(true) @map("is_active")
   deletedAt DateTime? @map("deleted_at")
@@ -5546,15 +5606,15 @@ model Job {
   customerId   String?       @map("customer_id")
 
   // Location (for off-platform jobs or override)
-  unitId         String? @map("unit_id")
-  propertyId     String? @map("property_id")
-  associationId  String? @map("association_id")
-  addressLine1   String? @map("address_line_1")
-  addressLine2   String? @map("address_line_2")
-  city           String?
-  state          String?
-  postalCode     String? @map("postal_code")
-  locationNotes  String? @map("location_notes")
+  unitId        String? @map("unit_id")
+  propertyId    String? @map("property_id")
+  associationId String? @map("association_id")
+  addressLine1  String? @map("address_line_1")
+  addressLine2  String? @map("address_line_2")
+  city          String?
+  state         String?
+  postalCode    String? @map("postal_code")
+  locationNotes String? @map("location_notes")
 
   // Job details
   title       String
@@ -5593,8 +5653,8 @@ model Job {
   warrantyNotes String?   @map("warranty_notes") @db.Text
 
   // Resolution
-  resolutionNotes String? @map("resolution_notes") @db.Text
-  customerRating  Int?    @map("customer_rating") // 1-5
+  resolutionNotes  String? @map("resolution_notes") @db.Text
+  customerRating   Int?    @map("customer_rating") // 1-5
   customerFeedback String? @map("customer_feedback") @db.Text
 
   // Soft delete
@@ -5604,14 +5664,14 @@ model Job {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  workOrder          WorkOrder?           @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
-  customer           Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  assignedTechnician Technician?          @relation(fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
-  assignedBranch     ContractorBranch?    @relation(fields: [assignedBranchId], references: [id], onDelete: SetNull)
-  unit               Unit?                @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  property           Property?            @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  association        Association?         @relation(fields: [associationId], references: [id], onDelete: SetNull)
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workOrder          WorkOrder?         @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  customer           Customer?          @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  assignedTechnician Technician?        @relation(fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  assignedBranch     ContractorBranch?  @relation(fields: [assignedBranchId], references: [id], onDelete: SetNull)
+  unit               Unit?              @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  property           Property?          @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  association        Association?       @relation(fields: [associationId], references: [id], onDelete: SetNull)
   statusHistory      JobStatusHistory[]
   notes              JobNote[]
   attachments        JobAttachment[]
@@ -5623,10 +5683,10 @@ model Job {
   slaRecord           SLARecord?
 
   // Field Technician Mobile
-  checklists   JobChecklist[]
-  media        JobMedia[]
-  timeEntries  JobTimeEntry[]
-  signatures   JobSignature[]
+  checklists  JobChecklist[]
+  media       JobMedia[]
+  timeEntries JobTimeEntry[]
+  signatures  JobSignature[]
 
   // Estimates & Invoicing
   estimates Estimate[]
@@ -5650,13 +5710,13 @@ model Job {
 
 /// @description Status change history for jobs
 model JobStatusHistory {
-  id        String    @id @default(cuid())
-  jobId     String    @map("job_id")
+  id         String     @id @default(cuid())
+  jobId      String     @map("job_id")
   fromStatus JobStatus? @map("from_status")
-  toStatus  JobStatus  @map("to_status")
-  changedBy String    @map("changed_by")
-  changedAt DateTime  @default(now()) @map("changed_at")
-  notes     String?   @db.Text
+  toStatus   JobStatus  @map("to_status")
+  changedBy  String     @map("changed_by")
+  changedAt  DateTime   @default(now()) @map("changed_at")
+  notes      String?    @db.Text
 
   // Relations
   job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -5685,8 +5745,8 @@ model JobNote {
 
 /// @description File attachments on a job
 model JobAttachment {
-  id       String @id @default(cuid())
-  jobId    String @map("job_id")
+  id    String @id @default(cuid())
+  jobId String @map("job_id")
 
   fileName    String  @map("file_name")
   fileUrl     String  @map("file_url")
@@ -5750,7 +5810,7 @@ model JobVisit {
   status String @default("SCHEDULED") // SCHEDULED, EN_ROUTE, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED
 
   // Notes
-  notes        String? @db.Text
+  notes         String? @db.Text
   workPerformed String? @map("work_performed") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -5786,11 +5846,11 @@ enum DispatchStatus {
 }
 
 enum SLAPriority {
-  EMERGENCY   // 2-4 hours
-  URGENT      // Same day
-  HIGH        // Next business day
-  STANDARD    // 2-3 business days
-  LOW         // 5+ business days
+  EMERGENCY // 2-4 hours
+  URGENT // Same day
+  HIGH // Next business day
+  STANDARD // 2-3 business days
+  LOW // 5+ business days
 }
 
 /// @description Assignment of a technician to a job/visit for dispatch
@@ -5806,16 +5866,16 @@ model DispatchAssignment {
   technicianId String @map("technician_id")
 
   // Status tracking
-  status       DispatchStatus @default(PENDING)
-  assignedAt   DateTime       @default(now()) @map("assigned_at")
-  assignedBy   String         @map("assigned_by")
-  acceptedAt   DateTime?      @map("accepted_at")
-  declinedAt   DateTime?      @map("declined_at")
-  declineReason String?       @map("decline_reason")
-  startedAt    DateTime?      @map("started_at")
-  completedAt  DateTime?      @map("completed_at")
-  cancelledAt  DateTime?      @map("cancelled_at")
-  cancelReason String?        @map("cancel_reason")
+  status        DispatchStatus @default(PENDING)
+  assignedAt    DateTime       @default(now()) @map("assigned_at")
+  assignedBy    String         @map("assigned_by")
+  acceptedAt    DateTime?      @map("accepted_at")
+  declinedAt    DateTime?      @map("declined_at")
+  declineReason String?        @map("decline_reason")
+  startedAt     DateTime?      @map("started_at")
+  completedAt   DateTime?      @map("completed_at")
+  cancelledAt   DateTime?      @map("cancelled_at")
+  cancelReason  String?        @map("cancel_reason")
 
   // Scheduling window
   scheduledStart DateTime  @map("scheduled_start")
@@ -5824,8 +5884,8 @@ model DispatchAssignment {
   actualEnd      DateTime? @map("actual_end")
 
   // Travel estimates
-  estimatedTravelMinutes Int? @map("estimated_travel_minutes")
-  actualTravelMinutes    Int? @map("actual_travel_minutes")
+  estimatedTravelMinutes Int?     @map("estimated_travel_minutes")
+  actualTravelMinutes    Int?     @map("actual_travel_minutes")
   distanceMiles          Decimal? @map("distance_miles") @db.Decimal(8, 2)
 
   // Notes
@@ -5892,17 +5952,17 @@ model RoutePlan {
   routeDate DateTime @map("route_date") @db.Date
 
   // Route optimization
-  isOptimized       Boolean   @default(false) @map("is_optimized")
-  optimizedAt       DateTime? @map("optimized_at")
-  totalDistanceMiles Decimal? @map("total_distance_miles") @db.Decimal(10, 2)
-  totalTravelMinutes Int?     @map("total_travel_minutes")
-  totalJobMinutes    Int?     @map("total_job_minutes")
+  isOptimized        Boolean   @default(false) @map("is_optimized")
+  optimizedAt        DateTime? @map("optimized_at")
+  totalDistanceMiles Decimal?  @map("total_distance_miles") @db.Decimal(10, 2)
+  totalTravelMinutes Int?      @map("total_travel_minutes")
+  totalJobMinutes    Int?      @map("total_job_minutes")
 
   // Start/end locations
-  startAddress String? @map("start_address")
+  startAddress String?  @map("start_address")
   startLat     Decimal? @map("start_lat") @db.Decimal(10, 7)
   startLng     Decimal? @map("start_lng") @db.Decimal(10, 7)
-  endAddress   String? @map("end_address")
+  endAddress   String?  @map("end_address")
   endLat       Decimal? @map("end_lat") @db.Decimal(10, 7)
   endLng       Decimal? @map("end_lng") @db.Decimal(10, 7)
 
@@ -5930,11 +5990,11 @@ model SLAWindow {
 
   // What this SLA applies to
   name        String
-  description String? @db.Text
+  description String?     @db.Text
   priority    SLAPriority
 
   // Response time requirements (in minutes)
-  responseTimeMinutes   Int @map("response_time_minutes")   // Time to acknowledge
+  responseTimeMinutes   Int @map("response_time_minutes") // Time to acknowledge
   resolutionTimeMinutes Int @map("resolution_time_minutes") // Time to complete
 
   // Business hours consideration
@@ -6037,9 +6097,9 @@ model JobChecklist {
   jobId String? @map("job_id") // Null for templates
 
   // Status
-  isCompleted   Boolean   @default(false) @map("is_completed")
-  completedAt   DateTime? @map("completed_at")
-  completedBy   String?   @map("completed_by")
+  isCompleted Boolean   @default(false) @map("is_completed")
+  completedAt DateTime? @map("completed_at")
+  completedBy String?   @map("completed_by")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6092,24 +6152,24 @@ model JobStep {
 
 /// @description Media files attached to jobs (photos, videos, voice notes)
 model JobMedia {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id")
-  jobId          String @map("job_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
+  jobId          String  @map("job_id")
   jobVisitId     String? @map("job_visit_id")
 
   // Media details
-  mediaType   MediaType
-  fileName    String    @map("file_name")
-  fileSize    Int       @map("file_size") // bytes
-  mimeType    String    @map("mime_type")
-  storageKey  String    @map("storage_key") // S3/storage key
-  storageUrl  String?   @map("storage_url") // Presigned URL (temporary)
+  mediaType  MediaType
+  fileName   String    @map("file_name")
+  fileSize   Int       @map("file_size") // bytes
+  mimeType   String    @map("mime_type")
+  storageKey String    @map("storage_key") // S3/storage key
+  storageUrl String?   @map("storage_url") // Presigned URL (temporary)
 
   // Metadata
-  caption     String? @db.Text
-  latitude    Decimal? @db.Decimal(10, 7)
-  longitude   Decimal? @db.Decimal(10, 7)
-  capturedAt  DateTime? @map("captured_at")
+  caption    String?   @db.Text
+  latitude   Decimal?  @db.Decimal(10, 7)
+  longitude  Decimal?  @db.Decimal(10, 7)
+  capturedAt DateTime? @map("captured_at")
 
   // Voice note transcription
   transcription String? @db.Text
@@ -6138,11 +6198,11 @@ model JobMedia {
 
 /// @description Time tracking entries for jobs
 model JobTimeEntry {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id")
-  jobId          String @map("job_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
+  jobId          String  @map("job_id")
   jobVisitId     String? @map("job_visit_id")
-  technicianId   String @map("technician_id")
+  technicianId   String  @map("technician_id")
 
   // Time tracking
   entryType TimeEntryType @map("entry_type")
@@ -6156,13 +6216,13 @@ model JobTimeEntry {
   notes String? @db.Text
 
   // Billing
-  isBillable Boolean @default(true) @map("is_billable")
+  isBillable Boolean  @default(true) @map("is_billable")
   hourlyRate Decimal? @map("hourly_rate") @db.Decimal(10, 2)
 
   // Sync status (for offline)
-  isSynced  Boolean   @default(true) @map("is_synced")
-  syncedAt  DateTime? @map("synced_at")
-  localId   String?   @map("local_id") // Client-side ID for offline records
+  isSynced Boolean   @default(true) @map("is_synced")
+  syncedAt DateTime? @map("synced_at")
+  localId  String?   @map("local_id") // Client-side ID for offline records
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -6181,9 +6241,9 @@ model JobTimeEntry {
 
 /// @description Digital signatures captured for jobs
 model JobSignature {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id")
-  jobId          String @map("job_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
+  jobId          String  @map("job_id")
   jobVisitId     String? @map("job_visit_id")
 
   // Signer info
@@ -6204,8 +6264,8 @@ model JobSignature {
   documentId   String? @map("document_id")
 
   // IP/device info for audit
-  ipAddress   String? @map("ip_address")
-  deviceInfo  String? @map("device_info")
+  ipAddress  String? @map("ip_address")
+  deviceInfo String? @map("device_info")
 
   capturedBy String @map("captured_by")
 
@@ -6229,9 +6289,9 @@ model OfflineSyncQueue {
 
   // Record details
   entityType String @map("entity_type") // JobTimeEntry, JobMedia, JobStep, etc.
-  entityId   String @map("entity_id")   // Local ID
+  entityId   String @map("entity_id") // Local ID
   action     String // CREATE, UPDATE, DELETE
-  payload    Json   // Full record data
+  payload    Json // Full record data
 
   // Sync status
   attempts      Int       @default(0)
@@ -6311,12 +6371,12 @@ model Estimate {
   status         EstimateStatus @default(DRAFT)
 
   // Dates
-  issueDate   DateTime  @default(now()) @map("issue_date")
-  validUntil  DateTime? @map("valid_until")
-  sentAt      DateTime? @map("sent_at")
-  viewedAt    DateTime? @map("viewed_at")
-  acceptedAt  DateTime? @map("accepted_at")
-  declinedAt  DateTime? @map("declined_at")
+  issueDate  DateTime  @default(now()) @map("issue_date")
+  validUntil DateTime? @map("valid_until")
+  sentAt     DateTime? @map("sent_at")
+  viewedAt   DateTime? @map("viewed_at")
+  acceptedAt DateTime? @map("accepted_at")
+  declinedAt DateTime? @map("declined_at")
 
   // Amounts
   subtotal    Decimal @default(0) @map("subtotal") @db.Decimal(12, 2)
@@ -6333,7 +6393,7 @@ model Estimate {
   // Revision tracking
   previousVersionId String? @map("previous_version_id")
 
-  createdBy String @map("created_by")
+  createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -6381,9 +6441,9 @@ model EstimateLine {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  estimate       Estimate        @relation(fields: [estimateId], references: [id], onDelete: Cascade)
-  pricebookItem  PricebookItem?  @relation(fields: [pricebookItemId], references: [id], onDelete: SetNull)
-  option         EstimateOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  estimate      Estimate        @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  pricebookItem PricebookItem?  @relation(fields: [pricebookItemId], references: [id], onDelete: SetNull)
+  option        EstimateOption? @relation(fields: [optionId], references: [id], onDelete: SetNull)
 
   @@unique([estimateId, lineNumber])
   @@index([estimateId])
@@ -6422,9 +6482,9 @@ model EstimateOption {
 
 /// @description Proposal sent to customer (can include multiple estimates/options)
 model Proposal {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id")
-  customerId     String @map("customer_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
+  customerId     String  @map("customer_id")
   estimateId     String? @map("estimate_id")
 
   // Proposal details
@@ -6440,18 +6500,18 @@ model Proposal {
   declinedAt DateTime? @map("declined_at")
 
   // Content
-  title          String?
-  coverLetter    String? @map("cover_letter") @db.Text
-  terms          String? @db.Text
-  signatureData  String? @map("signature_data") @db.Text
-  signedAt       DateTime? @map("signed_at")
-  signedByName   String? @map("signed_by_name")
-  signedByEmail  String? @map("signed_by_email")
+  title         String?
+  coverLetter   String?   @map("cover_letter") @db.Text
+  terms         String?   @db.Text
+  signatureData String?   @map("signature_data") @db.Text
+  signedAt      DateTime? @map("signed_at")
+  signedByName  String?   @map("signed_by_name")
+  signedByEmail String?   @map("signed_by_email")
 
   // Selected option (if estimate has options)
   selectedOptionId String? @map("selected_option_id")
 
-  createdBy String @map("created_by")
+  createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -6487,12 +6547,12 @@ model JobInvoice {
   paidAt    DateTime? @map("paid_at")
 
   // Amounts
-  subtotal      Decimal @default(0) @db.Decimal(12, 2)
-  taxAmount     Decimal @default(0) @map("tax_amount") @db.Decimal(12, 2)
-  discount      Decimal @default(0) @db.Decimal(12, 2)
-  totalAmount   Decimal @default(0) @map("total_amount") @db.Decimal(12, 2)
-  amountPaid    Decimal @default(0) @map("amount_paid") @db.Decimal(12, 2)
-  balanceDue    Decimal @default(0) @map("balance_due") @db.Decimal(12, 2)
+  subtotal    Decimal @default(0) @db.Decimal(12, 2)
+  taxAmount   Decimal @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  discount    Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal @default(0) @map("total_amount") @db.Decimal(12, 2)
+  amountPaid  Decimal @default(0) @map("amount_paid") @db.Decimal(12, 2)
+  balanceDue  Decimal @default(0) @map("balance_due") @db.Decimal(12, 2)
 
   // Content
   notes String? @db.Text
@@ -6501,14 +6561,14 @@ model JobInvoice {
   // Reference
   estimateId String? @map("estimate_id")
 
-  createdBy String @map("created_by")
+  createdBy String   @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  job          Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  customer     Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  customer     Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
   lines        InvoiceLine[]
   payments     PaymentIntent[]
 
@@ -6566,7 +6626,7 @@ model PaymentIntent {
 
   // Payment method
   paymentMethod String? @map("payment_method") // card, bank_transfer, check, cash, etc.
-  
+
   // External payment processor reference
   externalId       String? @map("external_id") // Stripe payment intent ID, etc.
   externalProvider String? @map("external_provider") // stripe, square, etc.
@@ -6648,12 +6708,12 @@ model Supplier {
   id             String @id @default(cuid())
   organizationId String @map("organization_id")
 
-  name           String
-  code           String? // Internal supplier code
-  contactName    String? @map("contact_name")
-  email          String?
-  phone          String?
-  website        String?
+  name        String
+  code        String? // Internal supplier code
+  contactName String? @map("contact_name")
+  email       String?
+  phone       String?
+  website     String?
 
   // Address
   addressLine1 String? @map("address_line_1")
@@ -6670,8 +6730,8 @@ model Supplier {
   // Link to existing Vendor if applicable
   vendorId String? @map("vendor_id")
 
-  notes     String? @db.Text
-  isActive  Boolean @default(true) @map("is_active")
+  notes     String?   @db.Text
+  isActive  Boolean   @default(true) @map("is_active")
   deletedAt DateTime? @map("deleted_at")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -6705,9 +6765,9 @@ model InventoryItem {
   unitCost      Decimal       @default(0) @map("unit_cost") @db.Decimal(12, 4)
 
   // Inventory control
-  reorderPoint    Int @default(0) @map("reorder_point")
-  reorderQuantity Int @default(0) @map("reorder_quantity")
-  minStockLevel   Int @default(0) @map("min_stock_level")
+  reorderPoint    Int  @default(0) @map("reorder_point")
+  reorderQuantity Int  @default(0) @map("reorder_quantity")
+  minStockLevel   Int  @default(0) @map("min_stock_level")
   maxStockLevel   Int? @map("max_stock_level")
 
   // Tracking
@@ -6727,11 +6787,11 @@ model InventoryItem {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  preferredSupplier Supplier?          @relation("PreferredSupplier", fields: [preferredSupplierId], references: [id], onDelete: SetNull)
-  pricebookItem     PricebookItem?     @relation(fields: [pricebookItemId], references: [id], onDelete: SetNull)
-  inventoryLevels   InventoryLevel[]
-  materialUsages    MaterialUsage[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  preferredSupplier  Supplier?           @relation("PreferredSupplier", fields: [preferredSupplierId], references: [id], onDelete: SetNull)
+  pricebookItem      PricebookItem?      @relation(fields: [pricebookItemId], references: [id], onDelete: SetNull)
+  inventoryLevels    InventoryLevel[]
+  materialUsages     MaterialUsage[]
   purchaseOrderLines PurchaseOrderLine[]
 
   @@unique([organizationId, sku])
@@ -6751,7 +6811,7 @@ model InventoryLocation {
   name        String
   code        String? // Location code
   type        InventoryLocationType
-  description String? @db.Text
+  description String?               @db.Text
 
   // Address (for warehouses)
   addressLine1 String? @map("address_line_1")
@@ -6773,9 +6833,9 @@ model InventoryLocation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  technician      Technician?      @relation(fields: [technicianId], references: [id], onDelete: SetNull)
-  branch          ContractorBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  technician      Technician?         @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  branch          ContractorBranch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
   inventoryLevels InventoryLevel[]
   transfersFrom   InventoryTransfer[] @relation("TransferFrom")
   transfersTo     InventoryTransfer[] @relation("TransferTo")
@@ -6800,8 +6860,8 @@ model InventoryLevel {
   quantityAvailable Int @default(0) @map("quantity_available") // Computed: onHand - reserved
 
   // Lot/serial tracking
-  lotNumber    String? @map("lot_number")
-  serialNumber String? @map("serial_number")
+  lotNumber      String?   @map("lot_number")
+  serialNumber   String?   @map("serial_number")
   expirationDate DateTime? @map("expiration_date")
 
   lastCountedAt DateTime? @map("last_counted_at")
@@ -6830,8 +6890,8 @@ model InventoryTransfer {
   fromLocationId String @map("from_location_id")
   toLocationId   String @map("to_location_id")
 
-  status      String @default("PENDING") // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
-  requestedAt DateTime @default(now()) @map("requested_at")
+  status      String    @default("PENDING") // PENDING, IN_TRANSIT, COMPLETED, CANCELLED
+  requestedAt DateTime  @default(now()) @map("requested_at")
   shippedAt   DateTime? @map("shipped_at")
   receivedAt  DateTime? @map("received_at")
 
@@ -6843,9 +6903,9 @@ model InventoryTransfer {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  fromLocation InventoryLocation @relation("TransferFrom", fields: [fromLocationId], references: [id], onDelete: Cascade)
-  toLocation   InventoryLocation @relation("TransferTo", fields: [toLocationId], references: [id], onDelete: Cascade)
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fromLocation InventoryLocation       @relation("TransferFrom", fields: [fromLocationId], references: [id], onDelete: Cascade)
+  toLocation   InventoryLocation       @relation("TransferTo", fields: [toLocationId], references: [id], onDelete: Cascade)
   lines        InventoryTransferLine[]
 
   @@unique([organizationId, transferNumber])
@@ -6885,21 +6945,21 @@ model MaterialUsage {
   id             String @id @default(cuid())
   organizationId String @map("organization_id")
 
-  jobId       String @map("job_id")
-  jobVisitId  String? @map("job_visit_id")
-  itemId      String @map("item_id")
-  locationId  String @map("location_id") // Where material was taken from
+  jobId      String  @map("job_id")
+  jobVisitId String? @map("job_visit_id")
+  itemId     String  @map("item_id")
+  locationId String  @map("location_id") // Where material was taken from
 
-  quantity    Int
-  unitCost    Decimal @map("unit_cost") @db.Decimal(12, 4)
-  totalCost   Decimal @map("total_cost") @db.Decimal(12, 2)
+  quantity  Int
+  unitCost  Decimal @map("unit_cost") @db.Decimal(12, 4)
+  totalCost Decimal @map("total_cost") @db.Decimal(12, 2)
 
   // Tracking
   lotNumber    String? @map("lot_number")
   serialNumber String? @map("serial_number")
 
-  usedAt   DateTime @default(now()) @map("used_at")
-  usedBy   String   @map("used_by") // Technician who used it
+  usedAt DateTime @default(now()) @map("used_at")
+  usedBy String   @map("used_by") // Technician who used it
 
   notes String? @db.Text
 
@@ -6931,20 +6991,20 @@ model PurchaseOrder {
   status     PurchaseOrderStatus @default(DRAFT)
 
   // Dates
-  orderDate        DateTime  @default(now()) @map("order_date")
-  expectedDate     DateTime? @map("expected_date")
-  submittedAt      DateTime? @map("submitted_at")
-  confirmedAt      DateTime? @map("confirmed_at")
-  receivedAt       DateTime? @map("received_at")
+  orderDate    DateTime  @default(now()) @map("order_date")
+  expectedDate DateTime? @map("expected_date")
+  submittedAt  DateTime? @map("submitted_at")
+  confirmedAt  DateTime? @map("confirmed_at")
+  receivedAt   DateTime? @map("received_at")
 
   // Delivery location
   deliveryLocationId String? @map("delivery_location_id")
 
   // Totals
-  subtotal    Decimal @default(0) @map("subtotal") @db.Decimal(12, 2)
-  taxAmount   Decimal @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  subtotal     Decimal @default(0) @map("subtotal") @db.Decimal(12, 2)
+  taxAmount    Decimal @default(0) @map("tax_amount") @db.Decimal(12, 2)
   shippingCost Decimal @default(0) @map("shipping_cost") @db.Decimal(12, 2)
-  totalAmount Decimal @default(0) @map("total_amount") @db.Decimal(12, 2)
+  totalAmount  Decimal @default(0) @map("total_amount") @db.Decimal(12, 2)
 
   notes         String? @db.Text
   supplierNotes String? @map("supplier_notes") @db.Text
@@ -6955,8 +7015,8 @@ model PurchaseOrder {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier               @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   lines        PurchaseOrderLine[]
   receipts     PurchaseOrderReceipt[]
 
@@ -6977,9 +7037,9 @@ model PurchaseOrderLine {
   itemId      String  @map("item_id")
   description String?
 
-  quantity         Int
-  unitCost         Decimal @map("unit_cost") @db.Decimal(12, 4)
-  lineTotal        Decimal @map("line_total") @db.Decimal(12, 2)
+  quantity  Int
+  unitCost  Decimal @map("unit_cost") @db.Decimal(12, 4)
+  lineTotal Decimal @map("line_total") @db.Decimal(12, 2)
 
   quantityReceived Int @default(0) @map("quantity_received")
 
@@ -7029,8 +7089,8 @@ model PurchaseOrderReceiptLine {
 
   quantityReceived Int @map("quantity_received")
 
-  lotNumber    String? @map("lot_number")
-  serialNumber String? @map("serial_number")
+  lotNumber      String?   @map("lot_number")
+  serialNumber   String?   @map("serial_number")
   expirationDate DateTime? @map("expiration_date")
 
   notes String? @db.Text
@@ -7094,7 +7154,7 @@ model ServiceContract {
   organizationId String @map("organization_id")
 
   // Contract identification
-  contractNumber String               @map("contract_number")
+  contractNumber String                @map("contract_number")
   name           String
   type           ServiceContractType
   status         ServiceContractStatus @default(DRAFT)
@@ -7113,10 +7173,10 @@ model ServiceContract {
   renewalNoticeAt DateTime? @map("renewal_notice_at")
 
   // Pricing
-  contractValue   Decimal  @map("contract_value") @db.Decimal(12, 2)
+  contractValue    Decimal             @map("contract_value") @db.Decimal(12, 2)
   billingFrequency RecurrenceFrequency @map("billing_frequency")
-  billingAmount   Decimal  @map("billing_amount") @db.Decimal(12, 2)
-  nextBillingDate DateTime? @map("next_billing_date") @db.Date
+  billingAmount    Decimal             @map("billing_amount") @db.Decimal(12, 2)
+  nextBillingDate  DateTime?           @map("next_billing_date") @db.Date
 
   // Service scope
   description      String? @db.Text
@@ -7125,8 +7185,8 @@ model ServiceContract {
   serviceAreaNotes String? @map("service_area_notes") @db.Text
 
   // SLA terms
-  responseTimeHours   Int? @map("response_time_hours") // Max hours to respond
-  resolutionTimeHours Int? @map("resolution_time_hours") // Max hours to resolve
+  responseTimeHours   Int?    @map("response_time_hours") // Max hours to respond
+  resolutionTimeHours Int?    @map("resolution_time_hours") // Max hours to resolve
   coverageHoursJson   String? @map("coverage_hours_json") @db.Text // JSON: { mon: "8-17", tue: "8-17", ... }
   emergencyCoverage   Boolean @default(false) @map("emergency_coverage")
 
@@ -7135,13 +7195,13 @@ model ServiceContract {
   assignedBranchId    String? @map("assigned_branch_id")
 
   // Documents
-  documentUrl String? @map("document_url")
+  documentUrl String?   @map("document_url")
   signedAt    DateTime? @map("signed_at")
   signedBy    String?   @map("signed_by")
 
   // Metadata
-  notes     String? @db.Text
-  metadata  Json?
+  notes    String? @db.Text
+  metadata Json?
 
   // Soft delete
   deletedAt DateTime? @map("deleted_at")
@@ -7151,18 +7211,18 @@ model ServiceContract {
   createdBy String   @map("created_by")
 
   // Relations
-  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer           Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  association        Association?      @relation(fields: [associationId], references: [id], onDelete: SetNull)
-  property           Property?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  unit               Unit?             @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  primaryTechnician  Technician?       @relation("PrimaryTechnician", fields: [primaryTechnicianId], references: [id], onDelete: SetNull)
-  assignedBranch     ContractorBranch? @relation(fields: [assignedBranchId], references: [id], onDelete: SetNull)
-  serviceItems       ContractServiceItem[]
-  schedules          ContractSchedule[]
-  scheduledVisits    ScheduledVisit[]
-  renewals           ContractRenewal[]
-  slaRecords         ContractSLARecord[]
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer          Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  association       Association?          @relation(fields: [associationId], references: [id], onDelete: SetNull)
+  property          Property?             @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  unit              Unit?                 @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  primaryTechnician Technician?           @relation("PrimaryTechnician", fields: [primaryTechnicianId], references: [id], onDelete: SetNull)
+  assignedBranch    ContractorBranch?     @relation(fields: [assignedBranchId], references: [id], onDelete: SetNull)
+  serviceItems      ContractServiceItem[]
+  schedules         ContractSchedule[]
+  scheduledVisits   ScheduledVisit[]
+  renewals          ContractRenewal[]
+  slaRecords        ContractSLARecord[]
 
   @@unique([organizationId, contractNumber])
   @@index([organizationId])
@@ -7179,21 +7239,21 @@ model ContractServiceItem {
   contractId String @map("contract_id")
 
   // Service details
-  name           String
-  description    String? @db.Text
+  name            String
+  description     String? @db.Text
   pricebookItemId String? @map("pricebook_item_id")
 
   // Frequency
-  frequency      RecurrenceFrequency
-  visitsPerPeriod Int @default(1) @map("visits_per_period")
+  frequency       RecurrenceFrequency
+  visitsPerPeriod Int                 @default(1) @map("visits_per_period")
 
   // Pricing
-  unitPrice   Decimal @map("unit_price") @db.Decimal(12, 2)
-  quantity    Int     @default(1)
-  lineTotal   Decimal @map("line_total") @db.Decimal(12, 2)
+  unitPrice Decimal @map("unit_price") @db.Decimal(12, 2)
+  quantity  Int     @default(1)
+  lineTotal Decimal @map("line_total") @db.Decimal(12, 2)
 
   // Scope
-  estimatedDurationMinutes Int? @map("estimated_duration_minutes")
+  estimatedDurationMinutes Int?    @map("estimated_duration_minutes")
   notes                    String? @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -7214,17 +7274,17 @@ model ContractSchedule {
 
   // Schedule definition
   name        String
-  description String? @db.Text
+  description String?             @db.Text
   frequency   RecurrenceFrequency
-  isActive    Boolean @default(true) @map("is_active")
+  isActive    Boolean             @default(true) @map("is_active")
 
   // Timing
-  startDate      DateTime  @map("start_date") @db.Date
-  endDate        DateTime? @map("end_date") @db.Date
-  preferredDayOfWeek  Int?  @map("preferred_day_of_week") // 0=Sun, 1=Mon, etc.
-  preferredDayOfMonth Int?  @map("preferred_day_of_month") // 1-31
-  preferredTimeStart  String? @map("preferred_time_start") // HH:MM
-  preferredTimeEnd    String? @map("preferred_time_end") // HH:MM
+  startDate           DateTime  @map("start_date") @db.Date
+  endDate             DateTime? @map("end_date") @db.Date
+  preferredDayOfWeek  Int?      @map("preferred_day_of_week") // 0=Sun, 1=Mon, etc.
+  preferredDayOfMonth Int?      @map("preferred_day_of_month") // 1-31
+  preferredTimeStart  String?   @map("preferred_time_start") // HH:MM
+  preferredTimeEnd    String?   @map("preferred_time_end") // HH:MM
 
   // Generation tracking
   lastGeneratedAt DateTime? @map("last_generated_at")
@@ -7239,7 +7299,7 @@ model ContractSchedule {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  contract       ServiceContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contract        ServiceContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
   scheduledVisits ScheduledVisit[]
 
   @@index([contractId])
@@ -7249,16 +7309,16 @@ model ContractSchedule {
 
 /// @description Individual scheduled visit generated from contract schedule
 model ScheduledVisit {
-  id         String @id @default(cuid())
-  contractId String @map("contract_id")
+  id         String  @id @default(cuid())
+  contractId String  @map("contract_id")
   scheduleId String? @map("schedule_id")
 
   // Visit identification
-  visitNumber Int @map("visit_number")
+  visitNumber Int                  @map("visit_number")
   status      ScheduledVisitStatus @default(SCHEDULED)
 
   // Scheduling
-  scheduledDate  DateTime @map("scheduled_date") @db.Date
+  scheduledDate  DateTime  @map("scheduled_date") @db.Date
   scheduledStart DateTime? @map("scheduled_start")
   scheduledEnd   DateTime? @map("scheduled_end")
   confirmedAt    DateTime? @map("confirmed_at")
@@ -7269,19 +7329,19 @@ model ScheduledVisit {
   completedAt DateTime? @map("completed_at")
 
   // Assignment
-  technicianId String? @map("technician_id")
+  technicianId String?   @map("technician_id")
   assignedAt   DateTime? @map("assigned_at")
 
   // Linked job (created when visit is executed)
   jobId String? @map("job_id")
 
   // Notes
-  serviceNotes   String? @map("service_notes") @db.Text
-  customerNotes  String? @map("customer_notes") @db.Text
+  serviceNotes    String? @map("service_notes") @db.Text
+  customerNotes   String? @map("customer_notes") @db.Text
   completionNotes String? @map("completion_notes") @db.Text
 
   // Rescheduling
-  rescheduledFrom String? @map("rescheduled_from") // Original visit ID
+  rescheduledFrom  String? @map("rescheduled_from") // Original visit ID
   rescheduleReason String? @map("reschedule_reason") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -7313,15 +7373,15 @@ model ContractRenewal {
   newEndDate      DateTime @map("new_end_date") @db.Date
 
   // Pricing changes
-  previousValue Decimal @map("previous_value") @db.Decimal(12, 2)
-  newValue      Decimal @map("new_value") @db.Decimal(12, 2)
+  previousValue Decimal  @map("previous_value") @db.Decimal(12, 2)
+  newValue      Decimal  @map("new_value") @db.Decimal(12, 2)
   changePercent Decimal? @map("change_percent") @db.Decimal(5, 2)
 
   // Approval
-  renewedAt   DateTime @map("renewed_at")
-  renewedBy   String   @map("renewed_by")
-  approvedAt  DateTime? @map("approved_at")
-  approvedBy  String?   @map("approved_by")
+  renewedAt  DateTime  @map("renewed_at")
+  renewedBy  String    @map("renewed_by")
+  approvedAt DateTime? @map("approved_at")
+  approvedBy String?   @map("approved_by")
 
   notes String? @db.Text
 
@@ -7345,10 +7405,10 @@ model ContractSLARecord {
   periodEnd   DateTime @map("period_end") @db.Date
 
   // Metrics
-  totalRequests      Int @default(0) @map("total_requests")
-  onTimeResponses    Int @default(0) @map("on_time_responses")
-  onTimeResolutions  Int @default(0) @map("on_time_resolutions")
-  missedSLAs         Int @default(0) @map("missed_slas")
+  totalRequests     Int @default(0) @map("total_requests")
+  onTimeResponses   Int @default(0) @map("on_time_responses")
+  onTimeResolutions Int @default(0) @map("on_time_resolutions")
+  missedSLAs        Int @default(0) @map("missed_slas")
 
   // Calculated
   responseCompliancePercent   Decimal? @map("response_compliance_percent") @db.Decimal(5, 2)
@@ -7359,9 +7419,9 @@ model ContractSLARecord {
   avgResolutionTimeMinutes Int? @map("avg_resolution_time_minutes")
 
   // Visits
-  scheduledVisits  Int @default(0) @map("scheduled_visits")
-  completedVisits  Int @default(0) @map("completed_visits")
-  missedVisits     Int @default(0) @map("missed_visits")
+  scheduledVisits        Int      @default(0) @map("scheduled_visits")
+  completedVisits        Int      @default(0) @map("completed_visits")
+  missedVisits           Int      @default(0) @map("missed_visits")
   visitCompliancePercent Decimal? @map("visit_compliance_percent") @db.Decimal(5, 2)
 
   notes String? @db.Text
@@ -7388,8 +7448,8 @@ model ContractSLARecord {
 
 /// @description Role a party plays in property ownership
 enum PropertyOwnershipRole {
-  OWNER           // Primary owner with full authority
-  CO_OWNER        // Joint owner with shared authority
+  OWNER // Primary owner with full authority
+  CO_OWNER // Joint owner with shared authority
   TRUSTEE_MANAGER // Manages property on behalf of trust/entity
   DELEGATED_AGENT // Authorized agent with delegated authority
 }
@@ -7404,12 +7464,12 @@ enum PropertyOwnershipStatus {
 
 /// @description Type of authority that can be delegated
 enum DelegatedAuthorityType {
-  MAINTENANCE_APPROVAL  // Can approve maintenance up to limit
-  VENDOR_SELECTION      // Can select vendors
-  DOCUMENT_ACCESS       // Can access/upload documents
-  CASE_MANAGEMENT       // Can manage concierge cases
-  FINANCIAL_DECISIONS   // Can make financial decisions up to limit
-  FULL_AUTHORITY        // Full delegated authority
+  MAINTENANCE_APPROVAL // Can approve maintenance up to limit
+  VENDOR_SELECTION // Can select vendors
+  DOCUMENT_ACCESS // Can access/upload documents
+  CASE_MANAGEMENT // Can manage concierge cases
+  FINANCIAL_DECISIONS // Can make financial decisions up to limit
+  FULL_AUTHORITY // Full delegated authority
 }
 
 /// @description Status of a delegated authority grant
@@ -7448,8 +7508,8 @@ model PropertyOwnership {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  property            IndividualProperty    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  party               Party                 @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  property             IndividualProperty   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  party                Party                @relation(fields: [partyId], references: [id], onDelete: Cascade)
   delegatedAuthorities DelegatedAuthority[] @relation("OwnershipDelegations")
 
   @@unique([propertyId, partyId, role])
@@ -7463,29 +7523,29 @@ model PropertyOwnership {
 model DelegatedAuthority {
   id                  String @id @default(cuid())
   propertyOwnershipId String @map("property_ownership_id") // The ownership granting authority
-  delegatePartyId     String @map("delegate_party_id")     // Party receiving authority
+  delegatePartyId     String @map("delegate_party_id") // Party receiving authority
 
   authorityType DelegatedAuthorityType
   status        DelegatedAuthorityStatus @default(PENDING_ACCEPTANCE)
 
   // Scope limits
-  monetaryLimit    Decimal? @map("monetary_limit") @db.Decimal(12, 2) // Max amount for financial decisions
-  scopeDescription String?  @map("scope_description") @db.Text        // Human-readable scope description
-  scopeRestrictions Json?   @map("scope_restrictions")                // Structured restrictions
+  monetaryLimit     Decimal? @map("monetary_limit") @db.Decimal(12, 2) // Max amount for financial decisions
+  scopeDescription  String?  @map("scope_description") @db.Text // Human-readable scope description
+  scopeRestrictions Json?    @map("scope_restrictions") // Structured restrictions
 
   // Validity
-  grantedAt   DateTime  @default(now()) @map("granted_at")
-  acceptedAt  DateTime? @map("accepted_at")
-  expiresAt   DateTime? @map("expires_at")
-  revokedAt   DateTime? @map("revoked_at")
-  revokedBy   String?   @map("revoked_by") // User ID who revoked
-  revokeReason String?  @map("revoke_reason")
+  grantedAt    DateTime  @default(now()) @map("granted_at")
+  acceptedAt   DateTime? @map("accepted_at")
+  expiresAt    DateTime? @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  revokedBy    String?   @map("revoked_by") // User ID who revoked
+  revokeReason String?   @map("revoke_reason")
 
   // Audit
   grantedBy String @map("granted_by") // User ID who granted
 
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   propertyOwnership PropertyOwnership @relation("OwnershipDelegations", fields: [propertyOwnershipId], references: [id], onDelete: Cascade)
@@ -7537,8 +7597,8 @@ model PortfolioProperty {
   displayOrder Int?    @map("display_order")
   notes        String? @db.Text
 
-  addedAt   DateTime @default(now()) @map("added_at")
-  addedBy   String   @map("added_by") // User ID who added
+  addedAt   DateTime  @default(now()) @map("added_at")
+  addedBy   String    @map("added_by") // User ID who added
   removedAt DateTime? @map("removed_at")
 
   // Relations
@@ -7557,12 +7617,12 @@ model PortfolioProperty {
 
 /// @description Category of owner intent/request
 enum OwnerIntentCategory {
-  MAINTENANCE   // Repair, upkeep
-  IMPROVEMENT   // Upgrades, renovations
-  COMPLIANCE    // HOA compliance, permits
-  DISPUTE       // Neighbor disputes, HOA disputes
-  INQUIRY       // General questions
-  EMERGENCY     // Urgent issues
+  MAINTENANCE // Repair, upkeep
+  IMPROVEMENT // Upgrades, renovations
+  COMPLIANCE // HOA compliance, permits
+  DISPUTE // Neighbor disputes, HOA disputes
+  INQUIRY // General questions
+  EMERGENCY // Urgent issues
   OTHER
 }
 
@@ -7576,12 +7636,12 @@ enum OwnerIntentPriority {
 
 /// @description Status of an owner intent
 enum OwnerIntentStatus {
-  DRAFT              // Not yet submitted
-  SUBMITTED          // Submitted by owner
-  ACKNOWLEDGED       // Acknowledged by concierge
-  CONVERTED_TO_CASE  // Converted to a concierge case
-  DECLINED           // Declined by concierge
-  WITHDRAWN          // Withdrawn by owner
+  DRAFT // Not yet submitted
+  SUBMITTED // Submitted by owner
+  ACKNOWLEDGED // Acknowledged by concierge
+  CONVERTED_TO_CASE // Converted to a concierge case
+  DECLINED // Declined by concierge
+  WITHDRAWN // Withdrawn by owner
 }
 
 /// @description Owner intent/request capturing goals in natural language
@@ -7592,7 +7652,7 @@ model OwnerIntent {
 
   // Intent details
   title       String
-  description String  @db.Text
+  description String              @db.Text
   category    OwnerIntentCategory
   priority    OwnerIntentPriority @default(NORMAL)
   status      OwnerIntentStatus   @default(DRAFT)
@@ -7610,25 +7670,25 @@ model OwnerIntent {
   acknowledgedBy String?   @map("acknowledged_by") // User ID
 
   // Conversion to case
-  convertedCaseId String? @map("converted_case_id")
+  convertedCaseId String?   @map("converted_case_id")
   convertedAt     DateTime? @map("converted_at")
 
   // Decline/withdraw info
-  declinedAt    DateTime? @map("declined_at")
-  declinedBy    String?   @map("declined_by")
-  declineReason String?   @map("decline_reason") @db.Text
-  withdrawnAt   DateTime? @map("withdrawn_at")
-  withdrawReason String?  @map("withdraw_reason") @db.Text
+  declinedAt     DateTime? @map("declined_at")
+  declinedBy     String?   @map("declined_by")
+  declineReason  String?   @map("decline_reason") @db.Text
+  withdrawnAt    DateTime? @map("withdrawn_at")
+  withdrawReason String?   @map("withdraw_reason") @db.Text
 
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  property        IndividualProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  submittedByParty Party?            @relation("IntentSubmitter", fields: [submittedByPartyId], references: [id], onDelete: SetNull)
-  notes           IntentNote[]
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property         IndividualProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  submittedByParty Party?             @relation("IntentSubmitter", fields: [submittedByPartyId], references: [id], onDelete: SetNull)
+  notes            IntentNote[]
 
   @@index([organizationId])
   @@index([propertyId])
@@ -7643,8 +7703,8 @@ model IntentNote {
   id       String @id @default(cuid())
   intentId String @map("intent_id")
 
-  content   String @db.Text
-  createdBy String @map("created_by") // User ID
+  content    String  @db.Text
+  createdBy  String  @map("created_by") // User ID
   isInternal Boolean @default(true) @map("is_internal") // Internal vs. visible to owner
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -7662,15 +7722,15 @@ model IntentNote {
 
 /// @description Status of a concierge case
 enum ConciergeCaseStatus {
-  INTAKE           // Initial intake
-  ASSESSMENT       // Being assessed
-  IN_PROGRESS      // Active work
+  INTAKE // Initial intake
+  ASSESSMENT // Being assessed
+  IN_PROGRESS // Active work
   PENDING_EXTERNAL // Waiting on external party (HOA, vendor)
-  PENDING_OWNER    // Waiting on owner response
-  ON_HOLD          // Temporarily paused
-  RESOLVED         // Work completed, pending closure
-  CLOSED           // Fully closed
-  CANCELLED        // Cancelled
+  PENDING_OWNER // Waiting on owner response
+  ON_HOLD // Temporarily paused
+  RESOLVED // Work completed, pending closure
+  CLOSED // Fully closed
+  CANCELLED // Cancelled
 }
 
 /// @description Priority level for concierge cases
@@ -7684,8 +7744,8 @@ enum ConciergeCasePriority {
 
 /// @description Owner availability preference for service visits
 enum AvailabilityType {
-  FLEXIBLE      // Any time works, ASAP preferred
-  SPECIFIC      // Specific time slots provided
+  FLEXIBLE // Any time works, ASAP preferred
+  SPECIFIC // Specific time slots provided
 }
 
 /// @description Durable case container for concierge operations
@@ -7699,7 +7759,7 @@ model ConciergeCase {
 
   // Case details
   title       String
-  description String @db.Text
+  description String                @db.Text
   status      ConciergeCaseStatus   @default(INTAKE)
   priority    ConciergeCasePriority @default(NORMAL)
 
@@ -7708,9 +7768,9 @@ model ConciergeCase {
 
   // Cross-Domain Integration (P3.12)
   // Link to Phase 1 HOA unit if property is in a platform HOA
-  linkedUnitId String? @map("linked_unit_id")
+  linkedUnitId       String? @map("linked_unit_id")
   // Link to Phase 2 Job when case requires contractor work
-  linkedJobId  String? @map("linked_job_id")
+  linkedJobId        String? @map("linked_job_id")
   // Link to CAM ARC Request
   linkedArcRequestId String? @map("linked_arc_request_id")
   // Link to CAM Work Order
@@ -7720,12 +7780,12 @@ model ConciergeCase {
   assignedConciergeUserId String? @map("assigned_concierge_user_id")
 
   // Lifecycle timestamps
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  resolvedAt DateTime? @map("resolved_at")
-  closedAt   DateTime? @map("closed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  resolvedAt  DateTime? @map("resolved_at")
+  closedAt    DateTime? @map("closed_at")
   cancelledAt DateTime? @map("cancelled_at")
-  deletedAt  DateTime? @map("deleted_at")
+  deletedAt   DateTime? @map("deleted_at")
 
   // Resolution details
   resolutionSummary String? @map("resolution_summary") @db.Text
@@ -7740,10 +7800,10 @@ model ConciergeCase {
   availabilityNotes String?          @map("availability_notes") @db.Text
 
   // Relations
-  availabilitySlots CaseAvailabilitySlot[]
-  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  property           IndividualProperty  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  assignedConcierge  User?               @relation("AssignedConciergeCases", fields: [assignedConciergeUserId], references: [id], onDelete: SetNull)
+  availabilitySlots  CaseAvailabilitySlot[]
+  organization       Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property           IndividualProperty          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  assignedConcierge  User?                       @relation("AssignedConciergeCases", fields: [assignedConciergeUserId], references: [id], onDelete: SetNull)
   statusHistory      CaseStatusHistory[]
   notes              CaseNote[]
   attachments        CaseAttachment[]
@@ -7754,21 +7814,21 @@ model ConciergeCase {
   decisions          MaterialDecision[]
 
   // Phase 16: Staff assignments
-  staffAssignments   StaffCaseAssignment[]
+  staffAssignments StaffCaseAssignment[]
 
   // Phase 16.5: Vendor Discovery
-  vendorCandidates   VendorCandidate[]
-  vendorBids         VendorBid[]
+  vendorCandidates VendorCandidate[]
+  vendorBids       VendorBid[]
 
   // Phase 16.7: Communications
-  communications     CaseCommunication[]
+  communications CaseCommunication[]
 
   // Phase 16.11: Case Review
-  review             CaseReview?
+  review CaseReview?
 
   // Phase 16.10: Milestones & Issues
-  milestones         CaseMilestone[]
-  issues             CaseIssue[]
+  milestones CaseMilestone[]
+  issues     CaseIssue[]
 
   @@index([organizationId])
   @@index([propertyId])
@@ -7823,10 +7883,10 @@ model CaseStatusHistory {
 
 /// @description Type of case note
 enum CaseNoteType {
-  GENERAL                // Default internal/external note
-  CLARIFICATION_REQUEST  // Concierge asking owner for info
+  GENERAL // Default internal/external note
+  CLARIFICATION_REQUEST // Concierge asking owner for info
   CLARIFICATION_RESPONSE // Owner's response to request
-  DECISION_RATIONALE     // Decision explanation
+  DECISION_RATIONALE // Decision explanation
 }
 
 /// @description Internal notes on concierge cases
@@ -7854,9 +7914,9 @@ model CaseNote {
 
 /// @description Direction of communication
 enum CommunicationDirection {
-  INBOUND   // From external party to staff
-  OUTBOUND  // From staff to external party
-  INTERNAL  // Staff-to-staff
+  INBOUND // From external party to staff
+  OUTBOUND // From staff to external party
+  INTERNAL // Staff-to-staff
 }
 
 /// @description Communication record for case correspondence
@@ -7865,14 +7925,14 @@ model CaseCommunication {
   caseId String @map("case_id")
 
   // Communication details
-  channel     CommunicationChannel
-  direction   CommunicationDirection
-  subject     String?
-  content     String  @db.Text
-  
+  channel   CommunicationChannel
+  direction CommunicationDirection
+  subject   String?
+  content   String                 @db.Text
+
   // Participants
-  fromUserId  String? @map("from_user_id") // Staff user who sent/logged
-  toRecipient String? @map("to_recipient") // Email, phone, or name
+  fromUserId   String? @map("from_user_id") // Staff user who sent/logged
+  toRecipient  String? @map("to_recipient") // Email, phone, or name
   ccRecipients String? @map("cc_recipients") // Comma-separated
 
   // External references
@@ -7880,11 +7940,11 @@ model CaseCommunication {
   threadId          String? @map("thread_id") // For grouping related messages
 
   // Status
-  sentAt     DateTime? @map("sent_at")
-  deliveredAt DateTime? @map("delivered_at")
-  readAt     DateTime? @map("read_at")
-  failedAt   DateTime? @map("failed_at")
-  failureReason String? @map("failure_reason")
+  sentAt        DateTime? @map("sent_at")
+  deliveredAt   DateTime? @map("delivered_at")
+  readAt        DateTime? @map("read_at")
+  failedAt      DateTime? @map("failed_at")
+  failureReason String?   @map("failure_reason")
 
   // Attachments
   attachmentIds Json? @map("attachment_ids") // Array of CaseAttachment IDs
@@ -7913,25 +7973,25 @@ model CaseReview {
   caseId String @unique @map("case_id")
 
   // Review content
-  outcomeSummary        String  @map("outcome_summary") @db.Text
+  outcomeSummary         String  @map("outcome_summary") @db.Text
   vendorPerformanceNotes String? @map("vendor_performance_notes") @db.Text
-  issuesEncountered     String? @map("issues_encountered") @db.Text
-  lessonsLearned        String? @map("lessons_learned") @db.Text
-  
+  issuesEncountered      String? @map("issues_encountered") @db.Text
+  lessonsLearned         String? @map("lessons_learned") @db.Text
+
   // Ratings (1-5 scale)
-  vendorRating          Int?    @map("vendor_rating")
-  communicationRating   Int?    @map("communication_rating")
-  timelinessRating      Int?    @map("timeliness_rating")
-  overallSatisfaction   Int?    @map("overall_satisfaction")
+  vendorRating        Int? @map("vendor_rating")
+  communicationRating Int? @map("communication_rating")
+  timelinessRating    Int? @map("timeliness_rating")
+  overallSatisfaction Int? @map("overall_satisfaction")
 
   // Reusability flags
-  reusableVendor        Boolean @default(false) @map("reusable_vendor")
-  reusableScope         Boolean @default(false) @map("reusable_scope")
-  reusableProcess       Boolean @default(false) @map("reusable_process")
+  reusableVendor  Boolean @default(false) @map("reusable_vendor")
+  reusableScope   Boolean @default(false) @map("reusable_scope")
+  reusableProcess Boolean @default(false) @map("reusable_process")
 
   // Metadata
-  reviewedByUserId      String  @map("reviewed_by_user_id")
-  reviewedAt            DateTime @map("reviewed_at")
+  reviewedByUserId String   @map("reviewed_by_user_id")
+  reviewedAt       DateTime @map("reviewed_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -7962,20 +8022,20 @@ model CaseAttachment {
   category    String? // e.g., "contract", "invoice", "photo", "report"
 
   // Versioning (Sub-Phase 9.3)
-  version         Int     @default(1)
+  version           Int     @default(1)
   previousVersionId String? @map("previous_version_id")
-  isLatest        Boolean @default(true) @map("is_latest")
-  versionNotes    String? @map("version_notes") @db.Text
+  isLatest          Boolean @default(true) @map("is_latest")
+  versionNotes      String? @map("version_notes") @db.Text
 
   // Immutability
-  lockedAt        DateTime? @map("locked_at") // Set when case is closed
-  lockedByUserId  String?   @map("locked_by_user_id")
+  lockedAt       DateTime? @map("locked_at") // Set when case is closed
+  lockedByUserId String?   @map("locked_by_user_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  previousVersion CaseAttachment? @relation("AttachmentVersions", fields: [previousVersionId], references: [id])
+  case            ConciergeCase    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  previousVersion CaseAttachment?  @relation("AttachmentVersions", fields: [previousVersionId], references: [id])
   newerVersions   CaseAttachment[] @relation("AttachmentVersions")
 
   @@index([caseId])
@@ -8017,22 +8077,22 @@ model CaseMilestone {
   caseId String @map("case_id")
 
   // Milestone details
-  milestoneType   MilestoneType
-  customName      String?       @map("custom_name") // For CUSTOM type
-  description     String?       @db.Text
-  status          MilestoneStatus @default(PENDING)
-  
+  milestoneType MilestoneType
+  customName    String?         @map("custom_name") // For CUSTOM type
+  description   String?         @db.Text
+  status        MilestoneStatus @default(PENDING)
+
   // Timeline
-  targetDate      DateTime?     @map("target_date")
-  completedAt     DateTime?     @map("completed_at")
-  completedByUserId String?     @map("completed_by_user_id")
+  targetDate        DateTime? @map("target_date")
+  completedAt       DateTime? @map("completed_at")
+  completedByUserId String?   @map("completed_by_user_id")
 
   // Ordering
-  sequenceOrder   Int           @map("sequence_order")
+  sequenceOrder Int @map("sequence_order")
 
   // Notes
-  notes           String?       @db.Text
-  blockerReason   String?       @map("blocker_reason") @db.Text
+  notes         String? @db.Text
+  blockerReason String? @map("blocker_reason") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -8053,29 +8113,29 @@ model CaseIssue {
   caseId String @map("case_id")
 
   // Issue details
-  title           String
-  description     String        @db.Text
-  severity        String        @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  category        String?       // e.g., "vendor", "timeline", "budget", "quality"
-  
+  title       String
+  description String  @db.Text
+  severity    String  @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  category    String? // e.g., "vendor", "timeline", "budget", "quality"
+
   // Status
-  status          String        @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
-  resolution      String?       @db.Text
-  resolvedAt      DateTime?     @map("resolved_at")
-  resolvedByUserId String?      @map("resolved_by_user_id")
+  status           String    @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  resolution       String?   @db.Text
+  resolvedAt       DateTime? @map("resolved_at")
+  resolvedByUserId String?   @map("resolved_by_user_id")
 
   // Assignment
-  reportedByUserId String       @map("reported_by_user_id")
-  assignedToUserId String?      @map("assigned_to_user_id")
+  reportedByUserId String  @map("reported_by_user_id")
+  assignedToUserId String? @map("assigned_to_user_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  case        ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  reportedBy  User          @relation("IssueReporter", fields: [reportedByUserId], references: [id])
-  resolvedBy  User?         @relation("IssueResolver", fields: [resolvedByUserId], references: [id])
-  assignedTo  User?         @relation("IssueAssignee", fields: [assignedToUserId], references: [id])
+  case       ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reportedBy User          @relation("IssueReporter", fields: [reportedByUserId], references: [id])
+  resolvedBy User?         @relation("IssueResolver", fields: [resolvedByUserId], references: [id])
+  assignedTo User?         @relation("IssueAssignee", fields: [assignedToUserId], references: [id])
 
   @@index([caseId])
   @@index([status])
@@ -8089,8 +8149,8 @@ model CaseParticipant {
   caseId String @map("case_id")
 
   // Participant can be a party or external contact
-  partyId             String? @map("party_id")
-  externalContactName String? @map("external_contact_name")
+  partyId              String? @map("party_id")
+  externalContactName  String? @map("external_contact_name")
   externalContactEmail String? @map("external_contact_email")
   externalContactPhone String? @map("external_contact_phone")
 
@@ -8117,26 +8177,26 @@ model CaseParticipant {
 
 /// @description Type of concierge action
 enum ConciergeActionType {
-  PHONE_CALL       // Phone call to owner, vendor, HOA, etc.
-  EMAIL            // Email correspondence
-  DOCUMENT_REVIEW  // Reviewing documents
-  RESEARCH         // Research and investigation
-  VENDOR_CONTACT   // Contacting vendors/service providers
-  HOA_CONTACT      // Contacting HOA
-  SCHEDULING       // Scheduling appointments, work
+  PHONE_CALL // Phone call to owner, vendor, HOA, etc.
+  EMAIL // Email correspondence
+  DOCUMENT_REVIEW // Reviewing documents
+  RESEARCH // Research and investigation
+  VENDOR_CONTACT // Contacting vendors/service providers
+  HOA_CONTACT // Contacting HOA
+  SCHEDULING // Scheduling appointments, work
   APPROVAL_REQUEST // Requesting approvals
-  FOLLOW_UP        // Follow-up actions
-  ESCALATION       // Escalating to supervisor
-  OTHER            // Other action types
+  FOLLOW_UP // Follow-up actions
+  ESCALATION // Escalating to supervisor
+  OTHER // Other action types
 }
 
 /// @description Status of a concierge action
 enum ConciergeActionStatus {
-  PLANNED      // Action is planned but not started
-  IN_PROGRESS  // Action is currently in progress
-  COMPLETED    // Action has been completed
-  CANCELLED    // Action was cancelled
-  BLOCKED      // Action is blocked by external factors
+  PLANNED // Action is planned but not started
+  IN_PROGRESS // Action is currently in progress
+  COMPLETED // Action has been completed
+  CANCELLED // Action was cancelled
+  BLOCKED // Action is blocked by external factors
 }
 
 /// @description Individual action taken by concierge staff on a case
@@ -8162,7 +8222,7 @@ model ConciergeAction {
   notes   String? @db.Text
 
   // Related entities (JSON arrays of IDs)
-  relatedDocumentIds       Json? @map("related_document_ids") // Array of Document IDs
+  relatedDocumentIds        Json? @map("related_document_ids") // Array of Document IDs
   relatedExternalContactIds Json? @map("related_external_contact_ids") // Array of external contact IDs
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -8170,9 +8230,9 @@ model ConciergeAction {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  case          ConciergeCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  performedBy   User                @relation("ActionPerformer", fields: [performedByUserId], references: [id])
-  logs          ConciergeActionLog[]
+  case        ConciergeCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  performedBy User                 @relation("ActionPerformer", fields: [performedByUserId], references: [id])
+  logs        ConciergeActionLog[]
 
   @@index([caseId])
   @@index([performedByUserId])
@@ -8187,11 +8247,11 @@ model ConciergeActionLog {
   actionId String @map("action_id")
 
   // Log details
-  eventType   String  // e.g., "status_change", "note_added", "outcome_recorded"
+  eventType   String // e.g., "status_change", "note_added", "outcome_recorded"
   fromStatus  ConciergeActionStatus? @map("from_status")
   toStatus    ConciergeActionStatus? @map("to_status")
-  description String? @db.Text
-  changedBy   String  @map("changed_by") // User ID
+  description String?                @db.Text
+  changedBy   String                 @map("changed_by") // User ID
 
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -8209,12 +8269,12 @@ model ConciergeActionLog {
 
 /// @description Status of an external HOA approval
 enum ExternalApprovalStatus {
-  NOT_REQUIRED  // No approval needed
-  PENDING       // Waiting to submit
-  SUBMITTED     // Submitted to HOA
-  APPROVED      // Approved by HOA
-  DENIED        // Denied by HOA
-  EXPIRED       // Approval expired
+  NOT_REQUIRED // No approval needed
+  PENDING // Waiting to submit
+  SUBMITTED // Submitted to HOA
+  APPROVED // Approved by HOA
+  DENIED // Denied by HOA
+  EXPIRED // Approval expired
 }
 
 /// @description External HOA context for properties with non-platform HOAs
@@ -8231,7 +8291,7 @@ model ExternalHOAContext {
   hoaAddress      String? @map("hoa_address") @db.Text
 
   // Notes and documents
-  notes        String? @db.Text
+  notes         String? @db.Text
   documentsJson Json?   @map("documents_json") // Array of Document IDs
 
   createdAt DateTime  @default(now()) @map("created_at")
@@ -8239,8 +8299,8 @@ model ExternalHOAContext {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  property     IndividualProperty  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property     IndividualProperty    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   approvals    ExternalHOAApproval[]
   rules        ExternalHOARule[]
 
@@ -8251,17 +8311,17 @@ model ExternalHOAContext {
 
 /// @description Approval tracking for external HOAs
 model ExternalHOAApproval {
-  id                   String @id @default(cuid())
-  externalHoaContextId String @map("external_hoa_context_id")
+  id                   String  @id @default(cuid())
+  externalHoaContextId String  @map("external_hoa_context_id")
   caseId               String? @map("case_id") // Optional link to concierge case
 
   // Approval details
   approvalType      String // e.g., "architectural", "landscaping", "fence"
   status            ExternalApprovalStatus @default(PENDING)
-  submittedAt       DateTime? @map("submitted_at")
-  responseAt        DateTime? @map("response_at")
-  expiresAt         DateTime? @map("expires_at")
-  approvalReference String?   @map("approval_reference") // HOA reference number
+  submittedAt       DateTime?              @map("submitted_at")
+  responseAt        DateTime?              @map("response_at")
+  expiresAt         DateTime?              @map("expires_at")
+  approvalReference String?                @map("approval_reference") // HOA reference number
 
   // Notes and documents
   notes              String? @db.Text
@@ -8310,8 +8370,8 @@ model ExternalHOARule {
 
 /// @description External vendor context for non-platform service providers
 model ExternalVendorContext {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
   propertyId     String? @map("property_id") // Optional property association
 
   // Vendor details
@@ -8333,9 +8393,9 @@ model ExternalVendorContext {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  organization          Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  property              IndividualProperty? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
-  linkedServiceProvider Organization?       @relation("LinkedServiceProvider", fields: [linkedServiceProviderOrgId], references: [id], onDelete: SetNull)
+  organization          Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  property              IndividualProperty?         @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  linkedServiceProvider Organization?               @relation("LinkedServiceProvider", fields: [linkedServiceProviderOrgId], references: [id], onDelete: SetNull)
   interactions          ExternalVendorInteraction[]
 
   // Phase 16.5: Vendor Discovery
@@ -8349,12 +8409,12 @@ model ExternalVendorContext {
 
 /// @description Interaction log for external vendors
 model ExternalVendorInteraction {
-  id                      String @id @default(cuid())
-  externalVendorContextId String @map("external_vendor_context_id")
+  id                      String  @id @default(cuid())
+  externalVendorContextId String  @map("external_vendor_context_id")
   caseId                  String? @map("case_id") // Optional link to concierge case
 
   // Interaction details
-  interactionType String   // QUOTE, SCHEDULE, WORK, INVOICE, OTHER
+  interactionType String // QUOTE, SCHEDULE, WORK, INVOICE, OTHER
   interactionDate DateTime @map("interaction_date")
   description     String   @db.Text
   amount          Decimal? @db.Decimal(12, 2) // Optional monetary amount
@@ -8381,26 +8441,26 @@ model ExternalVendorInteraction {
 
 /// @description Category of material decision
 enum DecisionCategory {
-  VENDOR_SELECTION    // Choosing a vendor
-  APPROVAL            // Approving something
-  COST_AUTHORIZATION  // Authorizing costs
-  SCHEDULING          // Scheduling decisions
-  ESCALATION          // Escalation decisions
-  RESOLUTION          // Resolution decisions
-  OTHER               // Other decisions
+  VENDOR_SELECTION // Choosing a vendor
+  APPROVAL // Approving something
+  COST_AUTHORIZATION // Authorizing costs
+  SCHEDULING // Scheduling decisions
+  ESCALATION // Escalation decisions
+  RESOLUTION // Resolution decisions
+  OTHER // Other decisions
 }
 
 /// @description Material decision record for auditability
 model MaterialDecision {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id")
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id")
   caseId         String? @map("case_id") // Optional link to concierge case
 
   // Decision details
   category    DecisionCategory
   title       String
-  description String @db.Text
-  rationale   String @db.Text // Why this decision was made
+  description String           @db.Text
+  rationale   String           @db.Text // Why this decision was made
 
   // Decision maker
   decidedByUserId String   @map("decided_by_user_id")
@@ -8410,8 +8470,8 @@ model MaterialDecision {
   optionsConsidered Json? @map("options_considered")
 
   // Impact and outcome
-  estimatedImpact String? @map("estimated_impact") @db.Text
-  actualOutcome   String? @map("actual_outcome") @db.Text
+  estimatedImpact   String?   @map("estimated_impact") @db.Text
+  actualOutcome     String?   @map("actual_outcome") @db.Text
   outcomeRecordedAt DateTime? @map("outcome_recorded_at")
 
   // Related entities
@@ -8440,13 +8500,13 @@ model MaterialDecision {
 
 /// @description Status of a vendor candidate in the discovery workflow
 enum VendorCandidateStatus {
-  IDENTIFIED      // Initial capture from research
-  CONTACTED       // Outreach initiated
-  RESPONDED       // Vendor has responded
-  QUOTED          // Bid/quote received
-  SELECTED        // Chosen for the job
-  REJECTED        // Not selected
-  ARCHIVED        // No longer active
+  IDENTIFIED // Initial capture from research
+  CONTACTED // Outreach initiated
+  RESPONDED // Vendor has responded
+  QUOTED // Bid/quote received
+  SELECTED // Chosen for the job
+  REJECTED // Not selected
+  ARCHIVED // No longer active
 }
 
 /// @description Vendor candidate discovered during case research
@@ -8464,27 +8524,27 @@ model VendorCandidate {
   vendorWebsite      String? @map("vendor_website")
 
   // Service details
-  serviceCategories  Json?   @map("service_categories") // Array of service categories
-  coverageArea       String? @map("coverage_area")
-  licensesAndCerts   Json?   @map("licenses_and_certs") // Array of credentials
+  serviceCategories Json?   @map("service_categories") // Array of service categories
+  coverageArea      String? @map("coverage_area")
+  licensesAndCerts  Json?   @map("licenses_and_certs") // Array of credentials
 
   // Status tracking
-  status             VendorCandidateStatus @default(IDENTIFIED)
-  statusChangedAt    DateTime? @map("status_changed_at")
+  status          VendorCandidateStatus @default(IDENTIFIED)
+  statusChangedAt DateTime?             @map("status_changed_at")
 
   // Provenance (where this vendor was found)
-  sourceUrl          String? @map("source_url") @db.Text
-  sourceHtml         String? @map("source_html") @db.Text
-  sourcePlainText    String? @map("source_plain_text") @db.Text
-  extractedAt        DateTime? @map("extracted_at")
-  extractionConfidence Float? @map("extraction_confidence") // 0.0 to 1.0
+  sourceUrl            String?   @map("source_url") @db.Text
+  sourceHtml           String?   @map("source_html") @db.Text
+  sourcePlainText      String?   @map("source_plain_text") @db.Text
+  extractedAt          DateTime? @map("extracted_at")
+  extractionConfidence Float?    @map("extraction_confidence") // 0.0 to 1.0
 
   // Extraction metadata (field-level confidence)
   extractionMetadata Json? @map("extraction_metadata")
 
   // Staff notes
-  notes              String? @db.Text
-  riskFlags          Json?   @map("risk_flags") // Array of risk flag strings
+  notes     String? @db.Text
+  riskFlags Json?   @map("risk_flags") // Array of risk flag strings
 
   // Link to platform vendor (if they join)
   linkedExternalVendorId String? @map("linked_external_vendor_id")
@@ -8494,10 +8554,10 @@ model VendorCandidate {
   deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  organization        Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  case                ConciergeCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  case                 ConciergeCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
   linkedExternalVendor ExternalVendorContext? @relation(fields: [linkedExternalVendorId], references: [id], onDelete: SetNull)
-  bids                VendorBid[]
+  bids                 VendorBid[]
 
   @@index([organizationId])
   @@index([caseId])
@@ -8513,15 +8573,15 @@ model VendorBid {
   caseId            String @map("case_id")
 
   // Bid details
-  scopeVersion      String? @map("scope_version") // Which scope version this bid is for
-  amount            Decimal? @db.Decimal(12, 2)
-  currency          String  @default("USD")
-  validUntil        DateTime? @map("valid_until")
+  scopeVersion String?   @map("scope_version") // Which scope version this bid is for
+  amount       Decimal?  @db.Decimal(12, 2)
+  currency     String    @default("USD")
+  validUntil   DateTime? @map("valid_until")
 
   // Bid breakdown
-  laborCost         Decimal? @map("labor_cost") @db.Decimal(12, 2)
-  materialsCost     Decimal? @map("materials_cost") @db.Decimal(12, 2)
-  otherCosts        Decimal? @map("other_costs") @db.Decimal(12, 2)
+  laborCost     Decimal? @map("labor_cost") @db.Decimal(12, 2)
+  materialsCost Decimal? @map("materials_cost") @db.Decimal(12, 2)
+  otherCosts    Decimal? @map("other_costs") @db.Decimal(12, 2)
 
   // Timeline
   estimatedStartDate DateTime? @map("estimated_start_date")
@@ -8529,19 +8589,19 @@ model VendorBid {
   estimatedEndDate   DateTime? @map("estimated_end_date")
 
   // Status
-  status            String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
-  receivedAt        DateTime  @map("received_at")
-  respondedAt       DateTime? @map("responded_at")
+  status      String    @default("PENDING") // PENDING, ACCEPTED, REJECTED, EXPIRED
+  receivedAt  DateTime  @map("received_at")
+  respondedAt DateTime? @map("responded_at")
 
   // Notes and attachments
-  notes             String?   @db.Text
-  attachmentIds     Json?     @map("attachment_ids") // Array of document IDs
+  notes         String? @db.Text
+  attachmentIds Json?   @map("attachment_ids") // Array of document IDs
 
   // Recommendation (Sub-Phase 6.2)
-  recommendation        String?   @db.Text // Staff recommendation text
-  recommendationRationale String? @map("recommendation_rationale") @db.Text
-  isRecommended         Boolean?  @map("is_recommended") // Staff recommendation flag
-  isCustomerFacing      Boolean   @default(false) @map("is_customer_facing") // Mark as customer-facing artifact
+  recommendation          String?  @db.Text // Staff recommendation text
+  recommendationRationale String?  @map("recommendation_rationale") @db.Text
+  isRecommended           Boolean? @map("is_recommended") // Staff recommendation flag
+  isCustomerFacing        Boolean  @default(false) @map("is_customer_facing") // Mark as customer-facing artifact
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

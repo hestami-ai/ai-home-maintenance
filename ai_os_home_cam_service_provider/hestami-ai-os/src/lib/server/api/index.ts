@@ -116,6 +116,9 @@ import { caseCommunicationRouter } from './routes/caseCommunication.js';
 // Phase 16.11: Case Review
 import { caseReviewRouter } from './routes/caseReview.js';
 
+// Phase 22: Permissions Admin
+import { permissionsAdminRouter } from './routes/permissionsAdmin.js';
+
 // Phase 15: Reporting & Analytics
 import {
 	reportDefinitionRouter,
@@ -268,14 +271,17 @@ export const appRouter = {
 	caseCommunication: caseCommunicationRouter,
 
 	// Phase 16.11: Case Review
-	caseReview: caseReviewRouter
+	caseReview: caseReviewRouter,
+
+	// Phase 22: Permissions Admin
+	permissionsAdmin: permissionsAdminRouter
 };
 
 export type AppRouter = typeof appRouter;
 
 // Re-export utilities
 export { createEmptyContext, type RequestContext } from './context.js';
-export { ApiException, ErrorCode, ErrorType } from './errors.js';
+export { ErrorCode, ErrorType } from './errors.js';
 export {
 	publicProcedure,
 	authedProcedure,

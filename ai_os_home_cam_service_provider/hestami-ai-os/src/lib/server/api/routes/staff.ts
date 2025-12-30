@@ -7,13 +7,13 @@
 
 import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
-import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema } from '../router.js';
+import { authedProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { recordActivityEvent } from '../middleware/activityEvent.js';
 import { StaffStatusSchema, StaffRoleSchema, PillarAccessSchema } from '../../../../../generated/zod/index.js';
 import { createModuleLogger } from '../../logger.js';
 import { encrypt, decrypt, generateActivationCode } from '../../security/encryption.js';
+import { recordSpanError } from '../middleware/tracing.js';
 
 const log = createModuleLogger('StaffRoute');
 
@@ -88,13 +88,17 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'User with this email not found' },
+			CONFLICT: { message: 'Staff profile already exists for this user' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const user = await prisma.user.findUnique({
 				where: { email: input.email }
 			});
 
 			if (!user) {
-				throw ApiException.notFound('User with this email not found');
+				throw errors.NOT_FOUND({ message: 'User with this email not found' });
 			}
 
 			// Check if staff profile already exists for this user
@@ -103,7 +107,7 @@ export const staffRouter = {
 			});
 
 			if (existingStaff) {
-				throw ApiException.conflict('Staff profile already exists for this user');
+				throw errors.CONFLICT({ message: 'Staff profile already exists for this user' });
 			}
 
 			// Generate activation code
@@ -197,7 +201,10 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const staff = await prisma.staff.findUnique({
 				where: { id: input.staffId },
 				include: {
@@ -212,7 +219,7 @@ export const staffRouter = {
 			});
 
 			if (!staff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			return successResponse(
@@ -394,13 +401,16 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			const previousState = {
@@ -487,17 +497,21 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			if (existingStaff.status !== 'PENDING') {
-				throw ApiException.badRequest(`Cannot activate staff with status: ${existingStaff.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot activate staff with status: ${existingStaff.status}` });
 			}
 
 			const now = new Date();
@@ -576,7 +590,11 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId },
 				include: {
@@ -587,11 +605,11 @@ export const staffRouter = {
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			if (existingStaff.status === 'SUSPENDED' || existingStaff.status === 'DEACTIVATED') {
-				throw ApiException.badRequest(`Cannot suspend staff with status: ${existingStaff.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot suspend staff with status: ${existingStaff.status}` });
 			}
 
 			const previousStatus = existingStaff.status;
@@ -695,7 +713,11 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId },
 				include: {
@@ -706,19 +728,19 @@ export const staffRouter = {
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			if (existingStaff.status === 'DEACTIVATED') {
-				throw ApiException.badRequest('Staff is already deactivated');
+				throw errors.BAD_REQUEST({ message: 'Staff is already deactivated' });
 			}
 
 			// Check for active cases - must be reassigned first
 			const activeCaseCount = existingStaff.assignedCases.length;
 			if (activeCaseCount > 0) {
-				throw ApiException.badRequest(
-					`Cannot deactivate staff with ${activeCaseCount} active case(s). Reassign cases first.`
-				);
+				throw errors.BAD_REQUEST({
+					message: `Cannot deactivate staff with ${activeCaseCount} active case(s). Reassign cases first.`
+				});
 			}
 
 			const previousStatus = existingStaff.status;
@@ -804,21 +826,25 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			if (existingStaff.status === 'ACTIVE') {
-				throw ApiException.badRequest('Staff is already active');
+				throw errors.BAD_REQUEST({ message: 'Staff is already active' });
 			}
 
 			if (existingStaff.status === 'PENDING') {
-				throw ApiException.badRequest('Use activate endpoint for pending staff');
+				throw errors.BAD_REQUEST({ message: 'Use activate endpoint for pending staff' });
 			}
 
 			const previousStatus = existingStaff.status;
@@ -897,13 +923,16 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			const previousRoles = existingStaff.roles;
@@ -981,13 +1010,16 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!existingStaff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			const previousPillarAccess = existingStaff.pillarAccess;
@@ -1073,13 +1105,16 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const staff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!staff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			const where: Record<string, unknown> = { staffId: input.staffId };
@@ -1127,17 +1162,21 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const staff = await prisma.staff.findUnique({
 				where: { id: input.staffId }
 			});
 
 			if (!staff) {
-				throw ApiException.notFound('Staff');
+				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
 			if (staff.status !== 'PENDING') {
-				throw ApiException.badRequest('Can only regenerate code for PENDING staff');
+				throw errors.BAD_REQUEST({ message: 'Can only regenerate code for PENDING staff' });
 			}
 
 			const activationCode = generateActivationCode();
@@ -1194,14 +1233,18 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Get current user's staff profile
 			const staff = await prisma.staff.findUnique({
 				where: { userId: context.user!.id }
 			});
 
 			if (!staff) {
-				throw ApiException.forbidden('Not a staff member');
+				throw errors.FORBIDDEN({ message: 'Not a staff member' });
 			}
 
 			if (staff.status === 'ACTIVE') {
@@ -1209,26 +1252,34 @@ export const staffRouter = {
 			}
 
 			if (staff.status !== 'PENDING') {
-				throw ApiException.forbidden('Account cannot be activated');
+				throw errors.FORBIDDEN({ message: 'Account cannot be activated' });
 			}
 
 			if (!staff.activationCodeEncrypted || !staff.activationCodeExpiresAt) {
-				throw ApiException.badRequest('No activation code found. Ask admin to regenerate.');
+				throw errors.BAD_REQUEST({ message: 'No activation code found. Ask admin to regenerate.' });
 			}
 
 			if (staff.activationCodeExpiresAt < new Date()) {
-				throw ApiException.badRequest('Activation code expired. Ask admin to regenerate.');
+				throw errors.BAD_REQUEST({ message: 'Activation code expired. Ask admin to regenerate.' });
 			}
 
 			// Verify code
 			try {
 				const plainCode = decrypt(staff.activationCodeEncrypted);
 				if (plainCode !== input.code.toUpperCase()) { // Case insensitive check
-					throw ApiException.badRequest('Invalid activation code');
+					throw errors.BAD_REQUEST({ message: 'Invalid activation code' });
 				}
 			} catch (e) {
+				const errorObj = e instanceof Error ? e : new Error(String(e));
 				log.error('Decryption failed during activation', { error: e });
-				throw ApiException.badRequest('Invalid activation code');
+
+				// Record error on span for trace visibility
+				await recordSpanError(errorObj, {
+					errorCode: 'ACTIVATION_FAILED',
+					errorType: 'STAFF_ACTIVATION_ERROR'
+				});
+
+				throw errors.BAD_REQUEST({ message: 'Invalid activation code' });
 			}
 
 			// Activate

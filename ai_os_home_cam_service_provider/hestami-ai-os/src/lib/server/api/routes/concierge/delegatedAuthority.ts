@@ -8,7 +8,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { DelegatedAuthorityTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/DelegatedAuthorityTypeSchema.js';
 import { DelegatedAuthorityStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/DelegatedAuthorityStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
@@ -35,6 +34,12 @@ export const delegatedAuthorityRouter = {
 				expiresAt: z.coerce.date().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			CONFLICT: { message: 'Conflict occurred' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -55,7 +60,7 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'delegated_authority', 'new');
 
@@ -66,12 +71,12 @@ export const delegatedAuthorityRouter = {
 			});
 
 			if (!propertyOwnership || propertyOwnership.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Only OWNER or CO_OWNER can grant delegated authority
 			if (!['OWNER', 'CO_OWNER'].includes(propertyOwnership.role)) {
-				throw ApiException.forbidden('Only owners or co-owners can grant delegated authority');
+				throw errors.FORBIDDEN({ message: 'Only owners or co-owners can grant delegated authority' });
 			}
 
 			// Verify delegate party exists and belongs to this organization
@@ -80,12 +85,12 @@ export const delegatedAuthorityRouter = {
 			});
 
 			if (!delegateParty) {
-				throw ApiException.notFound('Delegate Party');
+				throw errors.NOT_FOUND({ message: 'Delegate Party not found' });
 			}
 
 			// Cannot delegate to self
 			if (propertyOwnership.partyId === input.delegatePartyId) {
-				throw ApiException.badRequest('Cannot delegate authority to yourself');
+				throw errors.BAD_REQUEST({ message: 'Cannot delegate authority to yourself' });
 			}
 
 			// Check if similar delegation already exists
@@ -99,7 +104,7 @@ export const delegatedAuthorityRouter = {
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Delegated authority already exists for this party and type');
+				throw errors.CONFLICT({ message: 'Delegated authority already exists for this party and type' });
 			}
 
 			const delegatedAuthority = await prisma.delegatedAuthority.create({
@@ -142,6 +147,10 @@ export const delegatedAuthorityRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -183,7 +192,7 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const delegatedAuthority = await prisma.delegatedAuthority.findFirst({
 				where: { id: input.id },
 				include: {
@@ -201,7 +210,7 @@ export const delegatedAuthorityRouter = {
 				!delegatedAuthority ||
 				delegatedAuthority.propertyOwnership.property.ownerOrgId !== context.organization.id
 			) {
-				throw ApiException.notFound('DelegatedAuthority');
+				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
 			// Cerbos authorization
@@ -272,6 +281,10 @@ export const delegatedAuthorityRouter = {
 				authorityType: DelegatedAuthorityTypeSchema.optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -293,7 +306,7 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify property ownership exists and belongs to this organization
 			const propertyOwnership = await prisma.propertyOwnership.findFirst({
 				where: { id: input.propertyOwnershipId, deletedAt: null },
@@ -301,7 +314,7 @@ export const delegatedAuthorityRouter = {
 			});
 
 			if (!propertyOwnership || propertyOwnership.property.ownerOrgId !== context.organization.id) {
-				throw ApiException.notFound('PropertyOwnership');
+				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization
@@ -359,6 +372,10 @@ export const delegatedAuthorityRouter = {
 				authorityType: DelegatedAuthorityTypeSchema.optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -383,14 +400,14 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify party exists and belongs to this organization
 			const party = await prisma.party.findFirst({
 				where: { id: input.delegatePartyId, organizationId: context.organization.id }
 			});
 
 			if (!party) {
-				throw ApiException.notFound('Party');
+				throw errors.NOT_FOUND({ message: 'Party not found' });
 			}
 
 			// Cerbos authorization
@@ -458,6 +475,11 @@ export const delegatedAuthorityRouter = {
 				id: z.string()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -471,7 +493,7 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.delegatedAuthority.findFirst({
 				where: { id: input.id },
 				include: {
@@ -484,11 +506,11 @@ export const delegatedAuthorityRouter = {
 				!existing ||
 				existing.propertyOwnership.property.ownerOrgId !== context.organization.id
 			) {
-				throw ApiException.notFound('DelegatedAuthority');
+				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
 			if (existing.status !== 'PENDING_ACCEPTANCE') {
-				throw ApiException.badRequest('Delegated authority is not pending acceptance');
+				throw errors.BAD_REQUEST({ message: 'Delegated authority is not pending acceptance' });
 			}
 
 			// Cerbos authorization - delegate must accept
@@ -527,6 +549,11 @@ export const delegatedAuthorityRouter = {
 				reason: z.string().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -541,7 +568,7 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.delegatedAuthority.findFirst({
 				where: { id: input.id },
 				include: {
@@ -553,11 +580,11 @@ export const delegatedAuthorityRouter = {
 				!existing ||
 				existing.propertyOwnership.property.ownerOrgId !== context.organization.id
 			) {
-				throw ApiException.notFound('DelegatedAuthority');
+				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
 			if (!['ACTIVE', 'PENDING_ACCEPTANCE'].includes(existing.status)) {
-				throw ApiException.badRequest('Delegated authority cannot be revoked');
+				throw errors.BAD_REQUEST({ message: 'Delegated authority cannot be revoked' });
 			}
 
 			// Cerbos authorization
@@ -599,6 +626,10 @@ export const delegatedAuthorityRouter = {
 				amount: z.number().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -612,14 +643,14 @@ export const delegatedAuthorityRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Verify property belongs to this organization
 			const property = await prisma.individualProperty.findFirst({
 				where: { id: input.propertyId, ownerOrgId: context.organization.id }
 			});
 
 			if (!property) {
-				throw ApiException.notFound('IndividualProperty');
+				throw errors.NOT_FOUND({ message: 'IndividualProperty not found' });
 			}
 
 			// Cerbos authorization

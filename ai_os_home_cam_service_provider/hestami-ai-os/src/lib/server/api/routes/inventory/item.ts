@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { UnitOfMeasure } from '../../../../../../generated/prisma/client.js';
 import { startInventoryItemWorkflow } from '../../../workflows/inventoryItemWorkflow.js';
@@ -79,6 +78,10 @@ export const inventoryItemRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -86,8 +89,8 @@ export const inventoryItemRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'inventory_item', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -117,7 +120,7 @@ export const inventoryItemRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create item' });
 			}
 
 			const item = await prisma.inventoryItem.findUniqueOrThrow({
@@ -129,6 +132,10 @@ export const inventoryItemRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -136,15 +143,15 @@ export const inventoryItemRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_item', input.id);
 
 			const item = await prisma.inventoryItem.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
 
-			if (!item) throw ApiException.notFound('Inventory item');
+			if (!item) throw errors.NOT_FOUND({ message: 'Inventory item not found' });
 
 			return successResponse({ item: formatInventoryItem(item) }, context);
 		}),
@@ -161,6 +168,9 @@ export const inventoryItemRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -171,8 +181,8 @@ export const inventoryItemRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_item', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -235,6 +245,11 @@ export const inventoryItemRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -242,14 +257,14 @@ export const inventoryItemRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'inventory_item', input.id);
 
 			const existing = await prisma.inventoryItem.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Inventory item');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Inventory item not found' });
 
 			const { id, idempotencyKey, ...data } = input;
 
@@ -266,7 +281,7 @@ export const inventoryItemRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update item' });
 			}
 
 			const item = await prisma.inventoryItem.findUniqueOrThrow({
@@ -278,6 +293,11 @@ export const inventoryItemRouter = {
 
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -285,14 +305,14 @@ export const inventoryItemRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'inventory_item', input.id);
 
 			const existing = await prisma.inventoryItem.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!existing) throw ApiException.notFound('Inventory item');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Inventory item not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryItemWorkflow(
@@ -307,7 +327,7 @@ export const inventoryItemRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete item');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete item' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -315,6 +335,9 @@ export const inventoryItemRouter = {
 
 	getLowStock: orgProcedure
 		.input(PaginationInputSchema.optional())
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -330,8 +353,8 @@ export const inventoryItemRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'inventory_item', 'list');
 
 			const limit = input?.limit ?? 20;

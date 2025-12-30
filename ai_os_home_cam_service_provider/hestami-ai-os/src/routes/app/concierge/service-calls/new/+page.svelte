@@ -22,7 +22,6 @@
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import {
 		SERVICE_CALL_CATEGORY_LABELS,
 		SERVICE_CALL_CATEGORY_DESCRIPTIONS,
@@ -53,10 +52,18 @@
 		postalCode: string;
 	}
 
+	interface Props {
+		data: {
+			properties: Property[];
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let isSubmitting = $state(false);
-	let isLoadingProperties = $state(true);
+	let isLoadingProperties = $state(false);
 	let error = $state<string | null>(null);
-	let properties = $state<Property[]>([]);
+	let properties = $derived(data.properties);
 
 	// Form state
 	let selectedPropertyId = $state('');
@@ -136,10 +143,8 @@
 		return new Date(`${date}T${time}:00`).toISOString();
 	}
 
-	onMount(async () => {
-		await loadProperties();
-
-		// Set pre-selected values from URL
+	// Synchronize pre-selected values from URL
+	$effect(() => {
 		if (urlPropertyId) {
 			selectedPropertyId = urlPropertyId;
 		}
@@ -149,31 +154,13 @@
 				category = upperCategory;
 			}
 		}
+
+		// If only one property, auto-select it
+		if (properties.length === 1 && !urlPropertyId && !selectedPropertyId) {
+			selectedPropertyId = properties[0].id;
+		}
 	});
 
-	async function loadProperties() {
-		isLoadingProperties = true;
-		try {
-			const result = await orpc.individualProperty.list({ limit: 100 });
-			properties = result.data.properties.map((p) => ({
-				id: p.id,
-				name: p.name,
-				addressLine1: p.addressLine1,
-				city: p.city,
-				state: p.state,
-				postalCode: p.postalCode
-			}));
-
-			// If only one property, auto-select it
-			if (properties.length === 1 && !urlPropertyId) {
-				selectedPropertyId = properties[0].id;
-			}
-		} catch (err) {
-			console.error('Failed to load properties:', err);
-		} finally {
-			isLoadingProperties = false;
-		}
-	}
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();

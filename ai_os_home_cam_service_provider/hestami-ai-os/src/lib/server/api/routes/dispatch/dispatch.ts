@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { DispatchStatus, SLAPriority } from '../../../../../../generated/prisma/client.js';
 import { startDispatchWorkflow } from '../../../workflows/dispatchWorkflow.js';
@@ -80,7 +79,7 @@ const routePlanOutput = z.object({
 	totalJobMinutes: z.number().nullable(),
 	startAddress: z.string().nullable(),
 	endAddress: z.string().nullable(),
-	stopsJson: z.any().nullable(),
+	stopsJson: JsonSchema.nullable(),
 	createdAt: z.string(),
 	updatedAt: z.string()
 });
@@ -268,6 +267,12 @@ export const dispatchRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -275,15 +280,15 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('assign', 'dispatch_assignment', 'new');
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Validate technician eligibility
 			const eligibility = await validateTechnicianEligibility(
@@ -293,7 +298,7 @@ export const dispatchRouter = {
 				new Date(input.scheduledEnd)
 			);
 			if (!eligibility.eligible) {
-				throw ApiException.badRequest(eligibility.reason!);
+				throw errors.BAD_REQUEST({ message: eligibility.reason! });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -316,7 +321,7 @@ export const dispatchRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create assignment');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create assignment' });
 			}
 
 			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
@@ -341,6 +346,12 @@ export const dispatchRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -348,17 +359,17 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('reassign', 'dispatch_assignment', input.assignmentId);
 
 			const existing = await prisma.dispatchAssignment.findFirst({
 				where: { id: input.assignmentId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Dispatch assignment');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Dispatch assignment not found' });
 
 			if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
-				throw ApiException.badRequest(`Cannot reassign ${existing.status} dispatch`);
+				throw errors.BAD_REQUEST({ message: `Cannot reassign ${existing.status} dispatch` });
 			}
 
 			const scheduledStart = input.scheduledStart
@@ -376,7 +387,7 @@ export const dispatchRouter = {
 				scheduledEnd
 			);
 			if (!eligibility.eligible) {
-				throw ApiException.badRequest(eligibility.reason!);
+				throw errors.BAD_REQUEST({ message: eligibility.reason! });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -397,7 +408,7 @@ export const dispatchRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to reassign dispatch');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reassign dispatch' });
 			}
 
 			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
@@ -423,6 +434,12 @@ export const dispatchRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -430,13 +447,13 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.dispatchAssignment.findFirst({
 				where: { id: input.assignmentId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Dispatch assignment');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Dispatch assignment not found' });
 
 			// Authorize based on action
 			const action = input.status.toLowerCase();
@@ -445,51 +462,8 @@ export const dispatchRouter = {
 			// Validate transition
 			const allowedTransitions = DISPATCH_TRANSITIONS[existing.status];
 			if (!allowedTransitions.includes(input.status)) {
-				throw ApiException.badRequest(
-					`Cannot transition from ${existing.status} to ${input.status}`
-				);
+				throw errors.BAD_REQUEST({ message: `Cannot transition from ${existing.status} to ${input.status}` });
 			}
-
-			const updateDispatch = async () => {
-				const updateData: any = { status: input.status };
-
-				switch (input.status) {
-					case 'ACCEPTED':
-						updateData.acceptedAt = new Date();
-						break;
-					case 'DECLINED':
-						updateData.declinedAt = new Date();
-						updateData.declineReason = input.reason;
-						break;
-					case 'EN_ROUTE':
-						updateData.startedAt = new Date();
-						break;
-					case 'ON_SITE':
-						if (input.actualStart) {
-							updateData.actualStart = new Date(input.actualStart);
-						}
-						break;
-					case 'COMPLETED':
-						updateData.completedAt = new Date();
-						if (input.actualEnd) {
-							updateData.actualEnd = new Date(input.actualEnd);
-						}
-						break;
-					case 'CANCELLED':
-						updateData.cancelledAt = new Date();
-						updateData.cancelReason = input.reason;
-						break;
-				}
-
-				if (input.techNotes) {
-					updateData.techNotes = input.techNotes;
-				}
-
-				return prisma.dispatchAssignment.update({
-					where: { id: input.assignmentId },
-					data: updateData
-				});
-			};
 
 			// Use DBOS workflow for durable execution
 			const result = await startDispatchWorkflow(
@@ -502,14 +476,15 @@ export const dispatchRouter = {
 						status: input.status,
 						actualStart: input.actualStart,
 						actualEnd: input.actualEnd,
-						completionNotes: input.techNotes
+						completionNotes: input.techNotes,
+						reason: input.reason
 					}
 				},
 				input.idempotencyKey
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update dispatch status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update dispatch status' });
 			}
 
 			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
@@ -535,6 +510,9 @@ export const dispatchRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -545,8 +523,8 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'dispatch_assignment', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -593,6 +571,9 @@ export const dispatchRouter = {
 				technicianIds: z.array(z.string()).optional()
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -613,8 +594,8 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'dispatch_assignment', 'board');
 
 			const dateFrom = new Date(input.dateFrom);
@@ -682,6 +663,12 @@ export const dispatchRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -689,17 +676,17 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'dispatch_assignment', input.assignmentId);
 
 			const existing = await prisma.dispatchAssignment.findFirst({
 				where: { id: input.assignmentId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Dispatch assignment');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Dispatch assignment not found' });
 
 			if (['COMPLETED', 'CANCELLED', 'ON_SITE'].includes(existing.status)) {
-				throw ApiException.badRequest(`Cannot reschedule ${existing.status} dispatch`);
+				throw errors.BAD_REQUEST({ message: `Cannot reschedule ${existing.status} dispatch` });
 			}
 
 			// Validate technician still available for new time
@@ -712,7 +699,7 @@ export const dispatchRouter = {
 
 			// Allow if only conflict is this same assignment
 			if (!eligibility.eligible && eligibility.reason !== 'Technician has a conflicting dispatch assignment') {
-				throw ApiException.badRequest(eligibility.reason!);
+				throw errors.BAD_REQUEST({ message: eligibility.reason! });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -732,7 +719,7 @@ export const dispatchRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to reschedule dispatch');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reschedule dispatch' });
 			}
 
 			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
@@ -752,6 +739,10 @@ export const dispatchRouter = {
 				routeDate: z.string() // YYYY-MM-DD format
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -759,15 +750,15 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'route_plan', input.technicianId);
 
 			// Validate technician
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization!.id }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician not found' });
 
 			const routeDate = new Date(input.routeDate);
 
@@ -807,6 +798,10 @@ export const dispatchRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -814,8 +809,8 @@ export const dispatchRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('optimize', 'route_plan', input.technicianId);
 
 			const routeDate = new Date(input.routeDate);
@@ -865,7 +860,7 @@ export const dispatchRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to optimize route');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to optimize route' });
 			}
 
 			const routePlan = await prisma.routePlan.findUniqueOrThrow({

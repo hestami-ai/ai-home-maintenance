@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { recordActivityFromContext } from '../../middleware/activityEvent.js';
 import { startDashboardWorkflow } from '../../../workflows/dashboardWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -122,11 +121,11 @@ const widgetTypeEnum = z.enum([
 	'METRIC_CARD', 'TABLE', 'LIST', 'CALENDAR', 'MAP'
 ]);
 
-const getAssociationOrThrow = async (organizationId: string) => {
+const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
-	if (!association) throw ApiException.notFound('Association');
+	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
 };
 
@@ -157,9 +156,13 @@ export const dashboardRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'dashboard_widget', 'new');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
@@ -182,7 +185,7 @@ export const dashboardRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create widget');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create widget' });
 			}
 
 			const widget = await prisma.dashboardWidget.findUniqueOrThrow({
@@ -223,9 +226,12 @@ export const dashboardRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'dashboard_widget', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			const where: Record<string, unknown> = { associationId: association.id };
 			if (input?.userId !== undefined) where.userId = input.userId;
@@ -276,9 +282,13 @@ export const dashboardRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'dashboard_widget', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
@@ -301,7 +311,7 @@ export const dashboardRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update widget');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update widget' });
 			}
 
 			const widget = await prisma.dashboardWidget.findUniqueOrThrow({
@@ -331,9 +341,13 @@ export const dashboardRouter = {
 			data: z.object({ deleted: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'dashboard_widget', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
@@ -349,7 +363,7 @@ export const dashboardRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete widget');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete widget' });
 			}
 
 			return successResponse({ deleted: true }, context);
@@ -368,9 +382,13 @@ export const dashboardRouter = {
 			data: z.object({ reordered: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'dashboard_widget', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
@@ -385,7 +403,7 @@ export const dashboardRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to reorder widgets');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reorder widgets' });
 			}
 
 			return successResponse({ reordered: true }, context);
@@ -417,9 +435,12 @@ export const dashboardRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ context, errors }) => {
 			await context.cerbos.authorize('view', 'dashboard_widget', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Aggregate financial data
 			const receivables = await prisma.assessmentCharge.aggregate({
@@ -520,9 +541,12 @@ export const dashboardRouter = {
 			}),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'dashboard_widget', '*');
-			const association = await getAssociationOrThrow(context.organization!.id);
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 			const now = new Date();
 			const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -885,8 +909,11 @@ export const dashboardRouter = {
 			data: z.object({ recorded: z.boolean() }),
 			meta: ResponseMetaSchema
 		}))
-		.handler(async ({ input, context }) => {
-			const association = await getAssociationOrThrow(context.organization!.id);
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Build event summary based on type
 			let summary: string;

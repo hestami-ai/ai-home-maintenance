@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import {
 		Calendar,
 		ChevronLeft,
@@ -16,23 +15,23 @@
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { jobApi, type Job, type JobStatus } from '$lib/api/cam';
 
+	interface Props {
+		data: {
+			jobs: Job[];
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let jobs = $state<Job[]>([]);
-	let isLoading = $state(true);
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
-	
-	// Calendar state
-	let currentDate = $state(new Date());
-	let viewMode = $state<'day' | 'week'>('week');
-	
-	// Filters
-	let showUnscheduled = $state(true);
-	let technicianFilter = $state('');
 
-	const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-	const hours = Array.from({ length: 12 }, (_, i) => i + 7); // 7 AM to 6 PM
-
-	onMount(async () => {
-		await loadJobs();
+	// Synchronize server jobs to local state
+	$effect(() => {
+		if (data.jobs) {
+			jobs = [...data.jobs];
+		}
 	});
 
 	async function loadJobs() {
@@ -51,6 +50,17 @@
 			isLoading = false;
 		}
 	}
+
+	// Calendar state
+	let currentDate = $state(new Date());
+	let viewMode = $state<'day' | 'week'>('week');
+	
+	// Filters
+	let showUnscheduled = $state(true);
+	let technicianFilter = $state('');
+
+	const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+	const hours = Array.from({ length: 12 }, (_, i) => i + 7); // 7 AM to 6 PM
 
 	// Get week dates
 	function getWeekDates(date: Date): Date[] {

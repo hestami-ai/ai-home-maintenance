@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 
@@ -50,16 +49,21 @@ type LicenseInput = z.infer<typeof upsertInput>;
 export const licenseRouter = {
 	createOrUpdate: orgProcedure
 		.input(upsertInput)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ license: licenseOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'contractor_license', input.id ?? 'new');
 
 			const { id, idempotencyKey, ...data } = input;
 			const profile = await prisma.contractorProfile.findUnique({
 				where: { organizationId: context.organization.id }
 			});
-			if (!profile) throw ApiException.notFound('ContractorProfile');
+			if (!profile) throw errors.NOT_FOUND({ message: 'ContractorProfile' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startContractorProfileWorkflow(
@@ -74,7 +78,7 @@ export const licenseRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create/update license');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update license' });
 			}
 
 			const license = await prisma.contractorLicense.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -89,14 +93,18 @@ export const licenseRouter = {
 
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ license: licenseOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			const license = await prisma.contractorLicense.findFirst({
 				where: { id: input.id, contractorProfile: { organizationId: context.organization.id } },
 				include: { contractorProfile: true }
 			});
-			if (!license) throw ApiException.notFound('ContractorLicense');
-			await assertContractorOrg(license.contractorProfile.organizationId);
+			if (!license) throw errors.NOT_FOUND({ message: 'ContractorLicense' });
+			await assertContractorOrg(license.contractorProfile.organizationId, errors);
 			await context.cerbos.authorize('view', 'contractor_license', license.id);
 
 			return successResponse({ license: serializeLicense(license) }, context);
@@ -108,6 +116,10 @@ export const licenseRouter = {
 				status: z.enum(['ACTIVE', 'EXPIRED', 'SUSPENDED', 'REVOKED', 'PENDING_RENEWAL']).optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -115,12 +127,12 @@ export const licenseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			const profile = await prisma.contractorProfile.findUnique({
 				where: { organizationId: context.organization.id }
 			});
-			if (!profile) throw ApiException.notFound('ContractorProfile');
+			if (!profile) throw errors.NOT_FOUND({ message: 'ContractorProfile' });
 
 			const queryPlan = await context.cerbos.queryFilter('view', 'contractor_license');
 			if (queryPlan.kind === 'always_denied') {

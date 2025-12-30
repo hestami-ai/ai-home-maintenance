@@ -8,12 +8,14 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import {
 	ConciergeCaseStatus,
 	ConciergeCasePriority,
 	type LifecycleWorkflowResult
 } from './schemas.js';
 import { recordWorkflowEvent, recordWorkflowLifecycleEvent } from '../api/middleware/activityEvent.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 
 const WORKFLOW_STATUS_EVENT = 'case_lifecycle_status';
@@ -101,81 +103,86 @@ async function createCase(
 ): Promise<{ id: string; caseNumber: string; status: string }> {
 	const caseNumber = await generateCaseNumber(organizationId);
 
-	// Use transaction to ensure atomicity of case creation with availability slots
-	const newCase = await prisma.$transaction(async (tx) => {
-		const createdCase = await tx.conciergeCase.create({
-			data: {
-				organizationId,
-				propertyId,
-				caseNumber,
-				title,
-				description,
-				priority,
-				status: 'INTAKE',
-				...(originIntentId && { originIntentId }),
-				...(assignedConciergeUserId && { assignedConciergeUserId }),
-				availabilityType: availabilityType ?? 'FLEXIBLE',
-				availabilityNotes
-			}
-		});
-
-		// Create availability slots if provided
-		if (availabilitySlots && availabilitySlots.length > 0) {
-			await tx.caseAvailabilitySlot.createMany({
-				data: availabilitySlots.map((slot) => ({
-					caseId: createdCase.id,
-					startTime: new Date(slot.startTime),
-					endTime: new Date(slot.endTime),
-					notes: slot.notes
-				}))
-			});
-		}
-
-		// Log initial status
-		await tx.caseStatusHistory.create({
-			data: {
-				caseId: createdCase.id,
-				toStatus: 'INTAKE',
-				reason: 'Case created',
-				changedBy: userId
-			}
-		});
-
-		// If created from an intent, update the intent
-		if (originIntentId) {
-			await tx.ownerIntent.update({
-				where: { id: originIntentId },
+	try {
+		// Use orgTransaction to set RLS context and ensure atomicity
+		const newCase = await orgTransaction(organizationId, async (tx) => {
+			const createdCase = await tx.conciergeCase.create({
 				data: {
-					status: 'CONVERTED_TO_CASE',
-					convertedCaseId: createdCase.id,
-					convertedAt: new Date()
+					organizationId,
+					propertyId,
+					caseNumber,
+					title,
+					description,
+					priority,
+					status: 'INTAKE',
+					...(originIntentId && { originIntentId }),
+					...(assignedConciergeUserId && { assignedConciergeUserId }),
+					availabilityType: availabilityType ?? 'FLEXIBLE',
+					availabilityNotes
 				}
 			});
-		}
 
-		return createdCase;
-	});
+			// Create availability slots if provided
+			if (availabilitySlots && availabilitySlots.length > 0) {
+				await tx.caseAvailabilitySlot.createMany({
+					data: availabilitySlots.map((slot) => ({
+						caseId: createdCase.id,
+						startTime: new Date(slot.startTime),
+						endTime: new Date(slot.endTime),
+						notes: slot.notes
+					}))
+				});
+			}
 
-	// Record activity event for case creation
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'CONCIERGE_CASE',
-		entityId: newCase.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
-		summary: `Case created: ${title}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'caseLifecycleWorkflow_v1',
-		workflowStep: 'CREATE_CASE',
-		workflowVersion: 'v1',
-		caseId: newCase.id,
-		propertyId,
-		intentId: originIntentId,
-		newState: { caseNumber: newCase.caseNumber, status: newCase.status, title }
-	});
+			// Log initial status
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId: createdCase.id,
+					toStatus: 'INTAKE',
+					reason: 'Case created',
+					changedBy: userId
+				}
+			});
 
-	return { id: newCase.id, caseNumber: newCase.caseNumber, status: newCase.status };
+			// If created from an intent, update the intent
+			if (originIntentId) {
+				await tx.ownerIntent.update({
+					where: { id: originIntentId },
+					data: {
+						status: 'CONVERTED_TO_CASE',
+						convertedCaseId: createdCase.id,
+						convertedAt: new Date()
+					}
+				});
+			}
+
+			return createdCase;
+		}, { userId, reason: 'Creating case via workflow' });
+
+		// Record activity event for case creation
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'CONCIERGE_CASE',
+			entityId: newCase.id,
+			action: 'CREATE',
+			eventCategory: 'EXECUTION',
+			summary: `Case created: ${title}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: 'CREATE_CASE',
+			workflowVersion: 'v1',
+			caseId: newCase.id,
+			propertyId,
+			intentId: originIntentId,
+			newState: { caseNumber: newCase.caseNumber, status: newCase.status, title }
+		});
+
+		return { id: newCase.id, caseNumber: newCase.caseNumber, status: newCase.status };
+	} finally {
+		// CRITICAL: Always clear context to prevent leakage to next request
+		await clearOrgContext(userId);
+	}
 }
 
 async function convertIntentToCase(
@@ -196,59 +203,67 @@ async function convertIntentToCase(
 
 	const caseNumber = await generateCaseNumber(intent.organizationId);
 
-	const newCase = await prisma.conciergeCase.create({
-		data: {
+	try {
+		const newCase = await orgTransaction(intent.organizationId, async (tx) => {
+			const createdCase = await tx.conciergeCase.create({
+				data: {
+					organizationId: intent.organizationId,
+					propertyId: intent.propertyId,
+					caseNumber,
+					title: intent.title,
+					description: intent.description,
+					priority: intent.priority === 'URGENT' ? 'URGENT' : intent.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
+					status: 'INTAKE',
+					originIntentId: intentId
+				}
+			});
+
+			// Update intent
+			await tx.ownerIntent.update({
+				where: { id: intentId },
+				data: {
+					status: 'CONVERTED_TO_CASE',
+					convertedCaseId: createdCase.id,
+					convertedAt: new Date()
+				}
+			});
+
+			// Log initial status
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId: createdCase.id,
+					toStatus: 'INTAKE',
+					reason: `Converted from intent ${intentId}`,
+					changedBy: userId
+				}
+			});
+
+			return createdCase;
+		}, { userId, reason: 'Converting intent to case via workflow' });
+
+		// Record activity event for intent conversion
+		await recordWorkflowEvent({
 			organizationId: intent.organizationId,
-			propertyId: intent.propertyId,
-			caseNumber,
-			title: intent.title,
-			description: intent.description,
-			priority: intent.priority === 'URGENT' ? 'URGENT' : intent.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
-			status: 'INTAKE',
-			originIntentId: intentId
-		}
-	});
-
-	// Update intent
-	await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: {
-			status: 'CONVERTED_TO_CASE',
-			convertedCaseId: newCase.id,
-			convertedAt: new Date()
-		}
-	});
-
-	// Log initial status
-	await prisma.caseStatusHistory.create({
-		data: {
+			entityType: 'CONCIERGE_CASE',
+			entityId: newCase.id,
+			action: 'CREATE',
+			eventCategory: 'DECISION',
+			summary: `Intent converted to case: ${intent.title}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: 'CONVERT_INTENT',
+			workflowVersion: 'v1',
 			caseId: newCase.id,
-			toStatus: 'INTAKE',
-			reason: `Converted from intent ${intentId}`,
-			changedBy: userId
-		}
-	});
+			intentId,
+			propertyId: intent.propertyId,
+			newState: { caseNumber: newCase.caseNumber, status: newCase.status }
+		});
 
-	// Record activity event for intent conversion
-	await recordWorkflowEvent({
-		organizationId: intent.organizationId,
-		entityType: 'CONCIERGE_CASE',
-		entityId: newCase.id,
-		action: 'CREATE',
-		eventCategory: 'DECISION',
-		summary: `Intent converted to case: ${intent.title}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'caseLifecycleWorkflow_v1',
-		workflowStep: 'CONVERT_INTENT',
-		workflowVersion: 'v1',
-		caseId: newCase.id,
-		intentId,
-		propertyId: intent.propertyId,
-		newState: { caseNumber: newCase.caseNumber, status: newCase.status }
-	});
-
-	return { id: newCase.id, caseNumber: newCase.caseNumber, status: newCase.status };
+		return { id: newCase.id, caseNumber: newCase.caseNumber, status: newCase.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function transitionStatus(
@@ -270,41 +285,47 @@ async function transitionStatus(
 		throw new Error(`Invalid transition from ${caseRecord.status} to ${targetStatus}`);
 	}
 
-	await prisma.conciergeCase.update({
-		where: { id: caseId },
-		data: { status: targetStatus }
-	});
+	try {
+		await orgTransaction(caseRecord.organizationId, async (tx) => {
+			await tx.conciergeCase.update({
+				where: { id: caseId },
+				data: { status: targetStatus }
+			});
 
-	await prisma.caseStatusHistory.create({
-		data: {
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId,
+					fromStatus: caseRecord.status,
+					toStatus: targetStatus,
+					reason,
+					changedBy: userId
+				}
+			});
+		}, { userId, reason: 'Transitioning case status via workflow' });
+
+		// Record activity event for status transition
+		await recordWorkflowEvent({
+			organizationId: caseRecord.organizationId,
+			entityType: 'CONCIERGE_CASE',
+			entityId: caseId,
+			action: 'STATUS_CHANGE',
+			eventCategory: 'EXECUTION',
+			summary: `Case status changed from ${caseRecord.status} to ${targetStatus}${reason ? `: ${reason}` : ''}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: 'TRANSITION_STATUS',
+			workflowVersion: 'v1',
 			caseId,
-			fromStatus: caseRecord.status,
-			toStatus: targetStatus,
-			reason,
-			changedBy: userId
-		}
-	});
+			propertyId: caseRecord.propertyId,
+			previousState: { status: caseRecord.status },
+			newState: { status: targetStatus }
+		});
 
-	// Record activity event for status transition
-	await recordWorkflowEvent({
-		organizationId: caseRecord.organizationId,
-		entityType: 'CONCIERGE_CASE',
-		entityId: caseId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
-		summary: `Case status changed from ${caseRecord.status} to ${targetStatus}${reason ? `: ${reason}` : ''}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'caseLifecycleWorkflow_v1',
-		workflowStep: 'TRANSITION_STATUS',
-		workflowVersion: 'v1',
-		caseId,
-		propertyId: caseRecord.propertyId,
-		previousState: { status: caseRecord.status },
-		newState: { status: targetStatus }
-	});
-
-	return { status: targetStatus };
+		return { status: targetStatus };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function assignConcierge(
@@ -312,23 +333,30 @@ async function assignConcierge(
 	assigneeUserId: string,
 	userId: string
 ): Promise<{ assignedTo: string }> {
-	await prisma.conciergeCase.update({
-		where: { id: caseId },
-		data: { assignedConciergeUserId: assigneeUserId }
-	});
-
-	await prisma.caseNote.create({
-		data: {
-			caseId,
-			content: `Case assigned to user ${assigneeUserId}`,
-			createdBy: userId,
-			isInternal: true
-		}
-	});
-
-	// Record activity event for assignment
+	// First get the case to know the org
 	const caseRecord = await prisma.conciergeCase.findUnique({ where: { id: caseId } });
-	if (caseRecord) {
+	if (!caseRecord) {
+		throw new Error('Case not found');
+	}
+
+	try {
+		await orgTransaction(caseRecord.organizationId, async (tx) => {
+			await tx.conciergeCase.update({
+				where: { id: caseId },
+				data: { assignedConciergeUserId: assigneeUserId }
+			});
+
+			await tx.caseNote.create({
+				data: {
+					caseId,
+					content: `Case assigned to user ${assigneeUserId}`,
+					createdBy: userId,
+					isInternal: true
+				}
+			});
+		}, { userId, reason: 'Assigning concierge to case via workflow' });
+
+		// Record activity event for assignment
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
 			entityType: 'CONCIERGE_CASE',
@@ -345,9 +373,11 @@ async function assignConcierge(
 			propertyId: caseRecord.propertyId,
 			newState: { assignedConciergeUserId: assigneeUserId }
 		});
-	}
 
-	return { assignedTo: assigneeUserId };
+		return { assignedTo: assigneeUserId };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function resolveCase(
@@ -368,46 +398,52 @@ async function resolveCase(
 		throw new Error(`Cannot resolve case in status ${caseRecord.status}`);
 	}
 
-	await prisma.conciergeCase.update({
-		where: { id: caseId },
-		data: {
-			status: 'RESOLVED',
-			resolutionSummary,
-			resolvedBy: userId,
-			resolvedAt: new Date()
-		}
-	});
+	try {
+		await orgTransaction(caseRecord.organizationId, async (tx) => {
+			await tx.conciergeCase.update({
+				where: { id: caseId },
+				data: {
+					status: 'RESOLVED',
+					resolutionSummary,
+					resolvedBy: userId,
+					resolvedAt: new Date()
+				}
+			});
 
-	await prisma.caseStatusHistory.create({
-		data: {
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId,
+					fromStatus: caseRecord.status,
+					toStatus: 'RESOLVED',
+					reason: resolutionSummary,
+					changedBy: userId
+				}
+			});
+		}, { userId, reason: 'Resolving case via workflow' });
+
+		// Record activity event for resolution
+		await recordWorkflowEvent({
+			organizationId: caseRecord.organizationId,
+			entityType: 'CONCIERGE_CASE',
+			entityId: caseId,
+			action: 'COMPLETE',
+			eventCategory: 'DECISION',
+			summary: `Case resolved: ${resolutionSummary.substring(0, 100)}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: 'RESOLVE_CASE',
+			workflowVersion: 'v1',
 			caseId,
-			fromStatus: caseRecord.status,
-			toStatus: 'RESOLVED',
-			reason: resolutionSummary,
-			changedBy: userId
-		}
-	});
+			propertyId: caseRecord.propertyId,
+			previousState: { status: caseRecord.status },
+			newState: { status: 'RESOLVED', resolutionSummary }
+		});
 
-	// Record activity event for resolution
-	await recordWorkflowEvent({
-		organizationId: caseRecord.organizationId,
-		entityType: 'CONCIERGE_CASE',
-		entityId: caseId,
-		action: 'COMPLETE',
-		eventCategory: 'DECISION',
-		summary: `Case resolved: ${resolutionSummary.substring(0, 100)}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'caseLifecycleWorkflow_v1',
-		workflowStep: 'RESOLVE_CASE',
-		workflowVersion: 'v1',
-		caseId,
-		propertyId: caseRecord.propertyId,
-		previousState: { status: caseRecord.status },
-		newState: { status: 'RESOLVED', resolutionSummary }
-	});
-
-	return { status: 'RESOLVED' };
+		return { status: 'RESOLVED' };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function closeCase(caseId: string, userId: string): Promise<{ status: string }> {
@@ -423,44 +459,50 @@ async function closeCase(caseId: string, userId: string): Promise<{ status: stri
 		throw new Error('Can only close resolved cases');
 	}
 
-	await prisma.conciergeCase.update({
-		where: { id: caseId },
-		data: {
-			status: 'CLOSED',
-			closedAt: new Date()
-		}
-	});
+	try {
+		await orgTransaction(caseRecord.organizationId, async (tx) => {
+			await tx.conciergeCase.update({
+				where: { id: caseId },
+				data: {
+					status: 'CLOSED',
+					closedAt: new Date()
+				}
+			});
 
-	await prisma.caseStatusHistory.create({
-		data: {
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId,
+					fromStatus: 'RESOLVED',
+					toStatus: 'CLOSED',
+					reason: 'Case closed',
+					changedBy: userId
+				}
+			});
+		}, { userId, reason: 'Closing case via workflow' });
+
+		// Record activity event for close
+		await recordWorkflowEvent({
+			organizationId: caseRecord.organizationId,
+			entityType: 'CONCIERGE_CASE',
+			entityId: caseId,
+			action: 'CLOSE',
+			eventCategory: 'EXECUTION',
+			summary: `Case closed`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: 'CLOSE_CASE',
+			workflowVersion: 'v1',
 			caseId,
-			fromStatus: 'RESOLVED',
-			toStatus: 'CLOSED',
-			reason: 'Case closed',
-			changedBy: userId
-		}
-	});
+			propertyId: caseRecord.propertyId,
+			previousState: { status: 'RESOLVED' },
+			newState: { status: 'CLOSED' }
+		});
 
-	// Record activity event for close
-	await recordWorkflowEvent({
-		organizationId: caseRecord.organizationId,
-		entityType: 'CONCIERGE_CASE',
-		entityId: caseId,
-		action: 'CLOSE',
-		eventCategory: 'EXECUTION',
-		summary: `Case closed`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'caseLifecycleWorkflow_v1',
-		workflowStep: 'CLOSE_CASE',
-		workflowVersion: 'v1',
-		caseId,
-		propertyId: caseRecord.propertyId,
-		previousState: { status: 'RESOLVED' },
-		newState: { status: 'CLOSED' }
-	});
-
-	return { status: 'CLOSED' };
+		return { status: 'CLOSED' };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function cancelCase(
@@ -481,46 +523,52 @@ async function cancelCase(
 		throw new Error(`Cannot cancel case in status ${caseRecord.status}`);
 	}
 
-	await prisma.conciergeCase.update({
-		where: { id: caseId },
-		data: {
-			status: 'CANCELLED',
-			cancelReason,
-			cancelledBy: userId,
-			cancelledAt: new Date()
-		}
-	});
+	try {
+		await orgTransaction(caseRecord.organizationId, async (tx) => {
+			await tx.conciergeCase.update({
+				where: { id: caseId },
+				data: {
+					status: 'CANCELLED',
+					cancelReason,
+					cancelledBy: userId,
+					cancelledAt: new Date()
+				}
+			});
 
-	await prisma.caseStatusHistory.create({
-		data: {
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId,
+					fromStatus: caseRecord.status,
+					toStatus: 'CANCELLED',
+					reason: cancelReason,
+					changedBy: userId
+				}
+			});
+		}, { userId, reason: 'Cancelling case via workflow' });
+
+		// Record activity event for cancellation
+		await recordWorkflowEvent({
+			organizationId: caseRecord.organizationId,
+			entityType: 'CONCIERGE_CASE',
+			entityId: caseId,
+			action: 'CANCEL',
+			eventCategory: 'EXECUTION',
+			summary: `Case cancelled: ${cancelReason}`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: 'CANCEL_CASE',
+			workflowVersion: 'v1',
 			caseId,
-			fromStatus: caseRecord.status,
-			toStatus: 'CANCELLED',
-			reason: cancelReason,
-			changedBy: userId
-		}
-	});
+			propertyId: caseRecord.propertyId,
+			previousState: { status: caseRecord.status },
+			newState: { status: 'CANCELLED', cancelReason }
+		});
 
-	// Record activity event for cancellation
-	await recordWorkflowEvent({
-		organizationId: caseRecord.organizationId,
-		entityType: 'CONCIERGE_CASE',
-		entityId: caseId,
-		action: 'CANCEL',
-		eventCategory: 'EXECUTION',
-		summary: `Case cancelled: ${cancelReason}`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'caseLifecycleWorkflow_v1',
-		workflowStep: 'CANCEL_CASE',
-		workflowVersion: 'v1',
-		caseId,
-		propertyId: caseRecord.propertyId,
-		previousState: { status: caseRecord.status },
-		newState: { status: 'CANCELLED', cancelReason }
-	});
-
-	return { status: 'CANCELLED' };
+		return { status: 'CANCELLED' };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise<CaseLifecycleWorkflowResult> {
@@ -731,18 +779,24 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 			}
 		}
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		const errorStack = error instanceof Error ? error.stack : undefined;
-		
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
 		log.error('Workflow failed', {
 			action: input.action,
 			caseId: input.caseId,
 			intentId: input.intentId,
 			error: errorMessage,
-			stack: errorStack
+			stack: errorObj.stack
 		});
-		
+
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'CASE_LIFECYCLE_ERROR'
+		});
 		const errorResult = {
 			success: false,
 			action: input.action,
@@ -768,8 +822,8 @@ export async function startCaseLifecycleWorkflow(
 
 export async function getCaseLifecycleWorkflowStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 

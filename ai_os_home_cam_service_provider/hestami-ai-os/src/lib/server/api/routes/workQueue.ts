@@ -15,8 +15,8 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { authedProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { createModuleLogger } from '../../logger.js';
+import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
 
 const log = createModuleLogger('WorkQueueRoute');
 
@@ -187,6 +187,10 @@ export const workQueueRouter = {
 				state: z.string().optional()
 			}).optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Staff access required for work queue' },
+			INTERNAL_SERVER_ERROR: { message: 'Database error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -205,223 +209,104 @@ export const workQueueRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			const userId = context.user!.id;
+		.handler(async ({ input, context, errors }) => {
+			// Cerbos authorization - verify user is staff with work queue access
+			// Uses direct Cerbos call since work queue is cross-org (no orgProcedure)
+			const principal = buildPrincipal(
+				context.user!,
+				context.orgRoles ?? {},
+				undefined, // no current org
+				undefined, // no vendorId
+				undefined, // no currentOrgId
+				context.staffRoles,
+				context.pillarAccess
+			);
+			const resource = createResource('work_queue', 'list', 'global');
+			try {
+				await requireAuthorization(principal, resource, 'view');
+			} catch (error) {
+				throw errors.FORBIDDEN({
+					message: error instanceof Error ? error.message : 'Staff access required for work queue'
+				});
+			}
+
 			const pillar = input?.pillar ?? 'ALL';
 			const limit = input?.limit ?? 50;
 			const now = new Date();
 
-			const items: WorkQueueItem[] = [];
-
-			// Fetch Concierge Cases (if pillar is ALL or CONCIERGE)
-			if (pillar === 'ALL' || pillar === 'CONCIERGE') {
-				const caseWhere: Record<string, unknown> = {
-					deletedAt: null,
-					status: { notIn: ['CLOSED', 'CANCELLED'] }
-				};
-				if (input?.assignedToMe) caseWhere.assignedConciergeUserId = userId;
-				if (input?.unassignedOnly) caseWhere.assignedConciergeUserId = null;
-				if (input?.state) caseWhere.status = input.state;
-
-				const conciergeCases = await prisma.conciergeCase.findMany({
-					where: caseWhere,
-					include: {
-						property: true,
-						assignedConcierge: true,
-						organization: {
-							select: { id: true, name: true }
-						}
-					},
-					orderBy: [{ priority: 'desc' }, { updatedAt: 'asc' }],
-					take: limit
-				});
-
-				for (const c of conciergeCases) {
-					const timeInState = now.getTime() - c.updatedAt.getTime();
-					const urgency = calculateUrgency(c.priority, timeInState, null);
-
-					items.push({
-						id: `case-${c.id}`,
-						pillar: 'CONCIERGE',
-						itemType: 'CONCIERGE_CASE',
-						itemId: c.id,
-						itemNumber: c.caseNumber,
-						organizationId: c.organizationId,
-						title: c.title,
-						currentState: c.status,
-						timeInState,
-						timeInStateFormatted: formatTimeInState(timeInState),
-						requiredAction: getRequiredAction(c.status, 'CONCIERGE_CASE'),
-						priority: c.priority,
-						urgency,
-						slaStatus: null, // TODO: Implement SLA tracking
-						slaDeadline: null,
-						assignedToId: c.assignedConciergeUserId,
-						assignedToName: c.assignedConcierge?.name ?? null,
-						propertyName: c.property.name,
-						associationName: null,
-						organizationName: c.organization.name,
-						createdAt: c.createdAt.toISOString(),
-						updatedAt: c.updatedAt.toISOString()
-					});
-				}
+			// Use SECURITY DEFINER function to bypass RLS for cross-org staff access
+			// This function is defined in migration 20251228182900_staff_work_queue_functions
+			interface WorkQueueRow {
+				item_type: string;
+				item_id: string;
+				item_number: string;
+				organization_id: string;
+				organization_name: string | null;
+				title: string;
+				status: string;
+				priority: string;
+				property_name: string | null;
+				association_name: string | null;
+				assigned_to_id: string | null;
+				assigned_to_name: string | null;
+				created_at: Date;
+				updated_at: Date;
 			}
 
-			// Fetch Work Orders (if pillar is ALL or CAM)
-			if (pillar === 'ALL' || pillar === 'CAM') {
-				const woWhere: Record<string, unknown> = {
-					status: { notIn: ['CLOSED', 'CANCELLED'] }
-				};
-				if (input?.state) woWhere.status = input.state;
-
-				const workOrders = await prisma.workOrder.findMany({
-					where: woWhere,
-					include: {
-						association: {
-							include: {
-								organization: { select: { id: true, name: true } }
-							}
-						},
-						unit: true
-					},
-					orderBy: [{ priority: 'desc' }, { updatedAt: 'asc' }],
-					take: limit
+			let rawItems: WorkQueueRow[];
+			try {
+				rawItems = await prisma.$queryRaw<WorkQueueRow[]>`
+					SELECT * FROM get_staff_work_queue()
+				`;
+			} catch (dbError) {
+				log.error('Work queue database error', { error: dbError });
+				throw errors.INTERNAL_SERVER_ERROR({
+					message: dbError instanceof Error ? dbError.message : 'Failed to fetch work queue'
 				});
-
-				for (const wo of workOrders) {
-					const timeInState = now.getTime() - wo.updatedAt.getTime();
-					const urgency = calculateUrgency(wo.priority, timeInState, null);
-
-					items.push({
-						id: `wo-${wo.id}`,
-						pillar: 'CAM',
-						itemType: 'WORK_ORDER',
-						itemId: wo.id,
-						itemNumber: wo.workOrderNumber,
-						organizationId: wo.association.organization.id,
-						title: wo.title,
-						currentState: wo.status,
-						timeInState,
-						timeInStateFormatted: formatTimeInState(timeInState),
-						requiredAction: getRequiredAction(wo.status, 'WORK_ORDER'),
-						priority: wo.priority,
-						urgency,
-						slaStatus: null,
-						slaDeadline: null,
-						assignedToId: null,
-						assignedToName: null,
-						propertyName: wo.unit?.unitNumber ?? null,
-						associationName: wo.association?.name ?? null,
-						organizationName: wo.association.organization.name,
-						createdAt: wo.createdAt.toISOString(),
-						updatedAt: wo.updatedAt.toISOString()
-					});
-				}
 			}
 
-			// Fetch Violations (if pillar is ALL or CAM)
-			if (pillar === 'ALL' || pillar === 'CAM') {
-				const vioWhere: Record<string, unknown> = {
-					deletedAt: null,
-					status: { notIn: ['CLOSED', 'DISMISSED'] }
-				};
-				if (input?.state) vioWhere.status = input.state;
+			// Transform and filter based on pillar
+			let items: WorkQueueItem[] = [];
 
-				const violations = await prisma.violation.findMany({
-					where: vioWhere,
-					include: {
-						association: {
-							include: {
-								organization: { select: { id: true, name: true } }
-							}
-						},
-						unit: true
-					},
-					orderBy: [{ severity: 'desc' }, { updatedAt: 'asc' }],
-					take: limit
+			for (const row of rawItems) {
+				// Filter by pillar
+				const itemPillar = row.item_type === 'CONCIERGE_CASE' ? 'CONCIERGE' : 'CAM';
+				if (pillar !== 'ALL' && itemPillar !== pillar) continue;
+
+				// Filter by state if specified
+				if (input?.state && row.status !== input.state) continue;
+
+				// Filter by assignment
+				if (input?.assignedToMe && row.assigned_to_id !== context.user!.id) continue;
+				if (input?.unassignedOnly && row.assigned_to_id !== null) continue;
+
+				const timeInState = now.getTime() - new Date(row.updated_at).getTime();
+				const urgency = calculateUrgency(row.priority, timeInState, null);
+
+				items.push({
+					id: `${row.item_type.toLowerCase().replace('_', '-')}-${row.item_id}`,
+					pillar: itemPillar,
+					itemType: row.item_type,
+					itemId: row.item_id,
+					itemNumber: row.item_number,
+					organizationId: row.organization_id,
+					title: row.title,
+					currentState: row.status,
+					timeInState,
+					timeInStateFormatted: formatTimeInState(timeInState),
+					requiredAction: getRequiredAction(row.status, row.item_type),
+					priority: row.priority,
+					urgency,
+					slaStatus: null,
+					slaDeadline: null,
+					assignedToId: row.assigned_to_id,
+					assignedToName: row.assigned_to_name,
+					propertyName: row.property_name,
+					associationName: row.association_name,
+					organizationName: row.organization_name,
+					createdAt: new Date(row.created_at).toISOString(),
+					updatedAt: new Date(row.updated_at).toISOString()
 				});
-
-				for (const v of violations) {
-					const timeInState = now.getTime() - v.updatedAt.getTime();
-					const urgency = calculateUrgency(v.severity, timeInState, null);
-
-					items.push({
-						id: `vio-${v.id}`,
-						pillar: 'CAM',
-						itemType: 'VIOLATION',
-						itemId: v.id,
-						itemNumber: v.violationNumber,
-						organizationId: v.association.organization.id,
-						title: v.title,
-						currentState: v.status,
-						timeInState,
-						timeInStateFormatted: formatTimeInState(timeInState),
-						requiredAction: getRequiredAction(v.status, 'VIOLATION'),
-						priority: v.severity,
-						urgency,
-						slaStatus: null,
-						slaDeadline: v.curePeriodEnds?.toISOString() ?? null,
-						assignedToId: null,
-						assignedToName: null,
-						propertyName: v.unit?.unitNumber ?? null,
-						associationName: v.association?.name ?? null,
-						organizationName: v.association.organization.name,
-						createdAt: v.createdAt.toISOString(),
-						updatedAt: v.updatedAt.toISOString()
-					});
-				}
-			}
-
-			// Fetch ARC Requests (if pillar is ALL or CAM)
-			if (pillar === 'ALL' || pillar === 'CAM') {
-				const arcWhere: Record<string, unknown> = {
-					status: { notIn: ['APPROVED', 'DENIED', 'WITHDRAWN'] }
-				};
-				if (input?.state) arcWhere.status = input.state;
-
-				const arcRequests = await prisma.aRCRequest.findMany({
-					where: arcWhere,
-					include: {
-						association: {
-							include: {
-								organization: { select: { id: true, name: true } }
-							}
-						},
-						unit: true
-					},
-					orderBy: [{ submittedAt: 'asc' }],
-					take: limit
-				});
-
-				for (const arc of arcRequests) {
-					const timeInState = now.getTime() - arc.updatedAt.getTime();
-					const urgency = calculateUrgency('NORMAL', timeInState, null);
-
-					items.push({
-						id: `arc-${arc.id}`,
-						pillar: 'CAM',
-						itemType: 'ARC_REQUEST',
-						itemId: arc.id,
-						itemNumber: arc.requestNumber,
-						organizationId: arc.association.organization.id,
-						title: arc.title,
-						currentState: arc.status,
-						timeInState,
-						timeInStateFormatted: formatTimeInState(timeInState),
-						requiredAction: getRequiredAction(arc.status, 'ARC_REQUEST'),
-						priority: 'NORMAL',
-						urgency,
-						slaStatus: null,
-						slaDeadline: null,
-						assignedToId: null,
-						assignedToName: null,
-						propertyName: arc.unit?.unitNumber ?? null,
-						associationName: arc.association?.name ?? null,
-						organizationName: arc.association.organization.name,
-						createdAt: arc.createdAt.toISOString(),
-						updatedAt: arc.updatedAt.toISOString()
-					});
-				}
 			}
 
 			// Sort by urgency, then by time in state (oldest first)
@@ -433,24 +318,23 @@ export const workQueueRouter = {
 			});
 
 			// Filter by urgency if specified
-			let filteredItems = items;
 			if (input?.urgency) {
-				filteredItems = items.filter((item) => item.urgency === input.urgency);
+				items = items.filter((item) => item.urgency === input.urgency);
 			}
 
 			// Calculate summary
 			const summary = {
-				total: filteredItems.length,
-				critical: filteredItems.filter((i) => i.urgency === 'CRITICAL').length,
-				high: filteredItems.filter((i) => i.urgency === 'HIGH').length,
-				normal: filteredItems.filter((i) => i.urgency === 'NORMAL').length,
-				low: filteredItems.filter((i) => i.urgency === 'LOW').length,
-				unassigned: filteredItems.filter((i) => !i.assignedToId).length
+				total: items.length,
+				critical: items.filter((i) => i.urgency === 'CRITICAL').length,
+				high: items.filter((i) => i.urgency === 'HIGH').length,
+				normal: items.filter((i) => i.urgency === 'NORMAL').length,
+				low: items.filter((i) => i.urgency === 'LOW').length,
+				unassigned: items.filter((i) => !i.assignedToId).length
 			};
 
 			// Apply pagination
-			const paginatedItems = filteredItems.slice(0, limit);
-			const hasMore = filteredItems.length > limit;
+			const paginatedItems = items.slice(0, limit);
+			const hasMore = items.length > limit;
 
 			return successResponse(
 				{
@@ -469,6 +353,10 @@ export const workQueueRouter = {
 	 * Get work queue summary counts by pillar
 	 */
 	summary: authedProcedure
+		.errors({
+			FORBIDDEN: { message: 'Staff access required for work queue' },
+			INTERNAL_SERVER_ERROR: { message: 'Database error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -494,61 +382,80 @@ export const workQueueRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ context }) => {
-			// Concierge counts
-			const [intakeCount, inProgressCount, pendingExternalCount, pendingOwnerCount] =
-				await Promise.all([
-					prisma.conciergeCase.count({
-						where: { deletedAt: null, status: 'INTAKE' }
-					}),
-					prisma.conciergeCase.count({
-						where: { deletedAt: null, status: 'IN_PROGRESS' }
-					}),
-					prisma.conciergeCase.count({
-						where: { deletedAt: null, status: 'PENDING_EXTERNAL' }
-					}),
-					prisma.conciergeCase.count({
-						where: { deletedAt: null, status: 'PENDING_OWNER' }
-					})
-				]);
+		.handler(async ({ context, errors }) => {
+			// Cerbos authorization - verify user is staff with work queue access
+			// Uses direct Cerbos call since work queue is cross-org (no orgProcedure)
+			const principal = buildPrincipal(
+				context.user!,
+				context.orgRoles ?? {},
+				undefined, // no current org
+				undefined, // no vendorId
+				undefined, // no currentOrgId
+				context.staffRoles,
+				context.pillarAccess
+			);
+			const resource = createResource('work_queue', 'summary', 'global');
+			try {
+				await requireAuthorization(principal, resource, 'view');
+			} catch (error) {
+				throw errors.FORBIDDEN({
+					message: error instanceof Error ? error.message : 'Staff access required for work queue'
+				});
+			}
 
-			// CAM counts
-			const [workOrderCount, violationCount, arcCount] = await Promise.all([
-				prisma.workOrder.count({
-					where: { status: { notIn: ['CLOSED', 'CANCELLED'] } }
-				}),
-				prisma.violation.count({
-					where: { deletedAt: null, status: { notIn: ['CLOSED', 'DISMISSED'] } }
-				}),
-				prisma.aRCRequest.count({
-					where: { status: { notIn: ['APPROVED', 'DENIED', 'WITHDRAWN'] } }
-				})
-			]);
+			// Use SECURITY DEFINER function to bypass RLS for cross-org staff access
+			interface SummaryRow {
+				concierge_intake: number;
+				concierge_in_progress: number;
+				concierge_pending_external: number;
+				concierge_pending_owner: number;
+				work_orders_open: number;
+				violations_open: number;
+				arc_requests_pending: number;
+			}
 
-			// For urgency, we'd need to calculate based on priorities
-			// Simplified version - count by priority
-			const [emergencyWO, highWO] = await Promise.all([
-				prisma.workOrder.count({
-					where: { status: { notIn: ['CLOSED', 'CANCELLED'] }, priority: 'EMERGENCY' }
-				}),
-				prisma.workOrder.count({
-					where: { status: { notIn: ['CLOSED', 'CANCELLED'] }, priority: 'HIGH' }
-				})
-			]);
+			let summaryRow: SummaryRow | undefined;
+			let urgencyRow: { emergency: bigint; high: bigint } | undefined;
+			try {
+				[summaryRow] = await prisma.$queryRaw<SummaryRow[]>`
+					SELECT * FROM get_staff_work_queue_summary()
+				`;
+
+				// For urgency, use direct counts (these are simpler queries)
+				[urgencyRow] = await prisma.$queryRaw<[{ emergency: bigint; high: bigint }]>`
+					SELECT 
+						COUNT(*) FILTER (WHERE priority = 'EMERGENCY') as emergency,
+						COUNT(*) FILTER (WHERE priority = 'HIGH') as high
+					FROM work_orders 
+					WHERE status NOT IN ('CLOSED', 'CANCELLED')
+				`;
+			} catch (dbError) {
+				log.error('Work queue summary database error', { error: dbError });
+				throw errors.INTERNAL_SERVER_ERROR({
+					message: dbError instanceof Error ? dbError.message : 'Failed to fetch work queue summary'
+				});
+			}
+
+			const workOrderCount = summaryRow?.work_orders_open ?? 0;
+			const emergencyWO = Number(urgencyRow?.emergency ?? 0);
+			const highWO = Number(urgencyRow?.high ?? 0);
 
 			return successResponse(
 				{
 					concierge: {
-						total: intakeCount + inProgressCount + pendingExternalCount + pendingOwnerCount,
-						intake: intakeCount,
-						inProgress: inProgressCount,
-						pendingExternal: pendingExternalCount,
-						pendingOwner: pendingOwnerCount
+						total: (summaryRow?.concierge_intake ?? 0) +
+							(summaryRow?.concierge_in_progress ?? 0) +
+							(summaryRow?.concierge_pending_external ?? 0) +
+							(summaryRow?.concierge_pending_owner ?? 0),
+						intake: summaryRow?.concierge_intake ?? 0,
+						inProgress: summaryRow?.concierge_in_progress ?? 0,
+						pendingExternal: summaryRow?.concierge_pending_external ?? 0,
+						pendingOwner: summaryRow?.concierge_pending_owner ?? 0
 					},
 					cam: {
 						workOrders: workOrderCount,
-						violations: violationCount,
-						arcRequests: arcCount
+						violations: summaryRow?.violations_open ?? 0,
+						arcRequests: summaryRow?.arc_requests_pending ?? 0
 					},
 					urgency: {
 						critical: emergencyWO,
@@ -556,6 +463,81 @@ export const workQueueRouter = {
 						normal: workOrderCount - emergencyWO - highWO
 					}
 				},
+				context
+			);
+		}),
+
+	/**
+	 * Get the organization ID for a work queue item
+	 * Used by staff to get org context before calling org-scoped APIs
+	 */
+	getItemOrg: authedProcedure
+		.input(
+			z.object({
+				itemType: z.enum(['CONCIERGE_CASE', 'WORK_ORDER', 'VIOLATION', 'ARC_REQUEST']),
+				itemId: z.string()
+			})
+		)
+		.errors({
+			FORBIDDEN: { message: 'Staff access required' },
+			NOT_FOUND: { message: 'Work item not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Database error' }
+		})
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					organizationId: z.string()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Cerbos authorization - verify user is staff
+			const principal = buildPrincipal(
+				context.user!,
+				context.orgRoles ?? {},
+				undefined,
+				undefined,
+				undefined,
+				context.staffRoles,
+				context.pillarAccess
+			);
+			const resource = createResource('work_queue', 'item_lookup', 'global');
+			try {
+				await requireAuthorization(principal, resource, 'view');
+			} catch (error) {
+				throw errors.FORBIDDEN({
+					message: error instanceof Error ? error.message : 'Staff access required'
+				});
+			}
+
+			// Use SECURITY DEFINER function to look up org ID
+			interface OrgLookupResult {
+				get_work_item_org: string | null;
+			}
+
+			let result: OrgLookupResult[];
+			try {
+				result = await prisma.$queryRaw<OrgLookupResult[]>`
+					SELECT get_work_item_org(${input.itemType}, ${input.itemId})
+				`;
+			} catch (dbError) {
+				log.error('Work item org lookup error', { error: dbError });
+				throw errors.INTERNAL_SERVER_ERROR({
+					message: dbError instanceof Error ? dbError.message : 'Failed to look up work item'
+				});
+			}
+
+			const orgId = result[0]?.get_work_item_org;
+			if (!orgId) {
+				throw errors.NOT_FOUND({
+					message: `${input.itemType} with ID ${input.itemId} not found`
+				});
+			}
+
+			return successResponse(
+				{ organizationId: orgId },
 				context
 			);
 		})

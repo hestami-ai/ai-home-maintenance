@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('PropertyRoute');
@@ -55,7 +54,10 @@ export const propertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'property', 'new');
 
@@ -65,11 +67,14 @@ export const propertyRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const property = await prisma.property.create({
-				data: input
+				data: {
+					...input,
+					organizationId: context.organization.id
+				}
 			});
 
 			return successResponse(
@@ -118,14 +123,17 @@ export const propertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Property not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const property = await prisma.property.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!property || property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Property');
+				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 
 			// Cerbos authorization
@@ -275,14 +283,17 @@ export const propertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Property not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.property.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!existing || existing.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Property');
+				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 
 			// Cerbos authorization
@@ -325,14 +336,17 @@ export const propertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Property not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const property = await prisma.property.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!property || property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Property');
+				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 
 			// Cerbos authorization

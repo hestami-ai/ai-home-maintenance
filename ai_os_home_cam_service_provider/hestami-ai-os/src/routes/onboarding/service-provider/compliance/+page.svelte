@@ -3,7 +3,6 @@
 	import { Card } from '$lib/components/ui';
 	import { serviceProviderOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let hasBusinessLicense = $state($serviceProviderOnboarding.compliance.hasBusinessLicense);
 	let licenseNumber = $state($serviceProviderOnboarding.compliance.licenseNumber);
@@ -19,7 +18,7 @@
 		'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		serviceProviderOnboarding.setStep(1);
 	});
 

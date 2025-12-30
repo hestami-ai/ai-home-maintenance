@@ -3,7 +3,6 @@
 	import { Card } from '$lib/components/ui';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let boardSeats = $state($communityOnboarding.governance.boardSeats);
 	let fiscalYearStart = $state($communityOnboarding.governance.fiscalYearStart);
@@ -19,7 +18,7 @@
 		{ value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' }
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		communityOnboarding.setStep(2);
 	});
 

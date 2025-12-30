@@ -10,7 +10,8 @@
 		UpcomingMeetingsWidget 
 	} from '$lib/components/cam/dashboard';
 	import { auth, currentAssociation } from '$lib/stores';
-	import { dashboardApi, reportApi, governanceApi, type DashboardData, type DashboardEventType } from '$lib/api/cam';
+    import { invalidateAll } from '$app/navigation';
+	import { dashboardApi, type DashboardData, type DashboardEventType } from '$lib/api/cam'; // kept for recordView only
 
 	interface ReportSummary {
 		id: string;
@@ -28,12 +29,17 @@
 		location?: string;
 	}
 
-	let isLoading = $state(true);
+    let { data } = $props();
+
+	let isLoading = $state(false); // No client loading
 	let error = $state<string | null>(null);
-	let reports = $state<ReportSummary[]>([]);
-	let meetings = $state<Meeting[]>([]);
-	let dashboardData = $state<DashboardData | null>(null);
-	let hasRecordedView = $state(false);
+    
+    // Derived state from props
+	let reports = $derived(data.reports as ReportSummary[]);
+	let meetings = $derived(data.meetings as Meeting[]);
+	let dashboardData = $derived(data.dashboardData as DashboardData | null);
+	
+    let hasRecordedView = $state(false);
 
 	// Record audit event for dashboard interactions (fire-and-forget)
 	function recordDashboardEvent(
@@ -49,59 +55,18 @@
 		});
 	}
 
-	async function loadDashboardData() {
-		isLoading = true;
-		error = null;
-		try {
-			// Load main dashboard data from aggregated endpoint
-			const dashboardRes = await dashboardApi.getData();
-			if (dashboardRes.ok && dashboardRes.data?.dashboard) {
-				dashboardData = dashboardRes.data.dashboard;
-				
-				// Record dashboard viewed event (once per page load)
-				if (!hasRecordedView) {
-					recordDashboardEvent('DASHBOARD_VIEWED');
-					hasRecordedView = true;
-				}
-			} else {
-				error = 'Failed to load dashboard data';
-			}
-
-			// Load reports
-			const reportsRes = await reportApi.definitions.list({});
-			if (reportsRes.ok && reportsRes.data?.reports) {
-				reports = reportsRes.data.reports.slice(0, 5).map(r => ({
-					id: r.id,
-					name: r.name,
-					category: r.category,
-					lastRun: undefined
-				}));
-			}
-
-			// Load upcoming meetings
-			const meetingsRes = await governanceApi.meetings.list({ status: 'SCHEDULED' });
-			if (meetingsRes.ok && meetingsRes.data?.meetings) {
-				meetings = meetingsRes.data.meetings.slice(0, 4).map(m => ({
-					id: m.id,
-					title: m.title,
-					type: m.meetingType,
-					date: m.scheduledDate,
-					time: '',
-					location: undefined
-				}));
-			}
-		} catch (err) {
-			console.error('Failed to load dashboard data:', err);
-			error = 'An error occurred while loading the dashboard';
-		} finally {
-			isLoading = false;
-		}
-	}
+    // Handlers
+    async function handleRefresh() {
+        isLoading = true;
+        await invalidateAll();
+        isLoading = false;
+    }
 
 	$effect(() => {
-		if ($currentAssociation?.id) {
-			loadDashboardData();
-		}
+		if (dashboardData && !hasRecordedView) {
+            recordDashboardEvent('DASHBOARD_VIEWED');
+            hasRecordedView = true;
+        }
 	});
 </script>
 
@@ -122,7 +87,7 @@
 		</div>
 		<div class="flex gap-2">
 			<button 
-				onclick={() => loadDashboardData()} 
+				onclick={handleRefresh} 
 				class="btn preset-tonal-surface"
 				disabled={isLoading}
 			>
@@ -144,7 +109,7 @@
 	{#if error}
 		<div class="mb-6 rounded-lg bg-error-500/10 p-4 text-error-500">
 			<p>{error}</p>
-			<button onclick={() => loadDashboardData()} class="mt-2 text-sm underline">
+			<button onclick={handleRefresh} class="mt-2 text-sm underline">
 				Try again
 			</button>
 		</div>

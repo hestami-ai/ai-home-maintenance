@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { ArrowLeft, Check, Loader2, Wrench, Shield, MapPin, Clock } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { serviceProviderOnboarding, organizationStore } from '$lib/stores';
+	import { serviceProviderOnboarding } from '$lib/stores';
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
-	onMount(() => {
+	$effect.pre(() => {
 		serviceProviderOnboarding.setStep(4);
 	});
 
@@ -28,17 +27,7 @@
 			const org = result.data.organization;
 			await orpc.organization.setDefault({ organizationId: org.id });
 
-			organizationStore.addMembership({
-				organization: {
-					id: org.id,
-					name: org.name,
-					slug: org.slug,
-					type: org.type,
-					status: org.status
-				},
-				role: 'ADMIN',
-				isDefault: true
-			});
+			// Store update removed
 
 			// TODO: Create ContractorProfile via API
 			// TODO: Create ContractorBranch via API

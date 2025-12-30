@@ -4,8 +4,7 @@
 	import { ArrowLeft, Building2, FileText, Clock, Settings } from 'lucide-svelte';
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { camStore } from '$lib/stores';
-	import { associationApi, documentApi, activityEventApi } from '$lib/api/cam';
+    import { enhance } from '$app/forms';
 
 	interface Association {
 		id: string;
@@ -27,90 +26,36 @@
 
 	interface AssociationDocument {
 		id: string;
-		name: string;
+		title: string;
 		category: string;
 		createdAt: string;
+        fileName: string;
+        fileSize: number;
+        mimeType: string;
 	}
 
 	interface AssociationHistoryEvent {
 		id: string;
 		action: string;
-		description: string;
-		performedBy: string;
-		createdAt: string;
+		summary: string;
+		performedByType: string;
+		performedAt: string;
 	}
+    
+    let { data } = $props();
 
-	let association = $state<Association | null>(null);
-	let documents = $state<AssociationDocument[]>([]);
-	let history = $state<AssociationHistoryEvent[]>([]);
-	let isLoading = $state(true);
+    // Derived state from props
+	let association = $derived(data.association as Association);
+	let documents = $derived(data.documents as AssociationDocument[]);
+	let history = $derived(data.history as AssociationHistoryEvent[]);
+
+	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	const associationId = $derived(($page.params as Record<string, string>).id);
-
-	async function loadAssociation() {
-		if (!associationId) return;
-
-		isLoading = true;
-		error = null;
-
-		try {
-			const response = await associationApi.get(associationId);
-			if (!response.ok) {
-				error = 'Association not found';
-				return;
-			}
-			association = response.data.association as any;
-		} catch (e) {
-			error = 'Failed to load association';
-			console.error(e);
-		} finally {
-			isLoading = false;
-		}
-	}
-
-	async function loadDocuments() {
-		if (!associationId) return;
-		try {
-			const response = await documentApi.list({ contextType: 'ASSOCIATION', contextId: associationId });
-			if (response.ok) {
-				documents = response.data.documents as any;
-			}
-		} catch (e) {
-			console.error('Failed to load documents:', e);
-		}
-	}
-
-	async function loadHistory() {
-		if (!associationId) return;
-		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'ASSOCIATION', entityId: associationId });
-			if (response.ok) {
-				history = response.data.events.map((e: any) => ({
-					id: e.id,
-					action: e.action,
-					description: e.summary,
-					performedBy: e.performedBy,
-					createdAt: e.createdAt
-				}));
-			}
-		} catch (e) {
-			console.error('Failed to load history:', e);
-		}
-	}
-
-	function switchToAssociation() {
-		if (!association) return;
-		camStore.setCurrentAssociation({
-			id: association.id,
-			name: association.name,
-			legalName: association.legalName,
-			status: association.status,
-			fiscalYearEnd: association.fiscalYearEnd || 12
-		});
-	}
+	// No local load functions needed, data comes from SSR
 
 	function formatDate(dateString: string): string {
+        if (!dateString) return '—';
 		return new Date(dateString).toLocaleDateString('en-US', {
 			month: 'short',
 			day: 'numeric',
@@ -119,6 +64,7 @@
 	}
 
 	function formatDateTime(dateString: string): string {
+        if (!dateString) return '—';
 		return new Date(dateString).toLocaleString('en-US', {
 			month: 'short',
 			day: 'numeric',
@@ -127,14 +73,6 @@
 			minute: '2-digit'
 		});
 	}
-
-	$effect(() => {
-		if (associationId) {
-			loadAssociation();
-			loadDocuments();
-			loadHistory();
-		}
-	});
 </script>
 
 <svelte:head>
@@ -163,13 +101,15 @@
 				</div>
 
 				<div class="flex gap-2">
-					<button
-						type="button"
-						onclick={switchToAssociation}
-						class="btn btn-sm preset-filled-primary-500"
-					>
-						Switch to This
-					</button>
+					<form action="/api/cam/switch" method="POST" use:enhance>
+						<input type="hidden" name="associationId" value={association.id} />
+						<button
+							type="submit"
+							class="btn btn-sm preset-filled-primary-500"
+						>
+							Switch to This
+						</button>
+					</form>
 					<a href="/app/cam/associations/{association.id}/edit" class="btn btn-sm preset-tonal-surface">
 						Edit
 					</a>
@@ -307,7 +247,7 @@
 	<Card variant="outlined" padding="lg">
 		<div class="mb-4 flex items-center justify-between">
 			<h3 class="font-semibold">Governing Documents</h3>
-			<a href="/app/cam/documents/upload?contextType=ASSOCIATION&contextId={associationId}" class="btn btn-sm preset-filled-primary-500">
+			<a href="/app/cam/documents/upload?contextType=ASSOCIATION&contextId={association.id}" class="btn btn-sm preset-filled-primary-500">
 				Upload
 			</a>
 		</div>
@@ -323,7 +263,7 @@
 					<div class="flex items-center gap-3 py-3">
 						<FileText class="h-5 w-5 text-surface-400" />
 						<div class="flex-1">
-							<p class="font-medium">{doc.name}</p>
+							<p class="font-medium">{doc.title}</p>
 							<p class="text-sm text-surface-500">{doc.category} · {formatDate(doc.createdAt)}</p>
 						</div>
 						<a href="/api/document/{doc.id}/download" class="btn btn-sm preset-tonal-surface">
@@ -354,9 +294,9 @@
 						</div>
 						<div class="flex-1">
 							<p class="font-medium">{event.action}</p>
-							<p class="text-sm text-surface-500">{event.description}</p>
+							<p class="text-sm text-surface-500">{event.summary}</p>
 							<p class="mt-1 text-xs text-surface-400">
-								{event.performedBy} · {formatDateTime(event.createdAt)}
+								{event.performedByType} · {formatDateTime(event.performedAt)}
 							</p>
 						</div>
 					</div>

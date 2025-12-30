@@ -8,7 +8,6 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { DecisionCategorySchema } from '../../../../../../generated/zod/inputTypeSchemas/DecisionCategorySchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
@@ -61,14 +60,17 @@ export const materialDecisionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// If caseId provided, verify it belongs to org
 			if (input.caseId) {
 				const caseRecord = await prisma.conciergeCase.findFirst({
 					where: { id: input.caseId, organizationId: context.organization.id, deletedAt: null }
 				});
 				if (!caseRecord) {
-					throw ApiException.notFound('ConciergeCase');
+					throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 				}
 			}
 
@@ -139,7 +141,7 @@ export const materialDecisionRouter = {
 						rationale: z.string(),
 						decidedByUserId: z.string(),
 						decidedAt: z.string(),
-						optionsConsidered: z.array(z.any()),
+						optionsConsidered: z.array(z.object({ option: z.string(), pros: z.array(z.string()).optional(), cons: z.array(z.string()).optional(), selected: z.boolean().optional() })),
 						estimatedImpact: z.string().nullable(),
 						actualOutcome: z.string().nullable(),
 						outcomeRecordedAt: z.string().nullable(),
@@ -152,13 +154,16 @@ export const materialDecisionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const decision = await prisma.materialDecision.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!decision) {
-				throw ApiException.notFound('MaterialDecision');
+				throw errors.NOT_FOUND({ message: 'MaterialDecision' });
 			}
 
 			await context.cerbos.authorize('view', 'material_decision', decision.id);
@@ -283,13 +288,16 @@ export const materialDecisionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const decision = await prisma.materialDecision.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!decision) {
-				throw ApiException.notFound('MaterialDecision');
+				throw errors.NOT_FOUND({ message: 'MaterialDecision' });
 			}
 
 			await context.cerbos.authorize('update', 'material_decision', decision.id);
@@ -354,18 +362,22 @@ export const materialDecisionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const decision = await prisma.materialDecision.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!decision) {
-				throw ApiException.notFound('MaterialDecision');
+				throw errors.NOT_FOUND({ message: 'MaterialDecision' });
 			}
 
 			// Cannot update after outcome is recorded
 			if (decision.actualOutcome) {
-				throw ApiException.badRequest('Cannot update decision after outcome is recorded');
+				throw errors.BAD_REQUEST({ message: 'Cannot update decision after outcome is recorded' });
 			}
 
 			await context.cerbos.authorize('update', 'material_decision', decision.id);
@@ -406,13 +418,16 @@ export const materialDecisionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const decision = await prisma.materialDecision.findFirst({
 				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!decision) {
-				throw ApiException.notFound('MaterialDecision');
+				throw errors.NOT_FOUND({ message: 'MaterialDecision' });
 			}
 
 			await context.cerbos.authorize('delete', 'material_decision', decision.id);

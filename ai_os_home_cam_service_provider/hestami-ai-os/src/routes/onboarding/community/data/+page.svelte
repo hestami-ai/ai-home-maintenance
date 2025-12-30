@@ -3,7 +3,6 @@
 	import { Card } from '$lib/components/ui';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
 
 	let totalUnits = $state($communityOnboarding.initialData.totalUnits);
 	let unitTypes = $state<string[]>($communityOnboarding.initialData.unitTypes);
@@ -16,7 +15,7 @@
 		{ value: 'mixed', label: 'Mixed Use' }
 	];
 
-	onMount(() => {
+	$effect.pre(() => {
 		communityOnboarding.setStep(3);
 	});
 

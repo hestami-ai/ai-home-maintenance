@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -35,6 +34,11 @@ export const glAccountRouter = {
 				isActive: z.boolean().default(true)
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -52,17 +56,17 @@ export const glAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization - use 'new' as placeholder ID for create operations
 			await context.cerbos.authorize('create', 'gl_account', 'new');
 
 			// Get association from current org context
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Check for duplicate account number
@@ -76,7 +80,7 @@ export const glAccountRouter = {
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Account number already exists');
+				throw errors.CONFLICT({ message: 'Account number already exists' });
 			}
 
 			// Validate parent account if provided
@@ -85,7 +89,7 @@ export const glAccountRouter = {
 					where: { id: input.parentId, associationId: association.id }
 				});
 				if (!parent) {
-					throw ApiException.notFound('Parent account');
+					throw errors.NOT_FOUND({ message: 'Parent account not found' });
 				}
 			}
 
@@ -94,6 +98,7 @@ export const glAccountRouter = {
 
 			const account = await prisma.gLAccount.create({
 				data: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					accountNumber: input.accountNumber,
 					name: input.name,
@@ -135,6 +140,10 @@ export const glAccountRouter = {
 				parentId: z.string().nullable().optional()
 			}).optional()
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -157,16 +166,16 @@ export const glAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization - use '*' for list operations
 			await context.cerbos.authorize('view', 'gl_account', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const where: Prisma.GLAccountWhereInput = {
@@ -208,6 +217,10 @@ export const glAccountRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -235,15 +248,15 @@ export const glAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'gl_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const account = await prisma.gLAccount.findFirst({
@@ -257,7 +270,7 @@ export const glAccountRouter = {
 			});
 
 			if (!account) {
-				throw ApiException.notFound('GL Account');
+				throw errors.NOT_FOUND({ message: 'GL Account not found' });
 			}
 
 			return successResponse(
@@ -295,6 +308,11 @@ export const glAccountRouter = {
 				parentId: z.string().nullable().optional()
 			})
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -309,15 +327,15 @@ export const glAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'gl_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const existing = await prisma.gLAccount.findFirst({
@@ -325,23 +343,23 @@ export const glAccountRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('GL Account');
+				throw errors.NOT_FOUND({ message: 'GL Account not found' });
 			}
 
 			if (existing.isSystemAccount) {
-				throw ApiException.forbidden('Cannot modify system accounts');
+				throw errors.FORBIDDEN({ message: 'Cannot modify system accounts' });
 			}
 
 			// Validate parent if changing
 			if (input.parentId !== undefined && input.parentId !== null) {
 				if (input.parentId === input.id) {
-					throw ApiException.badRequest('Account cannot be its own parent');
+					throw errors.BAD_REQUEST({ message: 'Account cannot be its own parent' });
 				}
 				const parent = await prisma.gLAccount.findFirst({
 					where: { id: input.parentId, associationId: association.id }
 				});
 				if (!parent) {
-					throw ApiException.notFound('Parent account');
+					throw errors.NOT_FOUND({ message: 'Parent account not found' });
 				}
 			}
 
@@ -373,6 +391,11 @@ export const glAccountRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -380,15 +403,15 @@ export const glAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'gl_account', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			const account = await prisma.gLAccount.findFirst({
@@ -396,11 +419,11 @@ export const glAccountRouter = {
 			});
 
 			if (!account) {
-				throw ApiException.notFound('GL Account');
+				throw errors.NOT_FOUND({ message: 'GL Account not found' });
 			}
 
 			if (account.isSystemAccount) {
-				throw ApiException.forbidden('Cannot delete system accounts');
+				throw errors.FORBIDDEN({ message: 'Cannot delete system accounts' });
 			}
 
 			// Check if account has any journal entries
@@ -409,7 +432,7 @@ export const glAccountRouter = {
 			});
 
 			if (hasEntries) {
-				throw ApiException.conflict('Cannot delete account with journal entries');
+				throw errors.CONFLICT({ message: 'Cannot delete account with journal entries' });
 			}
 
 			// Check for child accounts
@@ -418,7 +441,7 @@ export const glAccountRouter = {
 			});
 
 			if (hasChildren) {
-				throw ApiException.conflict('Cannot delete account with child accounts');
+				throw errors.CONFLICT({ message: 'Cannot delete account with child accounts' });
 			}
 
 			await prisma.gLAccount.update({
@@ -435,6 +458,10 @@ export const glAccountRouter = {
 	 */
 	seedDefaults: orgProcedure
 		.input(z.object({}).optional())
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -445,15 +472,15 @@ export const glAccountRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ context }) => {
+		.handler(async ({ context, errors }) => {
 			await context.cerbos.authorize('create', 'gl_account', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association not found' });
 			}
 
 			// Check if accounts already exist
@@ -468,7 +495,7 @@ export const glAccountRouter = {
 				);
 			}
 
-			await seedDefaultChartOfAccounts(association.id);
+			await seedDefaultChartOfAccounts(context.organization.id, association.id);
 
 			const newCount = await prisma.gLAccount.count({
 				where: { associationId: association.id }

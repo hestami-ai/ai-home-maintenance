@@ -1,0 +1,26 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "permissions_admin"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Platform admins have full access to permissions admin
+    - actions: ["view", "export"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # Hestami staff have view access to permissions admin
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff
+
+    # Deny all other access
+    - actions: ["*"]
+      effect: EFFECT_DENY
+      roles: ["*"]
+      condition:
+        match:
+          expr: "!has(P.attr.staffRoles) || size(P.attr.staffRoles) == 0"

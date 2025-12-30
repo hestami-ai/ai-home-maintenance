@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ChecklistItemStatus } from '../../../../../../generated/prisma/client.js';
 import { startChecklistWorkflow } from '../../../workflows/checklistWorkflow.js';
@@ -104,6 +103,10 @@ export const checklistRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -111,8 +114,8 @@ export const checklistRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_checklist', 'new');
 
 			// Use DBOS workflow for durable execution
@@ -131,7 +134,7 @@ export const checklistRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create checklist');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create checklist' });
 			}
 
 			const checklist = await prisma.jobChecklist.findUniqueOrThrow({
@@ -147,6 +150,9 @@ export const checklistRouter = {
 	 */
 	listTemplates: orgProcedure
 		.input(PaginationInputSchema.optional())
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -157,8 +163,8 @@ export const checklistRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_checklist', 'list');
 
 			const limit = input?.limit ?? 20;
@@ -201,6 +207,11 @@ export const checklistRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -208,8 +219,8 @@ export const checklistRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_checklist', 'new');
 
 			// Validate template exists
@@ -221,13 +232,13 @@ export const checklistRouter = {
 				},
 				include: { steps: { orderBy: { stepNumber: 'asc' } } }
 			});
-			if (!template) throw ApiException.notFound('Checklist template');
+			if (!template) throw errors.NOT_FOUND({ message: 'Checklist template not found' });
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startChecklistWorkflow(
@@ -255,7 +266,7 @@ export const checklistRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to apply checklist');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to apply checklist' });
 			}
 
 			const checklist = await prisma.jobChecklist.findUniqueOrThrow({
@@ -271,6 +282,9 @@ export const checklistRouter = {
 	 */
 	getJobChecklist: orgProcedure
 		.input(z.object({ jobId: z.string(), checklistId: z.string().optional() }))
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -278,8 +292,8 @@ export const checklistRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_checklist', input.jobId);
 
 			const where: any = {
@@ -317,6 +331,12 @@ export const checklistRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -324,17 +344,17 @@ export const checklistRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 
 			// Get step and verify access
 			const step = await prisma.jobStep.findUnique({
 				where: { id: input.stepId },
 				include: { checklist: true }
 			});
-			if (!step) throw ApiException.notFound('Step');
+			if (!step) throw errors.NOT_FOUND({ message: 'Step not found' });
 			if (step.checklist.organizationId !== context.organization!.id) {
-				throw ApiException.forbidden();
+				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
 			await context.cerbos.authorize(
@@ -346,7 +366,7 @@ export const checklistRouter = {
 			// Validate requirements if completing
 			if (input.status === 'COMPLETED') {
 				if (step.requiresNotes && !input.notes && !step.notes) {
-					throw ApiException.badRequest('This step requires notes');
+					throw errors.BAD_REQUEST({ message: 'This step requires notes' });
 				}
 			}
 
@@ -367,7 +387,7 @@ export const checklistRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update step');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update step' });
 			}
 
 			const updatedStep = await prisma.jobStep.findUniqueOrThrow({
@@ -382,6 +402,11 @@ export const checklistRouter = {
 	 */
 	deleteTemplate: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -389,14 +414,14 @@ export const checklistRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'job_checklist', input.id);
 
 			const existing = await prisma.jobChecklist.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id, isTemplate: true }
 			});
-			if (!existing) throw ApiException.notFound('Checklist template');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Checklist template not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startChecklistWorkflow(
@@ -411,7 +436,7 @@ export const checklistRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete checklist');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete checklist' });
 			}
 
 			return successResponse({ deleted: true }, context);

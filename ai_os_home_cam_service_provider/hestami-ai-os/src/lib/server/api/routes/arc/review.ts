@@ -2,47 +2,12 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startARCReviewWorkflow } from '../../../workflows/arcReviewWorkflow.js';
-import type { Prisma, ARCReviewAction, ARCRequestStatus } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ARCReviewRoute');
 
 const arcReviewActionEnum = z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']);
-const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
-const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
-
-const ensureCommitteeBelongs = async (committeeId: string, associationId: string) => {
-	const committee = await prisma.aRCCommittee.findFirst({ where: { id: committeeId, associationId, isActive: true } });
-	if (!committee) throw ApiException.notFound('ARC Committee');
-	return committee;
-};
-
-const ensurePartyBelongs = async (partyId: string, organizationId: string) => {
-	const party = await prisma.party.findFirst({ where: { id: partyId, organizationId, deletedAt: null } });
-	if (!party) throw ApiException.notFound('Party');
-};
-
-const ensureCommitteeMember = async (committeeId: string, userId: string) => {
-	const membership = await prisma.aRCCommitteeMember.findFirst({
-		where: { committeeId, leftAt: null, party: { userId } }
-	});
-	if (!membership) throw ApiException.forbidden('User is not a committee member');
-};
-
-const getReviewStats = async (requestId: string) => {
-	const reviews = await prisma.aRCReview.findMany({ where: { requestId }, select: { action: true } });
-	const counts = reviews.reduce(
-		(acc, r) => {
-			acc.total += 1;
-			if (r.action === 'APPROVE') acc.approvals += 1;
-			return acc;
-		},
-		{ total: 0, approvals: 0 }
-	);
-	return counts;
-};
 
 export const arcReviewRouter = {
 	// Committee membership management
@@ -64,7 +29,10 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.committeeId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -81,7 +49,7 @@ export const arcReviewRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add member');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add member' });
 			}
 
 			const member = await prisma.aRCCommitteeMember.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -108,7 +76,10 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.committeeId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -125,7 +96,7 @@ export const arcReviewRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to remove member');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove member' });
 			}
 
 			return successResponse(
@@ -153,13 +124,16 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Committee not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const committee = await prisma.aRCCommittee.findFirst({
 				where: { id: input.committeeId },
 				include: { association: true }
 			});
 			if (!committee || committee.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Committee');
+				throw errors.NOT_FOUND({ message: 'ARC Committee' });
 			}
 
 			const members = await prisma.aRCCommitteeMember.findMany({
@@ -198,7 +172,10 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -215,7 +192,7 @@ export const arcReviewRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to assign committee');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign committee' });
 			}
 
 			return successResponse(
@@ -244,7 +221,10 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -266,7 +246,7 @@ export const arcReviewRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to submit review');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit review' });
 			}
 
 			const review = await prisma.aRCReview.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -297,7 +277,10 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('review', 'arc_request', input.requestId);
 			const { idempotencyKey, ...rest } = input;
 
@@ -319,7 +302,7 @@ export const arcReviewRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record decision');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record decision' });
 			}
 
 			return successResponse({ request: { id: result.entityId!, status: result.status! } }, context);
@@ -366,14 +349,17 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.aRCRequest.findFirst({
 				where: { id: input.requestId },
 				include: { association: true, committee: true }
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			await context.cerbos.authorize('view', 'arc_request', input.requestId);
@@ -386,10 +372,10 @@ export const arcReviewRouter = {
 			// Calculate vote summary
 			const summary = {
 				total: reviews.length,
-				approve: reviews.filter(r => r.action === 'APPROVE').length,
-				deny: reviews.filter(r => r.action === 'DENY').length,
-				requestChanges: reviews.filter(r => r.action === 'REQUEST_CHANGES').length,
-				table: reviews.filter(r => r.action === 'TABLE').length
+				approve: reviews.filter((r) => r.action === 'APPROVE').length,
+				deny: reviews.filter((r) => r.action === 'DENY').length,
+				requestChanges: reviews.filter((r) => r.action === 'REQUEST_CHANGES').length,
+				table: reviews.filter((r) => r.action === 'TABLE').length
 			};
 
 			// Get committee info for quorum/threshold
@@ -411,7 +397,7 @@ export const arcReviewRouter = {
 
 			return successResponse(
 				{
-					votes: reviews.map(r => ({
+					votes: reviews.map((r) => ({
 						id: r.id,
 						reviewerId: r.reviewerId,
 						reviewerName: null,
@@ -468,14 +454,17 @@ export const arcReviewRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'ARC Request not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.aRCRequest.findFirst({
 				where: { id: input.requestId },
 				include: { association: true, committee: true }
 			});
 
 			if (!request || request.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ARC Request');
+				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
 			await context.cerbos.authorize('view', 'arc_request', input.requestId);
@@ -494,7 +483,7 @@ export const arcReviewRouter = {
 				select: { reviewerId: true, action: true }
 			});
 
-			const voteMap = new Map(votes.map(v => [v.reviewerId, v.action]));
+			const voteMap = new Map(votes.map((v) => [v.reviewerId, v.action]));
 
 			return successResponse(
 				{
@@ -503,7 +492,7 @@ export const arcReviewRouter = {
 						name: request.committee.name,
 						quorum: request.committee.quorum,
 						approvalThreshold: request.committee.approvalThreshold ? Number(request.committee.approvalThreshold) : null,
-						members: members.map(m => ({
+						members: members.map((m) => ({
 							id: m.id,
 							partyId: m.partyId,
 							name: null,

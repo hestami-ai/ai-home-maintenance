@@ -1,12 +1,15 @@
 <script lang="ts">
+	interface Props {
+		data: {
+			onboardingState: any;
+		};
+	}
+
+	let { data }: Props = $props();
+
 	import { Building2, Briefcase } from 'lucide-svelte';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
-
-	onMount(() => {
-		communityOnboarding.setStep(0);
-	});
 
 	function selectType(type: 'COMMUNITY_ASSOCIATION' | 'MANAGEMENT_COMPANY') {
 		communityOnboarding.setOrganizationType(type);

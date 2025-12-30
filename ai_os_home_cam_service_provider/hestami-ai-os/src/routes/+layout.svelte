@@ -1,10 +1,11 @@
 <script lang="ts">
 	import './layout.css';
 	import { Header } from '$lib/components/layout';
-	import { theme, auth, organizationStore } from '$lib/stores';
-	import { orpc } from '$lib/api';
+	import { theme } from '$lib/stores';
 	import { logger } from '$lib/logger';
 	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
+	import type { Organization, Staff } from '../../generated/prisma/client';
 
 	const log = logger.child({ component: 'Layout' });
 
@@ -12,62 +13,22 @@
 		data: {
 			user: { id: string; email: string; name: string | null; emailVerified: boolean; image: string | null } | null;
 			session: { id: string; userId: string; token: string; expiresAt: Date } | null;
+			organization: Organization | null;
+			memberships: Array<{
+				organization: Organization;
+				role: string;
+				isDefault: boolean;
+			}>;
+			staff: Staff | null;
 		};
 		children: import('svelte').Snippet;
 	}
 
 	let { data, children }: Props = $props();
 
-	async function loadOrganizations() {
-		if (!data.user) {
-			organizationStore.clear();
-			return;
-		}
-
-		organizationStore.setLoading(true);
-		try {
-			log.debug('Loading organizations');
-			const result = await orpc.organization.list();
-			log.debug('Organizations loaded', { count: result.data.organizations.length });
-			const memberships = result.data.organizations.map((org) => ({
-				organization: {
-					id: org.id,
-					name: org.name,
-					slug: org.slug,
-					type: org.type,
-					status: 'ACTIVE'
-				},
-				role: org.role,
-				isDefault: org.isDefault
-			}));
-			organizationStore.setMemberships(memberships);
-		} catch (err) {
-			log.error('Failed to load organizations', { error: err instanceof Error ? err.message : String(err) });
-			organizationStore.setLoading(false);
-		}
-	}
-
 	onMount(() => {
-		// Initialize theme
+		// Initialize theme - this is the ONLY acceptable client-side store
 		theme.init();
-
-		// Set auth state from server data
-		if (data.user) {
-			auth.setUser(data.user);
-			loadOrganizations();
-		} else {
-			auth.clear();
-			organizationStore.clear();
-		}
-	});
-
-	// Update auth when data changes
-	$effect(() => {
-		if (data.user) {
-			auth.setUser(data.user);
-		} else {
-			auth.clear();
-		}
 	});
 </script>
 
@@ -76,7 +37,11 @@
 </svelte:head>
 
 <div class="flex min-h-screen flex-col bg-surface-50-950">
-	<Header />
+	<Header 
+		user={data.user} 
+		memberships={data.memberships}
+		currentOrganization={data.organization}
+	/>
 	<main class="flex-1">
 		{@render children()}
 	</main>

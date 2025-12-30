@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { startContractorComplianceWorkflow } from '../../../workflows/contractorComplianceWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -29,9 +28,13 @@ const complianceOutput = z.object({
 export const complianceRouter = {
 	getStatus: orgProcedure
 		.input(z.object({ vendorId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
-			const status = await computeCompliance(input.vendorId, context.organization.id);
+		.handler(async ({ input, context, errors }) => {
+			const status = await computeCompliance(input.vendorId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'contractor_compliance', input.vendorId);
 
 			return successResponse({ status: serializeCompliance(status) }, context);
@@ -39,8 +42,13 @@ export const complianceRouter = {
 
 	refresh: orgProcedure
 		.input(z.object({ vendorId: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			// Use DBOS workflow for durable execution
 			const result = await startContractorComplianceWorkflow(
@@ -55,7 +63,7 @@ export const complianceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to refresh compliance');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to refresh compliance' });
 			}
 
 			return successResponse({ status: serializeCompliance(result.complianceData) }, context);
@@ -71,8 +79,13 @@ export const complianceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			// Use DBOS workflow for durable execution
 			const result = await startContractorComplianceWorkflow(
@@ -87,7 +100,7 @@ export const complianceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to set block status');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to set block status' });
 			}
 
 			return successResponse({ status: serializeCompliance(result.complianceData) }, context);
@@ -105,8 +118,13 @@ export const complianceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'contractor_compliance', input.vendorId);
 			const { idempotencyKey, ...payload } = input;
 
@@ -128,35 +146,35 @@ export const complianceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to link HOA approval');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link HOA approval' });
 			}
 
 			return successResponse({ status: serializeCompliance(result.complianceData) }, context);
 		})
 };
 
-async function getLinkAndProfile(vendorId: string, organizationId: string) {
-	await assertContractorOrg(organizationId);
+async function getLinkAndProfile(vendorId: string, organizationId: string, errors: any) {
+	await assertContractorOrg(organizationId, errors);
 	const link = await prisma.serviceProviderLink.findFirst({
 		where: { vendorId, serviceProviderOrgId: organizationId }
 	});
-	if (!link) throw ApiException.notFound('ServiceProviderLink');
+	if (!link) throw errors.NOT_FOUND({ message: 'ServiceProviderLink' });
 
 	const profile = await prisma.contractorProfile.findUnique({
 		where: { organizationId }
 	});
-	if (!profile) throw ApiException.notFound('ContractorProfile');
+	if (!profile) throw errors.NOT_FOUND({ message: 'ContractorProfile' });
 
 	return { link, profile };
 }
 
-async function ensureComplianceRecord(vendorId: string, organizationId: string) {
+async function ensureComplianceRecord(vendorId: string, organizationId: string, errors: any) {
 	const existing = await prisma.contractorComplianceStatus.findUnique({
 		where: { vendorId }
 	});
 	if (existing) return existing;
 
-	const { link } = await getLinkAndProfile(vendorId, organizationId);
+	const { link } = await getLinkAndProfile(vendorId, organizationId, errors);
 	return prisma.contractorComplianceStatus.create({
 		data: {
 			vendorId: link.vendorId,
@@ -165,8 +183,8 @@ async function ensureComplianceRecord(vendorId: string, organizationId: string) 
 	});
 }
 
-async function computeCompliance(vendorId: string, organizationId: string, persist = false) {
-	const { link, profile } = await getLinkAndProfile(vendorId, organizationId);
+async function computeCompliance(vendorId: string, organizationId: string, errors: any, persist = false) {
+	const { link, profile } = await getLinkAndProfile(vendorId, organizationId, errors);
 
 	// Find latest valid license and insurance
 	const now = new Date();

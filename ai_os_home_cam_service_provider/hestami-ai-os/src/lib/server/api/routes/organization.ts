@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../schemas.js';
+import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } from '../schemas.js';
 import { authedProcedure, orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { recordActivityEvent, recordActivityFromContext } from '../middleware/activityEvent.js';
-import { createLogger, createModuleLogger } from '../../logger.js';
+import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('OrganizationRoute');
 
@@ -21,7 +20,7 @@ export const organizationRouter = {
 			z.object({
 				name: z.string().min(1).max(255),
 				slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
-				type: z.enum(['INDIVIDUAL_PROPERTY_OWNER', 'TRUST_OR_LLC', 'COMMUNITY_ASSOCIATION', 'MANAGEMENT_COMPANY', 'SERVICE_PROVIDER', 'COMMERCIAL_CLIENT'])
+				type: OrganizationTypeSchema
 			})
 		)
 		.output(
@@ -32,21 +31,24 @@ export const organizationRouter = {
 						id: z.string(),
 						name: z.string(),
 						slug: z.string(),
-						type: z.string(),
-						status: z.string()
+						type: OrganizationTypeSchema,
+						status: OrganizationStatusSchema
 					})
 				}),
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			CONFLICT: { message: 'Organization with this slug already exists' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Check if slug is already taken
 			const existing = await prisma.organization.findUnique({
 				where: { slug: input.slug }
 			});
 
 			if (existing) {
-				throw ApiException.conflict('Organization with this slug already exists');
+				throw errors.CONFLICT({ message: 'Organization with this slug already exists' });
 			}
 
 			// Create organization and add creator as ADMIN
@@ -110,7 +112,8 @@ export const organizationRouter = {
 							id: z.string(),
 							name: z.string(),
 							slug: z.string(),
-							type: z.string(),
+							type: OrganizationTypeSchema,
+							status: OrganizationStatusSchema,
 							role: z.string(),
 							isDefault: z.boolean()
 						})
@@ -135,6 +138,7 @@ export const organizationRouter = {
 							name: m.organization.name,
 							slug: m.organization.slug,
 							type: m.organization.type,
+							status: m.organization.status,
 							role: m.role,
 							isDefault: m.isDefault
 						}))
@@ -155,8 +159,8 @@ export const organizationRouter = {
 						id: z.string(),
 						name: z.string(),
 						slug: z.string(),
-						type: z.string(),
-						status: z.string()
+						type: OrganizationTypeSchema,
+						status: OrganizationStatusSchema
 					}),
 					role: z.string()
 				}),
@@ -197,7 +201,10 @@ export const organizationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Forbidden' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify user has access to this organization
 			const membership = await prisma.userOrganization.findUnique({
 				where: {
@@ -209,7 +216,7 @@ export const organizationRouter = {
 			});
 
 			if (!membership) {
-				throw ApiException.forbidden('You do not have access to this organization');
+				throw errors.FORBIDDEN({ message: 'You do not have access to this organization' });
 			}
 
 			// Get current default org for activity event
@@ -277,8 +284,8 @@ export const organizationRouter = {
 						id: z.string(),
 						name: z.string(),
 						slug: z.string(),
-						type: z.string(),
-						status: z.string(),
+						type: OrganizationTypeSchema,
+						status: OrganizationStatusSchema,
 						settings: z.record(z.string(), z.unknown())
 					}),
 					membership: z.object({
@@ -290,7 +297,10 @@ export const organizationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Organization not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const membership = await prisma.userOrganization.findUnique({
 				where: {
 					userId_organizationId: {
@@ -302,7 +312,7 @@ export const organizationRouter = {
 			});
 
 			if (!membership) {
-				throw ApiException.notFound('Organization');
+				throw errors.NOT_FOUND({ message: 'Organization' });
 			}
 
 			return successResponse(
@@ -343,8 +353,8 @@ export const organizationRouter = {
 						id: z.string(),
 						name: z.string(),
 						slug: z.string(),
-						type: z.string(),
-						status: z.string()
+						type: OrganizationTypeSchema,
+						status: OrganizationStatusSchema
 					})
 				}),
 				meta: ResponseMetaSchema

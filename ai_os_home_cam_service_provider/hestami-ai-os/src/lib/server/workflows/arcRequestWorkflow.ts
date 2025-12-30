@@ -7,7 +7,9 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('ARCRequestWorkflow');
@@ -71,25 +73,32 @@ async function createRequest(
 	const associationId = data.associationId as string;
 	const requestNumber = await generateRequestNumber(associationId);
 
-	const created = await prisma.aRCRequest.create({
-		data: {
-			associationId,
-			committeeId: data.committeeId as string | undefined,
-			unitId: data.unitId as string | undefined,
-			requesterPartyId: data.requesterPartyId as string,
-			title: data.title as string,
-			description: (data.description as string) || '',
-			category: data.category as any,
-			estimatedCost: data.estimatedCost as number | undefined,
-			proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate as string) : undefined,
-			proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate as string) : undefined,
-			requestNumber,
-			status: 'DRAFT'
-		}
-	});
+	try {
+		const created = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.create({
+				data: {
+					organizationId,
+					associationId,
+					committeeId: data.committeeId as string | undefined,
+					unitId: data.unitId as string | undefined,
+					requesterPartyId: data.requesterPartyId as string,
+					title: data.title as string,
+					description: (data.description as string) || '',
+					category: data.category as any,
+					estimatedCost: data.estimatedCost as number | undefined,
+					proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate as string) : undefined,
+					proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate as string) : undefined,
+					requestNumber,
+					status: 'DRAFT'
+				}
+			});
+		}, { userId, reason: 'Creating ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] CREATE_REQUEST request:${created.id} by user ${userId}`);
-	return { entityId: created.id, newStatus: created.status };
+		log.info('CREATE_REQUEST completed', { requestId: created.id, userId });
+		return { entityId: created.id, newStatus: created.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function updateRequest(
@@ -113,20 +122,26 @@ async function updateRequest(
 
 	const previousStatus = request.status;
 
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: {
-			title: data.title as string | undefined,
-			description: data.description as string | undefined,
-			category: data.category as any | undefined,
-			estimatedCost: data.estimatedCost as number | undefined,
-			proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate as string) : undefined,
-			proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate as string) : undefined
-		}
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					title: data.title as string | undefined,
+					description: data.description as string | undefined,
+					category: data.category as any | undefined,
+					estimatedCost: data.estimatedCost as number | undefined,
+					proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate as string) : undefined,
+					proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate as string) : undefined
+				}
+			});
+		}, { userId, reason: 'Updating ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] UPDATE_REQUEST request:${requestId} by user ${userId}`);
-	return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('UPDATE_REQUEST completed', { requestId, userId });
+		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function submitRequest(
@@ -150,16 +165,22 @@ async function submitRequest(
 
 	const previousStatus = request.status;
 
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: {
-			status: 'SUBMITTED',
-			submittedAt: new Date()
-		}
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					status: 'SUBMITTED',
+					submittedAt: new Date()
+				}
+			});
+		}, { userId, reason: 'Submitting ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] SUBMIT_REQUEST request:${requestId} by user ${userId}`);
-	return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('SUBMIT_REQUEST completed', { requestId, userId });
+		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function withdrawRequest(
@@ -183,16 +204,22 @@ async function withdrawRequest(
 
 	const previousStatus = request.status;
 
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: {
-			status: 'WITHDRAWN',
-			withdrawnAt: new Date()
-		}
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					status: 'WITHDRAWN',
+					withdrawnAt: new Date()
+				}
+			});
+		}, { userId, reason: 'Withdrawing ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] WITHDRAW_REQUEST request:${requestId} by user ${userId}`);
-	return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('WITHDRAW_REQUEST completed', { requestId, userId });
+		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function addDocument(
@@ -201,21 +228,27 @@ async function addDocument(
 	requestId: string,
 	data: Record<string, unknown>
 ): Promise<{ entityId: string }> {
-	const document = await prisma.aRCDocument.create({
-		data: {
-			requestId,
-			documentType: data.documentType as any,
-			fileName: data.fileName as string,
-			description: (data.description as string) || undefined,
-			fileUrl: data.fileUrl as string,
-			fileSize: (data.fileSize as number) || undefined,
-			mimeType: (data.mimeType as string) || undefined,
-			uploadedBy: userId
-		}
-	});
+	try {
+		const document = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCDocument.create({
+				data: {
+					requestId,
+					documentType: data.documentType as any,
+					fileName: data.fileName as string,
+					description: (data.description as string) || undefined,
+					fileUrl: data.fileUrl as string,
+					fileSize: (data.fileSize as number) || undefined,
+					mimeType: (data.mimeType as string) || undefined,
+					uploadedBy: userId
+				}
+			});
+		}, { userId, reason: 'Adding document to ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] ADD_DOCUMENT document:${document.id} request:${requestId} by user ${userId}`);
-	return { entityId: document.id };
+		log.info('ADD_DOCUMENT completed', { documentId: document.id, requestId, userId });
+		return { entityId: document.id };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function recordDecision(
@@ -242,28 +275,34 @@ async function recordDecision(
 	const action = data.action as string;
 	const newStatus = action === 'APPROVE' ? 'APPROVED' : action === 'DENY' ? 'DENIED' : 'UNDER_REVIEW';
 
-	// Create review record
-	await prisma.aRCReview.create({
-		data: {
-			requestId,
-			reviewerId: data.reviewerId as string,
-			action: action as any,
-			notes: (data.comments as string) || undefined,
-			conditions: (data.conditions as string) || undefined
-		}
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			// Create review record
+			await tx.aRCReview.create({
+				data: {
+					requestId,
+					reviewerId: data.reviewerId as string,
+					action: action as any,
+					notes: (data.comments as string) || undefined,
+					conditions: (data.conditions as string) || undefined
+				}
+			});
 
-	// Update request status
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: {
-			status: newStatus as any,
-			...(newStatus === 'APPROVED' || newStatus === 'DENIED' ? { decisionDate: new Date() } : {})
-		}
-	});
+			// Update request status
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					status: newStatus as any,
+					...(newStatus === 'APPROVED' || newStatus === 'DENIED' ? { decisionDate: new Date() } : {})
+				}
+			});
+		}, { userId, reason: 'Recording decision on ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] RECORD_DECISION request:${requestId} action:${action} by user ${userId}`);
-	return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('RECORD_DECISION completed', { requestId, action, userId });
+		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function requestInfo(
@@ -287,15 +326,21 @@ async function requestInfo(
 
 	const previousStatus = request.status;
 
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: {
-			status: 'CHANGES_REQUESTED'
-		}
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					status: 'CHANGES_REQUESTED'
+				}
+			});
+		}, { userId, reason: 'Requesting info on ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] REQUEST_INFO request:${requestId} by user ${userId}`);
-	return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('REQUEST_INFO completed', { requestId, userId });
+		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 async function submitInfo(
@@ -319,15 +364,21 @@ async function submitInfo(
 
 	const previousStatus = request.status;
 
-	const updated = await prisma.aRCRequest.update({
-		where: { id: requestId },
-		data: {
-			status: 'SUBMITTED'
-		}
-	});
+	try {
+		const updated = await orgTransaction(organizationId, async (tx) => {
+			return tx.aRCRequest.update({
+				where: { id: requestId },
+				data: {
+					status: 'SUBMITTED'
+				}
+			});
+		}, { userId, reason: 'Submitting info on ARC request via workflow' });
 
-	console.log(`[ARCRequestWorkflow] SUBMIT_INFO request:${requestId} by user ${userId}`);
-	return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('SUBMIT_INFO completed', { requestId, userId });
+		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+	} finally {
+		await clearOrgContext(userId);
+	}
 }
 
 // Main workflow function
@@ -403,8 +454,16 @@ async function arcRequestWorkflow(input: ARCRequestWorkflowInput): Promise<ARCRe
 			newStatus: result.newStatus
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
 		console.error(`[ARCRequestWorkflow] Error in ${input.action}:`, errorMessage);
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'ARC_REQUEST_WORKFLOW_ERROR'
+		});
+
 		return { success: false, error: errorMessage };
 	}
 }

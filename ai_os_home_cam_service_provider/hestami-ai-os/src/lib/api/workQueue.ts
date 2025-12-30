@@ -43,7 +43,14 @@ export const workQueueApi = {
 	/**
 	 * Get work queue summary counts
 	 */
-	summary: () => orpc.workQueue.summary({})
+	summary: () => orpc.workQueue.summary({}),
+
+	/**
+	 * Get the organization ID for a work item
+	 * Used by staff to get org context before calling org-scoped APIs
+	 */
+	getItemOrg: (params: { itemType: 'CONCIERGE_CASE' | 'WORK_ORDER' | 'VIOLATION' | 'ARC_REQUEST'; itemId: string }) =>
+		orpc.workQueue.getItemOrg(params)
 };
 
 // =============================================================================

@@ -16,7 +16,9 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import type { ARCRequestStatus } from '../../../../generated/prisma/client.js';
+import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('ARCReviewLifecycleWorkflow');
@@ -132,75 +134,86 @@ async function updateARCRequestStatus(
 	input: TransitionInput,
 	fromStatus: ARCRequestStatus
 ): Promise<{ approvalExpires?: Date }> {
-	let approvalExpires: Date | undefined;
-
-	await prisma.$transaction(async (tx) => {
-		// Build update data based on transition
-		const updateData: Record<string, unknown> = {
-			status: input.toStatus
-		};
-
-		// Handle specific transitions
-		switch (input.toStatus) {
-			case 'SUBMITTED':
-				updateData.submittedAt = new Date();
-				break;
-
-			case 'UNDER_REVIEW':
-				if (input.committeeId) {
-					updateData.committeeId = input.committeeId;
-				}
-				updateData.reviewedAt = new Date();
-				break;
-
-			case 'APPROVED':
-				updateData.decisionDate = new Date();
-				updateData.conditions = input.conditions;
-				// Set expiration date
-				const expirationDays = input.expirationDays || DEFAULT_APPROVAL_EXPIRATION_DAYS;
-				approvalExpires = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000);
-				updateData.expiresAt = approvalExpires;
-				break;
-
-			case 'DENIED':
-			case 'CHANGES_REQUESTED':
-			case 'TABLED':
-				updateData.decisionDate = new Date();
-				if (input.conditions) {
-					updateData.conditions = input.conditions;
-				}
-				break;
-
-			case 'WITHDRAWN':
-				updateData.withdrawnAt = new Date();
-				if (input.notes) {
-					updateData.cancellationReason = input.notes;
-				}
-				break;
-
-			case 'CANCELLED':
-				if (input.notes) {
-					updateData.cancellationReason = input.notes;
-				}
-				break;
-
-			case 'EXPIRED':
-				// No additional fields needed
-				break;
-		}
-
-		// Update the request
-		await tx.aRCRequest.update({
-			where: { id: input.requestId },
-			data: updateData
-		});
-
-		// Record status history if the model exists
-		// Note: ARCRequest doesn't have a status history model in the schema,
-		// but we can add a comment/note for audit purposes
+	// Look up the request to get organizationId
+	const request = await prisma.aRCRequest.findUnique({
+		where: { id: input.requestId },
+		select: { organizationId: true }
 	});
 
-	return { approvalExpires };
+	if (!request) {
+		throw new Error('ARC request not found');
+	}
+
+	const { organizationId } = request;
+	let approvalExpires: Date | undefined;
+
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			// Build update data based on transition
+			const updateData: Record<string, unknown> = {
+				status: input.toStatus
+			};
+
+			// Handle specific transitions
+			switch (input.toStatus) {
+				case 'SUBMITTED':
+					updateData.submittedAt = new Date();
+					break;
+
+				case 'UNDER_REVIEW':
+					if (input.committeeId) {
+						updateData.committeeId = input.committeeId;
+					}
+					updateData.reviewedAt = new Date();
+					break;
+
+				case 'APPROVED':
+					updateData.decisionDate = new Date();
+					updateData.conditions = input.conditions;
+					// Set expiration date
+					const expirationDays = input.expirationDays || DEFAULT_APPROVAL_EXPIRATION_DAYS;
+					approvalExpires = new Date(Date.now() + expirationDays * 24 * 60 * 60 * 1000);
+					updateData.expiresAt = approvalExpires;
+					break;
+
+				case 'DENIED':
+				case 'CHANGES_REQUESTED':
+				case 'TABLED':
+					updateData.decisionDate = new Date();
+					if (input.conditions) {
+						updateData.conditions = input.conditions;
+					}
+					break;
+
+				case 'WITHDRAWN':
+					updateData.withdrawnAt = new Date();
+					if (input.notes) {
+						updateData.cancellationReason = input.notes;
+					}
+					break;
+
+				case 'CANCELLED':
+					if (input.notes) {
+						updateData.cancellationReason = input.notes;
+					}
+					break;
+
+				case 'EXPIRED':
+					// No additional fields needed
+					break;
+			}
+
+			// Update the request
+			await tx.aRCRequest.update({
+				where: { id: input.requestId },
+				data: updateData
+			});
+		}, { userId: input.userId, reason: 'Updating ARC request status via lifecycle workflow' });
+
+		return { approvalExpires };
+	} finally {
+		await clearOrgContext(input.userId);
+	}
 }
 
 /**
@@ -333,8 +346,16 @@ async function arcReviewTransitionWorkflow(input: TransitionInput): Promise<Tran
 			approvalExpires: updateResult.approvalExpires?.toISOString()
 		};
 	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		const errorMessage = errorObj.message;
+
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
+
+		// Record error on span for trace visibility
+		await recordSpanError(errorObj, {
+			errorCode: 'WORKFLOW_FAILED',
+			errorType: 'ARC_REVIEW_LIFECYCLE_ERROR'
+		});
 
 		return {
 			success: false,
@@ -371,9 +392,9 @@ export async function startARCReviewTransition(
  */
 export async function getARCReviewTransitionStatus(
 	workflowId: string
-): Promise<{ step: string; [key: string]: unknown } | null> {
+): Promise<{ step: string;[key: string]: unknown } | null> {
 	const status = await DBOS.getEvent(workflowId, WORKFLOW_STATUS_EVENT, 0);
-	return status as { step: string; [key: string]: unknown } | null;
+	return status as { step: string;[key: string]: unknown } | null;
 }
 
 /**

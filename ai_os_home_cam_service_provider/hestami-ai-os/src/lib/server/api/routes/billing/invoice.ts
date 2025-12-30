@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobInvoiceStatus } from '../../../../../../generated/prisma/client.js';
 import { startInvoiceCreateWorkflow } from '../../../workflows/invoiceCreateWorkflow.js';
@@ -136,6 +135,12 @@ export const invoiceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -143,25 +148,25 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('create', 'job_invoice', 'new');
 
 			const estimate = await prisma.estimate.findFirst({
-				where: { id: input.estimateId, organizationId: context.organization!.id },
+				where: { id: input.estimateId, organizationId: context.organization.id },
 				include: { lines: true, options: { where: { isSelected: true }, include: { lines: true } } }
 			});
-			if (!estimate) throw ApiException.notFound('Estimate');
+			if (!estimate) throw errors.NOT_FOUND({ message: 'Estimate not found' });
 
 			if (estimate.status !== 'ACCEPTED') {
-				throw ApiException.badRequest('Can only create invoice from ACCEPTED estimate');
+				throw errors.BAD_REQUEST({ message: 'Can only create invoice from ACCEPTED estimate' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'CREATE_INVOICE_FROM_ESTIMATE',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
 						estimateId: input.estimateId,
@@ -174,7 +179,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create invoice from estimate');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create invoice from estimate' });
 			}
 
 			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
@@ -211,6 +216,11 @@ export const invoiceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -218,26 +228,26 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('create', 'job_invoice', 'new');
 
 			// Validate job and customer
 			const [job, customer] = await Promise.all([
 				prisma.job.findFirst({
-					where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
+					where: { id: input.jobId, organizationId: context.organization.id, deletedAt: null }
 				}),
 				prisma.customer.findFirst({
-					where: { id: input.customerId, organizationId: context.organization!.id, deletedAt: null }
+					where: { id: input.customerId, organizationId: context.organization.id, deletedAt: null }
 				})
 			]);
-			if (!job) throw ApiException.notFound('Job');
-			if (!customer) throw ApiException.notFound('Customer');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
+			if (!customer) throw errors.NOT_FOUND({ message: 'Customer not found' });
 
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
 			const result = await startInvoiceCreateWorkflow(
 				{
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					jobId: input.jobId,
 					customerId: input.customerId,
@@ -251,7 +261,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create invoice');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create invoice' });
 			}
 
 			// Fetch the created invoice with relations for the response
@@ -268,6 +278,10 @@ export const invoiceRouter = {
 	 */
 	get: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -275,16 +289,16 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('view', 'job_invoice', input.id);
 
 			const invoice = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id },
+				where: { id: input.id, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
-			if (!invoice) throw ApiException.notFound('Invoice');
+			if (!invoice) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
 		}),
@@ -304,6 +318,9 @@ export const invoiceRouter = {
 				.merge(PaginationInputSchema)
 				.optional()
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -314,15 +331,15 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('view', 'job_invoice', 'list');
 
 			const limit = input?.limit ?? 20;
 			const cursor = input?.cursor;
 
 			const where: any = {
-				organizationId: context.organization!.id,
+				organizationId: context.organization.id,
 				...(input?.jobId && { jobId: input.jobId }),
 				...(input?.customerId && { customerId: input.customerId }),
 				...(input?.status && { status: input.status })
@@ -369,6 +386,12 @@ export const invoiceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -376,25 +399,25 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'job_invoice', input.id);
 
 			const existing = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id },
+				where: { id: input.id, organizationId: context.organization.id },
 				include: { lines: true }
 			});
-			if (!existing) throw ApiException.notFound('Invoice');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only edit DRAFT invoices');
+				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT invoices' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'UPDATE_INVOICE',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {
@@ -408,7 +431,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update invoice');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update invoice' });
 			}
 
 			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
@@ -424,6 +447,12 @@ export const invoiceRouter = {
 	 */
 	send: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -431,24 +460,24 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('send', 'job_invoice', input.id);
 
 			const existing = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Invoice');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only send DRAFT invoices');
+				throw errors.BAD_REQUEST({ message: 'Can only send DRAFT invoices' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'SEND_INVOICE',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -457,7 +486,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to send invoice');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send invoice' });
 			}
 
 			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
@@ -473,6 +502,10 @@ export const invoiceRouter = {
 	 */
 	markViewed: orgProcedure
 		.input(z.object({ id: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -480,13 +513,13 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 
 			const existing = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Invoice');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			if (existing.status !== 'SENT') {
 				return successResponse({ invoice: formatInvoice(existing) }, context);
@@ -518,6 +551,12 @@ export const invoiceRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -525,24 +564,24 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'job_invoice', input.id);
 
 			const existing = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Invoice');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			if (!['SENT', 'VIEWED', 'PARTIAL', 'OVERDUE'].includes(existing.status)) {
-				throw ApiException.badRequest('Cannot record payment on this invoice');
+				throw errors.BAD_REQUEST({ message: 'Cannot record payment on this invoice' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'RECORD_INVOICE_PAYMENT',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: { amount: input.amount, paymentMethod: input.paymentMethod }
@@ -551,7 +590,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to record payment');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record payment' });
 			}
 
 			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
@@ -567,6 +606,12 @@ export const invoiceRouter = {
 	 */
 	void: orgProcedure
 		.input(z.object({ id: z.string(), reason: z.string().optional() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -574,24 +619,24 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('void', 'job_invoice', input.id);
 
 			const existing = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Invoice');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			if (['VOID', 'REFUNDED'].includes(existing.status)) {
-				throw ApiException.badRequest('Invoice is already void or refunded');
+				throw errors.BAD_REQUEST({ message: 'Invoice is already void or refunded' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'VOID_INVOICE',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -600,7 +645,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to void invoice');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to void invoice' });
 			}
 
 			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
@@ -616,6 +661,12 @@ export const invoiceRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' },
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -623,24 +674,24 @@ export const invoiceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'job_invoice', input.id);
 
 			const existing = await prisma.jobInvoice.findFirst({
-				where: { id: input.id, organizationId: context.organization!.id }
+				where: { id: input.id, organizationId: context.organization.id }
 			});
-			if (!existing) throw ApiException.notFound('Invoice');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
 			if (existing.status !== 'DRAFT') {
-				throw ApiException.badRequest('Can only delete DRAFT invoices');
+				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT invoices' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
 					action: 'DELETE_INVOICE',
-					organizationId: context.organization!.id,
+					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
 					data: {}
@@ -649,7 +700,7 @@ export const invoiceRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete invoice');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete invoice' });
 			}
 
 			return successResponse({ deleted: true }, context);

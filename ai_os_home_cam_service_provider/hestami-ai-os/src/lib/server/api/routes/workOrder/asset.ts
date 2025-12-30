@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -65,7 +64,10 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'asset', 'new');
 
 			const association = await prisma.association.findFirst({
@@ -73,7 +75,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			// Validate unit if provided
@@ -83,7 +85,7 @@ export const assetRouter = {
 					include: { property: { include: { association: true } } }
 				});
 				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
-					throw ApiException.notFound('Unit');
+					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
 
@@ -99,6 +101,7 @@ export const assetRouter = {
 
 			const asset = await prisma.asset.create({
 				data: {
+					organizationId: context.organization!.id,
 					associationId: association.id,
 					assetNumber,
 					name: input.name,
@@ -169,7 +172,10 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'asset', '*');
 
 			const association = await prisma.association.findFirst({
@@ -177,7 +183,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const where: Prisma.AssetWhereInput = {
@@ -257,7 +263,10 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'asset', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -265,7 +274,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const asset = await prisma.asset.findFirst({
@@ -273,7 +282,7 @@ export const assetRouter = {
 			});
 
 			if (!asset) {
-				throw ApiException.notFound('Asset');
+				throw errors.NOT_FOUND({ message: 'Asset' });
 			}
 
 			return successResponse(
@@ -341,7 +350,10 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'asset', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -349,7 +361,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const existing = await prisma.asset.findFirst({
@@ -357,7 +369,7 @@ export const assetRouter = {
 			});
 
 			if (!existing) {
-				throw ApiException.notFound('Asset');
+				throw errors.NOT_FOUND({ message: 'Asset' });
 			}
 
 			const { id, warrantyExpires, ...rest } = input;
@@ -394,7 +406,11 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			CONFLICT: { message: 'Conflict' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'asset', input.id);
 
 			const association = await prisma.association.findFirst({
@@ -402,7 +418,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const asset = await prisma.asset.findFirst({
@@ -410,7 +426,7 @@ export const assetRouter = {
 			});
 
 			if (!asset) {
-				throw ApiException.notFound('Asset');
+				throw errors.NOT_FOUND({ message: 'Asset' });
 			}
 
 			// Check for open work orders
@@ -422,7 +438,7 @@ export const assetRouter = {
 			});
 
 			if (openWorkOrders) {
-				throw ApiException.conflict('Cannot delete asset with open work orders');
+				throw errors.CONFLICT({ message: 'Cannot delete asset with open work orders' });
 			}
 
 			await prisma.asset.update({
@@ -462,7 +478,10 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'asset', input.assetId);
 
 			const association = await prisma.association.findFirst({
@@ -470,7 +489,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const asset = await prisma.asset.findFirst({
@@ -478,7 +497,7 @@ export const assetRouter = {
 			});
 
 			if (!asset) {
-				throw ApiException.notFound('Asset');
+				throw errors.NOT_FOUND({ message: 'Asset' });
 			}
 
 			const maintenanceDate = new Date(input.maintenanceDate);
@@ -545,7 +564,10 @@ export const assetRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'asset', input.assetId);
 
 			const association = await prisma.association.findFirst({
@@ -553,7 +575,7 @@ export const assetRouter = {
 			});
 
 			if (!association) {
-				throw ApiException.notFound('Association');
+				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
 			const asset = await prisma.asset.findFirst({
@@ -561,7 +583,7 @@ export const assetRouter = {
 			});
 
 			if (!asset) {
-				throw ApiException.notFound('Asset');
+				throw errors.NOT_FOUND({ message: 'Asset' });
 			}
 
 			const logs = await prisma.assetMaintenanceLog.findMany({

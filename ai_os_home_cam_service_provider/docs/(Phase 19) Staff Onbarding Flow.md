@@ -33,6 +33,7 @@ Implement a secure onboarding flow for Hestami staff users (`@hestami-ai.com`) w
     - Set `activationCodeExpiresAt` to `now() + 8 hours`.
     - Return plain code in response (admin sees it once).
     - **Note:** This simplifies the Admin flow significantly.
+- Add `activate` (see below) should also add user to Hestami Staff organization.
 - Add `regenerateActivationCode` (Admin only):
     - Checks if staff is `PENDING`.
     - Generates new code and new 8-hour expiry.
@@ -45,6 +46,7 @@ Implement a secure onboarding flow for Hestami staff users (`@hestami-ai.com`) w
     - Verify `activationCodeExpiresAt` > `now()`.
     - Set status to `ACTIVE`.
     - Clear encrypted code and expiry.
+    - **Add user to Hestami Staff organization** (`PLATFORM_OPERATOR` type, org ID: `hestami-staff-org`) with `ADMIN` role and `isDefault: true`.
 
 ### Frontend Layer
 #### [NEW] [Activation Page](file:///e:/Projects/hestami-ai/ai_os_home_cam_service_provider/hestami-ai-os/src/routes/app/staff/activation/+page.svelte)

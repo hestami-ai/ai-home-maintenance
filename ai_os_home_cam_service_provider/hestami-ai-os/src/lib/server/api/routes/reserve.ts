@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { startReserveWorkflow } from '../../workflows/reserveWorkflow.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
@@ -72,13 +71,17 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'reserveComponent', 'new');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
@@ -107,7 +110,7 @@ export const reserveRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create component');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create component' });
 			}
 
 			const component = await prisma.reserveComponent.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -158,14 +161,17 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve component not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const component = await prisma.reserveComponent.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!component || component.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveComponent');
+				throw errors.NOT_FOUND({ message: 'ReserveComponent' });
 			}
 
 			await context.cerbos.authorize('view', 'reserveComponent', component.id);
@@ -224,13 +230,16 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'reserveComponent', 'list');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const components = await prisma.reserveComponent.findMany({
 				where: {
@@ -298,14 +307,18 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve component not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const component = await prisma.reserveComponent.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!component || component.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveComponent');
+				throw errors.NOT_FOUND({ message: 'ReserveComponent' });
 			}
 
 			await context.cerbos.authorize('update', 'reserveComponent', component.id);
@@ -337,7 +350,7 @@ export const reserveRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update component');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update component' });
 			}
 
 			const updated = await prisma.reserveComponent.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -362,14 +375,17 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve component not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const component = await prisma.reserveComponent.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!component || component.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveComponent');
+				throw errors.NOT_FOUND({ message: 'ReserveComponent' });
 			}
 
 			await context.cerbos.authorize('delete', 'reserveComponent', component.id);
@@ -423,13 +439,17 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'reserveStudy', 'new');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
@@ -457,7 +477,7 @@ export const reserveRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create study');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create study' });
 			}
 
 			const study = await prisma.reserveStudy.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -505,7 +525,10 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve study not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const study = await prisma.reserveStudy.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: {
@@ -515,7 +538,7 @@ export const reserveRouter = {
 			});
 
 			if (!study || study.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveStudy');
+				throw errors.NOT_FOUND({ message: 'ReserveStudy' });
 			}
 
 			await context.cerbos.authorize('view', 'reserveStudy', study.id);
@@ -571,13 +594,16 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'reserveStudy', 'list');
 
 			const association = await prisma.association.findFirst({
 				where: { id: input.associationId, organizationId: context.organization.id, deletedAt: null }
 			});
-			if (!association) throw ApiException.notFound('Association');
+			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const studies = await prisma.reserveStudy.findMany({
 				where: { associationId: input.associationId, deletedAt: null },
@@ -639,14 +665,18 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const study = await prisma.reserveStudy.findFirst({
 				where: { id: input.studyId, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!study || study.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveStudy');
+				throw errors.NOT_FOUND({ message: 'ReserveStudy' });
 			}
 
 			await context.cerbos.authorize('update', 'reserveStudy', study.id);
@@ -654,7 +684,7 @@ export const reserveRouter = {
 			const component = await prisma.reserveComponent.findFirst({
 				where: { id: input.componentId, associationId: study.associationId, deletedAt: null }
 			});
-			if (!component) throw ApiException.notFound('ReserveComponent');
+			if (!component) throw errors.NOT_FOUND({ message: 'ReserveComponent' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
@@ -674,7 +704,7 @@ export const reserveRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to add study component');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add study component' });
 			}
 
 			const snapshot = await prisma.reserveStudyComponent.findUniqueOrThrow({ where: { id: result.entityId } });
@@ -714,14 +744,17 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve study not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const study = await prisma.reserveStudy.findFirst({
 				where: { id: input.studyId, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!study || study.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveStudy');
+				throw errors.NOT_FOUND({ message: 'ReserveStudy' });
 			}
 
 			await context.cerbos.authorize('view', 'reserveStudy', study.id);
@@ -778,14 +811,18 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve study not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const study = await prisma.reserveStudy.findFirst({
 				where: { id: input.studyId, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!study || study.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveStudy');
+				throw errors.NOT_FOUND({ message: 'ReserveStudy' });
 			}
 
 			await context.cerbos.authorize('update', 'reserveStudy', study.id);
@@ -806,7 +843,7 @@ export const reserveRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to generate funding schedule');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to generate funding schedule' });
 			}
 
 			return successResponse({ count: input.schedule.length }, context);
@@ -832,14 +869,17 @@ export const reserveRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Reserve study not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const study = await prisma.reserveStudy.findFirst({
 				where: { id: input.studyId, deletedAt: null },
 				include: { association: true }
 			});
 
 			if (!study || study.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('ReserveStudy');
+				throw errors.NOT_FOUND({ message: 'ReserveStudy' });
 			}
 
 			await context.cerbos.authorize('view', 'reserveStudy', study.id);

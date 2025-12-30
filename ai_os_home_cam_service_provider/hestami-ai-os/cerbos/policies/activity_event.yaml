@@ -3,7 +3,21 @@ apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: "activity_event"
+  importDerivedRoles:
+    - common_roles
   rules:
+    # Hestami platform admins have full cross-org access
+    - actions: ["view", "export"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # Hestami staff have cross-org view access for activity log
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff
+
     # Admins and managers have full view and export access
     - actions: ["view", "export"]
       effect: EFFECT_ALLOW

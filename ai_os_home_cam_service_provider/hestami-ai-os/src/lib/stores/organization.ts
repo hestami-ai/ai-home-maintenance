@@ -1,12 +1,9 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
+import type { operations } from '$lib/api/types.generated';
 
-export interface Organization {
-	id: string;
-	name: string;
-	slug: string;
-	type: string;
-	status: string;
-}
+// Extract Organization type from organization.create API response
+// This ensures the store uses the same type shape as the API
+export type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
 
 export interface OrganizationMembership {
 	organization: Organization;
@@ -70,3 +67,46 @@ export const currentOrganization = derived(organizationStore, ($org) => $org.cur
 export const currentRole = derived(organizationStore, ($org) => $org.current?.role);
 export const hasOrganizations = derived(organizationStore, ($org) => $org.memberships.length > 0);
 export const isOrgLoading = derived(organizationStore, ($org) => $org.isLoading);
+
+/**
+ * Wait for the organization store to finish loading.
+ * Use this before making API calls that require organization context.
+ * 
+ * @param timeoutMs - Maximum time to wait (default 10 seconds)
+ * @returns Promise that resolves when organization is loaded, or rejects on timeout
+ * 
+ * @example
+ * await waitForOrganization();
+ * const result = await orpc.conciergeCase.getDetail({ id });
+ */
+export function waitForOrganization(timeoutMs = 10000): Promise<Organization | null> {
+	return new Promise((resolve, reject) => {
+		const state = get(organizationStore);
+
+		// Already loaded
+		if (!state.isLoading) {
+			if (!state.current) {
+				console.warn('[waitForOrganization] Resolved with no organization');
+			}
+			resolve(state.current?.organization ?? null);
+			return;
+		}
+
+		const timeout = setTimeout(() => {
+			unsubscribe();
+			console.error('[waitForOrganization] Timeout waiting for organization');
+			reject(new Error('Timeout waiting for organization to load'));
+		}, timeoutMs);
+
+		const unsubscribe = organizationStore.subscribe((state) => {
+			if (!state.isLoading) {
+				clearTimeout(timeout);
+				unsubscribe();
+				if (!state.current) {
+					console.warn('[waitForOrganization] Resolved with no organization after subscription');
+				}
+				resolve(state.current?.organization ?? null);
+			}
+		});
+	});
+}

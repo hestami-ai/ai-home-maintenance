@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import {
 		ArrowLeft,
 		Clock,
@@ -26,35 +25,21 @@
 		ExternalLink
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { conciergeCaseApi, type ConciergeCaseDetail } from '$lib/api/cam';
+	import { invalidate } from '$app/navigation';
 
-	const caseId = $derived($page.params.id ?? '');
+	// Get data from server load function
+	let { data } = $props();
+	const caseDetail = $derived(data.caseDetail);
 
-	let caseDetail = $state<ConciergeCaseDetail | null>(null);
-	let isLoading = $state(true);
-	let error = $state<string | null>(null);
 	let activeTab = $state<string>('overview');
+	let isRefreshing = $state(false);
 
-	onMount(async () => {
-		await loadCaseDetail();
-	});
-
-	async function loadCaseDetail() {
-		if (!caseId) return;
-		isLoading = true;
-		error = null;
+	async function refresh() {
+		isRefreshing = true;
 		try {
-			const response = await conciergeCaseApi.getDetail(caseId);
-			if (!response.ok) {
-				error = 'Failed to load case details';
-				return;
-			}
-			caseDetail = response.data;
-		} catch (err) {
-			console.error('Failed to load case:', err);
-			error = 'An error occurred while loading the case';
+			await invalidate('data');
 		} finally {
-			isLoading = false;
+			isRefreshing = false;
 		}
 	}
 
@@ -155,24 +140,7 @@
 			</a>
 		</div>
 
-		{#if isLoading}
-			<div class="flex items-center justify-center py-12">
-				<Loader2 class="h-8 w-8 animate-spin text-primary-500" />
-			</div>
-		{:else if error || !caseDetail}
-			<Card variant="outlined" padding="lg">
-				<EmptyState
-					title="Unable to load case"
-					description={error || 'The case could not be found or you do not have permission to view it.'}
-				>
-					{#snippet actions()}
-						<a href="/app/admin/work-queue" class="btn preset-filled-primary-500">
-							Return to Work Queue
-						</a>
-					{/snippet}
-				</EmptyState>
-			</Card>
-		{:else}
+
 			<!-- Header -->
 			<div class="mb-6">
 				<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -210,18 +178,14 @@
 						</div>
 					</div>
 					<div class="flex flex-wrap gap-2">
-						<button onclick={loadCaseDetail} class="btn preset-outlined-surface-500" disabled={isLoading}>
-							<RefreshCw class="mr-2 h-4 w-4" />
+						<button onclick={refresh} class="btn preset-outlined-surface-500" disabled={isRefreshing}>
+							{#if isRefreshing}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							{:else}
+								<RefreshCw class="mr-2 h-4 w-4" />
+							{/if}
 							Refresh
 						</button>
-						<a
-							href="/app/concierge/cases/{caseDetail.case.id}"
-							class="btn preset-outlined-primary-500"
-							target="_blank"
-						>
-							<ExternalLink class="mr-2 h-4 w-4" />
-							Open in Concierge
-						</a>
 					</div>
 				</div>
 			</div>
@@ -620,6 +584,6 @@
 					</Card>
 				</div>
 			</div>
-		{/if}
 	</div>
 </PageContainer>
+

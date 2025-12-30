@@ -4,23 +4,50 @@
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
 	import { 
 		CONCIERGE_DOCUMENT_CATEGORIES,
 		CONCIERGE_CATEGORY_LABELS,
 		type ConciergeDocumentCategory
 	} from '$lib/utils/documentCategories';
 
+	// Property interface for type safety
 	interface Property {
 		id: string;
 		name: string;
 		addressLine1: string;
 	}
 
+	// File validation constants
+	const allowedTypes = [
+		'application/pdf',
+		'image/jpeg',
+		'image/jpg',
+		'image/png',
+		'image/gif',
+		'image/webp',
+		'application/msword',
+		'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+	];
+	const maxFileSize = 10 * 1024 * 1024; // 10MB
+
+	// Category options for select
+	const categories = CONCIERGE_DOCUMENT_CATEGORIES.map(cat => ({
+		value: cat,
+		label: CONCIERGE_CATEGORY_LABELS[cat]
+	}));
+
+	interface Props {
+		data: {
+			properties: Property[];
+		};
+	}
+
+	let { data }: Props = $props();
+
 	let isSubmitting = $state(false);
-	let isLoadingProperties = $state(true);
+	let isLoadingProperties = $state(false);
 	let error = $state<string | null>(null);
-	let properties = $state<Property[]>([]);
+	let properties = $derived(data.properties);
 
 	// Form state
 	let title = $state('');
@@ -30,57 +57,28 @@
 	let selectedFile = $state<globalThis.File | null>(null);
 	let isDragging = $state(false);
 
+	// Form validation
+	const isValid = $derived(
+		title.trim().length > 0 &&
+		selectedPropertyId.length > 0 &&
+		selectedFile !== null
+	);
+
 	// Get pre-selected property from URL
 	const urlPropertyId = $page.url.searchParams.get('propertyId');
 
-	// Use centralized category definitions from documentCategories.ts
-	const categories = CONCIERGE_DOCUMENT_CATEGORIES.map((cat) => ({
-		value: cat,
-		label: CONCIERGE_CATEGORY_LABELS[cat]
-	}));
-
-	const allowedTypes = [
-		'application/pdf',
-		'image/jpeg',
-		'image/png',
-		'image/gif',
-		'image/webp',
-		'application/msword',
-		'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-	];
-
-	const maxFileSize = 10 * 1024 * 1024; // 10MB
-
-	const isValid = $derived(
-		title.trim() !== '' && selectedFile !== null && selectedPropertyId !== ''
-	);
-
-	onMount(async () => {
-		await loadProperties();
+	// Synchronize pre-selected values
+	$effect(() => {
 		if (urlPropertyId) {
 			selectedPropertyId = urlPropertyId;
+		} else if (properties.length === 1 && !selectedPropertyId) {
+			selectedPropertyId = properties[0].id;
 		}
 	});
 
 	async function loadProperties() {
-		isLoadingProperties = true;
-		try {
-			const result = await orpc.individualProperty.list({ limit: 100 });
-			properties = result.data.properties.map((p) => ({
-				id: p.id,
-				name: p.name,
-				addressLine1: p.addressLine1
-			}));
-
-			// Auto-select if only one property
-			if (properties.length === 1 && !urlPropertyId) {
-				selectedPropertyId = properties[0].id;
-			}
-		} catch (err) {
-			console.error('Failed to load properties:', err);
-		} finally {
-			isLoadingProperties = false;
-		}
+		// Just refresh the data
+		window.location.reload();
 	}
 
 	function handleDragOver(e: DragEvent) {

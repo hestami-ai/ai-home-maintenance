@@ -8,7 +8,6 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { ApiException } from '../../errors.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { TimeEntryType } from '../../../../../../generated/prisma/client.js';
 import { startTimeEntryWorkflow } from '../../../workflows/timeEntryWorkflow.js';
@@ -73,6 +72,12 @@ export const timeEntryRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -80,21 +85,21 @@ export const timeEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('create', 'job_time_entry', 'new');
 
 			// Validate job exists
 			const job = await prisma.job.findFirst({
 				where: { id: input.jobId, organizationId: context.organization!.id, deletedAt: null }
 			});
-			if (!job) throw ApiException.notFound('Job');
+			if (!job) throw errors.NOT_FOUND({ message: 'Job not found' });
 
 			// Validate technician
 			const tech = await prisma.technician.findFirst({
 				where: { id: input.technicianId, organizationId: context.organization!.id, isActive: true }
 			});
-			if (!tech) throw ApiException.notFound('Technician');
+			if (!tech) throw errors.NOT_FOUND({ message: 'Technician not found' });
 
 			// Check for open time entry of same type
 			const openEntry = await prisma.jobTimeEntry.findFirst({
@@ -106,7 +111,7 @@ export const timeEntryRouter = {
 				}
 			});
 			if (openEntry) {
-				throw ApiException.badRequest(`Already have an open ${input.entryType} time entry for this job`);
+				throw errors.BAD_REQUEST({ message: `Already have an open ${input.entryType} time entry for this job` });
 			}
 
 			// Use DBOS workflow for durable execution
@@ -131,7 +136,7 @@ export const timeEntryRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to create time entry');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create time entry' });
 			}
 
 			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
@@ -154,6 +159,12 @@ export const timeEntryRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -161,17 +172,17 @@ export const timeEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'job_time_entry', input.timeEntryId);
 
 			const existing = await prisma.jobTimeEntry.findFirst({
 				where: { id: input.timeEntryId, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Time entry');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Time entry not found' });
 
 			if (existing.endTime) {
-				throw ApiException.badRequest('Time entry already stopped');
+				throw errors.BAD_REQUEST({ message: 'Time entry already stopped' });
 			}
 
 			const endTime = input.endTime ? new Date(input.endTime) : new Date();
@@ -196,7 +207,7 @@ export const timeEntryRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to stop time entry');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to stop time entry' });
 			}
 
 			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
@@ -219,6 +230,9 @@ export const timeEntryRouter = {
 				})
 				.merge(PaginationInputSchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -231,8 +245,8 @@ export const timeEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_time_entry', input.jobId);
 
 			const limit = input.limit ?? 50;
@@ -293,6 +307,9 @@ export const timeEntryRouter = {
 				})
 				.merge(PaginationInputSchema)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -304,8 +321,8 @@ export const timeEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('view', 'job_time_entry', input.technicianId);
 
 			const limit = input.limit ?? 50;
@@ -367,6 +384,11 @@ export const timeEntryRouter = {
 				})
 				.merge(IdempotencyKeySchema)
 		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -374,14 +396,14 @@ export const timeEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('edit', 'job_time_entry', input.id);
 
 			const existing = await prisma.jobTimeEntry.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Time entry');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Time entry not found' });
 
 			const startTime = input.startTime ? new Date(input.startTime) : existing.startTime;
 			const endTime =
@@ -415,7 +437,7 @@ export const timeEntryRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to update time entry');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update time entry' });
 			}
 
 			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
@@ -430,6 +452,11 @@ export const timeEntryRouter = {
 	 */
 	delete: orgProcedure
 		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -437,14 +464,14 @@ export const timeEntryRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			await assertContractorOrg(context.organization!.id);
+		.handler(async ({ input, context, errors }) => {
+			await assertContractorOrg(context.organization!.id, errors);
 			await context.cerbos.authorize('delete', 'job_time_entry', input.id);
 
 			const existing = await prisma.jobTimeEntry.findFirst({
 				where: { id: input.id, organizationId: context.organization!.id }
 			});
-			if (!existing) throw ApiException.notFound('Time entry');
+			if (!existing) throw errors.NOT_FOUND({ message: 'Time entry not found' });
 
 			// Use DBOS workflow for durable execution
 			const result = await startTimeEntryWorkflow(
@@ -459,7 +486,7 @@ export const timeEntryRouter = {
 			);
 
 			if (!result.success) {
-				throw ApiException.internal(result.error || 'Failed to delete time entry');
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete time entry' });
 			}
 
 			return successResponse({ deleted: true }, context);

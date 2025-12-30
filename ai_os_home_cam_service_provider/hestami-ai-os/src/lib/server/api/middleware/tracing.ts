@@ -150,6 +150,42 @@ export async function enrichSpanWithResource(
 }
 
 /**
+ * Record an error on the current active span
+ * This sets the span status to ERROR and records the exception details
+ */
+export async function recordSpanError(
+	error: Error,
+	attributes?: {
+		errorCode?: string;
+		httpStatus?: number;
+		errorType?: string;
+	}
+): Promise<void> {
+	const trace = await getTraceApi();
+	if (!trace) return;
+
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	// Record the exception (adds exception.type, exception.message, exception.stacktrace)
+	span.recordException(error);
+
+	// Set span status to ERROR with the error message
+	span.setStatus({ code: 2, message: error.message }); // SpanStatusCode.ERROR = 2
+
+	// Add custom error attributes for better filtering in SigNoz
+	if (attributes?.errorCode) {
+		span.setAttribute('error.code', attributes.errorCode);
+	}
+	if (attributes?.httpStatus) {
+		span.setAttribute('http.status_code', attributes.httpStatus);
+	}
+	if (attributes?.errorType) {
+		span.setAttribute('error.type', attributes.errorType);
+	}
+}
+
+/**
  * Get the current trace ID if available
  */
 export async function getCurrentTraceId(): Promise<string | undefined> {

@@ -14,7 +14,6 @@ import {
 	IdempotencyKeySchema
 } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { recordIntent, recordExecution } from '../middleware/activityEvent.js';
 
 // =============================================================================
@@ -140,7 +139,11 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Entity not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify vendor candidate exists and belongs to organization
 			const vendorCandidate = await prisma.vendorCandidate.findFirst({
 				where: {
@@ -151,12 +154,12 @@ export const vendorBidRouter = {
 			});
 
 			if (!vendorCandidate) {
-				throw ApiException.notFound('VendorCandidate');
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
 			}
 
 			// Verify case matches
 			if (vendorCandidate.caseId !== input.caseId) {
-				throw ApiException.badRequest('Vendor candidate does not belong to this case');
+				throw errors.BAD_REQUEST({ message: 'Vendor candidate does not belong to this case' });
 			}
 
 			await context.cerbos.authorize('create', 'vendor_bid', 'new');
@@ -222,7 +225,10 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor bid not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const bid = await prisma.vendorBid.findFirst({
 				where: { id: input.id },
 				include: {
@@ -232,7 +238,7 @@ export const vendorBidRouter = {
 			});
 
 			if (!bid || bid.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('VendorBid');
+				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
 			await context.cerbos.authorize('view', 'vendor_bid', bid.id);
@@ -260,7 +266,10 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Case not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -270,7 +279,7 @@ export const vendorBidRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('view', 'vendor_bid', 'list');
@@ -332,7 +341,10 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor bid not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorBid.findFirst({
 				where: { id: input.id },
 				include: {
@@ -342,7 +354,7 @@ export const vendorBidRouter = {
 			});
 
 			if (!existing || existing.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('VendorBid');
+				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
 			await context.cerbos.authorize('update', 'vendor_bid', existing.id);
@@ -402,7 +414,11 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor bid not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorBid.findFirst({
 				where: { id: input.id },
 				include: {
@@ -412,11 +428,11 @@ export const vendorBidRouter = {
 			});
 
 			if (!existing || existing.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('VendorBid');
+				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
 			if (existing.status !== 'PENDING') {
-				throw ApiException.badRequest(`Cannot accept bid with status ${existing.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot accept bid with status ${existing.status}` });
 			}
 
 			await context.cerbos.authorize('accept', 'vendor_bid', existing.id);
@@ -492,7 +508,11 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Vendor bid not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorBid.findFirst({
 				where: { id: input.id },
 				include: {
@@ -502,11 +522,11 @@ export const vendorBidRouter = {
 			});
 
 			if (!existing || existing.case?.organizationId !== context.organization.id) {
-				throw ApiException.notFound('VendorBid');
+				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
 			if (existing.status !== 'PENDING') {
-				throw ApiException.badRequest(`Cannot reject bid with status ${existing.status}`);
+				throw errors.BAD_REQUEST({ message: `Cannot reject bid with status ${existing.status}` });
 			}
 
 			await context.cerbos.authorize('reject', 'vendor_bid', existing.id);
@@ -587,7 +607,10 @@ export const vendorBidRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Case not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Verify case belongs to organization
 			const caseRecord = await prisma.conciergeCase.findFirst({
 				where: {
@@ -597,7 +620,7 @@ export const vendorBidRouter = {
 			});
 
 			if (!caseRecord) {
-				throw ApiException.notFound('ConciergeCase');
+				throw errors.NOT_FOUND({ message: 'ConciergeCase' });
 			}
 
 			await context.cerbos.authorize('view', 'vendor_bid', 'list');

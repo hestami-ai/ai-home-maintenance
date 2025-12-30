@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '../schemas.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { ApiException } from '../errors.js';
 import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('UnitRoute');
@@ -47,7 +46,10 @@ export const unitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Property not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'unit', 'new');
 
@@ -58,11 +60,14 @@ export const unitRouter = {
 			});
 
 			if (!property || property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Property');
+				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 
 			const unit = await prisma.unit.create({
-				data: input
+				data: {
+					...input,
+					organizationId: context.organization.id
+				}
 			});
 
 			return successResponse(
@@ -110,14 +115,17 @@ export const unitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Unit not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const unit = await prisma.unit.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: { include: { association: true } } }
 			});
 
 			if (!unit || unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Unit');
+				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
 			// Cerbos authorization
@@ -264,14 +272,17 @@ export const unitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Unit not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.unit.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: { include: { association: true } } }
 			});
 
 			if (!existing || existing.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Unit');
+				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
 			// Cerbos authorization
@@ -314,14 +325,17 @@ export const unitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			NOT_FOUND: { message: 'Unit not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			const unit = await prisma.unit.findFirst({
 				where: { id: input.id, deletedAt: null },
 				include: { property: { include: { association: true } } }
 			});
 
 			if (!unit || unit.property.association.organizationId !== context.organization.id) {
-				throw ApiException.notFound('Unit');
+				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
 			// Cerbos authorization
