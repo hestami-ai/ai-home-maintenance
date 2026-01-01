@@ -17,37 +17,37 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from './errors.js';
 
 // Import generated enum schemas from Prisma/Zod generation
-import { ARCCategorySchema as GeneratedARCCategorySchema } from '../../../../generated/zod/inputTypeSchemas/ARCCategorySchema.js';
-import { ARCRequestStatusSchema as GeneratedARCRequestStatusSchema } from '../../../../generated/zod/inputTypeSchemas/ARCRequestStatusSchema.js';
-import { ARCReviewActionSchema as GeneratedARCReviewActionSchema } from '../../../../generated/zod/inputTypeSchemas/ARCReviewActionSchema.js';
-import { ARCDocumentTypeSchema as GeneratedARCDocumentTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ARCDocumentTypeSchema.js';
-import { ViolationStatusSchema as GeneratedViolationStatusSchema } from '../../../../generated/zod/inputTypeSchemas/ViolationStatusSchema.js';
-import { ViolationSeveritySchema as GeneratedViolationSeveritySchema } from '../../../../generated/zod/inputTypeSchemas/ViolationSeveritySchema.js';
-import { NoticeTypeSchema as GeneratedNoticeTypeSchema } from '../../../../generated/zod/inputTypeSchemas/NoticeTypeSchema.js';
-import { NoticeDeliveryMethodSchema as GeneratedNoticeDeliveryMethodSchema } from '../../../../generated/zod/inputTypeSchemas/NoticeDeliveryMethodSchema.js';
-import { HearingOutcomeSchema as GeneratedHearingOutcomeSchema } from '../../../../generated/zod/inputTypeSchemas/HearingOutcomeSchema.js';
-import { AppealStatusSchema as GeneratedAppealStatusSchema } from '../../../../generated/zod/inputTypeSchemas/AppealStatusSchema.js';
-import { DocumentCategorySchema as GeneratedDocumentCategorySchema } from '../../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
-import { DocumentContextTypeSchema as GeneratedDocumentContextTypeSchema } from '../../../../generated/zod/inputTypeSchemas/DocumentContextTypeSchema.js';
-import { DocumentVisibilitySchema as GeneratedDocumentVisibilitySchema } from '../../../../generated/zod/inputTypeSchemas/DocumentVisibilitySchema.js';
-import { DocumentStatusSchema as GeneratedDocumentStatusSchema } from '../../../../generated/zod/inputTypeSchemas/DocumentStatusSchema.js';
-import { StorageProviderSchema as GeneratedStorageProviderSchema } from '../../../../generated/zod/inputTypeSchemas/StorageProviderSchema.js';
-import { WorkOrderStatusSchema as GeneratedWorkOrderStatusSchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderStatusSchema.js';
-import { WorkOrderPrioritySchema as GeneratedWorkOrderPrioritySchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderPrioritySchema.js';
-import { WorkOrderCategorySchema as GeneratedWorkOrderCategorySchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderCategorySchema.js';
-import { WorkOrderOriginTypeSchema as GeneratedWorkOrderOriginTypeSchema } from '../../../../generated/zod/inputTypeSchemas/WorkOrderOriginTypeSchema.js';
-import { BidStatusSchema as GeneratedBidStatusSchema } from '../../../../generated/zod/inputTypeSchemas/BidStatusSchema.js';
-import { FundTypeSchema as GeneratedFundTypeSchema } from '../../../../generated/zod/inputTypeSchemas/FundTypeSchema.js';
-import { StaffStatusSchema as GeneratedStaffStatusSchema } from '../../../../generated/zod/inputTypeSchemas/StaffStatusSchema.js';
-import { StaffRoleSchema as GeneratedStaffRoleSchema } from '../../../../generated/zod/inputTypeSchemas/StaffRoleSchema.js';
-import { PillarAccessSchema as GeneratedPillarAccessSchema } from '../../../../generated/zod/inputTypeSchemas/PillarAccessSchema.js';
-import { ActivityEntityTypeSchema as GeneratedActivityEntityTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ActivityEntityTypeSchema.js';
-import { ActivityActionTypeSchema as GeneratedActivityActionTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ActivityActionTypeSchema.js';
-import { ActivityActorTypeSchema as GeneratedActivityActorTypeSchema } from '../../../../generated/zod/inputTypeSchemas/ActivityActorTypeSchema.js';
-import { ActivityEventCategorySchema as GeneratedActivityEventCategorySchema } from '../../../../generated/zod/inputTypeSchemas/ActivityEventCategorySchema.js';
-import { OrganizationTypeSchema as GeneratedOrganizationTypeSchema } from '../../../../generated/zod/inputTypeSchemas/OrganizationTypeSchema.js';
-import { OrganizationStatusSchema as GeneratedOrganizationStatusSchema } from '../../../../generated/zod/inputTypeSchemas/OrganizationStatusSchema.js';
-import { UserRoleSchema as GeneratedUserRoleSchema } from '../../../../generated/zod/inputTypeSchemas/UserRoleSchema.js';
+import { ARCCategorySchema as GeneratedARCCategorySchema } from '../../../generated/zod/inputTypeSchemas/ARCCategorySchema.js';
+import { ARCRequestStatusSchema as GeneratedARCRequestStatusSchema } from '../../../generated/zod/inputTypeSchemas/ARCRequestStatusSchema.js';
+import { ARCReviewActionSchema as GeneratedARCReviewActionSchema } from '../../../generated/zod/inputTypeSchemas/ARCReviewActionSchema.js';
+import { ARCDocumentTypeSchema as GeneratedARCDocumentTypeSchema } from '../../../generated/zod/inputTypeSchemas/ARCDocumentTypeSchema.js';
+import { ViolationStatusSchema as GeneratedViolationStatusSchema } from '../../../generated/zod/inputTypeSchemas/ViolationStatusSchema.js';
+import { ViolationSeveritySchema as GeneratedViolationSeveritySchema } from '../../../generated/zod/inputTypeSchemas/ViolationSeveritySchema.js';
+import { NoticeTypeSchema as GeneratedNoticeTypeSchema } from '../../../generated/zod/inputTypeSchemas/NoticeTypeSchema.js';
+import { NoticeDeliveryMethodSchema as GeneratedNoticeDeliveryMethodSchema } from '../../../generated/zod/inputTypeSchemas/NoticeDeliveryMethodSchema.js';
+import { HearingOutcomeSchema as GeneratedHearingOutcomeSchema } from '../../../generated/zod/inputTypeSchemas/HearingOutcomeSchema.js';
+import { AppealStatusSchema as GeneratedAppealStatusSchema } from '../../../generated/zod/inputTypeSchemas/AppealStatusSchema.js';
+import { DocumentCategorySchema as GeneratedDocumentCategorySchema } from '../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
+import { DocumentContextTypeSchema as GeneratedDocumentContextTypeSchema } from '../../../generated/zod/inputTypeSchemas/DocumentContextTypeSchema.js';
+import { DocumentVisibilitySchema as GeneratedDocumentVisibilitySchema } from '../../../generated/zod/inputTypeSchemas/DocumentVisibilitySchema.js';
+import { DocumentStatusSchema as GeneratedDocumentStatusSchema } from '../../../generated/zod/inputTypeSchemas/DocumentStatusSchema.js';
+import { StorageProviderSchema as GeneratedStorageProviderSchema } from '../../../generated/zod/inputTypeSchemas/StorageProviderSchema.js';
+import { WorkOrderStatusSchema as GeneratedWorkOrderStatusSchema } from '../../../generated/zod/inputTypeSchemas/WorkOrderStatusSchema.js';
+import { WorkOrderPrioritySchema as GeneratedWorkOrderPrioritySchema } from '../../../generated/zod/inputTypeSchemas/WorkOrderPrioritySchema.js';
+import { WorkOrderCategorySchema as GeneratedWorkOrderCategorySchema } from '../../../generated/zod/inputTypeSchemas/WorkOrderCategorySchema.js';
+import { WorkOrderOriginTypeSchema as GeneratedWorkOrderOriginTypeSchema } from '../../../generated/zod/inputTypeSchemas/WorkOrderOriginTypeSchema.js';
+import { BidStatusSchema as GeneratedBidStatusSchema } from '../../../generated/zod/inputTypeSchemas/BidStatusSchema.js';
+import { FundTypeSchema as GeneratedFundTypeSchema } from '../../../generated/zod/inputTypeSchemas/FundTypeSchema.js';
+import { StaffStatusSchema as GeneratedStaffStatusSchema } from '../../../generated/zod/inputTypeSchemas/StaffStatusSchema.js';
+import { StaffRoleSchema as GeneratedStaffRoleSchema } from '../../../generated/zod/inputTypeSchemas/StaffRoleSchema.js';
+import { PillarAccessSchema as GeneratedPillarAccessSchema } from '../../../generated/zod/inputTypeSchemas/PillarAccessSchema.js';
+import { ActivityEntityTypeSchema as GeneratedActivityEntityTypeSchema } from '../../../generated/zod/inputTypeSchemas/ActivityEntityTypeSchema.js';
+import { ActivityActionTypeSchema as GeneratedActivityActionTypeSchema } from '../../../generated/zod/inputTypeSchemas/ActivityActionTypeSchema.js';
+import { ActivityActorTypeSchema as GeneratedActivityActorTypeSchema } from '../../../generated/zod/inputTypeSchemas/ActivityActorTypeSchema.js';
+import { ActivityEventCategorySchema as GeneratedActivityEventCategorySchema } from '../../../generated/zod/inputTypeSchemas/ActivityEventCategorySchema.js';
+import { OrganizationTypeSchema as GeneratedOrganizationTypeSchema } from '../../../generated/zod/inputTypeSchemas/OrganizationTypeSchema.js';
+import { OrganizationStatusSchema as GeneratedOrganizationStatusSchema } from '../../../generated/zod/inputTypeSchemas/OrganizationStatusSchema.js';
+import { UserRoleSchema as GeneratedUserRoleSchema } from '../../../generated/zod/inputTypeSchemas/UserRoleSchema.js';
 
 // Re-export for convenience
 export { ResponseMetaSchema };
@@ -709,6 +709,12 @@ export const DocumentSchema = z.object({
 	malwareScanStatus: z.string().nullish(),
 	contentModerationStatus: z.string().nullish(),
 	processingCompletedAt: z.coerce.date().nullish(),
+	processingStartedAt: z.coerce.date().nullish(),
+	processingAttemptCount: z.number().default(0),
+	processingNextRetryAt: z.coerce.date().nullish(),
+	processingErrorType: z.string().nullish(),
+	processingErrorMessage: z.string().nullish(),
+	processingErrorDetails: JsonSchema.nullish(),
 	latitude: DecimalSchema.nullish(),
 	longitude: DecimalSchema.nullish(),
 	capturedAt: z.coerce.date().nullish(),
@@ -748,6 +754,8 @@ export const DocumentSummarySchema = z.object({
 	fileSize: z.number(),
 	mimeType: z.string(),
 	version: z.number(),
+	processingAttemptCount: z.number().optional(),
+	processingErrorType: z.string().nullish(),
 	createdAt: z.coerce.date(),
 	updatedAt: z.coerce.date()
 });

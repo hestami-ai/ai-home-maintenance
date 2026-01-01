@@ -51,6 +51,8 @@ services:
   seaweedfs-master:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-master
+    env_file:
+      - ./.env
     #ports:
     #  - "9333:9333"
     #  - "19333:19333"
@@ -66,6 +68,8 @@ services:
   seaweedfs-volume:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-volume
+    env_file:
+      - ./.env
     #ports:
     #  - "8080:8080"
     #  - "18080:18080"
@@ -85,6 +89,8 @@ services:
   seaweedfs-filer:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-filer
+    env_file:
+      - ./.env
     #ports:
     #  - "8888:8888"
     #  - "18888:18888"
@@ -103,11 +109,14 @@ services:
   seaweedfs-s3:
     image: chrislusf/seaweedfs:4.04
     container_name: hestami-seaweedfs-s3
+    env_file:
+      - ./.env
     #ports:
     #  - "8333:8333"
-    command: "s3 -filer=hestami-seaweedfs-filer:8888 -port=8333 -config=/etc/seaweedfs/s3.json"
+    entrypoint: ["/bin/sh", "/scripts/s3-entrypoint.sh"]
+    command: ["s3", "-filer=hestami-seaweedfs-filer:8888", "-port=8333", "-ip.bind=0.0.0.0", "-config=/etc/seaweedfs/s3.json"]
     volumes:
-      - ./docker/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - ./docker/seaweedfs/s3-entrypoint.sh:/scripts/s3-entrypoint.sh:ro
     depends_on:
       - seaweedfs-master
       - seaweedfs-volume
@@ -127,6 +136,8 @@ services:
   tusd:
     image: tusproject/tusd:v2.8.0
     container_name: hestami-tusd
+    env_file:
+      - ./.env
     environment:
       - AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY:-hestami_admin}
       - AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY:-hestami_secret}
@@ -136,6 +147,7 @@ services:
       - "-s3-bucket=uploads"
       - "-s3-object-prefix="
       - "-behind-proxy"
+      - "-base-path=/files/"
       - "-hooks-http=http://hestami-app:3000/api/internal/tus-hook"
       - "-hooks-http-retry=3"
       - "-hooks-http-backoff=1s"
@@ -145,8 +157,17 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tusd.rule=Host(`dev-upload.hestami-ai.com`)"
-      - "traefik.http.services.tusd.loadbalancer.server.port=1080"
-      - "traefik.http.routers.tusd.middlewares=upload-limit"
+      - "traefik.http.services.tusd.loadbalancer.server.port=8080"
+      - "traefik.http.routers.tusd.middlewares=tusd-headers,tusd-cors,upload-limit"
+      # Headers middleware to pass X-Forwarded-Proto for HTTPS URL generation
+      - "traefik.http.middlewares.tusd-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      # CORS middleware for TUS protocol - allows browser uploads from app domain
+      - "traefik.http.middlewares.tusd-cors.headers.accessControlAllowMethods=GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+      - "traefik.http.middlewares.tusd-cors.headers.accessControlAllowHeaders=Authorization,Content-Type,Upload-Length,Upload-Offset,Tus-Resumable,Upload-Metadata,Upload-Concat,Upload-Defer-Length,X-Requested-With,X-HTTP-Method-Override"
+      - "traefik.http.middlewares.tusd-cors.headers.accessControlExposeHeaders=Upload-Offset,Location,Upload-Length,Tus-Version,Tus-Resumable,Tus-Max-Size,Tus-Extension,Upload-Metadata,Upload-Defer-Length,Upload-Concat"
+      - "traefik.http.middlewares.tusd-cors.headers.accessControlAllowOriginList=https://dev-platform.hestami-ai.com,http://localhost:5173,http://localhost:3000"
+      - "traefik.http.middlewares.tusd-cors.headers.accessControlMaxAge=86400"
+      - "traefik.http.middlewares.tusd-cors.headers.addVaryHeader=true"
     networks:
       - hestami-network
     logging:
@@ -160,14 +181,30 @@ services:
       context: ./docker/worker-document
       dockerfile: Dockerfile
     container_name: hestami-worker-document
+    env_file:
+      - ./.env
     environment:
       - SEAWEEDFS_S3_ENDPOINT=http://hestami-seaweedfs-s3:8333
       - SEAWEEDFS_S3_ACCESS_KEY=${S3_ACCESS_KEY:-hestami_admin}
       - SEAWEEDFS_S3_SECRET_KEY=${S3_SECRET_KEY:-hestami_secret}
+      - MAX_CONCURRENT_TASKS=3
+      - OTEL_SERVICE_NAME=hestami-worker-document
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-otel-collector:4318
+      - CLAMAV_UPDATE_INTERVAL_HOURS=6
+    volumes:
+      - clamav_data:/var/lib/clamav
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          memory: 512M
     depends_on:
       - seaweedfs-s3
     networks:
       - hestami-network
+      - signoz-net
     logging:
       driver: "local"
       options:
@@ -230,6 +267,8 @@ services:
   cerbos:
     image: cerbos/cerbos:0.48.0
     container_name: hestami-cerbos
+    env_file:
+      - ./.env
     environment:
       - OTEL_SERVICE_NAME=cerbos
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://signoz-otel-collector:4318
@@ -307,6 +346,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  clamav_data:
 
 networks:
   hestami-network:

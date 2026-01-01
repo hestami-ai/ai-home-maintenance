@@ -137,7 +137,7 @@
 			<div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
 				<Upload size={24} class="mx-auto text-gray-400 mb-2" />
 				<p class="text-sm text-gray-500">Drag and drop files here, or click to browse</p>
-				<p class="text-xs text-gray-400 mt-1">PDF, DOC, DOCX up to 10MB</p>
+				<p class="text-xs text-gray-400 mt-1">PDF, DOC, DOCX up to 100MB</p>
 			</div>
 		</div>
 	</div>

@@ -1547,7 +1547,7 @@
 									Drag and drop files here, or click to browse
 								</p>
 								<p class="mt-1 text-xs text-surface-400">
-									PDF, images, and documents up to 10MB
+									PDF, images, and documents up to 100MB
 								</p>
 								<button class="btn btn-sm preset-outlined-primary-500 mt-4">
 									Browse Files

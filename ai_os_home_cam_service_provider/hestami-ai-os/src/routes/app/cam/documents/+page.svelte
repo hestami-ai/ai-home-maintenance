@@ -44,6 +44,7 @@
 	let documents = $state<Document[]>([]);
 	let selectedDocument = $state<Document | null>(null);
 	let documentDetail = $state<DocumentDetail | null>(null);
+	let documentPresignedUrl = $state<string | null>(null);
 	let documentReferences = $state<DocumentReference[]>([]);
 	let documentVersions = $state<DocumentVersion[]>([]);
 	let activityHistory = $state<ActivityEvent[]>([]);
@@ -100,12 +101,14 @@
 
 	async function loadDocumentDetail(docId: string) {
 		isLoadingDetail = true;
+		documentPresignedUrl = null;
 		try {
-			const [detailRes, refsRes, versionsRes, historyRes] = await Promise.all([
+			const [detailRes, refsRes, versionsRes, historyRes, urlRes] = await Promise.all([
 				documentApi.get(docId),
 				documentApi.getReferences(docId),
 				documentApi.getVersions(docId),
-				documentApi.getActivityHistory(docId)
+				documentApi.getActivityHistory(docId),
+				documentApi.getDownloadUrl(docId).catch(() => null)
 			]);
 
 			if (detailRes.ok && detailRes.data?.document) {
@@ -140,6 +143,10 @@
 					previousState: null,
 					newState: null
 				}));
+			}
+
+			if (urlRes && urlRes.ok && urlRes.data?.downloadUrl) {
+				documentPresignedUrl = urlRes.data.downloadUrl;
 			}
 		} catch (error) {
 			console.error('Failed to load document detail:', error);
@@ -402,7 +409,7 @@
 
 				{#snippet actions()}
 					{@const d = selectedDocument!}
-					<a href={(d as any).fileUrl} download class="btn btn-sm preset-filled-primary-500">
+					<a href={documentPresignedUrl || ''} download class="btn btn-sm preset-filled-primary-500">
 						Download
 					</a>
 					<a href="/app/cam/documents/{d.id}/new-version" class="btn btn-sm preset-tonal-surface">
@@ -524,7 +531,7 @@
 				<div class="flex gap-2">
 					<button
 						type="button"
-						onclick={() => window.open((selectedDocument as any)?.fileUrl, '_blank')}
+						onclick={() => documentPresignedUrl && window.open(documentPresignedUrl, '_blank')}
 						class="btn btn-sm preset-tonal-surface"
 					>
 						<ExternalLink class="mr-1 h-4 w-4" />
@@ -545,25 +552,25 @@
 				{#if selectedDocument.mimeType.startsWith('image/')}
 					<div class="rounded-lg border border-surface-300-700 bg-surface-200-800 p-4">
 						<img
-							src={(selectedDocument as any).fileUrl}
-							alt={selectedDocument.title}
-							class="mx-auto max-h-[500px] rounded"
-						/>
+								src={documentPresignedUrl || ''}
+								alt={selectedDocument.title}
+								class="mx-auto max-h-[500px] rounded"
+							/>
 					</div>
 				{:else if selectedDocument.mimeType === 'application/pdf'}
 					<div class="rounded-lg border border-surface-300-700 bg-surface-200-800">
 						<iframe
-							src={(selectedDocument as any).fileUrl}
-							title={selectedDocument.title}
-							class="h-[600px] w-full rounded-lg"
-						></iframe>
+								src={documentPresignedUrl || ''}
+								title={selectedDocument.title}
+								class="h-[600px] w-full rounded-lg"
+							></iframe>
 					</div>
 				{:else}
 					<div class="flex h-64 items-center justify-center rounded-lg border border-surface-300-700 bg-surface-200-800">
 						<div class="text-center">
 							<Eye class="mx-auto h-8 w-8 text-surface-400" />
 							<p class="mt-2 text-surface-500">Preview not available for this file type</p>
-							<a href={(selectedDocument as any).fileUrl} download class="btn btn-sm preset-filled-primary-500 mt-3">
+							<a href={documentPresignedUrl || ''} download class="btn btn-sm preset-filled-primary-500 mt-3">
 								Download to View
 							</a>
 						</div>
@@ -574,7 +581,7 @@
 					<div class="text-center">
 						<FileText class="mx-auto h-8 w-8 text-surface-400" />
 						<p class="mt-2 text-surface-500">Preview not available for {selectedDocument.mimeType}</p>
-						<a href={(selectedDocument as any).fileUrl} download class="btn btn-sm preset-filled-primary-500 mt-3">
+						<a href={documentPresignedUrl || ''} download class="btn btn-sm preset-filled-primary-500 mt-3">
 							Download to View
 						</a>
 					</div>

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '$lib/schemas/index.js';
 import {
 	orgProcedure,
 	successResponse,

@@ -31,6 +31,7 @@
 			title: 'Operations',
 			items: [
 				{ label: 'Work Queue', href: '/app/admin/work-queue', icon: Inbox },
+				{ label: 'Document Processing', href: '/app/admin/document-processing', icon: Activity },
 				{ label: 'Cases', href: '/app/admin/cases', icon: Briefcase },
 				{ label: 'Vendors', href: '/app/admin/vendors', icon: Truck }
 			]

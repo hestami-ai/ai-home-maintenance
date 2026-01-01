@@ -42,6 +42,7 @@ import {
 import { communicationRouter } from './routes/communication/index.js';
 import { ownerPortalRouter } from './routes/ownerPortal.js';
 import { documentRouter } from './routes/document.js';
+import { documentProcessingRouter } from './routes/documentProcessing.js';
 import { reserveRouter } from './routes/reserve.js';
 import { complianceRouter } from './routes/compliance.js';
 import { contractorRouter } from './routes/contractor/index.js';
@@ -185,6 +186,7 @@ export const appRouter = {
 
 	// Phase 10: Documents & Records
 	document: documentRouter,
+	documentProcessing: documentProcessingRouter,
 
 	// Phase 11: Reserve Studies
 	reserve: reserveRouter,

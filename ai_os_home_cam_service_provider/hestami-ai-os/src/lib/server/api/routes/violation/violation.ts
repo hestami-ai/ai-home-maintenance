@@ -9,7 +9,7 @@ import {
 	NoticeTypeSchema,
 	NoticeDeliveryMethodSchema,
 	HearingOutcomeSchema
-} from '../../schemas.js';
+} from '$lib/schemas/index.js';
 import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
 import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';

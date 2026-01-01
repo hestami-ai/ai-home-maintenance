@@ -13,7 +13,7 @@ import {
 	ActivityActionTypeSchema,
 	ActivityActorTypeSchema,
 	ActivityEventCategorySchema
-} from '../schemas.js';
+} from '$lib/schemas/index.js';
 import {
 	authedProcedure,
 	orgProcedure,

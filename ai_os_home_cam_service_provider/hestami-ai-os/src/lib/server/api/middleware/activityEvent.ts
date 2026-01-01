@@ -81,6 +81,7 @@ export const ActivityMetadataSchema = z
 		// Error context (for failed operations)
 		error: z
 			.object({
+				type: z.string().optional(),
 				code: z.string(),
 				message: z.string(),
 				stack: z.string().optional()
@@ -534,6 +535,7 @@ export interface WorkflowActivityEventInput {
 	workflowVersion?: string;
 	previousState?: Record<string, unknown>;
 	newState?: Record<string, unknown>;
+	metadata?: ActivityMetadata;
 	// Context fields
 	caseId?: string;
 	intentId?: string;
@@ -551,47 +553,53 @@ export interface WorkflowActivityEventInput {
 /**
  * Record an activity event from a DBOS workflow step.
  * This is designed to be called from within workflow transactions.
+ * Uses SECURITY DEFINER function to bypass RLS for system-level operations.
  */
 export async function recordWorkflowEvent(input: WorkflowActivityEventInput): Promise<string> {
-	const event = await prisma.activityEvent.create({
-		data: {
-			organizationId: input.organizationId,
-			entityType: input.entityType,
-			entityId: input.entityId,
-			action: input.action,
-			eventCategory: input.eventCategory,
-			summary: input.summary,
-			performedById: input.performedById ?? null,
-			performedByType: input.performedByType ?? 'SYSTEM',
-			previousState: (input.previousState ?? {}) as object,
-			newState: (input.newState ?? {}) as object,
-			metadata: {
-				workflow: {
-					workflowId: input.workflowId,
-					workflowStep: input.workflowStep,
-					workflowVersion: input.workflowVersion
-				}
-			},
-			// Context fields
-			caseId: input.caseId,
-			intentId: input.intentId,
-			propertyId: input.propertyId,
-			decisionId: input.decisionId,
-			jobId: input.jobId,
-			workOrderId: input.workOrderId,
-			technicianId: input.technicianId,
-			associationId: input.associationId,
-			unitId: input.unitId,
-			violationId: input.violationId,
-			arcRequestId: input.arcRequestId
+	// Build metadata with workflow context
+	const metadata = {
+		...(input.metadata || {}),
+		workflow: {
+			workflowId: input.workflowId,
+			workflowStep: input.workflowStep,
+			workflowVersion: input.workflowVersion
 		}
-	});
+	};
 
-	return event.id;
+	// Use SECURITY DEFINER function to bypass RLS for system-level operations
+	const result = await prisma.$queryRaw<[{ record_activity_event_system: string }]>`
+		SELECT record_activity_event_system(
+			${input.organizationId}::TEXT,
+			${input.entityType}::TEXT,
+			${input.entityId}::TEXT,
+			${input.action}::TEXT,
+			${input.eventCategory}::TEXT,
+			${input.summary}::TEXT,
+			${input.performedById ?? null}::TEXT,
+			${input.performedByType ?? 'SYSTEM'}::TEXT,
+			${JSON.stringify(input.previousState ?? {})}::JSONB,
+			${JSON.stringify(input.newState ?? {})}::JSONB,
+			${JSON.stringify(metadata)}::JSONB,
+			${input.caseId ?? null}::TEXT,
+			${input.intentId ?? null}::TEXT,
+			${input.propertyId ?? null}::TEXT,
+			${input.decisionId ?? null}::TEXT,
+			${input.jobId ?? null}::TEXT,
+			${input.workOrderId ?? null}::TEXT,
+			${input.technicianId ?? null}::TEXT,
+			${input.associationId ?? null}::TEXT,
+			${input.unitId ?? null}::TEXT,
+			${input.violationId ?? null}::TEXT,
+			${input.arcRequestId ?? null}::TEXT
+		)
+	`;
+
+	return result[0].record_activity_event_system;
 }
 
 /**
  * Record workflow lifecycle events (started, completed, failed)
+ * Uses SECURITY DEFINER function to bypass RLS for system-level operations.
  */
 export async function recordWorkflowLifecycleEvent(
 	organizationId: string,
@@ -614,33 +622,48 @@ export async function recordWorkflowLifecycleEvent(
 		FAILED: 'STATUS_CHANGE'
 	};
 
-	const event = await prisma.activityEvent.create({
-		data: {
-			organizationId,
-			entityType: options?.entityType ?? 'OTHER',
-			entityId: options?.entityId ?? workflowId,
-			action: actionMap[lifecycle],
-			eventCategory: 'SYSTEM',
-			summary,
-			performedById: null,
-			performedByType: 'SYSTEM',
-			previousState: {},
-			newState: { workflowLifecycle: lifecycle },
-			metadata: {
-				workflow: {
-					workflowId,
-					workflowVersion,
-					lifecycle
-				},
-				...(options?.error && { error: options.error })
-			},
-			caseId: options?.caseId,
-			jobId: options?.jobId,
-			workOrderId: options?.workOrderId
-		}
-	});
+	const entityType = options?.entityType ?? 'OTHER';
+	const entityId = options?.entityId ?? workflowId;
+	const action = actionMap[lifecycle];
+	const metadata = {
+		workflow: {
+			workflowId,
+			workflowVersion,
+			lifecycle
+		},
+		...(options?.error && { error: options.error })
+	};
+	const newState = { workflowLifecycle: lifecycle };
 
-	return event.id;
+	// Use SECURITY DEFINER function to bypass RLS for system-level operations
+	const result = await prisma.$queryRaw<[{ record_activity_event_system: string }]>`
+		SELECT record_activity_event_system(
+			${organizationId}::TEXT,
+			${entityType}::TEXT,
+			${entityId}::TEXT,
+			${action}::TEXT,
+			${'SYSTEM'}::TEXT,
+			${summary}::TEXT,
+			${null}::TEXT,
+			${'SYSTEM'}::TEXT,
+			${'{}'}::JSONB,
+			${JSON.stringify(newState)}::JSONB,
+			${JSON.stringify(metadata)}::JSONB,
+			${options?.caseId ?? null}::TEXT,
+			${null}::TEXT,
+			${null}::TEXT,
+			${null}::TEXT,
+			${options?.jobId ?? null}::TEXT,
+			${options?.workOrderId ?? null}::TEXT,
+			${null}::TEXT,
+			${null}::TEXT,
+			${null}::TEXT,
+			${null}::TEXT,
+			${null}::TEXT
+		)
+	`;
+
+	return result[0].record_activity_event_system;
 }
 
 // =============================================================================
@@ -728,11 +751,11 @@ export async function getActivityEventsForOrganization(
 			...(options?.performedById && { performedById: options.performedById }),
 			...(options?.startDate || options?.endDate
 				? {
-						performedAt: {
-							...(options?.startDate && { gte: options.startDate }),
-							...(options?.endDate && { lte: options.endDate })
-						}
+					performedAt: {
+						...(options?.startDate && { gte: options.startDate }),
+						...(options?.endDate && { lte: options.endDate })
 					}
+				}
 				: {})
 		},
 		select: {

@@ -201,10 +201,10 @@ export const violationApi = {
 
 	close: (id: string, data?: { notes?: string }) => orpc.violation.close({ id, ...data }),
 
-	escalate: (id: string, data: { reason: string; idempotencyKey: string }) => 
+	escalate: (id: string, data: { reason: string; idempotencyKey: string }) =>
 		orpc.violation.escalate({ id, ...data }),
 
-	resolve: (id: string, data: { notes: string; idempotencyKey: string }) => 
+	resolve: (id: string, data: { notes: string; idempotencyKey: string }) =>
 		orpc.violation.resolve({ id, ...data }),
 
 	addEvidence: (data: {
@@ -226,7 +226,7 @@ export const violationApi = {
 
 	listFines: (violationId: string) => orpc.violation.listFines({ violationId }),
 
-	getPriorViolations: (data: { violationId: string; unitId?: string; violationTypeId?: string; limit?: number }) => 
+	getPriorViolations: (data: { violationId: string; unitId?: string; violationTypeId?: string; limit?: number }) =>
 		orpc.violation.getPriorViolations(data)
 };
 
@@ -571,7 +571,7 @@ export type DocumentCategory = 'GOVERNING_DOCS' | 'FINANCIAL' | 'MEETING' | 'LEG
 export type DocumentReference = operations['document.getReferences']['responses']['200']['content']['application/json']['data']['references'][number];
 export type DocumentVersion = operations['document.getVersions']['responses']['200']['content']['application/json']['data']['versions'][number];
 
-export type DocumentStatus = 'DRAFT' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
+export type DocumentStatus = 'DRAFT' | 'PENDING_UPLOAD' | 'PROCESSING' | 'PROCESSING_FAILED' | 'INFECTED' | 'ACTIVE' | 'SUPERSEDED' | 'ARCHIVED';
 
 export const documentApi = {
 	list: (params?: {
@@ -612,7 +612,9 @@ export const documentApi = {
 
 	getVersions: (documentId: string) => orpc.document.getVersions({ documentId }),
 
-	getActivityHistory: (documentId: string) => orpc.document.getActivityHistory({ documentId })
+	getActivityHistory: (documentId: string) => orpc.document.getActivityHistory({ documentId }),
+
+	getDownloadUrl: (id: string) => orpc.document.getDownloadUrl({ id })
 };
 
 // ============================================================================
@@ -649,13 +651,13 @@ export const governanceApi = {
 		get: (id: string) => orpc.governanceBoard.get({ id }),
 		create: (data: { associationId: string; name: string; description?: string; idempotencyKey: string }) =>
 			orpc.governanceBoard.create(data),
-		addMember: (data: { 
-			boardId: string; 
-			partyId: string; 
+		addMember: (data: {
+			boardId: string;
+			partyId: string;
 			role: 'PRESIDENT' | 'VICE_PRESIDENT' | 'SECRETARY' | 'TREASURER' | 'DIRECTOR' | 'MEMBER_AT_LARGE';
 			termStart: string;
 			termEnd?: string;
-			idempotencyKey: string 
+			idempotencyKey: string
 		}) => orpc.governanceBoard.addMember(data),
 		removeMember: (data: { boardId: string; memberId: string; idempotencyKey: string }) =>
 			orpc.governanceBoard.removeMember(data)

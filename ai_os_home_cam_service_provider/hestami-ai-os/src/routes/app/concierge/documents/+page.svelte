@@ -13,7 +13,9 @@
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
+	import { createOrgClient } from '$lib/api/orpc';
 	import { invalidateAll } from '$app/navigation';
+	import DocumentStatusBadge from '$lib/components/cam/documents/DocumentStatusBadge.svelte';
 
 	interface Document {
 		id: string;
@@ -25,12 +27,18 @@
 		fileSize: number;
 		mimeType: string;
 		version: number;
+		processingStartedAt: string | null;
+		processingCompletedAt: string | null;
+		processingAttemptCount: number;
+		processingErrorType: string | null;
 		createdAt: string;
+		thumbnailUrl: string | null;
 	}
 
 	interface Props {
 		data: {
 			documents: Document[];
+			organization: { id: string; name: string; slug: string };
 		};
 	}
 
@@ -97,6 +105,22 @@
 		if (mimeType.startsWith('image/')) return Image;
 		if (mimeType.includes('pdf')) return FileText;
 		return File;
+	}
+
+	async function handleDelete(docId: string) {
+		if (!confirm('Are you sure you want to delete this failed document?')) return;
+		
+		isLoading = true;
+		try {
+			const client = createOrgClient(data.organization.id);
+			await client.document.archiveDocument({ id: docId, reason: 'User deleted failed document' });
+			await invalidateAll();
+		} catch (err) {
+			console.error('Failed to delete document:', err);
+			error = 'Failed to delete document';
+		} finally {
+			isLoading = false;
+		}
 	}
 
 </script>
@@ -180,11 +204,21 @@
 							href="/app/concierge/documents/{doc.id}"
 							class="flex items-center gap-4 rounded-lg border border-surface-300-700 p-4 transition-all hover:border-primary-500 hover:bg-surface-500/5"
 						>
-							<div
-								class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-500/10"
-							>
-								<FileIcon class="h-6 w-6 text-surface-500" />
-							</div>
+							{#if doc.thumbnailUrl}
+								<div class="h-12 w-12 shrink-0 overflow-hidden rounded-lg">
+									<img
+										src={doc.thumbnailUrl}
+										alt={doc.title}
+										class="h-full w-full object-cover"
+									/>
+								</div>
+							{:else}
+								<div
+									class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-surface-500/10"
+								>
+									<FileIcon class="h-6 w-6 text-surface-500" />
+								</div>
+							{/if}
 							<div class="min-w-0 flex-1">
 								<h3 class="font-medium">{doc.title}</h3>
 								<div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-surface-500">
@@ -195,12 +229,27 @@
 									<span>{formatDate(doc.createdAt)}</span>
 								</div>
 							</div>
-							<div class="flex shrink-0 items-center gap-2">
-								<span
-									class="rounded-full bg-surface-500/10 px-2 py-0.5 text-xs font-medium"
-								>
-									{categoryLabels[doc.category] || doc.category}
-								</span>
+							<div class="flex shrink-0 items-center gap-4">
+								<DocumentStatusBadge 
+									status={doc.status} 
+									processingAttemptCount={doc.processingAttemptCount}
+									processingErrorType={doc.processingErrorType}
+									size="sm"
+								/>
+								{#if doc.status === 'PROCESSING_FAILED'}
+									<button
+										type="button"
+										onclick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											handleDelete(doc.id);
+										}}
+										class="btn-icon btn-icon-sm preset-tonal-error"
+										title="Delete failed document"
+									>
+										<Trash2 class="h-4 w-4" />
+									</button>
+								{/if}
 							</div>
 						</a>
 					{/each}

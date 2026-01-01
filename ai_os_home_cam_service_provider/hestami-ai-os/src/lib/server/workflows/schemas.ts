@@ -68,7 +68,10 @@ export {
 	CommunicationTemplateType,
 	DeliveryStatus,
 	AnnouncementStatus,
-	NotificationStatus
+	NotificationStatus,
+	NotificationType,
+	NotificationReadStatus,
+	NotificationCategory
 } from '../../../../generated/prisma/enums.js';
 
 // ARC
@@ -111,6 +114,25 @@ export interface BaseWorkflowResult {
  */
 export interface EntityWorkflowResult extends BaseWorkflowResult {
 	entityId?: string;
+}
+
+/**
+ * Processing metadata for Document Processing Queue (DPQ).
+ */
+export interface ProcessingMetadata {
+	errorType: 'TRANSIENT' | 'PERMANENT' | 'INFECTED';
+	errorCode: string;
+	errorMessage: string;
+	errorStack?: string;
+	attemptCount: number;
+	maxAttempts: number;
+	lastAttemptAt: Date;
+	nextRetryAt?: Date;
+	malwareInfo?: {
+		signature: string;
+		engine: string;
+		detectedAt: Date;
+	};
 }
 
 /**
@@ -186,3 +208,6 @@ export { ARCRequestStatusSchema } from '../../../../generated/zod/inputTypeSchem
 export { ARCCategorySchema } from '../../../../generated/zod/inputTypeSchemas/ARCCategorySchema.js';
 export { EstimateStatusSchema } from '../../../../generated/zod/inputTypeSchemas/EstimateStatusSchema.js';
 export { InvoiceStatusSchema } from '../../../../generated/zod/inputTypeSchemas/InvoiceStatusSchema.js';
+export { NotificationTypeSchema } from '../../../../generated/zod/inputTypeSchemas/NotificationTypeSchema.js';
+export { NotificationReadStatusSchema } from '../../../../generated/zod/inputTypeSchemas/NotificationReadStatusSchema.js';
+export { NotificationCategorySchema } from '../../../../generated/zod/inputTypeSchemas/NotificationCategorySchema.js';

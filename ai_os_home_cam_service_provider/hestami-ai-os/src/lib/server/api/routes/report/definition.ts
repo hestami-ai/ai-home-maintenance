@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';

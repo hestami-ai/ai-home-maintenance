@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema, JsonSchema } from '../../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';

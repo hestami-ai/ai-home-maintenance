@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../schemas.js';
+import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import {
 	orgProcedure,
 	successResponse,

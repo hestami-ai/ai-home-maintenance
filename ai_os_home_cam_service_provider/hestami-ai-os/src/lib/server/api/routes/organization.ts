@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } from '../schemas.js';
+import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } from '$lib/schemas/index.js';
 import { authedProcedure, orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';

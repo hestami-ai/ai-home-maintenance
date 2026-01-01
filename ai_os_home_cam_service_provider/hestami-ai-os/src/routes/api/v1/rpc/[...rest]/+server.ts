@@ -18,8 +18,39 @@ import { recordSpanError } from '$server/api/middleware/tracing';
  */
 const handler = new RPCHandler(appRouter);
 
+// Type for the raw membership row from SECURITY DEFINER function
+interface MembershipRow {
+	id: string;
+	user_id: string;
+	organization_id: string;
+	role: string;
+	is_default: boolean;
+	created_at: Date;
+	updated_at: Date;
+	org_id: string;
+	org_name: string;
+	org_slug: string;
+	org_type: string;
+	org_status: string;
+}
+
+// Type for the raw staff profile row from SECURITY DEFINER function
+interface StaffProfileRow {
+	id: string;
+	user_id: string;
+	status: string;
+	roles: string[];
+	pillar_access: string[];
+	activated_at: Date | null;
+	suspended_at: Date | null;
+	deactivated_at: Date | null;
+	created_at: Date;
+	updated_at: Date;
+}
+
 /**
  * Creates request context from SvelteKit request and locals
+ * Uses SECURITY DEFINER functions to bypass RLS for context bootstrapping
  */
 async function createContext(
 	request: Request,
@@ -58,34 +89,43 @@ async function createContext(
 	// Get organization context from header
 	const orgId = request.headers.get('X-Org-Id');
 	if (context.user) {
-		// Get ALL user's organization memberships and staff profile for Cerbos authorization
-		const [memberships, staffProfile] = await Promise.all([
-			prisma.userOrganization.findMany({
-				where: { userId: context.user.id },
-				include: { organization: true }
-			}),
-			prisma.staff.findUnique({
-				where: { userId: context.user.id, status: 'ACTIVE' }
-			})
+		// Get ALL user's organization memberships and staff profile using SECURITY DEFINER functions
+		// This bypasses RLS to solve the chicken-and-egg bootstrap problem
+		// 
+		// Note: get_staff_profile is called for ALL users but only returns data for Hestami staff.
+		// For regular platform users (e.g., Concierge homeowners), it returns an empty result set,
+		// and staffRoles/pillarAccess remain empty. The critical query for regular users is
+		// get_user_memberships, which returns their organization membership and role.
+		const [membershipRows, staffRows] = await Promise.all([
+			prisma.$queryRaw<MembershipRow[]>`SELECT * FROM get_user_memberships(${context.user.id})`,
+			prisma.$queryRaw<StaffProfileRow[]>`SELECT * FROM get_staff_profile(${context.user.id})`
 		]);
 
 		// Build orgRoles map for Cerbos principal
-		for (const membership of memberships) {
-			context.orgRoles[membership.organizationId] = membership.role;
+		for (const membership of membershipRows) {
+			context.orgRoles[membership.organization_id] = membership.role as any;
 		}
 
 		// Set staff roles and pillar access if user is active Hestami staff
+		// For non-staff users (e.g., Concierge homeowners), staffRows is empty and this is skipped
+		const staffProfile = staffRows.find((s) => s.status === 'ACTIVE');
 		if (staffProfile) {
-			context.staffRoles = staffProfile.roles;
-			context.pillarAccess = staffProfile.pillarAccess;
+			context.staffRoles = staffProfile.roles as any[];
+			context.pillarAccess = staffProfile.pillar_access as any[];
 		}
 
 		// Set current organization context if X-Org-Id header is provided
 		if (orgId) {
-			const currentMembership = memberships.find((m) => m.organizationId === orgId);
+			const currentMembership = membershipRows.find((m) => m.organization_id === orgId);
 			if (currentMembership) {
-				context.organization = currentMembership.organization;
-				context.role = currentMembership.role;
+				context.organization = {
+					id: currentMembership.org_id,
+					name: currentMembership.org_name,
+					slug: currentMembership.org_slug,
+					type: currentMembership.org_type,
+					status: currentMembership.org_status
+				} as any;
+				context.role = currentMembership.role as any;
 			}
 		}
 	}

@@ -141,15 +141,15 @@ function getLogLevel(): string {
 
 /**
  * Build transports array based on environment
+ * 
+ * Always include Console transport for local visibility.
+ * Add OpenTelemetry transport when OTLP endpoint is configured.
  */
 function buildTransports(): winston.transport[] {
 	const transports: winston.transport[] = [new winston.transports.Console()];
 
-	// Add OpenTelemetry transport when OTLP endpoint is configured
-	// This sends logs directly to Signoz via OTLP, bypassing Docker log scraping
 	if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
 		transports.push(new OpenTelemetryTransportV3());
-		console.log('[Logger] OpenTelemetry log transport enabled');
 	}
 
 	return transports;

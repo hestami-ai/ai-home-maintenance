@@ -6,7 +6,7 @@ import {
 	PaginationOutputSchema
 } from '../router.js';
 import { prisma } from '../../db.js';
-import { ResponseMetaSchema } from '../schemas.js';
+import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../accounting/index.js';
 import { recordExecution } from '../middleware/activityEvent.js';

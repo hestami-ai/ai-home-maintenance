@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../schemas.js';
+import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { authedProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import { recordActivityEvent } from '../middleware/activityEvent.js';

@@ -4004,6 +4004,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/document/initiateUpload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["document.initiateUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/document/uploadWithFile": {
         parameters: {
             query?: never;
@@ -4062,6 +4078,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["document.getDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document/getDownloadUrl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["document.getDownloadUrl"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4302,6 +4334,102 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["document.getActivityHistory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document/cancelUpload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["document.cancelUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documentProcessing/getQueueStats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["documentProcessing.getQueueStats"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documentProcessing/listQueue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["documentProcessing.listQueue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documentProcessing/getSettings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["documentProcessing.getSettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documentProcessing/updateSettings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["documentProcessing.updateSettings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documentProcessing/retryDocument": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["documentProcessing.retryDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -43031,7 +43159,7 @@ export interface operations {
                 "application/json": {
                     partyId: string;
                     /** @enum {unknown} */
-                    category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION";
+                    category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION" | "DOCUMENT_PROCESSING";
                     /** @enum {unknown} */
                     channel: "EMAIL" | "SMS" | "PUSH" | "MAIL" | "PORTAL";
                     /** @default true */
@@ -43054,7 +43182,7 @@ export interface operations {
                                 id: string;
                                 partyId: string;
                                 /** @enum {unknown} */
-                                category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION";
+                                category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION" | "DOCUMENT_PROCESSING";
                                 /** @enum {unknown} */
                                 channel: "EMAIL" | "SMS" | "PUSH" | "MAIL" | "PORTAL";
                                 isEnabled: boolean;
@@ -43179,7 +43307,7 @@ export interface operations {
                             settings: {
                                 id: string;
                                 /** @enum {unknown} */
-                                category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION";
+                                category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION" | "DOCUMENT_PROCESSING";
                                 /** @enum {unknown} */
                                 channel: "EMAIL" | "SMS" | "PUSH" | "MAIL" | "PORTAL";
                                 isEnabled: boolean;
@@ -43288,7 +43416,7 @@ export interface operations {
                 "application/json": {
                     partyId: string;
                     /** @enum {unknown} */
-                    category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION";
+                    category: "GENERAL" | "BILLING" | "MAINTENANCE" | "GOVERNANCE" | "ARC" | "VIOLATION" | "COMMUNICATION" | "DOCUMENT_PROCESSING";
                     /** @enum {unknown} */
                     channel: "EMAIL" | "SMS" | "PUSH" | "MAIL" | "PORTAL";
                 };
@@ -46048,6 +46176,167 @@ export interface operations {
             };
         };
     };
+    "document.initiateUpload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    idempotencyKey: string;
+                    fileName: string;
+                    fileSize: number;
+                    mimeType: string;
+                    /** @enum {unknown} */
+                    contextType: "ASSOCIATION" | "PROPERTY" | "UNIT" | "JOB" | "CASE" | "WORK_ORDER" | "TECHNICIAN" | "CONTRACTOR" | "VENDOR" | "PARTY" | "OWNER_INTENT" | "VIOLATION" | "ARC_REQUEST" | "BOARD_MOTION" | "RESOLUTION" | "MEETING";
+                    contextId: string;
+                    title: string;
+                    /** @enum {unknown} */
+                    category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
+                    description?: string;
+                    /**
+                     * @default PUBLIC
+                     * @enum {unknown}
+                     */
+                    visibility?: "PUBLIC" | "OWNERS_ONLY" | "BOARD_ONLY" | "STAFF_ONLY" | "PRIVATE";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            documentId: string;
+                            tusEndpoint: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "BAD_REQUEST";
+                        /** @constant */
+                        status: 400;
+                        /** @default Bad request */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "FORBIDDEN";
+                        /** @constant */
+                        status: 403;
+                        /** @default Organization context required or Permission denied */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 500 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "INTERNAL_SERVER_ERROR";
+                        /** @constant */
+                        status: 500;
+                        /** @default Internal server error */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
     "document.uploadWithFile": {
         parameters: {
             query?: never;
@@ -46098,7 +46387,7 @@ export interface operations {
                                 /** @enum {unknown} */
                                 category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                                 /** @enum {unknown} */
-                                status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+                                status: "DRAFT" | "PENDING_UPLOAD" | "PROCESSING" | "PROCESSING_FAILED" | "INFECTED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                                 version: number;
                                 fileUrl: string;
                                 createdAt: string;
@@ -46431,7 +46720,7 @@ export interface operations {
                                 /** @enum {unknown} */
                                 category: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                                 /** @enum {unknown} */
-                                status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+                                status: "DRAFT" | "PENDING_UPLOAD" | "PROCESSING" | "PROCESSING_FAILED" | "INFECTED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                                 version: number;
                                 createdAt: string;
                             };
@@ -46573,6 +46862,13 @@ export interface operations {
                                 expirationDate: string | null;
                                 tags: string[];
                                 uploadedBy: string;
+                                processingStartedAt: string | null;
+                                processingCompletedAt: string | null;
+                                processingAttemptCount: number;
+                                processingNextRetryAt: string | null;
+                                processingErrorType: string | null;
+                                processingErrorMessage: string | null;
+                                processingErrorDetails?: unknown | null;
                                 archivedAt: string | null;
                                 createdAt: string;
                                 updatedAt: string;
@@ -46679,6 +46975,177 @@ export interface operations {
             };
         };
     };
+    "document.getDownloadUrl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            downloadUrl: string;
+                            expiresAt: string;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+            /** @description 400 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "BAD_REQUEST";
+                        /** @constant */
+                        status: 400;
+                        /** @default Bad request */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "FORBIDDEN";
+                        /** @constant */
+                        status: 403;
+                        /** @default Organization context required or Permission denied */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default Document not found */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 500 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "INTERNAL_SERVER_ERROR";
+                        /** @constant */
+                        status: 500;
+                        /** @default Internal server error */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
     "document.listDocuments": {
         parameters: {
             query?: never;
@@ -46698,8 +47165,9 @@ export interface operations {
                     /** @enum {unknown} */
                     category?: "GOVERNING_DOCS" | "FINANCIAL" | "MEETING" | "LEGAL" | "INSURANCE" | "MAINTENANCE" | "ARCHITECTURAL" | "RESERVE_STUDY" | "INSPECTION" | "CONTRACT" | "CC_AND_RS" | "PERMIT" | "APPROVAL" | "CORRESPONDENCE" | "TITLE_DEED" | "SURVEY" | "WARRANTY" | "LICENSE" | "CERTIFICATION" | "BOND" | "PROPOSAL" | "ESTIMATE" | "INVOICE" | "WORK_ORDER" | "VOICE_NOTE" | "SIGNATURE" | "CHECKLIST" | "PHOTO" | "VIDEO" | "GENERAL";
                     /** @enum {unknown} */
-                    status?: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+                    status?: "DRAFT" | "PENDING_UPLOAD" | "PROCESSING" | "PROCESSING_FAILED" | "INFECTED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                     search?: string;
+                    includeProcessing?: boolean;
                 };
             };
         };
@@ -46724,6 +47192,10 @@ export interface operations {
                                 fileSize: number;
                                 mimeType: string;
                                 version: number;
+                                processingStartedAt: string | null;
+                                processingCompletedAt: string | null;
+                                processingAttemptCount: number;
+                                processingErrorType: string | null;
                                 createdAt: string;
                             }[];
                             pagination: {
@@ -47266,7 +47738,7 @@ export interface operations {
                                 id: string;
                                 version: number;
                                 /** @enum {unknown} */
-                                status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+                                status: "DRAFT" | "PENDING_UPLOAD" | "PROCESSING" | "PROCESSING_FAILED" | "INFECTED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
                                 fileName: string;
                                 fileSize: number;
                                 uploadedBy: string;
@@ -48685,6 +49157,443 @@ export interface operations {
                         /** @constant */
                         status: 404;
                         /** @default Document not found */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "document.cancelUpload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            success: boolean;
+                        };
+                        meta: {
+                            requestId: string;
+                            traceId: string | null;
+                            spanId: string | null;
+                            timestamp: string;
+                            /** @default en-US */
+                            locale: string;
+                        };
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 403 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "FORBIDDEN";
+                        /** @constant */
+                        status: 403;
+                        /** @default Organization context required or Permission denied */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default Document not found */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CONFLICT";
+                        /** @constant */
+                        status: 409;
+                        /** @default Cannot cancel upload in current status */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 500 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "INTERNAL_SERVER_ERROR";
+                        /** @constant */
+                        status: 500;
+                        /** @default Internal server error */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "documentProcessing.getQueueStats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                        data: {
+                            metric_name: string;
+                            metric_value?: unknown;
+                        }[];
+                        meta?: unknown;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "documentProcessing.listQueue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    cursor?: string;
+                    /** @default 20 */
+                    limit?: number;
+                    /** @enum {unknown} */
+                    status?: "DRAFT" | "PENDING_UPLOAD" | "PROCESSING" | "PROCESSING_FAILED" | "INFECTED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+                    /** @enum {unknown} */
+                    view?: "processing" | "auto-retry" | "needs-attention" | "infected" | "history";
+                    organizationId?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown | unknown;
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "documentProcessing.getSettings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown | unknown;
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "documentProcessing.updateSettings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    autoRetryEnabled: boolean;
+                    maxRetryAttempts: number;
+                    retryIntervalSeconds: number;
+                    retryBackoffMultiplier: number;
+                    infectedRetentionDays: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown | unknown;
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "documentProcessing.retryDocument": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    documentId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown | unknown;
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default Authentication required */
                         message: string;
                         data?: unknown;
                     } | {

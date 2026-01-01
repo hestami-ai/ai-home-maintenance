@@ -2,9 +2,10 @@
 	interface Props {
 		size?: 'sm' | 'md' | 'lg';
 		showText?: boolean;
+		href?: string;
 	}
 
-	let { size = 'md', showText = true }: Props = $props();
+	let { size = 'md', showText = true, href = '/' }: Props = $props();
 
 	const sizeClasses = {
 		sm: 'h-6 w-6',
@@ -19,7 +20,7 @@
 	};
 </script>
 
-<a href="/" class="flex items-center gap-2 no-underline">
+<a href={href} class="flex items-center gap-2 no-underline">
 	<div class="relative {sizeClasses[size]}">
 		<!-- Light mode logo (default) -->
 		<img 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema, JsonSchema } from '../schemas.js';
+import { ResponseMetaSchema, JsonSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
@@ -19,7 +19,8 @@ const NotificationCategoryEnum = z.enum([
 	'GOVERNANCE',
 	'ARC',
 	'VIOLATION',
-	'COMMUNICATION'
+	'COMMUNICATION',
+	'DOCUMENT_PROCESSING'
 ]);
 
 const OwnerRequestStatusEnum = z.enum([

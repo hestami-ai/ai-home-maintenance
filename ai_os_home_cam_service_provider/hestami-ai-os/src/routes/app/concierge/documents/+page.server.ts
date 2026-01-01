@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
     const staffRoles = staff?.roles ?? [];
     const pillarAccess = staff?.pillarAccess ?? [];
     const role = orgRoles[organization.id];
-    
+
     const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess, organization, role });
     const client = createDirectClient(context);
 
@@ -29,7 +29,8 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
         });
 
         return {
-            documents: result.ok ? result.data.documents : []
+            documents: result.ok ? result.data.documents : [],
+            organization
         };
     } catch (err) {
         console.error('Failed to load concierge documents:', err);

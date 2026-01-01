@@ -10,8 +10,8 @@ import {
 	DocumentStatusSchema,
 	StorageProviderSchema,
 	JsonSchema
-} from '../schemas.js';
-import { startDocumentWorkflow } from '../../workflows/documentWorkflow.js';
+} from '$lib/schemas/index.js';
+import { startDocumentWorkflow, getOrgQueueDepth } from '../../workflows/documentWorkflow.js';
 import { recordActivityFromContext } from '../middleware/activityEvent.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { writeFile, mkdir } from 'fs/promises';
@@ -19,6 +19,10 @@ import { join } from 'path';
 import { createHash } from 'crypto';
 import { recordSpanError } from '../middleware/tracing.js';
 import { createLogger, createModuleLogger } from '../../logger.js';
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { DBOS } from '../../dbos.js';
+import { updateDocumentProcessingStatus } from '../../workflows/documentWorkflow.js';
 
 const log = createModuleLogger('DocumentRoute');
 
@@ -77,10 +81,116 @@ const saveFileToLocal = async (
 	return { storagePath, fileUrl, checksum };
 };
 
+// S3 Client for SeaweedFS
+const s3Client = new S3Client({
+	endpoint: process.env.S3_ENDPOINT,
+	region: process.env.S3_REGION || 'us-east-1',
+	credentials: {
+		accessKeyId: process.env.S3_ACCESS_KEY || '',
+		secretAccessKey: process.env.S3_SECRET_KEY || ''
+	},
+	forcePathStyle: true // Required for SeaweedFS
+});
+
 export const documentRouter = {
 	// =========================================================================
 	// Document Upload & Creation (with actual file)
 	// =========================================================================
+
+	/**
+	 * Initiate a resumable upload via TUS.
+	 * Returns the TUS endpoint and metadata for the client to use.
+	 */
+	initiateUpload: orgProcedure
+		.input(
+			z.object({
+				idempotencyKey: z.string().uuid(),
+				fileName: z.string(),
+				fileSize: z.number().int().positive(),
+				mimeType: z.string(),
+				contextType: DocumentContextTypeEnum,
+				contextId: z.string(),
+				title: z.string().max(255),
+				category: DocumentCategoryEnum,
+				description: z.string().optional(),
+				visibility: DocumentVisibilityEnum.default('PUBLIC')
+			})
+		)
+		.output(
+			successResponseSchema(
+				z.object({
+					documentId: z.string(),
+					tusEndpoint: z.string()
+				})
+			)
+		)
+		.errors({
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const reqLog = log.child({
+				requestId: context.requestId,
+				organizationId: context.organization.id,
+				userId: context.user.id
+			});
+
+			try {
+				// 1. Check Queue Depth Limit
+				const queueLimit = parseInt(process.env.DPQ_MAX_QUEUED_PER_ORG || '50', 10);
+				const currentQueueDepth = await getOrgQueueDepth(context.organization.id);
+
+				if (currentQueueDepth >= queueLimit) {
+					reqLog.error('Queue depth limit reached', { currentQueueDepth, queueLimit });
+					throw errors.BAD_REQUEST({ message: 'Too many documents pending processing. Please wait for current uploads to complete.' });
+				}
+
+				// Create a PENDING_UPLOAD document record via workflow
+				// Status will transition: PENDING_UPLOAD -> PROCESSING -> ACTIVE (after TUS hook completes)
+				reqLog.debug('Starting document workflow', { action: 'CREATE_DOCUMENT_METADATA' });
+				const workflowResult = await startDocumentWorkflow(
+					{
+						action: 'CREATE_DOCUMENT_METADATA',
+						organizationId: context.organization.id,
+						userId: context.user.id,
+						data: {
+							title: input.title,
+							description: input.description,
+							category: input.category,
+							visibility: input.visibility,
+							status: 'PENDING_UPLOAD',
+							storageProvider: 'SEAWEEDFS',
+							storagePath: `pending/${input.idempotencyKey}/${input.fileName}`,
+							fileUrl: '',
+							fileName: input.fileName,
+							fileSize: input.fileSize,
+							mimeType: input.mimeType,
+							contextType: input.contextType,
+							contextId: input.contextId
+						}
+					},
+					input.idempotencyKey
+				);
+
+				if (!workflowResult.success) {
+					reqLog.error('Document workflow failed', { error: workflowResult.error });
+					throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to initiate upload' });
+				}
+
+				reqLog.info('Upload initiation successful', { documentId: workflowResult.entityId, tusEndpoint: process.env.PUBLIC_TUS_URL });
+
+				return successResponse(
+					{
+						documentId: workflowResult.entityId!,
+						tusEndpoint: process.env.PUBLIC_TUS_URL || 'https://dev-upload.hestami-ai.com/files/'
+					},
+					context
+				);
+			} catch (error) {
+				reqLog.error('Error initiating upload', { error });
+				throw error;
+			}
+		}),
 
 	/**
 	 * Upload a document with the actual file content.
@@ -450,6 +560,13 @@ export const documentRouter = {
 						expirationDate: z.string().nullable(),
 						tags: z.array(z.string()),
 						uploadedBy: z.string(),
+						processingStartedAt: z.string().nullable(),
+						processingCompletedAt: z.string().nullable(),
+						processingAttemptCount: z.number(),
+						processingNextRetryAt: z.string().nullable(),
+						processingErrorType: z.string().nullable(),
+						processingErrorMessage: z.string().nullable(),
+						processingErrorDetails: JsonSchema.nullable(),
 						archivedAt: z.string().nullable(),
 						createdAt: z.string(),
 						updatedAt: z.string()
@@ -494,6 +611,12 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('view', 'document', document.id);
 
+			// Sanitize error details
+			const sanitizedErrorDetails = document.processingErrorDetails as any;
+			if (sanitizedErrorDetails && typeof sanitizedErrorDetails === 'object') {
+				delete sanitizedErrorDetails.stack;
+			}
+
 			return successResponse(
 				{
 					document: {
@@ -517,6 +640,13 @@ export const documentRouter = {
 						expirationDate: document.expirationDate?.toISOString() ?? null,
 						tags: document.tags,
 						uploadedBy: document.uploadedBy,
+						processingStartedAt: document.processingStartedAt?.toISOString() ?? null,
+						processingCompletedAt: document.processingCompletedAt?.toISOString() ?? null,
+						processingAttemptCount: document.processingAttemptCount,
+						processingNextRetryAt: document.processingNextRetryAt?.toISOString() ?? null,
+						processingErrorType: document.processingErrorType,
+						processingErrorMessage: document.processingErrorMessage,
+						processingErrorDetails: sanitizedErrorDetails ?? null,
 						archivedAt: document.archivedAt?.toISOString() ?? null,
 						createdAt: document.createdAt.toISOString(),
 						updatedAt: document.updatedAt.toISOString()
@@ -536,6 +666,153 @@ export const documentRouter = {
 			);
 		}),
 
+	/**
+	 * Generate a presigned URL for downloading a document from storage.
+	 * Includes security verification via Cerbos.
+	 * Only allows downloads for documents that have completed processing (ACTIVE or SUPERSEDED status).
+	 */
+	getDownloadUrl: orgProcedure
+		.input(z.object({ id: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					downloadUrl: z.string(),
+					expiresAt: z.string()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw errors.NOT_FOUND({ message: 'Document' });
+			}
+
+			// Only allow downloads for documents that have completed processing
+			// DRAFT, PENDING_UPLOAD, PROCESSING, PROCESSING_FAILED, INFECTED statuses are not downloadable
+			const downloadableStatuses = ['ACTIVE', 'SUPERSEDED', 'ARCHIVED'];
+			if (!downloadableStatuses.includes(document.status)) {
+				log.warn('Download attempted for non-downloadable document', {
+					documentId: document.id,
+					status: document.status
+				});
+				throw errors.BAD_REQUEST({
+					message: `Document is not available for download (status: ${document.status})`
+				});
+			}
+
+			// Verify if user has permission to view (download) this document
+			await context.cerbos.authorize('view', 'document', document.id);
+
+			log.info('Generating download URL', { documentId: document.id, storageProvider: document.storageProvider });
+
+			try {
+				if (document.storageProvider === 'SEAWEEDFS' || document.storageProvider === 'S3') {
+					const s3Bucket = process.env.S3_BUCKET || 'uploads';
+					const command = new GetObjectCommand({
+						Bucket: s3Bucket,
+						Key: document.storagePath
+					});
+
+					// Generate presigned URL valid for 1 hour
+					const expiresIn = 3600;
+					const downloadUrl = await getSignedUrl(s3Client, command, { expiresIn });
+					const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+					log.info('Presigned S3 URL generated', { documentId: document.id, expiresAt });
+
+					return successResponse({ downloadUrl, expiresAt }, context);
+				} else if (document.storageProvider === 'LOCAL') {
+					// Fallback for locally stored files
+					return successResponse(
+						{
+							downloadUrl: document.fileUrl,
+							expiresAt: new Date(Date.now() + 3600 * 1000).toISOString()
+						},
+						context
+					);
+				} else {
+					throw new Error(`Unsupported storage provider: ${document.storageProvider}`);
+				}
+			} catch (error) {
+				log.error('Error generating download URL', { error, documentId: document.id });
+				throw errors.INTERNAL_SERVER_ERROR({ message: 'Failed to generate download URL' });
+			}
+		}),
+
+	/**
+	 * Generate a presigned URL for the document thumbnail.
+	 * Returns null if no thumbnail exists.
+	 */
+	getThumbnailUrl: orgProcedure
+		.input(z.object({ id: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					thumbnailUrl: z.string().nullable(),
+					expiresAt: z.string().nullable()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw errors.NOT_FOUND({ message: 'Document' });
+			}
+
+			// Verify if user has permission to view this document
+			await context.cerbos.authorize('view', 'document', document.id);
+
+			// If no thumbnail URL, return null
+			if (!document.thumbnailUrl) {
+				return successResponse({ thumbnailUrl: null, expiresAt: null }, context);
+			}
+
+			try {
+				// Extract the S3 key from the thumbnail URL
+				// Format: https://dev-s3.hestami-ai.com/uploads/derivatives/{docId}/thumb.webp
+				const s3Bucket = process.env.S3_BUCKET || 'uploads';
+				const thumbnailKey = document.thumbnailUrl.includes('/uploads/')
+					? document.thumbnailUrl.split('/uploads/')[1]
+					: document.thumbnailUrl;
+
+				const command = new GetObjectCommand({
+					Bucket: s3Bucket,
+					Key: thumbnailKey
+				});
+
+				// Generate presigned URL valid for 1 hour
+				const expiresIn = 3600;
+				const thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn });
+				const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+				log.debug('Presigned thumbnail URL generated', { documentId: document.id, thumbnailKey });
+
+				return successResponse({ thumbnailUrl, expiresAt }, context);
+			} catch (error) {
+				log.error('Error generating thumbnail URL', { error, documentId: document.id });
+				throw errors.INTERNAL_SERVER_ERROR({ message: 'Failed to generate thumbnail URL' });
+			}
+		}),
+
 	listDocuments: orgProcedure
 		.input(
 			PaginationInputSchema.extend({
@@ -543,7 +820,8 @@ export const documentRouter = {
 				contextId: z.string().optional(),
 				category: DocumentCategoryEnum.optional(),
 				status: DocumentStatusEnum.optional(),
-				search: z.string().optional()
+				search: z.string().optional(),
+				includeProcessing: z.boolean().optional()
 			})
 		)
 		.output(
@@ -561,7 +839,12 @@ export const documentRouter = {
 							fileSize: z.number(),
 							mimeType: z.string(),
 							version: z.number(),
-							createdAt: z.string()
+							processingStartedAt: z.string().nullable(),
+							processingCompletedAt: z.string().nullable(),
+							processingAttemptCount: z.number(),
+							processingErrorType: z.string().nullable(),
+							createdAt: z.string(),
+							thumbnailUrl: z.string().nullable()
 						})
 					),
 					pagination: PaginationOutputSchema
@@ -576,6 +859,12 @@ export const documentRouter = {
 				const where: Prisma.DocumentWhereInput = {
 					organizationId: context.organization.id,
 					deletedAt: null,
+					// Exclude archived and infected documents unless explicitly requested
+					...(!input.status && {
+						status: {
+							notIn: ['ARCHIVED', 'INFECTED'] as const
+						}
+					}),
 					...(input.category && { category: input.category }),
 					...(input.status && { status: input.status }),
 					...(input.contextType && input.contextId && {
@@ -605,9 +894,31 @@ export const documentRouter = {
 				const hasMore = documents.length > input.limit;
 				const items = hasMore ? documents.slice(0, -1) : documents;
 
-				return successResponse(
-					{
-						documents: items.map((d) => ({
+				// Generate presigned URLs for thumbnails
+				const s3Bucket = process.env.S3_BUCKET || 'uploads';
+				const expiresIn = 3600;
+
+				const documentsWithThumbnails = await Promise.all(
+					items.map(async (d) => {
+						let thumbnailUrl: string | null = null;
+
+						if (d.thumbnailUrl) {
+							try {
+								const thumbnailKey = d.thumbnailUrl.includes('/uploads/')
+									? d.thumbnailUrl.split('/uploads/')[1]
+									: d.thumbnailUrl;
+
+								const command = new GetObjectCommand({
+									Bucket: s3Bucket,
+									Key: thumbnailKey
+								});
+								thumbnailUrl = await getSignedUrl(s3Client, command, { expiresIn });
+							} catch {
+								// Silently fail for thumbnail URL generation
+							}
+						}
+
+						return {
 							id: d.id,
 							title: d.title,
 							category: d.category,
@@ -617,8 +928,19 @@ export const documentRouter = {
 							fileSize: d.fileSize,
 							mimeType: d.mimeType,
 							version: d.version,
-							createdAt: d.createdAt.toISOString()
-						})),
+							processingStartedAt: d.processingStartedAt?.toISOString() ?? null,
+							processingCompletedAt: d.processingCompletedAt?.toISOString() ?? null,
+							processingAttemptCount: d.processingAttemptCount,
+							processingErrorType: d.processingErrorType,
+							createdAt: d.createdAt.toISOString(),
+							thumbnailUrl
+						};
+					})
+				);
+
+				return successResponse(
+					{
+						documents: documentsWithThumbnails,
 						pagination: {
 							nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
 							hasMore
@@ -1549,5 +1871,95 @@ export const documentRouter = {
 				},
 				context
 			);
+		}),
+
+	cancelUpload: orgProcedure
+		.input(z.object({ id: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({ success: z.boolean() }),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Document not found' },
+			CONFLICT: { message: 'Cannot cancel upload in current status' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const document = await prisma.document.findFirst({
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null }
+			});
+
+			if (!document) {
+				throw errors.NOT_FOUND({ message: 'Document' });
+			}
+
+			// Verify permissions
+			await context.cerbos.authorize('update', 'document', document.id);
+
+			// Only allow cancellation for PENDING_UPLOAD or PROCESSING
+			if (!['PENDING_UPLOAD', 'PROCESSING'].includes(document.status)) {
+				throw errors.CONFLICT({ message: `Cannot cancel upload for document in ${document.status} status` });
+			}
+
+			log.info('Cancelling document upload', { documentId: document.id, status: document.status });
+
+			try {
+				// 1. Terminate DBOS workflow if it's processing
+				if (document.status === 'PROCESSING') {
+					// We use the predictable workflow ID from the TUS hook logic
+					// workflowId = `tus-process-${tusId}`
+					// Note: document.storagePath currently contains the tusId for pending uploads
+					const workflowId = `tus-process-${document.storagePath}`;
+					try {
+						await DBOS.cancelWorkflow(workflowId);
+						log.info('Terminated active processing workflow', { workflowId, documentId: document.id });
+					} catch (e) {
+						// Workflow might not be running or already completed
+						log.debug('Workflow termination skipped or failed', { workflowId, error: e });
+					}
+				}
+
+				// 2. Delete S3 object if it exists
+				if (document.storageProvider === 'SEAWEEDFS' || document.storageProvider === 'S3') {
+					const s3Bucket = process.env.S3_BUCKET || 'uploads';
+					log.info('Deleting S3 object', { bucket: s3Bucket, key: document.storagePath });
+
+					try {
+						await s3Client.send(new DeleteObjectCommand({
+							Bucket: s3Bucket,
+							Key: document.storagePath
+						}));
+					} catch (e) {
+						log.error('Failed to delete S3 object during cancellation', { error: e, documentId: document.id });
+						// We proceed even if file deletion fails, as the status change is more critical
+					}
+				}
+
+				// 3. Mark document as ARCHIVED using SECURITY DEFINER function
+				await updateDocumentProcessingStatus(document.id, 'ARCHIVED' as any, {
+					type: 'PERMANENT',
+					message: 'Upload cancelled by user',
+					details: { cancelledBy: context.user.id }
+				});
+
+				// 4. Record activity event
+				await recordActivityFromContext(context, {
+					entityType: 'DOCUMENT',
+					entityId: document.id,
+					action: 'ARCHIVE',
+					eventCategory: 'EXECUTION',
+					summary: 'Upload cancelled by user',
+					previousState: { status: document.status },
+					newState: { status: 'ARCHIVED' }
+				});
+
+				return successResponse({ success: true }, context);
+			} catch (error) {
+				log.error('Error cancelling upload', { error, documentId: document.id });
+				throw errors.INTERNAL_SERVER_ERROR({ message: 'Failed to cancel upload' });
+			}
 		})
 };

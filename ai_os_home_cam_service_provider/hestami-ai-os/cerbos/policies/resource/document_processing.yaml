@@ -1,0 +1,18 @@
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "document_processing"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Platform admins have full control
+    - actions: ["*"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+
+    # Hestami staff can view and retry
+    - actions: ["view_stats", "view_queue", "view_settings", "retry"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

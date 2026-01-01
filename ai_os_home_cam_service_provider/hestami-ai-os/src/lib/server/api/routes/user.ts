@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { authedProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
-import { ResponseMetaSchema } from '../schemas.js';
+import { ResponseMetaSchema } from '$lib/schemas/index.js';
 
 export const userRouter = {
     /**

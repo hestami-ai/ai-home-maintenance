@@ -546,8 +546,6 @@ ALTER TABLE accounts ALTER COLUMN access_token_expires_at TYPE TIMESTAMPTZ(3) US
  ALTER TABLE staff_case_assignments ALTER COLUMN created_at TYPE TIMESTAMPTZ(3) USING created_at AT TIME ZONE 'UTC';
  ALTER TABLE staff_case_assignments ALTER COLUMN unassigned_at TYPE TIMESTAMPTZ(3) USING unassigned_at AT TIME ZONE 'UTC';
  ALTER TABLE staff_case_assignments ALTER COLUMN updated_at TYPE TIMESTAMPTZ(3) USING updated_at AT TIME ZONE 'UTC';
- ALTER TABLE staff_concierge_cases_list ALTER COLUMN created_at TYPE TIMESTAMPTZ(3) USING created_at AT TIME ZONE 'UTC';
- ALTER TABLE staff_concierge_cases_list ALTER COLUMN updated_at TYPE TIMESTAMPTZ(3) USING updated_at AT TIME ZONE 'UTC';
  ALTER TABLE stored_payment_methods ALTER COLUMN created_at TYPE TIMESTAMPTZ(3) USING created_at AT TIME ZONE 'UTC';
  ALTER TABLE stored_payment_methods ALTER COLUMN deleted_at TYPE TIMESTAMPTZ(3) USING deleted_at AT TIME ZONE 'UTC';
  ALTER TABLE stored_payment_methods ALTER COLUMN updated_at TYPE TIMESTAMPTZ(3) USING updated_at AT TIME ZONE 'UTC';

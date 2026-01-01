@@ -41,6 +41,7 @@
 		user={data.user} 
 		memberships={data.memberships}
 		currentOrganization={data.organization}
+		staff={data.staff}
 	/>
 	<main class="flex-1">
 		{@render children()}

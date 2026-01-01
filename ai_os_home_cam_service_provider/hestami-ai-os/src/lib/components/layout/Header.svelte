@@ -3,7 +3,7 @@
 	import Logo from '$lib/components/ui/Logo.svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import UserMenu from './UserMenu.svelte';
-	import type { Organization } from '../../../../generated/prisma/client';
+	import type { Organization, Staff } from '../../../../generated/prisma/client';
 
 	let mobileMenuOpen = $state(false);
 	
@@ -15,15 +15,43 @@
 			isDefault: boolean;
 		}>;
 		currentOrganization: any | null;
+		staff?: Staff | null;
 	}
 
-	let { user, memberships, currentOrganization }: Props = $props();
+	let { user, memberships, currentOrganization, staff = null }: Props = $props();
 
 	const currentMembership = $derived(
 		currentOrganization 
 			? memberships.find(m => m.organization.id === currentOrganization.id) ?? null
 			: null
 	);
+
+	// Determine the dashboard URL based on user role
+	const dashboardUrl = $derived(() => {
+		if (!user) return '/';
+		
+		// Hestami staff/admin goes to admin work queue
+		if (staff && staff.status === 'ACTIVE') {
+			return '/app/admin/work-queue';
+		}
+		
+		// Check organization type for other users
+		if (currentOrganization) {
+			const orgType = currentOrganization.type;
+			switch (orgType) {
+				case 'CAM_COMPANY':
+					return '/app/cam';
+				case 'SERVICE_PROVIDER':
+					return '/app/contractor';
+				case 'INDIVIDUAL':
+				default:
+					return '/app/concierge';
+			}
+		}
+		
+		// Default for logged-in users without org context
+		return '/app/concierge';
+	});
 
 	function toggleMobileMenu() {
 		mobileMenuOpen = !mobileMenuOpen;
@@ -39,7 +67,7 @@
 		<div class="flex h-16 items-center justify-between">
 			<!-- Left: Logo -->
 			<div class="flex items-center">
-				<Logo size="md" />
+				<Logo size="md" href={dashboardUrl()} />
 			</div>
 
 			<!-- Right: Desktop Navigation -->

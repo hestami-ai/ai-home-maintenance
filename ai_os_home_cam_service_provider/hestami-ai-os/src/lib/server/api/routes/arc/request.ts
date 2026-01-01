@@ -15,7 +15,7 @@ import {
 	ARCCategorySchema,
 	ARCRequestStatusSchema,
 	ARCDocumentTypeSchema
-} from '../../schemas.js';
+} from '$lib/schemas/index.js';
 import { startARCRequestWorkflow } from '../../../workflows/arcRequestWorkflow.js';
 import type {
 	Prisma,

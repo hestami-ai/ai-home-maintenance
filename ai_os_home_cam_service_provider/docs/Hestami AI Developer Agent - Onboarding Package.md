@@ -356,7 +356,7 @@ Row-Level Security (RLS) is enabled on most tables to enforce multitenancy. Howe
 
 1. **Create the function in a Prisma migration** (`prisma/migrations/YYYYMMDDHHMMSS_function_name/migration.sql`):
 ```sql
--- Use TIMESTAMP(3) to match Prisma's default precision (not TIMESTAMPTZ)
+-- Use TIMESTAMPTZ(3) to match Prisma schema with @db.Timestamptz(3) annotation
 CREATE OR REPLACE FUNCTION get_user_memberships(p_user_id TEXT)
 RETURNS TABLE (
   id TEXT,
@@ -364,8 +364,8 @@ RETURNS TABLE (
   organization_id TEXT,
   role TEXT,
   is_default BOOLEAN,
-  created_at TIMESTAMP(3),  -- Match Prisma's timestamp precision
-  updated_at TIMESTAMP(3),
+  created_at TIMESTAMPTZ(3),  -- Match Prisma's @db.Timestamptz(3)
+  updated_at TIMESTAMPTZ(3),
   org_id TEXT,
   org_name TEXT,
   org_slug TEXT,
@@ -425,13 +425,13 @@ const rows = await prisma.$queryRaw<MembershipRow[]>`
 ```
 
 **Critical: Timestamp Type Matching**
-- Prisma uses `TIMESTAMP(3) WITHOUT TIME ZONE` by default
-- PostgreSQL `TIMESTAMPTZ` will cause "structure of query does not match function result type" errors
-- Always use `TIMESTAMP(3)` in function return types to match Prisma's precision
+- This project uses `TIMESTAMPTZ(3)` for all timestamp columns (timezone-aware)
+- Prisma schema uses `@db.Timestamptz(3)` annotation on DateTime fields
+- SECURITY DEFINER function return types MUST use `TIMESTAMPTZ(3)` to match
+- Mismatched types cause "structure of query does not match function result type" errors
 
 **Reference implementations:**
-- `prisma/migrations/20251228182900_staff_work_queue_functions/migration.sql` - Staff work queue functions
-- `prisma/migrations/20251230022800_user_memberships_function/migration.sql` - User context bootstrapping functions
+- `prisma/migrations/20251230201500_fix_security_definer_timestamptz/migration.sql` - Updated functions with TIMESTAMPTZ
 - `src/lib/server/api/routes/workQueue.ts` - Example of calling SECURITY DEFINER functions
 
 **Do NOT use `prismaAdmin` for RLS bypass** - Use SECURITY DEFINER functions instead. This keeps the bypass logic in the database layer and maintains proper audit trails.
@@ -533,6 +533,7 @@ const rows = await prisma.$queryRaw<MembershipRow[]>`
 * **Using client side onMount**: onMount and client side loading for important values such as organization ID cause race conditions on pages.
 * **Using default `orpc` client in SSR**: The default `orpc` client and API wrappers (e.g., `workQueueApi`) use relative URLs that fail in server-side contexts. Always use `createDirectClient` with `buildServerContext` in `+page.server.ts` files.
 * **Direct Prisma queries for user context in page server loads**: Querying `prisma.staff.findUnique()` or `prisma.userOrganization.findMany()` directly in `+page.server.ts` files fails due to RLS blocking access before context is established. Always use `await parent()` to get `staff` and `memberships` from the root layout, which fetches them via SECURITY DEFINER functions.
+* **Direct Prisma queries for user context in oRPC handlers**: The oRPC handler at `src/routes/api/v1/rpc/[...rest]/+server.ts` must use SECURITY DEFINER functions (`get_user_memberships`, `get_staff_profile`) instead of direct Prisma queries to bootstrap user context. Direct queries like `prisma.userOrganization.findMany()` fail due to RLS blocking access before organization context is established (chicken-and-egg problem). Note: `get_staff_profile` returns empty for non-staff users (e.g., Concierge homeowners) - this is expected behavior.
 * **TIMESTAMP vs TIMESTAMPTZ in SECURITY DEFINER functions**: Function return types must match the actual column types. After migrating to TIMESTAMPTZ, all SECURITY DEFINER functions must return `TIMESTAMPTZ(3)`, not `TIMESTAMP(3)`. Mismatched types cause "structure of query does not match function result type" errors.
 * **Enum arrays in SECURITY DEFINER functions**: PostgreSQL enum arrays (e.g., `StaffRole[]`) must be cast to `TEXT[]` in function return types. Use `ARRAY(SELECT unnest(column)::TEXT)::TEXT[]` pattern.
 
@@ -635,6 +636,146 @@ export const load: PageServerLoad = async () => {
 3. **No cookie forwarding issues**: HTTP-based SSR calls to localhost don't forward cookies properly
 
 **Type Safety**: `createDirectClient` returns `RouterClient<AppRouter>` which provides complete type inference from the server's router definition.
+
+---
+
+### **6c. Document Upload and Download Workflow**
+
+The document system uses a multi-stage workflow involving TUS resumable uploads, S3 storage (SeaweedFS), worker processing, and presigned URLs for secure access.
+
+#### **Architecture Overview**
+
+```
+Browser → TUS (tusd) → SeaweedFS S3 → TUS Hook → App Server → Worker → S3
+                                         ↓
+                                    DBOS Workflow
+```
+
+**Components:**
+- **tusd**: TUS protocol server for resumable uploads
+- **SeaweedFS**: S3-compatible object storage
+- **worker-document**: Python service for malware scanning (ClamAV), metadata extraction, and thumbnail generation
+- **DBOS Workflow**: Orchestrates the processing pipeline with durability
+
+#### **Upload Flow**
+
+1. **Client initiates upload** via `document.initiateUpload` oRPC endpoint
+   - Creates document record with status `PENDING_UPLOAD`
+   - Returns TUS endpoint URL
+
+2. **Client uploads file** directly to tusd using TUS protocol
+   - tusd streams file to SeaweedFS S3 bucket
+
+3. **TUS `post-finish` hook** triggers when upload completes
+   - tusd calls `http://hestami-app:3000/api/internal/tus-hook`
+   - Hook starts DBOS workflow with `HANDLE_TUS_HOOK` action
+
+4. **Workflow processes document**:
+   - Looks up document using `get_document_organization()` SECURITY DEFINER function (bypasses RLS)
+   - Updates status to `PROCESSING`
+   - Dispatches to `worker-document` service
+   - Worker performs: ClamAV scan, metadata extraction, thumbnail generation
+   - Worker uploads derivatives (thumbnails) to S3
+   - Workflow calls `finalize_document_processing_system()` to update document with results
+   - Status transitions to `ACTIVE` (clean) or `INFECTED` (malware detected)
+
+#### **Critical Implementation Details**
+
+**RLS Bypass for System Operations:**
+
+The TUS hook runs without organization context, so direct Prisma queries fail due to RLS. Use SECURITY DEFINER functions:
+
+```typescript
+// ✅ CORRECT - Use SECURITY DEFINER function
+interface DocOrgRow { organization_id: string }
+const rows = await prisma.$queryRaw<DocOrgRow[]>`
+    SELECT * FROM get_document_organization(${documentId})
+`;
+
+// ❌ WRONG - RLS blocks this query (no org context)
+const doc = await prisma.document.findUnique({ where: { id: documentId } });
+```
+
+**Passing Worker Results to Finalization:**
+
+When calling `finalizeProcessing`, pass `derivatives` and `metadata` directly from the worker response:
+
+```typescript
+// ✅ CORRECT - Pass derivatives at top level
+await finalizeProcessing(docId, {
+    status: workerResult.status,
+    checksum: workerResult.checksum,
+    derivatives: workerResult.derivatives,  // { thumbnail: "derivatives/.../thumb.webp" }
+    metadata: workerResult.metadata
+}, storagePath);
+
+// ❌ WRONG - Nesting workerResult loses derivatives
+await finalizeProcessing(docId, {
+    status: workerResult.status,
+    workerResult: workerResult  // derivatives not accessible at top level
+}, storagePath);
+```
+
+#### **Download Flow (Presigned URLs)**
+
+Documents are stored in S3 and accessed via presigned URLs for security:
+
+1. **`getDownloadUrl`** - Returns presigned URL for the original file
+2. **`getThumbnailUrl`** - Returns presigned URL for the thumbnail
+
+```typescript
+// Server-side: Fetch both URLs for document detail page
+const [urlResult, thumbResult] = await Promise.all([
+    client.document.getDownloadUrl({ id: documentId }),
+    client.document.getThumbnailUrl({ id: documentId })
+]);
+const presignedFileUrl = urlResult?.data?.downloadUrl || null;
+const presignedThumbnailUrl = thumbResult?.data?.thumbnailUrl || null;
+```
+
+**Thumbnail URL Extraction:**
+
+The `thumbnailUrl` stored in the database is a full URL. Extract the S3 key for presigning:
+
+```typescript
+const thumbnailKey = document.thumbnailUrl.includes('/uploads/')
+    ? document.thumbnailUrl.split('/uploads/')[1]
+    : document.thumbnailUrl;
+
+const command = new GetObjectCommand({ Bucket: s3Bucket, Key: thumbnailKey });
+const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+```
+
+#### **Worker-Document Service**
+
+The Python worker (`docker/worker-document/`) handles:
+
+- **ClamAV malware scanning** - Virus definitions stored in `clamav_data` Docker volume
+- **Metadata extraction** - ExifTool for image/document metadata
+- **Thumbnail generation** - pyvips for images, ffmpeg for video poster frames
+
+**ClamAV Setup:**
+- Entrypoint script (`entrypoint.sh`) downloads virus definitions on first start
+- Periodic updates run in background (default: every 6 hours)
+- Definitions persist in `clamav_data` volume
+
+#### **Document Status Transitions**
+
+```
+DRAFT → PENDING_UPLOAD → PROCESSING → ACTIVE
+                              ↓
+                         INFECTED (quarantined)
+                              ↓
+                    PROCESSING_FAILED (after max retries)
+```
+
+#### **Common Pitfalls**
+
+- **RLS blocking TUS hook**: The TUS hook has no org context. Use `get_document_organization()` SECURITY DEFINER function.
+- **Missing derivatives in finalization**: Pass `workerResult.derivatives` directly, not nested inside another object.
+- **Thumbnail not displaying**: Ensure `thumbnailUrl` is saved to database and presigned URLs are generated for display.
+- **ClamAV database not found**: Ensure `clamav_data` volume is mounted and `entrypoint.sh` downloads definitions.
+- **Worker can't reach OTel collector**: Add `signoz-net` network to `worker-document` service in docker-compose.
 
 ---
 

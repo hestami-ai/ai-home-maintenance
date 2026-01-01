@@ -11,8 +11,11 @@
 		Calendar,
 		Tag
 	} from 'lucide-svelte';
-	import { PageContainer, Card } from '$lib/components/ui';
+	import { PageContainer, Card, Alert } from '$lib/components/ui';
 	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
+	import { createOrgClient } from '$lib/api/orpc';
+	import DocumentStatusBadge from '$lib/components/cam/documents/DocumentStatusBadge.svelte';
 
 	interface Document {
 		id: string;
@@ -34,8 +37,14 @@
 		effectiveDate: string | null;
 		expirationDate: string | null;
 		tags: string[];
-		uploadedBy: string;
 		archivedAt: string | null;
+		processingStartedAt: string | null;
+		processingCompletedAt: string | null;
+		processingAttemptCount: number;
+		processingNextRetryAt: string | null;
+		processingErrorType: string | null;
+		processingErrorMessage: string | null;
+		processingErrorDetails: any | null;
 		createdAt: string;
 		updatedAt: string;
 	}
@@ -50,10 +59,14 @@
 		data: {
 			document: Document;
 			contextBindings: ContextBinding[];
+			organization: { id: string; name: string; slug: string };
 		};
 	}
 
 	let { data }: Props = $props();
+
+	// Create org client for API calls
+	const orgClient = $derived(createOrgClient(data.organization.id));
 
 	let document = $derived(data.document);
 	let contextBindings = $derived(data.contextBindings);
@@ -61,6 +74,11 @@
 	let isDeleting = $state(false);
 	let error = $state<string | null>(null);
 	let showDeleteConfirm = $state(false);
+	
+	// Check for feedback messages in URL
+	const showSuccessAlert = $derived(page.url.searchParams.get('success') === 'true');
+	const showErrorAlert = $derived(page.url.searchParams.get('error') === 'true');
+	const showInfectedAlert = $derived(page.url.searchParams.get('infected') === 'true');
 
 	const categoryLabels: Record<string, string> = {
 		PROPERTY_DEED: 'Property Deed',
@@ -81,9 +99,23 @@
 		isDeleting = true;
 		error = null;
 
-		// Note: Delete functionality requires archiveDocument API
-			// For now, redirect back to documents list
-			goto('/app/concierge/documents');
+		try {
+			const result = await orgClient.document.archiveDocument({
+				id: document.id,
+				reason: 'User requested deletion'
+			});
+
+			if (result.ok) {
+				goto('/app/concierge/documents');
+			} else {
+				error = 'Failed to delete document';
+				isDeleting = false;
+			}
+		} catch (err) {
+			console.error('Delete error:', err);
+			error = err instanceof Error ? err.message : 'Failed to delete document';
+			isDeleting = false;
+		}
 	}
 
 	function formatFileSize(bytes: number): string {
@@ -157,7 +189,15 @@
 							{/if}
 						</div>
 						<div>
-							<h1 class="text-2xl font-bold">{document.title}</h1>
+							<div class="flex items-center gap-3">
+								<h1 class="text-2xl font-bold">{document.title}</h1>
+								<DocumentStatusBadge 
+									status={document.status} 
+									processingAttemptCount={document.processingAttemptCount}
+									processingErrorType={document.processingErrorType}
+									size="md"
+								/>
+							</div>
 							<p class="mt-1 text-surface-500">
 								{document.fileName} • {formatFileSize(document.fileSize)}
 							</p>
@@ -166,7 +206,7 @@
 
 					<div class="flex gap-2">
 						<a
-							href={document.fileUrl}
+							href={(document as any).presignedFileUrl || ''}
 							target="_blank"
 							rel="noopener noreferrer"
 							class="btn preset-filled-primary-500"
@@ -223,12 +263,37 @@
 			<div class="grid gap-6 lg:grid-cols-3">
 				<!-- Main Content -->
 				<div class="space-y-6 lg:col-span-2">
+					<!-- Feedback Alerts -->
+					{#if showSuccessAlert}
+						<Alert variant="success" title="Upload Successful">
+							Your document has been processed and is now ready for use.
+						</Alert>
+					{/if}
+
+					{#if showInfectedAlert || (document.status === 'INFECTED')}
+						<Alert variant="error" title="Security Risk Detected">
+							This file has been flagged as a security risk and cannot be used.
+						</Alert>
+					{/if}
+
+					<!-- Processing Error Info -->
+					{#if document.status === 'PROCESSING_FAILED' && document.processingErrorMessage}
+						<Alert variant="error" title="Processing Issue">
+							<p>{document.processingErrorMessage}</p>
+							{#if document.processingNextRetryAt}
+								<p class="mt-2 text-sm">
+									Next retry scheduled for: {new Date(document.processingNextRetryAt).toLocaleString()}
+								</p>
+							{/if}
+						</Alert>
+					{/if}
+
 					<!-- Preview -->
 					{#if document.mimeType.startsWith('image/')}
 						<Card variant="outlined" padding="md">
 							<h2 class="mb-4 font-semibold">Preview</h2>
 							<img
-								src={document.fileUrl}
+								src={(document as any).presignedThumbnailUrl || (document as any).presignedFileUrl || ''}
 								alt={document.title}
 								class="max-h-96 w-full rounded-lg object-contain"
 							/>
@@ -238,7 +303,7 @@
 							<h2 class="mb-4 font-semibold">Preview</h2>
 							<div class="aspect-[8.5/11] w-full">
 								<iframe
-									src={document.fileUrl}
+									src={(document as any).presignedFileUrl || ''}
 									title={document.title}
 									class="h-full w-full rounded-lg border border-surface-300-700"
 								></iframe>

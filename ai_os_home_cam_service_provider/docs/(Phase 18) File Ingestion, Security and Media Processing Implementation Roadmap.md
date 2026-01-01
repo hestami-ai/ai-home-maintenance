@@ -36,75 +36,82 @@ NOTE: The following table is used to ensure consistency across the system. Howev
 - [ ] Setup cron job (`/etc/cron.daily/update-cloudflare-ips`) to refresh ranges.
 
 ### 1.2 Traefik Configuration Update
-- [ ] Increase `readTimeout` and `writeTimeout` to `3600s` (1 hour) for 1GB uploads.
-- [ ] Update `upload-limit` middleware to `1073741824` (1 GB).
-- [ ] Configure Host-based routing for `tusd` and `seaweedfs` subdomains.
+- [x] Increase `readTimeout` and `writeTimeout` to `3600s` (1 hour) for large uploads.
+- [x] Update `upload-limit` middleware to `100MB` (Updated from 10MB).
+- [x] Configure Host-based routing for `tusd` and `seaweedfs` subdomains.
 
 ---
 
 ## 2. Storage Backend: SeaweedFS Setup
 
 ### 2.1 Container Configuration
-- [ ] Integrate SeaweedFS Master, Volume, and S3 Gateway into `docker-compose.yml`.
-- [ ] Use a single-node setup for initial production (Single Filer/Volume).
-- [ ] Configure volumes for persistent storage (SeaweedFS Data).
+- [x] Integrate SeaweedFS Master, Volume, and S3 Gateway into `docker-compose.yml`.
+- [x] Use a single-node setup for initial production (Single Filer/Volume).
+- [x] Configure volumes for persistent storage (SeaweedFS Data).
 
 ### 2.2 S3 Gateway Initialization
-- [ ] Configure access keys and secret keys (stored in `.env`).
-- [ ] Create initial buckets (e.g., `user-media`, `system-assets`).
-- [ ] Verify presigned URL compatibility via SeaweedFS S3.
+- [x] Configure access keys and secret keys (stored in `.env`).
+- [x] Create initial buckets (e.g., `user-media`, `system-assets`).
+    - docker exec -it hestami-seaweedfs-master weed shell
+    - Inside the shell:
+        s3.bucket.create -name uploads
+        s3.bucket.create -name system-assets
+    - [x] `uploads`: For tusd uploads.
+    - [x] `user-media`: For user-uploaded media files.
+    - [x] `system-assets`: For system assets (e.g., thumbnails, icons).
+- [x] Verify presigned URL compatibility via SeaweedFS S3.
 
 ---
 
 ## 3. Upload Infrastructure: tusd Integration
 
 ### 3.1 tusd Deployment
-- [ ] Add `tusd` (TUS protocol server) to `docker-compose.yml`.
-- [ ] Configure `tusd` to use SeaweedFS S3 as the storage backend.
-- [ ] Set `tusd` to listen on the `uploads.*` subdomain via Traefik.
+- [x] Add `tusd` (TUS protocol server) to `docker-compose.yml`.
+- [x] Configure `tusd` to use SeaweedFS S3 as the storage backend.
+- [x] Set `tusd` to listen on the `uploads.*` subdomain via Traefik.
 
 ### 3.2 Global Success Hook (DBOS)
-- [ ] Configure `tusd` with a `--hooks-http` endpoint pointing to a DBOS Control Plane internal route.
-- [ ] Implement `POST /api/internal/v1/tus-hook` in DBOS to:
-    - [ ] Calculate final file hash (if not provided).
-    - [ ] Record file metadata in Postgres.
-    - [ ] Mark file status as `UPLOADING` -> `PENDING_SCAN`.
-    - [ ] Trigger the **Unified Processing Worker** workflow.
+- [x] Configure `tusd` with a `--hooks-http` endpoint pointing to a DBOS Control Plane internal route.
+- [x] Implement `POST /api/internal/tus-hook` in DBOS to:
+    - [x] Calculate final file hash (if not provided).
+    - [x] Record file metadata in Postgres.
+    - [x] Mark file status as `ACTIVE` -> `PENDING`.
+    - [x] Trigger the **Unified Processing Worker** workflow.
 
 ---
 
 ## 4. Unified Processing Worker
 
 ### 4.1 "Hestami Processing" Container
-- [ ] Create a custom Dockerfile for `hestami-worker-media`.
-- [ ] Bundle dependencies: `ClamAV`, `ffmpeg`, `libvips`, `ExifTool`.
-- [ ] Implement a lightweight Node.js or Python task runner to execute processing jobs.
+- [x] Create a custom Dockerfile for `hestami-worker-media`.
+- [x] Bundle dependencies: `ClamAV`, `ffmpeg`, `libvips`, `ExifTool`.
+- [x] Implement a lightweight Node.js or Python task runner to execute processing jobs (Python/FastAPI implemented).
 
 ### 4.2 Malware & Metadata Workflow
-- [ ] **Step 1: Malware Scan**: Run `clamscan` on the asset.
-- [ ] **Step 2: Metadata Extraction**: Run `exiftool` to extract GPS/EXIF data; store in Postgres.
-- [ ] **Step 3: Derivative Generation**:
-    - [ ] Images: Generate thumbnails/mobile-previews (WebP).
-    - [ ] Videos: Extract keyframes and poster frame.
-- [ ] **Step 4: Finalization**: Mark asset as `AVAILABLE` or `QUARANTINED` in DB.
+- [x] **Step 1: Malware Scan**: Run `clamscan` on the asset.
+- [x] **Step 2: Metadata Extraction**: Run `exiftool` to extract GPS/EXIF data; store in Postgres.
+- [x] **Step 3: Derivative Generation**:
+    - [x] Images: Generate thumbnails/mobile-previews (WebP implemented).
+    - [x] Videos: Extract keyframes and poster frame (Poster frame implemented).
+- [x] **Step 4: Finalization**: Mark asset as `AVAILABLE` or `QUARANTINED` in DB.
 
 ---
 
 ## 5. Control Plane & Authorization
 
 ### 5.1 Capability-Based Access (Presigned URLs)
-- [ ] Implement `file.getDownloadUrl` oRPC procedure.
-- [ ] **Logic**:
+- [x] Implement `document.getDownloadUrl` oRPC procedure.
+- [x] **Logic**:
     1. Verify requester identity (JWT).
     2. Check Cerbos policy for the specific resource/organization.
-    3. If authorized, generate an S3 presigned GET URL with 15-minute expiry.
+    3. If authorized, generate an S3 presigned GET URL with 1-hour expiry.
     4. Return URL to the mobile/web client.
 
 ### 5.2 Upload Initiation
-- [ ] Implement `file.initiateUpload` oRPC procedure.
-- [ ] **Logic**:
-    1. Validate tenant quota.
-    2. Create a placeholder record in Postgres.
+- [x] Implement `document.initiateUpload` oRPC procedure.
+- [x] **Logic**:
+    1. Validate tenant quota (Checked via Cerbos/Prisma).
+    2. Create a placeholder record in Postgres (`DRAFT` status).
     3. Return TUS endpoint and metadata headers needed by the client.
 
 ---

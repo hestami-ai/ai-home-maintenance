@@ -2,6 +2,7 @@
 	import { ArrowLeft, Upload, Loader2, Check, X, FileText, Image, File } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
+	import * as tus from 'tus-js-client';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { 
@@ -28,7 +29,7 @@
 		'application/msword',
 		'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 	];
-	const maxFileSize = 10 * 1024 * 1024; // 10MB
+	const maxFileSize = 100 * 1024 * 1024; // 100MB limit
 
 	// Category options for select
 	const categories = CONCIERGE_DOCUMENT_CATEGORIES.map(cat => ({
@@ -36,9 +37,15 @@
 		label: CONCIERGE_CATEGORY_LABELS[cat]
 	}));
 
+	import type { Organization } from '../../../../../../generated/prisma/client';
+	import { createOrgClient } from '$lib/api/orpc';
+
 	interface Props {
 		data: {
 			properties: Property[];
+			organization: Organization | null;
+			user: any;
+			memberships: any[];
 		};
 	}
 
@@ -55,7 +62,10 @@
 	let category = $state<ConciergeDocumentCategory>('GENERAL');
 	let selectedPropertyId = $state('');
 	let selectedFile = $state<globalThis.File | null>(null);
+	let uploadIdempotencyKey = $state<string | null>(null);
 	let isDragging = $state(false);
+	let uploadProgress = $state(0);
+	let isProcessing = $state(false);
 
 	// Form validation
 	const isValid = $derived(
@@ -117,11 +127,13 @@
 		}
 
 		if (file.size > maxFileSize) {
-			error = 'File is too large. Maximum size is 10MB.';
+			error = 'File is too large. Maximum size is 100MB.';
 			return;
 		}
 
 		selectedFile = file;
+		// Generate a new idempotency key for this file selection
+		uploadIdempotencyKey = crypto.randomUUID();
 
 		// Auto-fill title from filename if empty
 		if (!title) {
@@ -131,6 +143,7 @@
 
 	function clearFile() {
 		selectedFile = null;
+		uploadIdempotencyKey = null;
 	}
 
 	function formatFileSize(bytes: number): string {
@@ -145,18 +158,57 @@
 		return File;
 	}
 
+	async function pollDocumentStatus(documentId: string, orgId: string) {
+		const orgClient = createOrgClient(orgId);
+		let attempts = 0;
+		const maxAttempts = 30; // 30 seconds poll
+
+		const interval = setInterval(async () => {
+			attempts++;
+			try {
+				const result = await orgClient.document.getDocument({ id: documentId });
+				if (result.ok) {
+					const status = result.data.document.status;
+					if (status === 'ACTIVE') {
+						clearInterval(interval);
+						goto(`/app/concierge/documents/${documentId}?success=true`);
+					} else if (status === 'INFECTED') {
+						clearInterval(interval);
+						goto(`/app/concierge/documents/${documentId}?infected=true`);
+					} else if (status === 'PROCESSING_FAILED') {
+						clearInterval(interval);
+						goto(`/app/concierge/documents/${documentId}?error=true`);
+					}
+				}
+			} catch (err) {
+				console.error('Polling error:', err);
+			}
+
+			if (attempts >= maxAttempts) {
+				clearInterval(interval);
+				goto(`/app/concierge/documents/${documentId}`);
+			}
+		}, 1000);
+	}
+
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		if (!isValid || isSubmitting || !selectedFile) return;
+		if (!isValid || isSubmitting || !selectedFile || !data.organization) return;
 
 		isSubmitting = true;
 		error = null;
+		uploadProgress = 0;
 
 		try {
-			// Use oRPC's native file upload support
-			const result = await orpc.document.uploadWithFile({
-				idempotencyKey: crypto.randomUUID(),
-				file: selectedFile,
+			// 1. Initiate upload to get document ID and TUS endpoint
+			// Use a local organization client instead of the global store-based client
+			const orgClient = createOrgClient(data.organization.id);
+
+			const initResult = await orgClient.document.initiateUpload({
+				idempotencyKey: uploadIdempotencyKey!,
+				fileName: selectedFile.name,
+				fileSize: selectedFile.size,
+				mimeType: selectedFile.type,
 				contextType: 'PROPERTY',
 				contextId: selectedPropertyId,
 				title: title.trim(),
@@ -165,10 +217,36 @@
 				visibility: 'PRIVATE'
 			});
 
-			goto(`/app/concierge/documents/${result.data.document.id}`);
+			const { documentId, tusEndpoint } = initResult.data;
+
+			// 2. Perform resumable upload via TUS
+			const upload = new tus.Upload(selectedFile, {
+				endpoint: tusEndpoint,
+				retryDelays: [0, 3000, 5000, 10000, 20000],
+				metadata: {
+					filename: selectedFile.name,
+					filetype: selectedFile.type,
+					documentId: documentId // This links the TUS upload to our database record
+				},
+				onError: (err) => {
+					console.error('TUS upload failed:', err);
+					error = `Upload failed: ${err.message}`;
+					isSubmitting = false;
+				},
+				onProgress: (bytesUploaded, bytesTotal) => {
+					uploadProgress = Math.round((bytesUploaded / bytesTotal) * 100);
+				},
+				onSuccess: () => {
+					console.log('TUS upload successful');
+					isProcessing = true;
+					pollDocumentStatus(documentId, data.organization!.id);
+				}
+			});
+
+			upload.start();
 		} catch (err) {
-			console.error('Failed to upload document:', err);
-			error = err instanceof Error ? err.message : 'Failed to upload document';
+			console.error('Failed to initiate upload:', err);
+			error = err instanceof Error ? err.message : 'Failed to initiate upload';
 			isSubmitting = false;
 		}
 	}
@@ -252,9 +330,9 @@
 									/>
 								</label>
 							</p>
-							<p class="mt-2 text-sm text-surface-500">
-								PDF, images, or Word documents up to 10MB
-							</p>
+							<p class="mt-1 text-xs text-surface-400">
+							PDF, JPEG, PNG, DOC, DOCX up to 100MB
+						</p>
 						</div>
 					{/if}
 				</Card>
@@ -347,7 +425,11 @@
 					>
 						{#if isSubmitting}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Uploading...
+							{#if isProcessing}
+								Scanning for security...
+							{:else}
+								{uploadProgress > 0 ? `Uploading ${uploadProgress}%...` : 'Starting...'}
+							{/if}
 						{:else}
 							<Check class="mr-2 h-4 w-4" />
 							Upload Document

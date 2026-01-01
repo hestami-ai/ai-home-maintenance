@@ -1,11 +1,28 @@
 import type { Handle } from '@sveltejs/kit';
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
+import type { Organization, UserRole } from '../generated/prisma/client';
 import { auth } from '$server/auth';
 import { prisma } from '$server/db';
 import { initDBOS } from '$server/dbos';
 import { createModuleLogger } from '$server/logger';
 
 const log = createModuleLogger('Hooks');
+
+// Type for the raw membership row from SECURITY DEFINER function
+interface MembershipRow {
+	id: string;
+	user_id: string;
+	organization_id: string;
+	role: string;
+	is_default: boolean;
+	created_at: Date;
+	updated_at: Date;
+	org_id: string;
+	org_name: string;
+	org_slug: string;
+	org_type: string;
+	org_status: string;
+}
 
 // Initialize DBOS workflow engine
 const dbosReady = initDBOS().catch((err) => {
@@ -40,13 +57,21 @@ export const handle: Handle = async ({ event, resolve }) => {
 	}
 
 	// Store span context in locals for route handlers to access
-	const spanContext = span.spanContext();
-	event.locals.traceId = spanContext.traceId;
-	event.locals.spanId = spanContext.spanId;
+	if (span) {
+		const spanContext = span.spanContext();
+		event.locals.traceId = spanContext.traceId;
+		event.locals.spanId = spanContext.spanId;
+	} else {
+		event.locals.traceId = null;
+		event.locals.spanId = null;
+	}
+
+	const activeSpan = span;
+	const context = activeSpan ? trace.setSpan(otelContext.active(), activeSpan) : otelContext.active();
 
 	// Run the request within the span's context using context.with()
 	// This ensures DBOS workflows and Prisma queries inherit this trace context
-	return otelContext.with(trace.setSpan(otelContext.active(), span), async () => {
+	return otelContext.with(context, async () => {
 		try {
 			// Get session from Better-Auth
 			const session = await auth.api.getSession({
@@ -61,7 +86,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 					image: session.user.image ?? null
 				};
 				event.locals.session = session.session;
-				span.setAttribute('user.id', session.user.id);
+				if (activeSpan) activeSpan.setAttribute('user.id', session.user.id);
 
 				log.debug('Session validated', {
 					userId: session.user.id,
@@ -73,27 +98,30 @@ export const handle: Handle = async ({ event, resolve }) => {
 				// Check for organization context header
 				const orgId = event.request.headers.get('X-Org-Id');
 				if (orgId) {
-					// Validate user has access to this organization
-					const membership = await prisma.userOrganization.findUnique({
-						where: {
-							userId_organizationId: {
-								userId: session.user.id,
-								organizationId: orgId
-							}
-						},
-						include: {
-							organization: true
-						}
-					});
+					// Validate user has access to this organization using SECURITY DEFINER function
+					// This bypasses RLS to solve the chicken-and-egg bootstrap problem
+					const membershipRows = await prisma.$queryRaw<MembershipRow[]>`
+						SELECT * FROM get_user_memberships(${session.user.id}) 
+						WHERE organization_id = ${orgId} 
+						LIMIT 1
+					`;
+
+					const membership = membershipRows[0];
 
 					if (membership) {
-						event.locals.organization = membership.organization;
-						event.locals.role = membership.role;
-						span.setAttribute('org.id', orgId);
-						
+						event.locals.organization = {
+							id: membership.org_id,
+							name: membership.org_name,
+							slug: membership.org_slug,
+							type: membership.org_type,
+							status: membership.org_status
+						} as Organization;
+						event.locals.role = membership.role as UserRole;
+						if (activeSpan) activeSpan.setAttribute('org.id', orgId);
+
 						log.debug('Organization context resolved', {
 							orgId,
-							orgSlug: membership.organization.slug,
+							orgSlug: membership.org_slug,
 							role: membership.role,
 							userId: session.user.id
 						});
@@ -114,7 +142,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 				// No session - check if auth was expected
 				const authHeader = event.request.headers.get('Authorization');
 				const hasCookie = event.request.headers.get('Cookie')?.includes('better-auth');
-				
+
 				if (authHeader || hasCookie) {
 					log.warn('Auth validation failed', {
 						reason: 'invalid_or_expired',
@@ -126,15 +154,15 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 
 			const response = await resolve(event);
-			span.setAttribute('http.status_code', response.status);
+			if (activeSpan) activeSpan.setAttribute('http.status_code', response.status);
 			return response;
 		} catch (error) {
-			span.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+			if (activeSpan) activeSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
 			throw error;
 		} finally {
 			// Only end the span if we created it (not auto-instrumented)
-			if (!isAutoInstrumented) {
-				span.end();
+			if (!isAutoInstrumented && activeSpan) {
+				activeSpan.end();
 			}
 		}
 	});

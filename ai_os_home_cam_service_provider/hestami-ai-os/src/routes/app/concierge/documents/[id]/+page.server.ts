@@ -33,9 +33,22 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
             throw error(status, message);
         }
 
+        // Fetch presigned URLs for the document and thumbnail (SSR - has org context)
+        const [urlResult, thumbResult] = await Promise.all([
+            client.document.getDownloadUrl({ id: documentId }).catch(() => null),
+            client.document.getThumbnailUrl({ id: documentId }).catch(() => null)
+        ]);
+        const presignedFileUrl = urlResult?.data?.downloadUrl || null;
+        const presignedThumbnailUrl = thumbResult?.data?.thumbnailUrl || null;
+
         return {
-            document: result.data.document,
-            contextBindings: result.data.contextBindings
+            document: {
+                ...result.data.document,
+                presignedFileUrl,
+                presignedThumbnailUrl
+            },
+            contextBindings: result.data.contextBindings,
+            organization
         };
     } catch (err) {
         console.error(`Failed to load document detail for ${documentId}:`, err);

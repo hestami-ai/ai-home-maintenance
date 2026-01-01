@@ -10,9 +10,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Update ClamAV definitions (this might fail during build if no internet, 
-# typically handled in entrypoint or cron in prod, but let's try initial fetch)
-# RUN freshclam || true
+# Configure ClamAV freshclam
+RUN mkdir -p /var/lib/clamav && \
+    echo "DatabaseMirror database.clamav.net" > /etc/clamav/freshclam.conf && \
+    echo "DatabaseDirectory /var/lib/clamav" >> /etc/clamav/freshclam.conf && \
+    chown -R clamav:clamav /var/lib/clamav
 
 WORKDIR /app
 
@@ -22,4 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Entrypoint script handles ClamAV updates and starts the server
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]

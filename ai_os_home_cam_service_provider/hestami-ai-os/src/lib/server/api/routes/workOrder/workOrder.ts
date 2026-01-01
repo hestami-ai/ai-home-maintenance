@@ -9,7 +9,7 @@ import {
 	WorkOrderCategorySchema,
 	WorkOrderOriginTypeSchema,
 	FundTypeSchema
-} from '../../schemas.js';
+} from '$lib/schemas/index.js';
 import type { Prisma, TechnicianAvailability, WorkOrderStatus } from '../../../../../../generated/prisma/client.js';
 import { ContractorTradeType, PricebookItemType } from '../../../../../../generated/prisma/client.js';
 import { prisma } from '../../../db.js';

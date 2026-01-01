@@ -21,12 +21,16 @@
 		Play
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { orpc } from '$lib/api';
 	import { page } from '$app/stores';
 	import {
 		getServiceCallStatusLabel,
 		getServiceCallStatusColor
 	} from '$lib/utils/serviceCallTerminology';
+	import type { operations } from '$lib/api/types.generated';
+
+	// Types extracted directly from generated OpenAPI types
+	type ApiDocumentSummary = operations['document.listDocuments']['responses']['200']['content']['application/json']['data']['documents'][number];
+	type ApiDocumentDetail = operations['document.getDocument']['responses']['200']['content']['application/json']['data']['document'];
 
 	// Derive propertyId from route params
 	const propertyId = $derived($page.params.id);
@@ -88,15 +92,14 @@
 		activeCaseCount: number;
 	}
 
-	interface Document {
-		id: string;
-		title: string;
-		category: string;
-		fileName: string;
-		fileSize: number;
-		mimeType: string;
-		createdAt: string;
-	}
+	// Use DocumentDetail (from getDocument) which includes thumbnailUrl
+	// Extend with SSR-provided presigned fileUrl
+	type MediaItem = ApiDocumentDetail & {
+		fileUrl?: string | null;
+	};
+	
+	// Document summary type for non-media documents list
+	type DocumentListItem = ApiDocumentSummary;
 
 	interface ServiceCall {
 		id: string;
@@ -110,103 +113,48 @@
 	interface Props {
 		data: {
 			property: Property;
+			documents: DocumentListItem[];
+			mediaItems: MediaItem[];
+			serviceCalls: ServiceCall[];
 		};
 	}
 
 	let { data }: Props = $props();
 
 	let property = $state<Property | null>(null);
-	let documents = $state<Document[]>([]);
-	let mediaItems = $state<Document[]>([]);
+	let documents = $state<DocumentListItem[]>([]);
+	let mediaItems = $state<MediaItem[]>([]);
 	let serviceCalls = $state<ServiceCall[]>([]);
 	let isLoading = $state(false);
-	let isLoadingDocs = $state(false);
-	let isLoadingMedia = $state(false);
-	let isLoadingHistory = $state(false);
 	let error = $state<string | null>(null);
 	let activeTab = $state<'overview' | 'documents' | 'media' | 'history' | 'systems'>('overview');
-	let selectedImage = $state<Document | null>(null);
+	let selectedImage = $state<MediaItem | null>(null);
 
-	// Synchronize server data to local state
+	// Synchronize server data to local state (SSR-loaded, no client-side race conditions)
 	$effect(() => {
 		if (data.property) {
 			property = data.property;
 		}
+		if (data.documents) {
+			documents = data.documents;
+		}
+		if (data.mediaItems) {
+			mediaItems = data.mediaItems;
+		}
+		if (data.serviceCalls) {
+			serviceCalls = data.serviceCalls;
+		}
 	});
 
-	async function loadProperty() {
+	function loadProperty() {
 		// Just refresh the data
 		window.location.reload();
 	}
 
-	async function loadDocuments() {
-		if (documents.length > 0) return; // Already loaded
-		isLoadingDocs = true;
-		try {
-			const result = await orpc.document.listDocuments({
-				contextType: 'PROPERTY',
-				contextId: propertyId,
-				limit: 100
-			});
-			// Filter out media (images/videos)
-			documents = result.data.documents.filter(
-				(d) => !d.mimeType.startsWith('image/') && !d.mimeType.startsWith('video/')
-			);
-		} catch (err) {
-			console.error('Failed to load documents:', err);
-		} finally {
-			isLoadingDocs = false;
-		}
-	}
-
-	async function loadMedia() {
-		if (mediaItems.length > 0) return; // Already loaded
-		isLoadingMedia = true;
-		try {
-			const result = await orpc.document.listDocuments({
-				contextType: 'PROPERTY',
-				contextId: propertyId,
-				limit: 100
-			});
-			// Filter to only media (images/videos)
-			mediaItems = result.data.documents.filter(
-				(d) => d.mimeType.startsWith('image/') || d.mimeType.startsWith('video/')
-			);
-		} catch (err) {
-			console.error('Failed to load media:', err);
-		} finally {
-			isLoadingMedia = false;
-		}
-	}
-
-	async function loadServiceHistory() {
-		if (serviceCalls.length > 0) return; // Already loaded
-		isLoadingHistory = true;
-		try {
-			const result = await orpc.conciergeCase.list({
-				propertyId: propertyId,
-				limit: 50
-			});
-			serviceCalls = result.data.cases.map((c) => ({
-				id: c.id,
-				caseNumber: c.caseNumber,
-				title: c.title,
-				status: c.status,
-				priority: c.priority,
-				createdAt: c.createdAt
-			}));
-		} catch (err) {
-			console.error('Failed to load service history:', err);
-		} finally {
-			isLoadingHistory = false;
-		}
-	}
 
 	function handleTabChange(tabId: typeof activeTab) {
 		activeTab = tabId;
-		if (tabId === 'documents') loadDocuments();
-		if (tabId === 'media') loadMedia();
-		if (tabId === 'history') loadServiceHistory();
+		// All data is SSR-loaded, no lazy loading needed
 	}
 
 	function formatFileSize(bytes: number): string {
@@ -457,11 +405,7 @@
 						</a>
 					</div>
 
-					{#if isLoadingDocs}
-						<div class="flex items-center justify-center py-12">
-							<Loader2 class="h-6 w-6 animate-spin text-primary-500" />
-						</div>
-					{:else if documents.length === 0}
+					{#if documents.length === 0}
 						<Card variant="outlined" padding="md">
 							<EmptyState
 								title="No documents yet"
@@ -521,11 +465,7 @@
 						</a>
 					</div>
 
-					{#if isLoadingMedia}
-						<div class="flex items-center justify-center py-12">
-							<Loader2 class="h-6 w-6 animate-spin text-primary-500" />
-						</div>
-					{:else if mediaItems.length === 0}
+					{#if mediaItems.length === 0}
 						<Card variant="outlined" padding="md">
 							<EmptyState
 								title="No photos or videos yet"
@@ -553,7 +493,7 @@
 										class="group relative aspect-square overflow-hidden rounded-lg border border-surface-300-700 bg-surface-500/5 transition-all hover:border-primary-500"
 									>
 										<img
-											src={`/api/documents/${item.id}/thumbnail`}
+											src={item.thumbnailUrl || ''}
 											alt={item.title}
 											class="h-full w-full object-cover"
 											onerror={(e) => {
@@ -608,7 +548,7 @@
 						</button>
 						<div class="max-h-full max-w-full">
 							<img
-								src={`/api/documents/${selectedImage.id}/file`}
+								src={selectedImage.fileUrl || ''}
 								alt={selectedImage.title}
 								class="max-h-[80vh] max-w-full rounded-lg object-contain"
 							/>
@@ -632,11 +572,7 @@
 						</a>
 					</div>
 
-					{#if isLoadingHistory}
-						<div class="flex items-center justify-center py-12">
-							<Loader2 class="h-6 w-6 animate-spin text-primary-500" />
-						</div>
-					{:else if serviceCalls.length === 0}
+					{#if serviceCalls.length === 0}
 						<Card variant="outlined" padding="md">
 							<EmptyState
 								title="No service history yet"

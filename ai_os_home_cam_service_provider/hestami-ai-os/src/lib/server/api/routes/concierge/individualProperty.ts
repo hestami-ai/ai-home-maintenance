@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '../../schemas.js';
+import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import {
 	orgProcedure,
 	successResponse,
@@ -314,10 +314,12 @@ export const individualPropertyRouter = {
 								notes: externalHoa.notes
 							}
 							: null,
-						portfolios: property.portfolioMemberships.map((pm) => ({
-							id: pm.portfolio.id,
-							name: pm.portfolio.name
-						})),
+						portfolios: property.portfolioMemberships
+							.filter((pm) => pm.portfolio !== null)
+							.map((pm) => ({
+								id: pm.portfolio.id,
+								name: pm.portfolio.name
+							})),
 						activeCaseCount: property.conciergeCases.length
 					}
 				},

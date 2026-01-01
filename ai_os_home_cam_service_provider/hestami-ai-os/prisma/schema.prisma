@@ -1348,6 +1348,7 @@ enum NotificationCategory {
   ARC
   VIOLATION
   COMMUNICATION
+  DOCUMENT_PROCESSING
 }
 
 enum OwnerRequestStatus {
@@ -1453,6 +1454,10 @@ enum DocumentContextType {
 
 enum DocumentStatus {
   DRAFT
+  PENDING_UPLOAD
+  PROCESSING
+  PROCESSING_FAILED
+  INFECTED
   ACTIVE
   SUPERSEDED
   ARCHIVED
@@ -2233,6 +2238,41 @@ model NotificationSetting {
   @@map("notification_settings")
 }
 
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+enum NotificationReadStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+/// @description User in-app notifications
+model Notification {
+  id             String                 @id @default(cuid())
+  userId         String                 @map("user_id")
+  organizationId String                 @map("organization_id")
+  title          String
+  message        String                 @db.Text
+  type           NotificationType       @default(INFO)
+  category       NotificationCategory
+  status         NotificationReadStatus @default(UNREAD)
+  link           String?
+  metadata       Json?
+
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  readAt    DateTime? @db.Timestamptz(3) @map("read_at")
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("notifications")
+}
+
 /// @description Owner request / inquiry submitted via portal
 model OwnerRequest {
   id            String  @id @default(cuid())
@@ -2465,10 +2505,18 @@ model Document {
   archivedBy    String?   @map("archived_by")
   archiveReason String?   @map("archive_reason")
 
-  // Processing status (malware scan, content moderation)
+  // Processing status (malware scan, content moderation, DPQ)
   malwareScanStatus       String?   @map("malware_scan_status") // PENDING, CLEAN, INFECTED, ERROR
   contentModerationStatus String?   @map("content_moderation_status") // PENDING, APPROVED, FLAGGED
   processingCompletedAt   DateTime? @db.Timestamptz(3) @map("processing_completed_at")
+
+  // DPQ processing fields
+  processingStartedAt    DateTime? @db.Timestamptz(3) @map("processing_started_at")
+  processingAttemptCount Int       @default(0) @map("processing_attempt_count")
+  processingNextRetryAt  DateTime? @db.Timestamptz(3) @map("processing_next_retry_at")
+  processingErrorType    String?   @map("processing_error_type")
+  processingErrorMessage String?   @map("processing_error_message")
+  processingErrorDetails Json?     @map("processing_error_details")
 
   // Media-specific fields (for photos, videos, voice notes)
   latitude      Decimal?  @db.Decimal(10, 7)
@@ -2496,6 +2544,8 @@ model Document {
   @@index([visibility])
   @@index([status])
   @@index([malwareScanStatus])
+  @@index([status, processingNextRetryAt])
+  @@index([organizationId, status])
   @@map("documents")
 }
 
@@ -8614,5 +8664,16 @@ model VendorBid {
   @@index([caseId])
   @@index([status])
   @@map("vendor_bids")
+}
+
+/// @description Global system settings for platform configuration
+model SystemSetting {
+  key   String @id
+  value Json
+
+  updatedAt DateTime @db.Timestamptz(3) @updatedAt @map("updated_at")
+  updatedBy String   @map("updated_by")
+
+  @@map("system_settings")
 }
 

@@ -193,7 +193,7 @@
 								/>
 							</label>
 							<p class="mt-1 text-xs text-surface-400">
-								PDF, DOC, DOCX, JPG, PNG up to 10MB
+								PDF, DOC, DOCX, JPG, PNG up to 100MB
 							</p>
 						{/if}
 					</div>

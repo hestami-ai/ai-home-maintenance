@@ -8,7 +8,7 @@ import {
 	ActivityActionTypeSchema,
 	type ActivityEntityType,
 	type ActivityActionType
-} from '../schemas.js';
+} from '$lib/schemas/index.js';
 import {
 	authedProcedure,
 	successResponse,
