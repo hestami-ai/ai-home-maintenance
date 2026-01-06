@@ -10,7 +10,7 @@
  * - Error serialization with stack traces
  */
 
-import winston from 'winston';
+import * as winston from 'winston';
 import { trace } from '@opentelemetry/api';
 import { OpenTelemetryTransportV3 } from '@opentelemetry/winston-transport';
 import type { RequestContext } from './api/context.js';
@@ -168,14 +168,14 @@ const winstonLogger = winston.createLogger({
 		process.env.NODE_ENV === 'production'
 			? winston.format.json()
 			: winston.format.combine(
-					winston.format.colorize(),
-					winston.format.printf(({ level, message, timestamp, ...meta }) => {
-						const metaStr = Object.keys(meta).length > 0 
-							? ` ${JSON.stringify(meta, null, 2)}` 
-							: '';
-						return `${timestamp} [${level}] ${message}${metaStr}`;
-					})
-				)
+				winston.format.colorize(),
+				winston.format.printf(({ level, message, timestamp, ...meta }) => {
+					const metaStr = Object.keys(meta).length > 0
+						? ` ${JSON.stringify(meta, null, 2)}`
+						: '';
+					return `${timestamp} [${level}] ${message}${metaStr}`;
+				})
+			)
 	),
 	transports: buildTransports(),
 	// Don't exit on handled exceptions

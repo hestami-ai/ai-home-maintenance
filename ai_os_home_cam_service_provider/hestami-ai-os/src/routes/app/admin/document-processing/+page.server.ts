@@ -46,7 +46,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
             settings: settingsResponse.data,
             initialQueue: queueResponse.data.documents,
             pagination: queueResponse.data.pagination
-        };
+        , association: null};
     } catch (error) {
         console.error('Error loading DPQ admin data:', error);
         return {

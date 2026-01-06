@@ -19,6 +19,7 @@ export const load: LayoutServerLoad = async ({ parent }) => {
 
     // Return staff info for child routes
     return {
-        staff
+        staff,
+        association: null
     };
 };

@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
     if (!organization) {
         return {
             notifications: []
-        };
+        , association: null};
     }
 
     // Build context using data from parent layout
@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
         const casesResult = await client.conciergeCase.list({ limit: 10 });
         
         if (!casesResult.ok) {
-            return { notifications: [] };
+            return { notifications: [] , association: null};
         }
 
         const getStatusNotificationTitle = (status: string): string => {
@@ -77,11 +77,11 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
         return {
             notifications
-        };
+        , association: null};
     } catch (err) {
         console.error('Failed to load concierge notifications:', err);
         return {
             notifications: []
-        };
+        , association: null};
     }
 };

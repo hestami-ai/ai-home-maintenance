@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { Building2, Search } from 'lucide-svelte';
+	import { Building2, Search, Plus } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
-    import { enhance } from '$app/forms';
 
 	interface Association {
 		id: string;
@@ -36,6 +35,12 @@
 		});
 	}
 
+	function switchToAssociation(associationId: string) {
+		// Set cookie client-side and reload to switch association context
+		document.cookie = `cam_association_id=${associationId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+		window.location.href = '/app/cam';
+	}
+
 	const filteredAssociations = $derived(
 		associations.filter((a) =>
 			a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -53,7 +58,13 @@
 		<ListPanel loading={isLoading}>
 			{#snippet header()}
 				<div class="space-y-3">
-					<h1 class="text-lg font-semibold">Associations</h1>
+					<div class="flex items-center justify-between">
+						<h1 class="text-lg font-semibold">Associations</h1>
+						<a href="/app/cam/associations/new" class="btn btn-sm preset-filled-primary-500">
+							<Plus class="mr-1.5 h-4 w-4" />
+							New Association
+						</a>
+					</div>
 
 					<div class="relative">
 						<Search class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
@@ -126,15 +137,13 @@
 
 				{#snippet actions()}
 					{@const a = selectedAssociation!}
-					<form action="/api/cam/switch" method="POST" use:enhance>
-						<input type="hidden" name="associationId" value={a.id} />
-						<button
-							type="submit"
-							class="btn btn-sm preset-filled-primary-500"
-						>
-							Switch to This
-						</button>
-					</form>
+					<button
+						type="button"
+						onclick={() => switchToAssociation(a.id)}
+						class="btn btn-sm preset-filled-primary-500"
+					>
+						Switch to This
+					</button>
 					<a href="/app/cam/associations/{a.id}/edit" class="btn btn-sm preset-tonal-surface">
 						Edit
 					</a>

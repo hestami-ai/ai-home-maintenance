@@ -8,10 +8,10 @@ import {
 import { prisma } from '../../db.js';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
-import { seedDefaultChartOfAccounts } from '../../accounting/index.js';
-import { recordExecution } from '../middleware/activityEvent.js';
-import { recordSpanError } from '../middleware/tracing.js';
 import { createModuleLogger } from '../../logger.js';
+import { DBOS } from '@dbos-inc/dbos-sdk';
+import { createManagedAssociation_v1_wf } from '../../workflows/associationWorkflow.js';
+import { COATemplateId } from '../../accounting/defaultChartOfAccounts.js';
 
 const log = createModuleLogger('AssociationRoute');
 
@@ -25,12 +25,21 @@ export const associationRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				name: z.string().min(1).max(255),
-				legalName: z.string().max(255).optional(),
-				taxId: z.string().max(50).optional(),
-				incorporationDate: z.coerce.date().optional(),
+				legalName: z.string().max(255).optional().nullable(),
+				taxId: z.string().max(50).optional().nullable(),
+				incorporationDate: z.coerce.date().optional().nullable(),
 				fiscalYearEnd: z.number().int().min(1).max(12).default(12),
-				settings: z.record(z.string(), z.unknown()).optional()
+				settings: z.record(z.string(), z.unknown()).optional(),
+				coaTemplateId: z.nativeEnum(COATemplateId).default(COATemplateId.STANDARD_HOA),
+				contractData: z
+					.object({
+						contractNumber: z.string().max(100).optional().nullable(),
+						startDate: z.coerce.date()
+					})
+					.optional()
+					.nullable()
 			})
 		)
 		.output(
@@ -48,44 +57,46 @@ export const associationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization - check if user can create associations
 			await context.cerbos.authorize('create', 'association', 'new');
 
-			const association = await prisma.association.create({
-				data: {
-					organizationId: context.organization.id,
+			// Start DBOS workflow
+			const handle = await DBOS.startWorkflow(createManagedAssociation_v1_wf, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE_MANAGED_ASSOCIATION',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				associationData: {
 					name: input.name,
 					legalName: input.legalName,
 					taxId: input.taxId,
 					incorporationDate: input.incorporationDate,
 					fiscalYearEnd: input.fiscalYearEnd,
 					settings: (input.settings ?? {}) as Prisma.InputJsonValue
-				}
+				},
+				coaTemplateId: input.coaTemplateId,
+				contractData: input.contractData
 			});
 
-			// Seed default chart of accounts for the new association
-			try {
-				await seedDefaultChartOfAccounts(context.organization.id, association.id);
-			} catch (error) {
-				const errorObj = error instanceof Error ? error : new Error(String(error));
-				console.warn(`Failed to seed chart of accounts for association ${association.id}:`, error);
-				// Record non-fatal error but don't fail the request
-				await recordSpanError(errorObj, {
-					errorCode: 'SEEDING_FAILED',
-					errorType: 'ASSOCIATION_SETUP_ERROR'
-				});
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create association' });
 			}
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'ASSOCIATION',
-				entityId: association.id,
-				action: 'CREATE',
-				summary: `Association created: ${association.name}`,
-				associationId: association.id,
-				newState: { name: association.name, status: association.status }
+			// Fetch the created association to return its data
+			const association = await prisma.association.findUnique({
+				where: { id: result.associationId }
 			});
+
+			if (!association) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: 'Association created but not found' });
+			}
 
 			return successResponse(
 				{

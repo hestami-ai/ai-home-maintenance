@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
     if (!organization) {
         return {
             properties: []
-        };
+        , association: null};
     }
 
     // Build context using data from parent layout
@@ -30,11 +30,11 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
         return {
             properties: result.ok ? result.data.properties : []
-        };
+        , association: null};
     } catch (err) {
         console.error('Failed to load concierge properties:', err);
         return {
             properties: []
-        };
+        , association: null};
     }
 };

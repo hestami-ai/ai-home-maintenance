@@ -37,7 +37,8 @@ import { arcRequestRouter, arcReviewRouter } from './routes/arc/index.js';
 import {
 	governanceBoardRouter,
 	governanceMeetingRouter,
-	governanceResolutionRouter
+	governanceResolutionRouter,
+	governanceCommitteeRouter
 } from './routes/governance/index.js';
 import { communicationRouter } from './routes/communication/index.js';
 import { ownerPortalRouter } from './routes/ownerPortal.js';
@@ -104,7 +105,7 @@ import {
 import { activityEventRouter } from './routes/activityEvent.js';
 
 // Phase 16: Staff Management
-import { staffRouter } from './routes/staff.js';
+import { staffRouter, orgStaffRouter } from './routes/staff.js';
 import { workQueueRouter } from './routes/workQueue.js';
 
 // Phase 16.5: Vendor Discovery
@@ -177,6 +178,7 @@ export const appRouter = {
 	governanceBoard: governanceBoardRouter,
 	governanceMeeting: governanceMeetingRouter,
 	governanceResolution: governanceResolutionRouter,
+	governanceCommittee: governanceCommitteeRouter,
 
 	// Phase 8: Communications
 	communication: communicationRouter,
@@ -263,6 +265,7 @@ export const appRouter = {
 
 	// Phase 16: Staff Management
 	staff: staffRouter,
+	orgStaff: orgStaffRouter,
 	workQueue: workQueueRouter,
 
 	// Phase 16.5: Vendor Discovery

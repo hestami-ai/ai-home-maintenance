@@ -17,10 +17,10 @@ import {
 	ARCDocumentTypeSchema
 } from '$lib/schemas/index.js';
 import { startARCRequestWorkflow } from '../../../workflows/arcRequestWorkflow.js';
-import type {
+import {
 	Prisma,
-	ARCRequestStatus,
-	ARCCategory
+	type ARCRequestStatus,
+	type ARCCategory
 } from '../../../../../../generated/prisma/client.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
@@ -33,9 +33,13 @@ const arcRequestStatusEnum = ARCRequestStatusSchema;
 const arcDocumentTypeEnum = ARCDocumentTypeSchema;
 const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
 
-const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
+const getAssociationOrThrow = async (organizationId: string, associationId: string | null, errors: any) => {
 	const association = await prisma.association.findFirst({
-		where: { id: associationId, organizationId, deletedAt: null }
+		where: {
+			id: associationId ?? undefined,
+			organizationId,
+			deletedAt: undefined // Use undefined instead of null for RLS compatibility
+		}
 	});
 	if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 	return association;
@@ -102,7 +106,7 @@ export const arcRequestRouter = {
 			await context.cerbos.authorize('create', 'arc_request', 'new');
 			const { idempotencyKey, ...rest } = input;
 
-			await getAssociationOrThrow(rest.associationId, context.organization.id, errors);
+			await getAssociationOrThrow(context.organization.id, rest.associationId, errors);
 			if (rest.unitId) await ensureUnitBelongs(rest.unitId, rest.associationId, errors);
 			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, rest.associationId, errors);
 			await ensurePartyBelongs(rest.requesterPartyId, context.organization.id, errors);
@@ -184,7 +188,7 @@ export const arcRequestRouter = {
 					unit: true,
 					committee: true,
 					requesterParty: true,
-					documents: true,
+					// documents: true, // DEPRECATED: ARCDocument model is deprecated, use Document + DocumentContextBinding
 					reviews: true
 				}
 			});
@@ -224,7 +228,7 @@ export const arcRequestRouter = {
 			const where: Prisma.ARCRequestWhereInput = {
 				association: { organizationId: context.organization.id },
 				status: input.status as ARCRequestStatus | undefined,
-				associationId: input.associationId
+				associationId: input.associationId ?? context.associationId ?? undefined
 			};
 
 			const items = await prisma.aRCRequest.findMany({
@@ -501,19 +505,7 @@ export const arcRequestRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to add document' });
 			}
 
-			const document = await prisma.aRCDocument.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'ARC_REQUEST',
-				entityId: rest.requestId,
-				action: 'UPDATE',
-				summary: `Document added: ${rest.fileName}`,
-				arcRequestId: rest.requestId,
-				newState: { documentId: document.id, documentType: rest.documentType }
-			});
-
-			return successResponse({ document: { id: document.id, requestId: document.requestId } }, context);
+			return successResponse({ document: { id: workflowResult.entityId!, requestId: rest.requestId } }, context);
 		}),
 
 	recordDecision: orgProcedure

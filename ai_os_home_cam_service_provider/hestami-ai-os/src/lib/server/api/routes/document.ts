@@ -152,6 +152,7 @@ export const documentRouter = {
 					{
 						action: 'CREATE_DOCUMENT_METADATA',
 						organizationId: context.organization.id,
+						associationId: context.associationId, // NEW: Pass association context (Phase 30)
 						userId: context.user.id,
 						data: {
 							title: input.title,
@@ -265,6 +266,7 @@ export const documentRouter = {
 					{
 						action: 'CREATE_DOCUMENT',
 						organizationId: context.organization.id,
+						associationId: context.associationId, // NEW: Pass association context (Phase 30)
 						userId: context.user.id,
 						data: {
 							title: input.title,
@@ -400,6 +402,7 @@ export const documentRouter = {
 				{
 					action: 'CREATE_VERSION',
 					organizationId: context.organization.id,
+					associationId: context.associationId, // NEW: Pass association context (Phase 30)
 					userId: context.user.id,
 					documentId: parent.parentDocumentId ?? parent.id,
 					data: {
@@ -488,6 +491,7 @@ export const documentRouter = {
 				{
 					action: 'CREATE_DOCUMENT_METADATA',
 					organizationId: context.organization.id,
+					associationId: context.associationId, // NEW: Pass association context (Phase 30)
 					userId: context.user.id,
 					data: {
 						title: input.title,

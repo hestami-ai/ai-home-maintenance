@@ -1,0 +1,46 @@
+# Governance Board Resource Policy
+# Controls access to board of directors management
+# Phase 7: Governance
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_board"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all board operations
+    - actions: ["view", "create", "edit", "delete", "add_member", "remove_member", "view_history"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers have full access to board operations
+    - actions: ["view", "create", "edit", "delete", "add_member", "remove_member", "view_history"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view board info and history
+    - actions: ["view", "view_history"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view board members (transparency)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view board members (transparency)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Auditors can view board for audit purposes
+    - actions: ["view", "view_history"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { setContext } from 'svelte';
+	import { page } from '$app/stores';
 	import { CamSidebar, AssociationSelector } from '$lib/components/cam';
 	import { Loader2 } from 'lucide-svelte';
 
@@ -27,6 +28,12 @@
 	}
 
 	let { data, children }: Props = $props();
+
+	// Routes that should always render children even without a current association
+	const alwaysRenderRoutes = ['/app/cam/associations'];
+	const shouldAlwaysRender = $derived(
+		alwaysRenderRoutes.some(route => $page.url.pathname.startsWith(route))
+	);
 
 	// Make CAM state available to deep children via context if needed to avoid prop drilling
 	setContext('cam-state', {
@@ -61,7 +68,7 @@
 	<CamSidebar badgeCounts={data.badgeCounts} />
 
 	<div class="flex flex-1 flex-col overflow-hidden">
-		{#if !data.currentAssociation}
+		{#if !data.currentAssociation && !shouldAlwaysRender}
 			{#if data.associations.length > 0}
 				<!-- Should theoretically not happen if load function defaults correctly, but handle anyway -->
 				<div class="flex flex-1 items-center justify-center">

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import './layout.css';
 	import { Header } from '$lib/components/layout';
-	import { theme } from '$lib/stores';
+	import { theme, organizationStore } from '$lib/stores';
 	import { logger } from '$lib/logger';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
-	import type { Organization, Staff } from '../../generated/prisma/client';
+	import type { Organization, Staff } from '$lib/api/cam';
 
 	const log = logger.child({ component: 'Layout' });
 
@@ -25,6 +25,18 @@
 	}
 
 	let { data, children }: Props = $props();
+
+	// Initialize organization store from SSR data
+	// This ensures the oRPC client has access to organization context for API calls
+	$effect(() => {
+		if (browser && data.memberships) {
+			organizationStore.setMemberships(data.memberships);
+			log.debug('Organization store initialized', { 
+				membershipsCount: data.memberships.length,
+				currentOrgId: data.organization?.id 
+			});
+		}
+	});
 
 	onMount(() => {
 		// Initialize theme - this is the ONLY acceptable client-side store

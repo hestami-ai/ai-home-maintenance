@@ -87,7 +87,7 @@ export type JsonValue = string | number | boolean | null | JsonValue[] | { [key:
 export const JsonSchema = z.unknown().transform((val): JsonValue => {
 	// Runtime validation for JSON-compatible types
 	if (val === null || typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
-		return val;
+		return val as JsonValue;
 	}
 	if (Array.isArray(val)) {
 		return val as JsonValue[];
@@ -97,6 +97,82 @@ export const JsonSchema = z.unknown().transform((val): JsonValue => {
 	}
 	throw new Error('Invalid JSON value');
 });
+
+// =============================================================================
+// Document Domain Enum Schemas (re-exported from generated Zod schemas)
+// =============================================================================
+
+export const DocumentCategorySchema = GeneratedDocumentCategorySchema;
+export type DocumentCategory = z.infer<typeof DocumentCategorySchema>;
+
+export const DocumentContextTypeSchema = GeneratedDocumentContextTypeSchema;
+export type DocumentContextType = z.infer<typeof DocumentContextTypeSchema>;
+
+export const DocumentVisibilitySchema = GeneratedDocumentVisibilitySchema;
+export type DocumentVisibility = z.infer<typeof DocumentVisibilitySchema>;
+
+export const DocumentStatusSchema = GeneratedDocumentStatusSchema;
+export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
+
+export const StorageProviderSchema = GeneratedStorageProviderSchema;
+export type StorageProvider = z.infer<typeof StorageProviderSchema>;
+
+// =============================================================================
+// Document Domain Schemas
+// =============================================================================
+
+/**
+ * Document schema (matches Prisma Document model)
+ */
+export const DocumentSchema = z.object({
+	id: z.string(),
+	organizationId: z.string(),
+	associationId: z.string().nullish(),
+	title: z.string(),
+	description: z.string().nullish(),
+	category: DocumentCategorySchema,
+	visibility: DocumentVisibilitySchema,
+	status: DocumentStatusSchema,
+	storageProvider: StorageProviderSchema,
+	storagePath: z.string(),
+	fileUrl: z.string(),
+	fileName: z.string(),
+	fileSize: z.number(),
+	mimeType: z.string(),
+	checksum: z.string().nullish(),
+	pageCount: z.number().nullish(),
+	thumbnailUrl: z.string().nullish(),
+	extractedText: z.string().nullish(),
+	metadata: JsonSchema.nullish(),
+	version: z.number(),
+	parentDocumentId: z.string().nullish(),
+	supersededById: z.string().nullish(),
+	effectiveDate: z.coerce.date().nullish(),
+	expirationDate: z.coerce.date().nullish(),
+	uploadedBy: z.string(),
+	tags: z.array(z.string()),
+	archivedAt: z.coerce.date().nullish(),
+	archivedBy: z.string().nullish(),
+	archiveReason: z.string().nullish(),
+	malwareScanStatus: z.string().nullish(),
+	contentModerationStatus: z.string().nullish(),
+	processingCompletedAt: z.coerce.date().nullish(),
+	processingStartedAt: z.coerce.date().nullish(),
+	processingAttemptCount: z.number().default(0),
+	processingNextRetryAt: z.coerce.date().nullish(),
+	processingErrorType: z.string().nullish(),
+	processingErrorMessage: z.string().nullish(),
+	processingErrorDetails: JsonSchema.nullish(),
+	latitude: DecimalSchema.nullish(),
+	longitude: DecimalSchema.nullish(),
+	capturedAt: z.coerce.date().nullish(),
+	transcription: z.string().nullish(),
+	isTranscribed: z.boolean().default(false),
+	createdAt: z.coerce.date(),
+	updatedAt: z.coerce.date(),
+	deletedAt: z.coerce.date().nullish()
+});
+export type Document = z.infer<typeof DocumentSchema>;
 
 // =============================================================================
 // Base Response Helpers
@@ -181,6 +257,7 @@ export type ARCRequest = z.infer<typeof ARCRequestSchema>;
 /**
  * ARC Document schema (matches Prisma ARCDocument model)
  */
+/** @deprecated Use DocumentSchema instead */
 export const ARCDocumentSchema = z.object({
 	id: z.string(),
 	requestId: z.string(),
@@ -282,7 +359,7 @@ export const ARCRequestDetailSchema = ARCRequestSchema.extend({
 	unit: UnitSchema.nullish(),
 	committee: ARCCommitteeSchema.nullish(),
 	requesterParty: PartySchema.optional(),
-	documents: z.array(ARCDocumentSchema).optional(),
+	documents: z.array(DocumentSchema).optional(),
 	reviews: z.array(ARCReviewSchema).optional()
 });
 export type ARCRequestDetail = z.infer<typeof ARCRequestDetailSchema>;
@@ -508,6 +585,7 @@ export type Violation = z.infer<typeof ViolationSchema>;
 /**
  * ViolationEvidence schema
  */
+/** @deprecated Use DocumentSchema instead */
 export const ViolationEvidenceSchema = z.object({
 	id: z.string(),
 	violationId: z.string(),
@@ -627,7 +705,7 @@ export const ViolationDetailSchema = ViolationSchema.extend({
 	violationType: ViolationTypeSchema.optional(),
 	unit: UnitSchema.nullish(),
 	responsibleParty: PartySchema.nullish(),
-	evidence: z.array(ViolationEvidenceSchema).optional(),
+	evidence: z.array(DocumentSchema).optional(),
 	notices: z.array(ViolationNoticeSchema).optional(),
 	hearings: z.array(ViolationHearingSchema).optional(),
 	fines: z.array(ViolationFineSchema).optional()
@@ -655,76 +733,8 @@ export type ViolationSummary = z.infer<typeof ViolationSummarySchema>;
 // Document Domain Enum Schemas (re-exported from generated Zod schemas)
 // =============================================================================
 
-export const DocumentCategorySchema = GeneratedDocumentCategorySchema;
-export type DocumentCategory = z.infer<typeof DocumentCategorySchema>;
 
-export const DocumentContextTypeSchema = GeneratedDocumentContextTypeSchema;
-export type DocumentContextType = z.infer<typeof DocumentContextTypeSchema>;
 
-export const DocumentVisibilitySchema = GeneratedDocumentVisibilitySchema;
-export type DocumentVisibility = z.infer<typeof DocumentVisibilitySchema>;
-
-export const DocumentStatusSchema = GeneratedDocumentStatusSchema;
-export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
-
-export const StorageProviderSchema = GeneratedStorageProviderSchema;
-export type StorageProvider = z.infer<typeof StorageProviderSchema>;
-
-// =============================================================================
-// Document Domain Schemas
-// =============================================================================
-
-/**
- * Document schema (matches Prisma Document model)
- */
-export const DocumentSchema = z.object({
-	id: z.string(),
-	organizationId: z.string(),
-	title: z.string(),
-	description: z.string().nullish(),
-	category: DocumentCategorySchema,
-	visibility: DocumentVisibilitySchema,
-	status: DocumentStatusSchema,
-	storageProvider: StorageProviderSchema,
-	storagePath: z.string(),
-	fileUrl: z.string(),
-	fileName: z.string(),
-	fileSize: z.number(),
-	mimeType: z.string(),
-	checksum: z.string().nullish(),
-	pageCount: z.number().nullish(),
-	thumbnailUrl: z.string().nullish(),
-	extractedText: z.string().nullish(),
-	metadata: JsonSchema.nullish(),
-	version: z.number(),
-	parentDocumentId: z.string().nullish(),
-	supersededById: z.string().nullish(),
-	effectiveDate: z.coerce.date().nullish(),
-	expirationDate: z.coerce.date().nullish(),
-	uploadedBy: z.string(),
-	tags: z.array(z.string()),
-	archivedAt: z.coerce.date().nullish(),
-	archivedBy: z.string().nullish(),
-	archiveReason: z.string().nullish(),
-	malwareScanStatus: z.string().nullish(),
-	contentModerationStatus: z.string().nullish(),
-	processingCompletedAt: z.coerce.date().nullish(),
-	processingStartedAt: z.coerce.date().nullish(),
-	processingAttemptCount: z.number().default(0),
-	processingNextRetryAt: z.coerce.date().nullish(),
-	processingErrorType: z.string().nullish(),
-	processingErrorMessage: z.string().nullish(),
-	processingErrorDetails: JsonSchema.nullish(),
-	latitude: DecimalSchema.nullish(),
-	longitude: DecimalSchema.nullish(),
-	capturedAt: z.coerce.date().nullish(),
-	transcription: z.string().nullish(),
-	isTranscribed: z.boolean(),
-	createdAt: z.coerce.date(),
-	updatedAt: z.coerce.date(),
-	deletedAt: z.coerce.date().nullish()
-});
-export type Document = z.infer<typeof DocumentSchema>;
 
 /**
  * DocumentContextBinding schema

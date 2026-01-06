@@ -1,3 +1,7 @@
+// IMPORTANT: Import telemetry-init FIRST to register the OTel SDK
+// before any other modules that might use @opentelemetry/api
+import '$server/telemetry-init';
+
 import type { Handle } from '@sveltejs/kit';
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
 import type { Organization, UserRole } from '../generated/prisma/client';
@@ -5,8 +9,13 @@ import { auth } from '$server/auth';
 import { prisma } from '$server/db';
 import { initDBOS } from '$server/dbos';
 import { createModuleLogger } from '$server/logger';
+import { registerShutdownHandlers } from '$server/shutdown';
+import { nanoid } from 'nanoid';
 
 const log = createModuleLogger('Hooks');
+
+// Register graceful shutdown handlers (SIGTERM, SIGINT)
+registerShutdownHandlers();
 
 // Type for the raw membership row from SECURITY DEFINER function
 interface MembershipRow {
@@ -22,6 +31,13 @@ interface MembershipRow {
 	org_slug: string;
 	org_type: string;
 	org_status: string;
+}
+
+// Type for association membership lookup
+interface AssocMembershipRow {
+	association_id: string;
+	association_name: string;
+	role: string;
 }
 
 // Initialize DBOS workflow engine
@@ -41,6 +57,9 @@ const tracer = trace.getTracer('hestami-ai-os');
  * correlating workflow spans with their originating HTTP requests.
  */
 export const handle: Handle = async ({ event, resolve }) => {
+	// Generate unique request ID for correlation
+	const requestId = nanoid();
+
 	// Check if auto-instrumentation already created a span (from HTTP instrumentation)
 	let span = trace.getActiveSpan();
 	const isAutoInstrumented = !!span;
@@ -51,9 +70,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 			attributes: {
 				'http.method': event.request.method,
 				'http.url': event.url.href,
-				'http.target': event.url.pathname
+				'http.target': event.url.pathname,
+				'hestami.request_id': requestId
 			}
 		});
+	} else {
+		// Add request ID to existing span
+		span.setAttribute('hestami.request_id', requestId);
 	}
 
 	// Store span context in locals for route handlers to access
@@ -86,7 +109,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 					image: session.user.image ?? null
 				};
 				event.locals.session = session.session;
-				if (activeSpan) activeSpan.setAttribute('user.id', session.user.id);
+				if (activeSpan) {
+					activeSpan.setAttribute('user.id', session.user.id);
+					activeSpan.setAttribute('user.email', session.user.email);
+					activeSpan.setAttribute('hestami.session_id', session.session.id);
+					if (session.user.name) activeSpan.setAttribute('user.name', session.user.name);
+				}
 
 				log.debug('Session validated', {
 					userId: session.user.id,
@@ -117,7 +145,12 @@ export const handle: Handle = async ({ event, resolve }) => {
 							status: membership.org_status
 						} as Organization;
 						event.locals.role = membership.role as UserRole;
-						if (activeSpan) activeSpan.setAttribute('org.id', orgId);
+						if (activeSpan) {
+							activeSpan.setAttribute('org.id', orgId);
+							activeSpan.setAttribute('org.slug', membership.org_slug);
+							activeSpan.setAttribute('org.type', membership.org_type);
+							activeSpan.setAttribute('user.role', membership.role);
+						}
 
 						log.debug('Organization context resolved', {
 							orgId,
@@ -125,6 +158,60 @@ export const handle: Handle = async ({ event, resolve }) => {
 							role: membership.role,
 							userId: session.user.id
 						});
+
+						// Check for association context
+						const assocId = event.request.headers.get('X-Assoc-Id');
+						if (assocId) {
+							// Validate association access
+							const assocRows = await prisma.$queryRaw<AssocMembershipRow[]>`
+								SELECT * FROM get_user_associations(${session.user.id}, ${orgId})
+								WHERE association_id = ${assocId}
+								LIMIT 1
+							`;
+
+							const assoc = assocRows[0];
+							if (assoc) {
+								event.locals.association = {
+									id: assoc.association_id,
+									name: assoc.association_name,
+									organizationId: orgId
+								} as any; // Cast as we don't need full model here
+
+								if (activeSpan) {
+									activeSpan.setAttribute('assoc.id', assocId);
+									activeSpan.setAttribute('assoc.name', assoc.association_name);
+								}
+
+								log.debug('Association context resolved', {
+									assocId,
+									assocName: assoc.association_name,
+									userId: session.user.id
+								});
+							} else {
+								log.warn('Association access denied', {
+									userId: session.user.id,
+									requestedAssocId: assocId,
+									orgId
+								});
+							}
+						}
+
+						// Determine if user is platform staff
+						// This could be enhanced to check role types or staff model
+						event.locals.isStaff = membership.org_type === 'PLATFORM_OPERATOR' ||
+							membership.org_type === 'MANAGEMENT_COMPANY';
+
+						// Set SQL session context for RLS
+						await prisma.$executeRaw`
+							SELECT set_org_context_audited(
+								${session.user.id}, 
+								${orgId}, 
+								${event.locals.association?.id || null},
+								${event.locals.isStaff},
+								'hook_init'
+							)
+						`;
+
 					} else {
 						log.warn('Organization access denied', {
 							userId: session.user.id,
@@ -137,6 +224,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 						userId: session.user.id,
 						path: event.url.pathname
 					});
+
+					// Ensure RLS context is cleared if no org ID provided
+					await prisma.$executeRaw`SELECT clear_org_context_audited(${session.user.id})`;
 				}
 			} else {
 				// No session - check if auth was expected
@@ -154,10 +244,25 @@ export const handle: Handle = async ({ event, resolve }) => {
 			}
 
 			const response = await resolve(event);
-			if (activeSpan) activeSpan.setAttribute('http.status_code', response.status);
+
+			if (activeSpan) {
+				activeSpan.setAttribute('http.status_code', response.status);
+
+				// Set error status for HTTP error responses
+				if (response.status >= 400) {
+					activeSpan.setStatus({
+						code: SpanStatusCode.ERROR,
+						message: `HTTP ${response.status}`
+					});
+				}
+			}
+
 			return response;
 		} catch (error) {
-			if (activeSpan) activeSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+			if (activeSpan) {
+				activeSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(error) });
+				activeSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+			}
 			throw error;
 		} finally {
 			// Only end the span if we created it (not auto-instrumented)

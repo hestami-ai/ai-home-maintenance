@@ -6,9 +6,11 @@
  * - Step-level logging
  * - Error logging with context
  * - Duration tracking
+ * - OpenTelemetry span enrichment
  */
 
 import { createModuleLogger, type LogContext, type ChildLogger } from '../logger.js';
+import { trace } from '@opentelemetry/api';
 
 /**
  * Context for workflow logging
@@ -35,13 +37,38 @@ export function createWorkflowLogger(
 }
 
 /**
+ * Enrich the active span with workflow context
+ */
+function enrichSpanWithWorkflow(
+	workflowName: string,
+	workflowId: string | undefined,
+	action: string
+): void {
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	span.setAttribute('hestami.workflow_name', workflowName);
+	if (workflowId) {
+		span.setAttribute('hestami.workflow_id', workflowId);
+	}
+	span.setAttribute('hestami.workflow_action', action);
+}
+
+/**
  * Log workflow start
  */
 export function logWorkflowStart(
 	log: ChildLogger,
 	action: string,
-	input?: Record<string, unknown>
+	input?: Record<string, unknown>,
+	workflowName?: string,
+	workflowId?: string
 ): number {
+	// Enrich span with workflow context
+	if (workflowName) {
+		enrichSpanWithWorkflow(workflowName, workflowId, action);
+	}
+	
 	log.info('Workflow started', { action, input: summarizeInput(input) });
 	return Date.now();
 }

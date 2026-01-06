@@ -296,23 +296,38 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  # SvelteKit Application
+  # SvelteKit Application (Bun runtime, single process per container)
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: hestami-app
+    # Note: container_name removed to allow replicas
+    # container_name: hestami-app
     env_file:
       - ./.env
+    environment:
+      # Connection pool settings for deterministic DB connections
+      # Total connections = replicas × (PRISMA_POOL_MAX + DBOS_POOL_MAX)
+      - PRISMA_POOL_MAX=${PRISMA_POOL_MAX:-5}
+      - DBOS_POOL_MAX=${DBOS_POOL_MAX:-3}
+      - SHUTDOWN_TIMEOUT_MS=${SHUTDOWN_TIMEOUT_MS:-30000}
     #ports:
     #  - "3000:3000" #SvelteKit Hestami AI OS App
     #  - "3001:3001" #DBOS Admin -- https://docs.dbos.dev/production/self-hosting/admin-api
-    deploy:
-      resources:
-        limits:
-          memory: 4G  # Production: allow more concurrent uploads
-        reservations:
-          memory: 1G  # Base memory for app
+    #deploy:
+      # Replica scaling - adjust based on load requirements
+      # Default: 1 replica for development, increase for production
+      #replicas: ${APP_REPLICAS:-1}
+      #resources:
+        #limits:
+          #memory: 4G  # Production: allow more concurrent uploads
+        #reservations:
+          #memory: 1G  # Base memory for app
+      #restart_policy:
+        #condition: unless-stopped
+        #delay: 5s
+        #max_attempts: 3
+        #window: 120s
     depends_on:
       postgres:
         condition: service_healthy
@@ -324,6 +339,10 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`dev-platform.hestami-ai.com`)"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      # Health-aware load balancing - remove unhealthy containers from rotation
+      - "traefik.http.services.frontend.loadbalancer.healthcheck.path=/api/ready"
+      - "traefik.http.services.frontend.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.frontend.loadbalancer.healthcheck.timeout=5s"
       # Define upload-limit middleware (referenced by entrypoint)
       - "traefik.http.middlewares.upload-limit.buffering.maxRequestBodyBytes=104857600"  # 100MB
       - "traefik.http.middlewares.upload-limit.buffering.memRequestBodyBytes=104857600"  # 100MB in memory
@@ -332,7 +351,6 @@ services:
     networks:
       - hestami-network
       - signoz-net
-    #restart: unless-stopped
     volumes:
       - ./volumes/hestami-ai-os-app/user_media:/mnt/hestami-user-media
     logging:

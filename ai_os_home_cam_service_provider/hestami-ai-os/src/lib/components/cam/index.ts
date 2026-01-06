@@ -19,7 +19,9 @@ export { default as VendorApprovalModal } from './VendorApprovalModal.svelte';
 export { default as UploadComplianceDocModal } from './UploadComplianceDocModal.svelte';
 export { default as AppealModal } from './AppealModal.svelte';
 export { default as BoardApprovalPanel } from './BoardApprovalPanel.svelte';
+export { default as InviteStaffModal } from './InviteStaffModal.svelte';
 export { default as DocumentPicker } from './DocumentPicker.svelte';
+export { default as PartyPicker } from './PartyPicker.svelte';
 
 // Concierge Case components
 export * from './concierge';

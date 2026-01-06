@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
         return {
             jobs: response.data.jobs
-        };
+        , association: null};
     } catch (err) {
         console.error('Failed to load dispatch board data on server:', err);
         throw error(500, 'Failed to fetch jobs from server');

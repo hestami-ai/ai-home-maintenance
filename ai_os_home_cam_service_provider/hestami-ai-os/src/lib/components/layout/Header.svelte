@@ -1,9 +1,16 @@
 <script lang="ts">
-	import { Menu, X } from 'lucide-svelte';
+	import { Menu, X, Building2 } from 'lucide-svelte';
+	import { page } from '$app/stores';
 	import Logo from '$lib/components/ui/Logo.svelte';
 	import ThemeToggle from '$lib/components/ui/ThemeToggle.svelte';
 	import UserMenu from './UserMenu.svelte';
-	import type { Organization, Staff } from '../../../../generated/prisma/client';
+	import AssociationSwitcher from './AssociationSwitcher.svelte';
+	import { camStore } from '$lib/stores';
+	import type { operations } from '$lib/api/types.generated';
+
+	// Extract types from OpenAPI spec (avoids importing massive Prisma types)
+	type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
+	type Staff = operations['orgStaff.get']['responses']['200']['content']['application/json']['data']['staff'];
 
 	let mobileMenuOpen = $state(false);
 	
@@ -25,6 +32,10 @@
 			? memberships.find(m => m.organization.id === currentOrganization.id) ?? null
 			: null
 	);
+
+	// Check if we're in CAM context (for showing association switcher)
+	const isInCamContext = $derived($page.url.pathname.startsWith('/app/cam'));
+	const camState = $derived($camStore);
 
 	// Determine the dashboard URL based on user role
 	const dashboardUrl = $derived(() => {
@@ -72,6 +83,12 @@
 
 			<!-- Right: Desktop Navigation -->
 			<div class="hidden items-center gap-3 md:flex">
+				{#if isInCamContext && camState.currentAssociation}
+					<AssociationSwitcher
+						currentAssociation={camState.currentAssociation}
+						associations={camState.associations}
+					/>
+				{/if}
 				<ThemeToggle />
 
 				{#if user}

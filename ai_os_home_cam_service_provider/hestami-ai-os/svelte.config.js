@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from 'svelte-adapter-bun';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 /** @type {import('@sveltejs/kit').Config} */
@@ -7,7 +7,17 @@ const config = {
 	// for more information about preprocessors
 	preprocess: vitePreprocess(),
 	kit: {
-		adapter: adapter(),
+		adapter: adapter({
+			// Bun adapter options
+			out: 'build',
+			// Enable precompression for static assets
+			precompress: false,
+			// Development mode detection
+			development: process.env.NODE_ENV !== 'production',
+			// Mark Node.js built-ins as external - Bun resolves these at runtime
+			// Used by: src/routes/uploads/[...path]/+server.ts, src/lib/server/api/routes/document.ts
+			external: ['fs/promises', 'path', 'crypto']
+		}),
 		alias: {
 			$server: 'src/lib/server',
 			'$server/*': 'src/lib/server/*'

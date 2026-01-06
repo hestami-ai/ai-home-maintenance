@@ -45,6 +45,7 @@ export type DocumentAction = (typeof DocumentAction)[keyof typeof DocumentAction
 export interface DocumentWorkflowInput {
 	action: DocumentAction;
 	organizationId: string;
+	associationId?: string | null; // NEW: Propagate association context (Phase 30)
 	userId: string;
 	documentId?: string;
 	data: {
@@ -55,6 +56,7 @@ export interface DocumentWorkflowInput {
 		status?: DocumentStatus;
 		contextType?: DocumentContextType;
 		contextId?: string;
+		associationId?: string | null; // NEW: Direct association override
 		isPrimary?: boolean;
 		fileName?: string;
 		fileSize?: number;
@@ -76,11 +78,19 @@ export interface DocumentWorkflowResult extends EntityWorkflowResult {
 async function createDocument(
 	organizationId: string,
 	userId: string,
-	data: DocumentWorkflowInput['data']
+	data: DocumentWorkflowInput['data'],
+	workflowAssocId?: string | null
 ): Promise<string> {
+	// Determine association ID priority: data override > workflow context > ASSOCIATION context binding
+	let associationId = data.associationId || workflowAssocId || null;
+	if (!associationId && data.contextType === DocumentContextType.ASSOCIATION) {
+		associationId = data.contextId!;
+	}
+
 	const document = await prisma.document.create({
 		data: {
 			organizationId,
+			associationId,
 			title: data.title!,
 			description: data.description,
 			category: data.category!,
@@ -118,11 +128,19 @@ async function createDocument(
 async function createDocumentMetadata(
 	organizationId: string,
 	userId: string,
-	data: DocumentWorkflowInput['data']
+	data: DocumentWorkflowInput['data'],
+	workflowAssocId?: string | null
 ): Promise<string> {
+	// Determine association ID priority: data override > workflow context > ASSOCIATION context binding
+	let associationId = data.associationId || workflowAssocId || null;
+	if (!associationId && data.contextType === DocumentContextType.ASSOCIATION) {
+		associationId = data.contextId!;
+	}
+
 	const document = await prisma.document.create({
 		data: {
 			organizationId,
+			associationId,
 			title: data.title!,
 			description: data.description,
 			category: data.category!,
@@ -224,6 +242,7 @@ async function createVersion(
 	const newDoc = await prisma.document.create({
 		data: {
 			organizationId: parent.organizationId,
+			associationId: parent.associationId, // NEW: Copy associationId (Phase 30)
 			parentDocumentId: parentId,
 			title: parent.title,
 			description: data.description || parent.description,
@@ -296,6 +315,7 @@ async function restoreVersion(
 	const restored = await prisma.document.create({
 		data: {
 			organizationId: target.organizationId,
+			associationId: target.associationId, // NEW: Copy associationId (Phase 30)
 			parentDocumentId: rootId,
 			title: target.title,
 			description: target.description,
@@ -592,7 +612,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 			case 'CREATE_DOCUMENT':
 				log.debug('Executing CREATE_DOCUMENT step');
 				entityId = await DBOS.runStep(
-					() => createDocument(input.organizationId, input.userId, input.data),
+					() => createDocument(input.organizationId, input.userId, input.data, input.associationId),
 					{ name: 'createDocument' }
 				);
 				break;
@@ -600,7 +620,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 			case 'CREATE_DOCUMENT_METADATA':
 				log.debug('Executing CREATE_DOCUMENT_METADATA step');
 				entityId = await DBOS.runStep(
-					() => createDocumentMetadata(input.organizationId, input.userId, input.data),
+					() => createDocumentMetadata(input.organizationId, input.userId, input.data, input.associationId),
 					{ name: 'createDocumentMetadata' }
 				);
 				break;

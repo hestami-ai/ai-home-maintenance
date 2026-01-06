@@ -6,9 +6,9 @@
  * Prisma Schema → Zod Schemas → oRPC → OpenAPI → Generated Types → API Clients
  */
 
-import { orpc } from './index';
+import { orpc } from './orpc.js';
 import type { operations } from './types.generated';
-import { waitForOrganization } from '$lib/stores';
+import { waitForOrganization } from '$lib/stores/organization.js';
 
 /**
  * Helper to ensure organization context is loaded before making API calls.
@@ -25,6 +25,10 @@ async function withOrgContext<T>(fn: () => Promise<T>): Promise<T> {
 // ============================================================================
 // Types - Extracted from types.generated.ts
 // ============================================================================
+
+// Core Types - Organization and Staff (for client-side use instead of Prisma types)
+export type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
+export type Staff = operations['orgStaff.get']['responses']['200']['content']['application/json']['data']['staff'];
 
 // Violation Types
 export type Violation = operations['violation.list']['responses']['200']['content']['application/json']['data']['violations'][number];
@@ -90,10 +94,20 @@ export type VendorDetail = operations['vendor.get']['responses']['200']['content
 // Association Types
 export type Association = operations['association.list']['responses']['200']['content']['application/json']['data']['associations'][number];
 export type AssociationDetail = operations['association.get']['responses']['200']['content']['application/json']['data']['association'];
+export type AssociationCreateInput = operations['association.create']['requestBody']['content']['application/json'];
+export type AssociationUpdateInput = operations['association.update']['requestBody']['content']['application/json'];
 
 // Document Types
 export type Document = operations['document.listDocuments']['responses']['200']['content']['application/json']['data']['documents'][number];
 export type DocumentDetail = operations['document.getDocument']['responses']['200']['content']['application/json']['data']['document'];
+
+// Phase 28: Staff & Party Types
+export type OrgStaffListItem = operations['orgStaff.list']['responses']['200']['content']['application/json']['data']['staff'][number];
+export type OrgStaffDetail = operations['orgStaff.get']['responses']['200']['content']['application/json']['data']['staff'];
+export type StaffStatus = OrgStaffListItem['status'];
+export type StaffRole = OrgStaffListItem['roles'][number];
+export type PillarAccess = OrgStaffListItem['pillarAccess'][number];
+export type Party = operations['party.list']['responses']['200']['content']['application/json']['data']['parties'][number];
 
 // ============================================================================
 // Violation API - Using oRPC client
@@ -534,27 +548,14 @@ export const vendorApi = {
 // ============================================================================
 
 export const associationApi = {
-	list: (params?: { cursor?: string; limit?: number }) => orpc.association.list(params || {}),
+	list: (params?: { cursor?: string; limit?: number; status?: 'ACTIVE' | 'ONBOARDING' | 'SUSPENDED' | 'TERMINATED' }) =>
+		orpc.association.list(params || {}),
 
 	get: (id: string) => orpc.association.get({ id }),
 
-	create: (data: {
-		name: string;
-		legalName?: string;
-		taxId?: string;
-		incorporationDate?: string;
-		fiscalYearEnd?: number;
-		settings?: Record<string, unknown>;
-	}) => orpc.association.create(data),
+	create: (data: AssociationCreateInput) => orpc.association.create(data),
 
-	update: (id: string, data: {
-		name?: string;
-		legalName?: string;
-		taxId?: string;
-		incorporationDate?: string;
-		fiscalYearEnd?: number;
-		settings?: Record<string, unknown>;
-	}) => orpc.association.update({ id, ...data })
+	update: (data: AssociationUpdateInput) => orpc.association.update(data)
 };
 
 // ============================================================================
@@ -622,7 +623,7 @@ export const documentApi = {
 // ============================================================================
 
 // Activity entity type enum for type safety (matches oRPC schema)
-export type ActivityEntityType = 'ASSOCIATION' | 'UNIT' | 'OWNER' | 'VIOLATION' | 'ARC_REQUEST' | 'ASSESSMENT' | 'GOVERNING_DOCUMENT' | 'BOARD_ACTION' | 'JOB' | 'WORK_ORDER' | 'ESTIMATE' | 'INVOICE' | 'TECHNICIAN' | 'CONTRACTOR' | 'INVENTORY' | 'CONCIERGE_CASE' | 'OWNER_INTENT' | 'INDIVIDUAL_PROPERTY' | 'PROPERTY_DOCUMENT' | 'MATERIAL_DECISION' | 'EXTERNAL_HOA' | 'EXTERNAL_VENDOR' | 'CONCIERGE_ACTION' | 'USER' | 'USER_ROLE' | 'ORGANIZATION' | 'DOCUMENT' | 'OTHER';
+export type ActivityEntityType = 'ASSOCIATION' | 'UNIT' | 'OWNER' | 'VIOLATION' | 'ARC_REQUEST' | 'ASSESSMENT' | 'GOVERNING_DOCUMENT' | 'BOARD_ACTION' | 'JOB' | 'WORK_ORDER' | 'ESTIMATE' | 'INVOICE' | 'TECHNICIAN' | 'CONTRACTOR' | 'INVENTORY' | 'CONCIERGE_CASE' | 'OWNER_INTENT' | 'INDIVIDUAL_PROPERTY' | 'PROPERTY_DOCUMENT' | 'MATERIAL_DECISION' | 'EXTERNAL_HOA' | 'EXTERNAL_VENDOR' | 'CONCIERGE_ACTION' | 'USER' | 'USER_ROLE' | 'ORGANIZATION' | 'DOCUMENT' | 'STAFF' | 'STAFF_ASSIGNMENT' | 'OTHER';
 
 export const activityEventApi = {
 	getByEntity: (params: { entityType: ActivityEntityType; entityId: string; cursor?: string; limit?: number }) =>
@@ -768,7 +769,115 @@ export const governanceApi = {
 
 		linkToMotion: (data: { resolutionId: string; motionId: string; idempotencyKey: string }) =>
 			orpc.governanceResolution.linkToMotion(data)
+	},
+	// Phase 28: Committee management
+	committees: {
+		list: (params?: {
+			associationId?: string;
+			committeeType?: 'ARC' | 'SOCIAL' | 'LANDSCAPE' | 'BUDGET' | 'SAFETY' | 'NOMINATING' | 'CUSTOM';
+			isActive?: boolean;
+			cursor?: string;
+			limit?: number;
+		}) => orpc.governanceCommittee.list(params || {}),
+
+		get: (id: string) => orpc.governanceCommittee.get({ id }),
+
+		create: (data: {
+			associationId: string;
+			name: string;
+			description?: string;
+			committeeType: 'ARC' | 'SOCIAL' | 'LANDSCAPE' | 'BUDGET' | 'SAFETY' | 'NOMINATING' | 'CUSTOM';
+			isArcLinked?: boolean;
+			idempotencyKey: string;
+		}) => orpc.governanceCommittee.create(data),
+
+		update: (data: {
+			id: string;
+			name?: string;
+			description?: string | null;
+			committeeType?: 'ARC' | 'SOCIAL' | 'LANDSCAPE' | 'BUDGET' | 'SAFETY' | 'NOMINATING' | 'CUSTOM';
+			isArcLinked?: boolean;
+			isActive?: boolean;
+			idempotencyKey: string;
+		}) => orpc.governanceCommittee.update(data),
+
+		addMember: (data: {
+			committeeId: string;
+			partyId: string;
+			role: 'CHAIR' | 'VICE_CHAIR' | 'SECRETARY' | 'MEMBER';
+			termStart: string;
+			termEnd?: string;
+			idempotencyKey: string;
+		}) => orpc.governanceCommittee.addMember(data),
+
+		removeMember: (data: {
+			committeeId: string;
+			memberId: string;
+			idempotencyKey: string;
+		}) => orpc.governanceCommittee.removeMember(data),
+
+		listMembers: (params: {
+			committeeId: string;
+			isActive?: boolean;
+			cursor?: string;
+			limit?: number;
+		}) => orpc.governanceCommittee.listMembers(params)
 	}
+};
+
+// ============================================================================
+// Phase 28: Org Staff API - Using oRPC client
+// ============================================================================
+
+export const orgStaffApi = {
+	list: (params?: {
+		status?: StaffStatus;
+		role?: StaffRole;
+		pillar?: PillarAccess;
+		cursor?: string;
+		limit?: number;
+	}) => withOrgContext(() => orpc.orgStaff.list(params || {})),
+
+	get: (staffId: string) => withOrgContext(() => orpc.orgStaff.get({ staffId })),
+
+	create: (data: {
+		email: string;
+		displayName: string;
+		title?: string;
+		roles: StaffRole[];
+		pillarAccess: PillarAccess[];
+		canBeAssignedCases?: boolean;
+		idempotencyKey: string;
+	}) => withOrgContext(() => orpc.orgStaff.create(data)),
+
+	update: (data: {
+		staffId: string;
+		displayName?: string;
+		title?: string | null;
+		roles?: StaffRole[];
+		pillarAccess?: PillarAccess[];
+		canBeAssignedCases?: boolean;
+		idempotencyKey: string;
+	}) => withOrgContext(() => orpc.orgStaff.update(data)),
+
+	activate: (data: { staffId: string; idempotencyKey: string }) =>
+		withOrgContext(() => orpc.orgStaff.activate(data)),
+
+	deactivate: (data: { staffId: string; reason: string; idempotencyKey: string }) =>
+		withOrgContext(() => orpc.orgStaff.deactivate(data))
+};
+
+// ============================================================================
+// Party API - Using oRPC client (for selection)
+// ============================================================================
+
+export const partyApi = {
+	list: (params?: {
+		search?: string;
+		partyType?: 'INDIVIDUAL' | 'TRUST' | 'CORPORATION' | 'LLC' | 'PARTNERSHIP' | 'ESTATE';
+		cursor?: string;
+		limit?: number;
+	}) => orpc.party.list(params || {})
 };
 
 // ============================================================================

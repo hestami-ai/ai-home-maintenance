@@ -63,7 +63,8 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
                 actorType: performedByType || '',
                 startDate: startDate || '',
                 endDate: endDate || ''
-            }
+            },
+            association: null
         };
     } catch (err) {
         const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -87,7 +88,8 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
                 startDate: startDate || '',
                 endDate: endDate || ''
             },
-            error: 'Failed to load activity events'
+            error: 'Failed to load activity events',
+            association: null
         };
     }
 };

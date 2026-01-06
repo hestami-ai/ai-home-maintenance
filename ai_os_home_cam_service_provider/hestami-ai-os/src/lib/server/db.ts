@@ -1,5 +1,27 @@
 import { PrismaClient } from '../../../generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
+import type { Prisma } from '../../../generated/prisma/client.js';
+import { trace } from '@opentelemetry/api';
+
+/**
+ * Build Prisma log configuration based on environment variables
+ * - PRISMA_LOG_QUERIES=true: Enable query logging (verbose, use for debugging)
+ * - NODE_ENV=development: Enable warn level by default
+ * - Always log errors
+ */
+function getPrismaLogConfig(): Prisma.LogLevel[] {
+	const logs: Prisma.LogLevel[] = ['error'];
+	
+	if (process.env.PRISMA_LOG_QUERIES === 'true') {
+		logs.push('query');
+	}
+	
+	if (process.env.NODE_ENV === 'development') {
+		logs.push('warn');
+	}
+	
+	return logs;
+}
 
 // Prevent multiple instances of Prisma Client in development
 const globalForPrisma = globalThis as unknown as {
@@ -8,16 +30,68 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /**
+ * Add OpenTelemetry tracing to Prisma client
+ * Records db.operation, db.table, and db.duration_ms on the active span
+ */
+function withTracing<T extends PrismaClient>(client: T): T {
+	const tracer = trace.getTracer('hestami-ai-os');
+	
+	return client.$extends({
+		query: {
+			$allModels: {
+				async $allOperations({ model, operation, args, query }) {
+					const startTime = performance.now();
+					const span = trace.getActiveSpan();
+					
+					// Add attributes to the active span (don't create a child span to reduce noise)
+					if (span) {
+						span.setAttribute('db.system', 'postgresql');
+						span.setAttribute('db.operation', operation);
+						if (model) {
+							span.setAttribute('db.table', model);
+						}
+					}
+					
+					try {
+						const result = await query(args);
+						const durationMs = performance.now() - startTime;
+						
+						if (span) {
+							span.setAttribute('db.duration_ms', Math.round(durationMs * 100) / 100);
+						}
+						
+						return result;
+					} catch (error) {
+						const durationMs = performance.now() - startTime;
+						
+						if (span) {
+							span.setAttribute('db.duration_ms', Math.round(durationMs * 100) / 100);
+							span.setAttribute('db.error', true);
+							if (error instanceof Error) {
+								span.setAttribute('db.error_message', error.message);
+							}
+						}
+						
+						throw error;
+					}
+				}
+			}
+		}
+	}) as T;
+}
+
+/**
  * Create the regular Prisma client (RLS-enabled user)
  * This client is used for all normal application queries.
  * RLS policies will filter data based on app.organization_id session variable.
  */
 function createPrismaClient() {
 	const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
-	return new PrismaClient({
+	const client = new PrismaClient({
 		adapter,
-		log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
+		log: getPrismaLogConfig()
 	});
+	return withTracing(client);
 }
 
 /**
@@ -32,10 +106,11 @@ function createPrismaClient() {
 function createPrismaAdminClient() {
 	const adminUrl = process.env.DATABASE_URL_ADMIN || process.env.DATABASE_URL;
 	const adapter = new PrismaPg({ connectionString: adminUrl });
-	return new PrismaClient({
+	const client = new PrismaClient({
 		adapter,
-		log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error']
+		log: getPrismaLogConfig()
 	});
+	return withTracing(client);
 }
 
 // Regular client - subject to RLS policies

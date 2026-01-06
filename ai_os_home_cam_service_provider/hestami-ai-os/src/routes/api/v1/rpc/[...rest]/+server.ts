@@ -11,7 +11,7 @@ import {
 	logRequestEnd,
 	logRequestError
 } from '$server/api/middleware/logging';
-import { recordSpanError } from '$server/api/middleware/tracing';
+import { recordSpanError, enrichSpanWithRPC, enrichSpanWithRequestId } from '$server/api/middleware/tracing';
 
 /**
  * oRPC handler for /api/v1/rpc/*
@@ -46,6 +46,13 @@ interface StaffProfileRow {
 	deactivated_at: Date | null;
 	created_at: Date;
 	updated_at: Date;
+}
+
+// Type for association membership lookup
+interface AssocMembershipRow {
+	association_id: string;
+	association_name: string;
+	role: string;
 }
 
 /**
@@ -128,9 +135,66 @@ async function createContext(
 				context.role = currentMembership.role as any;
 			}
 		}
+
+		// Set association context if X-Assoc-Id header is provided
+		const assocId = request.headers.get('X-Assoc-Id');
+		if (assocId && context.organization) {
+			const assocRows = await prisma.$queryRaw<AssocMembershipRow[]>`
+				SELECT * FROM get_user_associations(${context.user.id}, ${context.organization.id})
+				WHERE association_id = ${assocId}
+				LIMIT 1
+			`;
+
+			const assoc = assocRows[0];
+			if (assoc) {
+				context.association = {
+					id: assoc.association_id,
+					name: assoc.association_name,
+					organizationId: context.organization.id
+				} as any;
+				context.associationId = assoc.association_id;
+			}
+		}
+
+		// Determine if user is platform staff (Phase 30)
+		// This uses the current organization's type from membership
+		if (context.organization) {
+			const currentMembership = membershipRows.find((m) => m.organization_id === context.organization!.id);
+			if (currentMembership) {
+				context.isStaff = currentMembership.org_type === 'PLATFORM_OPERATOR' ||
+					currentMembership.org_type === 'MANAGEMENT_COMPANY';
+			}
+		}
 	}
 
 	return context;
+}
+
+/**
+ * Extract RPC method from request URL path
+ * e.g., /api/v1/rpc/association.create -> association.create
+ */
+function extractRPCMethod(url: URL): string {
+	const path = url.pathname;
+	const prefix = '/api/v1/rpc/';
+	if (path.startsWith(prefix)) {
+		return path.slice(prefix.length) || 'unknown';
+	}
+	return 'unknown';
+}
+
+/**
+ * Extract idempotency key from request body if present
+ */
+async function extractIdempotencyKey(request: Request): Promise<string | undefined> {
+	try {
+		// Clone to avoid consuming the body
+		const cloned = request.clone();
+		const body = await cloned.json();
+		return body?.json?.idempotencyKey || body?.idempotencyKey;
+	} catch {
+		return undefined;
+	}
 }
 
 /**
@@ -141,9 +205,21 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 	let context = createEmptyContext(nanoid());
 	let logContext = createORPCLogContext(request, context);
 
+	// Extract RPC method from URL for tracing
+	const rpcMethod = extractRPCMethod(new URL(request.url));
+
 	try {
 		context = await createContext(request, locals);
 		logContext = createORPCLogContext(request, context);
+
+		// Enrich span with request ID and session ID
+		await enrichSpanWithRequestId(context.requestId, locals.session?.id);
+
+		// Extract idempotency key for mutating operations
+		const idempotencyKey = request.method === 'POST' ? await extractIdempotencyKey(request) : undefined;
+
+		// Enrich span with RPC method context
+		await enrichSpanWithRPC(rpcMethod, idempotencyKey);
 
 		logRequestStart(logContext);
 
@@ -166,13 +242,13 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 					const errorInfo = body?.json || body;
 					const errorMessage = errorInfo.message || 'Unknown error';
 					const error = new Error(errorMessage);
-					
+
 					logRequestError(logContext, error, {
 						errorCode: errorInfo.code,
 						errorDefined: errorInfo.defined,
 						errorData: errorInfo.data
 					});
-					
+
 					// Record error on the active span for trace visibility
 					await recordSpanError(error, {
 						errorCode: errorInfo.code,
@@ -193,16 +269,16 @@ const handleRequest: RequestHandler = async ({ request, locals }) => {
 	} catch (error) {
 		const durationMs = Date.now() - startTime;
 		const errorObj = error instanceof Error ? error : new Error(String(error));
-		
+
 		logRequestError(logContext, errorObj);
-		
+
 		// Record unhandled error on span
 		await recordSpanError(errorObj, {
 			errorCode: 'INTERNAL_SERVER_ERROR',
 			httpStatus: 500,
 			errorType: 'UNHANDLED_ERROR'
 		});
-		
+
 		logRequestEnd(logContext, 500, durationMs);
 		throw error;
 	}

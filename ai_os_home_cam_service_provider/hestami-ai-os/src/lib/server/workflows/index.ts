@@ -637,6 +637,29 @@ export {
 	type ResolutionCloseoutResult
 } from './resolutionCloseout.js';
 
+// Association Workflow (Phase 27)
+export {
+	createManagedAssociation_v1_wf,
+	type CreateManagedAssociationInput,
+	type CreateManagedAssociationResult
+} from './associationWorkflow.js';
+
+// Notification Workflow (Phase 24)
+export {
+	notificationWorkflow_v1,
+	NotificationAction,
+	type NotificationWorkflowInput,
+	type NotificationWorkflowResult
+} from './notificationWorkflow.js';
+
+// Document Processing Retry Workflow (Phase 24)
+export {
+	documentProcessingRetryWorkflow_v1,
+	DocumentRetryAction,
+	type DocumentRetryWorkflowInput,
+	type DocumentRetryWorkflowResult
+} from './documentProcessingRetryWorkflow.js';
+
 // Future workflows:
 // - apPaymentProcessing_v1 (Phase 13)
 // - vendorAssignment_v1 (Phase 13)

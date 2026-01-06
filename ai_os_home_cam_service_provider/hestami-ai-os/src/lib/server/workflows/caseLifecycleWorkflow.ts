@@ -572,13 +572,14 @@ async function cancelCase(
 }
 
 async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise<CaseLifecycleWorkflowResult> {
-	const log = createWorkflowLogger('CaseLifecycleWorkflow', undefined, input.action);
+	const workflowName = 'caseLifecycleWorkflow_v1';
+	const log = createWorkflowLogger(workflowName, DBOS.workflowID, input.action);
 	const startTime = logWorkflowStart(log, input.action, {
 		organizationId: input.organizationId,
 		userId: input.userId,
 		caseId: input.caseId,
 		intentId: input.intentId
-	});
+	}, workflowName, DBOS.workflowID);
 
 	try {
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });

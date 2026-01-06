@@ -1,7 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 
-import type { Organization, UserRole } from '../generated/prisma/client';
+import type { Organization, Association, UserRole } from '../generated/prisma/client';
 
 /** User type from Better Auth session */
 interface SessionUser {
@@ -25,7 +25,9 @@ declare global {
 			user: SessionUser | null;
 			session: { id: string; expiresAt: Date } | null;
 			organization: Organization | null;
+			association: Association | null;
 			role: UserRole | null;
+			isStaff: boolean;
 			/** OpenTelemetry trace ID */
 			traceId: string | null;
 			/** OpenTelemetry span ID */
@@ -35,6 +37,7 @@ declare global {
 		interface PageData {
 			user: SessionUser | null;
 			organization: Organization | null;
+			association: Association | null;
 		}
 
 		// interface PageState {}
@@ -42,4 +45,4 @@ declare global {
 	}
 }
 
-export {};
+export { };

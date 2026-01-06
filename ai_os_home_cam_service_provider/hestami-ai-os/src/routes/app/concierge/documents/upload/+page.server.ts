@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
     const { organization, memberships, staff } = await parent();
     
     if (!organization) {
-        return { properties: [] };
+        return { properties: [] , association: null};
     }
 
     // Build context using data from parent layout
@@ -32,6 +32,6 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
         };
     } catch (err) {
         console.error('Failed to load properties for upload:', err);
-        return { properties: [] };
+        return { properties: [] , association: null};
     }
 };

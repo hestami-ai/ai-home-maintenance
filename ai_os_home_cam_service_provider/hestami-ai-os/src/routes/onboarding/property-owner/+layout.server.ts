@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = async ({ parent }) => {
     return {
         // We can fetch initial onboarding state here if stored on server
         // For now, return empty to be consistent
-        onboardingState: {}
+        onboardingState: {},
+        association: null
     };
 };

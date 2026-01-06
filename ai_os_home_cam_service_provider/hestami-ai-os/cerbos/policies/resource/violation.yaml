@@ -1,0 +1,57 @@
+# Violation Resource Policy
+# Controls access to violation/covenant enforcement operations
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "violation"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access including delete
+    - actions: ["view", "create", "edit", "delete", "issue_notice", "schedule_hearing", "impose_fine", "close", "reopen"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can do everything except delete
+    - actions: ["view", "create", "edit", "issue_notice", "schedule_hearing", "impose_fine", "close", "reopen"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view violations and participate in hearings
+    - actions: ["view", "schedule_hearing", "record_hearing_decision"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view violations for their units
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+      condition:
+        match:
+          any:
+            of:
+              # Viewing violation for their unit
+              - expr: "has(R.attr.unitOwnerIds) && P.id in R.attr.unitOwnerIds"
+
+    # Tenants can view violations for their units
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+      condition:
+        match:
+          any:
+            of:
+              # Viewing violation for their unit
+              - expr: "has(R.attr.unitTenantIds) && P.id in R.attr.unitTenantIds"
+
+    # Auditor read-only access
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

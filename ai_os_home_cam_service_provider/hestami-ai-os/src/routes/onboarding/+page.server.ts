@@ -10,5 +10,5 @@ export const load: PageServerLoad = async ({ parent }) => {
 
     return {
         memberships
-    };
+    , association: null};
 };

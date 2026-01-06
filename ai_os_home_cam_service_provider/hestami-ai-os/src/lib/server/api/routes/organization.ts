@@ -2,9 +2,23 @@ import { z } from 'zod';
 import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } from '$lib/schemas/index.js';
 import { authedProcedure, orgProcedure, successResponse } from '../router.js';
 import { prisma } from '../../db.js';
-import type { Prisma } from '../../../../../generated/prisma/client.js';
+import type { Prisma, OrganizationType, OrganizationStatus } from '../../../../../generated/prisma/client.js';
 import { recordActivityEvent, recordActivityFromContext } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
+import { setOrgContext } from '../../db/rls.js';
+
+/**
+ * Result type for the create_organization_with_admin SECURITY DEFINER function
+ */
+interface CreateOrgResult {
+	id: string;
+	name: string;
+	slug: string;
+	type: string;
+	status: string;
+	created_at: Date;
+	updated_at: Date;
+}
 
 const log = createModuleLogger('OrganizationRoute');
 
@@ -20,7 +34,14 @@ export const organizationRouter = {
 			z.object({
 				name: z.string().min(1).max(255),
 				slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
-				type: OrganizationTypeSchema
+				type: OrganizationTypeSchema,
+				// Optional association config for self-managed HOAs (COMMUNITY_ASSOCIATION)
+				associationConfig: z.object({
+					legalName: z.string().max(255).optional(),
+					boardSeats: z.number().int().min(1).max(20).optional(),
+					totalUnits: z.number().int().min(1).optional(),
+					fiscalYearEndMonth: z.number().int().min(1).max(12).optional()
+				}).optional()
 			})
 		)
 		.output(
@@ -51,20 +72,34 @@ export const organizationRouter = {
 				throw errors.CONFLICT({ message: 'Organization with this slug already exists' });
 			}
 
-			// Create organization and add creator as ADMIN
-			const organization = await prisma.organization.create({
-				data: {
-					name: input.name,
-					slug: input.slug,
-					type: input.type,
-					memberships: {
-						create: {
-							userId: context.user!.id,
-							role: 'ADMIN',
-							isDefault: true
-						}
-					}
-				}
+			// Create organization and add creator as ADMIN using SECURITY DEFINER function
+			// This bypasses RLS since no org context exists during creation (chicken-and-egg problem)
+			const [orgResult] = await prisma.$queryRaw<CreateOrgResult[]>`
+				SELECT * FROM create_organization_with_admin(
+					${input.name}::TEXT, 
+					${input.slug}::TEXT, 
+					${input.type}::TEXT, 
+					${context.user!.id}::TEXT
+				)
+			`;
+
+			if (!orgResult) {
+				throw new Error('Failed to create organization');
+			}
+
+			// Map to expected shape (type/status come back as strings from the function)
+			const organization = {
+				id: orgResult.id,
+				name: orgResult.name,
+				slug: orgResult.slug,
+				type: orgResult.type as OrganizationType,
+				status: orgResult.status as OrganizationStatus
+			};
+
+			// Set org context to the newly created org so subsequent RLS-protected queries work
+			await setOrgContext(organization.id, {
+				userId: context.user!.id,
+				reason: 'Organization creation - setting initial context'
 			});
 
 			// Record activity event for organization creation
@@ -84,6 +119,46 @@ export const organizationRouter = {
 					status: organization.status
 				}
 			});
+
+			// For self-managed HOAs (COMMUNITY_ASSOCIATION), auto-create the association
+			if (organization.type === 'COMMUNITY_ASSOCIATION') {
+				const association = await prisma.association.create({
+					data: {
+						organizationId: organization.id,
+						name: organization.name,
+						legalName: input.associationConfig?.legalName ?? null,
+						fiscalYearEnd: input.associationConfig?.fiscalYearEndMonth ?? 12,
+						status: 'ONBOARDING',
+						settings: {
+							boardSeats: input.associationConfig?.boardSeats ?? 5,
+							totalUnits: input.associationConfig?.totalUnits ?? 0
+						}
+					}
+				});
+
+				log.info('Auto-created association for self-managed HOA', {
+					organizationId: organization.id,
+					associationId: association.id,
+					associationName: association.name
+				});
+
+				// Record activity event for association creation
+				await recordActivityEvent({
+					organizationId: organization.id,
+					entityType: 'ASSOCIATION',
+					entityId: association.id,
+					action: 'CREATE',
+					eventCategory: 'EXECUTION',
+					summary: `Association "${association.name}" auto-created during onboarding`,
+					performedById: context.user!.id,
+					performedByType: 'HUMAN',
+					associationId: association.id,
+					newState: {
+						name: association.name,
+						status: association.status
+					}
+				});
+			}
 
 			return successResponse(
 				{

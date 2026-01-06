@@ -9,6 +9,7 @@ export const load: LayoutServerLoad = async ({ parent }) => {
     }
 
     return {
-        onboardingState: {}
+        onboardingState: {},
+        association: null
     };
 };

@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { Wrench, Users, Calendar, DollarSign, ClipboardList, TrendingUp, AlertCircle } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import type { Organization } from '../../../../generated/prisma/client';
+	import type { operations } from '$lib/api/types.generated';
+
+	// Extract types from OpenAPI spec (avoids importing massive Prisma types)
+	type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
 
 	const quickActions = [
 		{ label: 'View All Jobs', icon: Wrench, href: '/app/contractor/jobs' },

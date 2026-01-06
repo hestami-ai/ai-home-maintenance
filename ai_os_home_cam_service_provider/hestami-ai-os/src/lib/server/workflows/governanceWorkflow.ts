@@ -45,7 +45,12 @@ export const GovernanceAction = {
 	APPROVE_MINUTES: 'APPROVE_MINUTES',
 	ARCHIVE_MEETING: 'ARCHIVE_MEETING',
 	ADD_BOARD_MEMBER: 'ADD_BOARD_MEMBER',
-	REMOVE_BOARD_MEMBER: 'REMOVE_BOARD_MEMBER'
+	REMOVE_BOARD_MEMBER: 'REMOVE_BOARD_MEMBER',
+	// Phase 28: Committee actions
+	CREATE_COMMITTEE: 'CREATE_COMMITTEE',
+	UPDATE_COMMITTEE: 'UPDATE_COMMITTEE',
+	ADD_COMMITTEE_MEMBER: 'ADD_COMMITTEE_MEMBER',
+	REMOVE_COMMITTEE_MEMBER: 'REMOVE_COMMITTEE_MEMBER'
 } as const;
 
 export type GovernanceAction = (typeof GovernanceAction)[keyof typeof GovernanceAction];
@@ -818,6 +823,103 @@ async function removeBoardMember(
 	return member.id;
 }
 
+// -----------------------------------------------------------------------------
+// Phase 28: Committee Step Functions
+// -----------------------------------------------------------------------------
+
+async function createCommittee(
+	organizationId: string,
+	userId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const associationId = data.associationId as string;
+	const name = data.name as string;
+	const description = data.description as string | undefined;
+	const committeeType = data.committeeType as string;
+	const isArcLinked = data.isArcLinked as boolean | undefined;
+
+	const committee = await prisma.committee.create({
+		data: {
+			organizationId,
+			associationId,
+			name,
+			description,
+			committeeType: committeeType as any,
+			isArcLinked: isArcLinked ?? false
+		}
+	});
+
+	console.log(`[GovernanceWorkflow] CREATE_COMMITTEE committee:${committee.id} by user ${userId}`);
+	return committee.id;
+}
+
+async function updateCommittee(
+	organizationId: string,
+	userId: string,
+	committeeId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const updateData: Record<string, any> = {};
+	if (data.name !== undefined) updateData.name = data.name;
+	if (data.description !== undefined) updateData.description = data.description;
+	if (data.committeeType !== undefined) updateData.committeeType = data.committeeType;
+	if (data.isArcLinked !== undefined) updateData.isArcLinked = data.isArcLinked;
+	if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+	await prisma.committee.update({
+		where: { id: committeeId },
+		data: updateData
+	});
+
+	console.log(`[GovernanceWorkflow] UPDATE_COMMITTEE committee:${committeeId} by user ${userId}`);
+	return committeeId;
+}
+
+async function addCommitteeMember(
+	organizationId: string,
+	userId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const committeeId = data.committeeId as string;
+	const partyId = data.partyId as string;
+	const termStart = new Date(data.termStart as string);
+
+	// Check if member already exists
+	const existing = await prisma.committeeMember.findFirst({
+		where: { committeeId, partyId, termStart }
+	});
+	if (existing) return existing.id;
+
+	const member = await prisma.committeeMember.create({
+		data: {
+			committeeId,
+			partyId,
+			role: data.role as any,
+			termStart,
+			termEnd: data.termEnd ? new Date(data.termEnd as string) : undefined
+		}
+	});
+
+	console.log(`[GovernanceWorkflow] ADD_COMMITTEE_MEMBER member:${member.id} committee:${committeeId} by user ${userId}`);
+	return member.id;
+}
+
+async function removeCommitteeMember(
+	organizationId: string,
+	userId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const memberId = data.memberId as string;
+
+	const member = await prisma.committeeMember.update({
+		where: { id: memberId },
+		data: { isActive: false, termEnd: new Date() }
+	});
+
+	console.log(`[GovernanceWorkflow] REMOVE_COMMITTEE_MEMBER member:${memberId} by user ${userId}`);
+	return member.id;
+}
+
 // Main workflow function
 async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<GovernanceWorkflowResult> {
 	try {
@@ -1031,6 +1133,35 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 				entityId = await DBOS.runStep(
 					() => removeBoardMember(input.organizationId, input.userId, input.data),
 					{ name: 'removeBoardMember' }
+				);
+				break;
+
+			// Phase 28: Committee actions
+			case 'CREATE_COMMITTEE':
+				entityId = await DBOS.runStep(
+					() => createCommittee(input.organizationId, input.userId, input.data),
+					{ name: 'createCommittee' }
+				);
+				break;
+
+			case 'UPDATE_COMMITTEE':
+				entityId = await DBOS.runStep(
+					() => updateCommittee(input.organizationId, input.userId, input.entityId!, input.data),
+					{ name: 'updateCommittee' }
+				);
+				break;
+
+			case 'ADD_COMMITTEE_MEMBER':
+				entityId = await DBOS.runStep(
+					() => addCommitteeMember(input.organizationId, input.userId, input.data),
+					{ name: 'addCommitteeMember' }
+				);
+				break;
+
+			case 'REMOVE_COMMITTEE_MEMBER':
+				entityId = await DBOS.runStep(
+					() => removeCommitteeMember(input.organizationId, input.userId, input.data),
+					{ name: 'removeCommitteeMember' }
 				);
 				break;
 

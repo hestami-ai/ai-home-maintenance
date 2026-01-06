@@ -15,7 +15,8 @@ import type { AppRouter } from '$server/api';
 import { browser } from '$app/environment';
 import { logger } from '$lib/logger';
 import { get } from 'svelte/store';
-import { currentOrganization } from '$lib/stores';
+import { currentOrganization } from '$lib/stores/organization.js';
+import { currentAssociationId } from '$lib/stores/association.js';
 
 const log = logger.child({ component: 'oRPC' });
 
@@ -25,7 +26,13 @@ const log = logger.child({ component: 'oRPC' });
  * - Includes credentials for session cookies
  * - Supports dynamic headers for organization context
  */
-function createLink(organizationId?: string | (() => string | undefined), customFetch?: typeof fetch) {
+function createLink(
+	context?: {
+		organizationId?: string | (() => string | undefined);
+		associationId?: string | (() => string | undefined);
+	},
+	customFetch?: typeof fetch
+) {
 	return new RPCLink({
 		// Use a function to resolve URL at request time, not module load time
 		// This ensures window.location.origin is available in the browser
@@ -39,11 +46,23 @@ function createLink(organizationId?: string | (() => string | undefined), custom
 		},
 		headers: () => {
 			const headers: Record<string, string> = {};
+
 			// Support both static string and dynamic function for org ID
-			const orgId = typeof organizationId === 'function' ? organizationId() : organizationId;
+			const orgId = typeof context?.organizationId === 'function'
+				? context.organizationId()
+				: context?.organizationId;
 			if (orgId) {
 				headers['X-Org-Id'] = orgId;
 			}
+
+			// Support both static string and dynamic function for assoc ID
+			const assocId = typeof context?.associationId === 'function'
+				? context.associationId()
+				: context?.associationId;
+			if (assocId) {
+				headers['X-Assoc-Id'] = assocId;
+			}
+
 			return headers;
 		},
 		fetch: (request, init) => {
@@ -68,7 +87,10 @@ function createLink(organizationId?: string | (() => string | undefined), custom
  * use the current organization from the store.
  */
 export const orpc: RouterClient<AppRouter> = createORPCClient(
-	createLink(() => get(currentOrganization)?.id)
+	createLink({
+		organizationId: () => get(currentOrganization)?.id,
+		associationId: () => get(currentAssociationId)
+	})
 );
 
 /**
@@ -79,8 +101,12 @@ export const orpc: RouterClient<AppRouter> = createORPCClient(
  * @param customFetch - Optional custom fetch function (e.g. SvelteKit's fetch in SSR)
  * @returns A type-safe oRPC client with organization context
  */
-export function createOrgClient(organizationId: string, customFetch?: typeof fetch): RouterClient<AppRouter> {
-	return createORPCClient(createLink(organizationId, customFetch));
+export function createOrgClient(
+	organizationId: string,
+	associationId?: string,
+	customFetch?: typeof fetch
+): RouterClient<AppRouter> {
+	return createORPCClient(createLink({ organizationId, associationId }, customFetch));
 }
 
 /**
@@ -98,9 +124,13 @@ export function createOrgClient(organizationId: string, customFetch?: typeof fet
  */
 export function createServerClient(options: {
 	fetch: typeof fetch,
-	organizationId?: string
+	organizationId?: string,
+	associationId?: string
 }): RouterClient<AppRouter> {
-	return createORPCClient(createLink(options.organizationId, options.fetch));
+	return createORPCClient(createLink({
+		organizationId: options.organizationId,
+		associationId: options.associationId
+	}, options.fetch));
 }
 
 /**

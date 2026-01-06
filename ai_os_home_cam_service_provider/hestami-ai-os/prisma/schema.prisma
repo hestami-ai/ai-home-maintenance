@@ -688,6 +688,27 @@ enum PolicyStatus {
   RETIRED
 }
 
+// -----------------------------------------------------------------------------
+// Phase 28: Committees (Governance Extension)
+// -----------------------------------------------------------------------------
+
+enum CommitteeType {
+  ARC
+  SOCIAL
+  LANDSCAPE
+  BUDGET
+  SAFETY
+  NOMINATING
+  CUSTOM
+}
+
+enum CommitteeRole {
+  CHAIR
+  VICE_CHAIR
+  SECRETARY
+  MEMBER
+}
+
 // =============================================================================
 // PHASE 8: Communications
 // =============================================================================
@@ -856,6 +877,10 @@ model Organization {
   // Phase 16.5: Vendor Discovery
   vendorCandidates VendorCandidate[]
 
+  // Phase 28: Org-scoped Staff and Committees
+  orgStaff   Staff[]
+  committees Committee[]
+
   @@map("organizations")
 }
 
@@ -916,6 +941,9 @@ model Staff {
   id     String @id @default(cuid())
   userId String @unique @map("user_id")
 
+  // Phase 28: Organization scope (null = Hestami platform-level staff)
+  organizationId String? @map("organization_id")
+
   // Identity
   displayName String  @map("display_name")
   title       String?
@@ -947,6 +975,7 @@ model Staff {
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Case assignments (staff as primary owner)
   assignedCases StaffCaseAssignment[]
@@ -1426,9 +1455,14 @@ enum DocumentCategory {
   SIGNATURE // Digital signatures
   CHECKLIST // Completed checklists
 
+  // === Community Association Management (CAM) ===
+  ARC_ATTACHMENT // Files attached to ARC requests
+  VIOLATION_EVIDENCE // Evidence for violations
+
   // === Cross-Pillar ===
   PHOTO // Photos (property, job, case - context determines meaning)
   VIDEO // Videos (property, job, case - context determines meaning)
+  AUDIO // Audio recordings
   GENERAL // Other documents
 }
 
@@ -1602,6 +1636,9 @@ model Association {
   calendarEvents         CalendarEvent[]
   calendarNotifications  CalendarEventNotification[]
 
+  // Phase 28: Committees
+  committees Committee[]
+
   // Phase 9: Owner Portal / CRM
   ownerRequests OwnerRequest[]
   // Documents are now accessed via DocumentContextBinding with contextType=ASSOCIATION
@@ -1628,6 +1665,9 @@ model Association {
 
   // Phase 2: Maintenance Contracts
   serviceContracts ServiceContract[]
+
+  // Phase 30: Association-Level Document Isolation
+  documents Document[]
 
   @@index([organizationId])
   @@map("associations")
@@ -1828,6 +1868,9 @@ model Party {
   voteBallots       VoteBallot[]
   announcementReads AnnouncementRead[]
 
+  // Phase 28: Committee Memberships
+  committeeMemberships CommitteeMember[]
+
   // Phase 9: Owner Portal / CRM
   userProfile          UserProfile?
   contactPreferences   ContactPreference[]
@@ -1931,7 +1974,7 @@ model Violation {
   violationType    ViolationType            @relation(fields: [violationTypeId], references: [id], onDelete: Restrict)
   unit             Unit?                    @relation(fields: [unitId], references: [id], onDelete: SetNull)
   responsibleParty Party?                   @relation(fields: [responsiblePartyId], references: [id], onDelete: SetNull)
-  evidence         ViolationEvidence[]
+  // evidence         ViolationEvidence[] // @deprecated Phase 30: Use unified Document
   notices          ViolationNotice[]
   hearings         ViolationHearing[]
   fines            ViolationFine[]
@@ -1954,6 +1997,9 @@ model Violation {
 }
 
 /// @description Evidence attached to a violation
+/// @deprecated Field and model being moved to unified Document model
+/// @deprecated Use unified Document model with DocumentContextBinding (contextType: VIOLATION)
+/*
 model ViolationEvidence {
   id           String    @id @default(cuid())
   violationId  String    @map("violation_id")
@@ -1977,6 +2023,7 @@ model ViolationEvidence {
   @@index([violationId])
   @@map("violation_evidence")
 }
+*/
 
 /// @description Notice issued for a violation
 model ViolationNotice {
@@ -2463,8 +2510,9 @@ model Tenancy {
 
 /// @description Unified document model spanning all pillars (CAM, Contractor, Concierge)
 model Document {
-  id             String @id @default(cuid())
-  organizationId String @map("organization_id") // Required for RLS
+  id             String  @id @default(cuid())
+  organizationId String  @map("organization_id") // Required for RLS
+  associationId  String? @map("association_id") // NEW: Required for tiered RLS (Phase 30)
 
   title       String
   description String?
@@ -2539,7 +2587,11 @@ model Document {
   accessGrants    DocumentAccessGrant[]
   downloadLogs    DocumentDownloadLog[]
 
+  association Association? @relation(fields: [associationId], references: [id])
+
   @@index([organizationId])
+  @@index([organizationId, associationId])
+  @@index([organizationId, associationId, status])
   @@index([category])
   @@index([visibility])
   @@index([status])
@@ -4037,7 +4089,7 @@ model ARCRequest {
   committee      ARCCommittee? @relation(fields: [committeeId], references: [id])
   unit           Unit?         @relation(fields: [unitId], references: [id])
   requesterParty Party         @relation("PartyARCRequests", fields: [requesterPartyId], references: [id])
-  documents      ARCDocument[]
+  // documents      ARCDocument[] // @deprecated Phase 30: Use unified Document
   reviews        ARCReview[]
 
   // Phase 9: Work Orders created from this ARC approval
@@ -4057,6 +4109,9 @@ model ARCRequest {
 }
 
 /// @description Documents attached to an ARC request
+/// @deprecated Field and model being moved to unified Document model
+/// @deprecated Use unified Document model with DocumentContextBinding (contextType: ARC_REQUEST)
+/*
 model ARCDocument {
   id        String @id @default(cuid())
   requestId String @map("request_id")
@@ -4080,6 +4135,7 @@ model ARCDocument {
   @@index([requestId])
   @@map("arc_documents")
 }
+*/
 
 /// @description ARC committee configuration
 model ARCCommittee {
@@ -4198,6 +4254,62 @@ model BoardMember {
   @@unique([boardId, partyId, termStart])
   @@index([partyId])
   @@map("board_members")
+}
+
+// -----------------------------------------------------------------------------
+// Phase 28: Committee Management
+// -----------------------------------------------------------------------------
+
+/// @description Generic committee for an association
+model Committee {
+  id             String        @id @default(cuid())
+  organizationId String        @map("organization_id")
+  associationId  String        @map("association_id")
+
+  name           String
+  description    String?       @db.Text
+  committeeType  CommitteeType @map("committee_type")
+
+  // ARC Integration: if true, committee reviews ARC requests
+  isArcLinked    Boolean       @default(false) @map("is_arc_linked")
+
+  isActive       Boolean       @default(true) @map("is_active")
+
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association       @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  members      CommitteeMember[]
+
+  @@index([organizationId])
+  @@index([associationId])
+  @@index([committeeType])
+  @@map("committees")
+}
+
+/// @description Committee membership with roles and terms
+model CommitteeMember {
+  id          String        @id @default(cuid())
+  committeeId String        @map("committee_id")
+  partyId     String        @map("party_id")
+
+  role        CommitteeRole @default(MEMBER)
+  termStart   DateTime      @db.Timestamptz(3)  @map("term_start")
+  termEnd     DateTime?     @db.Timestamptz(3) @map("term_end")
+  isActive    Boolean       @default(true) @map("is_active")
+
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
+
+  // Relations
+  committee Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  party     Party     @relation(fields: [partyId], references: [id])
+
+  @@unique([committeeId, partyId, termStart])
+  @@index([partyId])
+  @@map("committee_members")
 }
 
 /// @description Meetings for governance (board, annual, special)

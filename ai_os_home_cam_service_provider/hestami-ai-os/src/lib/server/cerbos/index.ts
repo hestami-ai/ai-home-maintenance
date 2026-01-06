@@ -11,7 +11,7 @@ import type { User, UserRole } from '../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../logger.js';
 
 const log = createModuleLogger('Cerbos');
-import { recordSpanError } from '../api/middleware/tracing.js';
+import { recordSpanError, enrichSpanWithCerbos } from '../api/middleware/tracing.js';
 
 // ============================================================================
 // Types
@@ -220,6 +220,15 @@ export async function isAllowed(
 		});
 
 		const allowed = result === true;
+		
+		// Enrich span with Cerbos authorization context
+		await enrichSpanWithCerbos(
+			action,
+			resource.kind,
+			resource.id,
+			allowed ? 'ALLOW' : 'DENY'
+		);
+		
 		log.debug('Authorization check', {
 			principalId: principal.id,
 			roles: principal.roles,

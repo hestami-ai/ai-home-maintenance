@@ -42,9 +42,9 @@ Key architectural patterns:
   3. **oRPC procedures** → use Zod schemas for input/output validation (can use generated schemas OR custom DTOs for aggregated/derived views)
   4. **OpenAPI spec** (`openapi.json`) → auto-generated from oRPC via `npm run openapi:generate`
   5. **Frontend types** (`src/lib/api/types.generated.ts`) → auto-generated from OpenAPI via `npm run types:generate`
-  6. **API clients** (`src/lib/api/cam.ts`) → import and re-export types from `types.generated.ts`
+  6. **API clients** (e.g., `src/lib/api/cam.ts`) → import and re-export types from `types.generated.ts`
 
-* **Never duplicate types**: Frontend components import from `cam.ts`, which derives types from `types.generated.ts`. Manual type definitions are only for API client convenience wrappers.
+* **Never duplicate types**: Try to maximize utitilization of generated types.
 
 * **Schema validation**: All API route responses use typed Zod schemas (e.g., `ResponseMetaSchema`)—avoid `z.any()`
 

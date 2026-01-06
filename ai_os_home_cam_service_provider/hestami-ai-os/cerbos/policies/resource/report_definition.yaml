@@ -1,15 +1,33 @@
+# Report Definition Resource Policy
+# Controls access to report definitions (templates, configurations)
+
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: "report_definition"
+  importDerivedRoles:
+    - common_roles
   rules:
+    # Admins have full access
     - actions: ["view", "create", "edit", "delete"]
       effect: EFFECT_ALLOW
-      roles:
-        - admin
-        - manager
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view reports
     - actions: ["view"]
       effect: EFFECT_ALLOW
-      roles:
-        - staff
-        - board_member
+      derivedRoles:
+        - org_board_member
+
+    # Auditors can view reports
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

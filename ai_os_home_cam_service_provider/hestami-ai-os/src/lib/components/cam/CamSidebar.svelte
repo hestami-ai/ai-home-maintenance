@@ -47,6 +47,7 @@
 		{ label: 'Documents & Records', href: '/app/cam/documents', icon: FileText },
 		{ label: 'Accounting', href: '/app/cam/accounting', icon: DollarSign },
 		{ label: 'Governance', href: '/app/cam/governance', icon: Gavel },
+		{ label: 'Staff & Roles', href: '/app/cam/management/staff', icon: Users },
 		{ label: 'Reports', href: '/app/cam/reports', icon: BarChart3 }
 	];
 

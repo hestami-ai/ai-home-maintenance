@@ -1,5 +1,8 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
+import { createModuleLogger } from '$lib/server/logger';
 import type { LayoutServerLoad } from './$types';
+
+const log = createModuleLogger('CamLayout');
 
 export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
     // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
@@ -27,11 +30,18 @@ export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
 
     try {
         const response = await client.association.list({});
-        const associations = response.ok ? response.data.associations : [];
+        const associations: Array<{ id: string; name: string; status: string; propertyCount?: number }> = 
+            response.ok ? response.data.associations : [];
 
         // Determine current association from cookie or default to first
         const cookieId = cookies.get('cam_association_id');
         let currentAssociation = null;
+
+        log.debug('Association cookie check', {
+            cookieId,
+            associationsCount: associations.length,
+            associationIds: associations.map(a => a.id)
+        });
 
         if (associations.length > 0) {
             if (cookieId) {
@@ -41,15 +51,31 @@ export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
             }
         }
 
+        log.debug('Current association selected', {
+            currentAssociationId: currentAssociation?.id,
+            currentAssociationName: currentAssociation?.name
+        });
+
         // Fetch badge counts if we have an association
         let badgeCounts = { violations: 0, arcRequests: 0, workOrders: 0 };
 
         if (currentAssociation) {
+            // Rebuild context with association for badge count queries
+            const assocContext = buildServerContext(locals, { 
+                orgRoles, 
+                staffRoles, 
+                pillarAccess, 
+                organization, 
+                role,
+                association: currentAssociation as any // Pass association for context.associationId
+            });
+            const assocClient = createDirectClient(assocContext);
+
             try {
                 const [violationsRes, arcRes, workOrdersRes] = await Promise.all([
-                    client.violation.list({}),
-                    client.arcRequest.list({ status: 'SUBMITTED' }),
-                    client.workOrder.list({ status: 'IN_PROGRESS' })
+                    assocClient.violation.list({}),
+                    assocClient.arcRequest.list({ status: 'SUBMITTED' }),
+                    assocClient.workOrder.list({ status: 'IN_PROGRESS' })
                 ]);
 
                 if (violationsRes.ok && violationsRes.data?.violations) {

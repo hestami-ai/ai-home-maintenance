@@ -17,11 +17,24 @@
 		error = null;
 
 		try {
+			// Build association config for self-managed HOAs
+			const associationConfig = $communityOnboarding.organizationType === 'COMMUNITY_ASSOCIATION'
+				? {
+					boardSeats: $communityOnboarding.governance.boardSeats,
+					totalUnits: $communityOnboarding.initialData.totalUnits || undefined,
+					// Fiscal year end is the month before fiscal year start (or December if start is January)
+					fiscalYearEndMonth: $communityOnboarding.governance.fiscalYearStart > 1
+						? $communityOnboarding.governance.fiscalYearStart - 1
+						: 12
+				}
+				: undefined;
+
 			// Type-safe oRPC call
 			const result = await orpc.organization.create({
 				name: $communityOnboarding.organizationDetails.name,
 				slug: $communityOnboarding.organizationDetails.slug,
-				type: $communityOnboarding.organizationType!
+				type: $communityOnboarding.organizationType!,
+				associationConfig
 			});
 
 			const org = result.data.organization;

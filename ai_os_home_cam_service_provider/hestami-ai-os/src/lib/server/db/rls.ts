@@ -5,6 +5,8 @@ import { prisma } from '../db.js';
  */
 export interface RLSContext {
 	userId: string;
+	associationId?: string | null;
+	isStaff?: boolean;
 	reason?: string;
 	itemType?: string;
 	itemId?: string;
@@ -22,18 +24,21 @@ export async function setOrgContext(
 	context?: RLSContext
 ): Promise<void> {
 	if (context?.userId) {
-		// Use audited version with logging
+		// Use audited version with logging (supports Phase 30 tiered RLS: Org + Assoc + Staff)
 		await prisma.$executeRawUnsafe(
-			`SELECT set_org_context_audited($1, $2, $3, $4, $5)`,
+			`SELECT set_org_context_audited($1, $2, $3, $4, $5, $6, $7)`,
 			context.userId,
 			organizationId,
+			context.associationId ?? null,
+			context.isStaff ?? false,
 			context.reason ?? null,
 			context.itemType ?? null,
 			context.itemId ?? null
 		);
 	} else {
-		// Simple version without audit (for backwards compatibility)
+		// Simple version without audit (updated to clear association context for safety)
 		await prisma.$executeRawUnsafe(`SELECT set_current_org_id($1)`, organizationId);
+		await prisma.$executeRawUnsafe(`SELECT set_config('app.current_assoc_id', '', false)`);
 	}
 }
 
@@ -44,11 +49,12 @@ export async function setOrgContext(
  */
 export async function clearOrgContext(userId?: string): Promise<void> {
 	if (userId) {
-		// Use audited version with logging
+		// Use audited version with logging (updated for Phase 30)
 		await prisma.$executeRawUnsafe(`SELECT clear_org_context_audited($1)`, userId);
 	} else {
 		// Simple version without audit
 		await prisma.$executeRawUnsafe(`SELECT set_current_org_id(NULL)`);
+		await prisma.$executeRawUnsafe(`SELECT set_config('app.current_assoc_id', '', false)`);
 	}
 }
 
@@ -58,6 +64,14 @@ export async function clearOrgContext(userId?: string): Promise<void> {
 export async function getCurrentOrgId(): Promise<string | null> {
 	const result = await prisma.$queryRaw<[{ current_org_id: string | null }]>`SELECT current_org_id()`;
 	return result[0]?.current_org_id ?? null;
+}
+
+/**
+ * Gets the current association ID from the session context
+ */
+export async function getCurrentAssocId(): Promise<string | null> {
+	const result = await prisma.$queryRaw<[{ current_assoc_id: string | null }]>`SELECT current_assoc_id()`;
+	return result[0]?.current_assoc_id ?? null;
 }
 
 /**
@@ -96,15 +110,18 @@ export async function orgTransaction<T>(
 	return prisma.$transaction(async (tx) => {
 		if (context?.userId) {
 			await tx.$executeRawUnsafe(
-				`SELECT set_org_context_audited($1, $2, $3, $4, $5)`,
+				`SELECT set_org_context_audited($1, $2, $3, $4, $5, $6, $7)`,
 				context.userId,
 				organizationId,
+				context.associationId ?? null,
+				context.isStaff ?? false,
 				context.reason ?? null,
 				context.itemType ?? null,
 				context.itemId ?? null
 			);
 		} else {
 			await tx.$executeRawUnsafe(`SELECT set_current_org_id($1)`, organizationId);
+			await tx.$executeRawUnsafe(`SELECT set_config('app.current_assoc_id', '', false)`);
 		}
 		return callback(tx as typeof prisma);
 	});
@@ -147,11 +164,11 @@ export async function setOrgContextForWorkItem(
 ): Promise<string | null> {
 	// Look up the org ID for this work item
 	const orgId = await lookupWorkItemOrgId(itemType, itemId);
-	
+
 	if (!orgId) {
 		return null;
 	}
-	
+
 	// Set context with full audit trail
 	await setOrgContext(orgId, {
 		userId,
@@ -159,6 +176,6 @@ export async function setOrgContextForWorkItem(
 		itemType,
 		itemId
 	});
-	
+
 	return orgId;
 }

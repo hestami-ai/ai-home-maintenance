@@ -1,6 +1,7 @@
 import { prisma } from '../db.js';
 import {
-	defaultChartOfAccounts,
+	coaTemplates,
+	COATemplateId,
 	SystemAccounts,
 	type DefaultAccountDefinition
 } from './defaultChartOfAccounts.js';
@@ -14,9 +15,13 @@ const log = createModuleLogger('GLService');
  */
 
 /**
- * Seed the default chart of accounts for a new association
+ * Seed the chart of accounts for a new association using a specific template
  */
-export async function seedDefaultChartOfAccounts(organizationId: string, associationId: string): Promise<void> {
+export async function seedDefaultChartOfAccounts(
+	organizationId: string,
+	associationId: string,
+	templateId: COATemplateId = COATemplateId.STANDARD_HOA
+): Promise<void> {
 	// Check if accounts already exist
 	const existingCount = await prisma.gLAccount.count({
 		where: { associationId }
@@ -27,11 +32,12 @@ export async function seedDefaultChartOfAccounts(organizationId: string, associa
 		return;
 	}
 
-	log.info('Seeding default chart of accounts', { associationId });
+	const template = coaTemplates[templateId] || coaTemplates[COATemplateId.STANDARD_HOA];
+	log.info('Seeding chart of accounts', { associationId, templateId });
 
 	// Create accounts in a transaction
 	await prisma.$transaction(async (tx) => {
-		for (const parentDef of defaultChartOfAccounts) {
+		for (const parentDef of template) {
 			// Create parent account
 			const parent = await createAccountFromDefinition(tx, organizationId, associationId, parentDef, null);
 

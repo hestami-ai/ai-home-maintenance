@@ -9,8 +9,10 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
+import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { Prisma } from '../../../../generated/prisma/client.js';
 
 const log = createWorkflowLogger('ARCRequestWorkflow');
 
@@ -229,22 +231,60 @@ async function addDocument(
 	data: Record<string, unknown>
 ): Promise<{ entityId: string }> {
 	try {
+		const request = await prisma.aRCRequest.findUniqueOrThrow({
+			where: { id: requestId },
+			select: { associationId: true }
+		});
+
 		const document = await orgTransaction(organizationId, async (tx) => {
-			return tx.aRCDocument.create({
+			return tx.document.create({
 				data: {
-					requestId,
-					documentType: data.documentType as any,
+					organizationId,
+					associationId: request.associationId,
+					title: data.fileName as string,
 					fileName: data.fileName as string,
-					description: (data.description as string) || undefined,
 					fileUrl: data.fileUrl as string,
-					fileSize: (data.fileSize as number) || undefined,
-					mimeType: (data.mimeType as string) || undefined,
-					uploadedBy: userId
+					fileSize: (data.fileSize as number) || 0,
+					mimeType: (data.mimeType as string) || 'application/octet-stream',
+					description: (data.description as string) || undefined,
+					category: 'ARC_ATTACHMENT',
+					visibility: 'PRIVATE',
+					status: 'ACTIVE',
+					uploadedBy: userId,
+					storagePath: data.fileUrl as string,
+					latitude: data.gpsLatitude ? new Prisma.Decimal(data.gpsLatitude as number) : undefined,
+					longitude: data.gpsLongitude ? new Prisma.Decimal(data.gpsLongitude as number) : undefined,
+					capturedAt: data.capturedAt ? new Date(data.capturedAt as string) : undefined,
+					contextBindings: {
+						create: {
+							contextType: 'ARC_REQUEST',
+							contextId: requestId,
+							isPrimary: true,
+							createdBy: userId
+						}
+					}
 				}
 			});
 		}, { userId, reason: 'Adding document to ARC request via workflow' });
 
 		log.info('ADD_DOCUMENT completed', { documentId: document.id, requestId, userId });
+
+		// Record activity event
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'ARC_REQUEST',
+			entityId: requestId,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Document added: ${data.fileName}`,
+			workflowId: 'arcRequestWorkflow_v1',
+			workflowStep: 'ADD_DOCUMENT',
+			performedById: userId,
+			performedByType: 'HUMAN',
+			arcRequestId: requestId,
+			newState: { documentId: document.id, fileName: data.fileName }
+		});
+
 		return { entityId: document.id };
 	} finally {
 		await clearOrgContext(userId);

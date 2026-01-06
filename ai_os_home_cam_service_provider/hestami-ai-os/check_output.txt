@@ -1,0 +1,118 @@
+$ svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+Loading svelte-check in workspace: e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os
+Getting Svelte diagnostics...
+
+NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\accounting\defaultChartOfAccounts.ts[39m:532:14
+[31mError[39m: Type '(DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; })[]' is not assignable to type 'DefaultAccountDefinition[]'.
+  Type 'DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+    Type '{ children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+      Types of property 'children' are incompatible.
+        Type '(Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]' is not assignable to type 'Omit<DefaultAccountDefinition, "children">[]'.
+          Type 'Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+            Type '{ accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+              Types of property 'category' are incompatible.
+                Type 'string' is not assignable to type 'AccountCategory'. 
+[36m */
+export const [35mcondoChartOfAccounts[36m: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group) => {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\accounting\defaultChartOfAccounts.ts[39m:578:14
+[31mError[39m: Type '(DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; })[]' is not assignable to type 'DefaultAccountDefinition[]'.
+  Type 'DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+    Type '{ children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+      Types of property 'children' are incompatible.
+        Type '(Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]' is not assignable to type 'Omit<DefaultAccountDefinition, "children">[]'.
+          Type 'Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+            Type '{ accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+              Types of property 'category' are incompatible.
+                Type 'string' is not assignable to type 'AccountCategory'. 
+[36m */
+export const [35msingleFamilyChartOfAccounts[36m: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group) => {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\accounting\defaultChartOfAccounts.ts[39m:605:14
+[31mError[39m: Type '(DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; })[]' is not assignable to type 'DefaultAccountDefinition[]'.
+  Type 'DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+    Type '{ children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+      Types of property 'children' are incompatible.
+        Type '(Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]' is not assignable to type 'Omit<DefaultAccountDefinition, "children">[]'.
+          Type 'Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+            Type '{ accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+              Types of property 'category' are incompatible.
+                Type 'string' is not assignable to type 'AccountCategory'. 
+[36m */
+export const [35mtownhomeChartOfAccounts[36m: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group) => {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\accounting\defaultChartOfAccounts.ts[39m:632:14
+[31mError[39m: Type '(DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; })[]' is not assignable to type 'DefaultAccountDefinition[]'.
+  Type 'DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+    Type '{ children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+      Types of property 'children' are incompatible.
+        Type '(Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]' is not assignable to type 'Omit<DefaultAccountDefinition, "children">[]'.
+          Type 'Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+            Type '{ accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+              Types of property 'category' are incompatible.
+                Type 'string' is not assignable to type 'AccountCategory'. 
+[36m */
+export const [35mmixedUseChartOfAccounts[36m: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group) => {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\accounting\defaultChartOfAccounts.ts[39m:659:14
+[31mError[39m: Type '(DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; })[]' is not assignable to type 'DefaultAccountDefinition[]'.
+  Type 'DefaultAccountDefinition | { children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; ... 5 more ...; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+    Type '{ children: (Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]; ... 6 more ...; isSystemAccount: boolean; }' is not assignable to type 'DefaultAccountDefinition'.
+      Types of property 'children' are incompatible.
+        Type '(Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; })[]' is not assignable to type 'Omit<DefaultAccountDefinition, "children">[]'.
+          Type 'Omit<DefaultAccountDefinition, "children"> | { accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+            Type '{ accountNumber: string; name: string; accountType: string; category: string; fundType: string; description: string; isSystemAccount: boolean; }' is not assignable to type 'Omit<DefaultAccountDefinition, "children">'.
+              Types of property 'category' are incompatible.
+                Type 'string' is not assignable to type 'AccountCategory'. 
+[36m */
+export const [35mseniorLivingChartOfAccounts[36m: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group) => {[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\workflows\associationWorkflow.ts[39m:51:59
+[31mError[39m: Argument of type 'CreateManagedAssociationInput' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'CreateManagedAssociationInput'. 
+[36m    const log = createWorkflowLogger('createManagedAssociation', DBOS.workflowID, input.action);
+    const startTime = logWorkflowStart(log, input.action, [35minput[36m);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\lib\server\workflows\associationWorkflow.ts[39m:110:13
+[31mError[39m: Type 'InputJsonValue' is not assignable to type 'Record<string, unknown> | undefined'.
+  Type 'string' is not assignable to type 'Record<string, unknown>'. 
+[36m            associationId: association.id,
+            [35mnewState[36m: { name: association.name, status: association.status } as Prisma.InputJsonValue
+        });[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\associations\new\+page.server.ts[39m:24:42
+[31mError[39m: Argument of type 'ZodObject<{ name: ZodString; legalName: ZodNullable<ZodOptional<ZodString>>; taxId: ZodNullable<ZodOptional<ZodString>>; fiscalYearEnd: ZodDefault<...>; coaTemplateId: ZodDefault<...>; contractNumber: ZodNullable<...>; contractStartDate: ZodString; }, $strip>' is not assignable to parameter of type 'ZodObjectType'.
+  Type 'ZodObject<{ name: ZodString; legalName: ZodNullable<ZodOptional<ZodString>>; taxId: ZodNullable<ZodOptional<ZodString>>; fiscalYearEnd: ZodDefault<...>; coaTemplateId: ZodDefault<...>; contractNumber: ZodNullable<...>; contractStartDate: ZodString; }, $strip>' is missing the following properties from type 'ZodType<Record<string, unknown>, ZodTypeDef, Record<string, unknown> | undefined>': _type, _parse, _getType, _getOrReturnCtx, and 7 more. 
+[36mexport const load: PageServerLoad = async () => {
+    const form = await superValidate(zod([35mnewAssociationSchema[36m));
+    return { form };[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\associations\new\+page.server.ts[39m:31:55
+[31mError[39m: Argument of type 'ZodObject<{ name: ZodString; legalName: ZodNullable<ZodOptional<ZodString>>; taxId: ZodNullable<ZodOptional<ZodString>>; fiscalYearEnd: ZodDefault<...>; coaTemplateId: ZodDefault<...>; contractNumber: ZodNullable<...>; contractStartDate: ZodString; }, $strip>' is not assignable to parameter of type 'ZodObjectType'.
+  Type 'ZodObject<{ name: ZodString; legalName: ZodNullable<ZodOptional<ZodString>>; taxId: ZodNullable<ZodOptional<ZodString>>; fiscalYearEnd: ZodDefault<...>; coaTemplateId: ZodDefault<...>; contractNumber: ZodNullable<...>; contractStartDate: ZodString; }, $strip>' is missing the following properties from type 'ZodType<Record<string, unknown>, ZodTypeDef, Record<string, unknown> | undefined>': _type, _parse, _getType, _getOrReturnCtx, and 7 more. 
+[36m        const { request, locals } = event;
+        const form = await superValidate(request, zod([35mnewAssociationSchema[36m));[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\associations\new\+page.server.ts[39m:44:68
+[31mError[39m: Type 'UserRole | null' is not assignable to type 'UserRole | undefined'.
+  Type 'null' is not assignable to type 'UserRole | undefined'. 
+[36m        const role = locals.role;
+        const context = buildServerContext(locals, { organization, [35mrole[36m });
+        const client = createDirectClient(context);[39m
+
+e:\Projects\hestami-ai\ai_os_home_cam_service_provider\hestami-ai-os\[32msrc\routes\app\cam\associations\new\+page.svelte[39m:8:77
+[31mError[39m: Argument of type '() => SuperValidated<Record<string, unknown>, any, Record<string, unknown>>' is not assignable to parameter of type 'Record<string, unknown> | SuperValidated<Record<string, unknown>, any, Record<string, unknown>>'. (ts)
+[36m
+	const { form, errors, constraints, message, delayed, enhance } = superForm([35m() => data.form[36m, {
+        resetForm: false,[39m
+
+====================================
+[31msvelte-check found 11 errors and 0 warnings in 4 files
+error: script "check" exited with code 1
+[39m

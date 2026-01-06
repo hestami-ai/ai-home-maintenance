@@ -356,5 +356,6 @@ async function scheduledRetryPoll(scheduledTime: Date, actualTime: Date): Promis
 
 export const documentProcessingRetryWorkflow_v1 = DBOS.registerWorkflow(retryDocument);
 
-// Register scheduled workflow to run every minute
-DBOS.registerScheduled(scheduledRetryPoll, { crontab: '*/1 * * * *', name: 'scheduledRetryPoll' });
+// Register the poll function as a workflow first, then schedule it
+const scheduledRetryPollWorkflow = DBOS.registerWorkflow(scheduledRetryPoll);
+DBOS.registerScheduled(scheduledRetryPollWorkflow, { crontab: '*/1 * * * *', name: 'scheduledRetryPoll' });

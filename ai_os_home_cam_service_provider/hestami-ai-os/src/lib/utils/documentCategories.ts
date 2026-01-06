@@ -96,7 +96,12 @@ export const DOCUMENT_CATEGORY_TO_CAM: Record<DocumentCategory, CamDocumentCateg
 	// Cross-pillar
 	[DocumentCategory.PHOTO]: 'EVIDENCE_INSPECTIONS',
 	[DocumentCategory.VIDEO]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.GENERAL]: 'OTHER'
+	[DocumentCategory.AUDIO]: 'CORRESPONDENCE',
+	[DocumentCategory.GENERAL]: 'OTHER',
+
+	// Phase 30: Deprecated categories (migrated to unified Document model)
+	[DocumentCategory.ARC_ATTACHMENT]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.VIOLATION_EVIDENCE]: 'EVIDENCE_INSPECTIONS'
 };
 
 /**
@@ -192,7 +197,7 @@ export const CONCIERGE_CATEGORY_LABELS: Record<ConciergeDocumentCategory, string
 	[DocumentCategory.INSPECTION]: 'Inspection Report',
 	[DocumentCategory.INVOICE]: 'Receipt/Invoice',
 	[DocumentCategory.CONTRACT]: 'Contract',
-	[DocumentCategory.PHOTO]: 'Photo',	
+	[DocumentCategory.PHOTO]: 'Photo',
 	[DocumentCategory.VIDEO]: 'Video',
 	[DocumentCategory.CORRESPONDENCE]: 'Correspondence',
 	[DocumentCategory.PERMIT]: 'Permit',

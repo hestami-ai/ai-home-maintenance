@@ -30,5 +30,5 @@ export const load: LayoutServerLoad = async ({ parent, url }) => {
 		}
 	}
 
-	return {};
+	return { association: null };
 };

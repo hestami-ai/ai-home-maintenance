@@ -10,19 +10,43 @@ import { createModuleLogger } from '../../logger.js';
 const log = createModuleLogger('TracingMiddleware');
 
 /**
- * Span attribute keys for contractor operations
+ * Span attribute keys for observability
  */
 export const SpanAttributes = {
+	// Organization context
 	ORG_ID: 'hestami.org_id',
 	ORG_TYPE: 'hestami.org_type',
 	USER_ID: 'hestami.user_id',
+	
+	// RPC context
+	RPC_METHOD: 'rpc.method',
+	RPC_SERVICE: 'rpc.service',
+	IDEMPOTENCY_KEY: 'hestami.idempotency_key',
+	
+	// Cerbos authorization
+	CERBOS_ACTION: 'cerbos.action',
+	CERBOS_RESOURCE: 'cerbos.resource',
+	CERBOS_RESOURCE_ID: 'cerbos.resource_id',
+	CERBOS_DECISION: 'cerbos.decision',
+	
+	// DBOS workflow
+	WORKFLOW_ID: 'hestami.workflow_id',
+	WORKFLOW_NAME: 'hestami.workflow_name',
+	WORKFLOW_ACTION: 'hestami.workflow_action',
+	
+	// Job/work order context
 	JOB_ID: 'hestami.job_id',
 	TECHNICIAN_ID: 'hestami.technician_id',
 	WORK_ORDER_ID: 'hestami.work_order_id',
-	WORKFLOW_ID: 'hestami.workflow_id',
+	
+	// Resource context
 	RESOURCE_TYPE: 'hestami.resource_type',
 	RESOURCE_ID: 'hestami.resource_id',
-	ACTION: 'hestami.action'
+	ACTION: 'hestami.action',
+	
+	// Request context
+	REQUEST_ID: 'hestami.request_id',
+	SESSION_ID: 'hestami.session_id'
 } as const;
 
 /**
@@ -104,6 +128,97 @@ export async function enrichSpanFromContext(context: RequestContext): Promise<vo
 		organizationType: context.organization?.type,
 		userId: context.user?.id
 	});
+}
+
+/**
+ * Enrich the current span with oRPC method context
+ * Call this at the start of oRPC request handling
+ */
+export async function enrichSpanWithRPC(
+	method: string,
+	idempotencyKey?: string
+): Promise<void> {
+	const trace = await getTraceApi();
+	if (!trace) return;
+
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	// Parse method into service and method (e.g., "association.create" -> service: "association", method: "create")
+	const parts = method.split('.');
+	const service = parts.length > 1 ? parts.slice(0, -1).join('.') : 'unknown';
+	const rpcMethod = parts[parts.length - 1] || method;
+
+	span.setAttribute(SpanAttributes.RPC_SERVICE, service);
+	span.setAttribute(SpanAttributes.RPC_METHOD, method);
+
+	if (idempotencyKey) {
+		span.setAttribute(SpanAttributes.IDEMPOTENCY_KEY, idempotencyKey);
+	}
+
+	// Update span name to include RPC method
+	span.updateName(`RPC ${method}`);
+}
+
+/**
+ * Enrich the current span with Cerbos authorization context
+ */
+export async function enrichSpanWithCerbos(
+	action: string,
+	resource: string,
+	resourceId: string,
+	decision: 'ALLOW' | 'DENY'
+): Promise<void> {
+	const trace = await getTraceApi();
+	if (!trace) return;
+
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	span.setAttribute(SpanAttributes.CERBOS_ACTION, action);
+	span.setAttribute(SpanAttributes.CERBOS_RESOURCE, resource);
+	span.setAttribute(SpanAttributes.CERBOS_RESOURCE_ID, resourceId);
+	span.setAttribute(SpanAttributes.CERBOS_DECISION, decision);
+}
+
+/**
+ * Enrich the current span with DBOS workflow context
+ */
+export async function enrichSpanWithDBOSWorkflow(
+	workflowId: string,
+	workflowName: string,
+	workflowAction?: string
+): Promise<void> {
+	const trace = await getTraceApi();
+	if (!trace) return;
+
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	span.setAttribute(SpanAttributes.WORKFLOW_ID, workflowId);
+	span.setAttribute(SpanAttributes.WORKFLOW_NAME, workflowName);
+	if (workflowAction) {
+		span.setAttribute(SpanAttributes.WORKFLOW_ACTION, workflowAction);
+	}
+}
+
+/**
+ * Enrich the current span with request identification
+ */
+export async function enrichSpanWithRequestId(
+	requestId: string,
+	sessionId?: string
+): Promise<void> {
+	const trace = await getTraceApi();
+	if (!trace) return;
+
+	const span = trace.getActiveSpan();
+	if (!span) return;
+
+	span.setAttribute(SpanAttributes.REQUEST_ID, requestId);
+	if (sessionId) {
+		span.setAttribute(SpanAttributes.SESSION_ID, sessionId);
+	}
 }
 
 /**

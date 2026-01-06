@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
-import { authedProcedure, successResponse } from '../router.js';
+import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { recordActivityEvent } from '../middleware/activityEvent.js';
 import { StaffStatusSchema, StaffRoleSchema, PillarAccessSchema } from '../../../../../generated/zod/index.js';
@@ -1311,3 +1311,684 @@ export const staffRouter = {
 			return successResponse({ success: true }, context);
 		})
 };
+
+// =============================================================================
+// Phase 28: Organization-Scoped Staff Management
+// =============================================================================
+
+/**
+ * CAM Pillar Restriction:
+ * For MANAGEMENT_COMPANY and COMMUNITY_ASSOCIATION organizations,
+ * staff can ONLY be granted access to the CAM pillar.
+ * This helper validates pillar access requests against org type.
+ */
+const CAM_ONLY_ORG_TYPES = ['MANAGEMENT_COMPANY', 'COMMUNITY_ASSOCIATION'];
+const ALLOWED_PILLAR_FOR_CAM = 'CAM';
+
+function validatePillarAccessForOrgType(
+	pillarAccess: string[],
+	orgType: string,
+	errors: { BAD_REQUEST: (opts: { message: string }) => Error }
+): void {
+	if (CAM_ONLY_ORG_TYPES.includes(orgType)) {
+		const invalidPillars = pillarAccess.filter(p => p !== ALLOWED_PILLAR_FOR_CAM);
+		if (invalidPillars.length > 0) {
+			throw errors.BAD_REQUEST({
+				message: `Organization type ${orgType} only allows CAM pillar access. Invalid pillars: ${invalidPillars.join(', ')}`
+			});
+		}
+	}
+}
+
+/**
+ * Organization-scoped staff output schema (includes organizationId)
+ */
+const OrgStaffOutputSchema = z.object({
+	id: z.string(),
+	userId: z.string(),
+	organizationId: z.string(),
+	displayName: z.string(),
+	title: z.string().nullable(),
+	status: StaffStatusSchema,
+	roles: z.array(StaffRoleSchema),
+	pillarAccess: z.array(PillarAccessSchema),
+	canBeAssignedCases: z.boolean(),
+	activatedAt: z.string().nullable(),
+	suspendedAt: z.string().nullable(),
+	deactivatedAt: z.string().nullable(),
+	createdAt: z.string(),
+	updatedAt: z.string(),
+	user: z.object({
+		id: z.string(),
+		email: z.string(),
+		name: z.string().nullable()
+	}).optional()
+});
+
+const OrgStaffListItemSchema = z.object({
+	id: z.string(),
+	userId: z.string(),
+	displayName: z.string(),
+	title: z.string().nullable(),
+	status: StaffStatusSchema,
+	roles: z.array(StaffRoleSchema),
+	pillarAccess: z.array(PillarAccessSchema),
+	canBeAssignedCases: z.boolean(),
+	createdAt: z.string(),
+	user: z.object({
+		email: z.string(),
+		name: z.string().nullable()
+	})
+});
+
+/**
+ * Organization-scoped staff router for CAM Management Companies and Self-Managed Associations.
+ * Uses orgProcedure to require organization context.
+ */
+export const orgStaffRouter = {
+	/**
+	 * List staff members for the current organization
+	 */
+	list: orgProcedure
+		.input(
+			PaginationInputSchema.extend({
+				status: StaffStatusSchema.optional(),
+				role: StaffRoleSchema.optional(),
+				pillar: PillarAccessSchema.optional(),
+				search: z.string().optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					staff: z.array(OrgStaffListItemSchema),
+					pagination: PaginationOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context }) => {
+			const take = input.limit ?? 50;
+			const where: Record<string, unknown> = {
+				organizationId: context.organization.id
+			};
+
+			if (input.status) {
+				where.status = input.status;
+			}
+
+			if (input.role) {
+				where.roles = { has: input.role };
+			}
+
+			if (input.pillar) {
+				where.pillarAccess = { has: input.pillar };
+			}
+
+			if (input.search) {
+				where.OR = [
+					{ displayName: { contains: input.search, mode: 'insensitive' } },
+					{ user: { email: { contains: input.search, mode: 'insensitive' } } },
+					{ user: { name: { contains: input.search, mode: 'insensitive' } } }
+				];
+			}
+
+			const staffList = await prisma.staff.findMany({
+				where,
+				include: {
+					user: {
+						select: {
+							email: true,
+							name: true
+						}
+					}
+				},
+				orderBy: { createdAt: 'desc' },
+				take: take + 1,
+				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 })
+			});
+
+			const hasMore = staffList.length > take;
+			const items = hasMore ? staffList.slice(0, -1) : staffList;
+			const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+
+			return successResponse(
+				{
+					staff: items.map((s) => ({
+						id: s.id,
+						userId: s.userId,
+						displayName: s.displayName,
+						title: s.title,
+						status: s.status,
+						roles: s.roles,
+						pillarAccess: s.pillarAccess,
+						canBeAssignedCases: s.canBeAssignedCases,
+						createdAt: s.createdAt.toISOString(),
+						user: s.user
+					})),
+					pagination: { hasMore, nextCursor }
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Get an organization staff member by ID
+	 */
+	get: orgProcedure
+		.input(z.object({ staffId: z.string() }))
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					staff: OrgStaffOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const staff = await prisma.staff.findFirst({
+				where: {
+					id: input.staffId,
+					organizationId: context.organization.id
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true
+						}
+					}
+				}
+			});
+
+			if (!staff) {
+				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
+			}
+
+			return successResponse(
+				{
+					staff: {
+						id: staff.id,
+						userId: staff.userId,
+						organizationId: staff.organizationId!,
+						displayName: staff.displayName,
+						title: staff.title,
+						status: staff.status,
+						roles: staff.roles,
+						pillarAccess: staff.pillarAccess,
+						canBeAssignedCases: staff.canBeAssignedCases,
+						activatedAt: staff.activatedAt?.toISOString() ?? null,
+						suspendedAt: staff.suspendedAt?.toISOString() ?? null,
+						deactivatedAt: staff.deactivatedAt?.toISOString() ?? null,
+						createdAt: staff.createdAt.toISOString(),
+						updatedAt: staff.updatedAt.toISOString(),
+						user: staff.user
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Create a new organization staff member
+	 * Enforces CAM-only pillar access for CAM org types
+	 */
+	create: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					email: z.string().email().describe('User email to link as staff'),
+					displayName: z.string().min(1).max(255),
+					title: z.string().max(255).optional(),
+					roles: z.array(StaffRoleSchema).min(1).describe('At least one role required'),
+					pillarAccess: z.array(PillarAccessSchema).min(1).describe('Pillar access (CAM only for CAM orgs)'),
+					canBeAssignedCases: z.boolean().default(false)
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					staff: OrgStaffOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'User with this email not found' },
+			CONFLICT: { message: 'Staff profile already exists' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			// Validate pillar access against organization type
+			validatePillarAccessForOrgType(input.pillarAccess, context.organization.type, errors);
+
+			const user = await prisma.user.findUnique({
+				where: { email: input.email }
+			});
+
+			if (!user) {
+				throw errors.NOT_FOUND({ message: 'User with this email not found' });
+			}
+
+			// Check if staff profile already exists for this user in this org
+			const existingStaff = await prisma.staff.findFirst({
+				where: {
+					userId: user.id,
+					organizationId: context.organization.id
+				}
+			});
+
+			if (existingStaff) {
+				throw errors.CONFLICT({ message: 'Staff profile already exists for this user in this organization' });
+			}
+
+			// Generate activation code
+			const activationCode = generateActivationCode();
+			const activationCodeEncrypted = encrypt(activationCode);
+			const activationCodeExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+
+			// Create staff entity with organization scope
+			const staff = await prisma.staff.create({
+				data: {
+					userId: user.id,
+					organizationId: context.organization.id,
+					displayName: input.displayName,
+					title: input.title,
+					roles: input.roles,
+					pillarAccess: input.pillarAccess,
+					canBeAssignedCases: input.canBeAssignedCases,
+					status: 'PENDING',
+					activationCodeEncrypted,
+					activationCodeExpiresAt
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true
+						}
+					}
+				}
+			});
+
+			// Record activity event
+			await recordActivityEvent({
+				organizationId: context.organization.id,
+				entityType: 'STAFF',
+				entityId: staff.id,
+				action: 'CREATE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization staff member "${staff.displayName}" created with roles: ${input.roles.join(', ')}`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				newState: {
+					id: staff.id,
+					userId: staff.userId,
+					organizationId: staff.organizationId,
+					displayName: staff.displayName,
+					roles: staff.roles,
+					pillarAccess: staff.pillarAccess,
+					status: staff.status
+				}
+			});
+
+			// TODO: Send invitation email when email system is integrated
+			log.info('Staff invitation created', {
+				staffId: staff.id,
+				email: input.email,
+				organizationId: context.organization.id
+			});
+
+			return successResponse(
+				{
+					staff: {
+						id: staff.id,
+						userId: staff.userId,
+						organizationId: staff.organizationId!,
+						displayName: staff.displayName,
+						title: staff.title,
+						status: staff.status,
+						roles: staff.roles,
+						pillarAccess: staff.pillarAccess,
+						canBeAssignedCases: staff.canBeAssignedCases,
+						activatedAt: staff.activatedAt?.toISOString() ?? null,
+						suspendedAt: staff.suspendedAt?.toISOString() ?? null,
+						deactivatedAt: staff.deactivatedAt?.toISOString() ?? null,
+						createdAt: staff.createdAt.toISOString(),
+						updatedAt: staff.updatedAt.toISOString(),
+						user: staff.user
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Update organization staff member details
+	 */
+	update: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					staffId: z.string(),
+					displayName: z.string().min(1).max(255).optional(),
+					title: z.string().max(255).nullable().optional(),
+					roles: z.array(StaffRoleSchema).optional(),
+					pillarAccess: z.array(PillarAccessSchema).optional(),
+					canBeAssignedCases: z.boolean().optional()
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					staff: OrgStaffOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			// Validate pillar access if being updated
+			if (input.pillarAccess) {
+				validatePillarAccessForOrgType(input.pillarAccess, context.organization.type, errors);
+			}
+
+			const existingStaff = await prisma.staff.findFirst({
+				where: {
+					id: input.staffId,
+					organizationId: context.organization.id
+				}
+			});
+
+			if (!existingStaff) {
+				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
+			}
+
+			const previousState = {
+				displayName: existingStaff.displayName,
+				title: existingStaff.title,
+				roles: existingStaff.roles,
+				pillarAccess: existingStaff.pillarAccess,
+				canBeAssignedCases: existingStaff.canBeAssignedCases
+			};
+
+			const staff = await prisma.staff.update({
+				where: { id: input.staffId },
+				data: {
+					...(input.displayName && { displayName: input.displayName }),
+					...(input.title !== undefined && { title: input.title }),
+					...(input.roles && { roles: input.roles }),
+					...(input.pillarAccess && { pillarAccess: input.pillarAccess }),
+					...(input.canBeAssignedCases !== undefined && { canBeAssignedCases: input.canBeAssignedCases })
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true
+						}
+					}
+				}
+			});
+
+			// Record activity event
+			await recordActivityEvent({
+				organizationId: context.organization.id,
+				entityType: 'STAFF',
+				entityId: staff.id,
+				action: 'UPDATE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization staff member "${staff.displayName}" updated`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				previousState,
+				newState: {
+					displayName: staff.displayName,
+					title: staff.title,
+					roles: staff.roles,
+					pillarAccess: staff.pillarAccess,
+					canBeAssignedCases: staff.canBeAssignedCases
+				}
+			});
+
+			return successResponse(
+				{
+					staff: {
+						id: staff.id,
+						userId: staff.userId,
+						organizationId: staff.organizationId!,
+						displayName: staff.displayName,
+						title: staff.title,
+						status: staff.status,
+						roles: staff.roles,
+						pillarAccess: staff.pillarAccess,
+						canBeAssignedCases: staff.canBeAssignedCases,
+						activatedAt: staff.activatedAt?.toISOString() ?? null,
+						suspendedAt: staff.suspendedAt?.toISOString() ?? null,
+						deactivatedAt: staff.deactivatedAt?.toISOString() ?? null,
+						createdAt: staff.createdAt.toISOString(),
+						updatedAt: staff.updatedAt.toISOString(),
+						user: staff.user
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Activate a pending organization staff member
+	 */
+	activate: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					staffId: z.string()
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					staff: OrgStaffOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const existingStaff = await prisma.staff.findFirst({
+				where: {
+					id: input.staffId,
+					organizationId: context.organization.id
+				}
+			});
+
+			if (!existingStaff) {
+				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
+			}
+
+			if (existingStaff.status !== 'PENDING') {
+				throw errors.BAD_REQUEST({ message: `Cannot activate staff with status: ${existingStaff.status}` });
+			}
+
+			const now = new Date();
+			const staff = await prisma.staff.update({
+				where: { id: input.staffId },
+				data: {
+					status: 'ACTIVE',
+					activatedAt: now
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true
+						}
+					}
+				}
+			});
+
+			// Record activity event
+			await recordActivityEvent({
+				organizationId: context.organization.id,
+				entityType: 'STAFF',
+				entityId: staff.id,
+				action: 'STATUS_CHANGE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization staff member "${staff.displayName}" activated`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				previousState: { status: 'PENDING' },
+				newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
+			});
+
+			return successResponse(
+				{
+					staff: {
+						id: staff.id,
+						userId: staff.userId,
+						organizationId: staff.organizationId!,
+						displayName: staff.displayName,
+						title: staff.title,
+						status: staff.status,
+						roles: staff.roles,
+						pillarAccess: staff.pillarAccess,
+						canBeAssignedCases: staff.canBeAssignedCases,
+						activatedAt: staff.activatedAt?.toISOString() ?? null,
+						suspendedAt: staff.suspendedAt?.toISOString() ?? null,
+						deactivatedAt: staff.deactivatedAt?.toISOString() ?? null,
+						createdAt: staff.createdAt.toISOString(),
+						updatedAt: staff.updatedAt.toISOString(),
+						user: staff.user
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Deactivate an organization staff member
+	 */
+	deactivate: orgProcedure
+		.input(
+			IdempotencyKeySchema.merge(
+				z.object({
+					staffId: z.string(),
+					reason: z.string().min(1).max(1000)
+				})
+			)
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					staff: OrgStaffOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Staff not found' },
+			BAD_REQUEST: { message: 'Bad request' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const existingStaff = await prisma.staff.findFirst({
+				where: {
+					id: input.staffId,
+					organizationId: context.organization.id
+				}
+			});
+
+			if (!existingStaff) {
+				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
+			}
+
+			if (existingStaff.status === 'DEACTIVATED') {
+				throw errors.BAD_REQUEST({ message: 'Staff is already deactivated' });
+			}
+
+			const previousStatus = existingStaff.status;
+			const now = new Date();
+
+			const staff = await prisma.staff.update({
+				where: { id: input.staffId },
+				data: {
+					status: 'DEACTIVATED',
+					deactivatedAt: now,
+					deactivationReason: input.reason,
+					canBeAssignedCases: false
+				},
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true
+						}
+					}
+				}
+			});
+
+			// Record activity event
+			await recordActivityEvent({
+				organizationId: context.organization.id,
+				entityType: 'STAFF',
+				entityId: staff.id,
+				action: 'STATUS_CHANGE',
+				eventCategory: 'EXECUTION',
+				summary: `Organization staff member "${staff.displayName}" deactivated. Reason: ${input.reason}`,
+				performedById: context.user!.id,
+				performedByType: 'HUMAN',
+				previousState: { status: previousStatus },
+				newState: {
+					status: 'DEACTIVATED',
+					deactivatedAt: now.toISOString(),
+					deactivationReason: input.reason
+				}
+			});
+
+			return successResponse(
+				{
+					staff: {
+						id: staff.id,
+						userId: staff.userId,
+						organizationId: staff.organizationId!,
+						displayName: staff.displayName,
+						title: staff.title,
+						status: staff.status,
+						roles: staff.roles,
+						pillarAccess: staff.pillarAccess,
+						canBeAssignedCases: staff.canBeAssignedCases,
+						activatedAt: staff.activatedAt?.toISOString() ?? null,
+						suspendedAt: staff.suspendedAt?.toISOString() ?? null,
+						deactivatedAt: staff.deactivatedAt?.toISOString() ?? null,
+						createdAt: staff.createdAt.toISOString(),
+						updatedAt: staff.updatedAt.toISOString(),
+						user: staff.user
+					}
+				},
+				context
+			);
+		})
+};
+

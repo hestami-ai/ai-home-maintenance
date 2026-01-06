@@ -8,7 +8,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
     if (!organization) {
         return {
             properties: []
-        };
+        , association: null};
     }
 
     // Build context using data from parent layout
@@ -37,11 +37,11 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 
         return {
             properties
-        };
+        , association: null};
     } catch (err) {
         console.error('Failed to load properties for new service call:', err);
         return {
             properties: []
-        };
+        , association: null};
     }
 };

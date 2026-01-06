@@ -10,7 +10,7 @@ import {
 	NoticeDeliveryMethodSchema,
 	HearingOutcomeSchema
 } from '$lib/schemas/index.js';
-import type { Prisma, ViolationStatus } from '../../../../../../generated/prisma/client.js';
+import { Prisma, type ViolationStatus } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
 import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';
 import { startViolationFineWorkflow } from '../../../workflows/violationFineWorkflow.js';
@@ -46,7 +46,15 @@ const assertStatusChangeAllowed = (current: ViolationStatus, next: ViolationStat
 	}
 };
 
-const getAssociationOrThrow = async (organizationId: string, errors: any) => {
+const getAssociationOrThrow = async (organizationId: string, contextAssocId: string | null, errors: any) => {
+	// Prioritize association from context (Phase 30)
+	if (contextAssocId) {
+		const assoc = await prisma.association.findFirst({
+			where: { id: contextAssocId, organizationId, deletedAt: null }
+		});
+		if (assoc) return assoc;
+	}
+
 	const association = await prisma.association.findFirst({
 		where: { organizationId, deletedAt: null }
 	});
@@ -122,8 +130,8 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
 
-			// Get association for this organization
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			// Get association context (prioritizing X-Assoc-Id header via context.associationId)
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			// Validate violation type before starting workflow
 			const violationType = await prisma.violationType.findFirst({
@@ -218,7 +226,7 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'violation', input.id);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.id, association.id, errors);
 
 			const deletedAt = new Date();
@@ -291,13 +299,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', '*');
 
-			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
-			});
-
-			if (!association) {
-				throw errors.NOT_FOUND({ message: 'Association' });
-			}
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			const where: Prisma.ViolationWhereInput = {
 				associationId: association.id,
@@ -385,7 +387,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const v = await getViolationOrThrow(input.id, association.id, errors);
 
 			return successResponse(
@@ -463,7 +465,7 @@ export const violationRouter = {
 
 			const { idempotencyKey, ...rest } = input;
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(rest.id, association.id, errors);
 
 			// Validate unit if provided
@@ -554,7 +556,7 @@ export const violationRouter = {
 
 			const { idempotencyKey, ...rest } = input;
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const v = await getViolationOrThrow(rest.id, association.id, errors);
 
 			assertStatusChangeAllowed(v.status, rest.status, errors);
@@ -619,7 +621,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const v = await getViolationOrThrow(input.id, association.id, errors);
 
 			assertStatusChangeAllowed(v.status, 'CURED', errors);
@@ -686,7 +688,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const v = await getViolationOrThrow(input.id, association.id, errors);
 
 			assertStatusChangeAllowed(v.status, 'CLOSED', errors);
@@ -781,20 +783,35 @@ export const violationRouter = {
 				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
-			const evidence = await prisma.violationEvidence.create({
+			const evidence = await prisma.document.create({
 				data: {
-					violationId: input.violationId,
-					evidenceType: input.evidenceType,
+					organizationId: context.organization!.id,
+					associationId: association.id,
+					title: input.fileName,
 					fileName: input.fileName,
 					fileUrl: input.fileUrl,
-					fileSize: input.fileSize,
-					mimeType: input.mimeType,
+					storagePath: input.fileUrl, // Fallback to fileUrl for now
+					fileSize: input.fileSize || 0,
+					mimeType: input.mimeType || 'application/octet-stream',
 					description: input.description,
+					category: 'VIOLATION_EVIDENCE',
+					visibility: 'PRIVATE',
+					status: 'ACTIVE',
+					uploadedBy: context.user!.id,
+					latitude: input.gpsLatitude ? new Prisma.Decimal(input.gpsLatitude) : null,
+					longitude: input.gpsLongitude ? new Prisma.Decimal(input.gpsLongitude) : null,
 					capturedAt: input.capturedAt ? new Date(input.capturedAt) : null,
-					capturedBy: context.user!.id,
-					gpsLatitude: input.gpsLatitude,
-					gpsLongitude: input.gpsLongitude,
-					uploadedBy: context.user!.id
+					metadata: {
+						evidenceType: input.evidenceType
+					},
+					contextBindings: {
+						create: {
+							contextType: 'VIOLATION',
+							contextId: input.violationId,
+							isPrimary: true,
+							createdBy: context.user!.id
+						}
+					}
 				}
 			});
 
@@ -802,7 +819,7 @@ export const violationRouter = {
 				{
 					evidence: {
 						id: evidence.id,
-						evidenceType: evidence.evidenceType,
+						evidenceType: input.evidenceType,
 						fileName: evidence.fileName
 					}
 				},
@@ -836,11 +853,18 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			await getViolationOrThrow(input.violationId, association.id, errors);
 
-			const evidence = await prisma.violationEvidence.findMany({
-				where: { violationId: input.violationId },
+			const evidence = await prisma.document.findMany({
+				where: {
+					contextBindings: {
+						some: {
+							contextType: 'VIOLATION',
+							contextId: input.violationId
+						}
+					}
+				},
 				orderBy: { createdAt: 'asc' }
 			});
 
@@ -848,10 +872,10 @@ export const violationRouter = {
 				{
 					evidence: evidence.map((e) => ({
 						id: e.id,
-						evidenceType: e.evidenceType,
+						evidenceType: (e.metadata as any)?.evidenceType || 'DOCUMENT',
 						fileName: e.fileName,
 						fileUrl: e.fileUrl,
-						capturedAt: e.capturedAt?.toISOString() ?? null
+						capturedAt: e.capturedAt?.toISOString() || e.createdAt.toISOString()
 					}))
 				},
 				context
@@ -895,13 +919,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
-			});
-
-			if (!association) {
-				throw errors.NOT_FOUND({ message: 'Association' });
-			}
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			const violation = await prisma.violation.findFirst({
 				where: { id: input.violationId, associationId: association.id, deletedAt: null },
@@ -1008,7 +1026,7 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const notices = await prisma.violationNotice.findMany({
@@ -1062,7 +1080,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const result = await prisma.$transaction(async (tx) => {
@@ -1139,7 +1157,7 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const hearings = await prisma.violationHearing.findMany({
@@ -1469,7 +1487,7 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const fines = await prisma.violationFine.findMany({
@@ -1604,7 +1622,7 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			const unitViolations = input.unitId
 				? await prisma.violation.findMany({
@@ -1688,7 +1706,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.id, association.id, errors);
 
 			assertStatusChangeAllowed(violation.status, 'ESCALATED', errors);
@@ -1766,7 +1784,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.id, association.id, errors);
 			const previousStatus = violation.status;
 
@@ -1844,7 +1862,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.id, association.id, errors);
 
 			assertStatusChangeAllowed(violation.status, 'CLOSED', errors);
@@ -1926,7 +1944,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
 
 			// Check if there's already a pending appeal
@@ -2037,7 +2055,7 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			const appeal = await prisma.violationAppeal.findFirst({
@@ -2203,7 +2221,7 @@ export const violationRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
-			const association = await getAssociationOrThrow(context.organization!.id, errors);
+			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startViolationFineWorkflow(

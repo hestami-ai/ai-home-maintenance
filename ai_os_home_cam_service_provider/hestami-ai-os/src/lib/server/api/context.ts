@@ -1,4 +1,4 @@
-import type { User, Organization, UserRole, StaffRole, PillarAccess } from '../../../../generated/prisma/client.js';
+import type { User, Organization, Association, UserRole, StaffRole, PillarAccess } from '../../../../generated/prisma/client.js';
 
 /**
  * Request context available to all oRPC procedures
@@ -10,8 +10,17 @@ export interface RequestContext {
 	/** Active organization context (null if not selected) */
 	organization: Organization | null;
 
+	/** Active association context (null if not selected) */
+	association: Association | null;
+
+	/** Active association ID (shorthand for RLS) */
+	associationId: string | null;
+
 	/** User's role in the active organization */
 	role: UserRole | null;
+
+	/** Whether the user is a Hestami platform staff member */
+	isStaff: boolean;
 
 	/**
 	 * Map of all organization IDs to user's role in each
@@ -45,7 +54,10 @@ export function createEmptyContext(requestId: string): RequestContext {
 	return {
 		user: null,
 		organization: null,
+		association: null,
+		associationId: null,
 		role: null,
+		isStaff: false,
 		orgRoles: {},
 		staffRoles: [],
 		pillarAccess: [],

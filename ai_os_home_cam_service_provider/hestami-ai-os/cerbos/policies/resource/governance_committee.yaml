@@ -1,0 +1,49 @@
+# Governance Committee Resource Policy
+# Controls access to committee management (ARC, social, etc.)
+# Phase 28: Governance and Staff Management
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_committee"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all committee operations
+    - actions: ["view", "create", "edit", "delete", "add_member", "remove_member"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers have full access to committee operations
+    - actions: ["view", "create", "edit", "delete", "add_member", "remove_member"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can manage committees
+    - actions: ["view", "create", "edit", "add_member", "remove_member"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Committee chairs can manage their committee members (placeholder - needs condition)
+    # TODO: Add committee chair role and condition for self-management
+
+    # Owners can view committees (transparency)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view committees (transparency)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Auditors can view committees for audit purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor

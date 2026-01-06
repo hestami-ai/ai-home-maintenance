@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Building2, ChevronDown, Check } from 'lucide-svelte';
-
+	
 	interface Association {
 		id: string;
 		name: string;
@@ -34,6 +34,19 @@
 	});
 
 	const hasMultiple = $derived(associations.length > 1);
+
+	/**
+	 * Switch to a different association.
+	 * Sets cookie client-side (not security-sensitive, just a user preference)
+	 * and invalidates all load functions to refresh data with new association context.
+	 */
+	async function switchAssociation(associationId: string) {
+		// Set cookie client-side - this is just a preference, not a security token
+		document.cookie = `cam_association_id=${associationId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+		isOpen = false;
+		// Force full page reload to ensure server reads the new cookie
+		window.location.reload();
+	}
 </script>
 
 {#if currentAssociation}
@@ -65,24 +78,23 @@
 			>
 				{#each associations as association}
 					{@const isSelected = association.id === currentAssociation?.id}
-					<form method="POST" action="/api/cam/switch" class="contents">
-						<input type="hidden" name="associationId" value={association.id} />
-						<button
-							type="submit"
-							class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-200-800 {isSelected
-								? 'bg-primary-500/10'
-								: ''}"
-						>
-							<Building2 class="h-4 w-4 flex-shrink-0 text-surface-500" />
-							<div class="min-w-0 flex-1">
-								<p class="truncate text-sm font-medium">{association.name}</p>
-								<p class="truncate text-xs text-surface-500">{association.status}</p>
-							</div>
-							{#if isSelected}
-								<Check class="h-4 w-4 flex-shrink-0 text-primary-500" />
-							{/if}
-						</button>
-					</form>
+					<button
+						type="button"
+						onclick={() => switchAssociation(association.id)}
+						disabled={isSelected}
+						class="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-surface-200-800 disabled:cursor-default {isSelected
+							? 'bg-primary-500/10'
+							: ''}"
+					>
+						<Building2 class="h-4 w-4 flex-shrink-0 text-surface-500" />
+						<div class="min-w-0 flex-1">
+							<p class="truncate text-sm font-medium">{association.name}</p>
+							<p class="truncate text-xs text-surface-500">{association.status}</p>
+						</div>
+						{#if isSelected}
+							<Check class="h-4 w-4 flex-shrink-0 text-primary-500" />
+						{/if}
+					</button>
 				{/each}
 			</div>
 		{/if}

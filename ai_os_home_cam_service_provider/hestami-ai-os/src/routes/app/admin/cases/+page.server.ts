@@ -55,7 +55,8 @@ export const load: PageServerLoad = async ({ parent, url }) => {
                 propertyName: c.property_name,
                 createdAt: c.created_at.toISOString(),
                 assignedConciergeName: c.assigned_concierge_name
-            }))
+            })),
+            association: null
         };
     } catch (err) {
         console.error('Error loading cases:', err);

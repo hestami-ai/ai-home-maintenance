@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 			dashboardData: null,
 			reports: [],
 			meetings: []
-		};
+		, association: null};
 	}
 
 	// Build context using data from parent layout
@@ -68,7 +68,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 			dashboardData,
 			reports,
 			meetings
-		};
+		, association: null};
 
 	} catch (err) {
 		console.error('Failed to load dashboard data:', err);
@@ -76,6 +76,6 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 			dashboardData: null,
 			reports: [],
 			meetings: []
-		};
+		, association: null};
 	}
 };

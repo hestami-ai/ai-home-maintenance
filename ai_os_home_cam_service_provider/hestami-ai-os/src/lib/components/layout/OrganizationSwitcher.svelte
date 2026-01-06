@@ -3,7 +3,10 @@
 	import OrganizationBadge from '$lib/components/ui/OrganizationBadge.svelte';
 	import RoleBadge from '$lib/components/ui/RoleBadge.svelte';
 	import { onMount } from 'svelte';
-	import type { Organization } from '../../../../generated/prisma/client';
+	import type { operations } from '$lib/api/types.generated';
+
+	// Extract types from OpenAPI spec (avoids importing massive Prisma types)
+	type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
 
 	interface OrganizationMembership {
 		organization: Organization;

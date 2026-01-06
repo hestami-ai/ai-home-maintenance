@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
         return {
             properties: [],
             serviceCalls: []
-        };
+        , association: null};
     }
 
     // Build context using data from parent layout
@@ -59,6 +59,6 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
             properties: [],
             serviceCalls: [],
             documentCount: 0
-        };
+        , association: null};
     }
 };

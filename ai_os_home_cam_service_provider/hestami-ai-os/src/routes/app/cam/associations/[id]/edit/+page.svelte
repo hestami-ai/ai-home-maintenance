@@ -77,7 +77,8 @@
 		error = null;
 
 		try {
-			const response = await associationApi.update(association.id, {
+			const response = await associationApi.update({
+				id: association.id,
 				name: formData.name,
 				legalName: formData.legalName || undefined,
 				fiscalYearEnd: parseInt(formData.fiscalYearEnd),

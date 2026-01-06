@@ -229,7 +229,12 @@ export const orgProcedure = authedProcedure
 		};
 
 		// Set RLS context before executing the procedure
-		await setOrgContext(organization.id, { userId: user.id });
+		await setOrgContext(organization.id, {
+			userId: user.id,
+			associationId: context.associationId,
+			isStaff: context.isStaff,
+			reason: 'orgProcedure'
+		});
 
 		try {
 			return await next({

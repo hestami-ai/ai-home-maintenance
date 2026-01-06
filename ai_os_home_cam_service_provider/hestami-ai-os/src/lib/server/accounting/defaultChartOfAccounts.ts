@@ -17,6 +17,20 @@ export interface DefaultAccountDefinition {
 }
 
 /**
+ * COA Template IDs
+ */
+export const COATemplateId = {
+	STANDARD_HOA: 'STANDARD_HOA',
+	CONDO: 'CONDO',
+	SINGLE_FAMILY: 'SINGLE_FAMILY',
+	TOWNHOME: 'TOWNHOME',
+	MIXED_USE: 'MIXED_USE',
+	SENIOR_LIVING: 'SENIOR_LIVING'
+} as const;
+
+export type COATemplateId = (typeof COATemplateId)[keyof typeof COATemplateId];
+
+/**
  * Standard HOA Chart of Accounts
  * Account numbering scheme:
  * - 1xxx: Assets
@@ -25,7 +39,7 @@ export interface DefaultAccountDefinition {
  * - 4xxx: Revenue
  * - 5xxx: Expenses
  */
-export const defaultChartOfAccounts: DefaultAccountDefinition[] = [
+export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 	// =========================================================================
 	// ASSETS (1xxx)
 	// =========================================================================
@@ -510,6 +524,184 @@ export const defaultChartOfAccounts: DefaultAccountDefinition[] = [
 		]
 	}
 ];
+
+/**
+ * Condo / High-Rise Chart of Accounts
+ * Standard HOA + specialized maintenance (Elevators, Life Safety, HVAC)
+ */
+export const condoChartOfAccounts: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group): DefaultAccountDefinition => {
+		if (group.accountNumber === '5000' && group.children) {
+			// Add Specialized Maintenance to Expenses
+			return {
+				...group,
+				children: [
+					...group.children,
+					{
+						accountNumber: '5250',
+						name: 'Elevator Maintenance',
+						accountType: 'EXPENSE',
+						category: 'MAINTENANCE',
+						fundType: 'OPERATING',
+						description: 'Elevator service and inspections',
+						isSystemAccount: false
+					},
+					{
+						accountNumber: '5260',
+						name: 'Life Safety Systems',
+						accountType: 'EXPENSE',
+						category: 'MAINTENANCE',
+						fundType: 'OPERATING',
+						description: 'Fire alarm and sprinkler inspections',
+						isSystemAccount: false
+					},
+					{
+						accountNumber: '5270',
+						name: 'HVAC - Common Areas',
+						accountType: 'EXPENSE',
+						category: 'MAINTENANCE',
+						fundType: 'OPERATING',
+						description: 'Heating and cooling for common areas',
+						isSystemAccount: false
+					}
+				]
+			};
+		}
+		return group;
+	})
+];
+
+/**
+ * Single Family Home Chart of Accounts
+ * Standard HOA - focused on common area landscaping and lifestyle
+ */
+export const singleFamilyChartOfAccounts: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group): DefaultAccountDefinition => {
+		if (group.accountNumber === '5000' && group.children) {
+			return {
+				...group,
+				children: [
+					...group.children,
+					{
+						accountNumber: '5280',
+						name: 'Detention Pond Maintenance',
+						accountType: 'EXPENSE',
+						category: 'MAINTENANCE',
+						fundType: 'OPERATING',
+						description: 'Maintenance of storm water management areas',
+						isSystemAccount: false
+					}
+				]
+			};
+		}
+		return group;
+	})
+];
+
+/**
+ * Townhome Chart of Accounts
+ * Standard HOA + specific reserves for roof/exterior
+ */
+export const townhomeChartOfAccounts: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group): DefaultAccountDefinition => {
+		if (group.accountNumber === '5000' && group.children) {
+			return {
+				...group,
+				children: [
+					...group.children,
+					{
+						accountNumber: '5290',
+						name: 'Roof Maintenance',
+						accountType: 'EXPENSE',
+						category: 'MAINTENANCE',
+						fundType: 'OPERATING',
+						description: 'Common roof repairs',
+						isSystemAccount: false
+					}
+				]
+			};
+		}
+		return group;
+	})
+];
+
+/**
+ * Mixed-Use Chart of Accounts
+ * Standard HOA + specialized cost centers/categories
+ */
+export const mixedUseChartOfAccounts: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group): DefaultAccountDefinition => {
+		if (group.accountNumber === '4000' && group.children) {
+			return {
+				...group,
+				children: [
+					...group.children,
+					{
+						accountNumber: '4400',
+						name: 'Commercial Assessments',
+						accountType: 'REVENUE',
+						category: 'ASSESSMENT_INCOME',
+						fundType: 'OPERATING',
+						description: 'Revenue from commercial units',
+						isSystemAccount: false
+					}
+				]
+			};
+		}
+		return group;
+	})
+];
+
+/**
+ * Senior Living Chart of Accounts
+ * Standard HOA + hospitality services (Dining, Transportation)
+ */
+export const seniorLivingChartOfAccounts: DefaultAccountDefinition[] = [
+	...standardHOAChartOfAccounts.map((group): DefaultAccountDefinition => {
+		if (group.accountNumber === '5000' && group.children) {
+			return {
+				...group,
+				children: [
+					...group.children,
+					{
+						accountNumber: '5600',
+						name: 'Dining Services',
+						accountType: 'EXPENSE',
+						category: 'ADMINISTRATIVE',
+						fundType: 'OPERATING',
+						description: 'On-site dining operations',
+						isSystemAccount: false
+					},
+					{
+						accountNumber: '5700',
+						name: 'Transportation Services',
+						accountType: 'EXPENSE',
+						category: 'ADMINISTRATIVE',
+						fundType: 'OPERATING',
+						description: 'Resident shuttle services',
+						isSystemAccount: false
+					}
+				]
+			};
+		}
+		return group;
+	})
+];
+
+/**
+ * Map of templates
+ */
+export const coaTemplates: Record<COATemplateId, DefaultAccountDefinition[]> = {
+	[COATemplateId.STANDARD_HOA]: standardHOAChartOfAccounts,
+	[COATemplateId.CONDO]: condoChartOfAccounts,
+	[COATemplateId.SINGLE_FAMILY]: singleFamilyChartOfAccounts,
+	[COATemplateId.TOWNHOME]: townhomeChartOfAccounts,
+	[COATemplateId.MIXED_USE]: mixedUseChartOfAccounts,
+	[COATemplateId.SENIOR_LIVING]: seniorLivingChartOfAccounts
+};
+
+// Keep for backward compatibility
+export const defaultChartOfAccounts = standardHOAChartOfAccounts;
 
 /**
  * Well-known account numbers for system use

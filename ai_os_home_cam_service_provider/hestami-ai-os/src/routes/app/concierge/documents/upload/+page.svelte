@@ -37,7 +37,10 @@
 		label: CONCIERGE_CATEGORY_LABELS[cat]
 	}));
 
-	import type { Organization } from '../../../../../../generated/prisma/client';
+	import type { operations } from '$lib/api/types.generated';
+
+	// Extract types from OpenAPI spec (avoids importing massive Prisma types)
+	type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
 	import { createOrgClient } from '$lib/api/orpc';
 
 	interface Props {

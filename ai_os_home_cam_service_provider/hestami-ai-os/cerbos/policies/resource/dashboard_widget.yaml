@@ -1,16 +1,39 @@
+# Dashboard Widget Resource Policy
+# Controls access to dashboard widgets and configurations
+
 apiVersion: api.cerbos.dev/v1
 resourcePolicy:
   version: "default"
   resource: "dashboard_widget"
+  importDerivedRoles:
+    - common_roles
   rules:
+    # Admins have full access
     - actions: ["view", "create", "edit", "delete"]
       effect: EFFECT_ALLOW
-      roles:
-        - admin
-        - manager
-        - staff
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view dashboards
     - actions: ["view"]
       effect: EFFECT_ALLOW
-      roles:
-        - board_member
-        - owner
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view dashboards
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Auditors can view dashboards
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor
