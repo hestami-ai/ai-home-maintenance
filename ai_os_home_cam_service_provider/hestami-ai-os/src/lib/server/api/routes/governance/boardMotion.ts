@@ -7,37 +7,15 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
+import {
+	BoardMotionCategorySchema,
+	BoardMotionStatusSchema,
+	BoardMotionOutcomeSchema
+} from '../../schemas.js';
 
-const boardMotionCategoryEnum = z.enum([
-	'POLICY',
-	'BUDGET',
-	'ASSESSMENT',
-	'ENFORCEMENT',
-	'CONTRACT',
-	'CAPITAL_PROJECT',
-	'RULE_CHANGE',
-	'ELECTION',
-	'OTHER'
-]);
-
-const boardMotionStatusEnum = z.enum([
-	'PROPOSED',
-	'SECONDED',
-	'UNDER_DISCUSSION',
-	'UNDER_VOTE',
-	'TABLED',
-	'APPROVED',
-	'DENIED',
-	'WITHDRAWN'
-]);
-
-const boardMotionOutcomeEnum = z.enum([
-	'PASSED',
-	'FAILED',
-	'TABLED',
-	'WITHDRAWN',
-	'AMENDED'
-]);
+const boardMotionCategoryEnum = BoardMotionCategorySchema;
+const boardMotionStatusEnum = BoardMotionStatusSchema;
+const boardMotionOutcomeEnum = BoardMotionOutcomeSchema;
 
 const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
@@ -91,6 +69,8 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'governance_motion', 'list');
+
 			const { associationId, meetingId, status, category, outcome, search, page, pageSize } = input;
 
 			await getAssociationOrThrow(associationId, context.organization.id, errors);
@@ -148,6 +128,8 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'governance_motion', input.id);
+
 			const motion = await prisma.boardMotion.findFirst({
 				where: { id: input.id },
 				include: {
@@ -198,6 +180,8 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('create', 'governance_motion', input.associationId);
+
 			const { associationId, idempotencyKey, ...data } = input;
 
 			await getAssociationOrThrow(associationId, context.organization.id, errors);
@@ -235,7 +219,8 @@ export const boardMotionRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				title: z.string().min(1).max(255).optional(),
 				description: z.string().optional(),
 				category: boardMotionCategoryEnum.optional(),
@@ -257,7 +242,9 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
-			const { id, ...data } = input;
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
+
+			const { id, idempotencyKey, ...data } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
 				where: { id },
@@ -273,21 +260,29 @@ export const boardMotionRouter = {
 				throw errors.BAD_REQUEST({ message: 'Cannot update a decided motion' });
 			}
 
-			const motion = await prisma.boardMotion.update({
-				where: { id },
-				data: {
-					...(data.title && { title: data.title }),
-					...(data.description !== undefined && { description: data.description }),
-					...(data.category && { category: data.category }),
-					...(data.rationale !== undefined && { rationale: data.rationale }),
-					...(data.effectiveDate !== undefined && {
-						effectiveDate: data.effectiveDate ? new Date(data.effectiveDate) : null
-					}),
-					...(data.expiresAt !== undefined && {
-						expiresAt: data.expiresAt ? new Date(data.expiresAt) : null
-					})
-				}
-			});
+			const result = await startGovernanceWorkflow(
+				{
+					action: 'UPDATE_MOTION',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					entityId: id,
+					data: {
+						title: data.title,
+						description: data.description,
+						category: data.category,
+						rationale: data.rationale,
+						effectiveDate: data.effectiveDate,
+						expiresAt: data.expiresAt
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update motion' });
+			}
+
+			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse({ motion }, context);
 		}),
@@ -319,6 +314,8 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
+
 			const { id, secondedById, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -390,6 +387,8 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
+
 			const { id, status, notes, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -462,6 +461,7 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
 			const { id, outcome, outcomeNotes, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -534,6 +534,7 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
 			const { id, reason, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -612,6 +613,7 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
 			const { id, meetingId, voteQuestion, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -693,6 +695,7 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
 			const { id, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -777,6 +780,7 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.id);
 			const { id, reason, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
@@ -854,6 +858,7 @@ export const boardMotionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'governance_motion', input.motionId);
 			const { motionId, arcRequestId, idempotencyKey } = input;
 
 			// Verify motion exists and is decided

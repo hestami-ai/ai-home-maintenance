@@ -1,12 +1,13 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '$lib/schemas/index.js';
+import { ResponseMetaSchema, ViolationSeveritySchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startViolationWorkflow } from '../../../workflows/violationWorkflow.js';
 
 const log = createModuleLogger('ViolationTypeRoute');
 
-const violationSeverityEnum = z.enum(['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL']);
+const violationSeverityEnum = ViolationSeveritySchema;
 
 /**
  * Violation Type configuration procedures
@@ -18,7 +19,8 @@ export const violationTypeRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				code: z.string().min(1).max(50),
+                idempotencyKey: z.string().uuid(),
+                code: z.string().min(1).max(50),
 				name: z.string().min(1).max(255),
 				description: z.string().max(1000).optional(),
 				category: z.string().min(1).max(100),
@@ -48,7 +50,8 @@ export const violationTypeRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			CONFLICT: { message: 'Conflict' }
+			CONFLICT: { message: 'Conflict' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('create', 'violation', 'new');
@@ -70,24 +73,35 @@ export const violationTypeRouter = {
 				throw errors.CONFLICT({ message: 'Violation type code already exists' });
 			}
 
-			const violationType = await prisma.violationType.create({
-				data: {
+			const result = await startViolationWorkflow(
+				{
+					action: 'CREATE_TYPE',
 					organizationId: context.organization!.id,
-					associationId: association.id,
-					code: input.code,
-					name: input.name,
-					description: input.description,
-					category: input.category,
-					ccnrSection: input.ccnrSection,
-					ruleReference: input.ruleReference,
-					defaultSeverity: input.defaultSeverity,
-					defaultCurePeriodDays: input.defaultCurePeriodDays,
-					firstFineAmount: input.firstFineAmount,
-					secondFineAmount: input.secondFineAmount,
-					subsequentFineAmount: input.subsequentFineAmount,
-					maxFineAmount: input.maxFineAmount
-				}
-			});
+					userId: context.user!.id,
+					data: {
+						associationId: association.id,
+						code: input.code,
+						name: input.name,
+						description: input.description,
+						category: input.category,
+						ccnrSection: input.ccnrSection,
+						ruleReference: input.ruleReference,
+						defaultSeverity: input.defaultSeverity,
+						defaultCurePeriodDays: input.defaultCurePeriodDays,
+						firstFineAmount: input.firstFineAmount,
+						secondFineAmount: input.secondFineAmount,
+						subsequentFineAmount: input.subsequentFineAmount,
+						maxFineAmount: input.maxFineAmount
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create violation type' });
+			}
+
+			const violationType = await prisma.violationType.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{
@@ -252,7 +266,8 @@ export const violationTypeRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				name: z.string().min(1).max(255).optional(),
 				description: z.string().max(1000).optional(),
 				category: z.string().min(1).max(100).optional(),
@@ -281,7 +296,8 @@ export const violationTypeRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Resource not found' }
+			NOT_FOUND: { message: 'Resource not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'violation', input.id);
@@ -302,12 +318,24 @@ export const violationTypeRouter = {
 				throw errors.NOT_FOUND({ message: 'Violation Type' });
 			}
 
-			const { id, ...updateData } = input;
+			const { id, idempotencyKey, ...updateData } = input;
 
-			const updated = await prisma.violationType.update({
-				where: { id },
-				data: updateData
-			});
+			const result = await startViolationWorkflow(
+				{
+					action: 'UPDATE_TYPE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					typeId: id,
+					data: updateData
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update violation type' });
+			}
+
+			const updated = await prisma.violationType.findUniqueOrThrow({ where: { id: result.entityId } });
 
 			return successResponse(
 				{

@@ -476,6 +476,6 @@ export async function startCommunicationWorkflow(
 	idempotencyKey: string
 ): Promise<CommunicationWorkflowResult> {
 	const workflowId = idempotencyKey || `communication-${input.action}-${input.entityId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(communicationWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(communicationWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

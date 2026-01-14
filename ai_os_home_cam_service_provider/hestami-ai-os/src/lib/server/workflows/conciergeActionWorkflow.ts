@@ -23,7 +23,8 @@ export const ConciergeActionAction = {
 	COMPLETE_ACTION: 'COMPLETE_ACTION',
 	BLOCK_ACTION: 'BLOCK_ACTION',
 	RESUME_ACTION: 'RESUME_ACTION',
-	CANCEL_ACTION: 'CANCEL_ACTION'
+	CANCEL_ACTION: 'CANCEL_ACTION',
+	ADD_LOG: 'ADD_LOG'
 } as const;
 
 export type ConciergeActionAction = (typeof ConciergeActionAction)[keyof typeof ConciergeActionAction];
@@ -41,11 +42,26 @@ export interface ConciergeActionWorkflowInput {
 	blockReason?: string;
 	cancelReason?: string;
 	notes?: string;
+	// Additional fields for create
+	relatedDocumentIds?: string[];
+	relatedExternalContactIds?: string[];
+	// Fields for addLog
+	eventType?: string;
+	logDescription?: string;
 }
 
 export interface ConciergeActionWorkflowResult extends LifecycleWorkflowResult {
 	actionId?: string;
 	status?: string;
+	startedAt?: string;
+	completedAt?: string;
+	outcome?: string;
+	logId?: string;
+	caseId?: string;
+	actionType?: string;
+	description?: string;
+	plannedAt?: string | null;
+	createdAt?: string;
 }
 
 const VALID_ACTION_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -62,8 +78,10 @@ async function createAction(
 	description: string,
 	userId: string,
 	plannedAt?: string,
-	notes?: string
-): Promise<{ id: string; status: string }> {
+	notes?: string,
+	relatedDocumentIds?: string[],
+	relatedExternalContactIds?: string[]
+): Promise<{ id: string; status: string; caseId: string; actionType: string; description: string; plannedAt: string | null; createdAt: string }> {
 	const action = await prisma.conciergeAction.create({
 		data: {
 			caseId,
@@ -72,7 +90,9 @@ async function createAction(
 			status: 'PLANNED',
 			performedByUserId: userId,
 			plannedAt: plannedAt ? new Date(plannedAt) : null,
-			notes
+			notes,
+			relatedDocumentIds: relatedDocumentIds ?? [],
+			relatedExternalContactIds: relatedExternalContactIds ?? []
 		}
 	});
 
@@ -86,7 +106,39 @@ async function createAction(
 		}
 	});
 
-	return { id: action.id, status: action.status };
+	return {
+		id: action.id,
+		status: action.status,
+		caseId: action.caseId,
+		actionType: action.actionType,
+		description: action.description,
+		plannedAt: action.plannedAt?.toISOString() ?? null,
+		createdAt: action.createdAt.toISOString()
+	};
+}
+
+async function addActionLog(
+	actionId: string,
+	eventType: string,
+	logDescription: string,
+	userId: string
+): Promise<{ logId: string; actionId: string; eventType: string; description: string; createdAt: string }> {
+	const logEntry = await prisma.conciergeActionLog.create({
+		data: {
+			actionId,
+			eventType,
+			description: logDescription,
+			changedBy: userId
+		}
+	});
+
+	return {
+		logId: logEntry.id,
+		actionId: logEntry.actionId,
+		eventType: logEntry.eventType,
+		description: logEntry.description!,
+		createdAt: logEntry.createdAt.toISOString()
+	};
 }
 
 async function startAction(actionId: string, userId: string): Promise<{ status: string; startedAt: string }> {
@@ -128,7 +180,7 @@ async function completeAction(
 	outcome: string,
 	userId: string,
 	notes?: string
-): Promise<{ status: string; completedAt: string }> {
+): Promise<{ status: string; completedAt: string; outcome: string }> {
 	const action = await prisma.conciergeAction.findUnique({
 		where: { id: actionId }
 	});
@@ -164,7 +216,7 @@ async function completeAction(
 		}
 	});
 
-	return { status: 'COMPLETED', completedAt: now.toISOString() };
+	return { status: 'COMPLETED', completedAt: now.toISOString(), outcome };
 }
 
 async function blockAction(
@@ -292,7 +344,9 @@ async function conciergeActionWorkflow(
 							input.description!,
 							input.userId,
 							input.plannedAt,
-							input.notes
+							input.notes,
+							input.relatedDocumentIds,
+							input.relatedExternalContactIds
 						),
 					{ name: 'createAction' }
 				);
@@ -302,7 +356,12 @@ async function conciergeActionWorkflow(
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					actionId: result.id,
-					status: result.status
+					status: result.status,
+					caseId: result.caseId,
+					actionType: result.actionType,
+					description: result.description,
+					plannedAt: result.plannedAt,
+					createdAt: result.createdAt
 				};
 			}
 
@@ -319,7 +378,8 @@ async function conciergeActionWorkflow(
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					actionId: input.actionId,
-					status: result.status
+					status: result.status,
+					startedAt: result.startedAt
 				};
 			}
 
@@ -337,7 +397,9 @@ async function conciergeActionWorkflow(
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					actionId: input.actionId,
-					status: result.status
+					status: result.status,
+					completedAt: result.completedAt,
+					outcome: result.outcome
 				};
 			}
 
@@ -395,6 +457,24 @@ async function conciergeActionWorkflow(
 				};
 			}
 
+			case 'ADD_LOG': {
+				if (!input.actionId || !input.eventType || !input.logDescription) {
+					throw new Error('Missing actionId, eventType or logDescription for ADD_LOG');
+				}
+				const result = await DBOS.runStep(
+					() => addActionLog(input.actionId!, input.eventType!, input.logDescription!, input.userId),
+					{ name: 'addActionLog' }
+				);
+				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'log_added', ...result });
+				return {
+					success: true,
+					action: input.action,
+					timestamp: new Date().toISOString(),
+					actionId: input.actionId,
+					logId: result.logId
+				};
+			}
+
 			default:
 				return {
 					success: false,
@@ -427,13 +507,10 @@ export const conciergeActionWorkflow_v1 = DBOS.registerWorkflow(conciergeActionW
 
 export async function startConciergeActionWorkflow(
 	input: ConciergeActionWorkflowInput,
-	workflowId?: string
-): Promise<{ workflowId: string }> {
-	const id =
-		workflowId ||
-		`action-${input.action.toLowerCase()}-${input.actionId || input.caseId || 'new'}-${Date.now()}`;
-	await DBOS.startWorkflow(conciergeActionWorkflow_v1, { workflowID: id })(input);
-	return { workflowId: id };
+	idempotencyKey: string
+): Promise<ConciergeActionWorkflowResult> {
+	const handle = await DBOS.startWorkflow(conciergeActionWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }
 
 export async function getConciergeActionWorkflowStatus(

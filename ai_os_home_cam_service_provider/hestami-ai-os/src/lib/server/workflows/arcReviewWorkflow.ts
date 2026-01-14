@@ -394,9 +394,9 @@ export const arcReviewWorkflow_v1 = DBOS.registerWorkflow(arcReviewWorkflow);
 
 export async function startARCReviewWorkflow(
 	input: ARCReviewWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ARCReviewWorkflowResult> {
 	const workflowId = idempotencyKey || `arc-review-${input.action}-${input.requestId || input.committeeId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(arcReviewWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(arcReviewWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

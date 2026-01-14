@@ -512,9 +512,9 @@ export const arcRequestWorkflow_v1 = DBOS.registerWorkflow(arcRequestWorkflow);
 
 export async function startARCRequestWorkflow(
 	input: ARCRequestWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ARCRequestWorkflowResult> {
 	const workflowId = idempotencyKey || `arc-request-${input.action}-${input.requestId}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(arcRequestWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(arcRequestWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

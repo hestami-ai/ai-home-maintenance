@@ -461,10 +461,10 @@ export const maintenanceContract_v1 = DBOS.registerWorkflow(maintenanceContractW
 
 export async function startMaintenanceContractWorkflow(
 	input: ContractWorkflowInput,
-	workflowId?: string
+	workflowId?: string, idempotencyKey: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `contract-${input.action.toLowerCase()}-${input.contractId}-${Date.now()}`;
-	await DBOS.startWorkflow(maintenanceContract_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(maintenanceContract_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

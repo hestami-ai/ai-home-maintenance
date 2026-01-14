@@ -22,7 +22,10 @@ export const ComplianceAction = {
 	UPDATE_COMPLIANCE_SCORE: 'UPDATE_COMPLIANCE_SCORE',
 	CREATE_REQUIREMENT: 'CREATE_REQUIREMENT',
 	UPDATE_REQUIREMENT: 'UPDATE_REQUIREMENT',
-	CREATE_DEADLINE: 'CREATE_DEADLINE'
+	CREATE_DEADLINE: 'CREATE_DEADLINE',
+	UPDATE_DEADLINE_STATUS: 'UPDATE_DEADLINE_STATUS',
+	ADD_EVIDENCE_DOCUMENT: 'ADD_EVIDENCE_DOCUMENT',
+	UPDATE_CHECKLIST_ITEM: 'UPDATE_CHECKLIST_ITEM'
 } as const;
 
 export type ComplianceAction = (typeof ComplianceAction)[keyof typeof ComplianceAction];
@@ -265,6 +268,90 @@ async function createDeadline(
 	return deadline.id;
 }
 
+async function updateDeadlineStatusStep(
+	deadlineId: string,
+	userId: string,
+	status: string,
+	notes?: string
+): Promise<string> {
+	const deadline = await prisma.complianceDeadline.findUnique({
+		where: { id: deadlineId }
+	});
+
+	if (!deadline) {
+		throw new Error('Deadline not found');
+	}
+
+	const isCompleting = status === 'COMPLETED' && deadline.status !== 'COMPLETED';
+
+	await prisma.complianceDeadline.update({
+		where: { id: deadlineId },
+		data: {
+			status,
+			...(isCompleting && { completedAt: new Date(), completedBy: userId }),
+			...(notes !== undefined && { notes })
+		}
+	});
+
+	return deadlineId;
+}
+
+async function addEvidenceDocumentStep(
+	deadlineId: string,
+	documentId: string
+): Promise<string> {
+	const deadline = await prisma.complianceDeadline.findUnique({
+		where: { id: deadlineId }
+	});
+
+	if (!deadline) {
+		throw new Error('Deadline not found');
+	}
+
+	if (!deadline.evidenceDocumentIds.includes(documentId)) {
+		await prisma.complianceDeadline.update({
+			where: { id: deadlineId },
+			data: {
+				evidenceDocumentIds: [...deadline.evidenceDocumentIds, documentId]
+			}
+		});
+	}
+
+	return deadlineId;
+}
+
+async function updateChecklistItemStep(
+	itemId: string,
+	userId: string,
+	isCompleted?: boolean,
+	notes?: string,
+	evidenceDocumentId?: string
+): Promise<string> {
+	const item = await prisma.complianceChecklistItem.findUnique({
+		where: { id: itemId }
+	});
+
+	if (!item) {
+		throw new Error('Checklist item not found');
+	}
+
+	const isCompletingItem = isCompleted === true && !item.isCompleted;
+	const isUncompletingItem = isCompleted === false && item.isCompleted;
+
+	await prisma.complianceChecklistItem.update({
+		where: { id: itemId },
+		data: {
+			...(isCompleted !== undefined && { isCompleted }),
+			...(isCompletingItem && { completedAt: new Date(), completedBy: userId }),
+			...(isUncompletingItem && { completedAt: null, completedBy: null }),
+			...(notes !== undefined && { notes }),
+			...(evidenceDocumentId !== undefined && { evidenceDocumentId })
+		}
+	});
+
+	return itemId;
+}
+
 async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<ComplianceWorkflowResult> {
 	const workflowId = DBOS.workflowID;
 
@@ -372,6 +459,65 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
+			case 'UPDATE_DEADLINE_STATUS': {
+				const data = input.data || {};
+				const entityId = await DBOS.runStep(
+					() => updateDeadlineStatusStep(
+						data.deadlineId as string,
+						input.userId,
+						data.status as string,
+						data.notes as string | undefined
+					),
+					{ name: 'updateDeadlineStatus' }
+				);
+
+				return {
+					success: true,
+					action: input.action,
+					timestamp: new Date().toISOString(),
+					entityId
+				};
+			}
+
+			case 'ADD_EVIDENCE_DOCUMENT': {
+				const data = input.data || {};
+				const entityId = await DBOS.runStep(
+					() => addEvidenceDocumentStep(
+						data.deadlineId as string,
+						data.documentId as string
+					),
+					{ name: 'addEvidenceDocument' }
+				);
+
+				return {
+					success: true,
+					action: input.action,
+					timestamp: new Date().toISOString(),
+					entityId
+				};
+			}
+
+			case 'UPDATE_CHECKLIST_ITEM': {
+				const data = input.data || {};
+				const entityId = await DBOS.runStep(
+					() => updateChecklistItemStep(
+						data.itemId as string,
+						input.userId,
+						data.isCompleted as boolean | undefined,
+						data.notes as string | undefined,
+						data.evidenceDocumentId as string | undefined
+					),
+					{ name: 'updateChecklistItem' }
+				);
+
+				return {
+					success: true,
+					action: input.action,
+					timestamp: new Date().toISOString(),
+					entityId
+				};
+			}
+
 			default:
 				return {
 					success: false,
@@ -404,10 +550,10 @@ export const complianceWorkflow_v1 = DBOS.registerWorkflow(complianceWorkflow);
 
 export async function startComplianceWorkflow(
 	input: ComplianceWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ComplianceWorkflowResult> {
 	const id = idempotencyKey || `compliance-${input.action.toLowerCase()}-${input.organizationId}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(complianceWorkflow_v1, { workflowID: id })(input);
+	const handle = await DBOS.startWorkflow(complianceWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }
 

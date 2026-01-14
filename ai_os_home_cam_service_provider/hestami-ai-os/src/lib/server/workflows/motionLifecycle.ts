@@ -322,7 +322,7 @@ export async function startMotionTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `motion-transition-${input.motionId}-${Date.now()}`;
-	await DBOS.startWorkflow(motionLifecycle_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(motionLifecycle_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

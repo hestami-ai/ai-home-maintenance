@@ -315,11 +315,10 @@ export const slaWorkflow_v1 = DBOS.registerWorkflow(slaWorkflow);
 
 export async function startSLAWorkflow(
 	input: SLAWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<SLAWorkflowResult> {
 	const handle = await DBOS.startWorkflow(slaWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

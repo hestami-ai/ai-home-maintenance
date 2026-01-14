@@ -9,19 +9,19 @@ resourcePolicy:
     - common_roles
   rules:
     # Admins have full access to all vote operations
-    - actions: ["view", "create", "cast_ballot", "close", "tally", "delete"]
+    - actions: ["view", "create", "edit", "vote", "cast_ballot", "close", "tally", "delete"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_admin
 
     # Managers have full access to vote operations
-    - actions: ["view", "create", "cast_ballot", "close", "tally", "delete"]
+    - actions: ["view", "create", "edit", "vote", "cast_ballot", "close", "tally", "delete"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_manager
 
-    # Board members can view, create votes, cast ballots, and tally
-    - actions: ["view", "create", "cast_ballot", "tally"]
+    # Board members can view, create, edit votes, cast ballots, and tally
+    - actions: ["view", "create", "edit", "vote", "cast_ballot", "tally"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_board_member

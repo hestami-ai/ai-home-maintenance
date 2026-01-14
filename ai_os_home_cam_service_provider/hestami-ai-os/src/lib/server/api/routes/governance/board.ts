@@ -5,10 +5,11 @@ import { prisma } from '../../../db.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { BoardRoleSchema } from '../../schemas.js';
 
 const log = createModuleLogger('BoardRoute');
 
-const boardRoleEnum = z.enum(['PRESIDENT', 'VICE_PRESIDENT', 'SECRETARY', 'TREASURER', 'DIRECTOR', 'MEMBER_AT_LARGE']);
+const boardRoleEnum = BoardRoleSchema;
 
 const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
@@ -108,7 +109,13 @@ export const governanceBoardRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_board', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },

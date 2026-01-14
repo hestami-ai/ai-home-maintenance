@@ -350,11 +350,10 @@ export const resolutionCloseoutWorkflow_v1 = DBOS.registerWorkflow(resolutionClo
 
 export async function startResolutionCloseoutWorkflow(
 	input: ResolutionCloseoutWorkflowInput,
-	workflowId?: string
+	idempotencyKey: string
 ): Promise<{ workflowId: string }> {
-	const id = workflowId || `closeout-${input.action.toLowerCase()}-${input.caseId}-${Date.now()}`;
-	await DBOS.startWorkflow(resolutionCloseoutWorkflow_v1, { workflowID: id })(input);
-	return { workflowId: id };
+	await DBOS.startWorkflow(resolutionCloseoutWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return { workflowId: idempotencyKey };
 }
 
 export async function getResolutionCloseoutWorkflowStatus(

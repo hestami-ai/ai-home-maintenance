@@ -29,6 +29,9 @@ export const systemRouter = {
 				})
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Health check failed' }
+		})
 		.handler(async ({ context }) => {
 			return successResponse(
 				{
@@ -74,6 +77,9 @@ export const systemRouter = {
 				})
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve user information' }
+		})
 		.handler(async ({ context }) => {
 			return successResponse(
 				{

@@ -14,7 +14,8 @@ import {
 	ARCRequestSummarySchema,
 	ARCCategorySchema,
 	ARCRequestStatusSchema,
-	ARCDocumentTypeSchema
+	ARCDocumentTypeSchema,
+	ARCReviewActionSchema
 } from '$lib/schemas/index.js';
 import { startARCRequestWorkflow } from '../../../workflows/arcRequestWorkflow.js';
 import {
@@ -223,7 +224,13 @@ export const arcRequestRouter = {
 				})
 			)
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve ARC requests' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'arc_request', 'list');
+
 			const take = input.limit ?? 20;
 			const where: Prisma.ARCRequestWhereInput = {
 				association: { organizationId: context.organization.id },
@@ -513,7 +520,7 @@ export const arcRequestRouter = {
 			IdempotencyKeySchema.merge(
 				z.object({
 					requestId: z.string(),
-					action: z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']),
+					action: ARCReviewActionSchema,
 					notes: z.string().max(5000).optional(),
 					conditions: z.string().max(5000).optional(),
 					expiresAt: z.string().datetime().optional()

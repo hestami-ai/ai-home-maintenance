@@ -216,7 +216,7 @@ async function queueNotifications(
 // Main Workflow
 // ============================================================================
 
-async function resolutionCloseoutWorkflow(input: CloseoutInput): Promise<CloseoutResult> {
+async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<CloseoutResult> {
 	try {
 		// Step 1: Validate transition
 		const validation = await DBOS.runStep(
@@ -322,7 +322,7 @@ async function resolutionCloseoutWorkflow(input: CloseoutInput): Promise<Closeou
 }
 
 // Register the workflow with DBOS
-export const resolutionCloseout_v1 = DBOS.registerWorkflow(resolutionCloseoutWorkflow);
+export const resolutionCloseout_v1 = DBOS.registerWorkflow(resolutionLifecycleWorkflow);
 
 // ============================================================================
 // Workflow Helpers
@@ -330,11 +330,10 @@ export const resolutionCloseout_v1 = DBOS.registerWorkflow(resolutionCloseoutWor
 
 export async function startResolutionCloseout(
 	input: CloseoutInput,
-	workflowId?: string
-): Promise<{ workflowId: string }> {
-	const id = workflowId || `resolution-closeout-${input.resolutionId}-${Date.now()}`;
-	await DBOS.startWorkflow(resolutionCloseout_v1, { workflowID: id })(input);
-	return { workflowId: id };
+	idempotencyKey: string
+): Promise<CloseoutResult> {
+	const handle = await DBOS.startWorkflow(resolutionCloseout_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }
 
 export async function getResolutionCloseoutStatus(

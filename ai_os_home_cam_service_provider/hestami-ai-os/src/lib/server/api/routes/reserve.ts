@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
+import { FundingPlanTypeSchema, ReserveComponentCategorySchema, ReserveStudyTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import { startReserveWorkflow } from '../../workflows/reserveWorkflow.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
@@ -8,26 +9,10 @@ import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('ReserveRoute');
 
-const ComponentCategoryEnum = z.enum([
-	'ROOFING',
-	'PAVING',
-	'PAINTING',
-	'PLUMBING',
-	'ELECTRICAL',
-	'HVAC',
-	'POOL_SPA',
-	'LANDSCAPING',
-	'FENCING',
-	'STRUCTURAL',
-	'ELEVATOR',
-	'COMMON_AREA',
-	'EQUIPMENT',
-	'OTHER'
-]);
+const ComponentCategoryEnum = ReserveComponentCategorySchema;
+const StudyTypeEnum = ReserveStudyTypeSchema;
 
-const StudyTypeEnum = z.enum(['FULL', 'UPDATE_WITH_SITE', 'UPDATE_NO_SITE']);
-
-const FundingPlanTypeEnum = z.enum(['BASELINE', 'THRESHOLD', 'FULL_FUNDING', 'STATUTORY']);
+const FundingPlanTypeEnum = FundingPlanTypeSchema;
 
 export const reserveRouter = {
 	// =========================================================================
@@ -367,7 +352,9 @@ export const reserveRouter = {
 		}),
 
 	deleteComponent: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({
+            idempotencyKey: z.string().uuid(),
+            id: z.string() }))
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -376,7 +363,8 @@ export const reserveRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Reserve component not found' }
+			NOT_FOUND: { message: 'Reserve component not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const component = await prisma.reserveComponent.findFirst({
@@ -390,13 +378,22 @@ export const reserveRouter = {
 
 			await context.cerbos.authorize('delete', 'reserveComponent', component.id);
 
-			const now = new Date();
-			await prisma.reserveComponent.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
-			});
+			const result = await startReserveWorkflow(
+				{
+					action: 'DELETE_COMPONENT',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					entityId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
 
-			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete component' });
+			}
+
+			return successResponse({ success: true, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	// =========================================================================

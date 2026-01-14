@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
+import { VendorApprovalStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startContractorComplianceWorkflow } from '../../../workflows/contractorComplianceWorkflow.js';
 import { assertContractorOrg } from './utils.js';
@@ -8,7 +9,7 @@ import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ContractorComplianceRoute');
 
-const vendorApprovalEnum = z.enum(['PENDING', 'APPROVED', 'CONDITIONAL', 'SUSPENDED', 'REJECTED']);
+const vendorApprovalEnum = VendorApprovalStatusSchema;
 
 const complianceOutput = z.object({
 	vendorId: z.string(),
@@ -34,7 +35,7 @@ export const complianceRouter = {
 		})
 		.output(z.object({ ok: z.literal(true), data: z.object({ status: complianceOutput }), meta: ResponseMetaSchema }))
 		.handler(async ({ input, context, errors }) => {
-			const status = await computeCompliance(input.vendorId, context.organization.id, errors);
+			const status = await computeComplianceReadOnly(input.vendorId, context.organization.id, errors);
 			await context.cerbos.authorize('view', 'contractor_compliance', input.vendorId);
 
 			return successResponse({ status: serializeCompliance(status) }, context);
@@ -168,22 +169,8 @@ async function getLinkAndProfile(vendorId: string, organizationId: string, error
 	return { link, profile };
 }
 
-async function ensureComplianceRecord(vendorId: string, organizationId: string, errors: any) {
-	const existing = await prisma.contractorComplianceStatus.findUnique({
-		where: { vendorId }
-	});
-	if (existing) return existing;
-
-	const { link } = await getLinkAndProfile(vendorId, organizationId, errors);
-	return prisma.contractorComplianceStatus.create({
-		data: {
-			vendorId: link.vendorId,
-			lastCheckedAt: new Date()
-		}
-	});
-}
-
-async function computeCompliance(vendorId: string, organizationId: string, errors: any, persist = false) {
+// Read-only computation of compliance status (no mutations - mutations go through workflow)
+async function computeComplianceReadOnly(vendorId: string, organizationId: string, errors: any) {
 	const { link, profile } = await getLinkAndProfile(vendorId, organizationId, errors);
 
 	// Find latest valid license and insurance
@@ -238,19 +225,6 @@ async function computeCompliance(vendorId: string, organizationId: string, error
 		blockReason,
 		lastCheckedAt: new Date()
 	};
-
-	if (persist) {
-		const existing = await prisma.contractorComplianceStatus.findUnique({ where: { vendorId } });
-		if (existing) {
-			return prisma.contractorComplianceStatus.update({
-				where: { vendorId },
-				data: status
-			});
-		}
-		return prisma.contractorComplianceStatus.create({
-			data: status
-		});
-	}
 
 	return status;
 }

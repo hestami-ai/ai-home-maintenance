@@ -17,6 +17,7 @@ const log = createWorkflowLogger('ReserveWorkflow');
 export const ReserveAction = {
 	CREATE_COMPONENT: 'CREATE_COMPONENT',
 	UPDATE_COMPONENT: 'UPDATE_COMPONENT',
+	DELETE_COMPONENT: 'DELETE_COMPONENT',
 	CREATE_STUDY: 'CREATE_STUDY',
 	ADD_STUDY_COMPONENT: 'ADD_STUDY_COMPONENT',
 	GENERATE_FUNDING_SCHEDULE: 'GENERATE_FUNDING_SCHEDULE'
@@ -91,6 +92,20 @@ async function updateComponent(
 	});
 
 	console.log(`[ReserveWorkflow] UPDATE_COMPONENT component:${componentId} by user ${userId}`);
+	return componentId;
+}
+
+async function deleteComponent(
+	organizationId: string,
+	userId: string,
+	componentId: string
+): Promise<string> {
+	await prisma.reserveComponent.update({
+		where: { id: componentId },
+		data: { deletedAt: new Date() }
+	});
+
+	console.log(`[ReserveWorkflow] DELETE_COMPONENT component:${componentId} by user ${userId}`);
 	return componentId;
 }
 
@@ -214,6 +229,13 @@ async function reserveWorkflow(input: ReserveWorkflowInput): Promise<ReserveWork
 				);
 				break;
 
+			case 'DELETE_COMPONENT':
+				entityId = await DBOS.runStep(
+					() => deleteComponent(input.organizationId, input.userId, input.entityId!),
+					{ name: 'deleteComponent' }
+				);
+				break;
+
 			case 'CREATE_STUDY':
 				entityId = await DBOS.runStep(
 					() => createStudy(input.organizationId, input.userId, input.data),
@@ -259,9 +281,9 @@ export const reserveWorkflow_v1 = DBOS.registerWorkflow(reserveWorkflow);
 
 export async function startReserveWorkflow(
 	input: ReserveWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ReserveWorkflowResult> {
 	const workflowId = idempotencyKey || `reserve-${input.action}-${input.entityId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(reserveWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(reserveWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

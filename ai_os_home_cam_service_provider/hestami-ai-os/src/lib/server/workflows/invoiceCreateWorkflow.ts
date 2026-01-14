@@ -226,11 +226,10 @@ export const invoiceCreateWorkflow_v1 = DBOS.registerWorkflow(invoiceCreateWorkf
 
 export async function startInvoiceCreateWorkflow(
 	input: InvoiceCreateInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<InvoiceCreateResult> {
 	const handle = await DBOS.startWorkflow(invoiceCreateWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

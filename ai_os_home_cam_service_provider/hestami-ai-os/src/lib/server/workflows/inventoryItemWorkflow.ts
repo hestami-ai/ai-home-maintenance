@@ -147,9 +147,9 @@ export const inventoryItemWorkflow_v1 = DBOS.registerWorkflow(inventoryItemWorkf
 
 export async function startInventoryItemWorkflow(
 	input: InventoryItemWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<InventoryItemWorkflowResult> {
 	const workflowId = idempotencyKey || `inv-item-${input.action}-${input.itemId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(inventoryItemWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(inventoryItemWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

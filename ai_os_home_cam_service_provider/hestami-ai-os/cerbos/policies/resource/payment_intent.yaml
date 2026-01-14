@@ -5,7 +5,7 @@ resourcePolicy:
   importDerivedRoles:
     - common_roles
   rules:
-    - actions: ["view", "create", "process", "refund"]
+    - actions: ["view", "create", "edit", "process", "refund"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - org_admin

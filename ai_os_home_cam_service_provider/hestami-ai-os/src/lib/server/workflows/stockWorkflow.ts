@@ -278,9 +278,9 @@ export const stockWorkflow_v1 = DBOS.registerWorkflow(stockWorkflow);
 
 export async function startStockWorkflow(
 	input: StockWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<StockWorkflowResult> {
 	const workflowId = idempotencyKey || `stock-${input.action}-${input.itemId || input.levelId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(stockWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(stockWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

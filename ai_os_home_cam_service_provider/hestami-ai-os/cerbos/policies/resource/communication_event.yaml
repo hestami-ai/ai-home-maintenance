@@ -1,0 +1,46 @@
+# Communication Event Resource Policy
+# Controls access to community events (meetings, gatherings, etc.)
+# organized by the association.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "communication_event"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to events
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit events
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view, create, and edit events
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view events
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view events
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

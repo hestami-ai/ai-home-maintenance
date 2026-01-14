@@ -1,19 +1,16 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
+import { AssetCategorySchema, AssetStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startAssetWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('AssetRoute');
 
-const assetCategoryEnum = z.enum([
-	'HVAC', 'PLUMBING', 'ELECTRICAL', 'STRUCTURAL', 'LANDSCAPING',
-	'POOL_SPA', 'ELEVATOR', 'SECURITY', 'FIRE_SAFETY', 'COMMON_AREA',
-	'EQUIPMENT', 'VEHICLE', 'OTHER'
-]);
-
-const assetStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'UNDER_REPAIR', 'DISPOSED']);
+const assetCategoryEnum = AssetCategorySchema;
+const assetStatusEnum = AssetStatusSchema;
 
 /**
  * Asset management procedures
@@ -25,7 +22,8 @@ export const assetRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				name: z.string().min(1).max(255),
+                idempotencyKey: z.string().uuid(),
+                name: z.string().min(1).max(255),
 				description: z.string().max(1000).optional(),
 				category: assetCategoryEnum,
 				// Location - either unit or common area
@@ -99,38 +97,48 @@ export const assetRouter = {
 				? `AST-${String(parseInt(lastAsset.assetNumber.split('-')[1] || '0') + 1).padStart(6, '0')}`
 				: 'AST-000001';
 
-			const asset = await prisma.asset.create({
-				data: {
+			// Create asset via workflow
+			const result = await startAssetWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization!.id,
+					userId: context.user!.id,
 					associationId: association.id,
-					assetNumber,
-					name: input.name,
-					description: input.description,
-					category: input.category,
-					unitId: input.unitId,
-					commonAreaName: input.commonAreaName,
-					locationDetails: input.locationDetails,
-					manufacturer: input.manufacturer,
-					model: input.model,
-					serialNumber: input.serialNumber,
-					purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : null,
-					installDate: input.installDate ? new Date(input.installDate) : null,
-					warrantyExpires: input.warrantyExpires ? new Date(input.warrantyExpires) : null,
-					warrantyDetails: input.warrantyDetails,
-					purchaseCost: input.purchaseCost,
-					currentValue: input.currentValue,
-					maintenanceFrequencyDays: input.maintenanceFrequencyDays
-				}
-			});
+					data: {
+						assetNumber,
+						name: input.name,
+						description: input.description,
+						category: input.category,
+						unitId: input.unitId,
+						commonAreaName: input.commonAreaName,
+						locationDetails: input.locationDetails,
+						manufacturer: input.manufacturer,
+						model: input.model,
+						serialNumber: input.serialNumber,
+						purchaseDate: input.purchaseDate ? new Date(input.purchaseDate) : null,
+						installDate: input.installDate ? new Date(input.installDate) : null,
+						warrantyExpires: input.warrantyExpires ? new Date(input.warrantyExpires) : null,
+						warrantyDetails: input.warrantyDetails,
+						purchaseCost: input.purchaseCost,
+						currentValue: input.currentValue,
+						maintenanceFrequencyDays: input.maintenanceFrequencyDays
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to create asset' });
+			}
 
 			return successResponse(
 				{
 					asset: {
-						id: asset.id,
-						assetNumber: asset.assetNumber,
-						name: asset.name,
-						category: asset.category,
-						status: asset.status
+						id: result.entityId!,
+						assetNumber: result.assetNumber!,
+						name: input.name,
+						category: input.category,
+						status: 'OPERATIONAL'
 					}
 				},
 				context
@@ -321,7 +329,8 @@ export const assetRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				name: z.string().min(1).max(255).optional(),
 				description: z.string().max(1000).nullable().optional(),
 				status: assetStatusEnum.optional(),
@@ -372,22 +381,37 @@ export const assetRouter = {
 				throw errors.NOT_FOUND({ message: 'Asset' });
 			}
 
-			const { id, warrantyExpires, ...rest } = input;
+			const { id, idempotencyKey, warrantyExpires, ...rest } = input;
 
-			const asset = await prisma.asset.update({
-				where: { id },
-				data: {
-					...rest,
-					warrantyExpires: warrantyExpires === null ? null : warrantyExpires ? new Date(warrantyExpires) : undefined
-				}
-			});
+			// Update asset via workflow
+			const result = await startAssetWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					assetId: id,
+					data: {
+						...rest,
+						warrantyExpires: warrantyExpires === null ? null : warrantyExpires ? new Date(warrantyExpires) : undefined
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update asset' });
+			}
+
+			// Fetch updated asset to return
+			const asset = await prisma.asset.findUnique({ where: { id } });
 
 			return successResponse(
 				{
 					asset: {
-						id: asset.id,
-						name: asset.name,
-						status: asset.status
+						id: asset!.id,
+						name: asset!.name,
+						status: asset!.status
 					}
 				},
 				context
@@ -398,7 +422,9 @@ export const assetRouter = {
 	 * Delete asset (soft delete)
 	 */
 	delete: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({
+            idempotencyKey: z.string().uuid(),
+            id: z.string() }))
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -441,10 +467,22 @@ export const assetRouter = {
 				throw errors.CONFLICT({ message: 'Cannot delete asset with open work orders' });
 			}
 
-			await prisma.asset.update({
-				where: { id: input.id },
-				data: { deletedAt: new Date(), status: 'DISPOSED' }
-			});
+			// Delete asset via workflow
+			const result = await startAssetWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					assetId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to delete asset' });
+			}
 
 			return successResponse({ success: true }, context);
 		}),
@@ -455,6 +493,7 @@ export const assetRouter = {
 	logMaintenance: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				assetId: z.string(),
 				maintenanceDate: z.string().datetime(),
 				maintenanceType: z.string().min(1).max(100),
@@ -502,38 +541,43 @@ export const assetRouter = {
 
 			const maintenanceDate = new Date(input.maintenanceDate);
 
-			// Create maintenance log and update asset's last maintenance date
-			const [log] = await prisma.$transaction([
-				prisma.assetMaintenanceLog.create({
+			// Calculate next maintenance date if frequency is set
+			const nextMaintenanceDate = asset.maintenanceFrequencyDays
+				? new Date(maintenanceDate.getTime() + asset.maintenanceFrequencyDays * 24 * 60 * 60 * 1000)
+				: null;
+
+			// Log maintenance via workflow
+			const result = await startAssetWorkflow(
+				{
+					action: 'LOG_MAINTENANCE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					assetId: input.assetId,
 					data: {
-						assetId: input.assetId,
 						maintenanceDate,
 						maintenanceType: input.maintenanceType,
-						description: input.description,
+						maintenanceDescription: input.description,
 						performedBy: input.performedBy,
 						cost: input.cost,
 						workOrderId: input.workOrderId,
 						notes: input.notes,
-						createdBy: context.user!.id
+						nextMaintenanceDate
 					}
-				}),
-				prisma.asset.update({
-					where: { id: input.assetId },
-					data: {
-						lastMaintenanceDate: maintenanceDate,
-						nextMaintenanceDate: asset.maintenanceFrequencyDays
-							? new Date(maintenanceDate.getTime() + asset.maintenanceFrequencyDays * 24 * 60 * 60 * 1000)
-							: null
-					}
-				})
-			]);
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to log maintenance' });
+			}
 
 			return successResponse(
 				{
 					maintenanceLog: {
-						id: log.id,
-						maintenanceDate: log.maintenanceDate.toISOString(),
-						maintenanceType: log.maintenanceType
+						id: result.maintenanceLogId!,
+						maintenanceDate: maintenanceDate.toISOString(),
+						maintenanceType: input.maintenanceType
 					}
 				},
 				context

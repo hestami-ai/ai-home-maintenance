@@ -255,9 +255,9 @@ export const contractorProfileWorkflow_v1 = DBOS.registerWorkflow(contractorProf
 
 export async function startContractorProfileWorkflow(
 	input: ContractorProfileWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ContractorProfileWorkflowResult> {
 	const workflowId = idempotencyKey || `contractor-profile-${input.action}-${input.entityId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(contractorProfileWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(contractorProfileWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

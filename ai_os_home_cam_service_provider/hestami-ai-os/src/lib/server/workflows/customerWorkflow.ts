@@ -216,11 +216,10 @@ export const customerWorkflow_v1 = DBOS.registerWorkflow(customerWorkflow);
 
 export async function startCustomerWorkflow(
 	input: CustomerWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<CustomerWorkflowResult> {
 	const handle = await DBOS.startWorkflow(customerWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

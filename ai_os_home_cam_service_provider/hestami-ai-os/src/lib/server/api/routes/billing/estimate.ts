@@ -729,7 +729,7 @@ export const estimateRouter = {
 	 * Mark estimate as viewed (called when customer views)
 	 */
 	markViewed: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' }
@@ -742,6 +742,7 @@ export const estimateRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'estimate', input.id);
 			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.estimate.findFirst({
@@ -753,19 +754,28 @@ export const estimateRouter = {
 				return successResponse({ estimate: formatEstimate(existing) }, context);
 			}
 
-			const estimate = await prisma.estimate.update({
-				where: { id: input.id },
-				data: {
-					status: 'VIEWED',
-					viewedAt: new Date()
+			// Mark as viewed via workflow
+			await startEstimateWorkflow(
+				{
+					action: 'MARK_VIEWED',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					estimateId: input.id,
+					data: {}
 				},
+				input.idempotencyKey
+			);
+
+			// Fetch updated estimate with relations
+			const estimate = await prisma.estimate.findUnique({
+				where: { id: input.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
 				}
 			});
 
-			return successResponse({ estimate: formatEstimate(estimate, true) }, context);
+			return successResponse({ estimate: formatEstimate(estimate!, true) }, context);
 		}),
 
 	/**
@@ -787,6 +797,7 @@ export const estimateRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'estimate', input.id);
 			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.estimate.findFirst({
@@ -845,6 +856,7 @@ export const estimateRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'estimate', input.id);
 			await assertContractorOrg(context.organization!.id, errors);
 
 			const existing = await prisma.estimate.findFirst({

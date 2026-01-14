@@ -585,9 +585,9 @@ export const purchaseOrderWorkflow_v1 = DBOS.registerWorkflow(purchaseOrderWorkf
 
 export async function startPurchaseOrderWorkflow(
 	input: PurchaseOrderWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<PurchaseOrderWorkflowResult> {
 	const workflowId = idempotencyKey || `po-${input.action}-${input.purchaseOrderId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(purchaseOrderWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(purchaseOrderWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

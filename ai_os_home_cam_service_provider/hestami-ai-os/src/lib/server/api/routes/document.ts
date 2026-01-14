@@ -129,6 +129,8 @@ export const documentRouter = {
 			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('create', 'document', 'new');
+
 			const reqLog = log.child({
 				requestId: context.requestId,
 				organizationId: context.organization.id,
@@ -745,7 +747,7 @@ export const documentRouter = {
 						context
 					);
 				} else {
-					throw new Error(`Unsupported storage provider: ${document.storageProvider}`);
+					throw errors.INTERNAL_SERVER_ERROR({ message: `Unsupported storage provider: ${document.storageProvider}` });
 				}
 			} catch (error) {
 				log.error('Error generating download URL', { error, documentId: document.id });
@@ -856,7 +858,11 @@ export const documentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			try {
 				await context.cerbos.authorize('view', 'document', 'list');
 
@@ -1050,7 +1056,8 @@ export const documentRouter = {
 	updateExtractedMetadata: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				pageCount: z.number().int().positive().optional(),
 				thumbnailUrl: z.string().optional(),
 				extractedText: z.string().optional(),
@@ -1065,7 +1072,8 @@ export const documentRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Document not found' }
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update document metadata' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
@@ -1078,15 +1086,25 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			await prisma.document.update({
-				where: { id: input.id },
-				data: {
-					...(input.pageCount && { pageCount: input.pageCount }),
-					...(input.thumbnailUrl && { thumbnailUrl: input.thumbnailUrl }),
-					...(input.extractedText && { extractedText: input.extractedText }),
-					...(input.metadata && { metadata: input.metadata as Prisma.InputJsonValue })
-				}
-			});
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'UPDATE_EXTRACTED_METADATA',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.id,
+					data: {
+						pageCount: input.pageCount,
+						thumbnailUrl: input.thumbnailUrl,
+						extractedText: input.extractedText,
+						metadata: input.metadata as Record<string, unknown> | undefined
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update document metadata' });
+			}
 
 			return successResponse({ success: true }, context);
 		}),
@@ -1313,6 +1331,7 @@ export const documentRouter = {
 	archiveDocument: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				reason: z.string().optional()
 			})
@@ -1325,7 +1344,8 @@ export const documentRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Document not found' }
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to archive document' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
@@ -1338,22 +1358,30 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('delete', 'document', document.id);
 
-			const now = new Date();
-			await prisma.document.update({
-				where: { id: input.id },
-				data: {
-					status: 'ARCHIVED',
-					archivedAt: now,
-					archivedBy: context.user.id,
-					archiveReason: input.reason
-				}
-			});
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'ARCHIVE_DOCUMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.id,
+					data: {
+						archiveReason: input.reason
+					}
+				},
+				input.idempotencyKey
+			);
 
-			return successResponse({ success: true, archivedAt: now.toISOString() }, context);
+			if (!workflowResult.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to archive document' });
+			}
+
+			// Get the archived document to return the timestamp
+			const archived = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
+			return successResponse({ success: true, archivedAt: archived.archivedAt!.toISOString() }, context);
 		}),
 
 	restoreDocument: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -1362,7 +1390,8 @@ export const documentRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Document not found' }
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to restore document' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
@@ -1375,15 +1404,20 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			await prisma.document.update({
-				where: { id: input.id },
-				data: {
-					status: 'ACTIVE',
-					archivedAt: null,
-					archivedBy: null,
-					archiveReason: null
-				}
-			});
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'RESTORE_DOCUMENT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					documentId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to restore document' });
+			}
 
 			return successResponse({ success: true }, context);
 		}),
@@ -1395,6 +1429,7 @@ export const documentRouter = {
 	logDownload: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				documentId: z.string(),
 				partyId: z.string().optional(),
 				ipAddress: z.string().optional(),
@@ -1409,9 +1444,12 @@ export const documentRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Document not found' }
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to log download' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'document', input.documentId);
+
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
@@ -1420,15 +1458,24 @@ export const documentRouter = {
 				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
-			await prisma.documentDownloadLog.create({
-				data: {
-					documentId: input.documentId,
-					partyId: input.partyId,
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'LOG_DOWNLOAD',
+					organizationId: context.organization.id,
 					userId: context.user.id,
-					ipAddress: input.ipAddress,
-					userAgent: input.userAgent
-				}
-			});
+					documentId: input.documentId,
+					data: {
+						partyId: input.partyId,
+						ipAddress: input.ipAddress,
+						userAgent: input.userAgent
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to log download' });
+			}
 
 			return successResponse({ logged: true }, context);
 		}),
@@ -1692,6 +1739,7 @@ export const documentRouter = {
 	unlinkFromContext: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				documentId: z.string(),
 				contextType: DocumentContextTypeEnum,
 				contextId: z.string()
@@ -1705,7 +1753,8 @@ export const documentRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Document not found' }
+			NOT_FOUND: { message: 'Document not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to unlink document from context' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const document = await prisma.document.findFirst({
@@ -1718,13 +1767,23 @@ export const documentRouter = {
 
 			await context.cerbos.authorize('update', 'document', document.id);
 
-			await prisma.documentContextBinding.deleteMany({
-				where: {
+			const workflowResult = await startDocumentWorkflow(
+				{
+					action: 'REMOVE_CONTEXT_BINDING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					documentId: input.documentId,
-					contextType: input.contextType,
-					contextId: input.contextId
-				}
-			});
+					data: {
+						contextType: input.contextType,
+						contextId: input.contextId
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to unlink document from context' });
+			}
 
 			return successResponse({ success: true }, context);
 		}),

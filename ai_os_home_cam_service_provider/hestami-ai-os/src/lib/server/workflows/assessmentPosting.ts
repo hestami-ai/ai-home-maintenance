@@ -335,7 +335,7 @@ export async function startAssessmentPosting(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `assessment-posting-${input.associationId}-${Date.now()}`;
-	await DBOS.startWorkflow(assessmentPosting_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(assessmentPosting_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

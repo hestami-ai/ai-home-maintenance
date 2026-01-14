@@ -124,6 +124,64 @@ async function transitionJobStatus(
 				notes
 			}
 		});
+
+		// Phase 15.7: Propagate status to linked entities (work orders and concierge cases)
+		// Map job status to work order status
+		const jobToWorkOrderStatus: Partial<Record<JobStatus, string>> = {
+			SCHEDULED: 'SCHEDULED',
+			DISPATCHED: 'SCHEDULED',
+			IN_PROGRESS: 'IN_PROGRESS',
+			COMPLETED: 'COMPLETED',
+			CLOSED: 'CLOSED',
+			CANCELLED: 'CANCELLED'
+		};
+
+		const workOrderStatus = jobToWorkOrderStatus[toStatus];
+
+		// Update linked work order if exists
+		if (job.workOrderId && workOrderStatus) {
+			await tx.workOrder.update({
+				where: { id: job.workOrderId },
+				data: {
+					status: workOrderStatus as any,
+					...(toStatus === 'COMPLETED' ? { completedAt: new Date() } : {}),
+					...(toStatus === 'CLOSED' ? { closedAt: new Date(), closedBy: userId } : {})
+				}
+			}).catch((err) => {
+				console.error(`Failed to update linked work order ${job.workOrderId}:`, err);
+			});
+		}
+
+		// Update linked concierge cases
+		const linkedCases = await tx.conciergeCase.findMany({
+			where: { linkedJobId: jobId }
+		});
+
+		if (linkedCases.length > 0) {
+			const jobToCaseStatus: Partial<Record<JobStatus, string>> = {
+				SCHEDULED: 'IN_PROGRESS',
+				IN_PROGRESS: 'IN_PROGRESS',
+				COMPLETED: 'RESOLVED',
+				CLOSED: 'CLOSED',
+				CANCELLED: 'CLOSED'
+			};
+
+			const caseStatus = jobToCaseStatus[toStatus];
+			if (caseStatus) {
+				for (const linkedCase of linkedCases) {
+					await tx.conciergeCase.update({
+						where: { id: linkedCase.id },
+						data: {
+							status: caseStatus as any,
+							...(toStatus === 'COMPLETED' || toStatus === 'CLOSED' ? { resolvedAt: new Date() } : {}),
+							...(toStatus === 'CLOSED' ? { closedAt: new Date() } : {})
+						}
+					}).catch((err) => {
+						console.error(`Failed to update linked case ${linkedCase.id}:`, err);
+					});
+				}
+			}
+		}
 	});
 
 	await recordWorkflowEvent(organizationId, userId, 'job', jobId, 'TRANSITION_STATUS', { fromStatus, toStatus });
@@ -466,9 +524,9 @@ export const jobWorkflow_v1 = DBOS.registerWorkflow(jobWorkflow);
 
 export async function startJobWorkflow(
 	input: JobWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<JobWorkflowResult> {
 	const workflowId = idempotencyKey || `job-${input.action}-${input.jobId || input.entityId}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(jobWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(jobWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

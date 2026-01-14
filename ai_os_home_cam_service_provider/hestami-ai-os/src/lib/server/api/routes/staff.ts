@@ -6,14 +6,15 @@
  */
 
 import { z } from 'zod';
+import { DBOS } from '@dbos-inc/dbos-sdk';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { recordActivityEvent } from '../middleware/activityEvent.js';
 import { StaffStatusSchema, StaffRoleSchema, PillarAccessSchema } from '../../../../../generated/zod/index.js';
 import { createModuleLogger } from '../../logger.js';
 import { encrypt, decrypt, generateActivationCode } from '../../security/encryption.js';
 import { recordSpanError } from '../middleware/tracing.js';
+import { staffWorkflow_v1 } from '../../workflows/staffWorkflow.js';
 
 const log = createModuleLogger('StaffRoute');
 
@@ -90,7 +91,8 @@ export const staffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'User with this email not found' },
-			CONFLICT: { message: 'Staff profile already exists for this user' }
+			CONFLICT: { message: 'Staff profile already exists for this user' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to create staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const user = await prisma.user.findUnique({
@@ -115,19 +117,34 @@ export const staffRouter = {
 			const activationCodeEncrypted = encrypt(activationCode);
 			const activationCodeExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
 
-			// Create staff entity
-			const staff = await prisma.staff.create({
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
 				data: {
-					userId: user.id,
+					targetUserId: user.id,
 					displayName: input.displayName,
 					title: input.title,
 					roles: input.roles,
 					pillarAccess: input.pillarAccess,
 					canBeAssignedCases: input.canBeAssignedCases,
-					status: 'PENDING',
 					activationCodeEncrypted,
 					activationCodeExpiresAt
-				},
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create staff' });
+			}
+
+			// Fetch the created staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: result.staffId },
 				include: {
 					user: {
 						select: {
@@ -136,27 +153,6 @@ export const staffRouter = {
 							name: true
 						}
 					}
-				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform', // Platform-level entity
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'CREATE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" created with roles: ${input.roles.join(', ')}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				newState: {
-					id: staff.id,
-					userId: staff.userId,
-					displayName: staff.displayName,
-					roles: staff.roles,
-					pillarAccess: staff.pillarAccess,
-					status: staff.status,
-					activationCodeExpiresAt: staff.activationCodeExpiresAt?.toISOString()
 				}
 			});
 
@@ -258,6 +254,9 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ context }) => {
 			const staff = await prisma.staff.findUnique({
 				where: { userId: context.user!.id },
@@ -323,6 +322,10 @@ export const staffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
 			const limit = input?.limit ?? 50;
 			const where: Record<string, unknown> = {};
@@ -402,7 +405,8 @@ export const staffRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Staff not found' }
+			NOT_FOUND: { message: 'Staff not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
@@ -413,19 +417,30 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			const previousState = {
-				displayName: existingStaff.displayName,
-				title: existingStaff.title,
-				canBeAssignedCases: existingStaff.canBeAssignedCases
-			};
-
-			const staff = await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UPDATE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
-					...(input.displayName && { displayName: input.displayName }),
-					...(input.title !== undefined && { title: input.title }),
-					...(input.canBeAssignedCases !== undefined && { canBeAssignedCases: input.canBeAssignedCases })
-				},
+					displayName: input.displayName,
+					title: input.title,
+					canBeAssignedCases: input.canBeAssignedCases
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
 				include: {
 					user: {
 						select: {
@@ -434,24 +449,6 @@ export const staffRouter = {
 							name: true
 						}
 					}
-				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'UPDATE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" updated`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState,
-				newState: {
-					displayName: staff.displayName,
-					title: staff.title,
-					canBeAssignedCases: staff.canBeAssignedCases
 				}
 			});
 
@@ -499,7 +496,8 @@ export const staffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to activate staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
@@ -514,13 +512,25 @@ export const staffRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot activate staff with status: ${existingStaff.status}` });
 			}
 
-			const now = new Date();
-			const staff = await prisma.staff.update({
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'ACTIVATE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
 				where: { id: input.staffId },
-				data: {
-					status: 'ACTIVE',
-					activatedAt: now
-				},
 				include: {
 					user: {
 						select: {
@@ -530,20 +540,6 @@ export const staffRouter = {
 						}
 					}
 				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" activated`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: 'PENDING' },
-				newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
 			});
 
 			return successResponse(
@@ -592,16 +588,12 @@ export const staffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to suspend staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
-				where: { id: input.staffId },
-				include: {
-					assignedCases: {
-						where: { unassignedAt: null }
-					}
-				}
+				where: { id: input.staffId }
 			});
 
 			if (!existingStaff) {
@@ -612,59 +604,36 @@ export const staffRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot suspend staff with status: ${existingStaff.status}` });
 			}
 
-			const previousStatus = existingStaff.status;
-			const now = new Date();
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'SUSPEND',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId,
+				data: {
+					reason: input.reason
+				}
+			});
 
-			// Suspend staff and unassign all cases
-			const [staff] = await prisma.$transaction([
-				prisma.staff.update({
-					where: { id: input.staffId },
-					data: {
-						status: 'SUSPENDED',
-						suspendedAt: now,
-						suspensionReason: input.reason
-					},
-					include: {
-						user: {
-							select: {
-								id: true,
-								email: true,
-								name: true
-							}
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to suspend staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
+				include: {
+					user: {
+						select: {
+							id: true,
+							email: true,
+							name: true
 						}
 					}
-				}),
-				// Mark all active assignments as unassigned
-				prisma.staffCaseAssignment.updateMany({
-					where: {
-						staffId: input.staffId,
-						unassignedAt: null
-					},
-					data: {
-						unassignedAt: now,
-						justification: `Staff suspended: ${input.reason}`
-					}
-				})
-			]);
-
-			const escalatedCaseCount = existingStaff.assignedCases.length;
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" suspended. Reason: ${input.reason}. ${escalatedCaseCount} cases escalated.`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: previousStatus },
-				newState: {
-					status: 'SUSPENDED',
-					suspendedAt: now.toISOString(),
-					suspensionReason: input.reason,
-					escalatedCaseCount
 				}
 			});
 
@@ -686,7 +655,7 @@ export const staffRouter = {
 						updatedAt: staff.updatedAt.toISOString(),
 						user: staff.user
 					},
-					escalatedCaseCount
+					escalatedCaseCount: result.escalatedCaseCount ?? 0
 				},
 				context
 			);
@@ -715,7 +684,8 @@ export const staffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to deactivate staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
@@ -743,17 +713,28 @@ export const staffRouter = {
 				});
 			}
 
-			const previousStatus = existingStaff.status;
-			const now = new Date();
-
-			const staff = await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'DEACTIVATE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
-					status: 'DEACTIVATED',
-					deactivatedAt: now,
-					deactivationReason: input.reason,
-					canBeAssignedCases: false
-				},
+					reason: input.reason
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to deactivate staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
 				include: {
 					user: {
 						select: {
@@ -762,24 +743,6 @@ export const staffRouter = {
 							name: true
 						}
 					}
-				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" deactivated. Reason: ${input.reason}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: previousStatus },
-				newState: {
-					status: 'DEACTIVATED',
-					deactivatedAt: now.toISOString(),
-					deactivationReason: input.reason
 				}
 			});
 
@@ -828,7 +791,8 @@ export const staffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to reactivate staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
@@ -847,14 +811,25 @@ export const staffRouter = {
 				throw errors.BAD_REQUEST({ message: 'Use activate endpoint for pending staff' });
 			}
 
-			const previousStatus = existingStaff.status;
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'REACTIVATE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId
+			});
 
-			const staff = await prisma.staff.update({
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reactivate staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
 				where: { id: input.staffId },
-				data: {
-					status: 'ACTIVE',
-					canBeAssignedCases: true
-				},
 				include: {
 					user: {
 						select: {
@@ -864,20 +839,6 @@ export const staffRouter = {
 						}
 					}
 				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" reactivated from ${previousStatus}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: previousStatus },
-				newState: { status: 'ACTIVE' }
 			});
 
 			return successResponse(
@@ -924,7 +885,8 @@ export const staffRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Staff not found' }
+			NOT_FOUND: { message: 'Staff not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update staff roles' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
@@ -935,13 +897,28 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			const previousRoles = existingStaff.roles;
-
-			const staff = await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UPDATE_ROLES',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
 					roles: input.roles
-				},
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update staff roles' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
 				include: {
 					user: {
 						select: {
@@ -951,20 +928,6 @@ export const staffRouter = {
 						}
 					}
 				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'ROLE_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" roles updated: ${previousRoles.join(', ')} → ${input.roles.join(', ')}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { roles: previousRoles },
-				newState: { roles: input.roles }
 			});
 
 			return successResponse(
@@ -1011,7 +974,8 @@ export const staffRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Staff not found' }
+			NOT_FOUND: { message: 'Staff not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update staff pillar access' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existingStaff = await prisma.staff.findUnique({
@@ -1022,13 +986,28 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			const previousPillarAccess = existingStaff.pillarAccess;
-
-			const staff = await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UPDATE_PILLAR_ACCESS',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
 					pillarAccess: input.pillarAccess
-				},
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update staff pillar access' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
 				include: {
 					user: {
 						select: {
@@ -1038,20 +1017,6 @@ export const staffRouter = {
 						}
 					}
 				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'UPDATE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" pillar access updated: ${previousPillarAccess.join(', ')} → ${input.pillarAccess.join(', ')}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { pillarAccess: previousPillarAccess },
-				newState: { pillarAccess: input.pillarAccess }
 			});
 
 			return successResponse(
@@ -1164,7 +1129,8 @@ export const staffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to regenerate activation code' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const staff = await prisma.staff.findUnique({
@@ -1183,28 +1149,25 @@ export const staffRouter = {
 			const activationCodeEncrypted = encrypt(activationCode);
 			const activationCodeExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
 
-			await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'REGENERATE_ACTIVATION_CODE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
 					activationCodeEncrypted,
 					activationCodeExpiresAt
 				}
 			});
 
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'UPDATE',
-				eventCategory: 'EXECUTION',
-				summary: `Activation code regenerated for "${staff.displayName}"`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				newState: {
-					activationCodeExpiresAt: activationCodeExpiresAt.toISOString()
-				}
-			});
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to regenerate activation code' });
+			}
 
 			return successResponse(
 				{
@@ -1221,7 +1184,8 @@ export const staffRouter = {
 	activateWithCode: authedProcedure
 		.input(
 			z.object({
-				code: z.string().length(8)
+				code: z.string().length(8),
+				idempotencyKey: z.string().uuid()
 			})
 		)
 		.output(
@@ -1235,7 +1199,8 @@ export const staffRouter = {
 		)
 		.errors({
 			FORBIDDEN: { message: 'Forbidden' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to activate account' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Get current user's staff profile
@@ -1282,31 +1247,24 @@ export const staffRouter = {
 				throw errors.BAD_REQUEST({ message: 'Invalid activation code' });
 			}
 
-			// Activate
-			const now = new Date();
-			await prisma.staff.update({
-				where: { id: staff.id },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'ACTIVATE_WITH_CODE',
+				organizationId: 'hestami-platform',
+				userId: context.user!.id,
+				staffId: staff.id,
 				data: {
-					status: 'ACTIVE',
-					activatedAt: now,
-					activationCodeEncrypted: null,
-					activationCodeExpiresAt: null
+					displayName: staff.displayName
 				}
 			});
 
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: 'hestami-platform',
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Staff member "${staff.displayName}" activated via self-service`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: 'PENDING' },
-				newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
-			});
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate account' });
+			}
 
 			return successResponse({ success: true }, context);
 		})
@@ -1408,7 +1366,14 @@ export const orgStaffRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'staff', 'list');
+
 			const take = input.limit ?? 50;
 			const where: Record<string, unknown> = {
 				organizationId: context.organization.id
@@ -1491,6 +1456,8 @@ export const orgStaffRouter = {
 			NOT_FOUND: { message: 'Staff not found' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'staff', input.staffId);
+
 			const staff = await prisma.staff.findFirst({
 				where: {
 					id: input.staffId,
@@ -1564,9 +1531,12 @@ export const orgStaffRouter = {
 		.errors({
 			NOT_FOUND: { message: 'User with this email not found' },
 			CONFLICT: { message: 'Staff profile already exists' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to create staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('create', 'staff', 'new');
+
 			// Validate pillar access against organization type
 			validatePillarAccessForOrgType(input.pillarAccess, context.organization.type, errors);
 
@@ -1595,20 +1565,34 @@ export const orgStaffRouter = {
 			const activationCodeEncrypted = encrypt(activationCode);
 			const activationCodeExpiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
 
-			// Create staff entity with organization scope
-			const staff = await prisma.staff.create({
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE',
+				organizationId: context.organization.id,
+				userId: context.user!.id,
 				data: {
-					userId: user.id,
-					organizationId: context.organization.id,
+					targetUserId: user.id,
 					displayName: input.displayName,
 					title: input.title,
 					roles: input.roles,
 					pillarAccess: input.pillarAccess,
 					canBeAssignedCases: input.canBeAssignedCases,
-					status: 'PENDING',
 					activationCodeEncrypted,
 					activationCodeExpiresAt
-				},
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create staff' });
+			}
+
+			// Fetch the created staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: result.staffId },
 				include: {
 					user: {
 						select: {
@@ -1617,27 +1601,6 @@ export const orgStaffRouter = {
 							name: true
 						}
 					}
-				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: context.organization.id,
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'CREATE',
-				eventCategory: 'EXECUTION',
-				summary: `Organization staff member "${staff.displayName}" created with roles: ${input.roles.join(', ')}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				newState: {
-					id: staff.id,
-					userId: staff.userId,
-					organizationId: staff.organizationId,
-					displayName: staff.displayName,
-					roles: staff.roles,
-					pillarAccess: staff.pillarAccess,
-					status: staff.status
 				}
 			});
 
@@ -1699,9 +1662,12 @@ export const orgStaffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'staff', input.staffId);
+
 			// Validate pillar access if being updated
 			if (input.pillarAccess) {
 				validatePillarAccessForOrgType(input.pillarAccess, context.organization.type, errors);
@@ -1718,23 +1684,32 @@ export const orgStaffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
 			}
 
-			const previousState = {
-				displayName: existingStaff.displayName,
-				title: existingStaff.title,
-				roles: existingStaff.roles,
-				pillarAccess: existingStaff.pillarAccess,
-				canBeAssignedCases: existingStaff.canBeAssignedCases
-			};
-
-			const staff = await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UPDATE',
+				organizationId: context.organization.id,
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
-					...(input.displayName && { displayName: input.displayName }),
-					...(input.title !== undefined && { title: input.title }),
-					...(input.roles && { roles: input.roles }),
-					...(input.pillarAccess && { pillarAccess: input.pillarAccess }),
-					...(input.canBeAssignedCases !== undefined && { canBeAssignedCases: input.canBeAssignedCases })
-				},
+					displayName: input.displayName,
+					title: input.title,
+					roles: input.roles,
+					pillarAccess: input.pillarAccess,
+					canBeAssignedCases: input.canBeAssignedCases
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
 				include: {
 					user: {
 						select: {
@@ -1743,26 +1718,6 @@ export const orgStaffRouter = {
 							name: true
 						}
 					}
-				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: context.organization.id,
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'UPDATE',
-				eventCategory: 'EXECUTION',
-				summary: `Organization staff member "${staff.displayName}" updated`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState,
-				newState: {
-					displayName: staff.displayName,
-					title: staff.title,
-					roles: staff.roles,
-					pillarAccess: staff.pillarAccess,
-					canBeAssignedCases: staff.canBeAssignedCases
 				}
 			});
 
@@ -1812,9 +1767,12 @@ export const orgStaffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to activate staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'staff', input.staffId);
+
 			const existingStaff = await prisma.staff.findFirst({
 				where: {
 					id: input.staffId,
@@ -1830,13 +1788,25 @@ export const orgStaffRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot activate staff with status: ${existingStaff.status}` });
 			}
 
-			const now = new Date();
-			const staff = await prisma.staff.update({
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'ACTIVATE',
+				organizationId: context.organization.id,
+				userId: context.user!.id,
+				staffId: input.staffId
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
 				where: { id: input.staffId },
-				data: {
-					status: 'ACTIVE',
-					activatedAt: now
-				},
 				include: {
 					user: {
 						select: {
@@ -1846,20 +1816,6 @@ export const orgStaffRouter = {
 						}
 					}
 				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: context.organization.id,
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Organization staff member "${staff.displayName}" activated`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: 'PENDING' },
-				newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
 			});
 
 			return successResponse(
@@ -1909,9 +1865,12 @@ export const orgStaffRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Staff not found' },
-			BAD_REQUEST: { message: 'Bad request' }
+			BAD_REQUEST: { message: 'Bad request' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to deactivate staff' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'staff', input.staffId);
+
 			const existingStaff = await prisma.staff.findFirst({
 				where: {
 					id: input.staffId,
@@ -1927,17 +1886,28 @@ export const orgStaffRouter = {
 				throw errors.BAD_REQUEST({ message: 'Staff is already deactivated' });
 			}
 
-			const previousStatus = existingStaff.status;
-			const now = new Date();
-
-			const staff = await prisma.staff.update({
-				where: { id: input.staffId },
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'DEACTIVATE',
+				organizationId: context.organization.id,
+				userId: context.user!.id,
+				staffId: input.staffId,
 				data: {
-					status: 'DEACTIVATED',
-					deactivatedAt: now,
-					deactivationReason: input.reason,
-					canBeAssignedCases: false
-				},
+					reason: input.reason
+				}
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to deactivate staff' });
+			}
+
+			// Fetch updated staff for response
+			const staff = await prisma.staff.findUniqueOrThrow({
+				where: { id: input.staffId },
 				include: {
 					user: {
 						select: {
@@ -1946,24 +1916,6 @@ export const orgStaffRouter = {
 							name: true
 						}
 					}
-				}
-			});
-
-			// Record activity event
-			await recordActivityEvent({
-				organizationId: context.organization.id,
-				entityType: 'STAFF',
-				entityId: staff.id,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
-				summary: `Organization staff member "${staff.displayName}" deactivated. Reason: ${input.reason}`,
-				performedById: context.user!.id,
-				performedByType: 'HUMAN',
-				previousState: { status: previousStatus },
-				newState: {
-					status: 'DEACTIVATED',
-					deactivatedAt: now.toISOString(),
-					deactivationReason: input.reason
 				}
 			});
 

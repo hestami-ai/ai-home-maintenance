@@ -172,9 +172,9 @@ export const workOrderConfigWorkflow_v1 = DBOS.registerWorkflow(workOrderConfigW
 
 export async function startWorkOrderConfigWorkflow(
 	input: WorkOrderConfigWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<WorkOrderConfigWorkflowResult> {
 	const workflowId = idempotencyKey || `work-order-config-${input.action}-${input.workOrderId}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(workOrderConfigWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(workOrderConfigWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

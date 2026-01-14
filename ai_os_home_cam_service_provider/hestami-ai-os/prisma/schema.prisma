@@ -395,6 +395,13 @@ enum ViolationSeverity {
   CRITICAL // Critical/safety issue
 }
 
+/// @description Who reported the violation
+enum ReporterType {
+  STAFF // Staff member
+  RESIDENT // Resident/owner
+  ANONYMOUS // Anonymous report
+}
+
 enum NoticeType {
   WARNING // Informal warning
   FIRST_NOTICE // First formal notice
@@ -429,6 +436,14 @@ enum AppealStatus {
   MODIFIED // Fine/penalty modified on appeal
   REVERSED // Original decision reversed
   WITHDRAWN // Appeal withdrawn by filer
+}
+
+/// @description Decision outcome for a violation appeal
+enum AppealDecision {
+  UPHELD // Original decision upheld
+  MODIFIED // Fine/penalty modified
+  OVERTURNED // Original decision overturned
+  REVERSED // Original decision reversed (alias for OVERTURNED)
 }
 
 // -----------------------------------------------------------------------------
@@ -787,9 +802,10 @@ model Organization {
   deletedAt DateTime? @db.Timestamptz(3) @map("deleted_at")
 
   // Relations
-  memberships         UserOrganization[]
-  idempotencyKeys     IdempotencyKey[]
-  associations        Association[]
+  memberships              UserOrganization[]
+  idempotencyKeys          IdempotencyKey[]
+  associations             Association[]
+  associationPreferences   UserAssociationPreference[]
   properties          Property[]
   units               Unit[]
   workOrders          WorkOrder[]
@@ -900,13 +916,14 @@ model User {
   updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
 
   // Relations
-  memberships        UserOrganization[]
-  sessions           Session[]
-  accounts           Account[]
-  parties            Party[] // Party records linked to this user
-  managerAssignments ManagerAssignment[]
+  memberships              UserOrganization[]
+  sessions                 Session[]
+  accounts                 Account[]
+  parties                  Party[] // Party records linked to this user
+  managerAssignments       ManagerAssignment[]
+  associationPreferences   UserAssociationPreference[]
   // Phase 6: ARC
-  arcReviews         ARCReview[]
+  arcReviews               ARCReview[]
 
   // Phase 3: Concierge Cases
   assignedConciergeCases ConciergeCase[]    @relation("AssignedConciergeCases")
@@ -1029,6 +1046,29 @@ model UserOrganization {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@map("user_organizations")
+}
+
+/// @description User's default association preference per organization
+/// Stores which association a user last selected within each organization context
+model UserAssociationPreference {
+  id             String @id @default(cuid())
+  userId         String @map("user_id")
+  organizationId String @map("organization_id")
+  associationId  String @map("association_id")
+
+  createdAt DateTime @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime @db.Timestamptz(3) @updatedAt @map("updated_at")
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  association  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([associationId])
+  @@map("user_association_preferences")
 }
 
 /// @description User session for authentication
@@ -1186,6 +1226,8 @@ enum ActivityEntityType {
   ASSOCIATION
   UNIT
   OWNER
+  PARTY
+  OWNERSHIP
   VIOLATION
   ARC_REQUEST
   ASSESSMENT
@@ -1669,6 +1711,9 @@ model Association {
   // Phase 30: Association-Level Document Isolation
   documents Document[]
 
+  // User preferences for default association
+  userPreferences UserAssociationPreference[]
+
   @@index([organizationId])
   @@map("associations")
 }
@@ -1955,7 +2000,7 @@ model Violation {
   closedDate         DateTime? @db.Timestamptz(3)         @map("closed_date")
   responsiblePartyId String?           @map("responsible_party_id")
   reportedBy         String            @map("reported_by")
-  reporterType       String?           @map("reporter_type")
+  reporterType       ReporterType?     @map("reporter_type")
   totalFinesAssessed Decimal           @default(0) @map("total_fines_assessed") @db.Decimal(10, 2)
   totalFinesPaid     Decimal           @default(0) @map("total_fines_paid") @db.Decimal(10, 2)
   totalFinesWaived   Decimal           @default(0) @map("total_fines_waived") @db.Decimal(10, 2)
@@ -3044,6 +3089,13 @@ enum FundType {
   SPECIAL
 }
 
+/// @description Type of bank account for association funds
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  MONEY_MARKET
+}
+
 enum JournalEntryStatus {
   DRAFT
   PENDING_APPROVAL
@@ -3246,11 +3298,11 @@ model BankAccount {
   glAccountId    String @map("gl_account_id")
 
   // Bank details
-  bankName      String  @map("bank_name")
-  accountName   String  @map("account_name")
-  accountNumber String  @map("account_number") // Last 4 digits only for display
-  routingNumber String? @map("routing_number") // Encrypted or last 4
-  accountType   String  @map("account_type") // "CHECKING", "SAVINGS", "MONEY_MARKET"
+  bankName      String          @map("bank_name")
+  accountName   String          @map("account_name")
+  accountNumber String          @map("account_number") // Last 4 digits only for display
+  routingNumber String?         @map("routing_number") // Encrypted or last 4
+  accountType   BankAccountType @map("account_type")
 
   // Fund designation
   fundType FundType @default(OPERATING) @map("fund_type")
@@ -5691,6 +5743,24 @@ enum JobSourceType {
   RECURRING // From maintenance contract
 }
 
+/// @description Priority level for a job
+enum JobPriority {
+  EMERGENCY // Emergency - immediate response needed
+  HIGH // High priority
+  MEDIUM // Medium/normal priority
+  LOW // Low priority
+}
+
+/// @description Status of a job visit/appointment
+enum JobVisitStatus {
+  SCHEDULED // Visit scheduled
+  EN_ROUTE // Technician en route
+  ARRIVED // Technician arrived
+  IN_PROGRESS // Work in progress
+  COMPLETED // Visit completed
+  CANCELLED // Visit cancelled
+}
+
 enum CheckpointType {
   QA_INSPECTION
   WARRANTY_CHECK
@@ -5782,7 +5852,7 @@ model Job {
   title       String
   description String? @db.Text
   category    String? // e.g., "HVAC", "Plumbing"
-  priority    String  @default("MEDIUM") // EMERGENCY, HIGH, MEDIUM, LOW
+  priority    JobPriority @default(MEDIUM)
 
   // Assignment
   assignedTechnicianId String?   @map("assigned_technician_id")
@@ -5969,7 +6039,7 @@ model JobVisit {
   technicianId String? @map("technician_id")
 
   // Status
-  status String @default("SCHEDULED") // SCHEDULED, EN_ROUTE, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED
+  status JobVisitStatus @default(SCHEDULED)
 
   // Notes
   notes         String? @db.Text
@@ -8530,6 +8600,15 @@ model ExternalHOARule {
 // Phase 3.8: External Vendor Coordination
 // -----------------------------------------------------------------------------
 
+/// @description Type of interaction with an external vendor
+enum VendorInteractionType {
+  QUOTE // Quote/estimate request
+  SCHEDULE // Scheduling work
+  WORK // Work performed
+  INVOICE // Invoice received
+  OTHER // Other interaction
+}
+
 /// @description External vendor context for non-platform service providers
 model ExternalVendorContext {
   id             String  @id @default(cuid())
@@ -8576,8 +8655,8 @@ model ExternalVendorInteraction {
   caseId                  String? @map("case_id") // Optional link to concierge case
 
   // Interaction details
-  interactionType String // QUOTE, SCHEDULE, WORK, INVOICE, OTHER
-  interactionDate DateTime  @db.Timestamptz(3) @map("interaction_date")
+  interactionType VendorInteractionType @map("interaction_type")
+  interactionDate DateTime              @db.Timestamptz(3) @map("interaction_date")
   description     String   @db.Text
   amount          Decimal? @db.Decimal(12, 2) // Optional monetary amount
 

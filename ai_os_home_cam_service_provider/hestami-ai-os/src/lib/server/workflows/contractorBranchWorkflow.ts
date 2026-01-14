@@ -176,9 +176,9 @@ export const contractorBranchWorkflow_v1 = DBOS.registerWorkflow(contractorBranc
 
 export async function startContractorBranchWorkflow(
 	input: ContractorBranchWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ContractorBranchWorkflowResult> {
 	const workflowId = idempotencyKey || `contractor-branch-${input.action}-${input.branchId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(contractorBranchWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(contractorBranchWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

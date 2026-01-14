@@ -10,8 +10,8 @@ import {
 import { prisma } from '../../../db.js';
 import { ExternalApprovalStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ExternalApprovalStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
-import { recordExecution, recordIntent } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startExternalHoaWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('ExternalHoaRoute');
 
@@ -64,9 +64,12 @@ export const externalHoaRouter = {
 
 			await context.cerbos.authorize('create', 'external_hoa_context', 'new');
 
-			const hoaContext = await prisma.externalHOAContext.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalHoaWorkflow(
+				{
+					action: 'CREATE_CONTEXT',
 					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyId: input.propertyId,
 					hoaName: input.hoaName,
 					hoaContactName: input.hoaContactName,
@@ -74,27 +77,22 @@ export const externalHoaRouter = {
 					hoaContactPhone: input.hoaContactPhone,
 					hoaAddress: input.hoaAddress,
 					notes: input.notes,
-					documentsJson: input.documentsJson ?? []
-				}
-			});
+					documentsJson: input.documentsJson
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'EXTERNAL_HOA',
-				entityId: hoaContext.id,
-				action: 'CREATE',
-				summary: `External HOA context created: ${input.hoaName}`,
-				propertyId: input.propertyId,
-				newState: { hoaName: input.hoaName }
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create HOA context' });
+			}
 
 			return successResponse(
 				{
 					context: {
-						id: hoaContext.id,
-						propertyId: hoaContext.propertyId,
-						hoaName: hoaContext.hoaName,
-						createdAt: hoaContext.createdAt.toISOString()
+						id: workflowResult.contextId!,
+						propertyId: input.propertyId,
+						hoaName: workflowResult.hoaName!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -265,6 +263,7 @@ export const externalHoaRouter = {
 	updateContext: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				hoaName: z.string().min(1).max(255).optional(),
 				hoaContactName: z.string().nullable().optional(),
@@ -303,25 +302,34 @@ export const externalHoaRouter = {
 
 			await context.cerbos.authorize('update', 'external_hoa_context', existing.id);
 
-			const updated = await prisma.externalHOAContext.update({
-				where: { id: input.id },
-				data: {
-					...(input.hoaName !== undefined && { hoaName: input.hoaName }),
-					...(input.hoaContactName !== undefined && { hoaContactName: input.hoaContactName }),
-					...(input.hoaContactEmail !== undefined && { hoaContactEmail: input.hoaContactEmail }),
-					...(input.hoaContactPhone !== undefined && { hoaContactPhone: input.hoaContactPhone }),
-					...(input.hoaAddress !== undefined && { hoaAddress: input.hoaAddress }),
-					...(input.notes !== undefined && { notes: input.notes }),
-					...(input.documentsJson !== undefined && { documentsJson: input.documentsJson })
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalHoaWorkflow(
+				{
+					action: 'UPDATE_CONTEXT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					contextId: input.id,
+					hoaName: input.hoaName,
+					hoaContactName: input.hoaContactName,
+					hoaContactEmail: input.hoaContactEmail,
+					hoaContactPhone: input.hoaContactPhone,
+					hoaAddress: input.hoaAddress,
+					notes: input.notes,
+					documentsJson: input.documentsJson
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update HOA context' });
+			}
 
 			return successResponse(
 				{
 					context: {
-						id: updated.id,
-						hoaName: updated.hoaName,
-						updatedAt: updated.updatedAt.toISOString()
+						id: workflowResult.contextId!,
+						hoaName: workflowResult.hoaName!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -370,35 +378,33 @@ export const externalHoaRouter = {
 
 			await context.cerbos.authorize('create', 'external_hoa_approval', 'new');
 
-			const approval = await prisma.externalHOAApproval.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalHoaWorkflow(
+				{
+					action: 'CREATE_APPROVAL',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					externalHoaContextId: input.externalHoaContextId,
+					propertyId: hoaContext.propertyId,
 					caseId: input.caseId,
 					approvalType: input.approvalType,
-					status: 'PENDING',
 					notes: input.notes,
-					relatedDocumentIds: input.relatedDocumentIds ?? []
-				}
-			});
+					relatedDocumentIds: input.relatedDocumentIds
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordIntent(context, {
-				entityType: 'EXTERNAL_HOA',
-				entityId: approval.id,
-				action: 'CREATE',
-				summary: `HOA approval requested: ${input.approvalType}`,
-				propertyId: hoaContext.propertyId,
-				caseId: input.caseId,
-				newState: { approvalType: input.approvalType, status: 'PENDING' }
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create approval' });
+			}
 
 			return successResponse(
 				{
 					approval: {
-						id: approval.id,
-						approvalType: approval.approvalType,
-						status: approval.status,
-						createdAt: approval.createdAt.toISOString()
+						id: workflowResult.approvalId!,
+						approvalType: workflowResult.approvalType!,
+						status: workflowResult.status!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -411,6 +417,7 @@ export const externalHoaRouter = {
 	updateApprovalStatus: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				status: ExternalApprovalStatusSchema,
 				submittedAt: z.string().datetime().optional(),
@@ -449,36 +456,36 @@ export const externalHoaRouter = {
 
 			await context.cerbos.authorize('update', 'external_hoa_approval', approval.id);
 
-			const updated = await prisma.externalHOAApproval.update({
-				where: { id: input.id },
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalHoaWorkflow(
+				{
+					action: 'UPDATE_APPROVAL_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					approvalId: input.id,
+					propertyId: approval.externalHoaContext.propertyId,
 					status: input.status,
-					...(input.submittedAt && { submittedAt: new Date(input.submittedAt) }),
-					...(input.responseAt && { responseAt: new Date(input.responseAt) }),
-					...(input.expiresAt && { expiresAt: new Date(input.expiresAt) }),
-					...(input.approvalReference && { approvalReference: input.approvalReference }),
-					...(input.notes && { notes: input.notes })
-				}
-			});
+					submittedAt: input.submittedAt ? new Date(input.submittedAt) : undefined,
+					responseAt: input.responseAt ? new Date(input.responseAt) : undefined,
+					expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
+					approvalReference: input.approvalReference,
+					notes: input.notes,
+					// Pass previous status for activity logging
+					...(({ previousStatus: approval.status }) as { previousStatus: string })
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'EXTERNAL_HOA',
-				entityId: approval.id,
-				action: 'STATUS_CHANGE',
-				summary: `HOA approval status: ${input.status}`,
-				propertyId: approval.externalHoaContext.propertyId,
-				caseId: approval.caseId ?? undefined,
-				previousState: { status: approval.status },
-				newState: { status: input.status }
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update approval status' });
+			}
 
 			return successResponse(
 				{
 					approval: {
-						id: updated.id,
-						status: updated.status,
-						updatedAt: updated.updatedAt.toISOString()
+						id: workflowResult.approvalId!,
+						status: workflowResult.status!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -527,23 +534,32 @@ export const externalHoaRouter = {
 
 			await context.cerbos.authorize('create', 'external_hoa_rule', 'new');
 
-			const rule = await prisma.externalHOARule.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalHoaWorkflow(
+				{
+					action: 'ADD_RULE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					externalHoaContextId: input.externalHoaContextId,
 					ruleCategory: input.ruleCategory,
 					ruleDescription: input.ruleDescription,
 					sourceDocumentId: input.sourceDocumentId,
 					notes: input.notes
-				}
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to add rule' });
+			}
 
 			return successResponse(
 				{
 					rule: {
-						id: rule.id,
-						ruleCategory: rule.ruleCategory,
-						ruleDescription: rule.ruleDescription,
-						createdAt: rule.createdAt.toISOString()
+						id: workflowResult.ruleId!,
+						ruleCategory: workflowResult.ruleCategory!,
+						ruleDescription: workflowResult.ruleDescription!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -554,7 +570,10 @@ export const externalHoaRouter = {
 	 * Delete a rule
 	 */
 	deleteRule: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({
+			idempotencyKey: z.string().uuid(),
+			id: z.string()
+		}))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' }
@@ -578,10 +597,20 @@ export const externalHoaRouter = {
 
 			await context.cerbos.authorize('delete', 'external_hoa_rule', rule.id);
 
-			await prisma.externalHOARule.update({
-				where: { id: input.id },
-				data: { deletedAt: new Date() }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalHoaWorkflow(
+				{
+					action: 'DELETE_RULE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					ruleId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete rule' });
+			}
 
 			return successResponse({ deleted: true }, context);
 		})

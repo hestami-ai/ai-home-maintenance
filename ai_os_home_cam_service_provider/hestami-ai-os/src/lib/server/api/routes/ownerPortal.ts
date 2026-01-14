@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { ResponseMetaSchema, JsonSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../router.js';
+import {
+	ContactPreferenceChannelSchema,
+	NotificationCategorySchema,
+	OwnerRequestStatusSchema,
+	OwnerRequestCategorySchema,
+	PaymentMethodTypeSchema,
+	AutoPayFrequencySchema
+} from '../schemas.js';
 import { prisma } from '../../db.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
@@ -11,37 +19,10 @@ import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('OwnerPortalRoute');
 
-const ContactPreferenceChannelEnum = z.enum(['EMAIL', 'SMS', 'PUSH', 'MAIL', 'PORTAL']);
-const NotificationCategoryEnum = z.enum([
-	'GENERAL',
-	'BILLING',
-	'MAINTENANCE',
-	'GOVERNANCE',
-	'ARC',
-	'VIOLATION',
-	'COMMUNICATION',
-	'DOCUMENT_PROCESSING'
-]);
-
-const OwnerRequestStatusEnum = z.enum([
-	'DRAFT',
-	'SUBMITTED',
-	'IN_PROGRESS',
-	'RESOLVED',
-	'CLOSED',
-	'CANCELLED'
-]);
-
-const OwnerRequestCategoryEnum = z.enum([
-	'GENERAL_INQUIRY',
-	'MAINTENANCE',
-	'BILLING',
-	'ARCHITECTURAL',
-	'VIOLATION',
-	'GOVERNANCE',
-	'AMENITY',
-	'OTHER'
-]);
+const ContactPreferenceChannelEnum = ContactPreferenceChannelSchema;
+const NotificationCategoryEnum = NotificationCategorySchema;
+const OwnerRequestStatusEnum = OwnerRequestStatusSchema;
+const OwnerRequestCategoryEnum = OwnerRequestCategorySchema;
 
 const JsonRecord = z.record(z.string(), JsonSchema);
 
@@ -60,6 +41,7 @@ export const ownerPortalRouter = {
 	upsertUserProfile: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				preferredName: z.string().max(255).optional(),
 				profilePhotoUrl: z.string().url().optional(),
@@ -93,23 +75,29 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'userProfile', input.partyId);
 
-			const { mailingAddress, partyId, ...rest } = input;
-			const profile = await prisma.userProfile.upsert({
-				where: { partyId },
-				create: {
-					partyId,
-					...rest,
-					...(mailingAddress !== undefined && {
-						mailingAddress: mailingAddress as Prisma.InputJsonValue
-					})
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'UPSERT_USER_PROFILE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						partyId: input.partyId,
+						preferredName: input.preferredName,
+						profilePhotoUrl: input.profilePhotoUrl,
+						language: input.language,
+						timezone: input.timezone,
+						mailingAddress: input.mailingAddress
+					}
 				},
-				update: {
-					...rest,
-					...(mailingAddress !== undefined && {
-						mailingAddress: mailingAddress as Prisma.InputJsonValue
-					})
-				}
-			});
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to upsert user profile' });
+			}
+
+			const profile = await prisma.userProfile.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -177,7 +165,10 @@ export const ownerPortalRouter = {
 		}),
 
 	deleteUserProfile: orgProcedure
-		.input(z.object({ partyId: z.string() }))
+		.input(z.object({
+			idempotencyKey: z.string().uuid(),
+			partyId: z.string()
+		}))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' }
@@ -196,20 +187,30 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'userProfile', input.partyId);
 
-			const now = new Date();
-			const updated = await prisma.userProfile.updateMany({
-				where: { partyId: input.partyId, deletedAt: null },
-				data: { deletedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'DELETE_USER_PROFILE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						partyId: input.partyId
+					}
+				},
+				input.idempotencyKey
+			);
 
-			if (updated.count === 0) throw errors.NOT_FOUND({ message: 'UserProfile' });
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'UserProfile' });
+			}
 
-			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
+			return successResponse({ success: true, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	upsertContactPreference: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				channel: ContactPreferenceChannelEnum,
 				isEnabled: z.boolean().default(true),
@@ -243,16 +244,29 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'contactPreference', input.partyId);
 
-			const preference = await prisma.contactPreference.upsert({
-				where: { partyId_channel: { partyId: input.partyId, channel: input.channel } },
-				create: input,
-				update: {
-					isEnabled: input.isEnabled,
-					allowTransactional: input.allowTransactional,
-					allowMarketing: input.allowMarketing,
-					allowEmergency: input.allowEmergency
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'UPSERT_CONTACT_PREFERENCE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						partyId: input.partyId,
+						channel: input.channel,
+						isEnabled: input.isEnabled,
+						allowTransactional: input.allowTransactional,
+						allowMarketing: input.allowMarketing,
+						allowEmergency: input.allowEmergency
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to upsert contact preference' });
+			}
+
+			const preference = await prisma.contactPreference.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -324,6 +338,7 @@ export const ownerPortalRouter = {
 	deleteContactPreference: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				channel: ContactPreferenceChannelEnum
 			})
@@ -346,24 +361,31 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'contactPreference', input.partyId);
 
-			const now = new Date();
-			const result = await prisma.contactPreference.updateMany({
-				where: {
-					partyId: input.partyId,
-					channel: input.channel,
-					deletedAt: null
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'DELETE_CONTACT_PREFERENCE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						partyId: input.partyId,
+						channel: input.channel
+					}
 				},
-				data: { deletedAt: now }
-			});
+				input.idempotencyKey
+			);
 
-			if (result.count === 0) throw errors.NOT_FOUND({ message: 'ContactPreference' });
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'ContactPreference' });
+			}
 
-			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
+			return successResponse({ success: true, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	upsertNotificationSetting: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				category: NotificationCategoryEnum,
 				channel: ContactPreferenceChannelEnum,
@@ -393,17 +415,27 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('update', 'notificationSetting', input.partyId);
 
-			const setting = await prisma.notificationSetting.upsert({
-				where: {
-					partyId_category_channel: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'UPSERT_NOTIFICATION_SETTING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
 						partyId: input.partyId,
 						category: input.category,
-						channel: input.channel
+						channel: input.channel,
+						isEnabled: input.isEnabled
 					}
 				},
-				create: input,
-				update: { isEnabled: input.isEnabled }
-			});
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to upsert notification setting' });
+			}
+
+			const setting = await prisma.notificationSetting.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
 
 			return successResponse(
 				{
@@ -465,6 +497,7 @@ export const ownerPortalRouter = {
 	deleteNotificationSetting: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				category: NotificationCategoryEnum,
 				channel: ContactPreferenceChannelEnum
@@ -488,20 +521,26 @@ export const ownerPortalRouter = {
 			await ensureParty(input.partyId, context.organization.id, errors);
 			await context.cerbos.authorize('delete', 'notificationSetting', input.partyId);
 
-			const now = new Date();
-			const result = await prisma.notificationSetting.updateMany({
-				where: {
-					partyId: input.partyId,
-					category: input.category,
-					channel: input.channel,
-					deletedAt: null
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'DELETE_NOTIFICATION_SETTING',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						partyId: input.partyId,
+						category: input.category,
+						channel: input.channel
+					}
 				},
-				data: { deletedAt: now }
-			});
+				input.idempotencyKey
+			);
 
-			if (result.count === 0) throw errors.NOT_FOUND({ message: 'NotificationSetting' });
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'NotificationSetting' });
+			}
 
-			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
+			return successResponse({ success: true, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	// =========================================================================
@@ -585,15 +624,6 @@ export const ownerPortalRouter = {
 			}
 
 			const request = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
-
-			await prisma.ownerRequestHistory.create({
-				data: {
-					requestId: request.id,
-					action: 'CREATED',
-					newStatus: 'DRAFT',
-					performedBy: context.user.id
-				}
-			});
 
 			return successResponse(
 				{
@@ -719,6 +749,10 @@ export const ownerPortalRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve owner requests' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'ownerRequest', 'list');
 
@@ -823,16 +857,6 @@ export const ownerPortalRouter = {
 
 			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
 
-			await prisma.ownerRequestHistory.create({
-				data: {
-					requestId: request.id,
-					action: 'SUBMITTED',
-					previousStatus: 'DRAFT',
-					newStatus: 'SUBMITTED',
-					performedBy: context.user.id
-				}
-			});
-
 			return successResponse(
 				{
 					request: {
@@ -895,7 +919,9 @@ export const ownerPortalRouter = {
 					entityId: input.id,
 					data: {
 						status: input.status,
-						resolution: input.resolutionNotes
+						resolution: input.resolutionNotes,
+						previousStatus: request.status,
+						notes: input.notes
 					}
 				},
 				input.idempotencyKey
@@ -906,17 +932,6 @@ export const ownerPortalRouter = {
 			}
 
 			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
-
-			await prisma.ownerRequestHistory.create({
-				data: {
-					requestId: request.id,
-					action: input.status,
-					previousStatus: request.status,
-					newStatus: input.status,
-					notes: input.notes,
-					performedBy: context.user.id
-				}
-			});
 
 			return successResponse(
 				{
@@ -985,7 +1000,8 @@ export const ownerPortalRouter = {
 					userId: context.user.id,
 					entityId: input.id,
 					data: {
-						workOrderId: input.workOrderId
+						workOrderId: input.workOrderId,
+						workOrderNumber: workOrder.workOrderNumber
 					}
 				},
 				input.idempotencyKey
@@ -996,15 +1012,6 @@ export const ownerPortalRouter = {
 			}
 
 			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
-
-			await prisma.ownerRequestHistory.create({
-				data: {
-					requestId: request.id,
-					action: 'LINKED_TO_WORK_ORDER',
-					notes: `Linked to work order ${workOrder.workOrderNumber}`,
-					performedBy: context.user.id
-				}
-			});
 
 			return successResponse(
 				{
@@ -1084,7 +1091,7 @@ export const ownerPortalRouter = {
 			z.object({
 				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
-				methodType: z.enum(['BANK_ACCOUNT', 'CREDIT_CARD', 'DEBIT_CARD']),
+				methodType: PaymentMethodTypeSchema,
 				nickname: z.string().max(100).optional(),
 				lastFour: z.string().length(4),
 				expirationMonth: z.number().int().min(1).max(12).optional(),
@@ -1104,7 +1111,7 @@ export const ownerPortalRouter = {
 				data: z.object({
 					paymentMethod: z.object({
 						id: z.string(),
-						methodType: z.enum(['BANK_ACCOUNT', 'CREDIT_CARD', 'DEBIT_CARD']),
+						methodType: PaymentMethodTypeSchema,
 						nickname: z.string().nullable(),
 						lastFour: z.string(),
 						isDefault: z.boolean(),
@@ -1172,7 +1179,7 @@ export const ownerPortalRouter = {
 					paymentMethods: z.array(
 						z.object({
 							id: z.string(),
-							methodType: z.enum(['BANK_ACCOUNT', 'CREDIT_CARD', 'DEBIT_CARD']),
+							methodType: PaymentMethodTypeSchema,
 							nickname: z.string().nullable(),
 							lastFour: z.string(),
 							expirationMonth: z.number().nullable(),
@@ -1268,6 +1275,7 @@ export const ownerPortalRouter = {
 	deletePaymentMethod: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				paymentMethodId: z.string()
 			})
@@ -1292,13 +1300,24 @@ export const ownerPortalRouter = {
 			});
 			if (!method) throw errors.NOT_FOUND({ message: 'PaymentMethod' });
 
-			const now = new Date();
-			await prisma.storedPaymentMethod.update({
-				where: { id: input.paymentMethodId },
-				data: { deletedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'DELETE_PAYMENT_METHOD',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						methodId: input.paymentMethodId
+					}
+				},
+				input.idempotencyKey
+			);
 
-			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'PaymentMethod' });
+			}
+
+			return successResponse({ success: true, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	upsertAutoPay: orgProcedure
@@ -1308,7 +1327,7 @@ export const ownerPortalRouter = {
 				partyId: z.string(),
 				paymentMethodId: z.string(),
 				isEnabled: z.boolean(),
-				frequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY', 'ON_DUE_DATE']),
+				frequency: AutoPayFrequencySchema,
 				dayOfMonth: z.number().int().min(1).max(28).optional(),
 				maxAmount: z.number().positive().optional(),
 				associationId: z.string().optional()
@@ -1326,7 +1345,7 @@ export const ownerPortalRouter = {
 					autoPay: z.object({
 						id: z.string(),
 						isEnabled: z.boolean(),
-						frequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY', 'ON_DUE_DATE']),
+						frequency: AutoPayFrequencySchema,
 						dayOfMonth: z.number().nullable(),
 						maxAmount: z.string().nullable(),
 						createdAt: z.string()
@@ -1403,7 +1422,7 @@ export const ownerPortalRouter = {
 							id: z.string(),
 							paymentMethodId: z.string(),
 							isEnabled: z.boolean(),
-							frequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY', 'ON_DUE_DATE']),
+							frequency: AutoPayFrequencySchema,
 							dayOfMonth: z.number().nullable(),
 							maxAmount: z.string().nullable(),
 							createdAt: z.string()
@@ -1447,6 +1466,7 @@ export const ownerPortalRouter = {
 	deleteAutoPay: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				partyId: z.string(),
 				autoPayId: z.string()
 			})
@@ -1471,13 +1491,24 @@ export const ownerPortalRouter = {
 			});
 			if (!autoPay) throw errors.NOT_FOUND({ message: 'AutoPaySetting' });
 
-			const now = new Date();
-			await prisma.autoPaySetting.update({
-				where: { id: input.autoPayId },
-				data: { deletedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'DELETE_AUTO_PAY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						autoPayId: input.autoPayId
+					}
+				},
+				input.idempotencyKey
+			);
 
-			return successResponse({ success: true, deletedAt: now.toISOString() }, context);
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'AutoPaySetting' });
+			}
+
+			return successResponse({ success: true, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	// =========================================================================
@@ -1700,6 +1731,7 @@ export const ownerPortalRouter = {
 	logDocumentDownload: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				documentId: z.string(),
 				partyId: z.string().optional(),
 				ipAddress: z.string().optional(),
@@ -1718,6 +1750,8 @@ export const ownerPortalRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'document', input.documentId);
+
 			const document = await prisma.document.findFirst({
 				where: { id: input.documentId, organizationId: context.organization.id, deletedAt: null }
 			});
@@ -1726,15 +1760,25 @@ export const ownerPortalRouter = {
 				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
-			await prisma.documentDownloadLog.create({
-				data: {
-					documentId: input.documentId,
-					partyId: input.partyId,
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'LOG_DOCUMENT_DOWNLOAD',
+					organizationId: context.organization.id,
 					userId: context.user.id,
-					ipAddress: input.ipAddress,
-					userAgent: input.userAgent
-				}
-			});
+					data: {
+						documentId: input.documentId,
+						partyId: input.partyId,
+						ipAddress: input.ipAddress,
+						userAgent: input.userAgent
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'Document' });
+			}
 
 			return successResponse({ logged: true }, context);
 		}),
@@ -1820,6 +1864,7 @@ export const ownerPortalRouter = {
 	revokeDocumentAccess: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				documentId: z.string(),
 				partyId: z.string()
 			})
@@ -1851,12 +1896,23 @@ export const ownerPortalRouter = {
 				throw errors.NOT_FOUND({ message: 'DocumentAccessGrant' });
 			}
 
-			const now = new Date();
-			await prisma.documentAccessGrant.update({
-				where: { id: grant.id },
-				data: { revokedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerPortalWorkflow(
+				{
+					action: 'REVOKE_DOCUMENT_ACCESS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						grantId: grant.id
+					}
+				},
+				input.idempotencyKey
+			);
 
-			return successResponse({ success: true, revokedAt: now.toISOString() }, context);
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: 'DocumentAccessGrant' });
+			}
+
+			return successResponse({ success: true, revokedAt: new Date().toISOString() }, context);
 		})
 };

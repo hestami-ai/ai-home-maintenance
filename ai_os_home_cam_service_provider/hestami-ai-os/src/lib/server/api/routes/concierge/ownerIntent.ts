@@ -12,8 +12,8 @@ import { OwnerIntentCategorySchema } from '../../../../../../generated/zod/input
 import { OwnerIntentPrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentPrioritySchema.js';
 import { OwnerIntentStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentStatusSchema.js';
 import { Prisma } from '../../../../../../generated/prisma/client.js';
-import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startOwnerIntentWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('OwnerIntentRoute');
 
@@ -80,47 +80,38 @@ export const ownerIntentRouter = {
 				}
 			}
 
-			const intent = await prisma.ownerIntent.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyId: input.propertyId,
 					title: input.title,
 					description: input.description,
 					category: input.category,
-					priority: input.priority ?? 'NORMAL',
-					status: 'DRAFT',
-					constraints: (input.constraints ?? undefined) as Prisma.InputJsonValue | undefined,
+					priority: input.priority,
+					constraints: input.constraints as Record<string, unknown> | undefined,
 					attachments: input.attachments,
 					submittedByPartyId: input.submittedByPartyId
-				}
-			});
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordIntent(context, {
-				entityType: 'OWNER_INTENT',
-				entityId: intent.id,
-				action: 'CREATE',
-				summary: `Owner intent created: ${intent.title}`,
-				intentId: intent.id,
-				propertyId: input.propertyId,
-				newState: {
-					title: intent.title,
-					category: intent.category,
-					priority: intent.priority,
-					status: intent.status
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to create intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						propertyId: intent.propertyId,
-						title: intent.title,
-						category: intent.category,
-						priority: intent.priority,
-						status: intent.status,
-						createdAt: intent.createdAt.toISOString()
+						id: workflowResult.intentId!,
+						propertyId: workflowResult.propertyId!,
+						title: workflowResult.title!,
+						category: workflowResult.category!,
+						priority: workflowResult.priority!,
+						status: workflowResult.status!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -280,6 +271,11 @@ export const ownerIntentRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
 			// Cerbos authorization for listing
 			await context.cerbos.authorize('view', 'owner_intent', 'list');
@@ -381,34 +377,35 @@ export const ownerIntentRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'owner_intent', existing.id);
 
-			const intent = await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: {
-					...(input.title !== undefined && { title: input.title }),
-					...(input.description !== undefined && { description: input.description }),
-					...(input.category !== undefined && { category: input.category }),
-					...(input.priority !== undefined && { priority: input.priority }),
-					...(input.constraints !== undefined && {
-						constraints: input.constraints === null
-							? Prisma.DbNull
-							: (input.constraints as Prisma.InputJsonValue)
-					}),
-					...(input.attachments !== undefined && {
-						attachments: input.attachments === null
-							? Prisma.DbNull
-							: (input.attachments as Prisma.InputJsonValue)
-					})
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id,
+					title: input.title,
+					description: input.description,
+					category: input.category,
+					priority: input.priority,
+					constraints: input.constraints as Record<string, unknown> | undefined,
+					attachments: input.attachments ?? undefined
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to update intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						title: intent.title,
-						category: intent.category,
-						priority: intent.priority,
-						updatedAt: intent.updatedAt.toISOString()
+						id: workflowResult.intentId!,
+						title: workflowResult.title!,
+						category: workflowResult.category!,
+						priority: workflowResult.priority!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -461,33 +458,29 @@ export const ownerIntentRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('submit', 'owner_intent', existing.id);
 
-			const now = new Date();
-			const intent = await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: {
-					status: 'SUBMITTED',
-					submittedAt: now
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'SUBMIT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id,
+					propertyId: existing.propertyId,
+					title: existing.title
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordIntent(context, {
-				entityType: 'OWNER_INTENT',
-				entityId: intent.id,
-				action: 'SUBMIT',
-				summary: `Intent submitted for review: ${existing.title}`,
-				intentId: intent.id,
-				propertyId: existing.propertyId,
-				previousState: { status: 'DRAFT' },
-				newState: { status: 'SUBMITTED' }
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to submit intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						status: intent.status,
-						submittedAt: intent.submittedAt!.toISOString()
+						id: workflowResult.intentId!,
+						status: workflowResult.status!,
+						submittedAt: workflowResult.submittedAt!
 					}
 				},
 				context
@@ -541,35 +534,29 @@ export const ownerIntentRouter = {
 			// Cerbos authorization - requires concierge/admin role
 			await context.cerbos.authorize('acknowledge', 'owner_intent', existing.id);
 
-			const now = new Date();
-			const intent = await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: {
-					status: 'ACKNOWLEDGED',
-					acknowledgedAt: now,
-					acknowledgedBy: context.user.id
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'ACKNOWLEDGE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id,
+					propertyId: existing.propertyId
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'OWNER_INTENT',
-				entityId: intent.id,
-				action: 'STATUS_CHANGE',
-				summary: `Intent acknowledged by concierge`,
-				intentId: intent.id,
-				propertyId: existing.propertyId,
-				previousState: { status: 'SUBMITTED' },
-				newState: { status: 'ACKNOWLEDGED' }
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to acknowledge intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						status: intent.status,
-						acknowledgedAt: intent.acknowledgedAt!.toISOString(),
-						acknowledgedBy: intent.acknowledgedBy!
+						id: workflowResult.intentId!,
+						status: workflowResult.status!,
+						acknowledgedAt: workflowResult.acknowledgedAt!,
+						acknowledgedBy: workflowResult.acknowledgedBy!
 					}
 				},
 				context
@@ -627,36 +614,31 @@ export const ownerIntentRouter = {
 			// Cerbos authorization - requires concierge/admin role
 			await context.cerbos.authorize('convert', 'owner_intent', existing.id);
 
-			const now = new Date();
-			const intent = await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: {
-					status: 'CONVERTED_TO_CASE',
-					convertedCaseId: input.caseId,
-					convertedAt: now
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'CONVERT_TO_CASE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id,
+					caseId: input.caseId,
+					propertyId: existing.propertyId,
+					priority: existing.status
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordDecision(context, {
-				entityType: 'OWNER_INTENT',
-				entityId: intent.id,
-				action: 'STATUS_CHANGE',
-				summary: `Intent converted to case`,
-				intentId: intent.id,
-				propertyId: existing.propertyId,
-				caseId: input.caseId,
-				previousState: { status: existing.status },
-				newState: { status: 'CONVERTED_TO_CASE', convertedCaseId: input.caseId }
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to convert intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						status: intent.status,
-						convertedCaseId: intent.convertedCaseId!,
-						convertedAt: intent.convertedAt!.toISOString()
+						id: workflowResult.intentId!,
+						status: workflowResult.status!,
+						convertedCaseId: workflowResult.convertedCaseId!,
+						convertedAt: workflowResult.convertedAt!
 					}
 				},
 				context
@@ -713,36 +695,31 @@ export const ownerIntentRouter = {
 			// Cerbos authorization - requires concierge/admin role
 			await context.cerbos.authorize('decline', 'owner_intent', existing.id);
 
-			const now = new Date();
-			const intent = await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: {
-					status: 'DECLINED',
-					declinedAt: now,
-					declinedBy: context.user.id,
-					declineReason: input.reason
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'DECLINE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id,
+					reason: input.reason,
+					propertyId: existing.propertyId,
+					priority: existing.status
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordDecision(context, {
-				entityType: 'OWNER_INTENT',
-				entityId: intent.id,
-				action: 'DENY',
-				summary: `Intent declined: ${input.reason}`,
-				intentId: intent.id,
-				propertyId: existing.propertyId,
-				previousState: { status: existing.status },
-				newState: { status: 'DECLINED', declineReason: input.reason }
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to decline intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						status: intent.status,
-						declinedAt: intent.declinedAt!.toISOString(),
-						declinedBy: intent.declinedBy!
+						id: workflowResult.intentId!,
+						status: workflowResult.status!,
+						declinedAt: workflowResult.declinedAt!,
+						declinedBy: workflowResult.declinedBy!
 					}
 				},
 				context
@@ -796,34 +773,30 @@ export const ownerIntentRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('withdraw', 'owner_intent', existing.id);
 
-			const now = new Date();
-			const intent = await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: {
-					status: 'WITHDRAWN',
-					withdrawnAt: now,
-					withdrawReason: input.reason
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'WITHDRAW',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id,
+					reason: input.reason,
+					propertyId: existing.propertyId,
+					priority: existing.status
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordIntent(context, {
-				entityType: 'OWNER_INTENT',
-				entityId: intent.id,
-				action: 'CANCEL',
-				summary: `Owner withdrew intent${input.reason ? `: ${input.reason}` : ''}`,
-				intentId: intent.id,
-				propertyId: existing.propertyId,
-				previousState: { status: existing.status },
-				newState: { status: 'WITHDRAWN', withdrawReason: input.reason }
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to withdraw intent' });
+			}
 
 			return successResponse(
 				{
 					intent: {
-						id: intent.id,
-						status: intent.status,
-						withdrawnAt: intent.withdrawnAt!.toISOString()
+						id: workflowResult.intentId!,
+						status: workflowResult.status!,
+						withdrawnAt: workflowResult.withdrawnAt!
 					}
 				},
 				context
@@ -876,24 +849,32 @@ export const ownerIntentRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('add_note', 'owner_intent', intent.id);
 
-			const note = await prisma.intentNote.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'ADD_NOTE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					intentId: input.intentId,
 					content: input.content,
-					isInternal: input.isInternal,
-					createdBy: context.user.id
-				}
-			});
+					isInternal: input.isInternal
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to add note' });
+			}
 
 			return successResponse(
 				{
 					note: {
-						id: note.id,
-						intentId: note.intentId,
-						content: note.content,
-						isInternal: note.isInternal,
-						createdBy: note.createdBy,
-						createdAt: note.createdAt.toISOString()
+						id: workflowResult.noteId!,
+						intentId: workflowResult.intentId!,
+						content: workflowResult.noteContent!,
+						isInternal: workflowResult.noteIsInternal!,
+						createdBy: workflowResult.noteCreatedBy!,
+						createdAt: workflowResult.noteCreatedAt!
 					}
 				},
 				context
@@ -1006,16 +987,25 @@ export const ownerIntentRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'owner_intent', existing.id);
 
-			const now = new Date();
-			await prisma.ownerIntent.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startOwnerIntentWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					intentId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to delete intent' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: workflowResult.deletedAt!
 				},
 				context
 			);

@@ -23,7 +23,8 @@ export const DispatchAction = {
 	REASSIGN: 'REASSIGN',
 	UPDATE_STATUS: 'UPDATE_STATUS',
 	RESCHEDULE: 'RESCHEDULE',
-	OPTIMIZE_ROUTE: 'OPTIMIZE_ROUTE'
+	OPTIMIZE_ROUTE: 'OPTIMIZE_ROUTE',
+	CREATE_ROUTE_PLAN: 'CREATE_ROUTE_PLAN'
 } as const;
 
 export type DispatchAction = (typeof DispatchAction)[keyof typeof DispatchAction];
@@ -288,6 +289,23 @@ async function optimizeRoute(
 	return { id: routePlan.id };
 }
 
+async function createRoutePlan(
+	organizationId: string,
+	userId: string,
+	data: Record<string, unknown>
+): Promise<{ id: string }> {
+	const routePlan = await prisma.routePlan.create({
+		data: {
+			organizationId,
+			technicianId: data.technicianId as string,
+			routeDate: new Date(data.routeDate as string)
+		}
+	});
+
+	log.info('CREATE_ROUTE_PLAN completed', { routePlanId: routePlan.id, technicianId: data.technicianId });
+	return { id: routePlan.id };
+}
+
 async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchWorkflowResult> {
 	try {
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
@@ -338,6 +356,14 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 				entityId = result.id;
 				break;
 			}
+			case 'CREATE_ROUTE_PLAN': {
+				const result = await DBOS.runStep(
+					() => createRoutePlan(input.organizationId, input.userId, input.data),
+					{ name: 'createRoutePlan' }
+				);
+				entityId = result.id;
+				break;
+			}
 			default:
 				throw new Error(`Unknown action: ${input.action}`);
 		}
@@ -374,11 +400,10 @@ export const dispatchWorkflow_v1 = DBOS.registerWorkflow(dispatchWorkflow);
 
 export async function startDispatchWorkflow(
 	input: DispatchWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<DispatchWorkflowResult> {
 	const handle = await DBOS.startWorkflow(dispatchWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

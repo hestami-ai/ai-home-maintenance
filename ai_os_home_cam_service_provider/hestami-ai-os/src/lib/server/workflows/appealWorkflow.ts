@@ -307,9 +307,9 @@ export const appealWorkflow_v1 = DBOS.registerWorkflow(appealWorkflow);
 
 export async function startAppealWorkflow(
 	input: AppealWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<AppealWorkflowResult> {
 	const workflowId = idempotencyKey || `appeal-${input.action}-${input.appealId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(appealWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(appealWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

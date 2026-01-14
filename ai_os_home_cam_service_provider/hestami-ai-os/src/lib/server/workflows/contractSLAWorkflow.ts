@@ -241,9 +241,9 @@ export const contractSLAWorkflow_v1 = DBOS.registerWorkflow(contractSLAWorkflow)
 
 export async function startContractSLAWorkflow(
 	input: ContractSLAWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ContractSLAWorkflowResult> {
 	const workflowId = idempotencyKey || `contract-sla-${input.action}-${input.slaRecordId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(contractSLAWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(contractSLAWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

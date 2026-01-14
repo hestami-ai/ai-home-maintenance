@@ -13,7 +13,9 @@ import { createWorkflowLogger } from './workflowLogger.js';
 
 // Action types for the unified workflow
 export const ViolationFineAction = {
-	FINE_TO_CHARGE: 'FINE_TO_CHARGE'
+	FINE_TO_CHARGE: 'FINE_TO_CHARGE',
+	ASSESS_FINE: 'ASSESS_FINE',
+	WAIVE_FINE: 'WAIVE_FINE'
 } as const;
 
 export type ViolationFineAction = (typeof ViolationFineAction)[keyof typeof ViolationFineAction];
@@ -23,8 +25,20 @@ export interface ViolationFineWorkflowInput {
 	organizationId: string;
 	userId: string;
 	associationId: string;
-	fineId: string;
-	data: Record<string, unknown>;
+	violationId?: string;
+	fineId?: string;
+	data: {
+		// ASSESS_FINE fields
+		amount?: number;
+		reason?: string;
+		dueDays?: number;
+		fineCount?: number;
+		currentStatus?: string;
+		// WAIVE_FINE fields
+		waivedAmount?: number;
+		waiveReason?: string;
+		fineAmount?: number;
+	};
 }
 
 export interface ViolationFineWorkflowResult extends EntityWorkflowResult {
@@ -125,16 +139,133 @@ async function fineToCharge(
 	return { fineId, chargeId: charge.id };
 }
 
+async function assessFine(
+	organizationId: string,
+	userId: string,
+	violationId: string,
+	data: ViolationFineWorkflowInput['data']
+): Promise<{ fineId: string; fineNumber: number; amount: string; dueDate: string }> {
+	const amount = data.amount!;
+	const reason = data.reason;
+	const dueDays = data.dueDays ?? 30;
+	const fineCount = data.fineCount ?? 0;
+	const currentStatus = data.currentStatus as string;
+
+	const now = new Date();
+	const dueDate = new Date(now.getTime() + dueDays * 24 * 60 * 60 * 1000);
+	const fineNumber = fineCount + 1;
+
+	const fine = await prisma.violationFine.create({
+		data: {
+			violationId,
+			fineNumber,
+			amount,
+			reason,
+			assessedDate: now,
+			dueDate,
+			balanceDue: amount,
+			assessedBy: userId
+		}
+	});
+
+	// Update violation totals
+	await prisma.violation.update({
+		where: { id: violationId },
+		data: {
+			totalFinesAssessed: { increment: amount },
+			status: 'FINE_ASSESSED'
+		}
+	});
+
+	if (currentStatus !== 'FINE_ASSESSED') {
+		await prisma.violationStatusHistory.create({
+			data: {
+				violationId,
+				fromStatus: currentStatus as any,
+				toStatus: 'FINE_ASSESSED',
+				changedBy: userId,
+				notes: `Fine #${fineNumber} assessed: $${amount}`
+			}
+		});
+	}
+
+	console.log(`[ViolationFineWorkflow] ASSESS_FINE fine:${fine.id} by user ${userId}`);
+	return {
+		fineId: fine.id,
+		fineNumber: fine.fineNumber,
+		amount: fine.amount.toString(),
+		dueDate: fine.dueDate.toISOString()
+	};
+}
+
+async function waiveFine(
+	organizationId: string,
+	userId: string,
+	fineId: string,
+	data: ViolationFineWorkflowInput['data']
+): Promise<{ fineId: string; waivedAmount: string; balanceDue: string }> {
+	const waivedAmount = data.waivedAmount!;
+	const waiveReason = data.waiveReason;
+
+	const fine = await prisma.violationFine.findUnique({ where: { id: fineId } });
+	if (!fine) throw new Error('Fine not found');
+
+	const newWaivedAmount = parseFloat(fine.waivedAmount.toString()) + waivedAmount;
+	const newBalanceDue = parseFloat(fine.balanceDue.toString()) - waivedAmount;
+
+	const updated = await prisma.violationFine.update({
+		where: { id: fineId },
+		data: {
+			waivedAmount: newWaivedAmount,
+			balanceDue: Math.max(0, newBalanceDue),
+			waivedBy: userId,
+			waivedDate: new Date(),
+			waiverReason: waiveReason
+		}
+	});
+
+	// Update violation totals
+	await prisma.violation.update({
+		where: { id: fine.violationId },
+		data: {
+			totalFinesWaived: { increment: waivedAmount }
+		}
+	});
+
+	console.log(`[ViolationFineWorkflow] WAIVE_FINE fine:${fineId} waived:${waivedAmount} by user ${userId}`);
+	return {
+		fineId: updated.id,
+		waivedAmount: newWaivedAmount.toString(),
+		balanceDue: Math.max(0, newBalanceDue).toString()
+	};
+}
+
 // Main workflow function
 async function violationFineWorkflow(input: ViolationFineWorkflowInput): Promise<ViolationFineWorkflowResult> {
 	try {
 		switch (input.action) {
 			case 'FINE_TO_CHARGE': {
 				const result = await DBOS.runStep(
-					() => fineToCharge(input.organizationId, input.userId, input.associationId, input.fineId),
+					() => fineToCharge(input.organizationId, input.userId, input.associationId, input.fineId!),
 					{ name: 'fineToCharge' }
 				);
 				return { success: true, entityId: result.fineId, chargeId: result.chargeId };
+			}
+
+			case 'ASSESS_FINE': {
+				const result = await DBOS.runStep(
+					() => assessFine(input.organizationId, input.userId, input.violationId!, input.data),
+					{ name: 'assessFine' }
+				);
+				return { success: true, entityId: result.fineId };
+			}
+
+			case 'WAIVE_FINE': {
+				const result = await DBOS.runStep(
+					() => waiveFine(input.organizationId, input.userId, input.fineId!, input.data),
+					{ name: 'waiveFine' }
+				);
+				return { success: true, entityId: result.fineId };
 			}
 
 			default:
@@ -159,9 +290,9 @@ export const violationFineWorkflow_v1 = DBOS.registerWorkflow(violationFineWorkf
 
 export async function startViolationFineWorkflow(
 	input: ViolationFineWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ViolationFineWorkflowResult> {
 	const workflowId = idempotencyKey || `viol-fine-${input.action}-${input.fineId}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(violationFineWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(violationFineWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

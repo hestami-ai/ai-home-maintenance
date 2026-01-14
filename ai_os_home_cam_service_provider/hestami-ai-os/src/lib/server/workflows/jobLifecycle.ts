@@ -389,7 +389,7 @@ export async function startJobTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `job-transition-${input.jobId}-${Date.now()}`;
-	await DBOS.startWorkflow(jobLifecycle_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(jobLifecycle_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { DBOS } from '@dbos-inc/dbos-sdk';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
+import { OwnershipTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
+import { ownershipWorkflow_v1 } from '../../workflows/ownershipWorkflow.js';
 
 const log = createModuleLogger('OwnershipRoute');
 
@@ -17,15 +20,10 @@ export const ownershipRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				unitId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                unitId: z.string(),
 				partyId: z.string(),
-				ownershipType: z.enum([
-					'FEE_SIMPLE',
-					'JOINT_TENANCY',
-					'TENANCY_IN_COMMON',
-					'COMMUNITY_PROPERTY',
-					'TRUST'
-				]),
+				ownershipType: OwnershipTypeSchema,
 				percentage: z.number().min(0).max(100).default(100),
 				startDate: z.coerce.date(),
 				endDate: z.coerce.date().optional(),
@@ -48,7 +46,8 @@ export const ownershipRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Entity not found' }
+			NOT_FOUND: { message: 'Entity not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to create ownership' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
@@ -73,29 +72,36 @@ export const ownershipRouter = {
 				throw errors.NOT_FOUND({ message: 'Party' });
 			}
 
-			// If setting as primary, unset other primaries for this unit
-			if (input.isPrimary) {
-				await prisma.ownership.updateMany({
-					where: { unitId: input.unitId, isPrimary: true },
-					data: { isPrimary: false }
-				});
-			}
-
-			const { mailingAddress, ...restInput } = input;
-			const ownership = await prisma.ownership.create({
-				data: {
-					...restInput,
-					...(mailingAddress !== undefined && { mailingAddress: mailingAddress as Prisma.InputJsonValue })
-				}
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(ownershipWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				unitId: input.unitId,
+				partyId: input.partyId,
+				ownershipType: input.ownershipType,
+				percentage: input.percentage,
+				startDate: input.startDate,
+				endDate: input.endDate,
+				isPrimary: input.isPrimary,
+				mailingAddress: input.mailingAddress
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create ownership' });
+			}
 
 			return successResponse(
 				{
 					ownership: {
-						id: ownership.id,
-						unitId: ownership.unitId,
-						partyId: ownership.partyId,
-						percentage: ownership.percentage
+						id: result.ownershipId!,
+						unitId: result.unitId!,
+						partyId: result.partyId!,
+						percentage: result.percentage!
 					}
 				},
 				context
@@ -284,6 +290,7 @@ export const ownershipRouter = {
 	end: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				endDate: z.coerce.date()
 			})
@@ -301,7 +308,8 @@ export const ownershipRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Ownership not found' }
+			NOT_FOUND: { message: 'Ownership not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to end ownership' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownership.findFirst({
@@ -316,16 +324,28 @@ export const ownershipRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('end', 'ownership', existing.id);
 
-			const ownership = await prisma.ownership.update({
-				where: { id: input.id },
-				data: { endDate: input.endDate, isPrimary: false }
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(ownershipWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'END',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				ownershipId: input.id,
+				endDate: input.endDate
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to end ownership' });
+			}
 
 			return successResponse(
 				{
 					ownership: {
-						id: ownership.id,
-						endDate: ownership.endDate!.toISOString()
+						id: result.ownershipId!,
+						endDate: result.endDate!
 					}
 				},
 				context
@@ -338,7 +358,8 @@ export const ownershipRouter = {
 	delete: orgProcedure
 		.input(
 			z.object({
-				id: z.string()
+                idempotencyKey: z.string().uuid(),
+                id: z.string()
 			})
 		)
 		.output(
@@ -352,7 +373,8 @@ export const ownershipRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Ownership not found' }
+			NOT_FOUND: { message: 'Ownership not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to delete ownership' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownership.findFirst({
@@ -367,16 +389,26 @@ export const ownershipRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'ownership', existing.id);
 
-			const now = new Date();
-			await prisma.ownership.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(ownershipWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'DELETE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				ownershipId: input.id
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete ownership' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: result.deletedAt!
 				},
 				context
 			);

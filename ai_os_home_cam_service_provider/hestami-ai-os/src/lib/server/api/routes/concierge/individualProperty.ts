@@ -9,6 +9,7 @@ import {
 import { prisma } from '../../../db.js';
 import { PropertyTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyTypeSchema.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startIndividualPropertyWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('IndividualPropertyRoute');
 
@@ -120,94 +121,39 @@ export const individualPropertyRouter = {
 				}
 			}
 
-			// Create property in transaction
-			const result = await prisma.$transaction(async (tx) => {
-				// Create the property
-				const property = await tx.individualProperty.create({
-					data: {
-						ownerOrgId: context.organization.id,
-						name: input.name,
-						propertyType: input.propertyType,
-						addressLine1: input.addressLine1,
-						addressLine2: input.addressLine2 ?? null,
-						city: input.city,
-						state: input.state,
-						postalCode: input.postalCode,
-						country: input.country ?? 'US',
-						yearBuilt: input.yearBuilt ?? null,
-						squareFeet: input.squareFeet ?? null,
-						lotSquareFeet: input.lotSquareFeet ?? null,
-						bedrooms: input.bedrooms ?? null,
-						bathrooms: input.bathrooms ?? null,
-						isActive: true
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startIndividualPropertyWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					name: input.name,
+					propertyType: input.propertyType,
+					addressLine1: input.addressLine1,
+					addressLine2: input.addressLine2,
+					city: input.city,
+					state: input.state,
+					postalCode: input.postalCode,
+					country: input.country,
+					yearBuilt: input.yearBuilt,
+					squareFeet: input.squareFeet,
+					lotSquareFeet: input.lotSquareFeet,
+					bedrooms: input.bedrooms,
+					bathrooms: input.bathrooms,
+					portfolioId: input.portfolioId,
+					externalHoa: input.externalHoa
+				},
+				input.idempotencyKey
+			);
 
-				// Add to portfolio if specified
-				if (input.portfolioId) {
-					await tx.portfolioProperty.create({
-						data: {
-							portfolioId: input.portfolioId,
-							propertyId: property.id,
-							addedBy: context.user.id
-						}
-					});
-				}
-
-				// Create external HOA context if provided
-				let externalHoa = null;
-				if (input.externalHoa && input.externalHoa.hoaName) {
-					externalHoa = await tx.externalHOAContext.create({
-						data: {
-							organizationId: context.organization.id,
-							propertyId: property.id,
-							hoaName: input.externalHoa.hoaName,
-							hoaContactName: input.externalHoa.hoaContactName ?? null,
-							hoaContactEmail: input.externalHoa.hoaContactEmail ?? null,
-							hoaContactPhone: input.externalHoa.hoaContactPhone ?? null,
-							hoaAddress: input.externalHoa.hoaAddress ?? null,
-							notes: input.externalHoa.notes ?? null
-						}
-					});
-				}
-
-				return { property, externalHoa };
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create property' });
+			}
 
 			return successResponse(
 				{
-					property: {
-						id: result.property.id,
-						ownerOrgId: result.property.ownerOrgId,
-						name: result.property.name,
-						propertyType: result.property.propertyType,
-						addressLine1: result.property.addressLine1,
-						addressLine2: result.property.addressLine2,
-						city: result.property.city,
-						state: result.property.state,
-						postalCode: result.property.postalCode,
-						country: result.property.country,
-						yearBuilt: result.property.yearBuilt,
-						squareFeet: result.property.squareFeet,
-						lotSquareFeet: result.property.lotSquareFeet,
-						bedrooms: result.property.bedrooms,
-						bathrooms: result.property.bathrooms,
-						isActive: result.property.isActive,
-						linkedUnitId: result.property.linkedUnitId,
-						createdAt: result.property.createdAt.toISOString(),
-						updatedAt: result.property.updatedAt.toISOString()
-					},
-					externalHoa: result.externalHoa
-						? {
-							id: result.externalHoa.id,
-							hoaName: result.externalHoa.hoaName,
-							hoaContactName: result.externalHoa.hoaContactName,
-							hoaContactEmail: result.externalHoa.hoaContactEmail,
-							hoaContactPhone: result.externalHoa.hoaContactPhone,
-							hoaAddress: result.externalHoa.hoaAddress,
-							notes: result.externalHoa.notes
-						}
-						: null
+					property: workflowResult.property!,
+					externalHoa: workflowResult.externalHoa ?? null
 				},
 				context
 			);
@@ -357,6 +303,8 @@ export const individualPropertyRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'individual_property', 'list');
+
 			// Build where clause
 			const where: any = {
 				ownerOrgId: context.organization.id,
@@ -482,39 +430,37 @@ export const individualPropertyRouter = {
 
 			const { propertyId, idempotencyKey, ...updateData } = input;
 
-			// Filter out undefined values
-			const filteredData = Object.fromEntries(
-				Object.entries(updateData).filter(([_, v]) => v !== undefined)
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startIndividualPropertyWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId,
+					name: updateData.name,
+					propertyType: updateData.propertyType,
+					addressLine1: updateData.addressLine1,
+					addressLine2: updateData.addressLine2,
+					city: updateData.city,
+					state: updateData.state,
+					postalCode: updateData.postalCode,
+					yearBuilt: updateData.yearBuilt,
+					squareFeet: updateData.squareFeet,
+					lotSquareFeet: updateData.lotSquareFeet,
+					bedrooms: updateData.bedrooms,
+					bathrooms: updateData.bathrooms,
+					isActive: updateData.isActive
+				},
+				idempotencyKey
 			);
 
-			const property = await prisma.individualProperty.update({
-				where: { id: propertyId },
-				data: filteredData
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update property' });
+			}
 
 			return successResponse(
 				{
-					property: {
-						id: property.id,
-						ownerOrgId: property.ownerOrgId,
-						name: property.name,
-						propertyType: property.propertyType,
-						addressLine1: property.addressLine1,
-						addressLine2: property.addressLine2,
-						city: property.city,
-						state: property.state,
-						postalCode: property.postalCode,
-						country: property.country,
-						yearBuilt: property.yearBuilt,
-						squareFeet: property.squareFeet,
-						lotSquareFeet: property.lotSquareFeet,
-						bedrooms: property.bedrooms,
-						bathrooms: property.bathrooms,
-						isActive: property.isActive,
-						linkedUnitId: property.linkedUnitId,
-						createdAt: property.createdAt.toISOString(),
-						updatedAt: property.updatedAt.toISOString()
-					}
+					property: workflowResult.property!
 				},
 				context
 			);
@@ -574,10 +520,20 @@ export const individualPropertyRouter = {
 				});
 			}
 
-			await prisma.individualProperty.update({
-				where: { id: input.propertyId },
-				data: { isActive: false }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startIndividualPropertyWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId: input.propertyId
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete property' });
+			}
 
 			return successResponse({ deleted: true }, context);
 		}),
@@ -606,6 +562,8 @@ export const individualPropertyRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'individual_property', input.propertyId);
+
 			// Verify property belongs to org
 			const property = await prisma.individualProperty.findFirst({
 				where: {
@@ -644,13 +602,21 @@ export const individualPropertyRouter = {
 				return successResponse({ added: false }, context);
 			}
 
-			await prisma.portfolioProperty.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startIndividualPropertyWorkflow(
+				{
+					action: 'ADD_TO_PORTFOLIO',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyId: input.propertyId,
-					portfolioId: input.portfolioId,
-					addedBy: context.user.id
-				}
-			});
+					portfolioId: input.portfolioId
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to add property to portfolio' });
+			}
 
 			return successResponse({ added: true }, context);
 		}),
@@ -678,6 +644,8 @@ export const individualPropertyRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('edit', 'individual_property', input.propertyId);
+
 			const membership = await prisma.portfolioProperty.findFirst({
 				where: {
 					propertyId: input.propertyId,
@@ -693,10 +661,22 @@ export const individualPropertyRouter = {
 				return successResponse({ removed: false }, context);
 			}
 
-			await prisma.portfolioProperty.update({
-				where: { id: membership.id },
-				data: { removedAt: new Date() }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startIndividualPropertyWorkflow(
+				{
+					action: 'REMOVE_FROM_PORTFOLIO',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId: input.propertyId,
+					portfolioId: input.portfolioId,
+					portfolioPropertyId: membership.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to remove property from portfolio' });
+			}
 
 			return successResponse({ removed: true }, context);
 		}),
@@ -750,48 +730,31 @@ export const individualPropertyRouter = {
 				where: { propertyId: input.propertyId }
 			});
 
-			let externalHoa;
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startIndividualPropertyWorkflow(
+				{
+					action: 'UPDATE_EXTERNAL_HOA',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId: input.propertyId,
+					externalHoaContextId: existing?.id,
+					hoaName: input.hoaName,
+					hoaContactName: input.hoaContactName,
+					hoaContactEmail: input.hoaContactEmail,
+					hoaContactPhone: input.hoaContactPhone,
+					hoaAddress: input.hoaAddress,
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
 
-			if (existing) {
-				// Update existing
-				externalHoa = await prisma.externalHOAContext.update({
-					where: { id: existing.id },
-					data: {
-						hoaName: input.hoaName,
-						hoaContactName: input.hoaContactName ?? null,
-						hoaContactEmail: input.hoaContactEmail ?? null,
-						hoaContactPhone: input.hoaContactPhone ?? null,
-						hoaAddress: input.hoaAddress ?? null,
-						notes: input.notes ?? null
-					}
-				});
-			} else {
-				// Create new
-				externalHoa = await prisma.externalHOAContext.create({
-					data: {
-						organizationId: context.organization.id,
-						propertyId: input.propertyId,
-						hoaName: input.hoaName,
-						hoaContactName: input.hoaContactName ?? null,
-						hoaContactEmail: input.hoaContactEmail ?? null,
-						hoaContactPhone: input.hoaContactPhone ?? null,
-						hoaAddress: input.hoaAddress ?? null,
-						notes: input.notes ?? null
-					}
-				});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update external HOA' });
 			}
 
 			return successResponse(
 				{
-					externalHoa: {
-						id: externalHoa.id,
-						hoaName: externalHoa.hoaName,
-						hoaContactName: externalHoa.hoaContactName,
-						hoaContactEmail: externalHoa.hoaContactEmail,
-						hoaContactPhone: externalHoa.hoaContactPhone,
-						hoaAddress: externalHoa.hoaAddress,
-						notes: externalHoa.notes
-					}
+					externalHoa: workflowResult.externalHoa ?? null
 				},
 				context
 			);

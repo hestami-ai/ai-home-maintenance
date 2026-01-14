@@ -329,6 +329,7 @@ export const offlineSyncRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await assertContractorOrg(context.organization!.id, errors);
+			await context.cerbos.authorize('sync', 'offline_sync_queue', input.queueItemId);
 
 			const existing = await prisma.offlineSyncQueue.findFirst({
 				where: { id: input.queueItemId, organizationId: context.organization!.id }

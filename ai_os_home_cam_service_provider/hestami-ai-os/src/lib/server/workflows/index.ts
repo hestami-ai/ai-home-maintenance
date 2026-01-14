@@ -2,7 +2,116 @@
  * DBOS Workflow Registry
  *
  * All workflows are registered here and exported for use in API routes.
+ * 
+ * IMPORTANT: Each workflow module calls DBOS.registerWorkflow() at module load time.
+ * The re-exports below ensure all modules are loaded when this index is imported.
+ * This must happen BEFORE DBOS.launch() is called.
  */
+
+// Force side-effect imports to ensure all workflow modules are evaluated
+// This prevents the bundler from lazy-loading workflow registrations
+import './workOrderLifecycle.js';
+import './workOrderLineItemWorkflow.js';
+import './violationLifecycle.js';
+import './violationCreateWorkflow.js';
+import './arcReviewLifecycle.js';
+import './assessmentPosting.js';
+import './meetingLifecycle.js';
+import './jobLifecycle.js';
+import './jobCreateWorkflow.js';
+import './estimateGeneration.js';
+import './estimateCreateWorkflow.js';
+import './dispatchAssignment.js';
+import './slaWorkflow.js';
+import './invoicePayment.js';
+import './invoiceCreateWorkflow.js';
+import './maintenanceContract.js';
+import './complianceWorkflow.js';
+import './inventoryWorkflow.js';
+import './technicianWorkflow.js';
+import './customerWorkflow.js';
+import './pricebookWorkflow.js';
+import './dispatchWorkflow.js';
+import './contractWorkflow.js';
+import './visitWorkflow.js';
+import './scheduleWorkflow.js';
+import './billingWorkflow.js';
+import './jobWorkflow.js';
+import './estimateWorkflow.js';
+import './purchaseOrderWorkflow.js';
+import './stockWorkflow.js';
+import './transferWorkflow.js';
+import './inventoryItemWorkflow.js';
+import './inventoryLocationWorkflow.js';
+import './supplierWorkflow.js';
+import './usageWorkflow.js';
+import './violationFineWorkflow.js';
+import './timeEntryWorkflow.js';
+import './checklistWorkflow.js';
+import './mediaWorkflow.js';
+import './offlineSyncWorkflow.js';
+import './signatureWorkflow.js';
+import './appealWorkflow.js';
+import './dashboardWorkflow.js';
+import './reportScheduleWorkflow.js';
+import './reportDefinitionWorkflow.js';
+import './reportExecutionWorkflow.js';
+import './arcRequestWorkflow.js';
+import './arcReviewWorkflow.js';
+import './contractSLAWorkflow.js';
+import './contractorComplianceWorkflow.js';
+import './serviceAreaWorkflow.js';
+import './noticeTemplateWorkflow.js';
+import './contractorBranchWorkflow.js';
+import './workOrderConfigWorkflow.js';
+import './contractorProfileWorkflow.js';
+import './governanceWorkflow.js';
+import './reserveWorkflow.js';
+import './violationWorkflow.js';
+import './caseLifecycleWorkflow.js';
+import './externalApprovalWorkflow.js';
+import './conciergeActionWorkflow.js';
+import './resolutionCloseoutWorkflow.js';
+import './communicationWorkflow.js';
+import './documentWorkflow.js';
+import './ownerPortalWorkflow.js';
+import './motionLifecycle.js';
+import './resolutionCloseout.js';
+import './associationWorkflow.js';
+import './notificationWorkflow.js';
+import './documentProcessingRetryWorkflow.js';
+import './apInvoiceWorkflow.js';
+import './assessmentWorkflow.js';
+import './bankAccountWorkflow.js';
+import './glAccountWorkflow.js';
+import './journalEntryWorkflow.js';
+import './paymentWorkflow.js';
+import './vendorWorkflow.js';
+import './workOrderMutationWorkflow.js';
+import './delegatedAuthorityWorkflow.js';
+import './externalHoaWorkflow.js';
+import './externalVendorWorkflow.js';
+import './individualPropertyWorkflow.js';
+import './materialDecisionWorkflow.js';
+import './ownerIntentWorkflow.js';
+import './ownershipWorkflow.js';
+import './propertyPortfolioWorkflow.js';
+import './partyWorkflow.js';
+import './staffWorkflow.js';
+import './unitWorkflow.js';
+import './documentCleanupWorkflow.js';
+import './portfolioWorkflow.js';
+import './propertyOwnershipWorkflow.js';
+import './crossDomainIntegrationWorkflow.js';
+import './bidWorkflow.js';
+import './assetWorkflow.js';
+import './organizationWorkflow.js';
+import './vendorBidWorkflow.js';
+import './vendorCandidateWorkflow.js';
+import './propertyWorkflow.js';
+import './caseCommunicationWorkflow.js';
+import './caseReviewWorkflow.js';
+import './systemSettingsWorkflow.js';
 
 // Work Order Lifecycle (Phase 4)
 export {
@@ -641,7 +750,12 @@ export {
 export {
 	createManagedAssociation_v1_wf,
 	type CreateManagedAssociationInput,
-	type CreateManagedAssociationResult
+	type CreateManagedAssociationResult,
+	associationManagement_v1,
+	startAssociationManagementWorkflow,
+	AssociationManagementAction,
+	type AssociationManagementInput,
+	type AssociationManagementResult
 } from './associationWorkflow.js';
 
 // Notification Workflow (Phase 24)
@@ -659,6 +773,251 @@ export {
 	type DocumentRetryWorkflowInput,
 	type DocumentRetryWorkflowResult
 } from './documentProcessingRetryWorkflow.js';
+
+// AP Invoice Workflow (Phase 13)
+export {
+	apInvoiceWorkflow_v1,
+	startAPInvoiceWorkflow,
+	APInvoiceAction,
+	type APInvoiceWorkflowInput,
+	type APInvoiceWorkflowResult,
+	type APInvoiceLineInput
+} from './apInvoiceWorkflow.js';
+
+// Assessment Workflow (Phase 13)
+export {
+	assessmentWorkflow_v1,
+	startAssessmentWorkflow,
+	AssessmentWorkflowAction,
+	type AssessmentWorkflowInput,
+	type AssessmentWorkflowResult
+} from './assessmentWorkflow.js';
+
+// Bank Account Workflow (Phase 13)
+export {
+	bankAccountWorkflow_v1,
+	startBankAccountWorkflow,
+	BankAccountWorkflowAction,
+	type BankAccountWorkflowInput,
+	type BankAccountWorkflowResult
+} from './bankAccountWorkflow.js';
+
+// GL Account Workflow (Phase 13)
+export {
+	glAccountWorkflow_v1,
+	startGLAccountWorkflow,
+	GLAccountWorkflowAction,
+	type GLAccountWorkflowInput,
+	type GLAccountWorkflowResult
+} from './glAccountWorkflow.js';
+
+// Journal Entry Workflow (Phase 13)
+export {
+	journalEntryWorkflow_v1,
+	startJournalEntryWorkflow,
+	JournalEntryWorkflowAction,
+	type JournalEntryWorkflowInput,
+	type JournalEntryWorkflowResult,
+	type JournalEntryLineInput
+} from './journalEntryWorkflow.js';
+
+// Payment Workflow (Phase 13)
+export {
+	paymentWorkflow_v1,
+	startPaymentWorkflow,
+	PaymentWorkflowAction,
+	type PaymentWorkflowInput,
+	type PaymentWorkflowResult
+} from './paymentWorkflow.js';
+
+// Vendor Workflow (Phase 13)
+export {
+	vendorWorkflow_v1,
+	startVendorWorkflow,
+	VendorWorkflowAction,
+	type VendorWorkflowInput,
+	type VendorWorkflowResult
+} from './vendorWorkflow.js';
+
+// Work Order Mutation Workflow (Phase 13)
+export {
+	workOrderMutationWorkflow_v1,
+	startWorkOrderMutationWorkflow,
+	WorkOrderMutationAction,
+	type WorkOrderMutationInput,
+	type WorkOrderMutationResult
+} from './workOrderMutationWorkflow.js';
+
+// Delegated Authority Workflow (Phase 3 Concierge)
+export {
+	delegatedAuthorityWorkflow_v1,
+	startDelegatedAuthorityWorkflow,
+	DelegatedAuthorityWorkflowAction,
+	type DelegatedAuthorityWorkflowInput,
+	type DelegatedAuthorityWorkflowResult
+} from './delegatedAuthorityWorkflow.js';
+
+// External HOA Workflow (Phase 3.7 Concierge)
+export {
+	externalHoaWorkflow_v1,
+	startExternalHoaWorkflow,
+	ExternalHoaWorkflowAction,
+	type ExternalHoaWorkflowInput,
+	type ExternalHoaWorkflowResult
+} from './externalHoaWorkflow.js';
+
+// External Vendor Workflow (Phase 3.8 Concierge)
+export {
+	externalVendorWorkflow_v1,
+	startExternalVendorWorkflow,
+	ExternalVendorWorkflowAction,
+	type ExternalVendorWorkflowInput,
+	type ExternalVendorWorkflowResult
+} from './externalVendorWorkflow.js';
+
+// Individual Property Workflow (Phase 17 Concierge)
+export {
+	individualPropertyWorkflow_v1,
+	startIndividualPropertyWorkflow,
+	IndividualPropertyWorkflowAction,
+	type IndividualPropertyWorkflowInput,
+	type IndividualPropertyWorkflowResult,
+	type ExternalHoaInput
+} from './individualPropertyWorkflow.js';
+
+// Material Decision Workflow (Phase 3.9 Concierge)
+export {
+	materialDecisionWorkflow_v1,
+	startMaterialDecisionWorkflow,
+	MaterialDecisionWorkflowAction,
+	type MaterialDecisionWorkflowInput,
+	type MaterialDecisionWorkflowResult
+} from './materialDecisionWorkflow.js';
+
+// Owner Intent Workflow (Phase 3 Concierge)
+export {
+	ownerIntentWorkflow_v1,
+	startOwnerIntentWorkflow,
+	OwnerIntentWorkflowAction,
+	type OwnerIntentWorkflowInput,
+	type OwnerIntentWorkflowResult
+} from './ownerIntentWorkflow.js';
+
+// Property Portfolio Workflow (Phase 17 Concierge)
+export {
+	propertyPortfolioWorkflow_v1,
+	startPropertyPortfolioWorkflow,
+	PropertyPortfolioWorkflowAction,
+	type PropertyPortfolioWorkflowInput,
+	type PropertyPortfolioWorkflowResult
+} from './propertyPortfolioWorkflow.js';
+
+// Portfolio (Phase 3 Concierge)
+export {
+	portfolioWorkflow_v1,
+	startPortfolioWorkflow,
+	PortfolioWorkflowAction,
+	type PortfolioWorkflowInput,
+	type PortfolioWorkflowResult
+} from './portfolioWorkflow.js';
+
+// Property Ownership (Phase 3 Concierge)
+export {
+	propertyOwnershipWorkflow_v1,
+	startPropertyOwnershipWorkflow,
+	PropertyOwnershipWorkflowAction,
+	type PropertyOwnershipWorkflowInput,
+	type PropertyOwnershipWorkflowResult
+} from './propertyOwnershipWorkflow.js';
+
+// Cross-Domain Integration (Phase 1/2 Integration)
+export {
+	crossDomainIntegrationWorkflow_v1,
+	startCrossDomainIntegrationWorkflow,
+	CrossDomainIntegrationWorkflowAction,
+	type CrossDomainIntegrationWorkflowInput,
+	type CrossDomainIntegrationWorkflowResult
+} from './crossDomainIntegrationWorkflow.js';
+
+// Bid Workflow (Work Order Bidding)
+export {
+	bidWorkflow_v1,
+	startBidWorkflow,
+	BidWorkflowAction,
+	type BidWorkflowInput,
+	type BidWorkflowResult
+} from './bidWorkflow.js';
+
+// Asset Workflow (Asset Management)
+export {
+	assetWorkflow_v1,
+	startAssetWorkflow,
+	AssetWorkflowAction,
+	type AssetWorkflowInput,
+	type AssetWorkflowResult
+} from './assetWorkflow.js';
+
+// Organization Workflow
+export {
+	organizationWorkflow_v1,
+	startOrganizationWorkflow,
+	OrganizationWorkflowAction,
+	type OrganizationWorkflowInput,
+	type OrganizationWorkflowResult
+} from './organizationWorkflow.js';
+
+// Vendor Bid Workflow (Concierge)
+export {
+	vendorBidWorkflow_v1,
+	startVendorBidWorkflow,
+	VendorBidWorkflowAction,
+	type VendorBidWorkflowInput,
+	type VendorBidWorkflowResult
+} from './vendorBidWorkflow.js';
+
+// Vendor Candidate Workflow (Concierge)
+export {
+	vendorCandidateWorkflow_v1,
+	startVendorCandidateWorkflow,
+	VendorCandidateWorkflowAction,
+	type VendorCandidateWorkflowInput,
+	type VendorCandidateWorkflowResult
+} from './vendorCandidateWorkflow.js';
+
+// Property Workflow
+export {
+	propertyWorkflow_v1,
+	startPropertyWorkflow,
+	PropertyWorkflowAction,
+	type PropertyWorkflowInput,
+	type PropertyWorkflowResult
+} from './propertyWorkflow.js';
+
+// Case Communication Workflow
+export {
+	caseCommunicationWorkflow_v1,
+	startCaseCommunicationWorkflow,
+	CaseCommunicationAction,
+	type CaseCommunicationWorkflowInput,
+	type CaseCommunicationWorkflowResult
+} from './caseCommunicationWorkflow.js';
+
+// Case Review Workflow
+export {
+	caseReviewWorkflow_v1,
+	startCaseReviewWorkflow,
+	CaseReviewAction,
+	type CaseReviewWorkflowInput,
+	type CaseReviewWorkflowResult
+} from './caseReviewWorkflow.js';
+
+export {
+	systemSettingsWorkflow_v1,
+	startSystemSettingsWorkflow,
+	SystemSettingsAction,
+	type SystemSettingsWorkflowInput,
+	type SystemSettingsWorkflowResult
+} from './systemSettingsWorkflow.js';
 
 // Future workflows:
 // - apPaymentProcessing_v1 (Phase 13)

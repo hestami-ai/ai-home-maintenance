@@ -11,6 +11,7 @@ import { prisma } from '../../../db.js';
 import { PropertyOwnershipRoleSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipRoleSchema.js';
 import { PropertyOwnershipStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipStatusSchema.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startPropertyOwnershipWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('PropertyOwnershipRoute');
 
@@ -112,43 +113,41 @@ export const propertyOwnershipRouter = {
 				}
 			}
 
-			// If setting as primary contact, unset other primaries for this property
-			if (input.isPrimaryContact) {
-				await prisma.propertyOwnership.updateMany({
-					where: { propertyId: input.propertyId, isPrimaryContact: true },
-					data: { isPrimaryContact: false }
-				});
-			}
-
-			const propertyOwnership = await prisma.propertyOwnership.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyOwnershipWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyId: input.propertyId,
 					partyId: input.partyId,
 					role: input.role,
-					status: 'ACTIVE',
 					ownershipPercentage: input.ownershipPercentage,
 					isPrimaryContact: input.isPrimaryContact,
-					effectiveFrom: input.effectiveFrom ?? new Date(),
+					effectiveFrom: input.effectiveFrom,
 					effectiveTo: input.effectiveTo,
 					notes: input.notes
-				}
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create property ownership' });
+			}
 
 			return successResponse(
 				{
 					propertyOwnership: {
-						id: propertyOwnership.id,
-						propertyId: propertyOwnership.propertyId,
-						partyId: propertyOwnership.partyId,
-						role: propertyOwnership.role,
-						status: propertyOwnership.status,
-						ownershipPercentage: propertyOwnership.ownershipPercentage
-							? Number(propertyOwnership.ownershipPercentage)
-							: null,
-						isPrimaryContact: propertyOwnership.isPrimaryContact,
-						effectiveFrom: propertyOwnership.effectiveFrom.toISOString(),
-						effectiveTo: propertyOwnership.effectiveTo?.toISOString() ?? null,
-						createdAt: propertyOwnership.createdAt.toISOString()
+						id: workflowResult.propertyOwnershipId!,
+						propertyId: workflowResult.propertyId!,
+						partyId: workflowResult.partyId!,
+						role: workflowResult.role!,
+						status: workflowResult.status!,
+						ownershipPercentage: workflowResult.ownershipPercentage ?? null,
+						isPrimaryContact: workflowResult.isPrimaryContact!,
+						effectiveFrom: workflowResult.effectiveFrom!,
+						effectiveTo: workflowResult.effectiveTo ?? null,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -496,40 +495,34 @@ export const propertyOwnershipRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'property_ownership', existing.id);
 
-			// If setting as primary contact, unset other primaries for this property
-			if (input.isPrimaryContact === true) {
-				await prisma.propertyOwnership.updateMany({
-					where: {
-						propertyId: existing.propertyId,
-						isPrimaryContact: true,
-						id: { not: input.id }
-					},
-					data: { isPrimaryContact: false }
-				});
-			}
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyOwnershipWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyOwnershipId: input.id,
+					propertyId: existing.propertyId,
+					ownershipPercentage: input.ownershipPercentage,
+					isPrimaryContact: input.isPrimaryContact,
+					effectiveTo: input.effectiveTo,
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
 
-			const propertyOwnership = await prisma.propertyOwnership.update({
-				where: { id: input.id },
-				data: {
-					...(input.ownershipPercentage !== undefined && {
-						ownershipPercentage: input.ownershipPercentage
-					}),
-					...(input.isPrimaryContact !== undefined && { isPrimaryContact: input.isPrimaryContact }),
-					...(input.effectiveTo !== undefined && { effectiveTo: input.effectiveTo }),
-					...(input.notes !== undefined && { notes: input.notes })
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update property ownership' });
+			}
 
 			return successResponse(
 				{
 					propertyOwnership: {
-						id: propertyOwnership.id,
-						ownershipPercentage: propertyOwnership.ownershipPercentage
-							? Number(propertyOwnership.ownershipPercentage)
-							: null,
-						isPrimaryContact: propertyOwnership.isPrimaryContact,
-						effectiveTo: propertyOwnership.effectiveTo?.toISOString() ?? null,
-						updatedAt: propertyOwnership.updatedAt.toISOString()
+						id: workflowResult.propertyOwnershipId!,
+						ownershipPercentage: workflowResult.ownershipPercentage ?? null,
+						isPrimaryContact: workflowResult.isPrimaryContact!,
+						effectiveTo: workflowResult.effectiveTo ?? null,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -576,23 +569,28 @@ export const propertyOwnershipRouter = {
 			// Cerbos authorization - requires admin or concierge role
 			await context.cerbos.authorize('verify', 'property_ownership', existing.id);
 
-			const now = new Date();
-			const propertyOwnership = await prisma.propertyOwnership.update({
-				where: { id: input.id },
-				data: {
-					status: 'ACTIVE',
-					verifiedAt: now,
-					verifiedBy: context.user.id
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyOwnershipWorkflow(
+				{
+					action: 'VERIFY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyOwnershipId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to verify property ownership' });
+			}
 
 			return successResponse(
 				{
 					propertyOwnership: {
-						id: propertyOwnership.id,
-						status: propertyOwnership.status,
-						verifiedAt: propertyOwnership.verifiedAt!.toISOString(),
-						verifiedBy: propertyOwnership.verifiedBy!
+						id: workflowResult.propertyOwnershipId!,
+						status: workflowResult.status!,
+						verifiedAt: workflowResult.verifiedAt!,
+						verifiedBy: workflowResult.verifiedBy!
 					}
 				},
 				context
@@ -657,36 +655,28 @@ export const propertyOwnershipRouter = {
 				}
 			}
 
-			const effectiveTo = input.effectiveTo ?? new Date();
-			const propertyOwnership = await prisma.propertyOwnership.update({
-				where: { id: input.id },
-				data: {
-					status: 'TERMINATED',
-					effectiveTo,
-					isPrimaryContact: false
-				}
-			});
-
-			// Also revoke any delegated authorities from this ownership
-			await prisma.delegatedAuthority.updateMany({
-				where: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyOwnershipWorkflow(
+				{
+					action: 'TERMINATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyOwnershipId: input.id,
-					status: 'ACTIVE'
+					effectiveTo: input.effectiveTo
 				},
-				data: {
-					status: 'REVOKED',
-					revokedAt: new Date(),
-					revokedBy: context.user.id,
-					revokeReason: 'Property ownership terminated'
-				}
-			});
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to terminate property ownership' });
+			}
 
 			return successResponse(
 				{
 					propertyOwnership: {
-						id: propertyOwnership.id,
-						status: propertyOwnership.status,
-						effectiveTo: propertyOwnership.effectiveTo!.toISOString()
+						id: workflowResult.propertyOwnershipId!,
+						status: workflowResult.status!,
+						effectiveTo: workflowResult.effectiveTo!
 					}
 				},
 				context
@@ -747,27 +737,25 @@ export const propertyOwnershipRouter = {
 				}
 			}
 
-			const now = new Date();
-			await prisma.propertyOwnership.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyOwnershipWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyOwnershipId: input.id
+				},
+				input.idempotencyKey
+			);
 
-			// Also soft delete any delegated authorities from this ownership
-			await prisma.delegatedAuthority.updateMany({
-				where: { propertyOwnershipId: input.id },
-				data: {
-					status: 'REVOKED',
-					revokedAt: now,
-					revokedBy: context.user.id,
-					revokeReason: 'Property ownership deleted'
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete property ownership' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: workflowResult.deletedAt!
 				},
 				context
 			);

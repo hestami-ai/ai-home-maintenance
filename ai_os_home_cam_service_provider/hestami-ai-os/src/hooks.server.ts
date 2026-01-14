@@ -57,6 +57,9 @@ const tracer = trace.getTracer('hestami-ai-os');
  * correlating workflow spans with their originating HTTP requests.
  */
 export const handle: Handle = async ({ event, resolve }) => {
+	// Ensure DBOS is fully initialized before processing any requests
+	// This prevents workflow registration after DBOS.launch()
+	await dbosReady;
 	// Generate unique request ID for correlation
 	const requestId = nanoid();
 

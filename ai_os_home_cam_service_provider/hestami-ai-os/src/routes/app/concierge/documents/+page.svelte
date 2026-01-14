@@ -113,7 +113,7 @@
 		isLoading = true;
 		try {
 			const client = createOrgClient(data.organization.id);
-			await client.document.archiveDocument({ id: docId, reason: 'User deleted failed document' });
+			await client.document.archiveDocument({ idempotencyKey: crypto.randomUUID(), id: docId, reason: 'User deleted failed document' });
 			await invalidateAll();
 		} catch (err) {
 			console.error('Failed to delete document:', err);

@@ -51,12 +51,17 @@
 	// Legacy Support: Sync to camStore for children that haven't been refactored yet
 	// TODO: Remove in Phase 5.4 when all children are migrated
 	import { camStore } from '$lib/stores';
+	import { associationStore } from '$lib/stores/association';
 	$effect(() => {
 		if (data.associations) {
 			camStore.setAssociations(data.associations);
+			// Also sync to associationStore so oRPC client sends correct X-Assoc-Id header
+			associationStore.setAssociations(data.associations as any);
 		}
 		if (data.currentAssociation) {
 			camStore.setCurrentAssociation(data.currentAssociation);
+			// Also sync to associationStore so oRPC client sends correct X-Assoc-Id header
+			associationStore.setCurrent(data.currentAssociation as any);
 		}
 		if (data.badgeCounts) {
 			camStore.setBadgeCounts(data.badgeCounts);

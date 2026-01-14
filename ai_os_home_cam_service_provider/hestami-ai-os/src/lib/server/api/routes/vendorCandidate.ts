@@ -14,23 +14,17 @@ import {
 	PaginationOutputSchema,
 	IdempotencyKeySchema
 } from '../router.js';
+import { VendorCandidateStatusSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import { recordIntent, recordExecution } from '../middleware/activityEvent.js';
+import { startVendorCandidateWorkflow } from '../../workflows/index.js';
 import type { VendorCandidateStatus } from '../../../../../generated/prisma/client.js';
 
 // =============================================================================
 // Schemas
 // =============================================================================
 
-const VendorCandidateStatusSchema = z.enum([
-	'IDENTIFIED',
-	'CONTACTED',
-	'RESPONDED',
-	'QUOTED',
-	'SELECTED',
-	'REJECTED',
-	'ARCHIVED'
-]);
+// VendorCandidateStatusSchema now imported from schemas.js
 
 const VendorCandidateOutputSchema = z.object({
 	id: z.string(),
@@ -180,29 +174,41 @@ export const vendorCandidateRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'vendor_candidate', 'new');
 
-			const now = new Date();
-			const vendorCandidate = await prisma.vendorCandidate.create({
-				data: {
+			// Create vendor candidate via workflow
+			const result = await startVendorCandidateWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
-					caseId: input.caseId,
-					vendorName: input.vendorName,
-					vendorContactName: input.vendorContactName,
-					vendorContactEmail: input.vendorContactEmail,
-					vendorContactPhone: input.vendorContactPhone,
-					vendorAddress: input.vendorAddress,
-					vendorWebsite: input.vendorWebsite,
-					serviceCategories: input.serviceCategories ?? [],
-					coverageArea: input.coverageArea,
-					licensesAndCerts: input.licensesAndCerts ?? [],
-					notes: input.notes,
-					status: 'IDENTIFIED',
-					sourceUrl: input.sourceUrl,
-					sourceHtml: input.sourceHtml,
-					sourcePlainText: input.sourcePlainText,
-					extractedAt: input.sourceUrl ? now : null,
-					extractionConfidence: input.extractionConfidence,
-					extractionMetadata: input.extractionMetadata as object | undefined
-				}
+					userId: context.user!.id,
+					data: {
+						caseId: input.caseId,
+						vendorName: input.vendorName,
+						vendorContactName: input.vendorContactName,
+						vendorContactEmail: input.vendorContactEmail,
+						vendorContactPhone: input.vendorContactPhone,
+						vendorAddress: input.vendorAddress,
+						vendorWebsite: input.vendorWebsite,
+						serviceCategories: input.serviceCategories,
+						coverageArea: input.coverageArea,
+						licensesAndCerts: input.licensesAndCerts,
+						notes: input.notes,
+						sourceUrl: input.sourceUrl,
+						sourceHtml: input.sourceHtml,
+						sourcePlainText: input.sourcePlainText,
+						extractionConfidence: input.extractionConfidence,
+						extractionMetadata: input.extractionMetadata as Record<string, unknown> | undefined
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success || !result.vendorCandidateId) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to create vendor candidate' });
+			}
+
+			// Fetch the created vendor candidate
+			const vendorCandidate = await prisma.vendorCandidate.findUnique({
+				where: { id: result.vendorCandidateId }
 			});
 
 			// Record activity event
@@ -283,6 +289,11 @@ export const vendorCandidateRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			NOT_FOUND: { message: 'Case not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve vendor candidates' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'vendor_candidate', 'list');
 
@@ -361,21 +372,37 @@ export const vendorCandidateRouter = {
 
 			await context.cerbos.authorize('update', 'vendor_candidate', existing.id);
 
-			const vendorCandidate = await prisma.vendorCandidate.update({
-				where: { id: input.id },
-				data: {
-					...(input.vendorName !== undefined && { vendorName: input.vendorName }),
-					...(input.vendorContactName !== undefined && { vendorContactName: input.vendorContactName }),
-					...(input.vendorContactEmail !== undefined && { vendorContactEmail: input.vendorContactEmail }),
-					...(input.vendorContactPhone !== undefined && { vendorContactPhone: input.vendorContactPhone }),
-					...(input.vendorAddress !== undefined && { vendorAddress: input.vendorAddress }),
-					...(input.vendorWebsite !== undefined && { vendorWebsite: input.vendorWebsite }),
-					...(input.serviceCategories !== undefined && { serviceCategories: input.serviceCategories }),
-					...(input.coverageArea !== undefined && { coverageArea: input.coverageArea }),
-					...(input.licensesAndCerts !== undefined && { licensesAndCerts: input.licensesAndCerts }),
-					...(input.notes !== undefined && { notes: input.notes }),
-					...(input.riskFlags !== undefined && { riskFlags: input.riskFlags })
-				}
+			// Update vendor candidate via workflow
+			const result = await startVendorCandidateWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					vendorCandidateId: input.id,
+					data: {
+						vendorName: input.vendorName,
+						vendorContactName: input.vendorContactName,
+						vendorContactEmail: input.vendorContactEmail,
+						vendorContactPhone: input.vendorContactPhone,
+						vendorAddress: input.vendorAddress,
+						vendorWebsite: input.vendorWebsite,
+						serviceCategories: input.serviceCategories,
+						coverageArea: input.coverageArea,
+						licensesAndCerts: input.licensesAndCerts,
+						notes: input.notes,
+						riskFlags: input.riskFlags
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update vendor candidate' });
+			}
+
+			// Fetch updated vendor candidate
+			const vendorCandidate = await prisma.vendorCandidate.findUnique({
+				where: { id: input.id }
 			});
 
 			await recordExecution(context, {
@@ -441,12 +468,27 @@ export const vendorCandidateRouter = {
 
 			await context.cerbos.authorize('update_status', 'vendor_candidate', existing.id);
 
-			const vendorCandidate = await prisma.vendorCandidate.update({
-				where: { id: input.id },
-				data: {
-					status: input.status as VendorCandidateStatus,
-					statusChangedAt: new Date()
-				}
+			// Update status via workflow
+			const result = await startVendorCandidateWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					vendorCandidateId: input.id,
+					data: {
+						status: input.status
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to update vendor candidate status' });
+			}
+
+			// Fetch updated vendor candidate
+			const vendorCandidate = await prisma.vendorCandidate.findUnique({
+				where: { id: input.id }
 			});
 
 			await recordExecution(context, {
@@ -501,10 +543,21 @@ export const vendorCandidateRouter = {
 
 			await context.cerbos.authorize('delete', 'vendor_candidate', existing.id);
 
-			await prisma.vendorCandidate.update({
-				where: { id: input.id },
-				data: { deletedAt: new Date() }
-			});
+			// Delete vendor candidate via workflow
+			const result = await startVendorCandidateWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					vendorCandidateId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to delete vendor candidate' });
+			}
 
 			await recordExecution(context, {
 				entityType: 'VENDOR_CANDIDATE',

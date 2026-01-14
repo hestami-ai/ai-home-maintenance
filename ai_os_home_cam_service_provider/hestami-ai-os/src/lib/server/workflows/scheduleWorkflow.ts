@@ -319,11 +319,10 @@ export const scheduleWorkflow_v1 = DBOS.registerWorkflow(scheduleWorkflow);
 
 export async function startScheduleWorkflow(
 	input: ScheduleWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<ScheduleWorkflowResult> {
 	const handle = await DBOS.startWorkflow(scheduleWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

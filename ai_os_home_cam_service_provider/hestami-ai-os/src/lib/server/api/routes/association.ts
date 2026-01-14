@@ -10,8 +10,9 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { createManagedAssociation_v1_wf } from '../../workflows/associationWorkflow.js';
+import { createManagedAssociation_v1_wf, startAssociationManagementWorkflow } from '../../workflows/associationWorkflow.js';
 import { COATemplateId } from '../../accounting/defaultChartOfAccounts.js';
+import { AssociationStatusSchema } from '../schemas.js';
 
 const log = createModuleLogger('AssociationRoute');
 
@@ -81,7 +82,7 @@ export const associationRouter = {
 				},
 				coaTemplateId: input.coaTemplateId,
 				contractData: input.contractData
-			});
+			}, { workflowID: idempotencyKey });
 
 			const result = await handle.getResult();
 
@@ -180,7 +181,7 @@ export const associationRouter = {
 	list: orgProcedure
 		.input(
 			PaginationInputSchema.extend({
-				status: z.enum(['ACTIVE', 'ONBOARDING', 'SUSPENDED', 'TERMINATED']).optional()
+				status: AssociationStatusSchema.optional()
 			})
 		)
 		.output(
@@ -200,6 +201,10 @@ export const associationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve associations' }
+		})
 		.handler(async ({ input, context }) => {
 			// Cerbos query plan - get filter for what associations user can view
 			const queryPlan = await context.cerbos.queryFilter('view', 'association');
@@ -261,11 +266,12 @@ export const associationRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				name: z.string().min(1).max(255).optional(),
 				legalName: z.string().max(255).optional(),
 				taxId: z.string().max(50).optional(),
-				status: z.enum(['ACTIVE', 'ONBOARDING', 'SUSPENDED', 'TERMINATED']).optional(),
+				status: AssociationStatusSchema.optional(),
 				fiscalYearEnd: z.number().int().min(1).max(12).optional(),
 				settings: z.record(z.string(), z.unknown()).optional()
 			})
@@ -299,13 +305,30 @@ export const associationRouter = {
 			// Cerbos authorization - check if user can edit this association
 			await context.cerbos.authorize('edit', 'association', existing.id);
 
-			const { id, settings, ...updateData } = input;
-			const association = await prisma.association.update({
-				where: { id },
-				data: {
-					...updateData,
-					...(settings !== undefined && { settings: settings as Prisma.InputJsonValue })
-				}
+			const { id, idempotencyKey, settings, ...updateData } = input;
+
+			// Update association via workflow
+			const result = await startAssociationManagementWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					associationId: id,
+					data: {
+						...updateData,
+						settings: settings as Prisma.InputJsonValue | undefined
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update association' });
+			}
+
+			// Fetch updated association
+			const association = await prisma.association.findUnique({
+				where: { id }
 			});
 
 			return successResponse(
@@ -322,12 +345,84 @@ export const associationRouter = {
 		}),
 
 	/**
+	 * Set the user's default association for this organization
+	 * This is a user preference, not a security-sensitive operation
+	 */
+	setDefault: orgProcedure
+		.input(
+			z.object({
+				idempotencyKey: z.string().uuid(),
+				associationId: z.string()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					associationId: z.string(),
+					associationName: z.string()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Association not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'association', input.associationId);
+
+			// Verify the association exists and belongs to this organization
+			const association = await prisma.association.findFirst({
+				where: {
+					id: input.associationId,
+					organizationId: context.organization.id,
+					deletedAt: null
+				}
+			});
+
+			if (!association) {
+				throw errors.NOT_FOUND({ message: 'Association not found' });
+			}
+
+			// Set default association via workflow
+			const result = await startAssociationManagementWorkflow(
+				{
+					action: 'SET_DEFAULT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					associationId: input.associationId
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to set default association' });
+			}
+
+			log.info('User set default association', {
+				userId: context.user.id,
+				organizationId: context.organization.id,
+				associationId: input.associationId,
+				associationName: association.name
+			});
+
+			return successResponse(
+				{
+					associationId: association.id,
+					associationName: association.name
+				},
+				context
+			);
+		}),
+
+	/**
 	 * Soft delete an association
 	 */
 	delete: orgProcedure
 		.input(
 			z.object({
-				id: z.string()
+                idempotencyKey: z.string().uuid(),
+                id: z.string()
 			})
 		)
 		.output(
@@ -355,16 +450,25 @@ export const associationRouter = {
 			// Cerbos authorization - check if user can delete this association
 			await context.cerbos.authorize('delete', 'association', existing.id);
 
-			const now = new Date();
-			await prisma.association.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
-			});
+			// Delete association via workflow
+			const result = await startAssociationManagementWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					associationId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to delete association' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: new Date().toISOString()
 				},
 				context
 			);

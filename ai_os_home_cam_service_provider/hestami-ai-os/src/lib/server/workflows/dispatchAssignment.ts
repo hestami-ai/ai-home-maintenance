@@ -309,7 +309,7 @@ export async function startDispatchAssignment(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `dispatch-${input.jobId}-${Date.now()}`;
-	await DBOS.startWorkflow(dispatchAssignment_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(dispatchAssignment_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

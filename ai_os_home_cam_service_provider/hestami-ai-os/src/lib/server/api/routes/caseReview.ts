@@ -14,6 +14,7 @@ import {
 import { prisma } from '../../db.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
+import { startCaseReviewWorkflow } from '../../workflows/caseReviewWorkflow.js';
 
 const log = createModuleLogger('CaseReviewRoute');
 
@@ -105,7 +106,8 @@ export const caseReviewRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'ConciergeCase not found' },
-			BAD_REQUEST: { message: 'A review already exists for this case' }
+			BAD_REQUEST: { message: 'A review already exists for this case' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Verify case exists and belongs to organization
@@ -132,26 +134,38 @@ export const caseReviewRouter = {
 
 			await context.cerbos.authorize('create', 'case_review', 'new');
 
-			const review = await prisma.caseReview.create({
-				data: {
+			// Create review via workflow
+			const result = await startCaseReviewWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					caseId: input.caseId,
-					outcomeSummary: input.outcomeSummary,
-					vendorPerformanceNotes: input.vendorPerformanceNotes,
-					issuesEncountered: input.issuesEncountered,
-					lessonsLearned: input.lessonsLearned,
-					vendorRating: input.vendorRating,
-					communicationRating: input.communicationRating,
-					timelinessRating: input.timelinessRating,
-					overallSatisfaction: input.overallSatisfaction,
-					reusableVendor: input.reusableVendor ?? false,
-					reusableScope: input.reusableScope ?? false,
-					reusableProcess: input.reusableProcess ?? false,
-					reviewedByUserId: context.user.id,
-					reviewedAt: new Date()
+					data: {
+						outcomeSummary: input.outcomeSummary,
+						vendorPerformanceNotes: input.vendorPerformanceNotes,
+						issuesEncountered: input.issuesEncountered,
+						lessonsLearned: input.lessonsLearned,
+						vendorRating: input.vendorRating,
+						communicationRating: input.communicationRating,
+						timelinessRating: input.timelinessRating,
+						overallSatisfaction: input.overallSatisfaction,
+						reusableVendor: input.reusableVendor,
+						reusableScope: input.reusableScope,
+						reusableProcess: input.reusableProcess
+					}
 				},
-				include: {
-					reviewedBy: true
-				}
+				input.idempotencyKey
+			);
+
+			if (!result.success || !result.reviewId) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create review' });
+			}
+
+			// Fetch created review with relations
+			const review = await prisma.caseReview.findUnique({
+				where: { id: result.reviewId },
+				include: { reviewedBy: true }
 			});
 
 			await recordExecution(context, {
@@ -161,14 +175,14 @@ export const caseReviewRouter = {
 				summary: `Case review completed with overall satisfaction: ${input.overallSatisfaction || 'N/A'}/5`,
 				caseId: input.caseId,
 				newState: {
-					reviewId: review.id,
+					reviewId: review!.id,
 					overallSatisfaction: input.overallSatisfaction,
 					reusableVendor: input.reusableVendor,
 					reusableScope: input.reusableScope
 				}
 			});
 
-			return successResponse({ review: serializeCaseReview(review) }, context);
+			return successResponse({ review: serializeCaseReview(review!) }, context);
 		}),
 
 	/**
@@ -244,7 +258,8 @@ export const caseReviewRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'CaseReview not found' }
+			NOT_FOUND: { message: 'CaseReview not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.caseReview.findUnique({
@@ -258,24 +273,38 @@ export const caseReviewRouter = {
 
 			await context.cerbos.authorize('update', 'case_review', existing.id);
 
-			const review = await prisma.caseReview.update({
-				where: { caseId: input.caseId },
-				data: {
-					...(input.outcomeSummary !== undefined && { outcomeSummary: input.outcomeSummary }),
-					...(input.vendorPerformanceNotes !== undefined && { vendorPerformanceNotes: input.vendorPerformanceNotes }),
-					...(input.issuesEncountered !== undefined && { issuesEncountered: input.issuesEncountered }),
-					...(input.lessonsLearned !== undefined && { lessonsLearned: input.lessonsLearned }),
-					...(input.vendorRating !== undefined && { vendorRating: input.vendorRating }),
-					...(input.communicationRating !== undefined && { communicationRating: input.communicationRating }),
-					...(input.timelinessRating !== undefined && { timelinessRating: input.timelinessRating }),
-					...(input.overallSatisfaction !== undefined && { overallSatisfaction: input.overallSatisfaction }),
-					...(input.reusableVendor !== undefined && { reusableVendor: input.reusableVendor }),
-					...(input.reusableScope !== undefined && { reusableScope: input.reusableScope }),
-					...(input.reusableProcess !== undefined && { reusableProcess: input.reusableProcess })
+			// Update review via workflow
+			const result = await startCaseReviewWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					caseId: input.caseId,
+					data: {
+						outcomeSummary: input.outcomeSummary,
+						vendorPerformanceNotes: input.vendorPerformanceNotes,
+						issuesEncountered: input.issuesEncountered,
+						lessonsLearned: input.lessonsLearned,
+						vendorRating: input.vendorRating,
+						communicationRating: input.communicationRating,
+						timelinessRating: input.timelinessRating,
+						overallSatisfaction: input.overallSatisfaction,
+						reusableVendor: input.reusableVendor,
+						reusableScope: input.reusableScope,
+						reusableProcess: input.reusableProcess
+					}
 				},
-				include: {
-					reviewedBy: true
-				}
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update review' });
+			}
+
+			// Fetch updated review with relations
+			const review = await prisma.caseReview.findUnique({
+				where: { caseId: input.caseId },
+				include: { reviewedBy: true }
 			});
 
 			await recordExecution(context, {
@@ -286,6 +315,6 @@ export const caseReviewRouter = {
 				caseId: input.caseId
 			});
 
-			return successResponse({ review: serializeCaseReview(review) }, context);
+			return successResponse({ review: serializeCaseReview(review!) }, context);
 		})
 };

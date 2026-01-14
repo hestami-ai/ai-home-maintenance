@@ -8,8 +8,8 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startPortfolioWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('PortfolioRoute');
 
@@ -50,23 +50,31 @@ export const portfolioRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'property_portfolio', 'new');
 
-			const portfolio = await prisma.propertyPortfolio.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPortfolioWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user.id,
 					name: input.name,
 					description: input.description,
-					settings: (input.settings ?? {}) as Prisma.InputJsonValue
-				}
-			});
+					settings: input.settings
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create portfolio' });
+			}
 
 			return successResponse(
 				{
 					portfolio: {
-						id: portfolio.id,
-						name: portfolio.name,
-						description: portfolio.description,
-						isActive: portfolio.isActive,
-						createdAt: portfolio.createdAt.toISOString()
+						id: workflowResult.portfolioId!,
+						name: workflowResult.name!,
+						description: workflowResult.description ?? null,
+						isActive: workflowResult.isActive!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -261,24 +269,33 @@ export const portfolioRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'property_portfolio', existing.id);
 
-			const portfolio = await prisma.propertyPortfolio.update({
-				where: { id: input.id },
-				data: {
-					...(input.name !== undefined && { name: input.name }),
-					...(input.description !== undefined && { description: input.description }),
-					...(input.settings !== undefined && { settings: input.settings as Prisma.InputJsonValue }),
-					...(input.isActive !== undefined && { isActive: input.isActive })
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPortfolioWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					portfolioId: input.id,
+					name: input.name,
+					description: input.description,
+					settings: input.settings,
+					isActive: input.isActive
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update portfolio' });
+			}
 
 			return successResponse(
 				{
 					portfolio: {
-						id: portfolio.id,
-						name: portfolio.name,
-						description: portfolio.description,
-						isActive: portfolio.isActive,
-						updatedAt: portfolio.updatedAt.toISOString()
+						id: workflowResult.portfolioId!,
+						name: workflowResult.name!,
+						description: workflowResult.description ?? null,
+						isActive: workflowResult.isActive!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -324,16 +341,25 @@ export const portfolioRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'property_portfolio', existing.id);
 
-			const now = new Date();
-			await prisma.propertyPortfolio.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPortfolioWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					portfolioId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete portfolio' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: workflowResult.deletedAt!
 				},
 				context
 			);
@@ -401,7 +427,7 @@ export const portfolioRouter = {
 			await context.cerbos.authorize('edit', 'property_portfolio', portfolio.id);
 
 			// Check if already in portfolio
-			const existing = await prisma.portfolioProperty.findFirst({
+			const existingPortfolioProperty = await prisma.portfolioProperty.findFirst({
 				where: {
 					portfolioId: input.portfolioId,
 					propertyId: input.propertyId,
@@ -409,28 +435,36 @@ export const portfolioRouter = {
 				}
 			});
 
-			if (existing) {
+			if (existingPortfolioProperty) {
 				throw errors.CONFLICT({ message: 'Property is already in this portfolio' });
 			}
 
-			const portfolioProperty = await prisma.portfolioProperty.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPortfolioWorkflow(
+				{
+					action: 'ADD_PROPERTY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					portfolioId: input.portfolioId,
 					propertyId: input.propertyId,
 					displayOrder: input.displayOrder,
-					notes: input.notes,
-					addedBy: context.user.id
-				}
-			});
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to add property to portfolio' });
+			}
 
 			return successResponse(
 				{
 					portfolioProperty: {
-						id: portfolioProperty.id,
-						portfolioId: portfolioProperty.portfolioId,
-						propertyId: portfolioProperty.propertyId,
-						displayOrder: portfolioProperty.displayOrder,
-						addedAt: portfolioProperty.addedAt.toISOString()
+						id: workflowResult.portfolioPropertyId!,
+						portfolioId: workflowResult.portfolioId!,
+						propertyId: workflowResult.propertyId as string,
+						displayOrder: workflowResult.displayOrder ?? null,
+						addedAt: workflowResult.addedAt!
 					}
 				},
 				context
@@ -478,7 +512,7 @@ export const portfolioRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'property_portfolio', portfolio.id);
 
-			const existing = await prisma.portfolioProperty.findFirst({
+			const existingPortfolioProperty = await prisma.portfolioProperty.findFirst({
 				where: {
 					portfolioId: input.portfolioId,
 					propertyId: input.propertyId,
@@ -486,20 +520,29 @@ export const portfolioRouter = {
 				}
 			});
 
-			if (!existing) {
+			if (!existingPortfolioProperty) {
 				throw errors.NOT_FOUND({ message: 'PortfolioProperty not found' });
 			}
 
-			const now = new Date();
-			await prisma.portfolioProperty.update({
-				where: { id: existing.id },
-				data: { removedAt: now }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPortfolioWorkflow(
+				{
+					action: 'REMOVE_PROPERTY',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					portfolioPropertyId: existingPortfolioProperty.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to remove property from portfolio' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					removedAt: now.toISOString()
+					removedAt: workflowResult.removedAt!
 				},
 				context
 			);

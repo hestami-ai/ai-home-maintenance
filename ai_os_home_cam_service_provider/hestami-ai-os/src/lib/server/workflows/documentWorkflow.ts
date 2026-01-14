@@ -33,10 +33,15 @@ export const DocumentAction = {
 	CREATE_DOCUMENT: 'CREATE_DOCUMENT',
 	CREATE_DOCUMENT_METADATA: 'CREATE_DOCUMENT_METADATA',
 	UPDATE_DOCUMENT: 'UPDATE_DOCUMENT',
+	UPDATE_EXTRACTED_METADATA: 'UPDATE_EXTRACTED_METADATA',
 	CREATE_VERSION: 'CREATE_VERSION',
 	RESTORE_VERSION: 'RESTORE_VERSION',
 	CHANGE_CATEGORY: 'CHANGE_CATEGORY',
 	ADD_CONTEXT_BINDING: 'ADD_CONTEXT_BINDING',
+	REMOVE_CONTEXT_BINDING: 'REMOVE_CONTEXT_BINDING',
+	ARCHIVE_DOCUMENT: 'ARCHIVE_DOCUMENT',
+	RESTORE_DOCUMENT: 'RESTORE_DOCUMENT',
+	LOG_DOWNLOAD: 'LOG_DOWNLOAD',
 	HANDLE_TUS_HOOK: 'HANDLE_TUS_HOOK'
 } as const;
 
@@ -66,6 +71,17 @@ export interface DocumentWorkflowInput {
 		fileUrl?: string;
 		checksum?: string;
 		targetVersionId?: string;
+		// Extracted metadata fields
+		pageCount?: number;
+		thumbnailUrl?: string;
+		extractedText?: string;
+		metadata?: Record<string, unknown>;
+		// Archive fields
+		archiveReason?: string;
+		// Download log fields
+		partyId?: string;
+		ipAddress?: string;
+		userAgent?: string;
 		// TUS Hook Data
 		tusPayload?: any;
 	};
@@ -400,6 +416,104 @@ async function addContextBinding(
 	return binding.id;
 }
 
+async function removeContextBinding(
+	documentId: string,
+	contextType: DocumentContextType,
+	contextId: string
+): Promise<string> {
+	await prisma.documentContextBinding.deleteMany({
+		where: {
+			documentId,
+			contextType,
+			contextId
+		}
+	});
+
+	console.log(`[DocumentWorkflow] REMOVE_CONTEXT_BINDING document:${documentId} context:${contextType}/${contextId}`);
+	return documentId;
+}
+
+async function updateExtractedMetadata(
+	documentId: string,
+	data: {
+		pageCount?: number;
+		thumbnailUrl?: string;
+		extractedText?: string;
+		metadata?: Record<string, unknown>;
+	}
+): Promise<string> {
+	await prisma.document.update({
+		where: { id: documentId },
+		data: {
+			...(data.pageCount && { pageCount: data.pageCount }),
+			...(data.thumbnailUrl && { thumbnailUrl: data.thumbnailUrl }),
+			...(data.extractedText && { extractedText: data.extractedText }),
+			...(data.metadata && { metadata: data.metadata as any })
+		}
+	});
+
+	console.log(`[DocumentWorkflow] UPDATE_EXTRACTED_METADATA document:${documentId}`);
+	return documentId;
+}
+
+async function archiveDocument(
+	documentId: string,
+	userId: string,
+	reason?: string
+): Promise<{ id: string; archivedAt: string }> {
+	const now = new Date();
+	await prisma.document.update({
+		where: { id: documentId },
+		data: {
+			status: 'ARCHIVED',
+			archivedAt: now,
+			archivedBy: userId,
+			archiveReason: reason
+		}
+	});
+
+	console.log(`[DocumentWorkflow] ARCHIVE_DOCUMENT document:${documentId} by user ${userId}`);
+	return { id: documentId, archivedAt: now.toISOString() };
+}
+
+async function restoreDocument(documentId: string): Promise<string> {
+	await prisma.document.update({
+		where: { id: documentId },
+		data: {
+			status: 'ACTIVE',
+			archivedAt: null,
+			archivedBy: null,
+			archiveReason: null
+		}
+	});
+
+	console.log(`[DocumentWorkflow] RESTORE_DOCUMENT document:${documentId}`);
+	return documentId;
+}
+
+async function logDownload(
+	documentId: string,
+	userId: string,
+	data: {
+		partyId?: string;
+		ipAddress?: string;
+		userAgent?: string;
+	}
+): Promise<string> {
+	const log = await prisma.documentDownloadLog.create({
+		data: {
+			documentId,
+			partyId: data.partyId,
+			userId,
+			ipAddress: data.ipAddress,
+			userAgent: data.userAgent
+		}
+	});
+
+	console.log(`[DocumentWorkflow] LOG_DOWNLOAD document:${documentId} log:${log.id}`);
+	return log.id;
+}
+
 // ---- Phase 18: File Ingestion & Processing Steps ----
 
 export async function updateDocumentStatus(
@@ -665,6 +779,56 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
+			case 'REMOVE_CONTEXT_BINDING':
+				log.debug('Executing REMOVE_CONTEXT_BINDING step', { documentId: input.documentId, contextType: input.data.contextType });
+				entityId = await DBOS.runStep(
+					() => removeContextBinding(input.documentId!, input.data.contextType!, input.data.contextId!),
+					{ name: 'removeContextBinding' }
+				);
+				break;
+
+			case 'UPDATE_EXTRACTED_METADATA':
+				log.debug('Executing UPDATE_EXTRACTED_METADATA step', { documentId: input.documentId });
+				entityId = await DBOS.runStep(
+					() => updateExtractedMetadata(input.documentId!, {
+						pageCount: input.data.pageCount,
+						thumbnailUrl: input.data.thumbnailUrl,
+						extractedText: input.data.extractedText,
+						metadata: input.data.metadata
+					}),
+					{ name: 'updateExtractedMetadata' }
+				);
+				break;
+
+			case 'ARCHIVE_DOCUMENT':
+				log.debug('Executing ARCHIVE_DOCUMENT step', { documentId: input.documentId });
+				const archiveResult = await DBOS.runStep(
+					() => archiveDocument(input.documentId!, input.userId, input.data.archiveReason),
+					{ name: 'archiveDocument' }
+				);
+				entityId = archiveResult.id;
+				break;
+
+			case 'RESTORE_DOCUMENT':
+				log.debug('Executing RESTORE_DOCUMENT step', { documentId: input.documentId });
+				entityId = await DBOS.runStep(
+					() => restoreDocument(input.documentId!),
+					{ name: 'restoreDocument' }
+				);
+				break;
+
+			case 'LOG_DOWNLOAD':
+				log.debug('Executing LOG_DOWNLOAD step', { documentId: input.documentId });
+				entityId = await DBOS.runStep(
+					() => logDownload(input.documentId!, input.userId, {
+						partyId: input.data.partyId,
+						ipAddress: input.data.ipAddress,
+						userAgent: input.data.userAgent
+					}),
+					{ name: 'logDownload' }
+				);
+				break;
+
 			case 'HANDLE_TUS_HOOK':
 				const tusPayload = input.data.tusPayload;
 				if (!tusPayload) throw new Error('Missing TUS payload');
@@ -856,7 +1020,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 						if (!doc) return;
 
 						const handle = await DBOS.startWorkflow(notificationWorkflow_v1, {
-							workflowID: `notify-${docIdFromMeta}-${isClean ? 'success' : 'infected'}`
+							workflowID: idempotencyKey
 						})({
 							action: NotificationAction.SEND_NOTIFICATION,
 							organizationId: actualOrgId,
@@ -930,7 +1094,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 							if (!doc) return;
 
 							const handle = await DBOS.startWorkflow(notificationWorkflow_v1, {
-								workflowID: `notify-${docIdFromMeta}-failed-${Date.now()}`
+								workflowID: idempotencyKey
 							})({
 								action: NotificationAction.SEND_NOTIFICATION,
 								organizationId: actualOrgId,
@@ -981,9 +1145,8 @@ export const documentWorkflow_v1 = DBOS.registerWorkflow(documentWorkflow);
 
 export async function startDocumentWorkflow(
 	input: DocumentWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<DocumentWorkflowResult> {
-	const workflowId = idempotencyKey || `document-${input.action}-${input.documentId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(documentWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(documentWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

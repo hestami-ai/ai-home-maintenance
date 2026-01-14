@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
+import { ReportFormatSchema, ScheduleFrequencySchema, ReportDeliveryMethodSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startReportScheduleWorkflow } from '../../../workflows/reportScheduleWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ReportScheduleRoute');
 
-const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
-const scheduleFrequencyEnum = z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY', 'CUSTOM']);
-const deliveryMethodEnum = z.enum(['EMAIL', 'PORTAL', 'BOTH']);
+const reportFormatEnum = ReportFormatSchema;
+const scheduleFrequencyEnum = ScheduleFrequencySchema;
+const deliveryMethodEnum = ReportDeliveryMethodSchema;
 
 const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({

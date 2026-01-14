@@ -284,9 +284,9 @@ export const mediaWorkflow_v1 = DBOS.registerWorkflow(mediaWorkflow);
 
 export async function startMediaWorkflow(
 	input: MediaWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<MediaWorkflowResult> {
 	const workflowId = idempotencyKey || `media-${input.action}-${input.mediaId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(mediaWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(mediaWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

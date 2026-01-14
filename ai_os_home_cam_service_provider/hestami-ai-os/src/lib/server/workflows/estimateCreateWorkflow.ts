@@ -210,11 +210,10 @@ export const estimateCreateWorkflow_v1 = DBOS.registerWorkflow(estimateCreateWor
 
 export async function startEstimateCreateWorkflow(
 	input: EstimateCreateInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<EstimateCreateResult> {
 	const handle = await DBOS.startWorkflow(estimateCreateWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

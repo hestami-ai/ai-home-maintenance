@@ -262,9 +262,9 @@ export const reportScheduleWorkflow_v1 = DBOS.registerWorkflow(reportScheduleWor
 
 export async function startReportScheduleWorkflow(
 	input: ReportScheduleWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ReportScheduleWorkflowResult> {
 	const workflowId = idempotencyKey || `report-schedule-${input.action}-${input.scheduleId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(reportScheduleWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(reportScheduleWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

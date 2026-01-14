@@ -4,10 +4,11 @@ import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../route
 import { prisma } from '../../../db.js';
 import { startARCReviewWorkflow } from '../../../workflows/arcReviewWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
+import { ARCReviewActionSchema } from '../../schemas.js';
 
 const log = createModuleLogger('ARCReviewRoute');
 
-const arcReviewActionEnum = z.enum(['APPROVE', 'DENY', 'REQUEST_CHANGES', 'TABLE']);
+const arcReviewActionEnum = ARCReviewActionSchema;
 
 export const arcReviewRouter = {
 	// Committee membership management
@@ -128,6 +129,8 @@ export const arcReviewRouter = {
 			NOT_FOUND: { message: 'ARC Committee not found' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'arc_request', input.committeeId);
+
 			const committee = await prisma.aRCCommittee.findFirst({
 				where: { id: input.committeeId },
 				include: { association: true }

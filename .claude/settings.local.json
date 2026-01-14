@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run verify:json:*)",
+      "Bash(bun run:*)",
+      "Bash(grep:*)",
+      "Bash(docker exec:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(bunx prisma generate:*)",
+      "Bash(npm run haos-guard:*)",
+      "Bash(bun:*)"
+    ]
+  }
+}

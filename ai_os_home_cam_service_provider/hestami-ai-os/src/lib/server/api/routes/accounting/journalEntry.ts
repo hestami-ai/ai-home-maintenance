@@ -4,6 +4,8 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { JournalEntryStatusSchema } from '../../schemas.js';
+import { startJournalEntryWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('JournalEntryRoute');
 
@@ -26,6 +28,7 @@ export const journalEntryRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				entryDate: z.string().datetime(),
 				description: z.string().min(1).max(500),
 				memo: z.string().max(1000).optional(),
@@ -107,40 +110,38 @@ export const journalEntryRouter = {
 				? `JE-${String(parseInt(lastEntry.entryNumber.split('-')[1] || '0') + 1).padStart(6, '0')}`
 				: 'JE-000001';
 
-			const journalEntry = await prisma.journalEntry.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startJournalEntryWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					entryNumber,
-					entryDate: new Date(input.entryDate),
+					entryDate: input.entryDate,
 					description: input.description,
 					memo: input.memo,
-					createdBy: context.user!.id,
-					status: 'DRAFT',
-					lines: {
-						create: input.lines.map((line, index) => ({
-							accountId: line.accountId,
-							debitAmount: line.debitAmount,
-							creditAmount: line.creditAmount,
-							description: line.description,
-							referenceType: line.referenceType,
-							referenceId: line.referenceId,
-							lineNumber: index + 1
-						}))
-					}
+					lines: input.lines,
+					totalDebits,
+					totalCredits
 				},
-				include: { lines: true }
-			});
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create journal entry' });
+			}
 
 			return successResponse(
 				{
 					journalEntry: {
-						id: journalEntry.id,
-						entryNumber: journalEntry.entryNumber,
-						entryDate: journalEntry.entryDate.toISOString(),
-						description: journalEntry.description,
-						status: journalEntry.status,
-						totalDebits: totalDebits.toFixed(2),
-						totalCredits: totalCredits.toFixed(2)
+						id: workflowResult.entryId!,
+						entryNumber: workflowResult.entryNumber!,
+						entryDate: workflowResult.entryDate!,
+						description: workflowResult.description!,
+						status: workflowResult.status!,
+						totalDebits: workflowResult.totalDebits!,
+						totalCredits: workflowResult.totalCredits!
 					}
 				},
 				context
@@ -153,7 +154,7 @@ export const journalEntryRouter = {
 	list: orgProcedure
 		.input(
 			z.object({
-				status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'POSTED', 'REVERSED']).optional(),
+				status: JournalEntryStatusSchema.optional(),
 				fromDate: z.string().datetime().optional(),
 				toDate: z.string().datetime().optional()
 			}).optional()
@@ -316,7 +317,7 @@ export const journalEntryRouter = {
 	 * Post a journal entry (finalize it)
 	 */
 	post: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -359,46 +360,27 @@ export const journalEntryRouter = {
 				throw errors.CONFLICT({ message: `Cannot post entry with status: ${entry.status}` });
 			}
 
-			// Update GL account balances
-			await prisma.$transaction(async (tx) => {
-				for (const line of entry.lines) {
-					const account = await tx.gLAccount.findUnique({
-						where: { id: line.accountId }
-					});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startJournalEntryWorkflow(
+				{
+					action: 'POST',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					entryId: input.id
+				},
+				input.idempotencyKey
+			);
 
-					if (account) {
-						const debit = Number(line.debitAmount || 0);
-						const credit = Number(line.creditAmount || 0);
-						// For normal debit accounts: debits increase, credits decrease
-						// For normal credit accounts: credits increase, debits decrease
-						const change = account.normalDebit ? debit - credit : credit - debit;
-
-						await tx.gLAccount.update({
-							where: { id: line.accountId },
-							data: {
-								currentBalance: { increment: change }
-							}
-						});
-					}
-				}
-
-				await tx.journalEntry.update({
-					where: { id: input.id },
-					data: {
-						status: 'POSTED',
-						postedAt: new Date(),
-						approvedBy: context.user!.id,
-						approvedAt: new Date()
-					}
-				});
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to post journal entry' });
+			}
 
 			return successResponse(
 				{
 					journalEntry: {
 						id: entry.id,
-						status: 'POSTED',
-						postedAt: new Date().toISOString()
+						status: workflowResult.status!,
+						postedAt: workflowResult.postedAt!
 					}
 				},
 				context
@@ -411,6 +393,7 @@ export const journalEntryRouter = {
 	reverse: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				reversalDate: z.string().datetime()
 			})
@@ -464,71 +447,41 @@ export const journalEntryRouter = {
 
 			const entryNumber = `JE-${String(parseInt(lastEntry!.entryNumber.split('-')[1] || '0') + 1).padStart(6, '0')}`;
 
-			// Create reversal entry with swapped debits/credits
-			const reversalEntry = await prisma.$transaction(async (tx) => {
-				const reversal = await tx.journalEntry.create({
-					data: {
-						associationId: association.id,
-						entryNumber,
-						entryDate: new Date(input.reversalDate),
-						description: `Reversal of ${entry.entryNumber}: ${entry.description}`,
-						createdBy: context.user!.id,
-						status: 'POSTED',
-						isReversal: true,
-						reversedEntryId: entry.id,
-						postedAt: new Date(),
-						approvedBy: context.user!.id,
-						approvedAt: new Date(),
-						lines: {
-							create: entry.lines.map((line, index) => ({
-								accountId: line.accountId,
-								// Swap debits and credits
-								debitAmount: line.creditAmount,
-								creditAmount: line.debitAmount,
-								description: `Reversal: ${line.description || ''}`,
-								referenceType: line.referenceType,
-								referenceId: line.referenceId,
-								lineNumber: index + 1
-							}))
-						}
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startJournalEntryWorkflow(
+				{
+					action: 'REVERSE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					entryNumber,
+					reversalDate: input.reversalDate,
+					originalEntry: {
+						id: entry.id,
+						entryNumber: entry.entryNumber,
+						description: entry.description,
+						lines: entry.lines.map((line) => ({
+							accountId: line.accountId,
+							debitAmount: line.debitAmount ? Number(line.debitAmount) : null,
+							creditAmount: line.creditAmount ? Number(line.creditAmount) : null,
+							description: line.description,
+							referenceType: line.referenceType,
+							referenceId: line.referenceId
+						}))
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update original entry status
-				await tx.journalEntry.update({
-					where: { id: entry.id },
-					data: { status: 'REVERSED' }
-				});
-
-				// Update GL balances (reverse the original posting)
-				for (const line of entry.lines) {
-					const account = await tx.gLAccount.findUnique({
-						where: { id: line.accountId }
-					});
-
-					if (account) {
-						const debit = Number(line.debitAmount || 0);
-						const credit = Number(line.creditAmount || 0);
-						// Reverse: subtract what was added
-						const change = account.normalDebit ? credit - debit : debit - credit;
-
-						await tx.gLAccount.update({
-							where: { id: line.accountId },
-							data: {
-								currentBalance: { increment: change }
-							}
-						});
-					}
-				}
-
-				return reversal;
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to reverse journal entry' });
+			}
 
 			return successResponse(
 				{
 					reversalEntry: {
-						id: reversalEntry.id,
-						entryNumber: reversalEntry.entryNumber
+						id: workflowResult.entryId!,
+						entryNumber: workflowResult.entryNumber!
 					}
 				},
 				context

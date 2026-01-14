@@ -7,12 +7,13 @@ import {
 	PaginationInputSchema,
 	PaginationOutputSchema
 } from '../../router.js';
+import { ResolutionStatusSchema, PolicyStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type { ResolutionStatus, PolicyStatus } from '../../../../../../generated/prisma/client.js';
 
-const resolutionStatusEnum = z.enum(['PROPOSED', 'ADOPTED', 'SUPERSEDED', 'ARCHIVED']);
-const policyStatusEnum = z.enum(['DRAFT', 'ACTIVE', 'RETIRED']);
+const resolutionStatusEnum = ResolutionStatusSchema;
+const policyStatusEnum = PolicyStatusSchema;
 
 const ensureAssociation = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
@@ -141,7 +142,13 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_resolution', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },
@@ -346,7 +353,13 @@ export const governanceResolutionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_policy', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },

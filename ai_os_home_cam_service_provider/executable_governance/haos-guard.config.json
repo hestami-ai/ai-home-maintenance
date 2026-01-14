@@ -1,0 +1,53 @@
+{
+    "projectRoot": "../hestami-ai-os",
+    "rules": {
+        "R5": {
+            "name": "SSR Boundary and Database Isolation",
+            "description": "Enforce that Prisma and server-only modules are not leaked to the client bundle.",
+            "boundaries": [
+                {
+                    "path": "src/routes/**/*.svelte",
+                    "forbiddenImports": [
+                        "@prisma/client",
+                        "generated/prisma/*",
+                        "**/*.server.ts",
+                        "src/lib/server/**/*"
+                    ],
+                    "allowedImportsFromMassiveFiles": [
+                        "$lib/api/cam.ts"
+                    ],
+                    "reason": "Direct Prisma or server-only imports in Svelte components cause memory issues and security leaks."
+                },
+                {
+                    "path": "src/lib/stores/**/*.ts",
+                    "forbiddenImports": [
+                        "@prisma/client",
+                        "generated/prisma/*"
+                    ],
+                    "reason": "Client-side stores must use extracted API types, not Prisma."
+                }
+            ]
+        },
+        "R4": {
+            "name": "Type Extraction Pattern",
+            "description": "Ensure API types are extracted and not imported directly from massive generated files in client code.",
+            "boundaries": [
+                {
+                    "path": "src/routes/**/*.svelte",
+                    "forbiddenImports": [
+                        "src/lib/api/types.generated.ts"
+                    ],
+                    "reason": "Directly importing types.generated.ts in .svelte files causes memory crashes."
+                }
+            ]
+        }
+    },
+    "paths": {
+        "prismaSchema": "prisma/schema.prisma",
+        "zodGenerated": "generated/zod",
+        "openApiSpec": "openapi.json",
+        "generatedTypes": "src/lib/api/types.generated.ts",
+        "apiBarrel": "src/lib/server/api/schemas.ts",
+        "workflowBarrel": "src/lib/server/workflows/schemas.ts"
+    }
+}

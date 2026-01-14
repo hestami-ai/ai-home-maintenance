@@ -1,0 +1,45 @@
+# Communication Announcement Resource Policy
+# Controls access to announcements posted to association members.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "communication_announcement"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to announcements
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit announcements
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view and create announcements
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view announcements
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view announcements
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

@@ -305,7 +305,7 @@ export async function startInvoicePayment(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `invoice-payment-${input.invoiceId}-${Date.now()}`;
-	await DBOS.startWorkflow(invoicePayment_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(invoicePayment_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

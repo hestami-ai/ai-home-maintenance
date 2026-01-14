@@ -9,7 +9,19 @@ export async function initDBOS(): Promise<void> {
 	// IMPORTANT: Import all workflows BEFORE calling DBOS.launch()
 	// This ensures all DBOS.registerWorkflow() calls happen before launch
 	// Workflows use DBOS.registerWorkflow() at module load time
-	await import('./workflows/index.js');
+	// We must access the exports to prevent tree-shaking/code-splitting
+	const workflows = await import('./workflows/index.js');
+	// Force evaluation of all workflow registrations by accessing each _v1 export
+	// This prevents the bundler from lazy-loading workflow modules
+	const workflowKeys = Object.keys(workflows).filter(k => k.endsWith('_v1'));
+	for (const key of workflowKeys) {
+		// Access each workflow to force module evaluation
+		const wf = (workflows as Record<string, unknown>)[key];
+		if (typeof wf !== 'function') {
+			console.warn(`[DBOS] Workflow ${key} is not a function:`, typeof wf);
+		}
+	}
+	console.log(`[DBOS] Loaded ${workflowKeys.length} workflow versions`);
 
 	// Configure DBOS
 	// NOTE: We disable DBOS's built-in OTLP because the preload script (telemetry.cjs)

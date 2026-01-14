@@ -4,6 +4,7 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startVendorWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('VendorRoute');
 
@@ -17,6 +18,7 @@ export const vendorRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				name: z.string().min(1).max(255),
 				dba: z.string().max(255).optional(),
 				contactName: z.string().max(255).optional(),
@@ -73,9 +75,12 @@ export const vendorRouter = {
 				}
 			}
 
-			const vendor = await prisma.vendor.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startVendorWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					name: input.name,
 					dba: input.dba,
@@ -92,16 +97,21 @@ export const vendorRouter = {
 					is1099Eligible: input.is1099Eligible,
 					paymentTerms: input.paymentTerms,
 					defaultGLAccountId: input.defaultGLAccountId
-				}
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create vendor' });
+			}
 
 			return successResponse(
 				{
 					vendor: {
-						id: vendor.id,
-						name: vendor.name,
-						email: vendor.email,
-						isActive: vendor.isActive
+						id: workflowResult.vendorId!,
+						name: workflowResult.name!,
+						email: workflowResult.email ?? null,
+						isActive: workflowResult.isActive!
 					}
 				},
 				context
@@ -272,6 +282,7 @@ export const vendorRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				name: z.string().min(1).max(255).optional(),
 				dba: z.string().max(255).nullable().optional(),
@@ -325,19 +336,42 @@ export const vendorRouter = {
 				throw errors.NOT_FOUND({ message: 'Vendor not found' });
 			}
 
-			const { id, ...updateData } = input;
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startVendorWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					vendorId: input.id,
+					name: input.name,
+					dba: input.dba,
+					contactName: input.contactName,
+					email: input.email,
+					phone: input.phone,
+					addressLine1: input.addressLine1,
+					addressLine2: input.addressLine2,
+					city: input.city,
+					state: input.state,
+					postalCode: input.postalCode,
+					w9OnFile: input.w9OnFile,
+					is1099Eligible: input.is1099Eligible,
+					paymentTerms: input.paymentTerms,
+					isActive: input.isActive
+				},
+				input.idempotencyKey
+			);
 
-			const vendor = await prisma.vendor.update({
-				where: { id },
-				data: updateData
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update vendor' });
+			}
 
 			return successResponse(
 				{
 					vendor: {
-						id: vendor.id,
-						name: vendor.name,
-						isActive: vendor.isActive
+						id: workflowResult.vendorId!,
+						name: workflowResult.name!,
+						isActive: workflowResult.isActive!
 					}
 				},
 				context
@@ -348,7 +382,7 @@ export const vendorRouter = {
 	 * Soft delete vendor
 	 */
 	delete: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -392,10 +426,21 @@ export const vendorRouter = {
 				throw errors.CONFLICT({ message: 'Cannot delete vendor with unpaid invoices' });
 			}
 
-			await prisma.vendor.update({
-				where: { id: input.id },
-				data: { deletedAt: new Date() }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startVendorWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					vendorId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete vendor' });
+			}
 
 			return successResponse({ success: true }, context);
 		})

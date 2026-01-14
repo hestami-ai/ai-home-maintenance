@@ -267,9 +267,9 @@ export const checklistWorkflow_v1 = DBOS.registerWorkflow(checklistWorkflow);
 
 export async function startChecklistWorkflow(
 	input: ChecklistWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ChecklistWorkflowResult> {
 	const workflowId = idempotencyKey || `checklist-${input.action}-${input.checklistId || input.stepId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(checklistWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(checklistWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

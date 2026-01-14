@@ -5,6 +5,8 @@ import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
+import { AccountTypeSchema, AccountCategorySchema, FundTypeSchema } from '../../schemas.js';
+import { startGLAccountWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('GLAccountRoute');
 
@@ -18,18 +20,13 @@ export const glAccountRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				accountNumber: z.string().min(1).max(20),
 				name: z.string().min(1).max(255),
 				description: z.string().max(500).optional(),
-				accountType: z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']),
-				category: z.enum([
-					'CASH', 'ACCOUNTS_RECEIVABLE', 'PREPAID', 'FIXED_ASSET', 'OTHER_ASSET',
-					'ACCOUNTS_PAYABLE', 'ACCRUED_LIABILITY', 'DEFERRED_REVENUE', 'LONG_TERM_LIABILITY', 'OTHER_LIABILITY',
-					'RETAINED_EARNINGS', 'FUND_BALANCE', 'RESERVE_FUND',
-					'ASSESSMENT_INCOME', 'LATE_FEE_INCOME', 'INTEREST_INCOME', 'OTHER_INCOME',
-					'ADMINISTRATIVE', 'UTILITIES', 'MAINTENANCE', 'INSURANCE', 'PROFESSIONAL_FEES', 'RESERVE_CONTRIBUTION', 'OTHER_EXPENSE'
-				]),
-				fundType: z.enum(['OPERATING', 'RESERVE', 'SPECIAL']).default('OPERATING'),
+				accountType: AccountTypeSchema,
+				category: AccountCategorySchema,
+				fundType: FundTypeSchema.default('OPERATING'),
 				parentId: z.string().optional(),
 				isActive: z.boolean().default(true)
 			})
@@ -93,12 +90,12 @@ export const glAccountRouter = {
 				}
 			}
 
-			// Determine normal balance based on account type
-			const normalDebit = ['ASSET', 'EXPENSE'].includes(input.accountType);
-
-			const account = await prisma.gLAccount.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startGLAccountWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					accountNumber: input.accountNumber,
 					name: input.name,
@@ -107,21 +104,25 @@ export const glAccountRouter = {
 					category: input.category,
 					fundType: input.fundType,
 					parentId: input.parentId,
-					isActive: input.isActive,
-					normalDebit
-				}
-			});
+					isActive: input.isActive
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create GL account' });
+			}
 
 			return successResponse(
 				{
 					account: {
-						id: account.id,
-						accountNumber: account.accountNumber,
-						name: account.name,
-						accountType: account.accountType,
-						category: account.category,
-						fundType: account.fundType,
-						isActive: account.isActive
+						id: workflowResult.accountId!,
+						accountNumber: workflowResult.accountNumber!,
+						name: workflowResult.name!,
+						accountType: workflowResult.accountType!,
+						category: workflowResult.category!,
+						fundType: workflowResult.fundType!,
+						isActive: workflowResult.isActive!
 					}
 				},
 				context
@@ -134,8 +135,8 @@ export const glAccountRouter = {
 	list: orgProcedure
 		.input(
 			z.object({
-				accountType: z.enum(['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE']).optional(),
-				fundType: z.enum(['OPERATING', 'RESERVE', 'SPECIAL']).optional(),
+				accountType: AccountTypeSchema.optional(),
+				fundType: FundTypeSchema.optional(),
 				isActive: z.boolean().optional(),
 				parentId: z.string().nullable().optional()
 			}).optional()
@@ -301,6 +302,7 @@ export const glAccountRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				name: z.string().min(1).max(255).optional(),
 				description: z.string().max(500).optional(),
@@ -363,23 +365,32 @@ export const glAccountRouter = {
 				}
 			}
 
-			const account = await prisma.gLAccount.update({
-				where: { id: input.id },
-				data: {
-					...(input.name && { name: input.name }),
-					...(input.description !== undefined && { description: input.description }),
-					...(input.isActive !== undefined && { isActive: input.isActive }),
-					...(input.parentId !== undefined && { parentId: input.parentId })
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startGLAccountWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					accountId: input.id,
+					name: input.name,
+					description: input.description,
+					isActive: input.isActive,
+					parentId: input.parentId
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update GL account' });
+			}
 
 			return successResponse(
 				{
 					account: {
-						id: account.id,
-						accountNumber: account.accountNumber,
-						name: account.name,
-						isActive: account.isActive
+						id: workflowResult.accountId!,
+						accountNumber: workflowResult.accountNumber!,
+						name: workflowResult.name!,
+						isActive: workflowResult.isActive!
 					}
 				},
 				context
@@ -390,7 +401,7 @@ export const glAccountRouter = {
 	 * Soft delete a GL account
 	 */
 	delete: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -444,10 +455,20 @@ export const glAccountRouter = {
 				throw errors.CONFLICT({ message: 'Cannot delete account with child accounts' });
 			}
 
-			await prisma.gLAccount.update({
-				where: { id: input.id },
-				data: { deletedAt: new Date() }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startGLAccountWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					accountId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete GL account' });
+			}
 
 			return successResponse({ success: true }, context);
 		}),

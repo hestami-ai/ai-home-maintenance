@@ -4,6 +4,8 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { InvoiceStatusSchema } from '../../schemas.js';
+import { startAPInvoiceWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('APInvoiceRoute');
 
@@ -24,6 +26,7 @@ export const apInvoiceRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				vendorId: z.string(),
 				invoiceNumber: z.string().min(1).max(50),
 				invoiceDate: z.string().datetime(),
@@ -99,46 +102,37 @@ export const apInvoiceRouter = {
 				throw errors.NOT_FOUND({ message: 'One or more GL Accounts not found' });
 			}
 
-			// Calculate totals
-			const subtotal = input.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
-			const totalAmount = subtotal; // No tax for now
-
-			const invoice = await prisma.aPInvoice.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startAPInvoiceWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					vendorId: input.vendorId,
 					invoiceNumber: input.invoiceNumber,
-					invoiceDate: new Date(input.invoiceDate),
-					dueDate: new Date(input.dueDate),
+					invoiceDate: input.invoiceDate,
+					dueDate: input.dueDate,
 					description: input.description,
 					memo: input.memo,
-					subtotal,
-					totalAmount,
-					balanceDue: totalAmount,
-					workOrderId: input.workOrderId,
-					status: 'DRAFT',
-					lineItems: {
-						create: input.lines.map((line, index) => ({
-							description: line.description,
-							quantity: line.quantity,
-							unitPrice: line.unitPrice,
-							amount: line.quantity * line.unitPrice,
-							glAccountId: line.glAccountId,
-							lineNumber: index + 1
-						}))
-					}
+					lines: input.lines,
+					workOrderId: input.workOrderId
 				},
-				include: { vendor: true }
-			});
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create AP invoice' });
+			}
 
 			return successResponse(
 				{
 					invoice: {
-						id: invoice.id,
-						invoiceNumber: invoice.invoiceNumber,
-						vendorName: invoice.vendor.name,
-						totalAmount: invoice.totalAmount.toString(),
-						status: invoice.status
+						id: workflowResult.invoiceId!,
+						invoiceNumber: workflowResult.invoiceNumber!,
+						vendorName: workflowResult.vendorName!,
+						totalAmount: workflowResult.totalAmount!,
+						status: workflowResult.status!
 					}
 				},
 				context
@@ -152,7 +146,7 @@ export const apInvoiceRouter = {
 		.input(
 			z.object({
 				vendorId: z.string().optional(),
-				status: z.enum(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PARTIALLY_PAID', 'PAID', 'VOIDED']).optional(),
+				status: InvoiceStatusSchema.optional(),
 				fromDate: z.string().datetime().optional(),
 				toDate: z.string().datetime().optional()
 			}).optional()
@@ -334,7 +328,7 @@ export const apInvoiceRouter = {
 	 * Approve an invoice
 	 */
 	approve: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -376,23 +370,27 @@ export const apInvoiceRouter = {
 				throw errors.CONFLICT({ message: `Cannot approve invoice with status: ${invoice.status}` });
 			}
 
-			const now = new Date();
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startAPInvoiceWorkflow(
+				{
+					action: 'APPROVE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					invoiceId: input.id
+				},
+				input.idempotencyKey
+			);
 
-			await prisma.aPInvoice.update({
-				where: { id: input.id },
-				data: {
-					status: 'APPROVED',
-					approvedBy: context.user!.id,
-					approvedAt: now
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to approve AP invoice' });
+			}
 
 			return successResponse(
 				{
 					invoice: {
 						id: invoice.id,
-						status: 'APPROVED',
-						approvedAt: now.toISOString()
+						status: workflowResult.status!,
+						approvedAt: workflowResult.approvedAt!
 					}
 				},
 				context
@@ -403,7 +401,7 @@ export const apInvoiceRouter = {
 	 * Void an invoice
 	 */
 	void: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -443,10 +441,20 @@ export const apInvoiceRouter = {
 				throw errors.CONFLICT({ message: 'Invoice already voided' });
 			}
 
-			await prisma.aPInvoice.update({
-				where: { id: input.id },
-				data: { status: 'VOIDED' }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startAPInvoiceWorkflow(
+				{
+					action: 'VOID',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					invoiceId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to void AP invoice' });
+			}
 
 			return successResponse({ success: true }, context);
 		})

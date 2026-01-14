@@ -398,7 +398,7 @@ export async function startViolationTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `viol-transition-${input.violationId}-${Date.now()}`;
-	await DBOS.startWorkflow(violationLifecycle_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(violationLifecycle_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

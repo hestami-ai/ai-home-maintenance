@@ -1,0 +1,52 @@
+# Governance Policy Document Resource Policy
+# Controls access to governance policy documents (CC&Rs, bylaws, rules, etc.)
+# managed through resolutions.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "governance_policy"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to governance policy documents
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit governance policy documents
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view, create, and edit governance policy documents
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view governance policy documents
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Tenants can view governance policy documents
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Auditors can view governance policy documents for compliance
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

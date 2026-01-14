@@ -4,40 +4,17 @@ import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputS
 import { prisma } from '../../db.js';
 import { startComplianceWorkflow } from '../../workflows/complianceWorkflow.js';
 import { createModuleLogger } from '../../logger.js';
+import {
+	ComplianceRequirementTypeSchema,
+	ComplianceStatusSchema,
+	RecurrencePatternSchema
+} from '../schemas.js';
 
 const log = createModuleLogger('ComplianceRoute');
 
-const RequirementTypeEnum = z.enum([
-	'STATUTORY_DEADLINE',
-	'NOTICE_REQUIREMENT',
-	'VOTING_RULE',
-	'FINANCIAL_AUDIT',
-	'RESALE_PACKET',
-	'INSURANCE',
-	'MEETING',
-	'FILING',
-	'RECORD_RETENTION',
-	'OTHER'
-]);
-
-const ComplianceStatusEnum = z.enum([
-	'NOT_STARTED',
-	'IN_PROGRESS',
-	'COMPLETED',
-	'OVERDUE',
-	'WAIVED',
-	'NOT_APPLICABLE'
-]);
-
-const RecurrencePatternEnum = z.enum([
-	'NONE',
-	'DAILY',
-	'WEEKLY',
-	'MONTHLY',
-	'QUARTERLY',
-	'SEMI_ANNUAL',
-	'ANNUAL'
-]);
+const RequirementTypeEnum = ComplianceRequirementTypeSchema;
+const ComplianceStatusEnum = ComplianceStatusSchema;
+const RecurrencePatternEnum = RecurrencePatternSchema;
 
 
 export const complianceRouter = {
@@ -219,6 +196,10 @@ export const complianceRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve compliance requirements' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'complianceRequirement', 'list');
 
@@ -606,6 +587,7 @@ export const complianceRouter = {
 	updateDeadlineStatus: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				status: ComplianceStatusEnum,
 				notes: z.string().optional()
@@ -639,23 +621,38 @@ export const complianceRouter = {
 
 			await context.cerbos.authorize('update', 'complianceDeadline', deadline.id);
 
-			const isCompleting = input.status === 'COMPLETED' && deadline.status !== 'COMPLETED';
+			const { idempotencyKey, ...updateData } = input;
 
-			const updated = await prisma.complianceDeadline.update({
-				where: { id: input.id },
-				data: {
-					status: input.status,
-					...(isCompleting && { completedAt: new Date(), completedBy: context.user.id }),
-					...(input.notes !== undefined && { notes: input.notes })
-				}
+			// Update deadline status via workflow
+			const result = await startComplianceWorkflow(
+				{
+					action: 'UPDATE_DEADLINE_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					deadlineId: input.id,
+					data: {
+						status: updateData.status,
+						notes: updateData.notes
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update deadline status' });
+			}
+
+			// Fetch updated deadline
+			const updated = await prisma.complianceDeadline.findUnique({
+				where: { id: input.id }
 			});
 
 			return successResponse(
 				{
 					deadline: {
-						id: updated.id,
-						status: updated.status,
-						completedAt: updated.completedAt?.toISOString() ?? null
+						id: updated!.id,
+						status: updated!.status,
+						completedAt: updated!.completedAt?.toISOString() ?? null
 					}
 				},
 				context
@@ -665,6 +662,7 @@ export const complianceRouter = {
 	addEvidenceDocument: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				deadlineId: z.string(),
 				documentId: z.string()
 			})
@@ -699,14 +697,24 @@ export const complianceRouter = {
 				throw errors.NOT_FOUND({ message: 'Document' });
 			}
 
-			// Add document ID if not already present
+			// Add document ID via workflow if not already present
 			if (!deadline.evidenceDocumentIds.includes(input.documentId)) {
-				await prisma.complianceDeadline.update({
-					where: { id: input.deadlineId },
-					data: {
-						evidenceDocumentIds: [...deadline.evidenceDocumentIds, input.documentId]
-					}
-				});
+				const result = await startComplianceWorkflow(
+					{
+						action: 'ADD_EVIDENCE_DOCUMENT',
+						organizationId: context.organization.id,
+						userId: context.user.id,
+						deadlineId: input.deadlineId,
+						data: {
+							documentId: input.documentId
+						}
+					},
+					input.idempotencyKey
+				);
+
+				if (!result.success) {
+					throw errors.NOT_FOUND({ message: result.error || 'Failed to add evidence document' });
+				}
 			}
 
 			return successResponse({ success: true }, context);
@@ -719,6 +727,7 @@ export const complianceRouter = {
 	updateChecklistItem: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				isCompleted: z.boolean().optional(),
 				notes: z.string().optional(),
@@ -753,26 +762,39 @@ export const complianceRouter = {
 
 			await context.cerbos.authorize('update', 'complianceDeadline', item.deadline.id);
 
-			const isCompleting = input.isCompleted === true && !item.isCompleted;
-			const isUncompleting = input.isCompleted === false && item.isCompleted;
+			const { idempotencyKey, id, ...updateData } = input;
 
-			const updated = await prisma.complianceChecklistItem.update({
-				where: { id: input.id },
-				data: {
-					...(input.isCompleted !== undefined && { isCompleted: input.isCompleted }),
-					...(isCompleting && { completedAt: new Date(), completedBy: context.user.id }),
-					...(isUncompleting && { completedAt: null, completedBy: null }),
-					...(input.notes !== undefined && { notes: input.notes }),
-					...(input.evidenceDocumentId !== undefined && { evidenceDocumentId: input.evidenceDocumentId })
-				}
+			// Update checklist item via workflow
+			const result = await startComplianceWorkflow(
+				{
+					action: 'UPDATE_CHECKLIST_ITEM',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					checklistItemId: id,
+					data: {
+						isCompleted: updateData.isCompleted,
+						notes: updateData.notes,
+						evidenceDocumentId: updateData.evidenceDocumentId
+					}
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update checklist item' });
+			}
+
+			// Fetch updated item
+			const updated = await prisma.complianceChecklistItem.findUnique({
+				where: { id }
 			});
 
 			return successResponse(
 				{
 					item: {
-						id: updated.id,
-						isCompleted: updated.isCompleted,
-						completedAt: updated.completedAt?.toISOString() ?? null
+						id: updated!.id,
+						isCompleted: updated!.isCompleted,
+						completedAt: updated!.completedAt?.toISOString() ?? null
 					}
 				},
 				context

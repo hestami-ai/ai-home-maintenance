@@ -1,17 +1,15 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
+import { ReportCategorySchema, ReportFormatSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ReportDefinitionRoute');
 
-const reportCategoryEnum = z.enum([
-	'FINANCIAL', 'RECEIVABLES', 'PAYABLES', 'OPERATIONAL', 'COMPLIANCE', 'GOVERNANCE', 'CUSTOM'
-]);
-
-const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
+const reportCategoryEnum = ReportCategorySchema;
+const reportFormatEnum = ReportFormatSchema;
 
 const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({

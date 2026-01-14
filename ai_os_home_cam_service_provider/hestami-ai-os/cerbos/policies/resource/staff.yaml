@@ -16,10 +16,17 @@ resourcePolicy:
     - common_roles
   rules:
     # Platform admins can perform all staff management actions
-    - actions: ["view", "create", "update", "deactivate", "suspend", "reactivate", "assign_role", "revoke_role", "update_pillar_access", "list"]
+    - actions: ["view", "create", "edit", "update", "deactivate", "suspend", "reactivate", "assign_role", "revoke_role", "update_pillar_access", "list"]
       effect: EFFECT_ALLOW
       derivedRoles:
         - hestami_platform_admin
+
+    # Org admins and managers can manage organization staff
+    - actions: ["view", "create", "edit", "list"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+        - org_manager
 
     # All Hestami staff can view staff list and profiles
     - actions: ["view", "list"]

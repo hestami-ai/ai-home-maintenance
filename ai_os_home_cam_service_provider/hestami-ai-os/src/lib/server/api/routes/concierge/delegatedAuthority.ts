@@ -12,6 +12,7 @@ import { DelegatedAuthorityTypeSchema } from '../../../../../../generated/zod/in
 import { DelegatedAuthorityStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/DelegatedAuthorityStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startDelegatedAuthorityWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('DelegatedAuthorityRoute');
 
@@ -107,35 +108,40 @@ export const delegatedAuthorityRouter = {
 				throw errors.CONFLICT({ message: 'Delegated authority already exists for this party and type' });
 			}
 
-			const delegatedAuthority = await prisma.delegatedAuthority.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startDelegatedAuthorityWorkflow(
+				{
+					action: 'GRANT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyOwnershipId: input.propertyOwnershipId,
 					delegatePartyId: input.delegatePartyId,
 					authorityType: input.authorityType,
-					status: 'PENDING_ACCEPTANCE',
 					monetaryLimit: input.monetaryLimit,
 					scopeDescription: input.scopeDescription,
-					scopeRestrictions: input.scopeRestrictions as Prisma.InputJsonValue | undefined,
-					expiresAt: input.expiresAt,
-					grantedBy: context.user.id
-				}
-			});
+					scopeRestrictions: input.scopeRestrictions as Record<string, unknown> | undefined,
+					expiresAt: input.expiresAt
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to grant delegated authority' });
+			}
 
 			return successResponse(
 				{
 					delegatedAuthority: {
-						id: delegatedAuthority.id,
-						propertyOwnershipId: delegatedAuthority.propertyOwnershipId,
-						delegatePartyId: delegatedAuthority.delegatePartyId,
-						authorityType: delegatedAuthority.authorityType,
-						status: delegatedAuthority.status,
-						monetaryLimit: delegatedAuthority.monetaryLimit
-							? Number(delegatedAuthority.monetaryLimit)
-							: null,
-						scopeDescription: delegatedAuthority.scopeDescription,
-						expiresAt: delegatedAuthority.expiresAt?.toISOString() ?? null,
-						grantedAt: delegatedAuthority.grantedAt.toISOString(),
-						grantedBy: delegatedAuthority.grantedBy
+						id: workflowResult.delegatedAuthorityId!,
+						propertyOwnershipId: workflowResult.propertyOwnershipId!,
+						delegatePartyId: workflowResult.delegatePartyId!,
+						authorityType: workflowResult.authorityType!,
+						status: workflowResult.status!,
+						monetaryLimit: workflowResult.monetaryLimit ?? null,
+						scopeDescription: workflowResult.scopeDescription ?? null,
+						expiresAt: workflowResult.expiresAt ?? null,
+						grantedAt: workflowResult.grantedAt!,
+						grantedBy: workflowResult.grantedBy!
 					}
 				},
 				context
@@ -518,21 +524,27 @@ export const delegatedAuthorityRouter = {
 				partyUserId: existing.delegateParty.userId ?? undefined
 			});
 
-			const now = new Date();
-			const delegatedAuthority = await prisma.delegatedAuthority.update({
-				where: { id: input.id },
-				data: {
-					status: 'ACTIVE',
-					acceptedAt: now
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startDelegatedAuthorityWorkflow(
+				{
+					action: 'ACCEPT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					delegatedAuthorityId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to accept delegated authority' });
+			}
 
 			return successResponse(
 				{
 					delegatedAuthority: {
-						id: delegatedAuthority.id,
-						status: delegatedAuthority.status,
-						acceptedAt: delegatedAuthority.acceptedAt!.toISOString()
+						id: workflowResult.delegatedAuthorityId!,
+						status: workflowResult.status!,
+						acceptedAt: workflowResult.acceptedAt!
 					}
 				},
 				context
@@ -590,24 +602,29 @@ export const delegatedAuthorityRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('revoke', 'delegated_authority', existing.id);
 
-			const now = new Date();
-			const delegatedAuthority = await prisma.delegatedAuthority.update({
-				where: { id: input.id },
-				data: {
-					status: 'REVOKED',
-					revokedAt: now,
-					revokedBy: context.user.id,
-					revokeReason: input.reason
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startDelegatedAuthorityWorkflow(
+				{
+					action: 'REVOKE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					delegatedAuthorityId: input.id,
+					reason: input.reason
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to revoke delegated authority' });
+			}
 
 			return successResponse(
 				{
 					delegatedAuthority: {
-						id: delegatedAuthority.id,
-						status: delegatedAuthority.status,
-						revokedAt: delegatedAuthority.revokedAt!.toISOString(),
-						revokedBy: delegatedAuthority.revokedBy!
+						id: workflowResult.delegatedAuthorityId!,
+						status: workflowResult.status!,
+						revokedAt: workflowResult.revokedAt!,
+						revokedBy: workflowResult.revokedBy!
 					}
 				},
 				context

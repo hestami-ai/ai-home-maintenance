@@ -3,9 +3,9 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
-import { postPaymentToGL, reversePaymentGL } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
-import { recordSpanError } from '../../middleware/tracing.js';
+import { PaymentMethodSchema, PaymentStatusSchema } from '../../schemas.js';
+import { startPaymentWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('PaymentRoute');
 
@@ -19,10 +19,11 @@ export const paymentRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				unitId: z.string(),
 				paymentDate: z.string().datetime(),
 				amount: z.number().positive(),
-				paymentMethod: z.enum(['CHECK', 'ACH', 'CREDIT_CARD', 'CASH', 'WIRE', 'OTHER']),
+				paymentMethod: PaymentMethodSchema,
 				referenceNumber: z.string().max(50).optional(),
 				bankAccountId: z.string().optional(),
 				payerName: z.string().max(255).optional(),
@@ -83,113 +84,40 @@ export const paymentRouter = {
 				}
 			}
 
-			// Create payment in transaction
-			const result = await prisma.$transaction(async (tx) => {
-				const payment = await tx.payment.create({
-					data: {
-						associationId: association.id,
-						unitId: input.unitId,
-						paymentDate: new Date(input.paymentDate),
-						amount: input.amount,
-						paymentMethod: input.paymentMethod,
-						referenceNumber: input.referenceNumber,
-						bankAccountId: input.bankAccountId,
-						payerName: input.payerName,
-						payerPartyId: input.payerPartyId,
-						memo: input.memo,
-						unappliedAmount: input.amount,
-						status: 'PENDING'
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPaymentWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					unitId: input.unitId,
+					paymentDate: input.paymentDate,
+					amount: input.amount,
+					paymentMethod: input.paymentMethod,
+					referenceNumber: input.referenceNumber,
+					bankAccountId: input.bankAccountId,
+					payerName: input.payerName,
+					payerPartyId: input.payerPartyId,
+					memo: input.memo,
+					autoApply: input.autoApply,
+					postToGL: input.postToGL
+				},
+				input.idempotencyKey
+			);
 
-				let appliedAmount = 0;
-
-				// Auto-apply to oldest unpaid charges
-				if (input.autoApply) {
-					const unpaidCharges = await tx.assessmentCharge.findMany({
-						where: {
-							unitId: input.unitId,
-							balanceDue: { gt: 0 },
-							status: { in: ['BILLED', 'PARTIALLY_PAID'] }
-						},
-						orderBy: { dueDate: 'asc' }
-					});
-
-					let remainingAmount = input.amount;
-
-					for (const charge of unpaidCharges) {
-						if (remainingAmount <= 0) break;
-
-						const balanceDue = Number(charge.balanceDue);
-						const applyAmount = Math.min(remainingAmount, balanceDue);
-
-						// Create payment application
-						await tx.paymentApplication.create({
-							data: {
-								paymentId: payment.id,
-								chargeId: charge.id,
-								amount: applyAmount
-							}
-						});
-
-						// Update charge
-						const newPaidAmount = Number(charge.paidAmount) + applyAmount;
-						const newBalanceDue = Number(charge.totalAmount) - newPaidAmount;
-						const newStatus = newBalanceDue <= 0 ? 'PAID' : 'PARTIALLY_PAID';
-
-						await tx.assessmentCharge.update({
-							where: { id: charge.id },
-							data: {
-								paidAmount: newPaidAmount,
-								balanceDue: newBalanceDue,
-								status: newStatus
-							}
-						});
-
-						appliedAmount += applyAmount;
-						remainingAmount -= applyAmount;
-					}
-
-					// Update payment with applied amounts
-					await tx.payment.update({
-						where: { id: payment.id },
-						data: {
-							appliedAmount,
-							unappliedAmount: input.amount - appliedAmount
-						}
-					});
-				}
-
-				return {
-					...payment,
-					appliedAmount,
-					unappliedAmount: input.amount - appliedAmount
-				};
-			});
-
-			// Post to GL if requested
-			if (input.postToGL) {
-				try {
-					await postPaymentToGL(result.id, context.user!.id);
-				} catch (error) {
-					const errorObj = error instanceof Error ? error : new Error(String(error));
-					// Log but don't fail - GL posting can be done later
-					console.warn(`Failed to post payment ${result.id} to GL:`, error);
-					await recordSpanError(errorObj, {
-						errorCode: 'GL_POSTING_FAILED',
-						errorType: 'Payment_GL_Error'
-					});
-				}
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create payment' });
 			}
 
 			return successResponse(
 				{
 					payment: {
-						id: result.id,
-						amount: result.amount.toString(),
-						appliedAmount: result.appliedAmount.toString(),
-						unappliedAmount: result.unappliedAmount.toString(),
-						status: result.status
+						id: workflowResult.paymentId!,
+						amount: workflowResult.amount!,
+						appliedAmount: workflowResult.appliedAmount!,
+						unappliedAmount: workflowResult.unappliedAmount!,
+						status: workflowResult.status!
 					}
 				},
 				context
@@ -203,7 +131,7 @@ export const paymentRouter = {
 		.input(
 			z.object({
 				unitId: z.string().optional(),
-				status: z.enum(['PENDING', 'CLEARED', 'BOUNCED', 'REFUNDED', 'VOIDED']).optional(),
+				status: PaymentStatusSchema.optional(),
 				fromDate: z.string().datetime().optional(),
 				toDate: z.string().datetime().optional()
 			}).optional()
@@ -365,7 +293,7 @@ export const paymentRouter = {
 	 * Void a payment
 	 */
 	void: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -402,54 +330,25 @@ export const paymentRouter = {
 				throw errors.CONFLICT({ message: 'Payment already voided' });
 			}
 
-			// Reverse all applications
-			await prisma.$transaction(async (tx) => {
-				for (const app of payment.applications) {
-					const charge = await tx.assessmentCharge.findUnique({
-						where: { id: app.chargeId }
-					});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPaymentWorkflow(
+				{
+					action: 'VOID',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					paymentId: input.id,
+					applications: payment.applications.map((app) => ({
+						chargeId: app.chargeId,
+						amount: Number(app.amount)
+					})),
+					paymentAmount: Number(payment.amount)
+				},
+				input.idempotencyKey
+			);
 
-					if (charge) {
-						const newPaidAmount = Math.max(0, Number(charge.paidAmount) - Number(app.amount));
-						const newBalanceDue = Number(charge.totalAmount) - newPaidAmount;
-						const newStatus = newPaidAmount === 0 ? 'BILLED' : 'PARTIALLY_PAID';
-
-						await tx.assessmentCharge.update({
-							where: { id: app.chargeId },
-							data: {
-								paidAmount: newPaidAmount,
-								balanceDue: newBalanceDue,
-								status: newStatus
-							}
-						});
-					}
-				}
-
-				// Delete applications and void payment
-				await tx.paymentApplication.deleteMany({
-					where: { paymentId: input.id }
-				});
-
-				await tx.payment.update({
-					where: { id: input.id },
-					data: {
-						status: 'VOIDED',
-						appliedAmount: 0,
-						unappliedAmount: payment.amount
-					}
-				});
-			});
-
-			// Reverse GL entry if it exists
-			try {
-				await reversePaymentGL(input.id, context.user!.id);
-			} catch (error) {
-				const errorObj = error instanceof Error ? error : new Error(String(error));
-				console.warn(`Failed to reverse GL for payment ${input.id}:`, error);
-				await recordSpanError(errorObj, {
-					errorCode: 'GL_REVERSAL_FAILED',
-					errorType: 'Payment_Void_Error'
-				});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to void payment' });
 			}
 
 			return successResponse({ success: true }, context);

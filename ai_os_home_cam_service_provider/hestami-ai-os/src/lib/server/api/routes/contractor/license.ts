@@ -7,6 +7,7 @@ import {
 	PaginationInputSchema,
 	PaginationOutputSchema
 } from '../../router.js';
+import { LicenseStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
@@ -38,7 +39,7 @@ const upsertInput = z
 		issuingState: z.string().optional(),
 		issueDate: z.string().datetime().optional(),
 		expirationDate: z.string().datetime().optional(),
-		status: z.enum(['ACTIVE', 'EXPIRED', 'SUSPENDED', 'REVOKED', 'PENDING_RENEWAL']).optional(),
+		status: LicenseStatusSchema.optional(),
 		documentUrl: z.string().url().optional(),
 		notes: z.string().optional()
 	})
@@ -113,7 +114,7 @@ export const licenseRouter = {
 	list: orgProcedure
 		.input(
 			PaginationInputSchema.extend({
-				status: z.enum(['ACTIVE', 'EXPIRED', 'SUSPENDED', 'REVOKED', 'PENDING_RENEWAL']).optional()
+				status: LicenseStatusSchema.optional()
 			})
 		)
 		.errors({

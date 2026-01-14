@@ -131,3 +131,144 @@ async function createManagedAssociation_v1(input: CreateManagedAssociationInput)
 }
 
 export const createManagedAssociation_v1_wf = DBOS.registerWorkflow(createManagedAssociation_v1);
+
+// ============================================================================
+// Association Management Workflow (Update, SetDefault, Delete)
+// ============================================================================
+
+export const AssociationManagementAction = {
+    UPDATE: 'UPDATE',
+    SET_DEFAULT: 'SET_DEFAULT',
+    DELETE: 'DELETE'
+} as const;
+
+export type AssociationManagementAction = (typeof AssociationManagementAction)[keyof typeof AssociationManagementAction];
+
+export interface AssociationManagementInput {
+    action: AssociationManagementAction;
+    organizationId: string;
+    userId: string;
+    associationId: string;
+    data?: {
+        // UPDATE fields
+        name?: string;
+        legalName?: string | null;
+        taxId?: string | null;
+        fiscalYearEnd?: number;
+        settings?: Prisma.InputJsonValue;
+    };
+}
+
+export interface AssociationManagementResult {
+    success: boolean;
+    error?: string;
+    associationId?: string;
+}
+
+async function updateAssociationStep(
+    associationId: string,
+    data: NonNullable<AssociationManagementInput['data']>
+): Promise<{ id: string }> {
+    const { settings, ...updateData } = data;
+    const association = await prisma.association.update({
+        where: { id: associationId },
+        data: {
+            ...updateData,
+            ...(settings !== undefined && { settings: settings as Prisma.InputJsonValue })
+        }
+    });
+    return { id: association.id };
+}
+
+async function setDefaultAssociationStep(
+    userId: string,
+    organizationId: string,
+    associationId: string
+): Promise<void> {
+    await prisma.userAssociationPreference.upsert({
+        where: {
+            userId_organizationId: {
+                userId,
+                organizationId
+            }
+        },
+        create: {
+            userId,
+            organizationId,
+            associationId
+        },
+        update: {
+            associationId
+        }
+    });
+}
+
+async function deleteAssociationStep(
+    associationId: string
+): Promise<{ deletedAt: Date }> {
+    const now = new Date();
+    await prisma.association.update({
+        where: { id: associationId },
+        data: { deletedAt: now }
+    });
+    return { deletedAt: now };
+}
+
+async function associationManagementWorkflow(input: AssociationManagementInput): Promise<AssociationManagementResult> {
+    const workflowName = 'associationManagement_v1';
+    const log = createWorkflowLogger(workflowName, DBOS.workflowID, input.action);
+
+    try {
+        switch (input.action) {
+            case 'UPDATE': {
+                if (!input.data) {
+                    return { success: false, error: 'Update data is required' };
+                }
+                const result = await DBOS.runStep(
+                    () => updateAssociationStep(input.associationId, input.data!),
+                    { name: 'updateAssociation' }
+                );
+                return { success: true, associationId: result.id };
+            }
+
+            case 'SET_DEFAULT': {
+                await DBOS.runStep(
+                    () => setDefaultAssociationStep(input.userId, input.organizationId, input.associationId),
+                    { name: 'setDefaultAssociation' }
+                );
+                return { success: true, associationId: input.associationId };
+            }
+
+            case 'DELETE': {
+                await DBOS.runStep(
+                    () => deleteAssociationStep(input.associationId),
+                    { name: 'deleteAssociation' }
+                );
+                return { success: true, associationId: input.associationId };
+            }
+
+            default:
+                return { success: false, error: `Unknown action: ${input.action}` };
+        }
+    } catch (error) {
+        const errorObj = error instanceof Error ? error : new Error(String(error));
+        log.error('Workflow failed', { action: input.action, error: errorObj.message });
+
+        await recordSpanError(errorObj, {
+            errorCode: 'WORKFLOW_FAILED',
+            errorType: 'ASSOCIATION_MANAGEMENT_ERROR'
+        });
+
+        return { success: false, error: errorObj.message };
+    }
+}
+
+export const associationManagement_v1 = DBOS.registerWorkflow(associationManagementWorkflow);
+
+export async function startAssociationManagementWorkflow(
+    input: AssociationManagementInput,
+    idempotencyKey: string
+): Promise<AssociationManagementResult> {
+    const handle = await DBOS.startWorkflow(associationManagement_v1, { workflowID: idempotencyKey })(input);
+    return handle.getResult();
+}

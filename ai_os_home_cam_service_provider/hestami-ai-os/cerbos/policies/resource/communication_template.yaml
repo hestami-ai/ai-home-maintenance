@@ -1,0 +1,34 @@
+# Communication Template Resource Policy
+# Controls access to communication templates used for emails,
+# notices, and other standardized communications.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "communication_template"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to communication templates
+    - actions: ["view", "create", "edit", "delete"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, and edit templates
+    - actions: ["view", "create", "edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view templates
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

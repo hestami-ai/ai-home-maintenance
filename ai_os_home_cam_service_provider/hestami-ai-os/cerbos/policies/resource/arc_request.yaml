@@ -1,0 +1,53 @@
+# ARC Request Resource Policy
+# Controls access to Architectural Review Committee (ARC) requests.
+# ARC requests are submitted by owners for architectural changes
+# and reviewed by committee members and management.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "arc_request"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all ARC requests
+    - actions: ["view", "create", "edit", "delete", "review"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view, create, edit, and review ARC requests
+    - actions: ["view", "create", "edit", "review"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view and review ARC requests
+    - actions: ["view", "review"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can create and view their own ARC requests
+    - actions: ["view", "create"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Owners can edit their own requests (before submission)
+    - actions: ["edit"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - resource_owner
+
+    # Tenants can view ARC requests related to their unit
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_tenant
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

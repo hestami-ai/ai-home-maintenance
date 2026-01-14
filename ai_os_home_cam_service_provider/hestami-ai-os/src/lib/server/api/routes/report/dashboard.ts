@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
+import { WidgetTypeSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { recordActivityFromContext } from '../../middleware/activityEvent.js';
 import { startDashboardWorkflow } from '../../../workflows/dashboardWorkflow.js';
@@ -116,10 +117,7 @@ const DashboardDataSchema = z.object({
 // Widget Types
 // =============================================================================
 
-const widgetTypeEnum = z.enum([
-	'CHART_BAR', 'CHART_LINE', 'CHART_PIE', 'CHART_DONUT',
-	'METRIC_CARD', 'TABLE', 'LIST', 'CALENDAR', 'MAP'
-]);
+const widgetTypeEnum = WidgetTypeSchema;
 
 const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
@@ -898,7 +896,8 @@ export const dashboardRouter = {
 	 */
 	recordView: orgProcedure
 		.input(z.object({
-			eventType: z.enum(['DASHBOARD_VIEWED', 'CARD_CLICKED', 'FILTER_APPLIED']),
+            idempotencyKey: z.string().uuid(),
+            eventType: z.enum(['DASHBOARD_VIEWED', 'CARD_CLICKED', 'FILTER_APPLIED']),
 			section: z.string().optional(),
 			card: z.string().optional(),
 			targetUrl: z.string().optional(),
@@ -913,6 +912,8 @@ export const dashboardRouter = {
 			NOT_FOUND: { message: 'Association not found' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'dashboard', 'record');
+
 			const association = await getAssociationOrThrow(context.organization!.id, errors);
 
 			// Build event summary based on type

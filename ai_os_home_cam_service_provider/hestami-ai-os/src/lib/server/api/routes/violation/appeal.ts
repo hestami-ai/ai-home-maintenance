@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
+import { AppealStatusSchema, AppealDecisionSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import type { AppealStatus } from '../../../../../../generated/prisma/client.js';
 import { startAppealWorkflow } from '../../../workflows/appealWorkflow.js';
@@ -8,9 +9,7 @@ import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('AppealRoute');
 
-const appealStatusEnum = z.enum([
-	'PENDING', 'SCHEDULED', 'UPHELD', 'MODIFIED', 'REVERSED', 'WITHDRAWN'
-]);
+const appealStatusEnum = AppealStatusSchema;
 
 const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
@@ -272,7 +271,7 @@ export const appealRouter = {
 	recordDecision: orgProcedure
 		.input(z.object({
 			id: z.string(),
-			status: z.enum(['UPHELD', 'MODIFIED', 'REVERSED']),
+			status: AppealDecisionSchema,
 			decisionNotes: z.string().max(5000).optional(),
 			revisedFineAmount: z.number().min(0).optional(),
 			idempotencyKey: z.string().optional()

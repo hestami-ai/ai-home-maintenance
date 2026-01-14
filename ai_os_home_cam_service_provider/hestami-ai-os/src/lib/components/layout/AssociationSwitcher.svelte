@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { ChevronDown, Building2, Check } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import { orpc } from '$lib/api/orpc';
+	import { associationStore } from '$lib/stores/association';
 	
 	interface Association {
 		id: string;
@@ -16,6 +18,7 @@
 	let { currentAssociation, associations }: Props = $props();
 
 	let isOpen = $state(false);
+	let isSwitching = $state(false);
 
 	function toggleDropdown() {
 		isOpen = !isOpen;
@@ -40,15 +43,30 @@
 
 	/**
 	 * Switch to a different association.
-	 * Sets cookie client-side (not security-sensitive, just a user preference)
-	 * and invalidates all load functions to refresh data with new association context.
+	 * Calls oRPC to persist the preference in the database, then reloads the page.
 	 */
 	async function switchAssociation(associationId: string) {
-		// Set cookie client-side - this is just a preference, not a security token
-		document.cookie = `cam_association_id=${associationId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+		if (isSwitching) return;
+		isSwitching = true;
 		closeDropdown();
-		// Force full page reload to ensure server reads the new cookie
-		window.location.reload();
+
+		try {
+			// Call oRPC to set the default association in the database
+			const result = await orpc.association.setDefault({ associationId });
+			
+			if (result.ok) {
+				// Update the store immediately for optimistic UI
+				const newAssociation = associations.find(a => a.id === associationId);
+				if (newAssociation) {
+					associationStore.setCurrent(newAssociation as any);
+				}
+				// Reload to get fresh server data with new association context
+				window.location.reload();
+			}
+		} catch (err) {
+			console.error('Failed to switch association:', err);
+			isSwitching = false;
+		}
 	}
 </script>
 
@@ -95,7 +113,7 @@
 						<button
 							type="button"
 							onclick={() => switchAssociation(association.id)}
-							disabled={isSelected}
+							disabled={isSelected || isSwitching}
 							class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-surface-200-800 disabled:opacity-50 disabled:cursor-default"
 						>
 							<Building2 class="h-4 w-4 flex-shrink-0 text-surface-500" />

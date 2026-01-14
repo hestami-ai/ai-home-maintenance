@@ -115,9 +115,9 @@ export const signatureWorkflow_v1 = DBOS.registerWorkflow(signatureWorkflow);
 
 export async function startSignatureWorkflow(
 	input: SignatureWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<SignatureWorkflowResult> {
 	const workflowId = idempotencyKey || `signature-${input.action}-${input.signatureId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(signatureWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(signatureWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

@@ -101,6 +101,7 @@
 
 		try {
 			const result = await orgClient.document.archiveDocument({
+				idempotencyKey: crypto.randomUUID(),
 				id: document.id,
 				reason: 'User requested deletion'
 			});

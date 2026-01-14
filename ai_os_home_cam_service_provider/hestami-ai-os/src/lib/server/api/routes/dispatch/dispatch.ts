@@ -734,10 +734,12 @@ export const dispatchRouter = {
 	 */
 	getRoutePlan: orgProcedure
 		.input(
-			z.object({
-				technicianId: z.string(),
-				routeDate: z.string() // YYYY-MM-DD format
-			})
+			z
+				.object({
+					technicianId: z.string(),
+					routeDate: z.string() // YYYY-MM-DD format
+				})
+				.merge(IdempotencyKeySchema)
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
@@ -772,12 +774,26 @@ export const dispatchRouter = {
 			});
 
 			if (!routePlan) {
-				routePlan = await prisma.routePlan.create({
-					data: {
+				const result = await startDispatchWorkflow(
+					{
+						action: 'CREATE_ROUTE_PLAN',
 						organizationId: context.organization!.id,
-						technicianId: input.technicianId,
-						routeDate
-					}
+						userId: context.user!.id,
+						data: {
+							technicianId: input.technicianId,
+							routeDate: input.routeDate
+						}
+					},
+					'dispatch',
+					input.idempotencyKey
+				);
+
+				if (!result.success) {
+					throw errors.NOT_FOUND({ message: result.error || 'Failed to create route plan' });
+				}
+
+				routePlan = await prisma.routePlan.findUniqueOrThrow({
+					where: { id: result.entityId }
 				});
 			}
 

@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
+import { ReportFormatSchema, ReportExecutionStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startReportExecutionWorkflow } from '../../../workflows/reportExecutionWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ReportExecutionRoute');
 
-const reportFormatEnum = z.enum(['PDF', 'EXCEL', 'CSV', 'JSON', 'HTML']);
-const executionStatusEnum = z.enum(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);
+const reportFormatEnum = ReportFormatSchema;
+const executionStatusEnum = ReportExecutionStatusSchema;
 
 const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({

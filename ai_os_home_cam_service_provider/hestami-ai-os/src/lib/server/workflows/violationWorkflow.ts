@@ -25,11 +25,18 @@ const log = createWorkflowLogger('ViolationWorkflow');
 export const ViolationAction = {
 	UPDATE_VIOLATION: 'UPDATE_VIOLATION',
 	UPDATE_STATUS: 'UPDATE_STATUS',
+	DELETE_VIOLATION: 'DELETE_VIOLATION',
+	SEND_NOTICE: 'SEND_NOTICE',
+	ESCALATE: 'ESCALATE',
+	DISMISS: 'DISMISS',
 	SCHEDULE_HEARING: 'SCHEDULE_HEARING',
 	RECORD_HEARING_OUTCOME: 'RECORD_HEARING_OUTCOME',
 	RECORD_APPEAL: 'RECORD_APPEAL',
 	SCHEDULE_APPEAL_HEARING: 'SCHEDULE_APPEAL_HEARING',
-	RECORD_APPEAL_DECISION: 'RECORD_APPEAL_DECISION'
+	RECORD_APPEAL_DECISION: 'RECORD_APPEAL_DECISION',
+	// Violation Type actions
+	CREATE_TYPE: 'CREATE_TYPE',
+	UPDATE_TYPE: 'UPDATE_TYPE'
 } as const;
 
 export type ViolationAction = (typeof ViolationAction)[keyof typeof ViolationAction];
@@ -38,7 +45,8 @@ export interface ViolationWorkflowInput {
 	action: ViolationAction;
 	organizationId: string;
 	userId: string;
-	violationId: string;
+	violationId?: string;
+	typeId?: string; // For violation type operations
 	data: {
 		title?: string;
 		description?: string;
@@ -68,6 +76,26 @@ export interface ViolationWorkflowInput {
 		filedBy?: string;
 		documentsJson?: string | null;
 		revisedFineAmount?: number;
+		// SEND_NOTICE fields
+		noticeType?: string;
+		subject?: string;
+		body?: string;
+		deliveryMethod?: string;
+		recipientName?: string;
+		recipientAddress?: string;
+		recipientEmail?: string;
+		curePeriodDays?: number;
+		noticeCount?: number;
+		defaultCurePeriodDays?: number;
+		// ESCALATE fields
+		escalationReason?: string;
+		assignedTo?: string;
+		// RECORD_HEARING_OUTCOME fields
+		fineAssessed?: number;
+		fineWaived?: number;
+		appealDeadlineDays?: number;
+		// RECORD_APPEAL fields
+		createPlaceholderHearing?: boolean;
 	};
 }
 
@@ -121,12 +149,30 @@ async function updateStatus(
 	if (!violation) throw new Error('Violation not found');
 
 	const oldStatus = violation.status;
+	const now = new Date();
+
+	// Build status-specific update data
+	const updateData: Prisma.ViolationUncheckedUpdateInput = { status: newStatus };
+
+	// Set status-specific fields
+	if (newStatus === 'CURED') {
+		updateData.curedDate = now;
+		updateData.resolutionNotes = notes ?? violation.resolutionNotes;
+	} else if (newStatus === 'CLOSED') {
+		updateData.closedDate = now;
+		updateData.closedBy = userId;
+		updateData.resolutionNotes = notes ?? violation.resolutionNotes;
+	} else if (newStatus === 'DISMISSED') {
+		updateData.closedDate = now;
+		updateData.closedBy = userId;
+		updateData.resolutionNotes = notes ?? violation.resolutionNotes;
+	}
 
 	try {
 		await orgTransaction(organizationId, async (tx) => {
 			await tx.violation.update({
 				where: { id: violationId },
-				data: { status: newStatus }
+				data: updateData
 			});
 
 			await tx.violationStatusHistory.create({
@@ -141,6 +187,216 @@ async function updateStatus(
 		}, { userId, reason: `Updating violation status from ${oldStatus} to ${newStatus}` });
 
 		log.info('UPDATE_STATUS completed', { violationId, oldStatus, newStatus, userId });
+		return violationId;
+	} finally {
+		await clearOrgContext(userId);
+	}
+}
+
+async function deleteViolation(
+	organizationId: string,
+	userId: string,
+	violationId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const reason = data.reason as string | undefined;
+
+	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
+	if (!violation) throw new Error('Violation not found');
+
+	const deletedAt = new Date();
+
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violation.update({
+				where: { id: violationId },
+				data: {
+					deletedAt,
+					status: 'CLOSED',
+					closedDate: deletedAt,
+					closedBy: userId,
+					resolutionNotes: reason ?? violation.resolutionNotes
+				}
+			});
+
+			await tx.violationStatusHistory.create({
+				data: {
+					violationId,
+					fromStatus: violation.status,
+					toStatus: 'CLOSED',
+					changedBy: userId,
+					notes: reason ?? 'Violation deleted'
+				}
+			});
+		}, { userId, reason: `Deleting violation: ${reason ?? 'No reason provided'}` });
+
+		log.info('DELETE_VIOLATION completed', { violationId, userId });
+		return violationId;
+	} finally {
+		await clearOrgContext(userId);
+	}
+}
+
+async function sendNotice(
+	organizationId: string,
+	userId: string,
+	violationId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const noticeType = data.noticeType as string;
+	const subject = data.subject as string;
+	const body = data.body as string;
+	const deliveryMethod = data.deliveryMethod as string;
+	const recipientName = data.recipientName as string;
+	const recipientAddress = data.recipientAddress as string | undefined;
+	const recipientEmail = data.recipientEmail as string | undefined;
+	const curePeriodDays = data.curePeriodDays as number;
+	const noticeCount = data.noticeCount as number;
+	const defaultCurePeriodDays = data.defaultCurePeriodDays as number;
+
+	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
+	if (!violation) throw new Error('Violation not found');
+
+	const now = new Date();
+	const effectiveCurePeriodDays = curePeriodDays ?? defaultCurePeriodDays ?? 0;
+	const curePeriodEnds = effectiveCurePeriodDays > 0
+		? new Date(now.getTime() + effectiveCurePeriodDays * 24 * 60 * 60 * 1000)
+		: null;
+	const targetStatus = effectiveCurePeriodDays > 0 ? 'CURE_PERIOD' : 'NOTICE_SENT';
+
+	try {
+		const noticeId = await orgTransaction(organizationId, async (tx) => {
+			const notice = await tx.violationNotice.create({
+				data: {
+					violationId,
+					noticeType: noticeType as any,
+					noticeNumber: noticeCount + 1,
+					subject,
+					body,
+					deliveryMethod: deliveryMethod as any,
+					recipientName,
+					recipientAddress,
+					recipientEmail,
+					sentDate: now,
+					curePeriodDays: effectiveCurePeriodDays,
+					curePeriodEnds,
+					sentBy: userId
+				}
+			});
+
+			await tx.violation.update({
+				where: { id: violationId },
+				data: {
+					noticeCount: { increment: 1 },
+					lastNoticeDate: now,
+					lastNoticeType: noticeType as any,
+					curePeriodEnds,
+					status: targetStatus
+				}
+			});
+
+			if (violation.status !== targetStatus) {
+				await tx.violationStatusHistory.create({
+					data: {
+						violationId,
+						fromStatus: violation.status,
+						toStatus: targetStatus,
+						changedBy: userId,
+						notes: `${noticeType} sent`
+					}
+				});
+			}
+
+			return notice.id;
+		}, { userId, reason: `Sending ${noticeType} notice for violation` });
+
+		log.info('SEND_NOTICE completed', { noticeId, violationId, userId });
+		return noticeId;
+	} finally {
+		await clearOrgContext(userId);
+	}
+}
+
+async function escalateViolation(
+	organizationId: string,
+	userId: string,
+	violationId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const escalationReason = data.escalationReason as string | undefined;
+	const assignedTo = data.assignedTo as string | undefined;
+
+	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
+	if (!violation) throw new Error('Violation not found');
+
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violation.update({
+				where: { id: violationId },
+				data: {
+					status: 'ESCALATED',
+					escalatedAt: new Date(),
+					escalatedBy: userId,
+					escalationReason,
+					...(assignedTo && { assignedTo })
+				}
+			});
+
+			await tx.violationStatusHistory.create({
+				data: {
+					violationId,
+					fromStatus: violation.status,
+					toStatus: 'ESCALATED',
+					changedBy: userId,
+					notes: escalationReason ?? 'Violation escalated'
+				}
+			});
+		}, { userId, reason: `Escalating violation: ${escalationReason ?? 'No reason provided'}` });
+
+		log.info('ESCALATE completed', { violationId, userId });
+		return violationId;
+	} finally {
+		await clearOrgContext(userId);
+	}
+}
+
+async function dismissViolation(
+	organizationId: string,
+	userId: string,
+	violationId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const reason = data.reason as string | undefined;
+
+	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
+	if (!violation) throw new Error('Violation not found');
+
+	const now = new Date();
+
+	try {
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.violation.update({
+				where: { id: violationId },
+				data: {
+					status: 'DISMISSED',
+					closedDate: now,
+					closedBy: userId,
+					resolutionNotes: reason ?? violation.resolutionNotes
+				}
+			});
+
+			await tx.violationStatusHistory.create({
+				data: {
+					violationId,
+					fromStatus: violation.status,
+					toStatus: 'DISMISSED',
+					changedBy: userId,
+					notes: reason ?? 'Violation dismissed'
+				}
+			});
+		}, { userId, reason: `Dismissing violation: ${reason ?? 'No reason provided'}` });
+
+		log.info('DISMISS completed', { violationId, userId });
 		return violationId;
 	} finally {
 		await clearOrgContext(userId);
@@ -190,6 +446,14 @@ async function recordHearingOutcome(
 	const hearingId = data.hearingId as string;
 	const outcome = data.outcome as string;
 	const notes = data.notes as string | undefined;
+	const fineAssessed = data.fineAssessed as number | undefined;
+	const fineWaived = data.fineWaived as number | undefined;
+	const appealDeadlineDays = data.appealDeadlineDays as number | undefined;
+
+	const now = new Date();
+	const appealDeadline = appealDeadlineDays
+		? new Date(now.getTime() + appealDeadlineDays * 24 * 60 * 60 * 1000)
+		: null;
 
 	// Determine new violation status based on outcome
 	let newStatus: ViolationStatus = 'HEARING_HELD';
@@ -206,14 +470,27 @@ async function recordHearingOutcome(
 				data: {
 					outcome: outcome as any,
 					outcomeNotes: notes,
+					fineAssessed,
+					fineWaived,
+					appealDeadline,
 					recordedBy: userId,
-					recordedAt: new Date()
+					recordedAt: now
 				}
 			});
 
 			await tx.violation.update({
 				where: { id: violationId },
 				data: { status: newStatus }
+			});
+
+			await tx.violationStatusHistory.create({
+				data: {
+					violationId,
+					fromStatus: 'HEARING_SCHEDULED',
+					toStatus: newStatus,
+					changedBy: userId,
+					notes: `Hearing outcome: ${outcome}`
+				}
 			});
 		}, { userId, reason: `Recording hearing outcome: ${outcome}` });
 
@@ -230,12 +507,30 @@ async function recordAppeal(
 	violationId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const hearingId = data.hearingId as string;
+	let hearingId = data.hearingId as string | undefined;
 	const reason = data.reason as string;
 	const filedBy = data.filedBy as string | undefined;
+	const createPlaceholderHearing = data.createPlaceholderHearing as boolean | undefined;
 
 	try {
 		const appealId = await orgTransaction(organizationId, async (tx) => {
+			// Create placeholder hearing if needed
+			if (createPlaceholderHearing && !hearingId) {
+				const hearing = await tx.violationHearing.create({
+					data: {
+						violationId,
+						hearingDate: new Date(),
+						outcome: 'PENDING',
+						outcomeNotes: 'Appeal filed - hearing pending'
+					}
+				});
+				hearingId = hearing.id;
+			}
+
+			if (!hearingId) {
+				throw new Error('No hearing found and createPlaceholderHearing not set');
+			}
+
 			const appeal = await tx.violationAppeal.create({
 				data: {
 					hearingId,
@@ -326,6 +621,52 @@ async function recordAppealDecision(
 	}
 }
 
+// Violation Type step functions
+async function createViolationType(
+	organizationId: string,
+	userId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const violationType = await prisma.violationType.create({
+		data: {
+			organizationId,
+			associationId: data.associationId as string,
+			code: data.code as string,
+			name: data.name as string,
+			description: data.description as string | undefined,
+			category: data.category as string,
+			ccnrSection: data.ccnrSection as string | undefined,
+			ruleReference: data.ruleReference as string | undefined,
+			defaultSeverity: data.defaultSeverity as any,
+			defaultCurePeriodDays: data.defaultCurePeriodDays as number | undefined,
+			firstFineAmount: data.firstFineAmount as number | undefined,
+			secondFineAmount: data.secondFineAmount as number | undefined,
+			subsequentFineAmount: data.subsequentFineAmount as number | undefined,
+			maxFineAmount: data.maxFineAmount as number | undefined
+		}
+	});
+
+	log.info('CREATE_TYPE completed', { typeId: violationType.id, code: violationType.code, userId });
+	return violationType.id;
+}
+
+async function updateViolationType(
+	organizationId: string,
+	userId: string,
+	typeId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const { id, associationId, code, ...updateData } = data;
+
+	await prisma.violationType.update({
+		where: { id: typeId },
+		data: updateData
+	});
+
+	log.info('UPDATE_TYPE completed', { typeId, userId });
+	return typeId;
+}
+
 // Main workflow function
 async function violationWorkflow(input: ViolationWorkflowInput): Promise<ViolationWorkflowResult> {
 	try {
@@ -334,50 +675,92 @@ async function violationWorkflow(input: ViolationWorkflowInput): Promise<Violati
 		switch (input.action) {
 			case 'UPDATE_VIOLATION':
 				entityId = await DBOS.runStep(
-					() => updateViolation(input.organizationId, input.userId, input.violationId, input.data),
+					() => updateViolation(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'updateViolation' }
 				);
 				break;
 
 			case 'UPDATE_STATUS':
 				entityId = await DBOS.runStep(
-					() => updateStatus(input.organizationId, input.userId, input.violationId, input.data),
+					() => updateStatus(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'updateStatus' }
+				);
+				break;
+
+			case 'DELETE_VIOLATION':
+				entityId = await DBOS.runStep(
+					() => deleteViolation(input.organizationId, input.userId, input.violationId!, input.data),
+					{ name: 'deleteViolation' }
+				);
+				break;
+
+			case 'SEND_NOTICE':
+				entityId = await DBOS.runStep(
+					() => sendNotice(input.organizationId, input.userId, input.violationId!, input.data),
+					{ name: 'sendNotice' }
+				);
+				break;
+
+			case 'ESCALATE':
+				entityId = await DBOS.runStep(
+					() => escalateViolation(input.organizationId, input.userId, input.violationId!, input.data),
+					{ name: 'escalateViolation' }
+				);
+				break;
+
+			case 'DISMISS':
+				entityId = await DBOS.runStep(
+					() => dismissViolation(input.organizationId, input.userId, input.violationId!, input.data),
+					{ name: 'dismissViolation' }
 				);
 				break;
 
 			case 'SCHEDULE_HEARING':
 				entityId = await DBOS.runStep(
-					() => scheduleHearing(input.organizationId, input.userId, input.violationId, input.data),
+					() => scheduleHearing(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'scheduleHearing' }
 				);
 				break;
 
 			case 'RECORD_HEARING_OUTCOME':
 				entityId = await DBOS.runStep(
-					() => recordHearingOutcome(input.organizationId, input.userId, input.violationId, input.data),
+					() => recordHearingOutcome(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'recordHearingOutcome' }
 				);
 				break;
 
 			case 'RECORD_APPEAL':
 				entityId = await DBOS.runStep(
-					() => recordAppeal(input.organizationId, input.userId, input.violationId, input.data),
+					() => recordAppeal(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'recordAppeal' }
 				);
 				break;
 
 			case 'SCHEDULE_APPEAL_HEARING':
 				entityId = await DBOS.runStep(
-					() => scheduleAppealHearing(input.organizationId, input.userId, input.violationId, input.data),
+					() => scheduleAppealHearing(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'scheduleAppealHearing' }
 				);
 				break;
 
 			case 'RECORD_APPEAL_DECISION':
 				entityId = await DBOS.runStep(
-					() => recordAppealDecision(input.organizationId, input.userId, input.violationId, input.data),
+					() => recordAppealDecision(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'recordAppealDecision' }
+				);
+				break;
+
+			case 'CREATE_TYPE':
+				entityId = await DBOS.runStep(
+					() => createViolationType(input.organizationId, input.userId, input.data),
+					{ name: 'createViolationType' }
+				);
+				break;
+
+			case 'UPDATE_TYPE':
+				entityId = await DBOS.runStep(
+					() => updateViolationType(input.organizationId, input.userId, input.typeId!, input.data),
+					{ name: 'updateViolationType' }
 				);
 				break;
 
@@ -405,9 +788,9 @@ export const violationWorkflow_v1 = DBOS.registerWorkflow(violationWorkflow);
 
 export async function startViolationWorkflow(
 	input: ViolationWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ViolationWorkflowResult> {
 	const workflowId = idempotencyKey || `violation-${input.action}-${input.violationId}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(violationWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(violationWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

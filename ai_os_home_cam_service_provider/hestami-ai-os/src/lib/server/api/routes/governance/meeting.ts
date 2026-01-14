@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
+import {
+	MeetingTypeSchema,
+	MeetingStatusSchema,
+	MeetingAttendanceStatusSchema,
+	VoteMethodSchema,
+	VoteChoiceSchema
+} from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import type {
@@ -14,11 +21,11 @@ import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('MeetingRoute');
 
-const meetingTypeEnum = z.enum(['BOARD', 'ANNUAL', 'SPECIAL']);
-const meetingStatusEnum = z.enum(['SCHEDULED', 'IN_SESSION', 'ADJOURNED', 'MINUTES_DRAFT', 'MINUTES_APPROVED', 'ARCHIVED', 'CANCELLED']);
-const attendanceStatusEnum = z.enum(['PRESENT', 'ABSENT', 'EXCUSED']);
-const voteMethodEnum = z.enum(['IN_PERSON', 'PROXY', 'ELECTRONIC']);
-const voteChoiceEnum = z.enum(['YES', 'NO', 'ABSTAIN']);
+const meetingTypeEnum = MeetingTypeSchema;
+const meetingStatusEnum = MeetingStatusSchema;
+const attendanceStatusEnum = MeetingAttendanceStatusSchema;
+const voteMethodEnum = VoteMethodSchema;
+const voteChoiceEnum = VoteChoiceSchema;
 
 const getAssociationOrThrow = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({ where: { id: associationId, organizationId, deletedAt: null } });
@@ -193,6 +200,8 @@ export const governanceMeetingRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'governance_meeting', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },
@@ -915,14 +924,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to adjourn meeting' });
 			}
 
-			// Create minutes placeholder if not exists
-			const existingMinutes = await prisma.meetingMinutes.findUnique({ where: { meetingId } });
-			if (!existingMinutes) {
-				await prisma.meetingMinutes.create({
-					data: { meetingId, recordedBy: context.user!.id, content: '' }
-				});
-			}
-
+			// Minutes placeholder is now created by the workflow
 			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);

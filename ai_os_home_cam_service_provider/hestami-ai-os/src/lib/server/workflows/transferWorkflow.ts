@@ -339,9 +339,9 @@ export const transferWorkflow_v1 = DBOS.registerWorkflow(transferWorkflow);
 
 export async function startTransferWorkflow(
 	input: TransferWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<TransferWorkflowResult> {
 	const workflowId = idempotencyKey || `transfer-${input.action}-${input.transferId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(transferWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(transferWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

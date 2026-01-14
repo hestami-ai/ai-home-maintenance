@@ -163,6 +163,7 @@ export const mediaRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await assertContractorOrg(context.organization!.id, errors);
+			await context.cerbos.authorize('edit', 'job_media', input.mediaId);
 
 			const existing = await prisma.jobMedia.findFirst({
 				where: { id: input.mediaId, organizationId: context.organization!.id }
@@ -293,6 +294,7 @@ export const mediaRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			await assertContractorOrg(context.organization!.id, errors);
+			await context.cerbos.authorize('edit', 'job_media', input.mediaId);
 
 			const existing = await prisma.jobMedia.findFirst({
 				where: { id: input.mediaId, organizationId: context.organization!.id }

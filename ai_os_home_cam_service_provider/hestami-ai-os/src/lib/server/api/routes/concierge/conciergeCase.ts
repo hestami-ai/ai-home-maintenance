@@ -520,47 +520,27 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('update_status', 'concierge_case', existing.id);
 
-			const now = new Date();
-			const conciergeCase = await prisma.$transaction(async (tx) => {
-				// Update case
-				const updated = await tx.conciergeCase.update({
-					where: { id: input.id },
-					data: {
-						status: input.status,
-						...(input.status === 'RESOLVED' && { resolvedAt: now, resolvedBy: context.user.id }),
-						...(input.status === 'CLOSED' && { closedAt: now }),
-						...(input.status === 'CANCELLED' && {
-							cancelledAt: now,
-							cancelledBy: context.user.id,
-							cancelReason: input.reason
-						})
-					}
-				});
-
-				// Create status history entry
-				await tx.caseStatusHistory.create({
-					data: {
-						caseId: input.id,
-						fromStatus: existing.status,
-						toStatus: input.status,
-						reason: input.reason,
-						changedBy: context.user.id
-					}
-				});
-
-				return updated;
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'TRANSITION_STATUS',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.id,
+				targetStatus: input.status,
+				statusChangeReason: input.reason
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'STATUS_CHANGE',
-				summary: `Case status changed from ${existing.status} to ${input.status}${input.reason ? `: ${input.reason}` : ''}`,
-				caseId: conciergeCase.id,
-				propertyId: existing.propertyId,
-				previousState: { status: existing.status },
-				newState: { status: input.status }
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update status' });
+			}
+
+			// Fetch updated case for response
+			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: input.id }
 			});
 
 			return successResponse(
@@ -628,24 +608,27 @@ export const conciergeCaseRouter = {
 				}
 			}
 
-			const conciergeCase = await prisma.conciergeCase.update({
-				where: { id: input.id },
-				data: { assignedConciergeUserId: input.assignedConciergeUserId }
+			// Use DBOS workflow for durable execution
+			const workflowAction = input.assignedConciergeUserId ? 'ASSIGN_CONCIERGE' : 'UNASSIGN_CONCIERGE';
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: workflowAction,
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.id,
+				assigneeUserId: input.assignedConciergeUserId ?? undefined
 			});
 
-			// Record activity event
-			const action = input.assignedConciergeUserId ? 'ASSIGN' : 'UNASSIGN';
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action,
-				summary: input.assignedConciergeUserId
-					? `Case assigned to concierge`
-					: `Case unassigned`,
-				caseId: conciergeCase.id,
-				propertyId: existing.propertyId,
-				previousState: { assignedConciergeUserId: existing.assignedConciergeUserId },
-				newState: { assignedConciergeUserId: input.assignedConciergeUserId }
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign concierge' });
+			}
+
+			// Fetch updated case for response
+			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: input.id }
 			});
 
 			return successResponse(
@@ -711,41 +694,26 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('resolve', 'concierge_case', existing.id);
 
-			const now = new Date();
-			const conciergeCase = await prisma.$transaction(async (tx) => {
-				const updated = await tx.conciergeCase.update({
-					where: { id: input.id },
-					data: {
-						status: 'RESOLVED',
-						resolvedAt: now,
-						resolvedBy: context.user.id,
-						resolutionSummary: input.resolutionSummary
-					}
-				});
-
-				await tx.caseStatusHistory.create({
-					data: {
-						caseId: input.id,
-						fromStatus: existing.status,
-						toStatus: 'RESOLVED',
-						reason: input.resolutionSummary,
-						changedBy: context.user.id
-					}
-				});
-
-				return updated;
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'RESOLVE_CASE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.id,
+				resolutionSummary: input.resolutionSummary
 			});
 
-			// Record activity event
-			await recordDecision(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'STATUS_CHANGE',
-				summary: `Case resolved: ${input.resolutionSummary}`,
-				caseId: conciergeCase.id,
-				propertyId: existing.propertyId,
-				previousState: { status: existing.status },
-				newState: { status: 'RESOLVED', resolutionSummary: input.resolutionSummary }
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to resolve case' });
+			}
+
+			// Fetch updated case for response
+			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: input.id }
 			});
 
 			return successResponse(
@@ -808,38 +776,25 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('close', 'concierge_case', existing.id);
 
-			const now = new Date();
-			const conciergeCase = await prisma.$transaction(async (tx) => {
-				const updated = await tx.conciergeCase.update({
-					where: { id: input.id },
-					data: {
-						status: 'CLOSED',
-						closedAt: now
-					}
-				});
-
-				await tx.caseStatusHistory.create({
-					data: {
-						caseId: input.id,
-						fromStatus: 'RESOLVED',
-						toStatus: 'CLOSED',
-						changedBy: context.user.id
-					}
-				});
-
-				return updated;
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CLOSE_CASE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.id
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'CLOSE',
-				summary: `Case closed`,
-				caseId: conciergeCase.id,
-				propertyId: existing.propertyId,
-				previousState: { status: 'RESOLVED' },
-				newState: { status: 'CLOSED' }
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to close case' });
+			}
+
+			// Fetch updated case for response
+			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: input.id }
 			});
 
 			return successResponse(
@@ -903,41 +858,26 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('cancel', 'concierge_case', existing.id);
 
-			const now = new Date();
-			const conciergeCase = await prisma.$transaction(async (tx) => {
-				const updated = await tx.conciergeCase.update({
-					where: { id: input.id },
-					data: {
-						status: 'CANCELLED',
-						cancelledAt: now,
-						cancelledBy: context.user.id,
-						cancelReason: input.reason
-					}
-				});
-
-				await tx.caseStatusHistory.create({
-					data: {
-						caseId: input.id,
-						fromStatus: existing.status,
-						toStatus: 'CANCELLED',
-						reason: input.reason,
-						changedBy: context.user.id
-					}
-				});
-
-				return updated;
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CANCEL_CASE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.id,
+				cancelReason: input.reason
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'CANCEL',
-				summary: `Case cancelled: ${input.reason}`,
-				caseId: conciergeCase.id,
-				propertyId: existing.propertyId,
-				previousState: { status: existing.status },
-				newState: { status: 'CANCELLED', cancelReason: input.reason }
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel case' });
+			}
+
+			// Fetch updated case for response
+			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: input.id }
 			});
 
 			return successResponse(
@@ -1064,14 +1004,28 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('add_note', 'concierge_case', conciergeCase.id);
 
-			const note = await prisma.caseNote.create({
-				data: {
-					caseId: input.caseId,
-					content: input.content,
-					noteType: input.noteType ?? 'GENERAL',
-					isInternal: input.isInternal,
-					createdBy: context.user.id
-				}
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'ADD_NOTE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				noteContent: input.content,
+				noteType: input.noteType ?? 'GENERAL',
+				isInternal: input.isInternal
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add note' });
+			}
+
+			// Fetch created note for response
+			const note = await prisma.caseNote.findUniqueOrThrow({
+				where: { id: result.noteId }
 			});
 
 			return successResponse(
@@ -1232,17 +1186,31 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('add_participant', 'concierge_case', conciergeCase.id);
 
-			const participant = await prisma.caseParticipant.create({
-				data: {
-					caseId: input.caseId,
-					partyId: input.partyId,
-					externalContactName: input.externalContactName,
-					externalContactEmail: input.externalContactEmail,
-					externalContactPhone: input.externalContactPhone,
-					role: input.role,
-					notes: input.notes,
-					addedBy: context.user.id
-				}
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'ADD_PARTICIPANT',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				partyId: input.partyId,
+				externalContactName: input.externalContactName,
+				externalContactEmail: input.externalContactEmail,
+				externalContactPhone: input.externalContactPhone,
+				participantRole: input.role,
+				participantNotes: input.notes
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add participant' });
+			}
+
+			// Fetch created participant for response
+			const participant = await prisma.caseParticipant.findUniqueOrThrow({
+				where: { id: result.participantId }
 			});
 
 			return successResponse(
@@ -1373,16 +1341,26 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('remove_participant', 'concierge_case', participant.caseId);
 
-			const now = new Date();
-			await prisma.caseParticipant.update({
-				where: { id: input.participantId },
-				data: { removedAt: now }
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'REMOVE_PARTICIPANT',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				participantId: input.participantId
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove participant' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					removedAt: now.toISOString()
+					removedAt: result.removedAt!
 				},
 				context
 			);
@@ -1429,15 +1407,27 @@ export const conciergeCaseRouter = {
 				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
 
-			await prisma.conciergeCase.update({
-				where: { id: input.caseId },
-				data: { linkedUnitId: input.unitId }
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'LINK_UNIT',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				unitId: input.unitId
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link unit' });
+			}
 
 			return successResponse(
 				{
 					caseId: input.caseId,
-					linkedUnitId: input.unitId
+					linkedUnitId: result.linkedUnitId!
 				},
 				context
 			);
@@ -1484,15 +1474,27 @@ export const conciergeCaseRouter = {
 				throw errors.NOT_FOUND({ message: 'Job not found' });
 			}
 
-			await prisma.conciergeCase.update({
-				where: { id: input.caseId },
-				data: { linkedJobId: input.jobId }
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'LINK_JOB',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				jobId: input.jobId
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link job' });
+			}
 
 			return successResponse(
 				{
 					caseId: input.caseId,
-					linkedJobId: input.jobId
+					linkedJobId: result.linkedJobId!
 				},
 				context
 			);
@@ -1533,34 +1535,27 @@ export const conciergeCaseRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
 
-			const unlinked: string[] = [];
-			const updateData: { linkedUnitId?: null; linkedJobId?: null } = {};
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UNLINK_CROSS_DOMAIN',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				unlinkType: input.unlinkType
+			});
 
-			if (input.unlinkType === 'unit' || input.unlinkType === 'all') {
-				if (conciergeCase.linkedUnitId) {
-					updateData.linkedUnitId = null;
-					unlinked.push('unit');
-				}
-			}
+			const result = await handle.getResult();
 
-			if (input.unlinkType === 'job' || input.unlinkType === 'all') {
-				if (conciergeCase.linkedJobId) {
-					updateData.linkedJobId = null;
-					unlinked.push('job');
-				}
-			}
-
-			if (Object.keys(updateData).length > 0) {
-				await prisma.conciergeCase.update({
-					where: { id: input.caseId },
-					data: updateData
-				});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to unlink' });
 			}
 
 			return successResponse(
 				{
 					caseId: input.caseId,
-					unlinked
+					unlinked: result.unlinked ?? []
 				},
 				context
 			);
@@ -1615,67 +1610,43 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('request_clarification', 'concierge_case', conciergeCase.id);
 
-			// Create clarification request note and transition status in transaction
-			const result = await prisma.$transaction(async (tx) => {
-				// Create the clarification request note
-				const note = await tx.caseNote.create({
-					data: {
-						caseId: input.caseId,
-						content: input.question,
-						noteType: 'CLARIFICATION_REQUEST',
-						isInternal: false, // Visible to owner
-						createdBy: context.user.id
-					}
-				});
-
-				// Transition to PENDING_OWNER if not already there
-				let updatedCase = conciergeCase;
-				if (conciergeCase.status !== 'PENDING_OWNER') {
-					const validTransitions = VALID_STATUS_TRANSITIONS[conciergeCase.status] || [];
-					if (validTransitions.includes('PENDING_OWNER')) {
-						updatedCase = await tx.conciergeCase.update({
-							where: { id: input.caseId },
-							data: { status: 'PENDING_OWNER' }
-						});
-
-						await tx.caseStatusHistory.create({
-							data: {
-								caseId: input.caseId,
-								fromStatus: conciergeCase.status,
-								toStatus: 'PENDING_OWNER',
-								reason: 'Clarification requested from owner',
-								changedBy: context.user.id
-							}
-						});
-					}
-				}
-
-				return { note, updatedCase };
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'REQUEST_CLARIFICATION',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				clarificationQuestion: input.question
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'REQUEST_INFO',
-				summary: `Clarification requested: ${input.question.substring(0, 100)}`,
-				caseId: conciergeCase.id,
-				propertyId: conciergeCase.propertyId,
-				newState: { status: result.updatedCase.status, clarificationRequested: true }
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to request clarification' });
+			}
+
+			// Fetch note and case for response
+			const note = await prisma.caseNote.findUniqueOrThrow({
+				where: { id: result.noteId }
+			});
+			const updatedCase = await prisma.conciergeCase.findUniqueOrThrow({
+				where: { id: input.caseId }
 			});
 
 			return successResponse(
 				{
 					note: {
-						id: result.note.id,
-						caseId: result.note.caseId,
-						content: result.note.content,
-						noteType: result.note.noteType,
-						createdAt: result.note.createdAt.toISOString()
+						id: note.id,
+						caseId: note.caseId,
+						content: note.content,
+						noteType: note.noteType,
+						createdAt: note.createdAt.toISOString()
 					},
 					case: {
-						id: result.updatedCase.id,
-						status: result.updatedCase.status
+						id: updatedCase.id,
+						status: updatedCase.status
 					}
 				},
 				context
@@ -1727,25 +1698,26 @@ export const conciergeCaseRouter = {
 			// Cerbos authorization - owners can respond to clarifications
 			await context.cerbos.authorize('respond_clarification', 'concierge_case', conciergeCase.id);
 
-			// Create clarification response note
-			const note = await prisma.caseNote.create({
-				data: {
-					caseId: input.caseId,
-					content: input.response,
-					noteType: 'CLARIFICATION_RESPONSE',
-					isInternal: false, // Visible to concierge
-					createdBy: context.user.id
-				}
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'RESPOND_CLARIFICATION',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				clarificationResponse: input.response
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'RESPOND',
-				summary: `Owner responded to clarification: ${input.response.substring(0, 100)}`,
-				caseId: conciergeCase.id,
-				propertyId: conciergeCase.propertyId
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to respond to clarification' });
+			}
+
+			// Fetch note for response
+			const note = await prisma.caseNote.findUniqueOrThrow({
+				where: { id: result.noteId }
 			});
 
 			return successResponse(
@@ -2101,26 +2073,27 @@ export const conciergeCaseRouter = {
 				throw errors.NOT_FOUND({ message: 'ARCRequest not found' });
 			}
 
-			await prisma.conciergeCase.update({
-				where: { id: input.caseId },
-				data: { linkedArcRequestId: input.arcRequestId }
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'LINK_ARC',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				arcRequestId: input.arcRequestId
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'LINK',
-				summary: `Case linked to ARC request`,
-				caseId: conciergeCase.id,
-				propertyId: conciergeCase.propertyId,
-				newState: { linkedArcRequestId: input.arcRequestId }
-			});
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link ARC request' });
+			}
 
 			return successResponse(
 				{
 					caseId: input.caseId,
-					linkedArcRequestId: input.arcRequestId
+					linkedArcRequestId: result.linkedArcRequestId!
 				},
 				context
 			);
@@ -2167,21 +2140,22 @@ export const conciergeCaseRouter = {
 				throw errors.NOT_FOUND({ message: 'WorkOrder not found' });
 			}
 
-			await prisma.conciergeCase.update({
-				where: { id: input.caseId },
-				data: { linkedWorkOrderId: input.workOrderId }
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'LINK_WORK_ORDER',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.caseId,
+				workOrderId: input.workOrderId
 			});
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
-				entityId: conciergeCase.id,
-				action: 'LINK',
-				summary: `Case linked to work order`,
-				caseId: conciergeCase.id,
-				propertyId: conciergeCase.propertyId,
-				newState: { linkedWorkOrderId: input.workOrderId }
-			});
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link work order' });
+			}
 
 			return successResponse(
 				{
@@ -2211,7 +2185,13 @@ export const conciergeCaseRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ context }) => {
+			await context.cerbos.authorize('view', 'concierge_case', 'list');
+
 			// Get all members of the organization who can be assigned as concierges
 			// Include ADMIN and MANAGER roles as potential concierges
 			const memberships = await prisma.userOrganization.findMany({

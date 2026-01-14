@@ -1,0 +1,33 @@
+# Dashboard Resource Policy
+# Controls access to dashboard views and analytics.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "dashboard"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to dashboards
+    - actions: ["view", "record"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can view and interact with dashboards
+    - actions: ["view", "record"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view dashboards
+    - actions: ["view", "record"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

@@ -283,7 +283,7 @@ export async function startEstimateGeneration(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `estimate-gen-${input.estimateId}-${Date.now()}`;
-	await DBOS.startWorkflow(estimateGeneration_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(estimateGeneration_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

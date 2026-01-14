@@ -306,6 +306,7 @@ export const paymentRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'payment_intent', input.id);
 			await assertContractorOrg(context.organization.id, errors);
 
 			const existing = await prisma.paymentIntent.findFirst({
@@ -426,6 +427,7 @@ export const paymentRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'payment_intent', input.id);
 			await assertContractorOrg(context.organization.id, errors);
 
 			const existing = await prisma.paymentIntent.findFirst({

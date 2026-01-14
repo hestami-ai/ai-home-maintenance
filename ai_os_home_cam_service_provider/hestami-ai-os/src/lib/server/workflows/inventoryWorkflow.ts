@@ -355,10 +355,10 @@ export const inventoryWorkflow_v1 = DBOS.registerWorkflow(inventoryWorkflow);
 
 export async function startInventoryWorkflow(
 	input: InventoryWorkflowInput,
-	workflowId?: string
+	workflowId?: string, idempotencyKey: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `inventory-${input.action.toLowerCase()}-${Date.now()}`;
-	await DBOS.startWorkflow(inventoryWorkflow_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(inventoryWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

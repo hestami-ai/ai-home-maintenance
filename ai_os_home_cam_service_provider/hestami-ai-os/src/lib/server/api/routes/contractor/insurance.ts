@@ -7,6 +7,7 @@ import {
 	PaginationInputSchema,
 	PaginationOutputSchema
 } from '../../router.js';
+import { InsuranceTypeSchema, InsuranceStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
@@ -35,21 +36,14 @@ const insuranceOutput = z.object({
 const upsertInput = z
 	.object({
 		id: z.string().optional(),
-		insuranceType: z.enum([
-			'GENERAL_LIABILITY',
-			'WORKERS_COMPENSATION',
-			'PROFESSIONAL_LIABILITY',
-			'AUTO_LIABILITY',
-			'UMBRELLA',
-			'BONDING'
-		]),
+		insuranceType: InsuranceTypeSchema,
 		policyNumber: z.string().min(1),
 		carrier: z.string().min(1),
 		coverageAmount: z.union([z.number().positive(), z.string().min(1)]),
 		deductible: z.union([z.number().nonnegative(), z.string()]).optional(),
 		effectiveDate: z.string().datetime(),
 		expirationDate: z.string().datetime(),
-		status: z.enum(['ACTIVE', 'EXPIRED', 'PENDING_VERIFICATION', 'CANCELLED']).optional(),
+		status: InsuranceStatusSchema.optional(),
 		verifiedAt: z.string().datetime().optional(),
 		verifiedBy: z.string().optional(),
 		coiDocumentUrl: z.string().url().optional(),
@@ -124,7 +118,7 @@ export const insuranceRouter = {
 	list: orgProcedure
 		.input(
 			PaginationInputSchema.extend({
-				status: z.enum(['ACTIVE', 'EXPIRED', 'PENDING_VERIFICATION', 'CANCELLED']).optional()
+				status: InsuranceStatusSchema.optional()
 			})
 		)
 		.errors({

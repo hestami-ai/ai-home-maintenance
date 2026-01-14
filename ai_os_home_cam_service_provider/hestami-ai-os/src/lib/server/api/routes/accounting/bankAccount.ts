@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
+import { FundTypeSchema, BankAccountTypeSchema } from '../../schemas.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startBankAccountWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('BankAccountRoute');
 
@@ -17,13 +19,14 @@ export const bankAccountRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				glAccountId: z.string(),
 				bankName: z.string().min(1).max(255),
 				accountName: z.string().min(1).max(255),
 				accountNumber: z.string().min(1).max(20), // Last 4 digits for display
 				routingNumber: z.string().max(20).optional(),
-				accountType: z.enum(['CHECKING', 'SAVINGS', 'MONEY_MARKET']),
-				fundType: z.enum(['OPERATING', 'RESERVE', 'SPECIAL']).default('OPERATING'),
+				accountType: BankAccountTypeSchema,
+				fundType: FundTypeSchema.default('OPERATING'),
 				isPrimary: z.boolean().default(false)
 			})
 		)
@@ -84,21 +87,12 @@ export const bankAccountRouter = {
 				throw errors.CONFLICT({ message: 'GL account is already linked to a bank account' });
 			}
 
-			// If setting as primary, unset other primary accounts of same fund type
-			if (input.isPrimary) {
-				await prisma.bankAccount.updateMany({
-					where: {
-						associationId: association.id,
-						fundType: input.fundType,
-						isPrimary: true
-					},
-					data: { isPrimary: false }
-				});
-			}
-
-			const bankAccount = await prisma.bankAccount.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startBankAccountWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					glAccountId: input.glAccountId,
 					bankName: input.bankName,
@@ -108,19 +102,24 @@ export const bankAccountRouter = {
 					accountType: input.accountType,
 					fundType: input.fundType,
 					isPrimary: input.isPrimary
-				}
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create bank account' });
+			}
 
 			return successResponse(
 				{
 					bankAccount: {
-						id: bankAccount.id,
-						bankName: bankAccount.bankName,
-						accountName: bankAccount.accountName,
-						accountNumber: bankAccount.accountNumber,
-						accountType: bankAccount.accountType,
-						fundType: bankAccount.fundType,
-						isPrimary: bankAccount.isPrimary
+						id: workflowResult.bankAccountId!,
+						bankName: workflowResult.bankName!,
+						accountName: workflowResult.accountName!,
+						accountNumber: workflowResult.accountNumber!,
+						accountType: input.accountType,
+						fundType: workflowResult.fundType!,
+						isPrimary: workflowResult.isPrimary!
 					}
 				},
 				context
@@ -133,7 +132,7 @@ export const bankAccountRouter = {
 	list: orgProcedure
 		.input(
 			z.object({
-				fundType: z.enum(['OPERATING', 'RESERVE', 'SPECIAL']).optional(),
+				fundType: FundTypeSchema.optional(),
 				isActive: z.boolean().optional()
 			}).optional()
 		)
@@ -298,6 +297,7 @@ export const bankAccountRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				bankName: z.string().min(1).max(255).optional(),
 				accountName: z.string().min(1).max(255).optional(),
@@ -345,34 +345,37 @@ export const bankAccountRouter = {
 				throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 			}
 
-			// If setting as primary, unset other primary accounts of same fund type
-			if (input.isPrimary === true) {
-				await prisma.bankAccount.updateMany({
-					where: {
-						associationId: association.id,
-						fundType: existing.fundType,
-						isPrimary: true,
-						id: { not: input.id }
-					},
-					data: { isPrimary: false }
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startBankAccountWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					bankAccountId: input.id,
+					bankName: input.bankName,
+					accountName: input.accountName,
+					accountNumber: input.accountNumber,
+					routingNumber: input.routingNumber,
+					isPrimary: input.isPrimary,
+					isActive: input.isActive,
+					existingFundType: existing.fundType
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update bank account' });
 			}
-
-			const { id, ...updateData } = input;
-
-			const bankAccount = await prisma.bankAccount.update({
-				where: { id },
-				data: updateData
-			});
 
 			return successResponse(
 				{
 					bankAccount: {
-						id: bankAccount.id,
-						bankName: bankAccount.bankName,
-						accountName: bankAccount.accountName,
-						isPrimary: bankAccount.isPrimary,
-						isActive: bankAccount.isActive
+						id: workflowResult.bankAccountId!,
+						bankName: workflowResult.bankName!,
+						accountName: workflowResult.accountName!,
+						isPrimary: workflowResult.isPrimary!,
+						isActive: workflowResult.isActive!
 					}
 				},
 				context
@@ -383,7 +386,7 @@ export const bankAccountRouter = {
 	 * Deactivate bank account (soft delete)
 	 */
 	delete: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ idempotencyKey: z.string().uuid(), id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			CONFLICT: { message: 'Conflict' },
@@ -431,10 +434,20 @@ export const bankAccountRouter = {
 				throw errors.CONFLICT({ message: 'Cannot deactivate bank account with pending payments' });
 			}
 
-			await prisma.bankAccount.update({
-				where: { id: input.id },
-				data: { isActive: false, isPrimary: false }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startBankAccountWorkflow(
+				{
+					action: 'DEACTIVATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					bankAccountId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to deactivate bank account' });
+			}
 
 			return successResponse({ success: true }, context);
 		}),
@@ -445,6 +458,7 @@ export const bankAccountRouter = {
 	updateBankBalance: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				bankBalance: z.number(),
 				reconcileDate: z.string().datetime().optional()
@@ -488,24 +502,31 @@ export const bankAccountRouter = {
 				throw errors.NOT_FOUND({ message: 'Bank Account not found' });
 			}
 
-			const bankAccount = await prisma.bankAccount.update({
-				where: { id: input.id },
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startBankAccountWorkflow(
+				{
+					action: 'UPDATE_BALANCE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					bankAccountId: input.id,
 					bankBalance: input.bankBalance,
-					lastReconciled: input.reconcileDate ? new Date(input.reconcileDate) : new Date()
-				}
-			});
+					reconcileDate: input.reconcileDate
+				},
+				input.idempotencyKey
+			);
 
-			const difference = Number(bankAccount.bookBalance) - Number(bankAccount.bankBalance);
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update bank balance' });
+			}
 
 			return successResponse(
 				{
 					bankAccount: {
-						id: bankAccount.id,
-						bookBalance: bankAccount.bookBalance.toString(),
-						bankBalance: bankAccount.bankBalance.toString(),
-						difference: difference.toFixed(2),
-						lastReconciled: bankAccount.lastReconciled?.toISOString() ?? null
+						id: workflowResult.bankAccountId!,
+						bookBalance: workflowResult.bookBalance!,
+						bankBalance: workflowResult.bankBalance!,
+						difference: workflowResult.difference!,
+						lastReconciled: workflowResult.lastReconciled ?? null
 					}
 				},
 				context

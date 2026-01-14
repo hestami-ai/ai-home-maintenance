@@ -380,11 +380,10 @@ export const visitWorkflow_v1 = DBOS.registerWorkflow(visitWorkflow);
 
 export async function startVisitWorkflow(
 	input: VisitWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<VisitWorkflowResult> {
 	const handle = await DBOS.startWorkflow(visitWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

@@ -1,0 +1,45 @@
+# Violation Fine Resource Policy
+# Controls access to fines issued for violations.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "violation_fine"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to violation fines
+    - actions: ["view", "create", "edit", "delete", "waive", "convert_to_charge"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can manage violation fines
+    - actions: ["view", "create", "edit", "waive", "convert_to_charge"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view and waive fines
+    - actions: ["view", "waive"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Owners can view fines against their units
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_owner
+
+    # Auditors can view for compliance purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_auditor
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

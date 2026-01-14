@@ -24,6 +24,7 @@ export const BillingAction = {
 	CREATE_PROPOSAL: 'CREATE_PROPOSAL',
 	UPDATE_PROPOSAL: 'UPDATE_PROPOSAL',
 	SEND_PROPOSAL: 'SEND_PROPOSAL',
+	MARK_PROPOSAL_VIEWED: 'MARK_PROPOSAL_VIEWED',
 	ACCEPT_PROPOSAL: 'ACCEPT_PROPOSAL',
 	DECLINE_PROPOSAL: 'DECLINE_PROPOSAL',
 	DELETE_PROPOSAL: 'DELETE_PROPOSAL',
@@ -44,6 +45,7 @@ export const BillingAction = {
 	CREATE_INVOICE_FROM_ESTIMATE: 'CREATE_INVOICE_FROM_ESTIMATE',
 	UPDATE_INVOICE: 'UPDATE_INVOICE',
 	SEND_INVOICE: 'SEND_INVOICE',
+	MARK_INVOICE_VIEWED: 'MARK_INVOICE_VIEWED',
 	RECORD_INVOICE_PAYMENT: 'RECORD_INVOICE_PAYMENT',
 	VOID_INVOICE: 'VOID_INVOICE',
 	DELETE_INVOICE: 'DELETE_INVOICE'
@@ -523,6 +525,15 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 				entityId = result.id;
 				break;
 			}
+			case 'MARK_PROPOSAL_VIEWED': {
+				if (!input.entityId) throw new Error('entityId required');
+				const result = await DBOS.runStep(
+					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, 'VIEWED', 'MARK_PROPOSAL_VIEWED'),
+					{ name: 'markProposalViewed' }
+				);
+				entityId = result.id;
+				break;
+			}
 			case 'ACCEPT_PROPOSAL': {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
@@ -653,6 +664,15 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 				entityId = result.id;
 				break;
 			}
+			case 'MARK_INVOICE_VIEWED': {
+				if (!input.entityId) throw new Error('entityId required');
+				const result = await DBOS.runStep(
+					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, 'VIEWED', 'MARK_INVOICE_VIEWED'),
+					{ name: 'markInvoiceViewed' }
+				);
+				entityId = result.id;
+				break;
+			}
 			case 'VOID_INVOICE': {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
@@ -708,11 +728,10 @@ export const billingWorkflow_v1 = DBOS.registerWorkflow(billingWorkflow);
 
 export async function startBillingWorkflow(
 	input: BillingWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<BillingWorkflowResult> {
 	const handle = await DBOS.startWorkflow(billingWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

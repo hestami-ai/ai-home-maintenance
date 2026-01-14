@@ -186,9 +186,9 @@ export const timeEntryWorkflow_v1 = DBOS.registerWorkflow(timeEntryWorkflow);
 
 export async function startTimeEntryWorkflow(
 	input: TimeEntryWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<TimeEntryWorkflowResult> {
 	const workflowId = idempotencyKey || `time-entry-${input.action}-${input.entryId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(timeEntryWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(timeEntryWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

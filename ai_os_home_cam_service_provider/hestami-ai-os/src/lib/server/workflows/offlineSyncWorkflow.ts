@@ -298,9 +298,9 @@ export const offlineSyncWorkflow_v1 = DBOS.registerWorkflow(offlineSyncWorkflow)
 
 export async function startOfflineSyncWorkflow(
 	input: OfflineSyncWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<OfflineSyncWorkflowResult> {
 	const workflowId = idempotencyKey || `offline-sync-${input.action}-${input.queueItemId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(offlineSyncWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(offlineSyncWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

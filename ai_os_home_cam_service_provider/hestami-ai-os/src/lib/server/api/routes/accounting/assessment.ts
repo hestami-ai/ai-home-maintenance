@@ -3,9 +3,9 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
-import { postAssessmentChargeToGL } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
-import { recordSpanError } from '../../middleware/tracing.js';
+import { AssessmentFrequencySchema, ChargeStatusSchema } from '../../schemas.js';
+import { startAssessmentWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('AssessmentRoute');
 
@@ -23,10 +23,11 @@ export const assessmentRouter = {
 	createType: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				name: z.string().min(1).max(255),
 				description: z.string().max(500).optional(),
 				code: z.string().min(1).max(10).regex(/^[A-Z0-9]+$/, 'Code must be uppercase alphanumeric'),
-				frequency: z.enum(['MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL', 'ONE_TIME']),
+				frequency: AssessmentFrequencySchema,
 				defaultAmount: z.number().positive(),
 				revenueAccountId: z.string(),
 				lateFeeAccountId: z.string().optional(),
@@ -99,9 +100,12 @@ export const assessmentRouter = {
 				throw errors.CONFLICT({ message: 'Assessment type code already exists' });
 			}
 
-			const assessmentType = await prisma.assessmentType.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startAssessmentWorkflow(
+				{
+					action: 'CREATE_TYPE',
 					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					name: input.name,
 					description: input.description,
@@ -114,17 +118,22 @@ export const assessmentRouter = {
 					lateFeePercent: input.lateFeePercent,
 					gracePeriodDays: input.gracePeriodDays,
 					prorateOnTransfer: input.prorateOnTransfer
-				}
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create assessment type' });
+			}
 
 			return successResponse(
 				{
 					assessmentType: {
-						id: assessmentType.id,
-						name: assessmentType.name,
-						code: assessmentType.code,
-						frequency: assessmentType.frequency,
-						defaultAmount: assessmentType.defaultAmount.toString()
+						id: workflowResult.assessmentTypeId!,
+						name: workflowResult.assessmentTypeName!,
+						code: workflowResult.assessmentTypeCode!,
+						frequency: input.frequency,
+						defaultAmount: input.defaultAmount.toString()
 					}
 				},
 				context
@@ -211,6 +220,7 @@ export const assessmentRouter = {
 	createCharge: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				unitId: z.string(),
 				assessmentTypeId: z.string(),
 				chargeDate: z.string().datetime(),
@@ -270,45 +280,37 @@ export const assessmentRouter = {
 				throw errors.NOT_FOUND({ message: 'Assessment Type not found' });
 			}
 
-			const charge = await prisma.assessmentCharge.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startAssessmentWorkflow(
+				{
+					action: 'CREATE_CHARGE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
 					associationId: association.id,
 					unitId: input.unitId,
 					assessmentTypeId: input.assessmentTypeId,
-					chargeDate: new Date(input.chargeDate),
-					dueDate: new Date(input.dueDate),
-					periodStart: input.periodStart ? new Date(input.periodStart) : null,
-					periodEnd: input.periodEnd ? new Date(input.periodEnd) : null,
+					chargeDate: input.chargeDate,
+					dueDate: input.dueDate,
+					periodStart: input.periodStart,
+					periodEnd: input.periodEnd,
 					amount: input.amount,
-					totalAmount: input.amount,
-					balanceDue: input.amount,
 					description: input.description,
-					status: 'BILLED'
-				}
-			});
+					postToGL: input.postToGL
+				},
+				input.idempotencyKey
+			);
 
-			// Post to GL if requested
-			if (input.postToGL) {
-				try {
-					await postAssessmentChargeToGL(charge.id, context.user!.id);
-				} catch (error) {
-					const errorObj = error instanceof Error ? error : new Error(String(error));
-					// Log but don't fail - GL posting can be done later
-					console.warn(`Failed to post charge ${charge.id} to GL:`, error);
-					await recordSpanError(errorObj, {
-						errorCode: 'GL_POSTING_FAILED',
-						errorType: 'AssessmentCharge_GL_Error'
-					});
-				}
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create assessment charge' });
 			}
 
 			return successResponse(
 				{
 					charge: {
-						id: charge.id,
-						amount: charge.amount.toString(),
-						dueDate: charge.dueDate.toISOString(),
-						status: charge.status
+						id: workflowResult.chargeId!,
+						amount: workflowResult.chargeAmount!,
+						dueDate: workflowResult.chargeDueDate!,
+						status: workflowResult.chargeStatus!
 					}
 				},
 				context
@@ -322,7 +324,7 @@ export const assessmentRouter = {
 		.input(
 			z.object({
 				unitId: z.string().optional(),
-				status: z.enum(['PENDING', 'BILLED', 'PARTIALLY_PAID', 'PAID', 'WRITTEN_OFF', 'CREDITED']).optional(),
+				status: ChargeStatusSchema.optional(),
 				fromDate: z.string().datetime().optional(),
 				toDate: z.string().datetime().optional()
 			}).optional()

@@ -187,11 +187,10 @@ export const jobCreateWorkflow_v1 = DBOS.registerWorkflow(jobCreateWorkflow);
 
 export async function startJobCreateWorkflow(
 	input: JobCreateInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<JobCreateResult> {
 	const handle = await DBOS.startWorkflow(jobCreateWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

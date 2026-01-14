@@ -7,90 +7,17 @@ import {
 	PaginationInputSchema,
 	PaginationOutputSchema
 } from '../../router.js';
+import { JobPrioritySchema, JobVisitStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobStatus, JobSourceType, CheckpointType } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
 import { startJobCreateWorkflow } from '../../../workflows/jobCreateWorkflow.js';
 import { startJobWorkflow } from '../../../workflows/jobWorkflow.js';
-import { recordSpanError } from '../../middleware/tracing.js';
-
-// Phase 15.7: CAM & Concierge Integration - Propagate job status to linked entities
-async function propagateJobStatusToLinkedEntities(
-	job: { id: string; workOrderId: string | null; status: JobStatus },
-	toStatus: JobStatus,
-	context: { user?: { id: string } | null }
-): Promise<void> {
-	try {
-		// Map job status to work order status
-		const jobToWorkOrderStatus: Partial<Record<JobStatus, string>> = {
-			SCHEDULED: 'SCHEDULED',
-			DISPATCHED: 'SCHEDULED',
-			IN_PROGRESS: 'IN_PROGRESS',
-			COMPLETED: 'COMPLETED',
-			CLOSED: 'CLOSED',
-			CANCELLED: 'CANCELLED'
-		};
-
-		const workOrderStatus = jobToWorkOrderStatus[toStatus];
-
-		// Update linked work order if exists
-		if (job.workOrderId && workOrderStatus) {
-			await prisma.workOrder.update({
-				where: { id: job.workOrderId },
-				data: {
-					status: workOrderStatus as any,
-					...(toStatus === 'COMPLETED' ? { completedAt: new Date() } : {}),
-					...(toStatus === 'CLOSED' ? { closedAt: new Date(), closedBy: context.user?.id } : {})
-				}
-			}).catch((err) => {
-				console.error(`Failed to update linked work order ${job.workOrderId}:`, err);
-			});
-		}
-
-		// Concierge Case Integration - Find and update linked cases
-		// Cases are linked to jobs via the linkedJobId field
-		const linkedCases = await prisma.conciergeCase.findMany({
-			where: { linkedJobId: job.id }
-		}).catch(() => []);
-
-		if (linkedCases.length > 0) {
-			// Map job status to case status
-			const jobToCaseStatus: Partial<Record<JobStatus, string>> = {
-				SCHEDULED: 'IN_PROGRESS',
-				IN_PROGRESS: 'IN_PROGRESS',
-				COMPLETED: 'RESOLVED',
-				CLOSED: 'CLOSED',
-				CANCELLED: 'CLOSED'
-			};
-
-			const caseStatus = jobToCaseStatus[toStatus];
-			if (caseStatus) {
-				for (const linkedCase of linkedCases) {
-					await prisma.conciergeCase.update({
-						where: { id: linkedCase.id },
-						data: {
-							status: caseStatus as any,
-							...(toStatus === 'COMPLETED' || toStatus === 'CLOSED' ? { resolvedAt: new Date() } : {}),
-							...(toStatus === 'CLOSED' ? { closedAt: new Date() } : {})
-						}
-					}).catch((err) => {
-						console.error(`Failed to update linked case ${linkedCase.id}:`, err);
-					});
-				}
-			}
-		}
-	} catch (err) {
-		const errorObj = err instanceof Error ? err : new Error(String(err));
-		console.error('Failed to propagate job status to linked entities:', err);
-		await recordSpanError(errorObj, {
-			errorCode: 'STATUS_PROPAGATION_FAILED',
-			errorType: 'Job_Status_Propagation_Error'
-		});
-	}
-}
 
 // Valid state transitions for jobs (Phase 15 - Contractor Job Lifecycle)
+// Note: Linked entity propagation (work orders, concierge cases) is now handled
+// inside the jobWorkflow transitionJobStatus step function
 const JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 	// Initial states
 	LEAD: ['TICKET', 'CANCELLED'],
@@ -358,7 +285,7 @@ export const jobRouter = {
 					title: z.string().min(1).max(255),
 					description: z.string().optional(),
 					category: z.string().max(100).optional(),
-					priority: z.enum(['EMERGENCY', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
+					priority: JobPrioritySchema.default('MEDIUM'),
 					estimatedHours: z.number().positive().optional(),
 					estimatedCost: z.number().nonnegative().optional()
 				})
@@ -552,7 +479,7 @@ export const jobRouter = {
 					title: z.string().min(1).max(255).optional(),
 					description: z.string().nullable().optional(),
 					category: z.string().max(100).nullable().optional(),
-					priority: z.enum(['EMERGENCY', 'HIGH', 'MEDIUM', 'LOW']).optional(),
+					priority: JobPrioritySchema.optional(),
 					addressLine1: z.string().max(255).nullable().optional(),
 					addressLine2: z.string().max(255).nullable().optional(),
 					city: z.string().max(100).nullable().optional(),
@@ -711,8 +638,7 @@ export const jobRouter = {
 				{ jobId: updatedJob.id }
 			);
 
-			// Phase 15.7: CAM & Concierge Integration - Propagate status to linked entities
-			await propagateJobStatusToLinkedEntities(updatedJob, input.toStatus, context);
+			// Phase 15.7: Linked entity propagation is now handled by the jobWorkflow
 
 			return successResponse({ job: formatJob(updatedJob) }, context);
 		}),
@@ -1361,7 +1287,7 @@ export const jobRouter = {
 				.object({
 					jobId: z.string(),
 					visitId: z.string(),
-					status: z.enum(['SCHEDULED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
+					status: JobVisitStatusSchema,
 					actualStart: z.string().datetime().optional(),
 					actualEnd: z.string().datetime().optional(),
 					workPerformed: z.string().optional()

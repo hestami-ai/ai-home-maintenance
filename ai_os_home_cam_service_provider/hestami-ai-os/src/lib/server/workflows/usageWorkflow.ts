@@ -186,9 +186,9 @@ export const usageWorkflow_v1 = DBOS.registerWorkflow(usageWorkflow);
 
 export async function startUsageWorkflow(
 	input: UsageWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<UsageWorkflowResult> {
 	const workflowId = idempotencyKey || `usage-${input.action}-${input.usageId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(usageWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(usageWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

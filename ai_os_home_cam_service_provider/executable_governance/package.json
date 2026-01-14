@@ -1,0 +1,35 @@
+{
+  "name": "executable_governance",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "verify": "bun run src/cli.ts verify mutations",
+    "verify:json": "bun run src/cli.ts verify mutations --json",
+    "fix:workflows": "bun run scripts/fix-workflow-mapping.ts",
+    "fix:workflows:dry": "bun run scripts/fix-workflow-mapping.ts --dry-run",
+    "fix:schemas": "bun run scripts/fix-input-schemas.ts",
+    "fix:schemas:dry": "bun run scripts/fix-input-schemas.ts --dry-run",
+    "fix:signatures": "bun run scripts/fix-workflow-signatures.ts",
+    "fix:signatures:dry": "bun run scripts/fix-workflow-signatures.ts --dry-run",
+    "fix:malformed": "bun run scripts/fix-malformed-workflow-calls.ts",
+    "fix:malformed:dry": "bun run scripts/fix-malformed-workflow-calls.ts --dry-run",
+    "fix:all": "bun run scripts/fix-workflow-mapping.ts && bun run scripts/fix-input-schemas.ts && bun run scripts/fix-workflow-signatures.ts && bun run scripts/fix-malformed-workflow-calls.ts",
+    "fix:all:dry": "bun run scripts/fix-workflow-mapping.ts --dry-run && bun run scripts/fix-input-schemas.ts --dry-run && bun run scripts/fix-workflow-signatures.ts --dry-run && bun run scripts/fix-malformed-workflow-calls.ts --dry-run",
+    "template": "bun run scripts/generate-workflow-template.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "glob": "^13.0.0",
+    "minimatch": "^10.1.1",
+    "ts-morph": "^27.0.2",
+    "zod": "^4.3.5"
+  }
+}

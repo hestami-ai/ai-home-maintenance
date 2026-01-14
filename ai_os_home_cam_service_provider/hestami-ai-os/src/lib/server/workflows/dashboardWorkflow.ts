@@ -203,9 +203,9 @@ export const dashboardWorkflow_v1 = DBOS.registerWorkflow(dashboardWorkflow);
 
 export async function startDashboardWorkflow(
 	input: DashboardWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<DashboardWorkflowResult> {
 	const workflowId = idempotencyKey || `dashboard-${input.action}-${input.widgetId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(dashboardWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(dashboardWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

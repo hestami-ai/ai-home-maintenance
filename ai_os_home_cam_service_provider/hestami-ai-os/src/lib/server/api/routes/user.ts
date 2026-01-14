@@ -27,6 +27,10 @@ export const userRouter = {
                 meta: ResponseMetaSchema
             })
         )
+        .errors({
+			BAD_REQUEST: { message: 'Invalid email address' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to find user' }
+		})
         .handler(async ({ input, context }) => {
             const user = await prisma.user.findUnique({
                 where: { email: input.email },

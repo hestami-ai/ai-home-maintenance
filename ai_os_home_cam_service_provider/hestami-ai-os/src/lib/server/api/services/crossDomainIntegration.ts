@@ -7,10 +7,14 @@
  * - Violation → Job creation for remediation
  * - ARC Request → Job creation for inspections/installations
  * - Vendor compliance integration
+ *
+ * NOTE: All mutating operations are now delegated to crossDomainIntegrationWorkflow
+ * for governance compliance (R2/R3 rules - DBOS durable workflows).
  */
 
 import { prisma } from '../../db.js';
 import { JobStatus, JobSourceType, WorkOrderStatus } from '../../../../../generated/prisma/client.js';
+import { startCrossDomainIntegrationWorkflow } from '../../workflows/index.js';
 
 // =============================================================================
 // Status Mapping
@@ -56,6 +60,7 @@ export interface CreateJobFromWorkOrderInput {
 	userId: string;
 	assignedTechnicianId?: string;
 	assignedBranchId?: string;
+	idempotencyKey: string;
 }
 
 export interface CreateJobFromWorkOrderResult {
@@ -66,27 +71,12 @@ export interface CreateJobFromWorkOrderResult {
 
 /**
  * Create a contractor Job from an HOA Work Order
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function createJobFromWorkOrder(
 	input: CreateJobFromWorkOrderInput
 ): Promise<CreateJobFromWorkOrderResult> {
-	const workOrder = await prisma.workOrder.findUnique({
-		where: { id: input.workOrderId },
-		include: {
-			unit: true,
-			association: {
-				include: {
-					properties: { take: 1 }
-				}
-			}
-		}
-	});
-
-	if (!workOrder) {
-		throw new Error(`Work order not found: ${input.workOrderId}`);
-	}
-
-	// Check if job already exists for this work order
+	// Check if job already exists for this work order (read-only check)
 	const existingJob = await prisma.job.findFirst({
 		where: {
 			workOrderId: input.workOrderId,
@@ -103,64 +93,24 @@ export async function createJobFromWorkOrder(
 		};
 	}
 
-	// Generate job number
-	const year = new Date().getFullYear();
-	const count = await prisma.job.count({
-		where: {
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'CREATE_JOB_FROM_WORK_ORDER',
 			organizationId: input.contractorOrgId,
-			jobNumber: { startsWith: `JOB-${year}-` }
-		}
-	});
-	const jobNumber = `JOB-${year}-${String(count + 1).padStart(6, '0')}`;
+			userId: input.userId,
+			workOrderId: input.workOrderId
+		},
+		input.idempotencyKey
+	);
 
-	// Map work order status to job status
-	const jobStatus = WORK_ORDER_TO_JOB_STATUS[workOrder.status] ?? 'TICKET';
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to create job from work order');
+	}
 
-	// Map priority
-	const priorityMap: Record<string, string> = {
-		EMERGENCY: 'EMERGENCY',
-		HIGH: 'HIGH',
-		MEDIUM: 'MEDIUM',
-		LOW: 'LOW'
-	};
-
-	const job = await prisma.$transaction(async (tx) => {
-		const newJob = await tx.job.create({
-			data: {
-				organizationId: input.contractorOrgId,
-				jobNumber,
-				status: jobStatus,
-				sourceType: 'WORK_ORDER',
-				workOrderId: workOrder.id,
-				unitId: workOrder.unitId,
-				propertyId: workOrder.unit?.propertyId ?? workOrder.association?.properties[0]?.id,
-				associationId: workOrder.associationId,
-				title: workOrder.title,
-				description: workOrder.description,
-				category: workOrder.category,
-				priority: priorityMap[workOrder.priority] ?? 'MEDIUM',
-				assignedTechnicianId: input.assignedTechnicianId,
-				assignedBranchId: input.assignedBranchId,
-				assignedAt: input.assignedTechnicianId ? new Date() : null,
-				assignedBy: input.assignedTechnicianId ? input.userId : null,
-				scheduledStart: workOrder.scheduledStart,
-				scheduledEnd: workOrder.scheduledEnd,
-				estimatedCost: workOrder.estimatedCost,
-				estimatedHours: workOrder.estimatedHours,
-				locationNotes: workOrder.locationDetails
-			}
-		});
-
-		// Record initial status
-		await tx.jobStatusHistory.create({
-			data: {
-				jobId: newJob.id,
-				toStatus: newJob.status,
-				changedBy: input.userId
-			}
-		});
-
-		return newJob;
+	// Fetch the created job to get the job number
+	const job = await prisma.job.findUniqueOrThrow({
+		where: { id: result.jobId! }
 	});
 
 	return {
@@ -172,21 +122,20 @@ export async function createJobFromWorkOrder(
 
 /**
  * Sync Job status back to Work Order
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function syncJobStatusToWorkOrder(
 	jobId: string,
-	userId: string
+	userId: string,
+	organizationId: string,
+	idempotencyKey: string
 ): Promise<{ workOrderId: string; newStatus: WorkOrderStatus } | null> {
 	const job = await prisma.job.findUnique({
 		where: { id: jobId },
 		select: {
 			workOrderId: true,
 			status: true,
-			completedAt: true,
-			closedAt: true,
-			actualCost: true,
-			actualHours: true,
-			resolutionNotes: true
+			organizationId: true
 		}
 	});
 
@@ -208,45 +157,37 @@ export async function syncJobStatusToWorkOrder(
 		return null;
 	}
 
-	await prisma.$transaction(async (tx) => {
-		// Update work order status
-		await tx.workOrder.update({
-			where: { id: job.workOrderId! },
-			data: {
-				status: newWorkOrderStatus,
-				...(job.status === 'IN_PROGRESS' && !job.completedAt && { startedAt: new Date() }),
-				...(job.status === 'COMPLETED' && { completedAt: job.completedAt ?? new Date() }),
-				...(job.status === 'CLOSED' && { closedAt: job.closedAt ?? new Date(), closedBy: userId }),
-				...(job.actualCost && { actualCost: job.actualCost }),
-				...(job.actualHours && { actualHours: job.actualHours }),
-				...(job.resolutionNotes && { resolutionNotes: job.resolutionNotes })
-			}
-		});
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'SYNC_JOB_STATUS_TO_WORK_ORDER',
+			organizationId,
+			userId,
+			jobId,
+			jobStatus: job.status
+		},
+		idempotencyKey
+	);
 
-		// Record status history
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: job.workOrderId!,
-				fromStatus: workOrder.status,
-				toStatus: newWorkOrderStatus,
-				changedBy: userId,
-				notes: `Synced from Job status: ${job.status}`
-			}
-		});
-	});
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to sync job status to work order');
+	}
 
 	return {
 		workOrderId: job.workOrderId,
-		newStatus: newWorkOrderStatus
+		newStatus: result.newStatus as WorkOrderStatus
 	};
 }
 
 /**
  * Sync Work Order status to Job
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function syncWorkOrderStatusToJob(
 	workOrderId: string,
-	userId: string
+	userId: string,
+	organizationId: string,
+	idempotencyKey: string
 ): Promise<{ jobId: string; newStatus: JobStatus } | null> {
 	const workOrder = await prisma.workOrder.findUnique({
 		where: { id: workOrderId },
@@ -271,26 +212,25 @@ export async function syncWorkOrderStatusToJob(
 		return null;
 	}
 
-	await prisma.$transaction(async (tx) => {
-		await tx.job.update({
-			where: { id: job.id },
-			data: { status: newJobStatus }
-		});
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'SYNC_WORK_ORDER_STATUS_TO_JOB',
+			organizationId,
+			userId,
+			workOrderId,
+			workOrderStatus: workOrder.status
+		},
+		idempotencyKey
+	);
 
-		await tx.jobStatusHistory.create({
-			data: {
-				jobId: job.id,
-				fromStatus: job.status,
-				toStatus: newJobStatus,
-				changedBy: userId,
-				notes: `Synced from Work Order status: ${workOrder.status}`
-			}
-		});
-	});
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to sync work order status to job');
+	}
 
 	return {
 		jobId: job.id,
-		newStatus: newJobStatus
+		newStatus: result.newStatus as JobStatus
 	};
 }
 
@@ -306,6 +246,7 @@ export interface CreateJobFromViolationInput {
 	description?: string;
 	assignedTechnicianId?: string;
 	assignedBranchId?: string;
+	idempotencyKey: string;
 }
 
 export interface CreateJobFromViolationResult {
@@ -316,23 +257,12 @@ export interface CreateJobFromViolationResult {
 
 /**
  * Create a remediation Job from a Violation
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function createJobFromViolation(
 	input: CreateJobFromViolationInput
 ): Promise<CreateJobFromViolationResult> {
-	const violation = await prisma.violation.findUnique({
-		where: { id: input.violationId },
-		include: {
-			unit: { select: { propertyId: true } },
-			violationType: { select: { name: true } }
-		}
-	});
-
-	if (!violation) {
-		throw new Error(`Violation not found: ${input.violationId}`);
-	}
-
-	// Check if job already exists
+	// Check if job already exists (read-only check)
 	const existingJob = await prisma.job.findFirst({
 		where: {
 			violationId: input.violationId,
@@ -349,48 +279,24 @@ export async function createJobFromViolation(
 		};
 	}
 
-	// Generate job number
-	const year = new Date().getFullYear();
-	const count = await prisma.job.count({
-		where: {
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'CREATE_JOB_FROM_VIOLATION',
 			organizationId: input.contractorOrgId,
-			jobNumber: { startsWith: `JOB-${year}-` }
-		}
-	});
-	const jobNumber = `JOB-${year}-${String(count + 1).padStart(6, '0')}`;
+			userId: input.userId,
+			violationId: input.violationId
+		},
+		input.idempotencyKey
+	);
 
-	const job = await prisma.$transaction(async (tx) => {
-		const violationTypeName = violation.violationType?.name ?? 'Unknown';
-		const newJob = await tx.job.create({
-			data: {
-				organizationId: input.contractorOrgId,
-				jobNumber,
-				status: 'TICKET',
-				sourceType: 'VIOLATION',
-				violationId: violation.id,
-				unitId: violation.unitId,
-				propertyId: violation.unit?.propertyId,
-				associationId: violation.associationId,
-				title: input.title ?? `Violation Remediation: ${violationTypeName}`,
-				description: input.description ?? violation.description,
-				category: violationTypeName,
-				priority: violation.severity === 'CRITICAL' ? 'EMERGENCY' : violation.severity === 'MAJOR' ? 'HIGH' : 'MEDIUM',
-				assignedTechnicianId: input.assignedTechnicianId,
-				assignedBranchId: input.assignedBranchId,
-				assignedAt: input.assignedTechnicianId ? new Date() : null,
-				assignedBy: input.assignedTechnicianId ? input.userId : null
-			}
-		});
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to create job from violation');
+	}
 
-		await tx.jobStatusHistory.create({
-			data: {
-				jobId: newJob.id,
-				toStatus: newJob.status,
-				changedBy: input.userId
-			}
-		});
-
-		return newJob;
+	// Fetch the created job to get the job number
+	const job = await prisma.job.findUniqueOrThrow({
+		where: { id: result.jobId! }
 	});
 
 	return {
@@ -413,6 +319,7 @@ export interface CreateJobFromARCRequestInput {
 	jobType: 'INSPECTION' | 'INSTALLATION';
 	assignedTechnicianId?: string;
 	assignedBranchId?: string;
+	idempotencyKey: string;
 }
 
 export interface CreateJobFromARCRequestResult {
@@ -423,22 +330,12 @@ export interface CreateJobFromARCRequestResult {
 
 /**
  * Create an inspection or installation Job from an ARC Request
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function createJobFromARCRequest(
 	input: CreateJobFromARCRequestInput
 ): Promise<CreateJobFromARCRequestResult> {
-	const arcRequest = await prisma.aRCRequest.findUnique({
-		where: { id: input.arcRequestId },
-		include: {
-			unit: { select: { propertyId: true } }
-		}
-	});
-
-	if (!arcRequest) {
-		throw new Error(`ARC Request not found: ${input.arcRequestId}`);
-	}
-
-	// Check if job already exists
+	// Check if job already exists (read-only check)
 	const existingJob = await prisma.job.findFirst({
 		where: {
 			arcRequestId: input.arcRequestId,
@@ -456,49 +353,24 @@ export async function createJobFromARCRequest(
 		};
 	}
 
-	// Generate job number
-	const year = new Date().getFullYear();
-	const count = await prisma.job.count({
-		where: {
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'CREATE_JOB_FROM_ARC_REQUEST',
 			organizationId: input.contractorOrgId,
-			jobNumber: { startsWith: `JOB-${year}-` }
-		}
-	});
-	const jobNumber = `JOB-${year}-${String(count + 1).padStart(6, '0')}`;
+			userId: input.userId,
+			arcRequestId: input.arcRequestId
+		},
+		input.idempotencyKey
+	);
 
-	const titlePrefix = input.jobType === 'INSPECTION' ? 'ARC Inspection' : 'ARC Installation';
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to create job from ARC request');
+	}
 
-	const job = await prisma.$transaction(async (tx) => {
-		const newJob = await tx.job.create({
-			data: {
-				organizationId: input.contractorOrgId,
-				jobNumber,
-				status: 'TICKET',
-				sourceType: 'ARC_REQUEST',
-				arcRequestId: arcRequest.id,
-				unitId: arcRequest.unitId,
-				propertyId: arcRequest.unit?.propertyId,
-				associationId: arcRequest.associationId,
-				title: input.title ?? `${titlePrefix}: ${arcRequest.title}`,
-				description: input.description ?? arcRequest.description,
-				category: input.jobType,
-				priority: 'MEDIUM',
-				assignedTechnicianId: input.assignedTechnicianId,
-				assignedBranchId: input.assignedBranchId,
-				assignedAt: input.assignedTechnicianId ? new Date() : null,
-				assignedBy: input.assignedTechnicianId ? input.userId : null
-			}
-		});
-
-		await tx.jobStatusHistory.create({
-			data: {
-				jobId: newJob.id,
-				toStatus: newJob.status,
-				changedBy: input.userId
-			}
-		});
-
-		return newJob;
+	// Fetch the created job to get the job number
+	const job = await prisma.job.findUniqueOrThrow({
+		where: { id: result.jobId! }
 	});
 
 	return {
@@ -617,9 +489,13 @@ export async function getVendorComplianceStatus(
 
 /**
  * Update vendor compliance notes based on contractor compliance status
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function syncVendorComplianceNotes(
-	vendorId: string
+	vendorId: string,
+	organizationId: string,
+	userId: string,
+	idempotencyKey: string
 ): Promise<{ updated: boolean; notes?: string }> {
 	const compliance = await getVendorComplianceStatus(vendorId);
 
@@ -645,10 +521,21 @@ export async function syncVendorComplianceNotes(
 
 	const complianceNotes = notes.join('; ');
 
-	await prisma.vendor.update({
-		where: { id: vendorId },
-		data: { complianceNotes }
-	});
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'SYNC_VENDOR_COMPLIANCE_NOTES',
+			organizationId,
+			userId,
+			vendorId,
+			notes: complianceNotes
+		},
+		idempotencyKey
+	);
+
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to sync vendor compliance notes');
+	}
 
 	return { updated: true, notes: complianceNotes };
 }
@@ -862,6 +749,7 @@ export interface CreateWorkOrderFromViolationInput {
 	title?: string;
 	description?: string;
 	priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW' | 'SCHEDULED';
+	idempotencyKey: string;
 }
 
 export interface CreateWorkOrderFromViolationResult {
@@ -872,6 +760,7 @@ export interface CreateWorkOrderFromViolationResult {
 
 /**
  * Phase 9: Create a Work Order from a Violation (remediation work)
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function createWorkOrderFromViolation(
 	input: CreateWorkOrderFromViolationInput
@@ -892,7 +781,7 @@ export async function createWorkOrderFromViolation(
 		throw new Error('Violation does not belong to this association');
 	}
 
-	// Check if work order already exists for this violation
+	// Check if work order already exists for this violation (read-only check)
 	const existingWO = await prisma.workOrder.findFirst({
 		where: {
 			violationId: input.violationId,
@@ -908,45 +797,25 @@ export async function createWorkOrderFromViolation(
 		};
 	}
 
-	// Generate work order number
-	const lastWO = await prisma.workOrder.findFirst({
-		where: { associationId: input.associationId },
-		orderBy: { createdAt: 'desc' }
-	});
-
-	const workOrderNumber = lastWO
-		? `WO-${String(parseInt(lastWO.workOrderNumber.split('-')[1] || '0') + 1).padStart(6, '0')}`
-		: 'WO-000001';
-
-	const workOrder = await prisma.workOrder.create({
-		data: {
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'CREATE_WORK_ORDER_FROM_VIOLATION',
 			organizationId: input.organizationId,
-			associationId: input.associationId,
-			workOrderNumber,
-			title: input.title ?? `Remediation: ${violation.violationType.name}`,
-			description: input.description ?? `Work order created to remediate violation #${violation.violationNumber}: ${violation.title}`,
-			category: 'REPAIR',
-			priority: input.priority ?? 'MEDIUM',
-			status: 'DRAFT',
-			unitId: violation.unitId,
-			commonAreaName: violation.commonAreaName,
-			locationDetails: violation.locationDetails,
-			requestedBy: input.userId,
-			originType: 'VIOLATION_REMEDIATION',
-			violationId: violation.id,
-			originNotes: `Created from violation #${violation.violationNumber}`
-		}
-	});
+			userId: input.userId,
+			violationId: input.violationId,
+			priority: input.priority as any
+		},
+		input.idempotencyKey
+	);
 
-	// Record status history
-	await prisma.workOrderStatusHistory.create({
-		data: {
-			workOrderId: workOrder.id,
-			fromStatus: null,
-			toStatus: 'DRAFT',
-			changedBy: input.userId,
-			notes: `Work order created from violation #${violation.violationNumber}`
-		}
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to create work order from violation');
+	}
+
+	// Fetch the created work order to get the work order number
+	const workOrder = await prisma.workOrder.findUniqueOrThrow({
+		where: { id: result.workOrderId! }
 	});
 
 	return {
@@ -964,6 +833,7 @@ export interface CreateWorkOrderFromARCInput {
 	title?: string;
 	description?: string;
 	priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW' | 'SCHEDULED';
+	idempotencyKey: string;
 }
 
 export interface CreateWorkOrderFromARCResult {
@@ -974,6 +844,7 @@ export interface CreateWorkOrderFromARCResult {
 
 /**
  * Phase 9: Create a Work Order from an approved ARC Request
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function createWorkOrderFromARC(
 	input: CreateWorkOrderFromARCInput
@@ -995,7 +866,7 @@ export async function createWorkOrderFromARC(
 		throw new Error('ARC Request must be approved before creating work order');
 	}
 
-	// Check if work order already exists for this ARC request
+	// Check if work order already exists for this ARC request (read-only check)
 	const existingWO = await prisma.workOrder.findFirst({
 		where: {
 			arcRequestId: input.arcRequestId,
@@ -1011,45 +882,25 @@ export async function createWorkOrderFromARC(
 		};
 	}
 
-	// Generate work order number
-	const lastWO = await prisma.workOrder.findFirst({
-		where: { associationId: input.associationId },
-		orderBy: { createdAt: 'desc' }
-	});
-
-	const workOrderNumber = lastWO
-		? `WO-${String(parseInt(lastWO.workOrderNumber.split('-')[1] || '0') + 1).padStart(6, '0')}`
-		: 'WO-000001';
-
-	const workOrder = await prisma.workOrder.create({
-		data: {
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'CREATE_WORK_ORDER_FROM_ARC',
 			organizationId: input.organizationId,
-			associationId: input.associationId,
-			workOrderNumber,
-			title: input.title ?? arcRequest.title,
-			description: input.description ?? arcRequest.description,
-			category: 'INSTALLATION',
-			priority: input.priority ?? 'MEDIUM',
-			status: 'DRAFT',
-			unitId: arcRequest.unitId,
-			requestedBy: input.userId,
-			estimatedCost: arcRequest.estimatedCost,
-			originType: 'ARC_APPROVAL',
-			arcRequestId: arcRequest.id,
-			originNotes: `Created from ARC request #${arcRequest.requestNumber}`,
-			constraints: arcRequest.conditions // Copy approval conditions
-		}
-	});
+			userId: input.userId,
+			arcRequestId: input.arcRequestId,
+			priority: input.priority as any
+		},
+		input.idempotencyKey
+	);
 
-	// Record status history
-	await prisma.workOrderStatusHistory.create({
-		data: {
-			workOrderId: workOrder.id,
-			fromStatus: null,
-			toStatus: 'DRAFT',
-			changedBy: input.userId,
-			notes: `Work order created from ARC request #${arcRequest.requestNumber}`
-		}
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to create work order from ARC request');
+	}
+
+	// Fetch the created work order to get the work order number
+	const workOrder = await prisma.workOrder.findUniqueOrThrow({
+		where: { id: result.workOrderId! }
 	});
 
 	return {
@@ -1069,6 +920,7 @@ export interface CreateWorkOrderFromResolutionInput {
 	priority?: 'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW' | 'SCHEDULED';
 	budgetSource?: 'OPERATING' | 'RESERVE' | 'SPECIAL';
 	approvedAmount?: number;
+	idempotencyKey: string;
 }
 
 export interface CreateWorkOrderFromResolutionResult {
@@ -1080,6 +932,7 @@ export interface CreateWorkOrderFromResolutionResult {
 /**
  * Phase 9: Create a Work Order from a Board Resolution (board directive)
  * Board directives are pre-authorized
+ * Uses crossDomainIntegrationWorkflow for governance compliance.
  */
 export async function createWorkOrderFromResolution(
 	input: CreateWorkOrderFromResolutionInput
@@ -1100,7 +953,7 @@ export async function createWorkOrderFromResolution(
 		throw new Error('Resolution must be adopted before creating work order');
 	}
 
-	// Check if work order already exists for this resolution
+	// Check if work order already exists for this resolution (read-only check)
 	const existingWO = await prisma.workOrder.findFirst({
 		where: {
 			resolutionId: input.resolutionId,
@@ -1116,52 +969,25 @@ export async function createWorkOrderFromResolution(
 		};
 	}
 
-	// Generate work order number
-	const lastWO = await prisma.workOrder.findFirst({
-		where: { associationId: input.associationId },
-		orderBy: { createdAt: 'desc' }
-	});
-
-	const workOrderNumber = lastWO
-		? `WO-${String(parseInt(lastWO.workOrderNumber.split('-')[1] || '0') + 1).padStart(6, '0')}`
-		: 'WO-000001';
-
-	const now = new Date();
-
-	// Board directives are pre-authorized
-	const workOrder = await prisma.workOrder.create({
-		data: {
+	// Delegate to workflow for mutation
+	const result = await startCrossDomainIntegrationWorkflow(
+		{
+			action: 'CREATE_WORK_ORDER_FROM_RESOLUTION',
 			organizationId: input.organizationId,
-			associationId: input.associationId,
-			workOrderNumber,
-			title: input.title ?? resolution.title,
-			description: input.description ?? resolution.summary ?? `Work order per board resolution: ${resolution.title}`,
-			category: 'MAINTENANCE',
-			priority: input.priority ?? 'MEDIUM',
-			status: 'AUTHORIZED', // Pre-authorized by board
-			requestedBy: input.userId,
-			originType: 'BOARD_DIRECTIVE',
-			resolutionId: resolution.id,
-			originNotes: `Created from board resolution: ${resolution.title}`,
-			// Pre-authorized fields
-			authorizedBy: input.userId,
-			authorizedAt: now,
-			authorizingRole: 'BOARD',
-			authorizationRationale: `Per board resolution: ${resolution.title}`,
-			budgetSource: input.budgetSource,
-			approvedAmount: input.approvedAmount
-		}
-	});
+			userId: input.userId,
+			resolutionId: input.resolutionId,
+			priority: input.priority as any
+		},
+		input.idempotencyKey
+	);
 
-	// Record status history (skip DRAFT, go straight to AUTHORIZED)
-	await prisma.workOrderStatusHistory.create({
-		data: {
-			workOrderId: workOrder.id,
-			fromStatus: null,
-			toStatus: 'AUTHORIZED',
-			changedBy: input.userId,
-			notes: `Work order created and pre-authorized from board resolution: ${resolution.title}`
-		}
+	if (!result.success) {
+		throw new Error(result.error || 'Failed to create work order from resolution');
+	}
+
+	// Fetch the created work order to get the work order number
+	const workOrder = await prisma.workOrder.findUniqueOrThrow({
+		where: { id: result.workOrderId! }
 	});
 
 	return {

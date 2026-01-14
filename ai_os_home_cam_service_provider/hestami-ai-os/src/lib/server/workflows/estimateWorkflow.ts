@@ -21,6 +21,7 @@ export const EstimateAction = {
 	ADD_LINE: 'ADD_LINE',
 	REMOVE_LINE: 'REMOVE_LINE',
 	SEND_ESTIMATE: 'SEND_ESTIMATE',
+	MARK_VIEWED: 'MARK_VIEWED',
 	ACCEPT_ESTIMATE: 'ACCEPT_ESTIMATE',
 	DECLINE_ESTIMATE: 'DECLINE_ESTIMATE',
 	REVISE_ESTIMATE: 'REVISE_ESTIMATE',
@@ -117,6 +118,23 @@ async function sendEstimate(
 	});
 
 	console.log(`[EstimateWorkflow] SEND_ESTIMATE on estimate:${estimateId} by user ${userId}`);
+	return estimateId;
+}
+
+async function markViewed(
+	organizationId: string,
+	userId: string,
+	estimateId: string
+): Promise<string> {
+	await prisma.estimate.update({
+		where: { id: estimateId },
+		data: {
+			status: 'VIEWED',
+			viewedAt: new Date()
+		}
+	});
+
+	log.info('MARK_VIEWED completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -362,6 +380,13 @@ async function estimateWorkflow(input: EstimateWorkflowInput): Promise<EstimateW
 				);
 				break;
 
+			case 'MARK_VIEWED':
+				entityId = await DBOS.runStep(
+					() => markViewed(input.organizationId, input.userId, input.estimateId!),
+					{ name: 'markViewed' }
+				);
+				break;
+
 			case 'ACCEPT_ESTIMATE':
 				entityId = await DBOS.runStep(
 					() => acceptEstimate(input.organizationId, input.userId, input.estimateId!, input.data),
@@ -421,9 +446,9 @@ export const estimateWorkflow_v1 = DBOS.registerWorkflow(estimateWorkflow);
 
 export async function startEstimateWorkflow(
 	input: EstimateWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<EstimateWorkflowResult> {
 	const workflowId = idempotencyKey || `estimate-${input.action}-${input.estimateId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(estimateWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(estimateWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

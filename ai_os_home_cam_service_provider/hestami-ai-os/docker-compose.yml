@@ -148,7 +148,7 @@ services:
       - "-s3-object-prefix="
       - "-behind-proxy"
       - "-base-path=/files/"
-      - "-hooks-http=http://hestami-app:3000/api/internal/tus-hook"
+      - "-hooks-http=http://app:3000/api/internal/tus-hook"
       - "-hooks-http-retry=3"
       - "-hooks-http-backoff=1s"
     depends_on:
@@ -301,7 +301,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    # Note: container_name removed to allow replicas
+    # Note: container_name removed to allow replicas; hostname has a similar problem as well
     # container_name: hestami-app
     env_file:
       - ./.env

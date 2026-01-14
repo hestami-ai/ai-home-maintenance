@@ -7,6 +7,7 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
+import { startPropertyPortfolioWorkflow } from '../../../workflows/index.js';
 
 /**
  * Property Portfolio Schema for responses
@@ -48,30 +49,37 @@ export const propertyPortfolioRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'property_portfolio', 'new');
 
-			const portfolio = await prisma.propertyPortfolio.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyPortfolioWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user.id,
 					name: input.name,
-					description: input.description ?? null,
-					isActive: true
-				}
-			});
+					description: input.description
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create portfolio' });
+			}
 
 			return successResponse(
 				{
 					portfolio: {
-						id: portfolio.id,
-						organizationId: portfolio.organizationId,
-						name: portfolio.name,
-						description: portfolio.description,
-						isActive: portfolio.isActive,
-						propertyCount: 0,
-						createdAt: portfolio.createdAt.toISOString(),
-						updatedAt: portfolio.updatedAt.toISOString()
+						id: workflowResult.portfolioId!,
+						organizationId: context.organization.id,
+						name: workflowResult.name!,
+						description: workflowResult.description ?? null,
+						isActive: workflowResult.isActive!,
+						propertyCount: workflowResult.propertyCount!,
+						createdAt: workflowResult.createdAt!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -184,6 +192,8 @@ export const propertyPortfolioRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'property_portfolio', 'list');
+
 			const where = {
 				organizationId: context.organization.id,
 				deletedAt: null,
@@ -265,31 +275,35 @@ export const propertyPortfolioRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'property_portfolio', existing.id);
 
-			const portfolio = await prisma.propertyPortfolio.update({
-				where: { id: input.portfolioId },
-				data: {
-					...(input.name !== undefined && { name: input.name }),
-					...(input.description !== undefined && { description: input.description }),
-					...(input.isActive !== undefined && { isActive: input.isActive })
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyPortfolioWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					portfolioId: input.portfolioId,
+					name: input.name,
+					description: input.description,
+					isActive: input.isActive
 				},
-				include: {
-					_count: {
-						select: { properties: true }
-					}
-				}
-			});
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update portfolio' });
+			}
 
 			return successResponse(
 				{
 					portfolio: {
-						id: portfolio.id,
-						organizationId: portfolio.organizationId,
-						name: portfolio.name,
-						description: portfolio.description,
-						isActive: portfolio.isActive,
-						propertyCount: portfolio._count.properties,
-						createdAt: portfolio.createdAt.toISOString(),
-						updatedAt: portfolio.updatedAt.toISOString()
+						id: workflowResult.portfolioId!,
+						organizationId: context.organization.id,
+						name: workflowResult.name!,
+						description: workflowResult.description ?? null,
+						isActive: workflowResult.isActive!,
+						propertyCount: workflowResult.propertyCount!,
+						createdAt: workflowResult.createdAt!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -334,10 +348,20 @@ export const propertyPortfolioRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'property_portfolio', existing.id);
 
-			await prisma.propertyPortfolio.update({
-				where: { id: input.portfolioId },
-				data: { deletedAt: new Date() }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyPortfolioWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					portfolioId: input.portfolioId
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to delete portfolio' });
+			}
 
 			return successResponse({ deleted: true }, context);
 		}),
@@ -361,55 +385,36 @@ export const propertyPortfolioRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
-			// Check for existing default portfolio
-			let portfolio = await prisma.propertyPortfolio.findFirst({
-				where: {
+		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('view', 'property_portfolio', 'list');
+
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startPropertyPortfolioWorkflow(
+				{
+					action: 'GET_OR_CREATE_DEFAULT',
 					organizationId: context.organization.id,
-					deletedAt: null,
-					isActive: true
+					userId: context.user.id
 				},
-				orderBy: { createdAt: 'asc' },
-				include: {
-					_count: {
-						select: { properties: true }
-					}
-				}
-			});
+				input.idempotencyKey
+			);
 
-			let created = false;
-
-			if (!portfolio) {
-				// Create default portfolio
-				portfolio = await prisma.propertyPortfolio.create({
-					data: {
-						organizationId: context.organization.id,
-						name: 'My Properties',
-						description: 'Default property portfolio',
-						isActive: true
-					},
-					include: {
-						_count: {
-							select: { properties: true }
-						}
-					}
-				});
-				created = true;
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to get or create default portfolio' });
 			}
 
 			return successResponse(
 				{
 					portfolio: {
-						id: portfolio.id,
-						organizationId: portfolio.organizationId,
-						name: portfolio.name,
-						description: portfolio.description,
-						isActive: portfolio.isActive,
-						propertyCount: portfolio._count.properties,
-						createdAt: portfolio.createdAt.toISOString(),
-						updatedAt: portfolio.updatedAt.toISOString()
+						id: workflowResult.portfolioId!,
+						organizationId: context.organization.id,
+						name: workflowResult.name!,
+						description: workflowResult.description ?? null,
+						isActive: workflowResult.isActive!,
+						propertyCount: workflowResult.propertyCount!,
+						createdAt: workflowResult.createdAt!,
+						updatedAt: workflowResult.updatedAt!
 					},
-					created
+					created: workflowResult.created!
 				},
 				context
 			);

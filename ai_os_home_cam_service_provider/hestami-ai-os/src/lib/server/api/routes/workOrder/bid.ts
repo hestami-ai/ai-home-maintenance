@@ -1,15 +1,14 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
+import { BidStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startBidWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('BidRoute');
 
-const bidStatusEnum = z.enum([
-	'REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW',
-	'ACCEPTED', 'REJECTED', 'WITHDRAWN', 'EXPIRED'
-]);
+const bidStatusEnum = BidStatusSchema;
 
 /**
  * Work Order Bidding procedures
@@ -21,6 +20,7 @@ export const bidRouter = {
 	requestBids: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				workOrderId: z.string(),
 				vendorIds: z.array(z.string()).min(1).max(10),
 				dueDate: z.string().datetime(),
@@ -95,20 +95,30 @@ export const bidRouter = {
 				throw errors.CONFLICT({ message: 'Bids already requested from all specified vendors' });
 			}
 
-			// Create bid requests
-			const bids = await prisma.$transaction(
-				newVendorIds.map(vendorId =>
-					prisma.workOrderBid.create({
-						data: {
-							workOrderId: input.workOrderId,
-							vendorId,
-							status: 'REQUESTED',
-							validUntil: new Date(input.dueDate),
-							notes: input.notes
-						}
-					})
-				)
+			// Create bid requests via workflow
+			const result = await startBidWorkflow(
+				{
+					action: 'REQUEST_BIDS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					workOrderId: input.workOrderId,
+					data: {
+						vendorIds: newVendorIds,
+						dueDate: input.dueDate,
+						notes: input.notes
+					}
+				},
+				input.idempotencyKey
 			);
+
+			if (!result.success || !result.bidIds) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to request bids' });
+			}
+
+			// Return the created bids
+			const bids = await prisma.workOrderBid.findMany({
+				where: { id: { in: result.bidIds } }
+			});
 
 			return successResponse(
 				{
@@ -128,7 +138,8 @@ export const bidRouter = {
 	submitBid: orgProcedure
 		.input(
 			z.object({
-				bidId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                bidId: z.string(),
 				laborCost: z.number().min(0),
 				materialsCost: z.number().min(0),
 				estimatedHours: z.number().min(0).optional(),
@@ -182,36 +193,51 @@ export const bidRouter = {
 
 			// Check if bid has expired
 			if (bid.validUntil && new Date() > bid.validUntil) {
-				await prisma.workOrderBid.update({
-					where: { id: input.bidId },
-					data: { status: 'EXPIRED' }
-				});
+				// Expire via workflow
+				await startBidWorkflow(
+					{
+						action: 'EXPIRE_BID',
+						organizationId: context.organization!.id,
+						userId: context.user!.id,
+						bidId: input.bidId,
+						data: {}
+					},
+					`${input.idempotencyKey}-expire`
+				);
 				throw errors.BAD_REQUEST({ message: 'Bid has expired' });
+			}
+
+			// Submit bid via workflow
+			const result = await startBidWorkflow(
+				{
+					action: 'SUBMIT_BID',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					bidId: input.bidId,
+					data: {
+						laborCost: input.laborCost,
+						materialsCost: input.materialsCost,
+						estimatedHours: input.estimatedHours,
+						proposedStartDate: input.proposedStartDate,
+						proposedEndDate: input.proposedEndDate,
+						notes: input.notes
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to submit bid' });
 			}
 
 			const totalAmount = input.laborCost + input.materialsCost;
 
-			const updated = await prisma.workOrderBid.update({
-				where: { id: input.bidId },
-				data: {
-					laborCost: input.laborCost,
-					materialsCost: input.materialsCost,
-					totalAmount,
-					estimatedHours: input.estimatedHours,
-					proposedStartDate: input.proposedStartDate ? new Date(input.proposedStartDate) : null,
-					proposedEndDate: input.proposedEndDate ? new Date(input.proposedEndDate) : null,
-					notes: input.notes,
-					status: 'SUBMITTED',
-					submittedAt: new Date()
-				}
-			});
-
 			return successResponse(
 				{
 					bid: {
-						id: updated.id,
-						totalAmount: updated.totalAmount!.toString(),
-						status: updated.status
+						id: input.bidId,
+						totalAmount: totalAmount.toString(),
+						status: 'SUBMITTED'
 					}
 				},
 				context
@@ -300,6 +326,7 @@ export const bidRouter = {
 	acceptBid: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				bidId: z.string(),
 				notes: z.string().max(1000).optional()
 			})
@@ -348,68 +375,40 @@ export const bidRouter = {
 				throw errors.BAD_REQUEST({ message: 'Bid must be submitted to accept' });
 			}
 
-			const result = await prisma.$transaction(async (tx) => {
-				// Accept this bid
-				const acceptedBid = await tx.workOrderBid.update({
-					where: { id: input.bidId },
-					data: {
-						status: 'ACCEPTED',
-						respondedAt: new Date(),
-						respondedBy: context.user!.id
-					}
-				});
-
-				// Reject all other bids for this work order
-				await tx.workOrderBid.updateMany({
-					where: {
-						workOrderId: bid.workOrderId,
-						id: { not: input.bidId },
-						status: { in: ['REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW'] }
-					},
-					data: {
-						status: 'REJECTED',
-						respondedAt: new Date(),
-						respondedBy: context.user!.id
-					}
-				});
-
-				// Assign vendor to work order
-				const workOrder = await tx.workOrder.update({
-					where: { id: bid.workOrderId },
-					data: {
-						assignedVendorId: bid.vendorId,
-						assignedAt: new Date(),
-						assignedBy: context.user!.id,
-						status: 'ASSIGNED',
-						estimatedCost: bid.totalAmount,
-						estimatedHours: bid.estimatedHours
-					}
-				});
-
-				// Record status change
-				await tx.workOrderStatusHistory.create({
+			// Accept bid via workflow
+			const result = await startBidWorkflow(
+				{
+					action: 'ACCEPT_BID',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					bidId: input.bidId,
 					data: {
 						workOrderId: bid.workOrderId,
-						fromStatus: bid.workOrder.status,
-						toStatus: 'ASSIGNED',
-						changedBy: context.user!.id,
-						notes: input.notes || `Bid accepted from ${bid.vendor.name}`
+						vendorId: bid.vendorId,
+						vendorName: bid.vendor.name,
+						workOrderStatus: bid.workOrder.status,
+						totalAmount: bid.totalAmount ? parseFloat(bid.totalAmount.toString()) : undefined,
+						estimatedHours: bid.estimatedHours ?? undefined,
+						notes: input.notes
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return { acceptedBid, workOrder };
-			});
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to accept bid' });
+			}
 
 			return successResponse(
 				{
 					bid: {
-						id: result.acceptedBid.id,
-						status: result.acceptedBid.status
+						id: input.bidId,
+						status: 'ACCEPTED'
 					},
 					workOrder: {
-						id: result.workOrder.id,
-						status: result.workOrder.status,
-						assignedVendorId: result.workOrder.assignedVendorId!
+						id: bid.workOrderId,
+						status: 'ASSIGNED',
+						assignedVendorId: bid.vendorId
 					}
 				},
 				context
@@ -422,6 +421,7 @@ export const bidRouter = {
 	rejectBid: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				bidId: z.string(),
 				reason: z.string().max(500).optional()
 			})
@@ -465,21 +465,29 @@ export const bidRouter = {
 				throw errors.BAD_REQUEST({ message: 'Bid must be submitted to reject' });
 			}
 
-			const updated = await prisma.workOrderBid.update({
-				where: { id: input.bidId },
-				data: {
-					status: 'REJECTED',
-					respondedAt: new Date(),
-					respondedBy: context.user!.id,
-					notes: input.reason ? `Rejected: ${input.reason}` : bid.notes
-				}
-			});
+			// Reject bid via workflow
+			const result = await startBidWorkflow(
+				{
+					action: 'REJECT_BID',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					bidId: input.bidId,
+					data: {
+						reason: input.reason
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to reject bid' });
+			}
 
 			return successResponse(
 				{
 					bid: {
-						id: updated.id,
-						status: updated.status
+						id: input.bidId,
+						status: 'REJECTED'
 					}
 				},
 				context
@@ -492,6 +500,7 @@ export const bidRouter = {
 	withdrawBid: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				bidId: z.string(),
 				reason: z.string().max(500).optional()
 			})
@@ -513,6 +522,8 @@ export const bidRouter = {
 			BAD_REQUEST: { message: 'Bad request' }
 		})
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'work_order_bid', input.bidId);
+
 			const association = await prisma.association.findFirst({
 				where: { organizationId: context.organization!.id, deletedAt: null }
 			});
@@ -533,19 +544,29 @@ export const bidRouter = {
 				throw errors.BAD_REQUEST({ message: 'Bid cannot be withdrawn in current status' });
 			}
 
-			const updated = await prisma.workOrderBid.update({
-				where: { id: input.bidId },
-				data: {
-					status: 'WITHDRAWN',
-					notes: input.reason ? `Withdrawn: ${input.reason}` : bid.notes
-				}
-			});
+			// Withdraw bid via workflow
+			const result = await startBidWorkflow(
+				{
+					action: 'WITHDRAW_BID',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					bidId: input.bidId,
+					data: {
+						reason: input.reason
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to withdraw bid' });
+			}
 
 			return successResponse(
 				{
 					bid: {
-						id: updated.id,
-						status: updated.status
+						id: input.bidId,
+						status: 'WITHDRAWN'
 					}
 				},
 				context

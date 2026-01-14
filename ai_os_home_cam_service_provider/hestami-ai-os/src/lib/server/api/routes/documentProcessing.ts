@@ -4,6 +4,7 @@ import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
 import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
 import { DocumentStatusSchema } from '$lib/schemas/index.js';
+import { startSystemSettingsWorkflow } from '../../workflows/systemSettingsWorkflow.js';
 
 const log = createModuleLogger('DocumentProcessingRoute');
 
@@ -45,6 +46,10 @@ export const documentProcessingRouter = {
                 meta: z.any()
             })
         )
+        .errors({
+            FORBIDDEN: { message: 'Access denied' },
+            INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+        })
         .handler(async ({ context, errors }) => {
             await requireStaffPermission(context, 'view_stats', errors);
 
@@ -66,6 +71,10 @@ export const documentProcessingRouter = {
                 organizationId: z.string().optional()
             })
         )
+        .errors({
+            FORBIDDEN: { message: 'Access denied' },
+            INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+        })
         .handler(async ({ input, context, errors }) => {
             await requireStaffPermission(context, 'view_queue', errors);
 
@@ -107,6 +116,10 @@ export const documentProcessingRouter = {
      * Get DPQ global settings
      */
     getSettings: authedProcedure
+        .errors({
+            FORBIDDEN: { message: 'Access denied' },
+            INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+        })
         .handler(async ({ context, errors }) => {
             await requireStaffPermission(context, 'view_settings', errors);
 
@@ -122,31 +135,40 @@ export const documentProcessingRouter = {
      */
     updateSettings: authedProcedure
         .input(z.object({
+            idempotencyKey: z.string().uuid(),
             autoRetryEnabled: z.boolean(),
             maxRetryAttempts: z.number().int().min(0),
             retryIntervalSeconds: z.number().int().min(30),
             retryBackoffMultiplier: z.number().min(1),
             infectedRetentionDays: z.number().int().min(1)
         }))
+        .errors({
+            FORBIDDEN: { message: 'Access denied' },
+            INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+        })
         .handler(async ({ input, context, errors }) => {
             await requireStaffPermission(context, 'update_settings', errors);
 
-            const setting = await prisma.systemSetting.upsert({
-                where: { key: 'dpq_settings' },
-                create: {
-                    key: 'dpq_settings',
-                    value: input as any,
-                    updatedBy: context.user!.id
+            const { idempotencyKey, ...settingsData } = input;
+            const result = await startSystemSettingsWorkflow(
+                {
+                    action: 'UPSERT_SETTING',
+                    userId: context.user!.id,
+                    data: {
+                        key: 'dpq_settings',
+                        value: settingsData as Record<string, unknown>
+                    }
                 },
-                update: {
-                    value: input as any,
-                    updatedBy: context.user!.id
-                }
-            });
+                idempotencyKey
+            );
 
-            log.info('DPQ settings updated', { userId: context.user!.id, settings: input });
+            if (!result.success) {
+                throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update settings' });
+            }
 
-            return successResponse(setting.value, context);
+            log.info('DPQ settings updated', { userId: context.user!.id, settings: settingsData });
+
+            return successResponse(settingsData, context);
         }),
 
     /**
@@ -156,6 +178,11 @@ export const documentProcessingRouter = {
         .input(z.object({
             documentId: z.string()
         }))
+        .errors({
+            FORBIDDEN: { message: 'Access denied' },
+            NOT_FOUND: { message: 'Document not found' },
+            INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
+        })
         .handler(async ({ input, context, errors }) => {
             await requireStaffPermission(context, 'retry', errors);
 

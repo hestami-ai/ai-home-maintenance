@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
+import { PropertyTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
+import { startPropertyWorkflow } from '../../workflows/index.js';
 
 const log = createModuleLogger('PropertyRoute');
 
@@ -16,16 +18,10 @@ export const propertyRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				associationId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                associationId: z.string(),
 				name: z.string().min(1).max(255),
-				propertyType: z.enum([
-					'SINGLE_FAMILY',
-					'CONDOMINIUM',
-					'TOWNHOUSE',
-					'COOPERATIVE',
-					'MIXED_USE',
-					'COMMERCIAL'
-				]),
+				propertyType: PropertyTypeSchema,
 				addressLine1: z.string().min(1).max(255),
 				addressLine2: z.string().max(255).optional(),
 				city: z.string().min(1).max(100),
@@ -70,11 +66,26 @@ export const propertyRouter = {
 				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
-			const property = await prisma.property.create({
-				data: {
-					...input,
-					organizationId: context.organization.id
-				}
+			const { idempotencyKey, ...propertyData } = input;
+
+			// Create property via workflow
+			const result = await startPropertyWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: propertyData
+				},
+				idempotencyKey
+			);
+
+			if (!result.success || !result.propertyId) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to create property' });
+			}
+
+			// Fetch the created property
+			const property = await prisma.property.findUnique({
+				where: { id: result.propertyId }
 			});
 
 			return successResponse(
@@ -194,6 +205,10 @@ export const propertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve properties' }
+		})
 		.handler(async ({ input, context }) => {
 			// Cerbos query plan
 			const queryPlan = await context.cerbos.queryFilter('view', 'property');
@@ -253,7 +268,8 @@ export const propertyRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				name: z.string().min(1).max(255).optional(),
 				propertyType: z
 					.enum(['SINGLE_FAMILY', 'CONDOMINIUM', 'TOWNHOUSE', 'COOPERATIVE', 'MIXED_USE', 'COMMERCIAL'])
@@ -299,18 +315,35 @@ export const propertyRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'property', existing.id);
 
-			const { id, ...updateData } = input;
-			const property = await prisma.property.update({
-				where: { id },
-				data: updateData
+			const { id, idempotencyKey, ...updateData } = input;
+
+			// Update property via workflow
+			const result = await startPropertyWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId: id,
+					data: updateData
+				},
+				idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update property' });
+			}
+
+			// Fetch updated property
+			const property = await prisma.property.findUnique({
+				where: { id }
 			});
 
 			return successResponse(
 				{
 					property: {
-						id: property.id,
-						name: property.name,
-						updatedAt: property.updatedAt.toISOString()
+						id: property!.id,
+						name: property!.name,
+						updatedAt: property!.updatedAt.toISOString()
 					}
 				},
 				context
@@ -323,7 +356,8 @@ export const propertyRouter = {
 	delete: orgProcedure
 		.input(
 			z.object({
-				id: z.string()
+                idempotencyKey: z.string().uuid(),
+                id: z.string()
 			})
 		)
 		.output(
@@ -352,16 +386,26 @@ export const propertyRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'property', property.id);
 
-			const now = new Date();
-			await prisma.property.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
-			});
+			// Delete property via workflow
+			const result = await startPropertyWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					propertyId: input.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to delete property' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: new Date().toISOString()
 				},
 				context
 			);

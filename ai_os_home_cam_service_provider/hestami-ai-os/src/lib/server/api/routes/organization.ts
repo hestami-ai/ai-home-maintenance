@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } from '$lib/schemas/index.js';
-import { authedProcedure, orgProcedure, successResponse } from '../router.js';
+import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema } from '../router.js';
 import { prisma } from '../../db.js';
 import type { Prisma, OrganizationType, OrganizationStatus } from '../../../../../generated/prisma/client.js';
 import { recordActivityEvent, recordActivityFromContext } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
 import { setOrgContext } from '../../db/rls.js';
+import { startOrganizationWorkflow } from '../../workflows/index.js';
 
 /**
  * Result type for the create_organization_with_admin SECURITY DEFINER function
@@ -32,7 +33,8 @@ export const organizationRouter = {
 	create: authedProcedure
 		.input(
 			z.object({
-				name: z.string().min(1).max(255),
+                idempotencyKey: z.string().uuid(),
+                name: z.string().min(1).max(255),
 				slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
 				type: OrganizationTypeSchema,
 				// Optional association config for self-managed HOAs (COMMUNITY_ASSOCIATION)
@@ -60,7 +62,8 @@ export const organizationRouter = {
 			})
 		)
 		.errors({
-			CONFLICT: { message: 'Organization with this slug already exists' }
+			CONFLICT: { message: 'Organization with this slug already exists' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Check if slug is already taken
@@ -72,28 +75,31 @@ export const organizationRouter = {
 				throw errors.CONFLICT({ message: 'Organization with this slug already exists' });
 			}
 
-			// Create organization and add creator as ADMIN using SECURITY DEFINER function
-			// This bypasses RLS since no org context exists during creation (chicken-and-egg problem)
-			const [orgResult] = await prisma.$queryRaw<CreateOrgResult[]>`
-				SELECT * FROM create_organization_with_admin(
-					${input.name}::TEXT, 
-					${input.slug}::TEXT, 
-					${input.type}::TEXT, 
-					${context.user!.id}::TEXT
-				)
-			`;
+			// Create organization and add creator as ADMIN via workflow
+			const createResult = await startOrganizationWorkflow(
+				{
+					action: 'CREATE_WITH_ADMIN',
+					userId: context.user!.id,
+					data: {
+						name: input.name,
+						slug: input.slug,
+						type: input.type
+					}
+				},
+				input.idempotencyKey
+			);
 
-			if (!orgResult) {
-				throw new Error('Failed to create organization');
+			if (!createResult.success || !createResult.organizationId) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: createResult.error || 'Failed to create organization' });
 			}
 
-			// Map to expected shape (type/status come back as strings from the function)
+			// Map to expected shape
 			const organization = {
-				id: orgResult.id,
-				name: orgResult.name,
-				slug: orgResult.slug,
-				type: orgResult.type as OrganizationType,
-				status: orgResult.status as OrganizationStatus
+				id: createResult.organizationId,
+				name: input.name,
+				slug: input.slug,
+				type: createResult.organizationType as OrganizationType,
+				status: createResult.organizationStatus as OrganizationStatus
 			};
 
 			// Set org context to the newly created org so subsequent RLS-protected queries work
@@ -122,42 +128,47 @@ export const organizationRouter = {
 
 			// For self-managed HOAs (COMMUNITY_ASSOCIATION), auto-create the association
 			if (organization.type === 'COMMUNITY_ASSOCIATION') {
-				const association = await prisma.association.create({
-					data: {
+				const assocResult = await startOrganizationWorkflow(
+					{
+						action: 'CREATE_ASSOCIATION',
+						userId: context.user!.id,
 						organizationId: organization.id,
-						name: organization.name,
-						legalName: input.associationConfig?.legalName ?? null,
-						fiscalYearEnd: input.associationConfig?.fiscalYearEndMonth ?? 12,
-						status: 'ONBOARDING',
-						settings: {
+						data: {
+							name: organization.name,
+							associationName: organization.name,
+							legalName: input.associationConfig?.legalName ?? null,
 							boardSeats: input.associationConfig?.boardSeats ?? 5,
-							totalUnits: input.associationConfig?.totalUnits ?? 0
+							totalUnits: input.associationConfig?.totalUnits ?? 0,
+							fiscalYearEndMonth: input.associationConfig?.fiscalYearEndMonth ?? 12
 						}
-					}
-				});
+					},
+					`${input.idempotencyKey}-assoc`
+				);
 
-				log.info('Auto-created association for self-managed HOA', {
-					organizationId: organization.id,
-					associationId: association.id,
-					associationName: association.name
-				});
+				if (assocResult.success && assocResult.associationId) {
+					log.info('Auto-created association for self-managed HOA', {
+						organizationId: organization.id,
+						associationId: assocResult.associationId,
+						associationName: organization.name
+					});
 
-				// Record activity event for association creation
-				await recordActivityEvent({
-					organizationId: organization.id,
-					entityType: 'ASSOCIATION',
-					entityId: association.id,
-					action: 'CREATE',
-					eventCategory: 'EXECUTION',
-					summary: `Association "${association.name}" auto-created during onboarding`,
-					performedById: context.user!.id,
-					performedByType: 'HUMAN',
-					associationId: association.id,
-					newState: {
-						name: association.name,
-						status: association.status
-					}
-				});
+					// Record activity event for association creation
+					await recordActivityEvent({
+						organizationId: organization.id,
+						entityType: 'ASSOCIATION',
+						entityId: assocResult.associationId,
+						action: 'CREATE',
+						eventCategory: 'EXECUTION',
+						summary: `Association "${organization.name}" auto-created during onboarding`,
+						performedById: context.user!.id,
+						performedByType: 'HUMAN',
+						associationId: assocResult.associationId,
+						newState: {
+							name: organization.name,
+							status: 'ONBOARDING'
+						}
+					});
+				}
 			}
 
 			return successResponse(
@@ -197,6 +208,9 @@ export const organizationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ context }) => {
 			const memberships = await prisma.userOrganization.findMany({
 				where: { userId: context.user!.id, organization: { deletedAt: null } },
@@ -242,7 +256,12 @@ export const organizationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ context }) => {
+			await context.cerbos.authorize('view', 'organization', context.organization!.id);
+
 			return successResponse(
 				{
 					organization: {
@@ -264,6 +283,7 @@ export const organizationRouter = {
 	setDefault: authedProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				organizationId: z.string()
 			})
 		)
@@ -300,17 +320,21 @@ export const organizationRouter = {
 				include: { organization: true }
 			});
 
-			// Clear existing default and set new one
-			await prisma.$transaction([
-				prisma.userOrganization.updateMany({
-					where: { userId: context.user!.id, isDefault: true },
-					data: { isDefault: false }
-				}),
-				prisma.userOrganization.update({
-					where: { id: membership.id },
-					data: { isDefault: true }
-				})
-			]);
+			// Clear existing default and set new one via workflow
+			const setDefaultResult = await startOrganizationWorkflow(
+				{
+					action: 'SET_DEFAULT',
+					userId: context.user!.id,
+					data: {
+						membershipId: membership.id
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!setDefaultResult.success) {
+				throw errors.FORBIDDEN({ message: setDefaultResult.error || 'Failed to set default organization' });
+			}
 
 			// Get new org details for activity event
 			const newOrg = await prisma.organization.findUnique({
@@ -416,7 +440,8 @@ export const organizationRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				name: z.string().min(1).max(255).optional(),
+                idempotencyKey: z.string().uuid(),
+                name: z.string().min(1).max(255).optional(),
 				settings: z.record(z.string(), z.unknown()).optional()
 			})
 		)
@@ -435,6 +460,10 @@ export const organizationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'organization', context.organization!.id);
@@ -445,36 +474,51 @@ export const organizationRouter = {
 				settings: context.organization!.settings
 			};
 
-			const organization = await prisma.organization.update({
-				where: { id: context.organization!.id },
-				data: {
-					...(input.name && { name: input.name }),
-					...(input.settings && { settings: input.settings as Prisma.InputJsonValue })
-				}
+			// Update organization via workflow
+			const updateResult = await startOrganizationWorkflow(
+				{
+					action: 'UPDATE',
+					userId: context.user!.id,
+					organizationId: context.organization!.id,
+					data: {
+						name: input.name,
+						settings: input.settings
+					}
+				},
+				input.idempotencyKey
+			);
+
+			if (!updateResult.success) {
+				throw { code: 'INTERNAL_SERVER_ERROR', message: updateResult.error || 'Failed to update organization' };
+			}
+
+			// Fetch updated organization
+			const organization = await prisma.organization.findUnique({
+				where: { id: context.organization!.id }
 			});
 
 			// Record activity event for organization update
 			await recordActivityFromContext(context, {
 				entityType: 'ORGANIZATION',
-				entityId: organization.id,
+				entityId: organization!.id,
 				action: 'UPDATE',
 				eventCategory: 'EXECUTION',
-				summary: `Organization "${organization.name}" updated`,
+				summary: `Organization "${organization!.name}" updated`,
 				previousState: previousState as Record<string, unknown>,
 				newState: {
-					name: organization.name,
-					settings: organization.settings
+					name: organization!.name,
+					settings: organization!.settings
 				}
 			});
 
 			return successResponse(
 				{
 					organization: {
-						id: organization.id,
-						name: organization.name,
-						slug: organization.slug,
-						type: organization.type,
-						status: organization.status
+						id: organization!.id,
+						name: organization!.name,
+						slug: organization!.slug,
+						type: organization!.type,
+						status: organization!.status
 					}
 				},
 				context
@@ -485,6 +529,7 @@ export const organizationRouter = {
 	 * Soft delete organization (requires ADMIN role)
 	 */
 	delete: orgProcedure
+		.input(IdempotencyKeySchema)
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -495,15 +540,30 @@ export const organizationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
+		.handler(async ({ input, context }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'organization', context.organization!.id);
 
+			// Delete organization via workflow
+			const deleteResult = await startOrganizationWorkflow(
+				{
+					action: 'DELETE',
+					userId: context.user!.id,
+					organizationId: context.organization!.id,
+					data: {}
+				},
+				input.idempotencyKey
+			);
+
+			if (!deleteResult.success) {
+				throw { code: 'INTERNAL_SERVER_ERROR', message: deleteResult.error || 'Failed to delete organization' };
+			}
+
 			const now = new Date();
-			await prisma.organization.update({
-				where: { id: context.organization!.id },
-				data: { deletedAt: now }
-			});
 
 			// Record activity event for organization deletion
 			await recordActivityFromContext(context, {

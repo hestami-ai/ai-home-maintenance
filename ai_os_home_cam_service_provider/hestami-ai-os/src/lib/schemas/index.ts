@@ -27,6 +27,9 @@ import { NoticeTypeSchema as GeneratedNoticeTypeSchema } from '../../../generate
 import { NoticeDeliveryMethodSchema as GeneratedNoticeDeliveryMethodSchema } from '../../../generated/zod/inputTypeSchemas/NoticeDeliveryMethodSchema.js';
 import { HearingOutcomeSchema as GeneratedHearingOutcomeSchema } from '../../../generated/zod/inputTypeSchemas/HearingOutcomeSchema.js';
 import { AppealStatusSchema as GeneratedAppealStatusSchema } from '../../../generated/zod/inputTypeSchemas/AppealStatusSchema.js';
+import { AppealDecisionSchema as GeneratedAppealDecisionSchema } from '../../../generated/zod/inputTypeSchemas/AppealDecisionSchema.js';
+import { ReporterTypeSchema as GeneratedReporterTypeSchema } from '../../../generated/zod/inputTypeSchemas/ReporterTypeSchema.js';
+import { MediaTypeSchema as GeneratedMediaTypeSchema } from '../../../generated/zod/inputTypeSchemas/MediaTypeSchema.js';
 import { DocumentCategorySchema as GeneratedDocumentCategorySchema } from '../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
 import { DocumentContextTypeSchema as GeneratedDocumentContextTypeSchema } from '../../../generated/zod/inputTypeSchemas/DocumentContextTypeSchema.js';
 import { DocumentVisibilitySchema as GeneratedDocumentVisibilitySchema } from '../../../generated/zod/inputTypeSchemas/DocumentVisibilitySchema.js';
@@ -512,6 +515,15 @@ export type HearingOutcome = z.infer<typeof HearingOutcomeSchema>;
 
 export const AppealStatusSchema = GeneratedAppealStatusSchema;
 export type AppealStatus = z.infer<typeof AppealStatusSchema>;
+
+export const AppealDecisionSchema = GeneratedAppealDecisionSchema;
+export type AppealDecision = z.infer<typeof AppealDecisionSchema>;
+
+export const ReporterTypeSchema = GeneratedReporterTypeSchema;
+export type ReporterType = z.infer<typeof ReporterTypeSchema>;
+
+export const MediaTypeSchema = GeneratedMediaTypeSchema;
+export type MediaType = z.infer<typeof MediaTypeSchema>;
 
 // =============================================================================
 // Violation Domain Schemas

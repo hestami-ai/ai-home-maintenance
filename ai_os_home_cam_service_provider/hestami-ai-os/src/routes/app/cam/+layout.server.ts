@@ -1,10 +1,11 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { createModuleLogger } from '$lib/server/logger';
+import { prisma } from '$lib/server/db';
 import type { LayoutServerLoad } from './$types';
 
 const log = createModuleLogger('CamLayout');
 
-export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
+export const load: LayoutServerLoad = async ({ parent, locals }) => {
     // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
     const { organization, memberships, staff } = await parent();
     
@@ -33,22 +34,35 @@ export const load: LayoutServerLoad = async ({ parent, locals, cookies }) => {
         const associations: Array<{ id: string; name: string; status: string; propertyCount?: number }> = 
             response.ok ? response.data.associations : [];
 
-        // Determine current association from cookie or default to first
-        const cookieId = cookies.get('cam_association_id');
+        // Determine current association from user preference in database
         let currentAssociation = null;
 
-        log.debug('Association cookie check', {
-            cookieId,
-            associationsCount: associations.length,
-            associationIds: associations.map(a => a.id)
-        });
+        if (associations.length > 0 && locals.user) {
+            // Look up user's preferred association for this organization
+            const preference = await prisma.userAssociationPreference.findUnique({
+                where: {
+                    userId_organizationId: {
+                        userId: locals.user.id,
+                        organizationId: organization.id
+                    }
+                }
+            });
 
-        if (associations.length > 0) {
-            if (cookieId) {
-                currentAssociation = associations.find((a) => a.id === cookieId) || associations[0];
+            log.debug('Association preference check', {
+                userId: locals.user.id,
+                preferredAssociationId: preference?.associationId,
+                associationsCount: associations.length
+            });
+
+            if (preference?.associationId) {
+                // Use preferred association if it exists in the list
+                currentAssociation = associations.find((a) => a.id === preference.associationId) || associations[0];
             } else {
+                // Default to first association
                 currentAssociation = associations[0];
             }
+        } else if (associations.length > 0) {
+            currentAssociation = associations[0];
         }
 
         log.debug('Current association selected', {

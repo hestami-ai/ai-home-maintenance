@@ -252,22 +252,20 @@ export const removeLineItemWorkflow_v1 = DBOS.registerWorkflow(removeLineItemWor
 
 export async function startAddLineItemWorkflow(
 	input: AddLineItemInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<LineItemResult> {
 	const handle = await DBOS.startWorkflow(addLineItemWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }
 
 export async function startRemoveLineItemWorkflow(
 	input: RemoveLineItemInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<LineItemResult> {
 	const handle = await DBOS.startWorkflow(removeLineItemWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

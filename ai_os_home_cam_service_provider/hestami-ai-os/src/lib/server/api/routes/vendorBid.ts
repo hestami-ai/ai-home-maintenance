@@ -15,6 +15,7 @@ import {
 } from '../router.js';
 import { prisma } from '../../db.js';
 import { recordIntent, recordExecution } from '../middleware/activityEvent.js';
+import { startVendorBidWorkflow } from '../../workflows/index.js';
 
 // =============================================================================
 // Schemas
@@ -164,41 +165,44 @@ export const vendorBidRouter = {
 
 			await context.cerbos.authorize('create', 'vendor_bid', 'new');
 
-			const bid = await prisma.vendorBid.create({
-				data: {
-					vendorCandidateId: input.vendorCandidateId,
-					caseId: input.caseId,
-					scopeVersion: input.scopeVersion,
-					amount: input.amount,
-					currency: input.currency,
-					validUntil: input.validUntil ? new Date(input.validUntil) : null,
-					laborCost: input.laborCost,
-					materialsCost: input.materialsCost,
-					otherCosts: input.otherCosts,
-					estimatedStartDate: input.estimatedStartDate ? new Date(input.estimatedStartDate) : null,
-					estimatedDuration: input.estimatedDuration,
-					estimatedEndDate: input.estimatedEndDate ? new Date(input.estimatedEndDate) : null,
-					notes: input.notes,
-					status: 'PENDING',
-					receivedAt: new Date()
+			// Create bid via workflow
+			const result = await startVendorBidWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					data: {
+						vendorCandidateId: input.vendorCandidateId,
+						caseId: input.caseId,
+						scopeVersion: input.scopeVersion,
+						amount: input.amount,
+						currency: input.currency,
+						validUntil: input.validUntil ? new Date(input.validUntil) : null,
+						laborCost: input.laborCost,
+						materialsCost: input.materialsCost,
+						otherCosts: input.otherCosts,
+						estimatedStartDate: input.estimatedStartDate ? new Date(input.estimatedStartDate) : null,
+						estimatedDuration: input.estimatedDuration,
+						estimatedEndDate: input.estimatedEndDate ? new Date(input.estimatedEndDate) : null,
+						notes: input.notes
+					}
 				},
-				include: {
-					vendorCandidate: true
-				}
-			});
+				input.idempotencyKey
+			);
 
-			// Update vendor candidate status to QUOTED
-			await prisma.vendorCandidate.update({
-				where: { id: input.vendorCandidateId },
-				data: {
-					status: 'QUOTED',
-					statusChangedAt: new Date()
-				}
+			if (!result.success || !result.bidId) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to create bid' });
+			}
+
+			// Fetch the created bid
+			const bid = await prisma.vendorBid.findUnique({
+				where: { id: result.bidId },
+				include: { vendorCandidate: true }
 			});
 
 			await recordIntent(context, {
 				entityType: 'VENDOR_BID',
-				entityId: bid.id,
+				entityId: result.bidId,
 				action: 'CREATE',
 				summary: `Bid received from ${vendorCandidate.vendorName}: ${input.amount ? `$${input.amount}` : 'Amount TBD'}`,
 				caseId: input.caseId,
@@ -359,29 +363,37 @@ export const vendorBidRouter = {
 
 			await context.cerbos.authorize('update', 'vendor_bid', existing.id);
 
-			const bid = await prisma.vendorBid.update({
-				where: { id: input.id },
-				data: {
-					...(input.scopeVersion !== undefined && { scopeVersion: input.scopeVersion }),
-					...(input.amount !== undefined && { amount: input.amount }),
-					...(input.validUntil !== undefined && {
-						validUntil: input.validUntil ? new Date(input.validUntil) : null
-					}),
-					...(input.laborCost !== undefined && { laborCost: input.laborCost }),
-					...(input.materialsCost !== undefined && { materialsCost: input.materialsCost }),
-					...(input.otherCosts !== undefined && { otherCosts: input.otherCosts }),
-					...(input.estimatedStartDate !== undefined && {
-						estimatedStartDate: input.estimatedStartDate ? new Date(input.estimatedStartDate) : null
-					}),
-					...(input.estimatedDuration !== undefined && { estimatedDuration: input.estimatedDuration }),
-					...(input.estimatedEndDate !== undefined && {
-						estimatedEndDate: input.estimatedEndDate ? new Date(input.estimatedEndDate) : null
-					}),
-					...(input.notes !== undefined && { notes: input.notes })
+			// Update bid via workflow
+			const result = await startVendorBidWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					bidId: input.id,
+					data: {
+						scopeVersion: input.scopeVersion,
+						amount: input.amount,
+						validUntil: input.validUntil ? new Date(input.validUntil) : input.validUntil === null ? null : undefined,
+						laborCost: input.laborCost,
+						materialsCost: input.materialsCost,
+						otherCosts: input.otherCosts,
+						estimatedStartDate: input.estimatedStartDate ? new Date(input.estimatedStartDate) : input.estimatedStartDate === null ? null : undefined,
+						estimatedDuration: input.estimatedDuration,
+						estimatedEndDate: input.estimatedEndDate ? new Date(input.estimatedEndDate) : input.estimatedEndDate === null ? null : undefined,
+						notes: input.notes
+					}
 				},
-				include: {
-					vendorCandidate: true
-				}
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.NOT_FOUND({ message: result.error || 'Failed to update bid' });
+			}
+
+			// Fetch updated bid
+			const bid = await prisma.vendorBid.findUnique({
+				where: { id: input.id },
+				include: { vendorCandidate: true }
 			});
 
 			await recordExecution(context, {
@@ -437,43 +449,29 @@ export const vendorBidRouter = {
 
 			await context.cerbos.authorize('accept', 'vendor_bid', existing.id);
 
-			// Use transaction to update bid and vendor candidate
-			const bid = await prisma.$transaction(async (tx) => {
-				// Accept this bid
-				const updatedBid = await tx.vendorBid.update({
-					where: { id: input.id },
+			// Accept bid via workflow
+			const result = await startVendorBidWorkflow(
+				{
+					action: 'ACCEPT',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					bidId: input.id,
 					data: {
-						status: 'ACCEPTED',
-						respondedAt: new Date()
-					},
-					include: {
-						vendorCandidate: true
+						vendorCandidateId: existing.vendorCandidateId,
+						caseId: existing.caseId
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update vendor candidate to SELECTED
-				await tx.vendorCandidate.update({
-					where: { id: existing.vendorCandidateId },
-					data: {
-						status: 'SELECTED',
-						statusChangedAt: new Date()
-					}
-				});
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to accept bid' });
+			}
 
-				// Reject other pending bids for this case
-				await tx.vendorBid.updateMany({
-					where: {
-						caseId: existing.caseId,
-						id: { not: input.id },
-						status: 'PENDING'
-					},
-					data: {
-						status: 'REJECTED',
-						respondedAt: new Date()
-					}
-				});
-
-				return updatedBid;
+			// Fetch updated bid
+			const bid = await prisma.vendorBid.findUnique({
+				where: { id: input.id },
+				include: { vendorCandidate: true }
 			});
 
 			await recordExecution(context, {
@@ -531,33 +529,30 @@ export const vendorBidRouter = {
 
 			await context.cerbos.authorize('reject', 'vendor_bid', existing.id);
 
-			const bid = await prisma.$transaction(async (tx) => {
-				const updatedBid = await tx.vendorBid.update({
-					where: { id: input.id },
+			// Reject bid via workflow
+			const result = await startVendorBidWorkflow(
+				{
+					action: 'REJECT',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					bidId: input.id,
 					data: {
-						status: 'REJECTED',
-						respondedAt: new Date(),
-						notes: input.reason
-							? existing.notes
-								? `${existing.notes}\n\nRejection reason: ${input.reason}`
-								: `Rejection reason: ${input.reason}`
-							: existing.notes
-					},
-					include: {
-						vendorCandidate: true
+						vendorCandidateId: existing.vendorCandidateId,
+						notes: existing.notes,
+						reason: input.reason
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update vendor candidate to REJECTED
-				await tx.vendorCandidate.update({
-					where: { id: existing.vendorCandidateId },
-					data: {
-						status: 'REJECTED',
-						statusChangedAt: new Date()
-					}
-				});
+			if (!result.success) {
+				throw errors.BAD_REQUEST({ message: result.error || 'Failed to reject bid' });
+			}
 
-				return updatedBid;
+			// Fetch updated bid
+			const bid = await prisma.vendorBid.findUnique({
+				where: { id: input.id },
+				include: { vendorCandidate: true }
 			});
 
 			await recordExecution(context, {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResponseMetaSchema } from '$lib/schemas/index.js';
+import { ResponseMetaSchema, NoticeTypeSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { startNoticeTemplateWorkflow } from '../../../workflows/noticeTemplateWorkflow.js';
@@ -7,10 +7,7 @@ import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('NoticeTemplateRoute');
 
-const noticeTypeEnum = z.enum([
-	'WARNING', 'FIRST_NOTICE', 'SECOND_NOTICE', 'FINAL_NOTICE',
-	'FINE_NOTICE', 'HEARING_NOTICE', 'CURE_CONFIRMATION'
-]);
+const noticeTypeEnum = NoticeTypeSchema;
 
 const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({

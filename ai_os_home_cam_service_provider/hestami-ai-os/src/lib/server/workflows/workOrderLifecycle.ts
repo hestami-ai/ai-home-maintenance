@@ -358,7 +358,7 @@ export async function startWorkOrderTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `wo-transition-${input.workOrderId}-${Date.now()}`;
-	await DBOS.startWorkflow(workOrderLifecycle_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(workOrderLifecycle_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

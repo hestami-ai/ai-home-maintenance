@@ -24,7 +24,7 @@ import {
 	startRemoveLineItemWorkflow
 } from '../../../workflows/workOrderLineItemWorkflow.js';
 import { startWorkOrderConfigWorkflow } from '../../../workflows/workOrderConfigWorkflow.js';
-import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
+import { startWorkOrderMutationWorkflow } from '../../../workflows/index.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('WorkOrderRoute');
@@ -199,7 +199,8 @@ export const workOrderRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				title: z.string().min(1).max(255),
+                idempotencyKey: z.string().uuid(),
+                title: z.string().min(1).max(255),
 				description: z.string().min(1).max(2000),
 				category: workOrderCategoryEnum,
 				priority: workOrderPriorityEnum.default('MEDIUM'),
@@ -323,80 +324,51 @@ export const workOrderRouter = {
 				}
 			}
 
-			const workOrder = await prisma.$transaction(async (tx) => {
-				const wo = await tx.workOrder.create({
-					data: {
-						organizationId: context.organization.id,
-						associationId: association.id,
-						workOrderNumber,
-						title: input.title,
-						description: input.description,
-						category: input.category,
-						priority: input.priority,
-						status: 'DRAFT',
-						unitId: input.unitId,
-						commonAreaName: input.commonAreaName,
-						assetId: input.assetId,
-						locationDetails: input.locationDetails,
-						requestedBy: context.user!.id,
-						scheduledStart: input.scheduledStart ? new Date(input.scheduledStart) : null,
-						scheduledEnd: input.scheduledEnd ? new Date(input.scheduledEnd) : null,
-						estimatedCost: input.estimatedCost,
-						estimatedHours: input.estimatedHours,
-						slaDeadline,
-						// Phase 9: Origin tracking
-						originType: input.originType,
-						violationId: input.violationId,
-						arcRequestId: input.arcRequestId,
-						resolutionId: input.resolutionId,
-						originNotes: input.originNotes,
-						// Phase 9: Budget
-						budgetSource: input.budgetSource,
-						approvedAmount: input.approvedAmount,
-						// Phase 9: Constraints
-						constraints: input.constraints
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderNumber,
+					title: input.title,
+					description: input.description,
+					category: input.category,
+					priority: input.priority,
+					unitId: input.unitId,
+					commonAreaName: input.commonAreaName,
+					assetId: input.assetId,
+					locationDetails: input.locationDetails,
+					scheduledStart: input.scheduledStart ? new Date(input.scheduledStart) : null,
+					scheduledEnd: input.scheduledEnd ? new Date(input.scheduledEnd) : null,
+					estimatedCost: input.estimatedCost,
+					estimatedHours: input.estimatedHours,
+					slaDeadline,
+					originType: input.originType,
+					violationId: input.violationId,
+					arcRequestId: input.arcRequestId,
+					resolutionId: input.resolutionId,
+					originNotes: input.originNotes,
+					budgetSource: input.budgetSource,
+					approvedAmount: input.approvedAmount,
+					constraints: input.constraints
+				},
+				input.idempotencyKey
+			);
 
-				// Record initial status
-				await tx.workOrderStatusHistory.create({
-					data: {
-						workOrderId: wo.id,
-						fromStatus: null,
-						toStatus: 'DRAFT',
-						changedBy: context.user!.id,
-						notes: 'Work order created'
-					}
-				});
-
-				return wo;
-			});
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'WORK_ORDER',
-				entityId: workOrder.id,
-				action: 'CREATE',
-				summary: `Work order created: ${workOrder.title}`,
-				workOrderId: workOrder.id,
-				associationId: association.id,
-				newState: {
-					workOrderNumber: workOrder.workOrderNumber,
-					title: workOrder.title,
-					status: workOrder.status,
-					priority: workOrder.priority,
-					category: workOrder.category
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to create work order' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: workOrder.id,
-						workOrderNumber: workOrder.workOrderNumber,
-						title: workOrder.title,
-						status: workOrder.status,
-						priority: workOrder.priority
+						id: workflowResult.workOrderId!,
+						workOrderNumber: workflowResult.workOrderNumber!,
+						title: input.title,
+						status: workflowResult.status!,
+						priority: input.priority
 					}
 				},
 				context
@@ -604,7 +576,8 @@ export const workOrderRouter = {
 	updateStatus: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				status: workOrderStatusEnum,
 				notes: z.string().max(1000).optional()
 			})
@@ -654,59 +627,39 @@ export const workOrderRouter = {
 			}
 
 			const previousStatus = wo.status;
-			const now = new Date();
 
-			// Build update data based on new status
-			const updateData: Prisma.WorkOrderUpdateInput = {
-				status: input.status
-			};
-
-			if (input.status === 'IN_PROGRESS' && !wo.startedAt) {
-				updateData.startedAt = now;
-			}
-			if (input.status === 'COMPLETED') {
-				updateData.completedAt = now;
-				// Check SLA
-				if (wo.slaDeadline) {
-					updateData.slaMet = now <= wo.slaDeadline;
-				}
-			}
-			if (input.status === 'CLOSED') {
-				updateData.closedAt = now;
-				updateData.closedBy = context.user!.id;
+			// Calculate slaMet for COMPLETED status
+			let slaMet: boolean | null = null;
+			if (input.status === 'COMPLETED' && wo.slaDeadline) {
+				slaMet = new Date() <= wo.slaDeadline;
 			}
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.id },
-					data: updateData
-				});
-
-				await tx.workOrderStatusHistory.create({
-					data: {
-						workOrderId: input.id,
-						fromStatus: previousStatus,
-						toStatus: input.status,
-						changedBy: context.user!.id,
-						notes: input.notes
-					}
-				});
-
-				return result;
-			});
-
-			// Record activity event
-			await recordStatusChange(context, 'WORK_ORDER', updated.id, previousStatus, input.status,
-				`Work order status changed from ${previousStatus} to ${input.status}${input.notes ? `: ${input.notes}` : ''}`,
-				{ workOrderId: updated.id, associationId: association.id }
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.id,
+					previousStatus,
+					newStatus: input.status,
+					notes: input.notes,
+					slaMet
+				},
+				input.idempotencyKey
 			);
+
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to update work order status' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						previousStatus
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						previousStatus: workflowResult.previousStatus!
 					}
 				},
 				context
@@ -719,6 +672,7 @@ export const workOrderRouter = {
 	assignVendor: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				vendorId: z.string(),
 				notes: z.string().max(1000).optional()
@@ -776,44 +730,32 @@ export const workOrderRouter = {
 
 			const previousStatus = wo.status;
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.id },
-					data: {
-						assignedVendorId: input.vendorId,
-						assignedAt: new Date(),
-						assignedBy: context.user!.id,
-						status: 'ASSIGNED'
-					}
-				});
-
-				if (previousStatus !== 'ASSIGNED') {
-					await tx.workOrderStatusHistory.create({
-						data: {
-							workOrderId: input.id,
-							fromStatus: previousStatus,
-							toStatus: 'ASSIGNED',
-							changedBy: context.user!.id,
-							notes: input.notes || `Assigned to vendor: ${vendor.name}`
-						}
-					});
-				}
-
-				return result;
-			});
-
-			// Record activity event
-			await recordAssignment(context, 'WORK_ORDER', updated.id, input.vendorId, vendor.name,
-				`Vendor assigned to work order: ${vendor.name}`,
-				{ workOrderId: updated.id, associationId: association.id }
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'ASSIGN_VENDOR',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.id,
+					vendorId: input.vendorId,
+					vendorName: vendor.name,
+					previousStatus,
+					notes: input.notes
+				},
+				input.idempotencyKey
 			);
+
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to assign vendor' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						assignedVendorId: updated.assignedVendorId!
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						assignedVendorId: input.vendorId
 					}
 				},
 				context
@@ -826,6 +768,7 @@ export const workOrderRouter = {
 	assignTechnician: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				technicianId: z.string(),
 				notes: z.string().max(1000).optional()
@@ -877,43 +820,33 @@ export const workOrderRouter = {
 
 			const previousStatus = wo.status;
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.id },
-					data: {
-						assignedTechnicianId: tech.id,
-						assignedTechnicianBranchId: tech.branchId,
-						status: previousStatus === 'TRIAGED' ? 'ASSIGNED' : previousStatus
-					}
-				});
-
-				if (previousStatus === 'TRIAGED') {
-					await tx.workOrderStatusHistory.create({
-						data: {
-							workOrderId: input.id,
-							fromStatus: previousStatus,
-							toStatus: 'ASSIGNED',
-							changedBy: context.user!.id,
-							notes: input.notes || `Assigned to technician: ${tech.firstName} ${tech.lastName}`
-						}
-					});
-				}
-
-				return result;
-			});
-
-			// Record activity event
-			await recordAssignment(context, 'WORK_ORDER', updated.id, tech.id, `${tech.firstName} ${tech.lastName}`,
-				`Technician assigned to work order: ${tech.firstName} ${tech.lastName}`,
-				{ workOrderId: updated.id, associationId: association.id, technicianId: tech.id }
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'ASSIGN_TECHNICIAN',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.id,
+					technicianId: tech.id,
+					technicianBranchId: tech.branchId,
+					technicianName: `${tech.firstName} ${tech.lastName}`,
+					previousStatus,
+					notes: input.notes
+				},
+				input.idempotencyKey
 			);
+
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to assign technician' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						assignedTechnicianId: updated.assignedTechnicianId!
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						assignedTechnicianId: tech.id
 					}
 				},
 				context
@@ -926,6 +859,7 @@ export const workOrderRouter = {
 	schedule: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				scheduledStart: z.string().datetime(),
 				scheduledEnd: z.string().datetime().optional(),
@@ -993,39 +927,34 @@ export const workOrderRouter = {
 
 			const previousStatus = wo.status;
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.id },
-					data: {
-						scheduledStart: start,
-						scheduledEnd: end,
-						assignedTechnicianId: technicianId ?? wo.assignedTechnicianId,
-						assignedTechnicianBranchId: technicianBranchId ?? wo.assignedTechnicianBranchId,
-						status: 'SCHEDULED'
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'SCHEDULE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.id,
+					scheduledStart: start,
+					scheduledEnd: end,
+					technicianId: technicianId ?? wo.assignedTechnicianId ?? undefined,
+					technicianBranchId: technicianBranchId ?? wo.assignedTechnicianBranchId,
+					previousStatus,
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
 
-				if (previousStatus !== 'SCHEDULED') {
-					await tx.workOrderStatusHistory.create({
-						data: {
-							workOrderId: input.id,
-							fromStatus: previousStatus,
-							toStatus: 'SCHEDULED',
-							changedBy: context.user!.id,
-							notes: input.notes || `Scheduled for ${input.scheduledStart}`
-						}
-					});
-				}
-
-				return result;
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to schedule work order' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						scheduledStart: updated.scheduledStart!.toISOString()
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						scheduledStart: start.toISOString()
 					}
 				},
 				context
@@ -1038,6 +967,7 @@ export const workOrderRouter = {
 	complete: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				actualCost: z.number().min(0).optional(),
 				actualHours: z.number().min(0).optional(),
@@ -1088,70 +1018,37 @@ export const workOrderRouter = {
 			const now = new Date();
 			const slaMet = wo.slaDeadline ? now <= wo.slaDeadline : null;
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.id },
-					data: {
-						status: 'COMPLETED',
-						completedAt: now,
-						actualCost: input.actualCost,
-						actualHours: input.actualHours,
-						resolutionNotes: input.resolutionNotes,
-						slaMet
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'COMPLETE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.id,
+					actualCost: input.actualCost,
+					actualHours: input.actualHours,
+					resolutionNotes: input.resolutionNotes,
+					slaMet,
+					assetId: wo.assetId,
+					category: wo.category,
+					title: wo.title,
+					vendorId: wo.assignedVendorId ?? undefined
+				},
+				input.idempotencyKey
+			);
 
-				await tx.workOrderStatusHistory.create({
-					data: {
-						workOrderId: input.id,
-						fromStatus: 'IN_PROGRESS',
-						toStatus: 'COMPLETED',
-						changedBy: context.user!.id,
-						notes: input.resolutionNotes || 'Work completed'
-					}
-				});
-
-				// If there's an asset, log maintenance
-				if (wo.assetId) {
-					await tx.assetMaintenanceLog.create({
-						data: {
-							assetId: wo.assetId,
-							maintenanceDate: now,
-							maintenanceType: wo.category,
-							description: wo.title,
-							performedBy: wo.assignedVendorId ? 'Vendor' : 'Internal',
-							cost: input.actualCost,
-							workOrderId: wo.id,
-							notes: input.resolutionNotes,
-							createdBy: context.user!.id
-						}
-					});
-
-					// Update asset maintenance dates
-					const asset = await tx.asset.findUnique({ where: { id: wo.assetId } });
-					if (asset) {
-						await tx.asset.update({
-							where: { id: wo.assetId },
-							data: {
-								lastMaintenanceDate: now,
-								nextMaintenanceDate: asset.maintenanceFrequencyDays
-									? new Date(now.getTime() + asset.maintenanceFrequencyDays * 24 * 60 * 60 * 1000)
-									: null
-							}
-						});
-					}
-				}
-
-				return result;
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to complete work order' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						completedAt: updated.completedAt!.toISOString(),
-						slaMet: updated.slaMet
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						completedAt: workflowResult.completedAt!,
+						slaMet: workflowResult.slaMet ?? null
 					}
 				},
 				context
@@ -1165,6 +1062,7 @@ export const workOrderRouter = {
 	authorize: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				workOrderId: z.string(),
 				rationale: z.string().min(1).max(2000),
 				budgetSource: fundTypeEnum,
@@ -1233,66 +1131,35 @@ export const workOrderRouter = {
 			const threshold = (settings?.workOrder as Record<string, unknown>)?.boardApprovalThreshold as number | undefined;
 			const requiresBoardApproval = threshold !== undefined && input.approvedAmount > threshold;
 
-			const now = new Date();
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'AUTHORIZE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.workOrderId,
+					rationale: input.rationale,
+					budgetSource: input.budgetSource,
+					approvedAmount: input.approvedAmount,
+					constraints: input.constraints,
+					requiresBoardApproval,
+					authorizingRole: 'MANAGER'
+				},
+				input.idempotencyKey
+			);
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.workOrderId },
-					data: {
-						status: requiresBoardApproval ? 'TRIAGED' : 'AUTHORIZED', // Stay in TRIAGED if board approval needed
-						authorizedBy: requiresBoardApproval ? null : context.user!.id,
-						authorizedAt: requiresBoardApproval ? null : now,
-						authorizationRationale: input.rationale,
-						authorizingRole: requiresBoardApproval ? null : 'MANAGER',
-						budgetSource: input.budgetSource,
-						approvedAmount: input.approvedAmount,
-						constraints: input.constraints,
-						requiresBoardApproval,
-						boardApprovalStatus: requiresBoardApproval ? 'PENDING' : null
-					}
-				});
-
-				if (!requiresBoardApproval) {
-					await tx.workOrderStatusHistory.create({
-						data: {
-							workOrderId: input.workOrderId,
-							fromStatus: 'TRIAGED',
-							toStatus: 'AUTHORIZED',
-							changedBy: context.user!.id,
-							notes: `Authorized by manager: ${input.rationale}`
-						}
-					});
-				}
-
-				return result;
-			});
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'WORK_ORDER',
-				entityId: updated.id,
-				action: requiresBoardApproval ? 'UPDATE' : 'APPROVE',
-				summary: requiresBoardApproval
-					? `Work order requires board approval (amount: ${input.approvedAmount})`
-					: `Work order authorized: ${input.rationale}`,
-				workOrderId: updated.id,
-				associationId: association.id,
-				newState: {
-					status: updated.status,
-					budgetSource: updated.budgetSource,
-					approvedAmount: updated.approvedAmount?.toString(),
-					requiresBoardApproval: updated.requiresBoardApproval,
-					authorizingRole: updated.authorizingRole
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to authorize work order' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						authorizedAt: updated.authorizedAt?.toISOString() ?? now.toISOString(),
-						requiresBoardApproval: updated.requiresBoardApproval
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						authorizedAt: workflowResult.authorizedAt ?? new Date().toISOString(),
+						requiresBoardApproval: (workflowResult.requiresBoardApproval as boolean) ?? false
 					}
 				},
 				context
@@ -1306,6 +1173,7 @@ export const workOrderRouter = {
 	acceptCompletion: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				workOrderId: z.string(),
 				outcomeSummary: z.string().min(1).max(2000),
 				actualCost: z.number().min(0).optional()
@@ -1352,56 +1220,33 @@ export const workOrderRouter = {
 				throw errors.BAD_REQUEST({ message: 'Work order must be completed before accepting' });
 			}
 
-			const now = new Date();
 			const previousStatus = wo.status;
 
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.workOrder.update({
-					where: { id: input.workOrderId },
-					data: {
-						status: 'CLOSED',
-						closedAt: now,
-						closedBy: context.user!.id,
-						resolutionNotes: input.outcomeSummary,
-						actualCost: input.actualCost ?? wo.actualCost,
-						spendToDate: input.actualCost ?? wo.actualCost ?? wo.spendToDate
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'ACCEPT_COMPLETION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.workOrderId,
+					resolutionNotes: input.outcomeSummary,
+					actualCost: input.actualCost ?? wo.actualCost?.toNumber(),
+					previousStatus
+				},
+				input.idempotencyKey
+			);
 
-				await tx.workOrderStatusHistory.create({
-					data: {
-						workOrderId: input.workOrderId,
-						fromStatus: previousStatus,
-						toStatus: 'CLOSED',
-						changedBy: context.user!.id,
-						notes: `Completion accepted: ${input.outcomeSummary}`
-					}
-				});
-
-				return result;
-			});
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'WORK_ORDER',
-				entityId: updated.id,
-				action: 'APPROVE',
-				summary: `Work order completion accepted: ${input.outcomeSummary}`,
-				workOrderId: updated.id,
-				associationId: association.id,
-				newState: {
-					status: updated.status,
-					closedAt: updated.closedAt?.toISOString(),
-					resolutionNotes: updated.resolutionNotes
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to accept completion' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						closedAt: updated.closedAt!.toISOString()
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						closedAt: workflowResult.closedAt!
 					}
 				},
 				context
@@ -1415,6 +1260,7 @@ export const workOrderRouter = {
 	requestBoardApproval: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				workOrderId: z.string(),
 				meetingId: z.string(),
 				question: z.string().max(500).optional()
@@ -1481,49 +1327,35 @@ export const workOrderRouter = {
 			const question = input.question ??
 				`Approve work order ${wo.workOrderNumber}: ${wo.title} (Budget: $${wo.approvedAmount?.toString() ?? 'TBD'})`;
 
-			// Create vote for board approval
-			const vote = await prisma.vote.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'REQUEST_BOARD_APPROVAL',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.workOrderId,
+					workOrderNumber: wo.workOrderNumber,
 					meetingId: input.meetingId,
-					question,
-					method: 'IN_PERSON',
-					createdBy: context.user!.id
-				}
-			});
+					voteQuestion: question
+				},
+				input.idempotencyKey
+			);
 
-			// Link vote to work order
-			const updated = await prisma.workOrder.update({
-				where: { id: input.workOrderId },
-				data: {
-					boardApprovalVoteId: vote.id,
-					boardApprovalStatus: 'PENDING'
-				}
-			});
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'WORK_ORDER',
-				entityId: updated.id,
-				action: 'UPDATE',
-				summary: `Board approval requested for work order ${wo.workOrderNumber}`,
-				workOrderId: updated.id,
-				associationId: association.id,
-				newState: {
-					boardApprovalVoteId: vote.id,
-					boardApprovalStatus: 'PENDING'
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to request board approval' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						boardApprovalVoteId: updated.boardApprovalVoteId!,
-						boardApprovalStatus: updated.boardApprovalStatus!
+						id: workflowResult.workOrderId!,
+						boardApprovalVoteId: workflowResult.voteId!,
+						boardApprovalStatus: workflowResult.boardApprovalStatus!
 					},
 					vote: {
-						id: vote.id,
-						question: vote.question
+						id: workflowResult.voteId!,
+						question
 					}
 				},
 				context
@@ -1537,7 +1369,8 @@ export const workOrderRouter = {
 	recordBoardDecision: orgProcedure
 		.input(
 			z.object({
-				workOrderId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                workOrderId: z.string(),
 				approved: z.boolean(),
 				rationale: z.string().min(1).max(2000)
 			})
@@ -1587,70 +1420,33 @@ export const workOrderRouter = {
 				throw errors.BAD_REQUEST({ message: 'Board decision has already been recorded' });
 			}
 
-			const now = new Date();
-			const newStatus = input.approved ? 'AUTHORIZED' : 'CANCELLED';
-			const boardApprovalStatus = input.approved ? 'APPROVED' : 'DENIED';
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'RECORD_BOARD_DECISION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.workOrderId,
+					approved: input.approved,
+					rationale: input.rationale,
+					boardApprovalVoteId: wo.boardApprovalVoteId,
+					previousStatus: wo.status
+				},
+				input.idempotencyKey
+			);
 
-			const updated = await prisma.$transaction(async (tx) => {
-				// Close the vote if it exists
-				if (wo.boardApprovalVoteId) {
-					await tx.vote.update({
-						where: { id: wo.boardApprovalVoteId },
-						data: { closedAt: now }
-					});
-				}
-
-				const result = await tx.workOrder.update({
-					where: { id: input.workOrderId },
-					data: {
-						status: newStatus,
-						boardApprovalStatus,
-						authorizedBy: input.approved ? context.user!.id : null,
-						authorizedAt: input.approved ? now : null,
-						authorizingRole: input.approved ? 'BOARD' : null,
-						authorizationRationale: input.rationale
-					}
-				});
-
-				await tx.workOrderStatusHistory.create({
-					data: {
-						workOrderId: input.workOrderId,
-						fromStatus: wo.status,
-						toStatus: newStatus,
-						changedBy: context.user!.id,
-						notes: input.approved
-							? `Board approved: ${input.rationale}`
-							: `Board denied: ${input.rationale}`
-					}
-				});
-
-				return result;
-			});
-
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'WORK_ORDER',
-				entityId: updated.id,
-				action: input.approved ? 'APPROVE' : 'DENY',
-				summary: input.approved
-					? `Board approved work order: ${input.rationale}`
-					: `Board denied work order: ${input.rationale}`,
-				workOrderId: updated.id,
-				associationId: association.id,
-				newState: {
-					status: updated.status,
-					boardApprovalStatus: updated.boardApprovalStatus,
-					authorizingRole: updated.authorizingRole
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to record board decision' });
+			}
 
 			return successResponse(
 				{
 					workOrder: {
-						id: updated.id,
-						status: updated.status,
-						boardApprovalStatus: updated.boardApprovalStatus!,
-						authorizedAt: updated.authorizedAt?.toISOString() ?? null
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!,
+						boardApprovalStatus: workflowResult.boardApprovalStatus!,
+						authorizedAt: workflowResult.authorizedAt ?? null
 					}
 				},
 				context
@@ -1663,6 +1459,7 @@ export const workOrderRouter = {
 	addComment: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				workOrderId: z.string(),
 				comment: z.string().min(1).max(2000),
 				isInternal: z.boolean().default(false)
@@ -1703,21 +1500,30 @@ export const workOrderRouter = {
 				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
-			const comment = await prisma.workOrderComment.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'ADD_COMMENT',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
 					workOrderId: input.workOrderId,
 					comment: input.comment,
-					isInternal: input.isInternal,
-					authorId: context.user!.id
-				}
-			});
+					isInternal: input.isInternal
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to add comment' });
+			}
 
 			return successResponse(
 				{
 					comment: {
-						id: comment.id,
-						comment: comment.comment,
-						createdAt: comment.createdAt.toISOString()
+						id: workflowResult.commentId!,
+						comment: input.comment,
+						createdAt: new Date().toISOString()
 					}
 				},
 				context
@@ -1795,7 +1601,8 @@ export const workOrderRouter = {
 	createInvoice: orgProcedure
 		.input(
 			z.object({
-				workOrderId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                workOrderId: z.string(),
 				invoiceNumber: z.string().min(1).max(50),
 				invoiceDate: z.string().datetime(),
 				dueDate: z.string().datetime(),
@@ -1878,80 +1685,44 @@ export const workOrderRouter = {
 			const subtotal = input.laborAmount + input.materialsAmount;
 			const totalAmount = subtotal + input.taxAmount;
 
-			const result = await prisma.$transaction(async (tx) => {
-				// Create AP Invoice
-				const invoice = await tx.aPInvoice.create({
-					data: {
-						associationId: association.id,
-						vendorId: wo.assignedVendorId!,
-						invoiceNumber: input.invoiceNumber,
-						invoiceDate: new Date(input.invoiceDate),
-						dueDate: new Date(input.dueDate),
-						subtotal,
-						taxAmount: input.taxAmount,
-						totalAmount,
-						balanceDue: totalAmount,
-						status: 'PENDING_APPROVAL',
-						description: input.description || `Work Order ${wo.workOrderNumber}: ${wo.title}`,
-						workOrderId: wo.id,
-						lineItems: {
-							create: [
-								...(input.laborAmount > 0 ? [{
-									description: 'Labor',
-									quantity: 1,
-									unitPrice: input.laborAmount,
-									amount: input.laborAmount,
-									glAccountId: input.glAccountId,
-									lineNumber: 1
-								}] : []),
-								...(input.materialsAmount > 0 ? [{
-									description: 'Materials',
-									quantity: 1,
-									unitPrice: input.materialsAmount,
-									amount: input.materialsAmount,
-									glAccountId: input.glAccountId,
-									lineNumber: 2
-								}] : [])
-							]
-						}
-					}
-				});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startWorkOrderMutationWorkflow(
+				{
+					action: 'CREATE_INVOICE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					workOrderId: input.workOrderId,
+					workOrderNumber: wo.workOrderNumber,
+					title: wo.title,
+					vendorId: wo.assignedVendorId!,
+					invoiceNumber: input.invoiceNumber,
+					invoiceDate: new Date(input.invoiceDate),
+					dueDate: new Date(input.dueDate),
+					laborAmount: input.laborAmount,
+					materialsAmount: input.materialsAmount,
+					taxAmount: input.taxAmount,
+					invoiceDescription: input.description,
+					glAccountId: input.glAccountId
+				},
+				input.idempotencyKey
+			);
 
-				// Update work order with invoice reference and status
-				const updatedWO = await tx.workOrder.update({
-					where: { id: input.workOrderId },
-					data: {
-						invoiceId: invoice.id,
-						status: 'INVOICED',
-						actualCost: totalAmount
-					}
-				});
-
-				// Record status change
-				await tx.workOrderStatusHistory.create({
-					data: {
-						workOrderId: input.workOrderId,
-						fromStatus: 'COMPLETED',
-						toStatus: 'INVOICED',
-						changedBy: context.user!.id,
-						notes: `Invoice ${input.invoiceNumber} created`
-					}
-				});
-
-				return { invoice, workOrder: updatedWO };
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to create invoice' });
+			}
 
 			return successResponse(
 				{
 					invoice: {
-						id: result.invoice.id,
-						invoiceNumber: result.invoice.invoiceNumber,
-						totalAmount: result.invoice.totalAmount.toString(),
-						status: result.invoice.status
+						id: workflowResult.invoiceId!,
+						invoiceNumber: input.invoiceNumber,
+						totalAmount: totalAmount.toString(),
+						status: 'PENDING_APPROVAL'
 					},
 					workOrder: {
-						id: result.workOrder.id,
-						status: result.workOrder.status
+						id: workflowResult.workOrderId!,
+						status: workflowResult.status!
 					}
 				},
 				context
@@ -2041,6 +1812,9 @@ export const workOrderRouter = {
 	 */
 	getTransitionStatus: orgProcedure
 		.input(z.object({ workflowId: z.string() }))
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' }
+		})
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -2052,6 +1826,8 @@ export const workOrderRouter = {
 			})
 		)
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'work_order', input.workflowId);
+
 			const status = await getWorkOrderTransitionStatus(input.workflowId);
 			const error = await getWorkOrderTransitionError(input.workflowId);
 

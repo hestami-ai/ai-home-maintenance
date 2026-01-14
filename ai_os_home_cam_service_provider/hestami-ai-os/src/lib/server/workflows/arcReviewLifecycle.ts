@@ -383,7 +383,7 @@ export async function startARCReviewTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `arc-transition-${input.requestId}-${Date.now()}`;
-	await DBOS.startWorkflow(arcReviewLifecycle_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(arcReviewLifecycle_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

@@ -17,15 +17,14 @@ import { prisma } from '../../db.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import type { CommunicationChannel, CommunicationDirection } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
+import { startCaseCommunicationWorkflow } from '../../workflows/caseCommunicationWorkflow.js';
+import { CommunicationChannelSchema, CommunicationDirectionSchema } from '../schemas.js';
 
 const log = createModuleLogger('CaseCommunicationRoute');
 
 // =============================================================================
 // Schemas
 // =============================================================================
-
-const CommunicationChannelSchema = z.enum(['EMAIL', 'SMS', 'LETTER']);
-const CommunicationDirectionSchema = z.enum(['INBOUND', 'OUTBOUND', 'INTERNAL']);
 
 const CaseCommunicationOutputSchema = z.object({
 	id: z.string(),
@@ -135,7 +134,8 @@ export const caseCommunicationRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'ConciergeCase not found' }
+			NOT_FOUND: { message: 'ConciergeCase not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Verify case exists and belongs to organization
@@ -153,22 +153,35 @@ export const caseCommunicationRouter = {
 
 			await context.cerbos.authorize('create', 'case_communication', 'new');
 
-			const communication = await prisma.caseCommunication.create({
-				data: {
-					caseId: input.caseId,
-					channel: input.channel as CommunicationChannel,
-					direction: input.direction as CommunicationDirection,
-					subject: input.subject,
-					content: input.content,
-					fromUserId: context.user.id,
-					toRecipient: input.toRecipient,
-					ccRecipients: input.ccRecipients,
-					threadId: input.threadId,
-					sentAt: input.sentAt ? new Date(input.sentAt) : new Date()
+			// Create communication via workflow
+			const result = await startCaseCommunicationWorkflow(
+				{
+					action: 'CREATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					data: {
+						caseId: input.caseId,
+						channel: input.channel as CommunicationChannel,
+						direction: input.direction as CommunicationDirection,
+						subject: input.subject,
+						content: input.content,
+						toRecipient: input.toRecipient,
+						ccRecipients: input.ccRecipients ? [input.ccRecipients] : undefined,
+						threadId: input.threadId,
+						sentAt: input.sentAt
+					}
 				},
-				include: {
-					fromUser: true
-				}
+				input.idempotencyKey
+			);
+
+			if (!result.success || !result.communicationId) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create communication' });
+			}
+
+			// Fetch created communication with relations
+			const communication = await prisma.caseCommunication.findUnique({
+				where: { id: result.communicationId },
+				include: { fromUser: true }
 			});
 
 			await recordExecution(context, {
@@ -184,7 +197,7 @@ export const caseCommunicationRouter = {
 				}
 			});
 
-			return successResponse({ communication: serializeCommunication(communication) }, context);
+			return successResponse({ communication: serializeCommunication(communication!) }, context);
 		}),
 
 	/**
@@ -316,7 +329,8 @@ export const caseCommunicationRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'CaseCommunication not found' }
+			NOT_FOUND: { message: 'CaseCommunication not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.caseCommunication.findFirst({
@@ -332,26 +346,34 @@ export const caseCommunicationRouter = {
 
 			await context.cerbos.authorize('update', 'case_communication', existing.id);
 
-			const communication = await prisma.caseCommunication.update({
-				where: { id: input.id },
-				data: {
-					...(input.deliveredAt !== undefined && {
-						deliveredAt: input.deliveredAt ? new Date(input.deliveredAt) : null
-					}),
-					...(input.readAt !== undefined && {
-						readAt: input.readAt ? new Date(input.readAt) : null
-					}),
-					...(input.failedAt !== undefined && {
-						failedAt: input.failedAt ? new Date(input.failedAt) : null
-					}),
-					...(input.failureReason !== undefined && { failureReason: input.failureReason })
+			// Update communication status via workflow
+			const result = await startCaseCommunicationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					communicationId: input.id,
+					data: {
+						deliveredAt: input.deliveredAt,
+						readAt: input.readAt,
+						failedAt: input.failedAt,
+						failureReason: input.failureReason
+					}
 				},
-				include: {
-					fromUser: true
-				}
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update communication' });
+			}
+
+			// Fetch updated communication with relations
+			const communication = await prisma.caseCommunication.findUnique({
+				where: { id: input.id },
+				include: { fromUser: true }
 			});
 
-			return successResponse({ communication: serializeCommunication(communication) }, context);
+			return successResponse({ communication: serializeCommunication(communication!) }, context);
 		}),
 
 	/**

@@ -446,11 +446,10 @@ export const pricebookWorkflow_v1 = DBOS.registerWorkflow(pricebookWorkflow);
 
 export async function startPricebookWorkflow(
 	input: PricebookWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<PricebookWorkflowResult> {
 	const handle = await DBOS.startWorkflow(pricebookWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

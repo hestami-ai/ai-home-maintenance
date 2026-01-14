@@ -458,11 +458,10 @@ export const contractWorkflow_v1 = DBOS.registerWorkflow(contractWorkflow);
 
 export async function startServiceContractWorkflow(
 	input: ServiceContractWorkflowInput,
-	workflowId: string
+	workflowId: string, idempotencyKey: string
 ): Promise<ServiceContractWorkflowResult> {
 	const handle = await DBOS.startWorkflow(contractWorkflow_v1, {
-		workflowID: workflowId
-	})(input);
+		workflowID: idempotencyKey})(input);
 
 	return handle.getResult();
 }

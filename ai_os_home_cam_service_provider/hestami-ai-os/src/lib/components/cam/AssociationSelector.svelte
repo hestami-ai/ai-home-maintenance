@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { Building2, ChevronDown, Check } from 'lucide-svelte';
+	import { orpc } from '$lib/api/orpc';
+	import { invalidateAll } from '$app/navigation';
+	import { associationStore } from '$lib/stores/association';
 	
 	interface Association {
 		id: string;
@@ -14,6 +17,7 @@
 
 	let { associations, currentAssociation }: Props = $props();
 	let isOpen = $state(false);
+	let isSwitching = $state(false);
 	let dropdownRef = $state<HTMLDivElement | null>(null);
 
 	function toggleDropdown() {
@@ -37,15 +41,30 @@
 
 	/**
 	 * Switch to a different association.
-	 * Sets cookie client-side (not security-sensitive, just a user preference)
-	 * and invalidates all load functions to refresh data with new association context.
+	 * Calls oRPC to persist the preference in the database, then reloads the page.
 	 */
 	async function switchAssociation(associationId: string) {
-		// Set cookie client-side - this is just a preference, not a security token
-		document.cookie = `cam_association_id=${associationId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+		if (isSwitching) return;
+		isSwitching = true;
 		isOpen = false;
-		// Force full page reload to ensure server reads the new cookie
-		window.location.reload();
+
+		try {
+			// Call oRPC to set the default association in the database
+			const result = await orpc.association.setDefault({ associationId });
+			
+			if (result.ok) {
+				// Update the store immediately for optimistic UI
+				const newAssociation = associations.find(a => a.id === associationId);
+				if (newAssociation) {
+					associationStore.setCurrent(newAssociation as any);
+				}
+				// Reload to get fresh server data with new association context
+				window.location.reload();
+			}
+		} catch (err) {
+			console.error('Failed to switch association:', err);
+			isSwitching = false;
+		}
 	}
 </script>
 

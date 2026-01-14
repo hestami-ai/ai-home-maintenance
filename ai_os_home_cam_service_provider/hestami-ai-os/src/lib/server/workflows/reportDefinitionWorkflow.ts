@@ -177,9 +177,9 @@ export const reportDefinitionWorkflow_v1 = DBOS.registerWorkflow(reportDefinitio
 
 export async function startReportDefinitionWorkflow(
 	input: ReportDefinitionWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ReportDefinitionWorkflowResult> {
 	const workflowId = idempotencyKey || `report-def-${input.action}-${input.reportId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(reportDefinitionWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(reportDefinitionWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

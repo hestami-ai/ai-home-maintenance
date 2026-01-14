@@ -151,9 +151,9 @@ export const serviceAreaWorkflow_v1 = DBOS.registerWorkflow(serviceAreaWorkflow)
 
 export async function startServiceAreaWorkflow(
 	input: ServiceAreaWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<ServiceAreaWorkflowResult> {
 	const workflowId = idempotencyKey || `service-area-${input.action}-${input.serviceAreaId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(serviceAreaWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(serviceAreaWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

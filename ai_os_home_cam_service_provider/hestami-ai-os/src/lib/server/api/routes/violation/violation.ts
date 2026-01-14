@@ -8,13 +8,17 @@ import {
 	ViolationSeveritySchema,
 	NoticeTypeSchema,
 	NoticeDeliveryMethodSchema,
-	HearingOutcomeSchema
+	HearingOutcomeSchema,
+	MediaTypeSchema,
+	ReporterTypeSchema,
+	AppealDecisionSchema
 } from '$lib/schemas/index.js';
 import { Prisma, type ViolationStatus } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
 import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';
 import { startViolationFineWorkflow } from '../../../workflows/violationFineWorkflow.js';
 import { startViolationWorkflow } from '../../../workflows/violationWorkflow.js';
+import { startDocumentWorkflow } from '../../../workflows/documentWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ViolationRoute');
@@ -105,7 +109,7 @@ export const violationRouter = {
 				locationDetails: z.string().max(500).optional(),
 				observedDate: z.string().datetime(),
 				responsiblePartyId: z.string().optional(),
-				reporterType: z.enum(['STAFF', 'RESIDENT', 'ANONYMOUS']).default('STAFF'),
+				reporterType: ReporterTypeSchema.default('STAFF'),
 				idempotencyKey: z.string().min(1)
 			})
 		)
@@ -211,7 +215,9 @@ export const violationRouter = {
 	 * Soft delete violation
 	 */
 	delete: orgProcedure
-		.input(z.object({ id: z.string(), reason: z.string().max(1000).optional() }))
+		.input(z.object({
+            idempotencyKey: z.string().uuid(),
+            id: z.string(), reason: z.string().max(1000).optional() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' }
@@ -227,36 +233,26 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'violation', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(input.id, association.id, errors);
+			await getViolationOrThrow(input.id, association.id, errors);
 
-			const deletedAt = new Date();
-
-			const result = await prisma.$transaction(async (tx) => {
-				const updated = await tx.violation.update({
-					where: { id: input.id },
+			const result = await startViolationWorkflow(
+				{
+					action: 'DELETE_VIOLATION',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.id,
 					data: {
-						deletedAt,
-						status: 'CLOSED',
-						closedDate: deletedAt,
-						closedBy: context.user!.id,
-						resolutionNotes: input.reason ?? violation.resolutionNotes
+						reason: input.reason
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				await tx.violationStatusHistory.create({
-					data: {
-						violationId: input.id,
-						fromStatus: violation.status,
-						toStatus: 'CLOSED',
-						changedBy: context.user!.id,
-						notes: input.reason ?? 'Violation deleted'
-					}
-				});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete violation' });
+			}
 
-				return updated;
-			});
-
-			return successResponse({ id: result.id, deletedAt: deletedAt.toISOString() }, context);
+			return successResponse({ id: input.id, deletedAt: new Date().toISOString() }, context);
 		}),
 
 	/**
@@ -439,7 +435,7 @@ export const violationRouter = {
 				locationDetails: z.string().max(500).optional(),
 				observedDate: z.string().datetime().optional(),
 				responsiblePartyId: z.string().optional(),
-				reporterType: z.enum(['STAFF', 'RESIDENT', 'ANONYMOUS']).optional(),
+				reporterType: ReporterTypeSchema.optional(),
 				idempotencyKey: z.string().min(1)
 			})
 		)
@@ -598,6 +594,7 @@ export const violationRouter = {
 	cure: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				notes: z.string().max(1000).optional()
 			})
@@ -626,33 +623,33 @@ export const violationRouter = {
 
 			assertStatusChangeAllowed(v.status, 'CURED', errors);
 
-			const now = new Date();
-
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.violation.update({
-					where: { id: input.id },
-					data: { status: 'CURED', curedDate: now, resolutionNotes: input.notes ?? v.resolutionNotes }
-				});
-
-				await tx.violationStatusHistory.create({
+			const result = await startViolationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.id,
 					data: {
-						violationId: input.id,
-						fromStatus: v.status,
-						toStatus: 'CURED',
-						changedBy: context.user!.id,
+						status: 'CURED',
 						notes: input.notes ?? 'Violation cured'
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return result;
-			});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cure violation' });
+			}
+
+			// Fetch updated record for response
+			const updated = await prisma.violation.findUnique({ where: { id: input.id } });
 
 			return successResponse(
 				{
 					violation: {
-						id: updated.id,
-						status: updated.status,
-						curedDate: updated.curedDate?.toISOString() ?? null
+						id: input.id,
+						status: 'CURED' as const,
+						curedDate: updated?.curedDate?.toISOString() ?? null
 					}
 				},
 				context
@@ -665,6 +662,7 @@ export const violationRouter = {
 	close: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				id: z.string(),
 				notes: z.string().max(1000).optional()
 			})
@@ -693,38 +691,33 @@ export const violationRouter = {
 
 			assertStatusChangeAllowed(v.status, 'CLOSED', errors);
 
-			const now = new Date();
-
-			const updated = await prisma.$transaction(async (tx) => {
-				const result = await tx.violation.update({
-					where: { id: input.id },
+			const result = await startViolationWorkflow(
+				{
+					action: 'UPDATE_STATUS',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.id,
 					data: {
 						status: 'CLOSED',
-						closedDate: now,
-						closedBy: context.user!.id,
-						resolutionNotes: input.notes ?? v.resolutionNotes
-					}
-				});
-
-				await tx.violationStatusHistory.create({
-					data: {
-						violationId: input.id,
-						fromStatus: v.status,
-						toStatus: 'CLOSED',
-						changedBy: context.user!.id,
 						notes: input.notes ?? 'Violation closed'
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				return result;
-			});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to close violation' });
+			}
+
+			// Fetch updated record for response
+			const updated = await prisma.violation.findUnique({ where: { id: input.id } });
 
 			return successResponse(
 				{
 					violation: {
-						id: updated.id,
-						status: updated.status,
-						closedDate: updated.closedDate?.toISOString() ?? null
+						id: input.id,
+						status: 'CLOSED' as const,
+						closedDate: updated?.closedDate?.toISOString() ?? null
 					}
 				},
 				context
@@ -737,8 +730,9 @@ export const violationRouter = {
 	addEvidence: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				violationId: z.string(),
-				evidenceType: z.enum(['PHOTO', 'VIDEO', 'DOCUMENT', 'AUDIO']),
+				evidenceType: MediaTypeSchema,
 				fileName: z.string().min(1).max(255),
 				fileUrl: z.string().url(),
 				fileSize: z.number().int().optional(),
@@ -783,44 +777,46 @@ export const violationRouter = {
 				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
-			const evidence = await prisma.document.create({
-				data: {
+			const result = await startDocumentWorkflow(
+				{
+					action: 'CREATE_DOCUMENT',
 					organizationId: context.organization!.id,
 					associationId: association.id,
-					title: input.fileName,
-					fileName: input.fileName,
-					fileUrl: input.fileUrl,
-					storagePath: input.fileUrl, // Fallback to fileUrl for now
-					fileSize: input.fileSize || 0,
-					mimeType: input.mimeType || 'application/octet-stream',
-					description: input.description,
-					category: 'VIOLATION_EVIDENCE',
-					visibility: 'PRIVATE',
-					status: 'ACTIVE',
-					uploadedBy: context.user!.id,
-					latitude: input.gpsLatitude ? new Prisma.Decimal(input.gpsLatitude) : null,
-					longitude: input.gpsLongitude ? new Prisma.Decimal(input.gpsLongitude) : null,
-					capturedAt: input.capturedAt ? new Date(input.capturedAt) : null,
-					metadata: {
-						evidenceType: input.evidenceType
-					},
-					contextBindings: {
-						create: {
-							contextType: 'VIOLATION',
-							contextId: input.violationId,
-							isPrimary: true,
-							createdBy: context.user!.id
+					userId: context.user!.id,
+					data: {
+						title: input.fileName,
+						fileName: input.fileName,
+						fileUrl: input.fileUrl,
+						storagePath: input.fileUrl,
+						fileSize: input.fileSize || 0,
+						mimeType: input.mimeType || 'application/octet-stream',
+						description: input.description,
+						category: 'VIOLATION_EVIDENCE',
+						visibility: 'PRIVATE',
+						contextType: 'VIOLATION',
+						contextId: input.violationId,
+						isPrimary: true,
+						metadata: {
+							evidenceType: input.evidenceType,
+							gpsLatitude: input.gpsLatitude,
+							gpsLongitude: input.gpsLongitude,
+							capturedAt: input.capturedAt
 						}
 					}
-				}
-			});
+				},
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add evidence' });
+			}
 
 			return successResponse(
 				{
 					evidence: {
-						id: evidence.id,
+						id: result.entityId!,
 						evidenceType: input.evidenceType,
-						fileName: evidence.fileName
+						fileName: input.fileName
 					}
 				},
 				context
@@ -888,6 +884,7 @@ export const violationRouter = {
 	sendNotice: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				violationId: z.string(),
 				noticeType: noticeTypeEnum,
 				subject: z.string().min(1).max(255),
@@ -936,64 +933,45 @@ export const violationRouter = {
 					: 'NOTICE_SENT';
 			assertStatusChangeAllowed(violation.status, targetStatus, errors);
 
-			const now = new Date();
-			const curePeriodDays = input.curePeriodDays || violation.violationType.defaultCurePeriodDays;
-			const curePeriodEnds = new Date(now.getTime() + curePeriodDays * 24 * 60 * 60 * 1000);
-
-			const result = await prisma.$transaction(async (tx) => {
-				const notice = await tx.violationNotice.create({
+			const result = await startViolationWorkflow(
+				{
+					action: 'SEND_NOTICE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.violationId,
 					data: {
-						violationId: input.violationId,
 						noticeType: input.noticeType,
-						noticeNumber: violation.noticeCount + 1,
 						subject: input.subject,
 						body: input.body,
 						deliveryMethod: input.deliveryMethod,
 						recipientName: input.recipientName,
 						recipientAddress: input.recipientAddress,
 						recipientEmail: input.recipientEmail,
-						sentDate: now,
-						curePeriodDays,
-						curePeriodEnds,
-						sentBy: context.user!.id
+						curePeriodDays: input.curePeriodDays,
+						noticeCount: violation.noticeCount,
+						defaultCurePeriodDays: violation.violationType.defaultCurePeriodDays
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update violation
-				await tx.violation.update({
-					where: { id: input.violationId },
-					data: {
-						noticeCount: { increment: 1 },
-						lastNoticeDate: now,
-						lastNoticeType: input.noticeType,
-						curePeriodEnds,
-						status: targetStatus
-					}
-				});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send notice' });
+			}
 
-				// Record status change if needed
-				if (violation.status !== targetStatus) {
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.violationId,
-							fromStatus: violation.status,
-							toStatus: targetStatus,
-							changedBy: context.user!.id,
-							notes: `${input.noticeType} sent`
-						}
-					});
-				}
-
-				return notice;
+			// Fetch the created notice for response
+			const notice = await prisma.violationNotice.findFirst({
+				where: { violationId: input.violationId },
+				orderBy: { createdAt: 'desc' }
 			});
 
 			return successResponse(
 				{
 					notice: {
-						id: result.id,
-						noticeType: result.noticeType,
-						noticeNumber: result.noticeNumber,
-						sentDate: result.sentDate.toISOString()
+						id: notice?.id || result.entityId!,
+						noticeType: input.noticeType,
+						noticeNumber: violation.noticeCount + 1,
+						sentDate: new Date().toISOString()
 					}
 				},
 				context
@@ -1054,6 +1032,7 @@ export const violationRouter = {
 	scheduleHearing: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				violationId: z.string(),
 				hearingDate: z.string().datetime(),
 				hearingTime: z.string().max(20).optional(),
@@ -1083,47 +1062,33 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
 
-			const result = await prisma.$transaction(async (tx) => {
-				const hearing = await tx.violationHearing.create({
+			assertStatusChangeAllowed(violation.status, 'HEARING_SCHEDULED', errors);
+
+			const result = await startViolationWorkflow(
+				{
+					action: 'SCHEDULE_HEARING',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: input.violationId,
 					data: {
-						violationId: input.violationId,
-						hearingDate: new Date(input.hearingDate),
-						hearingTime: input.hearingTime,
-						location: input.location,
-						hearingOfficer: input.hearingOfficer,
-						outcome: 'PENDING'
+						hearingDate: input.hearingDate,
+						hearingLocation: input.location,
+						hearingNotes: input.hearingTime ? `Time: ${input.hearingTime}` : undefined
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				const previousStatus = violation.status;
-				assertStatusChangeAllowed(previousStatus, 'HEARING_SCHEDULED', errors);
-
-				await tx.violation.update({
-					where: { id: input.violationId },
-					data: { status: 'HEARING_SCHEDULED' }
-				});
-
-				if (previousStatus !== 'HEARING_SCHEDULED') {
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.violationId,
-							fromStatus: previousStatus,
-							toStatus: 'HEARING_SCHEDULED',
-							changedBy: context.user!.id,
-							notes: `Hearing scheduled for ${input.hearingDate}`
-						}
-					});
-				}
-
-				return hearing;
-			});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to schedule hearing' });
+			}
 
 			return successResponse(
 				{
 					hearing: {
-						id: result.id,
-						hearingDate: result.hearingDate.toISOString(),
-						location: result.location
+						id: result.entityId!,
+						hearingDate: input.hearingDate,
+						location: input.location ?? null
 					}
 				},
 				context
@@ -1184,7 +1149,8 @@ export const violationRouter = {
 	recordHearingOutcome: orgProcedure
 		.input(
 			z.object({
-				hearingId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                hearingId: z.string(),
 				outcome: hearingOutcomeEnum,
 				outcomeNotes: z.string().max(5000).optional(),
 				fineAssessed: z.number().min(0).optional(),
@@ -1221,49 +1187,34 @@ export const violationRouter = {
 
 			await context.cerbos.authorize('edit', 'violation', hearing.violationId);
 
-			const now = new Date();
-			const appealDeadline = new Date(now.getTime() + input.appealDeadlineDays * 24 * 60 * 60 * 1000);
-
-			const result = await prisma.$transaction(async (tx) => {
-				const updatedHearing = await tx.violationHearing.update({
-					where: { id: input.hearingId },
+			const result = await startViolationWorkflow(
+				{
+					action: 'RECORD_HEARING_OUTCOME',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					violationId: hearing.violationId,
 					data: {
+						hearingId: input.hearingId,
 						outcome: input.outcome,
-						outcomeNotes: input.outcomeNotes,
+						notes: input.outcomeNotes,
 						fineAssessed: input.fineAssessed,
 						fineWaived: input.fineWaived,
-						appealDeadline,
-						recordedBy: context.user!.id,
-						recordedAt: now
+						appealDeadlineDays: input.appealDeadlineDays
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update violation status
-				const newStatus: ViolationStatus = input.outcome === 'DISMISSED' ? 'DISMISSED' : 'HEARING_HELD';
-				await tx.violation.update({
-					where: { id: hearing.violationId },
-					data: { status: newStatus }
-				});
-
-				await tx.violationStatusHistory.create({
-					data: {
-						violationId: hearing.violationId,
-						fromStatus: 'HEARING_SCHEDULED',
-						toStatus: newStatus,
-						changedBy: context.user!.id,
-						notes: `Hearing outcome: ${input.outcome}`
-					}
-				});
-
-				return updatedHearing;
-			});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record hearing outcome' });
+			}
 
 			return successResponse(
 				{
 					hearing: {
-						id: result.id,
-						outcome: result.outcome,
-						fineAssessed: result.fineAssessed?.toString() ?? null
+						id: input.hearingId,
+						outcome: input.outcome,
+						fineAssessed: input.fineAssessed?.toString() ?? null
 					}
 				},
 				context
@@ -1276,6 +1227,7 @@ export const violationRouter = {
 	assessFine: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				violationId: z.string(),
 				amount: z.number().min(0.01),
 				reason: z.string().max(500).optional(),
@@ -1320,55 +1272,41 @@ export const violationRouter = {
 				throw errors.NOT_FOUND({ message: 'Violation' });
 			}
 
-			const now = new Date();
-			const dueDate = new Date(now.getTime() + input.dueDays * 24 * 60 * 60 * 1000);
-			const fineNumber = violation.fines.length + 1;
-
-			const result = await prisma.$transaction(async (tx) => {
-				const fine = await tx.violationFine.create({
+			const result = await startViolationFineWorkflow(
+				{
+					action: 'ASSESS_FINE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: association.id,
+					violationId: input.violationId,
 					data: {
-						violationId: input.violationId,
-						fineNumber,
 						amount: input.amount,
 						reason: input.reason,
-						assessedDate: now,
-						dueDate,
-						balanceDue: input.amount,
-						assessedBy: context.user!.id
+						dueDays: input.dueDays,
+						fineCount: violation.fines.length,
+						currentStatus: violation.status
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update violation totals
-				await tx.violation.update({
-					where: { id: input.violationId },
-					data: {
-						totalFinesAssessed: { increment: input.amount },
-						status: 'FINE_ASSESSED'
-					}
-				});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assess fine' });
+			}
 
-				if (violation.status !== 'FINE_ASSESSED') {
-					await tx.violationStatusHistory.create({
-						data: {
-							violationId: input.violationId,
-							fromStatus: violation.status,
-							toStatus: 'FINE_ASSESSED',
-							changedBy: context.user!.id,
-							notes: `Fine #${fineNumber} assessed: $${input.amount}`
-						}
-					});
-				}
-
-				return fine;
+			// Fetch the created fine for response
+			const fine = await prisma.violationFine.findFirst({
+				where: { violationId: input.violationId },
+				orderBy: { createdAt: 'desc' }
 			});
 
 			return successResponse(
 				{
 					fine: {
-						id: result.id,
-						fineNumber: result.fineNumber,
-						amount: result.amount.toString(),
-						dueDate: result.dueDate.toISOString()
+						id: fine?.id || result.entityId!,
+						fineNumber: violation.fines.length + 1,
+						amount: input.amount.toString(),
+						dueDate: new Date(Date.now() + input.dueDays * 24 * 60 * 60 * 1000).toISOString()
 					}
 				},
 				context
@@ -1381,6 +1319,7 @@ export const violationRouter = {
 	waiveFine: orgProcedure
 		.input(
 			z.object({
+				idempotencyKey: z.string().uuid(),
 				fineId: z.string(),
 				waivedAmount: z.number().min(0.01),
 				reason: z.string().min(1).max(500)
@@ -1420,38 +1359,34 @@ export const violationRouter = {
 				throw errors.BAD_REQUEST({ message: 'Waived amount cannot exceed balance due' });
 			}
 
-			const newBalanceDue = Number(fine.balanceDue) - input.waivedAmount;
-			const totalWaived = Number(fine.waivedAmount) + input.waivedAmount;
-
-			const result = await prisma.$transaction(async (tx) => {
-				const updated = await tx.violationFine.update({
-					where: { id: input.fineId },
+			const result = await startViolationFineWorkflow(
+				{
+					action: 'WAIVE_FINE',
+					organizationId: context.organization!.id,
+					userId: context.user!.id,
+					associationId: fine.violation.association.id,
+					fineId: input.fineId,
 					data: {
-						waivedAmount: totalWaived,
-						balanceDue: newBalanceDue,
-						waivedBy: context.user!.id,
-						waivedDate: new Date(),
-						waiverReason: input.reason
+						waivedAmount: input.waivedAmount,
+						waiveReason: input.reason
 					}
-				});
+				},
+				input.idempotencyKey
+			);
 
-				// Update violation totals
-				await tx.violation.update({
-					where: { id: fine.violationId },
-					data: {
-						totalFinesWaived: { increment: input.waivedAmount }
-					}
-				});
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to waive fine' });
+			}
 
-				return updated;
-			});
+			// Fetch updated fine for response
+			const updatedFine = await prisma.violationFine.findUnique({ where: { id: input.fineId } });
 
 			return successResponse(
 				{
 					fine: {
-						id: result.id,
-						waivedAmount: result.waivedAmount.toString(),
-						balanceDue: result.balanceDue.toString()
+						id: input.fineId,
+						waivedAmount: updatedFine?.waivedAmount.toString() || '0',
+						balanceDue: updatedFine?.balanceDue.toString() || '0'
 					}
 				},
 				context
@@ -1945,7 +1880,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, association.id, errors);
 
 			// Check if there's already a pending appeal
 			const existingAppeal = await prisma.violationAppeal.findFirst({
@@ -1959,25 +1894,13 @@ export const violationRouter = {
 				throw errors.CONFLICT({ message: 'An appeal is already pending for this violation' });
 			}
 
-			// Get or create a hearing to attach the appeal to
-			let hearing = await prisma.violationHearing.findFirst({
+			// Check if there's an existing hearing
+			const existingHearing = await prisma.violationHearing.findFirst({
 				where: { violationId: input.violationId },
 				orderBy: { hearingDate: 'desc' }
 			});
 
-			if (!hearing) {
-				// Create a placeholder hearing for the appeal
-				hearing = await prisma.violationHearing.create({
-					data: {
-						violationId: input.violationId,
-						hearingDate: new Date(),
-						outcome: 'PENDING',
-						outcomeNotes: 'Appeal filed - hearing pending'
-					}
-				});
-			}
-
-			// Use DBOS workflow for durable execution
+			// Use DBOS workflow for durable execution (workflow will create placeholder hearing if needed)
 			const workflowResult = await startViolationWorkflow(
 				{
 					action: 'RECORD_APPEAL',
@@ -1985,10 +1908,11 @@ export const violationRouter = {
 					userId: context.user!.id,
 					violationId: input.violationId,
 					data: {
-						hearingId: hearing.id,
+						hearingId: existingHearing?.id,
 						reason: input.reason,
 						filedBy: context.user!.id,
-						documentsJson: input.supportingInfo ? JSON.stringify({ supportingInfo: input.supportingInfo, requestBoardReview: input.requestBoardReview }) : null
+						documentsJson: input.supportingInfo ? JSON.stringify({ supportingInfo: input.supportingInfo, requestBoardReview: input.requestBoardReview }) : null,
+						createPlaceholderHearing: !existingHearing
 					}
 				},
 				input.idempotencyKey
@@ -2107,7 +2031,7 @@ export const violationRouter = {
 		.input(
 			z.object({
 				appealId: z.string(),
-				decision: z.enum(['UPHELD', 'OVERTURNED', 'MODIFIED']),
+				decision: AppealDecisionSchema,
 				notes: z.string().min(1).max(2000),
 				revisedFineAmount: z.number().min(0).optional(),
 				idempotencyKey: z.string().min(1)
@@ -2221,6 +2145,8 @@ export const violationRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'violation_fine', input.fineId);
+
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			// Use DBOS workflow for durable execution

@@ -4,12 +4,13 @@ import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSch
 import { prisma } from '../../../db.js';
 import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
+import { CommitteeTypeSchema, CommitteeRoleSchema } from '../../schemas.js';
 
 const log = createModuleLogger('CommitteeRoute');
 
 // Enums matching Prisma schema
-const committeeTypeEnum = z.enum(['ARC', 'SOCIAL', 'LANDSCAPE', 'BUDGET', 'SAFETY', 'NOMINATING', 'CUSTOM']);
-const committeeRoleEnum = z.enum(['CHAIR', 'VICE_CHAIR', 'SECRETARY', 'MEMBER']);
+const committeeTypeEnum = CommitteeTypeSchema;
+const committeeRoleEnum = CommitteeRoleSchema;
 
 // Output schemas
 const CommitteeOutputSchema = z.object({
@@ -221,7 +222,13 @@ export const governanceCommitteeRouter = {
                 meta: ResponseMetaSchema
             })
         )
+        .errors({
+            FORBIDDEN: { message: 'Access denied' },
+            INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+        })
         .handler(async ({ input, context }) => {
+            await context.cerbos.authorize('view', 'governance_committee', 'list');
+
             const take = input.limit ?? 20;
             const where: any = {
                 association: { organizationId: context.organization.id }

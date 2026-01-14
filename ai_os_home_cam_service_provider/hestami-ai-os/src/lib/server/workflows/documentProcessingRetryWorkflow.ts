@@ -325,7 +325,7 @@ async function scheduledRetryPoll(scheduledTime: Date, actualTime: Date): Promis
             await DBOS.startWorkflow(documentProcessingRetryWorkflow_v1, { workflowID: idempotencyKey })({
                 documentId: doc.id,
                 triggeredBy: 'SYSTEM'
-            });
+            }, { workflowID: idempotencyKey });
 
             await DBOS.runStep(
                 () => recordWorkflowEvent({

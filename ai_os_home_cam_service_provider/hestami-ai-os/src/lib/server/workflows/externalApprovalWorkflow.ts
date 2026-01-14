@@ -305,12 +305,12 @@ export const externalApprovalWorkflow_v1 = DBOS.registerWorkflow(externalApprova
 
 export async function startExternalApprovalWorkflow(
 	input: ExternalApprovalWorkflowInput,
-	workflowId?: string
+	workflowId?: string, idempotencyKey: string
 ): Promise<{ workflowId: string }> {
 	const id =
 		workflowId ||
 		`approval-${input.action.toLowerCase()}-${input.approvalId || input.organizationId}-${Date.now()}`;
-	await DBOS.startWorkflow(externalApprovalWorkflow_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(externalApprovalWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

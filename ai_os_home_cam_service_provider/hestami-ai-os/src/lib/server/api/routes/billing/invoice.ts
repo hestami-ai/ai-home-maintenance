@@ -501,10 +501,11 @@ export const invoiceRouter = {
 	 * Mark invoice as viewed
 	 */
 	markViewed: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({ id: z.string() }).merge(IdempotencyKeySchema))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -514,6 +515,7 @@ export const invoiceRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			await context.cerbos.authorize('edit', 'job_invoice', input.id);
 			await assertContractorOrg(context.organization.id, errors);
 
 			const existing = await prisma.jobInvoice.findFirst({
@@ -525,16 +527,30 @@ export const invoiceRouter = {
 				return successResponse({ invoice: formatInvoice(existing) }, context);
 			}
 
-			const invoice = await prisma.jobInvoice.update({
-				where: { id: input.id },
-				data: {
-					status: 'VIEWED',
-					viewedAt: new Date()
+			// Mark as viewed via workflow
+			const result = await startBillingWorkflow(
+				{
+					action: 'MARK_INVOICE_VIEWED',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					entityId: input.id,
+					data: {}
 				},
+				input.idempotencyKey,
+				input.idempotencyKey
+			);
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark invoice viewed' });
+			}
+
+			// Fetch updated invoice
+			const invoice = await prisma.jobInvoice.findUnique({
+				where: { id: input.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
-			return successResponse({ invoice: formatInvoice(invoice, true) }, context);
+			return successResponse({ invoice: formatInvoice(invoice!, true) }, context);
 		}),
 
 	/**

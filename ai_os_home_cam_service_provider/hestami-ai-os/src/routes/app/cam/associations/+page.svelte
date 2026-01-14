@@ -2,6 +2,8 @@
 	import { Building2, Search, Plus } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
+	import { orpc } from '$lib/api/orpc';
+	import { associationStore } from '$lib/stores/association';
 
 	interface Association {
 		id: string;
@@ -19,7 +21,8 @@
 	let associations = $derived(data.associations as Association[]);
 	
 	let selectedAssociation = $state<Association | null>(null);
-	let isLoading = $state(false); // No loading state needed for initial load
+	let isLoading = $state(false);
+	let isSwitching = $state(false);
 	let searchQuery = $state('');
 
 	function selectAssociation(association: Association) {
@@ -35,10 +38,27 @@
 		});
 	}
 
-	function switchToAssociation(associationId: string) {
-		// Set cookie client-side and reload to switch association context
-		document.cookie = `cam_association_id=${associationId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
-		window.location.href = '/app/cam';
+	async function switchToAssociation(associationId: string) {
+		if (isSwitching) return;
+		isSwitching = true;
+
+		try {
+			// Call oRPC to set the default association in the database
+			const result = await orpc.association.setDefault({ associationId });
+			
+			if (result.ok) {
+				// Update the store immediately for optimistic UI
+				const newAssociation = associations.find(a => a.id === associationId);
+				if (newAssociation) {
+					associationStore.setCurrent(newAssociation as any);
+				}
+				// Navigate to CAM dashboard with new association context
+				window.location.href = '/app/cam';
+			}
+		} catch (err) {
+			console.error('Failed to switch association:', err);
+			isSwitching = false;
+		}
 	}
 
 	const filteredAssociations = $derived(

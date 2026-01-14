@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import { DBOS } from '@dbos-inc/dbos-sdk';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
+import { UnitTypeSchema } from '../schemas.js';
+import { unitWorkflow_v1 } from '../../workflows/unitWorkflow.js';
 
 const log = createModuleLogger('UnitRoute');
 
@@ -16,9 +19,10 @@ export const unitRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				propertyId: z.string(),
+                idempotencyKey: z.string().uuid(),
+                propertyId: z.string(),
 				unitNumber: z.string().min(1).max(50),
-				unitType: z.enum(['SINGLE_FAMILY_HOME', 'CONDO_UNIT', 'TOWNHOUSE', 'LOT', 'COMMERCIAL_UNIT']),
+				unitType: UnitTypeSchema,
 				addressLine1: z.string().max(255).optional(),
 				addressLine2: z.string().max(255).optional(),
 				city: z.string().max(100).optional(),
@@ -47,7 +51,8 @@ export const unitRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Property not found' }
+			NOT_FOUND: { message: 'Property not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to create unit' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
@@ -63,19 +68,42 @@ export const unitRouter = {
 				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 
-			const unit = await prisma.unit.create({
-				data: {
-					...input,
-					organizationId: context.organization.id
-				}
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(unitWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				propertyId: input.propertyId,
+				unitNumber: input.unitNumber,
+				unitType: input.unitType,
+				addressLine1: input.addressLine1,
+				addressLine2: input.addressLine2,
+				city: input.city,
+				state: input.state,
+				postalCode: input.postalCode,
+				bedrooms: input.bedrooms,
+				bathrooms: input.bathrooms,
+				squareFeet: input.squareFeet,
+				lotSquareFeet: input.lotSquareFeet,
+				parkingSpaces: input.parkingSpaces,
+				assessmentClass: input.assessmentClass,
+				votingWeight: input.votingWeight
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create unit' });
+			}
 
 			return successResponse(
 				{
 					unit: {
-						id: unit.id,
-						unitNumber: unit.unitNumber,
-						unitType: unit.unitType
+						id: result.unitId!,
+						unitNumber: result.unitNumber!,
+						unitType: result.unitType!
 					}
 				},
 				context
@@ -165,7 +193,7 @@ export const unitRouter = {
 		.input(
 			PaginationInputSchema.extend({
 				propertyId: z.string().optional(),
-				unitType: z.enum(['SINGLE_FAMILY_HOME', 'CONDO_UNIT', 'TOWNHOUSE', 'LOT', 'COMMERCIAL_UNIT']).optional()
+				unitType: UnitTypeSchema.optional()
 			})
 		)
 		.output(
@@ -186,6 +214,10 @@ export const unitRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve units' }
+		})
 		.handler(async ({ input, context }) => {
 			// Cerbos query plan
 			const queryPlan = await context.cerbos.queryFilter('view', 'unit');
@@ -242,9 +274,10 @@ export const unitRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				unitNumber: z.string().min(1).max(50).optional(),
-				unitType: z.enum(['SINGLE_FAMILY_HOME', 'CONDO_UNIT', 'TOWNHOUSE', 'LOT', 'COMMERCIAL_UNIT']).optional(),
+				unitType: UnitTypeSchema.optional(),
 				addressLine1: z.string().max(255).optional(),
 				addressLine2: z.string().max(255).optional(),
 				city: z.string().max(100).optional(),
@@ -273,7 +306,8 @@ export const unitRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Unit not found' }
+			NOT_FOUND: { message: 'Unit not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update unit' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.unit.findFirst({
@@ -288,18 +322,42 @@ export const unitRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'unit', existing.id);
 
-			const { id, ...updateData } = input;
-			const unit = await prisma.unit.update({
-				where: { id },
-				data: updateData
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(unitWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UPDATE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				unitId: input.id,
+				unitNumber: input.unitNumber,
+				unitType: input.unitType,
+				addressLine1: input.addressLine1,
+				addressLine2: input.addressLine2,
+				city: input.city,
+				state: input.state,
+				postalCode: input.postalCode,
+				bedrooms: input.bedrooms,
+				bathrooms: input.bathrooms,
+				squareFeet: input.squareFeet,
+				lotSquareFeet: input.lotSquareFeet,
+				parkingSpaces: input.parkingSpaces,
+				assessmentClass: input.assessmentClass,
+				votingWeight: input.votingWeight
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update unit' });
+			}
 
 			return successResponse(
 				{
 					unit: {
-						id: unit.id,
-						unitNumber: unit.unitNumber,
-						updatedAt: unit.updatedAt.toISOString()
+						id: result.unitId!,
+						unitNumber: result.unitNumber!,
+						updatedAt: result.updatedAt!
 					}
 				},
 				context
@@ -312,7 +370,8 @@ export const unitRouter = {
 	delete: orgProcedure
 		.input(
 			z.object({
-				id: z.string()
+                idempotencyKey: z.string().uuid(),
+                id: z.string()
 			})
 		)
 		.output(
@@ -326,7 +385,8 @@ export const unitRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Unit not found' }
+			NOT_FOUND: { message: 'Unit not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to delete unit' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const unit = await prisma.unit.findFirst({
@@ -341,16 +401,26 @@ export const unitRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'unit', unit.id);
 
-			const now = new Date();
-			await prisma.unit.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(unitWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'DELETE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				unitId: input.id
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete unit' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: result.deletedAt!
 				},
 				context
 			);

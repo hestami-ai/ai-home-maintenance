@@ -19,6 +19,7 @@ export const GovernanceAction = {
 	CREATE_BOARD: 'CREATE_BOARD',
 	CREATE_MEETING: 'CREATE_MEETING',
 	CREATE_MOTION: 'CREATE_MOTION',
+	UPDATE_MOTION: 'UPDATE_MOTION',
 	CREATE_RESOLUTION: 'CREATE_RESOLUTION',
 	UPDATE_RESOLUTION_STATUS: 'UPDATE_RESOLUTION_STATUS',
 	CREATE_POLICY: 'CREATE_POLICY',
@@ -188,6 +189,32 @@ async function createMotion(
 	});
 
 	console.log(`[GovernanceWorkflow] CREATE_MOTION motion:${motion.id} by user ${userId}`);
+	return motion.id;
+}
+
+async function updateMotion(
+	organizationId: string,
+	userId: string,
+	motionId: string,
+	data: Record<string, unknown>
+): Promise<string> {
+	const motion = await prisma.boardMotion.update({
+		where: { id: motionId },
+		data: {
+			...(data.title && { title: data.title as string }),
+			...(data.description !== undefined && { description: data.description as string | null }),
+			...(data.category && { category: data.category as any }),
+			...(data.rationale !== undefined && { rationale: data.rationale as string | null }),
+			...(data.effectiveDate !== undefined && {
+				effectiveDate: data.effectiveDate ? new Date(data.effectiveDate as string) : null
+			}),
+			...(data.expiresAt !== undefined && {
+				expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : null
+			})
+		}
+	});
+
+	console.log(`[GovernanceWorkflow] UPDATE_MOTION motion:${motion.id} by user ${userId}`);
 	return motion.id;
 }
 
@@ -686,6 +713,14 @@ async function adjournMeeting(
 		data: { status: 'ADJOURNED' }
 	});
 
+	// Create minutes placeholder if not exists
+	const existingMinutes = await prisma.meetingMinutes.findUnique({ where: { meetingId } });
+	if (!existingMinutes) {
+		await prisma.meetingMinutes.create({
+			data: { meetingId, recordedBy: userId, content: '' }
+		});
+	}
+
 	console.log(`[GovernanceWorkflow] ADJOURN_MEETING meeting:${meetingId} by user ${userId}`);
 	return meetingId;
 }
@@ -947,6 +982,13 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 				);
 				break;
 
+			case 'UPDATE_MOTION':
+				entityId = await DBOS.runStep(
+					() => updateMotion(input.organizationId, input.userId, input.entityId!, input.data),
+					{ name: 'updateMotion' }
+				);
+				break;
+
 			case 'CREATE_RESOLUTION':
 				entityId = await DBOS.runStep(
 					() => createResolution(input.organizationId, input.userId, input.data),
@@ -1189,9 +1231,9 @@ export const governanceWorkflow_v1 = DBOS.registerWorkflow(governanceWorkflow);
 
 export async function startGovernanceWorkflow(
 	input: GovernanceWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<GovernanceWorkflowResult> {
 	const workflowId = idempotencyKey || `governance-${input.action}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(governanceWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(governanceWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

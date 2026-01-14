@@ -1,8 +1,11 @@
 import { z } from 'zod';
+import { DBOS } from '@dbos-inc/dbos-sdk';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
+import { PartyTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
+import { partyWorkflow_v1 } from '../../workflows/partyWorkflow.js';
 
 const log = createModuleLogger('PartyRoute');
 
@@ -16,7 +19,8 @@ export const partyRouter = {
 	create: orgProcedure
 		.input(
 			z.object({
-				partyType: z.enum(['INDIVIDUAL', 'TRUST', 'CORPORATION', 'LLC', 'PARTNERSHIP', 'ESTATE']),
+                idempotencyKey: z.string().uuid(),
+                partyType: PartyTypeSchema,
 				firstName: z.string().max(100).optional(),
 				lastName: z.string().max(100).optional(),
 				entityName: z.string().max(255).optional(),
@@ -44,28 +48,49 @@ export const partyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid party data' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to create party' }
+		})
+		.handler(async ({ input, context, errors }) => {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'party', 'new');
 
-			const party = await prisma.party.create({
-				data: {
-					organizationId: context.organization.id,
-					...input
-				}
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(partyWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'CREATE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				partyType: input.partyType,
+				firstName: input.firstName,
+				lastName: input.lastName,
+				entityName: input.entityName,
+				email: input.email,
+				phone: input.phone,
+				addressLine1: input.addressLine1,
+				addressLine2: input.addressLine2,
+				city: input.city,
+				state: input.state,
+				postalCode: input.postalCode,
+				country: input.country,
+				linkedUserId: input.userId
 			});
 
-			const displayName =
-				party.partyType === 'INDIVIDUAL'
-					? `${party.firstName ?? ''} ${party.lastName ?? ''}`.trim()
-					: party.entityName ?? '';
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create party' });
+			}
 
 			return successResponse(
 				{
 					party: {
-						id: party.id,
-						partyType: party.partyType,
-						displayName
+						id: result.partyId!,
+						partyType: result.partyType!,
+						displayName: result.displayName!
 					}
 				},
 				context
@@ -149,7 +174,7 @@ export const partyRouter = {
 	list: orgProcedure
 		.input(
 			PaginationInputSchema.extend({
-				partyType: z.enum(['INDIVIDUAL', 'TRUST', 'CORPORATION', 'LLC', 'PARTNERSHIP', 'ESTATE']).optional(),
+				partyType: PartyTypeSchema.optional(),
 				search: z.string().optional()
 			})
 		)
@@ -170,6 +195,10 @@ export const partyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve parties' }
+		})
 		.handler(async ({ input, context }) => {
 			// Cerbos query plan
 			const queryPlan = await context.cerbos.queryFilter('view', 'party');
@@ -234,8 +263,9 @@ export const partyRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
-				partyType: z.enum(['INDIVIDUAL', 'TRUST', 'CORPORATION', 'LLC', 'PARTNERSHIP', 'ESTATE']).optional(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
+				partyType: PartyTypeSchema.optional(),
 				firstName: z.string().max(100).optional(),
 				lastName: z.string().max(100).optional(),
 				entityName: z.string().max(255).optional(),
@@ -262,7 +292,8 @@ export const partyRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Party not found' }
+			NOT_FOUND: { message: 'Party not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to update party' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.party.findFirst({
@@ -276,17 +307,39 @@ export const partyRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('edit', 'party', existing.id, { userId: existing.userId ?? undefined });
 
-			const { id, ...updateData } = input;
-			const party = await prisma.party.update({
-				where: { id },
-				data: updateData
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(partyWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'UPDATE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				partyId: input.id,
+				partyType: input.partyType,
+				firstName: input.firstName,
+				lastName: input.lastName,
+				entityName: input.entityName,
+				email: input.email,
+				phone: input.phone,
+				addressLine1: input.addressLine1,
+				addressLine2: input.addressLine2,
+				city: input.city,
+				state: input.state,
+				postalCode: input.postalCode,
+				country: input.country
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update party' });
+			}
 
 			return successResponse(
 				{
 					party: {
-						id: party.id,
-						updatedAt: party.updatedAt.toISOString()
+						id: result.partyId!,
+						updatedAt: result.updatedAt!
 					}
 				},
 				context
@@ -299,7 +352,8 @@ export const partyRouter = {
 	delete: orgProcedure
 		.input(
 			z.object({
-				id: z.string()
+                idempotencyKey: z.string().uuid(),
+                id: z.string()
 			})
 		)
 		.output(
@@ -313,7 +367,8 @@ export const partyRouter = {
 			})
 		)
 		.errors({
-			NOT_FOUND: { message: 'Party not found' }
+			NOT_FOUND: { message: 'Party not found' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to delete party' }
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.party.findFirst({
@@ -327,16 +382,26 @@ export const partyRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('delete', 'party', existing.id);
 
-			const now = new Date();
-			await prisma.party.update({
-				where: { id: input.id },
-				data: { deletedAt: now }
+			// Start DBOS workflow with idempotency key
+			const handle = await DBOS.startWorkflow(partyWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: 'DELETE',
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				partyId: input.id
 			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to delete party' });
+			}
 
 			return successResponse(
 				{
 					success: true,
-					deletedAt: now.toISOString()
+					deletedAt: result.deletedAt!
 				},
 				context
 			);

@@ -187,9 +187,9 @@ export const noticeTemplateWorkflow_v1 = DBOS.registerWorkflow(noticeTemplateWor
 
 export async function startNoticeTemplateWorkflow(
 	input: NoticeTemplateWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<NoticeTemplateWorkflowResult> {
 	const workflowId = idempotencyKey || `notice-template-${input.action}-${input.templateId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(noticeTemplateWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(noticeTemplateWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

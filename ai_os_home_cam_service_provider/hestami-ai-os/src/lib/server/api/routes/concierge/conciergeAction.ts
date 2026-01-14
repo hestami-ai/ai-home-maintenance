@@ -13,6 +13,7 @@ import { ConciergeActionStatusSchema } from '../../../../../../generated/zod/inp
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startConciergeActionWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('ConciergeActionRoute');
 
@@ -89,55 +90,51 @@ export const conciergeActionRouter = {
 			await ensureCase(input.caseId, context.organization.id, errors);
 			await context.cerbos.authorize('create', 'concierge_action', 'new');
 
-			const action = await prisma.conciergeAction.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'CREATE_ACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					caseId: input.caseId,
 					actionType: input.actionType,
-					status: 'PLANNED',
 					description: input.description,
-					plannedAt: input.plannedAt ? new Date(input.plannedAt) : null,
-					performedByUserId: context.user.id,
+					plannedAt: input.plannedAt,
 					notes: input.notes,
-					relatedDocumentIds: input.relatedDocumentIds ?? [],
-					relatedExternalContactIds: input.relatedExternalContactIds ?? []
-				}
-			});
+					relatedDocumentIds: input.relatedDocumentIds,
+					relatedExternalContactIds: input.relatedExternalContactIds
+				},
+				input.idempotencyKey
+			);
 
-			// Log creation
-			await prisma.conciergeActionLog.create({
-				data: {
-					actionId: action.id,
-					eventType: 'created',
-					toStatus: 'PLANNED',
-					description: 'Action created',
-					changedBy: context.user.id
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create action' });
+			}
 
 			// Record activity event
 			await recordDecision(context, {
 				entityType: 'CONCIERGE_ACTION',
-				entityId: action.id,
+				entityId: workflowResult.actionId!,
 				action: 'CREATE',
 				summary: `Action planned: ${input.actionType} - ${input.description}`,
 				caseId: input.caseId,
 				newState: {
-					actionType: action.actionType,
-					status: action.status,
-					description: action.description
+					actionType: workflowResult.actionType,
+					status: workflowResult.status,
+					description: workflowResult.description
 				}
 			});
 
 			return successResponse(
 				{
 					action: {
-						id: action.id,
-						caseId: action.caseId,
-						actionType: action.actionType,
-						status: action.status,
-						description: action.description,
-						plannedAt: action.plannedAt?.toISOString() ?? null,
-						createdAt: action.createdAt.toISOString()
+						id: workflowResult.actionId!,
+						caseId: workflowResult.caseId!,
+						actionType: workflowResult.actionType!,
+						status: workflowResult.status!,
+						description: workflowResult.description!,
+						plannedAt: workflowResult.plannedAt ?? null,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -321,7 +318,7 @@ export const conciergeActionRouter = {
 	 * Start an action (transition from PLANNED to IN_PROGRESS)
 	 */
 	start: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(IdempotencyKeySchema.extend({ id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			BAD_REQUEST: { message: 'Invalid request' },
@@ -356,25 +353,20 @@ export const conciergeActionRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot start action in status ${action.status}` });
 			}
 
-			const now = new Date();
-			const updated = await prisma.conciergeAction.update({
-				where: { id: input.id },
-				data: {
-					status: 'IN_PROGRESS',
-					startedAt: now
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'START_ACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					actionId: input.id
+				},
+				input.idempotencyKey
+			);
 
-			await prisma.conciergeActionLog.create({
-				data: {
-					actionId: action.id,
-					eventType: 'status_change',
-					fromStatus: action.status,
-					toStatus: 'IN_PROGRESS',
-					description: 'Action started',
-					changedBy: context.user.id
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to start action' });
+			}
 
 			// Record activity event
 			await recordExecution(context, {
@@ -390,9 +382,9 @@ export const conciergeActionRouter = {
 			return successResponse(
 				{
 					action: {
-						id: updated.id,
-						status: updated.status,
-						startedAt: updated.startedAt!.toISOString()
+						id: input.id,
+						status: workflowResult.status!,
+						startedAt: workflowResult.startedAt!
 					}
 				},
 				context
@@ -404,7 +396,7 @@ export const conciergeActionRouter = {
 	 */
 	complete: orgProcedure
 		.input(
-			z.object({
+			IdempotencyKeySchema.extend({
 				id: z.string(),
 				outcome: z.string().min(1),
 				notes: z.string().optional()
@@ -445,27 +437,22 @@ export const conciergeActionRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot complete action in status ${action.status}` });
 			}
 
-			const now = new Date();
-			const updated = await prisma.conciergeAction.update({
-				where: { id: input.id },
-				data: {
-					status: 'COMPLETED',
-					completedAt: now,
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'COMPLETE_ACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					actionId: input.id,
 					outcome: input.outcome,
-					notes: input.notes ?? action.notes
-				}
-			});
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
 
-			await prisma.conciergeActionLog.create({
-				data: {
-					actionId: action.id,
-					eventType: 'completed',
-					fromStatus: action.status,
-					toStatus: 'COMPLETED',
-					description: `Action completed with outcome: ${input.outcome.substring(0, 100)}`,
-					changedBy: context.user.id
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to complete action' });
+			}
 
 			// Record activity event
 			await recordExecution(context, {
@@ -481,10 +468,10 @@ export const conciergeActionRouter = {
 			return successResponse(
 				{
 					action: {
-						id: updated.id,
-						status: updated.status,
-						outcome: updated.outcome!,
-						completedAt: updated.completedAt!.toISOString()
+						id: input.id,
+						status: workflowResult.status!,
+						outcome: workflowResult.outcome!,
+						completedAt: workflowResult.completedAt!
 					}
 				},
 				context
@@ -496,7 +483,7 @@ export const conciergeActionRouter = {
 	 */
 	block: orgProcedure
 		.input(
-			z.object({
+			IdempotencyKeySchema.extend({
 				id: z.string(),
 				reason: z.string().min(1)
 			})
@@ -534,24 +521,21 @@ export const conciergeActionRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot block action in status ${action.status}` });
 			}
 
-			const updated = await prisma.conciergeAction.update({
-				where: { id: input.id },
-				data: {
-					status: 'BLOCKED',
-					notes: input.reason
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'BLOCK_ACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					actionId: input.id,
+					blockReason: input.reason
+				},
+				input.idempotencyKey
+			);
 
-			await prisma.conciergeActionLog.create({
-				data: {
-					actionId: action.id,
-					eventType: 'blocked',
-					fromStatus: action.status,
-					toStatus: 'BLOCKED',
-					description: `Action blocked: ${input.reason}`,
-					changedBy: context.user.id
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to block action' });
+			}
 
 			// Record activity event
 			await recordExecution(context, {
@@ -567,8 +551,8 @@ export const conciergeActionRouter = {
 			return successResponse(
 				{
 					action: {
-						id: updated.id,
-						status: updated.status
+						id: input.id,
+						status: workflowResult.status!
 					}
 				},
 				context
@@ -580,7 +564,7 @@ export const conciergeActionRouter = {
 	 */
 	cancel: orgProcedure
 		.input(
-			z.object({
+			IdempotencyKeySchema.extend({
 				id: z.string(),
 				reason: z.string().min(1)
 			})
@@ -618,21 +602,21 @@ export const conciergeActionRouter = {
 				throw errors.BAD_REQUEST({ message: `Cannot cancel action in status ${action.status}` });
 			}
 
-			const updated = await prisma.conciergeAction.update({
-				where: { id: input.id },
-				data: { status: 'CANCELLED' }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'CANCEL_ACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					actionId: input.id,
+					cancelReason: input.reason
+				},
+				input.idempotencyKey
+			);
 
-			await prisma.conciergeActionLog.create({
-				data: {
-					actionId: action.id,
-					eventType: 'cancelled',
-					fromStatus: action.status,
-					toStatus: 'CANCELLED',
-					description: `Action cancelled: ${input.reason}`,
-					changedBy: context.user.id
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to cancel action' });
+			}
 
 			// Record activity event
 			await recordExecution(context, {
@@ -648,8 +632,8 @@ export const conciergeActionRouter = {
 			return successResponse(
 				{
 					action: {
-						id: updated.id,
-						status: updated.status
+						id: input.id,
+						status: workflowResult.status!
 					}
 				},
 				context
@@ -661,7 +645,7 @@ export const conciergeActionRouter = {
 	 */
 	resume: orgProcedure
 		.input(
-			z.object({
+			IdempotencyKeySchema.extend({
 				id: z.string(),
 				notes: z.string().optional()
 			})
@@ -699,24 +683,21 @@ export const conciergeActionRouter = {
 				throw errors.BAD_REQUEST({ message: 'Can only resume blocked actions' });
 			}
 
-			const updated = await prisma.conciergeAction.update({
-				where: { id: input.id },
-				data: {
-					status: 'IN_PROGRESS',
-					notes: input.notes ?? action.notes
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'RESUME_ACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					actionId: input.id,
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
 
-			await prisma.conciergeActionLog.create({
-				data: {
-					actionId: action.id,
-					eventType: 'resumed',
-					fromStatus: 'BLOCKED',
-					toStatus: 'IN_PROGRESS',
-					description: input.notes ?? 'Action resumed',
-					changedBy: context.user.id
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to resume action' });
+			}
 
 			// Record activity event
 			await recordExecution(context, {
@@ -732,8 +713,8 @@ export const conciergeActionRouter = {
 			return successResponse(
 				{
 					action: {
-						id: updated.id,
-						status: updated.status
+						id: input.id,
+						status: workflowResult.status!
 					}
 				},
 				context
@@ -745,7 +726,7 @@ export const conciergeActionRouter = {
 	 */
 	addLog: orgProcedure
 		.input(
-			z.object({
+			IdempotencyKeySchema.extend({
 				actionId: z.string(),
 				eventType: z.string().min(1),
 				description: z.string().min(1)
@@ -782,23 +763,31 @@ export const conciergeActionRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
-			const log = await prisma.conciergeActionLog.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startConciergeActionWorkflow(
+				{
+					action: 'ADD_LOG',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					actionId: input.actionId,
 					eventType: input.eventType,
-					description: input.description,
-					changedBy: context.user.id
-				}
-			});
+					logDescription: input.description
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to add log' });
+			}
 
 			return successResponse(
 				{
 					log: {
-						id: log.id,
-						actionId: log.actionId,
-						eventType: log.eventType,
-						description: log.description!,
-						createdAt: log.createdAt.toISOString()
+						id: workflowResult.logId!,
+						actionId: input.actionId,
+						eventType: input.eventType,
+						description: input.description,
+						createdAt: new Date().toISOString()
 					}
 				},
 				context

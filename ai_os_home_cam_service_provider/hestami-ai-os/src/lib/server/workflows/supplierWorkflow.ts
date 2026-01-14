@@ -202,9 +202,9 @@ export const supplierWorkflow_v1 = DBOS.registerWorkflow(supplierWorkflow);
 
 export async function startSupplierWorkflow(
 	input: SupplierWorkflowInput,
-	idempotencyKey?: string
+	idempotencyKey: string
 ): Promise<SupplierWorkflowResult> {
 	const workflowId = idempotencyKey || `supplier-${input.action}-${input.supplierId || 'new'}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(supplierWorkflow_v1, { workflowID: workflowId })(input);
+	const handle = await DBOS.startWorkflow(supplierWorkflow_v1, { workflowID: idempotencyKey})(input);
 	return handle.getResult();
 }

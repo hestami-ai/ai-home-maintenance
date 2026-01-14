@@ -252,7 +252,7 @@ export async function startMeetingTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `meeting-transition-${input.meetingId}-${Date.now()}`;
-	await DBOS.startWorkflow(meetingLifecycle_v1, { workflowID: id })(input);
+	await DBOS.startWorkflow(meetingLifecycle_v1, { workflowID: idempotencyKey})(input);
 	return { workflowId: id };
 }
 

@@ -1,0 +1,45 @@
+# Work Order Bid Resource Policy
+# Controls access to bids submitted by vendors for work orders.
+
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "work_order_bid"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Admins have full access to all bids
+    - actions: ["view", "create", "edit", "delete", "accept", "reject", "withdraw"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_admin
+
+    # Managers can manage bids
+    - actions: ["view", "create", "edit", "accept", "reject", "withdraw"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_manager
+
+    # Board members can view and approve/reject bids
+    - actions: ["view", "accept", "reject"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_board_member
+
+    # Vendors can view, create, edit, and withdraw their own bids
+    - actions: ["view", "create", "edit", "withdraw"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_vendor
+
+    # Technicians can view bids related to their assigned work
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - org_technician
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff

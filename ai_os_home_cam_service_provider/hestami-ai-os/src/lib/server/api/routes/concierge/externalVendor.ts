@@ -7,10 +7,11 @@ import {
 	PaginationOutputSchema,
 	IdempotencyKeySchema
 } from '../../router.js';
+import { VendorInteractionTypeSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
-import { recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startExternalVendorWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('ExternalVendorRoute');
 
@@ -64,36 +65,34 @@ export const externalVendorRouter = {
 
 			await context.cerbos.authorize('create', 'external_vendor_context', 'new');
 
-			const vendorContext = await prisma.externalVendorContext.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalVendorWorkflow(
+				{
+					action: 'CREATE_CONTEXT',
 					organizationId: context.organization.id,
+					userId: context.user.id,
 					propertyId: input.propertyId,
 					vendorName: input.vendorName,
 					vendorContactName: input.vendorContactName,
 					vendorContactEmail: input.vendorContactEmail,
 					vendorContactPhone: input.vendorContactPhone,
 					vendorAddress: input.vendorAddress,
-					tradeCategories: input.tradeCategories ?? [],
+					tradeCategories: input.tradeCategories,
 					notes: input.notes
-				}
-			});
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'EXTERNAL_VENDOR',
-				entityId: vendorContext.id,
-				action: 'CREATE',
-				summary: `External vendor added: ${input.vendorName}`,
-				propertyId: input.propertyId,
-				newState: { vendorName: input.vendorName, tradeCategories: input.tradeCategories }
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to create vendor context' });
+			}
 
 			return successResponse(
 				{
 					context: {
-						id: vendorContext.id,
-						vendorName: vendorContext.vendorName,
-						createdAt: vendorContext.createdAt.toISOString()
+						id: workflowResult.contextId!,
+						vendorName: workflowResult.vendorName!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -256,7 +255,8 @@ export const externalVendorRouter = {
 	updateContext: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				vendorName: z.string().min(1).max(255).optional(),
 				vendorContactName: z.string().nullable().optional(),
 				vendorContactEmail: z.string().email().nullable().optional(),
@@ -294,25 +294,34 @@ export const externalVendorRouter = {
 
 			await context.cerbos.authorize('update', 'external_vendor_context', existing.id);
 
-			const updated = await prisma.externalVendorContext.update({
-				where: { id: input.id },
-				data: {
-					...(input.vendorName !== undefined && { vendorName: input.vendorName }),
-					...(input.vendorContactName !== undefined && { vendorContactName: input.vendorContactName }),
-					...(input.vendorContactEmail !== undefined && { vendorContactEmail: input.vendorContactEmail }),
-					...(input.vendorContactPhone !== undefined && { vendorContactPhone: input.vendorContactPhone }),
-					...(input.vendorAddress !== undefined && { vendorAddress: input.vendorAddress }),
-					...(input.tradeCategories !== undefined && { tradeCategories: input.tradeCategories }),
-					...(input.notes !== undefined && { notes: input.notes })
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalVendorWorkflow(
+				{
+					action: 'UPDATE_CONTEXT',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					contextId: input.id,
+					vendorName: input.vendorName,
+					vendorContactName: input.vendorContactName,
+					vendorContactEmail: input.vendorContactEmail,
+					vendorContactPhone: input.vendorContactPhone,
+					vendorAddress: input.vendorAddress,
+					tradeCategories: input.tradeCategories,
+					notes: input.notes
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to update vendor context' });
+			}
 
 			return successResponse(
 				{
 					context: {
-						id: updated.id,
-						vendorName: updated.vendorName,
-						updatedAt: updated.updatedAt.toISOString()
+						id: workflowResult.contextId!,
+						vendorName: workflowResult.vendorName!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -324,7 +333,7 @@ export const externalVendorRouter = {
 	 */
 	linkToServiceProvider: orgProcedure
 		.input(
-			z.object({
+			IdempotencyKeySchema.extend({
 				id: z.string(),
 				serviceProviderOrgId: z.string()
 			})
@@ -365,26 +374,29 @@ export const externalVendorRouter = {
 
 			await context.cerbos.authorize('update', 'external_vendor_context', existing.id);
 
-			const updated = await prisma.externalVendorContext.update({
-				where: { id: input.id },
-				data: { linkedServiceProviderOrgId: input.serviceProviderOrgId }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalVendorWorkflow(
+				{
+					action: 'LINK_TO_SERVICE_PROVIDER',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					contextId: input.id,
+					propertyId: existing.propertyId ?? undefined,
+					serviceProviderOrgId: input.serviceProviderOrgId,
+					serviceProviderName: serviceProviderOrg.name
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'EXTERNAL_VENDOR',
-				entityId: existing.id,
-				action: 'UPDATE',
-				summary: `Vendor linked to platform provider: ${serviceProviderOrg.name}`,
-				propertyId: existing.propertyId ?? undefined,
-				newState: { linkedServiceProviderOrgId: input.serviceProviderOrgId }
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to link service provider' });
+			}
 
 			return successResponse(
 				{
 					context: {
-						id: updated.id,
-						linkedServiceProviderOrgId: updated.linkedServiceProviderOrgId!
+						id: workflowResult.contextId!,
+						linkedServiceProviderOrgId: workflowResult.linkedServiceProviderOrgId!
 					}
 				},
 				context
@@ -399,7 +411,7 @@ export const externalVendorRouter = {
 			IdempotencyKeySchema.extend({
 				externalVendorContextId: z.string(),
 				caseId: z.string().optional(),
-				interactionType: z.enum(['QUOTE', 'SCHEDULE', 'WORK', 'INVOICE', 'OTHER']),
+				interactionType: VendorInteractionTypeSchema,
 				interactionDate: z.string().datetime(),
 				description: z.string().min(1),
 				amount: z.string().optional(), // Decimal as string
@@ -436,37 +448,36 @@ export const externalVendorRouter = {
 
 			await context.cerbos.authorize('create', 'external_vendor_interaction', 'new');
 
-			const interaction = await prisma.externalVendorInteraction.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startExternalVendorWorkflow(
+				{
+					action: 'LOG_INTERACTION',
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					externalVendorContextId: input.externalVendorContextId,
+					propertyId: vendorContext.propertyId ?? undefined,
 					caseId: input.caseId,
 					interactionType: input.interactionType,
 					interactionDate: new Date(input.interactionDate),
 					description: input.description,
-					amount: input.amount ? parseFloat(input.amount) : null,
+					amount: input.amount ? parseFloat(input.amount) : undefined,
 					notes: input.notes,
-					relatedDocumentIds: input.relatedDocumentIds ?? []
-				}
-			});
+					relatedDocumentIds: input.relatedDocumentIds
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'EXTERNAL_VENDOR',
-				entityId: interaction.id,
-				action: 'CREATE',
-				summary: `Vendor interaction: ${input.interactionType} - ${input.description.substring(0, 50)}`,
-				propertyId: vendorContext.propertyId ?? undefined,
-				caseId: input.caseId,
-				newState: { interactionType: input.interactionType, description: input.description }
-			});
+			if (!workflowResult.success) {
+				throw errors.FORBIDDEN({ message: workflowResult.error || 'Failed to log interaction' });
+			}
 
 			return successResponse(
 				{
 					interaction: {
-						id: interaction.id,
-						interactionType: interaction.interactionType,
-						interactionDate: interaction.interactionDate.toISOString(),
-						createdAt: interaction.createdAt.toISOString()
+						id: workflowResult.interactionId!,
+						interactionType: workflowResult.interactionType!,
+						interactionDate: workflowResult.interactionDate!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -480,7 +491,7 @@ export const externalVendorRouter = {
 		.input(
 			PaginationInputSchema.extend({
 				externalVendorContextId: z.string(),
-				interactionType: z.enum(['QUOTE', 'SCHEDULE', 'WORK', 'INVOICE', 'OTHER']).optional()
+				interactionType: VendorInteractionTypeSchema.optional()
 			})
 		)
 		.errors({

@@ -23,14 +23,24 @@ import type {
 	DeliveryStatus,
 	Prisma
 } from '../../../../../../generated/prisma/client.js';
+import {
+	CommunicationTemplateTypeSchema,
+	CommunicationChannelSchema,
+	CommunicationStatusSchema,
+	AnnouncementStatusSchema,
+	CalendarEventTypeSchema,
+	DeliveryStatusSchema,
+	NotificationStatusSchema,
+	TemplateVersionStatusSchema
+} from '../../schemas.js';
 
-const templateTypeEnum = z.enum(['EMAIL', 'SMS', 'LETTER']);
-const channelEnum = z.enum(['EMAIL', 'SMS', 'LETTER']);
-const commStatusEnum = z.enum(['DRAFT', 'SCHEDULED', 'SENT', 'CANCELLED']);
-const announcementStatusEnum = z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']);
-const eventTypeEnum = z.enum(['MEETING', 'MAINTENANCE', 'AMENITY_CLOSURE', 'OTHER']);
-const deliveryStatusEnum = z.enum(['PENDING', 'SENT', 'FAILED']);
-const notificationStatusEnum = z.enum(['PENDING', 'SENT', 'FAILED', 'CANCELLED']);
+const templateTypeEnum = CommunicationTemplateTypeSchema;
+const channelEnum = CommunicationChannelSchema;
+const commStatusEnum = CommunicationStatusSchema;
+const announcementStatusEnum = AnnouncementStatusSchema;
+const eventTypeEnum = CalendarEventTypeSchema;
+const deliveryStatusEnum = DeliveryStatusSchema;
+const notificationStatusEnum = NotificationStatusSchema;
 
 const ensureAssociation = async (associationId: string, organizationId: string, errors: any) => {
 	const association = await prisma.association.findFirst({
@@ -134,7 +144,12 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'communication_template', 'list');
+
 			const take = input.limit ?? 20;
 			const where = { association: { organizationId: context.organization.id }, associationId: input.associationId };
 			const items = await prisma.communicationTemplate.findMany({
@@ -192,7 +207,7 @@ export const communicationRouter = {
 					subject: z.string().max(500).optional(),
 					body: z.string().min(1),
 					variables: z.record(z.string(), JsonSchema).optional(),
-					status: z.enum(['DRAFT', 'ACTIVE', 'RETIRED']).default('DRAFT')
+					status: TemplateVersionStatusSchema.default('DRAFT')
 				})
 			)
 		)
@@ -432,7 +447,12 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'communication_mass', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },
@@ -711,7 +731,12 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'communication_announcement', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },
@@ -911,7 +936,12 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'communication_event', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },
@@ -1122,7 +1152,12 @@ export const communicationRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'communication_event', 'list');
+
 			const take = input.limit ?? 20;
 			const where = {
 				association: { organizationId: context.organization.id },

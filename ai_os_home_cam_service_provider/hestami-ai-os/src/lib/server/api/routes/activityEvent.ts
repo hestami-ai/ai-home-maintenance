@@ -122,6 +122,10 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'activity_event', input.entityId);
 
@@ -176,6 +180,10 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve organization activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'activity_event', 'list');
 
@@ -237,6 +245,10 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve case activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'activity_event', input.caseId);
 
@@ -285,6 +297,10 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve job activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'activity_event', input.jobId);
 
@@ -334,6 +350,10 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to retrieve actor activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'activity_event', 'list');
 
@@ -402,6 +422,11 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid search parameters' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to search activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'activity_event', 'search');
 
@@ -482,6 +507,11 @@ export const activityEventRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid date range' },
+			INTERNAL_SERVER_ERROR: { message: 'Failed to export activity events' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('export', 'activity_event', 'export');
 

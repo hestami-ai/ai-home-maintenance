@@ -10,8 +10,8 @@ import {
 import { prisma } from '../../../db.js';
 import { DecisionCategorySchema } from '../../../../../../generated/zod/inputTypeSchemas/DecisionCategorySchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
-import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
+import { startMaterialDecisionWorkflow } from '../../../workflows/index.js';
 
 const log = createModuleLogger('MaterialDecisionRoute');
 
@@ -76,47 +76,37 @@ export const materialDecisionRouter = {
 
 			await context.cerbos.authorize('create', 'material_decision', 'new');
 
-			const now = new Date();
-			const decision = await prisma.materialDecision.create({
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startMaterialDecisionWorkflow(
+				{
+					action: 'CREATE',
 					organizationId: context.organization.id,
+					userId: context.user.id,
 					caseId: input.caseId,
 					category: input.category,
 					title: input.title,
 					description: input.description,
 					rationale: input.rationale,
-					decidedByUserId: context.user.id,
-					decidedAt: now,
-					optionsConsidered: input.optionsConsidered ?? [],
+					optionsConsidered: input.optionsConsidered,
 					estimatedImpact: input.estimatedImpact,
-					relatedDocumentIds: input.relatedDocumentIds ?? [],
-					relatedActionIds: input.relatedActionIds ?? []
-				}
-			});
+					relatedDocumentIds: input.relatedDocumentIds,
+					relatedActionIds: input.relatedActionIds
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordDecision(context, {
-				entityType: 'MATERIAL_DECISION',
-				entityId: decision.id,
-				action: 'CREATE',
-				summary: `Decision recorded: ${decision.title}`,
-				caseId: input.caseId,
-				decisionId: decision.id,
-				newState: {
-					category: decision.category,
-					title: decision.title,
-					rationale: decision.rationale
-				}
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to create decision' });
+			}
 
 			return successResponse(
 				{
 					decision: {
-						id: decision.id,
-						category: decision.category,
-						title: decision.title,
-						decidedAt: decision.decidedAt.toISOString(),
-						createdAt: decision.createdAt.toISOString()
+						id: workflowResult.decisionId!,
+						category: workflowResult.category!,
+						title: workflowResult.title!,
+						decidedAt: workflowResult.decidedAt!,
+						createdAt: workflowResult.createdAt!
 					}
 				},
 				context
@@ -224,6 +214,11 @@ export const materialDecisionRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Operation failed' }
+		})
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'material_decision', 'list');
 
@@ -271,7 +266,8 @@ export const materialDecisionRouter = {
 	recordOutcome: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				actualOutcome: z.string().min(1)
 			})
 		)
@@ -302,32 +298,29 @@ export const materialDecisionRouter = {
 
 			await context.cerbos.authorize('update', 'material_decision', decision.id);
 
-			const now = new Date();
-			const updated = await prisma.materialDecision.update({
-				where: { id: input.id },
-				data: {
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startMaterialDecisionWorkflow(
+				{
+					action: 'RECORD_OUTCOME',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					decisionId: input.id,
 					actualOutcome: input.actualOutcome,
-					outcomeRecordedAt: now
-				}
-			});
+					caseId: decision.caseId ?? undefined
+				},
+				input.idempotencyKey
+			);
 
-			// Record activity event
-			await recordExecution(context, {
-				entityType: 'MATERIAL_DECISION',
-				entityId: decision.id,
-				action: 'UPDATE',
-				summary: `Decision outcome recorded: ${input.actualOutcome.substring(0, 100)}`,
-				caseId: decision.caseId ?? undefined,
-				decisionId: decision.id,
-				newState: { actualOutcome: input.actualOutcome }
-			});
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to record outcome' });
+			}
 
 			return successResponse(
 				{
 					decision: {
-						id: updated.id,
-						actualOutcome: updated.actualOutcome!,
-						outcomeRecordedAt: updated.outcomeRecordedAt!.toISOString()
+						id: workflowResult.decisionId!,
+						actualOutcome: workflowResult.actualOutcome!,
+						outcomeRecordedAt: workflowResult.outcomeRecordedAt!
 					}
 				},
 				context
@@ -340,7 +333,8 @@ export const materialDecisionRouter = {
 	update: orgProcedure
 		.input(
 			z.object({
-				id: z.string(),
+                idempotencyKey: z.string().uuid(),
+                id: z.string(),
 				title: z.string().min(1).max(255).optional(),
 				description: z.string().optional(),
 				rationale: z.string().optional(),
@@ -382,24 +376,33 @@ export const materialDecisionRouter = {
 
 			await context.cerbos.authorize('update', 'material_decision', decision.id);
 
-			const updated = await prisma.materialDecision.update({
-				where: { id: input.id },
-				data: {
-					...(input.title !== undefined && { title: input.title }),
-					...(input.description !== undefined && { description: input.description }),
-					...(input.rationale !== undefined && { rationale: input.rationale }),
-					...(input.estimatedImpact !== undefined && { estimatedImpact: input.estimatedImpact }),
-					...(input.relatedDocumentIds !== undefined && { relatedDocumentIds: input.relatedDocumentIds }),
-					...(input.relatedActionIds !== undefined && { relatedActionIds: input.relatedActionIds })
-				}
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startMaterialDecisionWorkflow(
+				{
+					action: 'UPDATE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					decisionId: input.id,
+					title: input.title,
+					description: input.description,
+					rationale: input.rationale,
+					estimatedImpact: input.estimatedImpact ?? undefined,
+					relatedDocumentIds: input.relatedDocumentIds,
+					relatedActionIds: input.relatedActionIds
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to update decision' });
+			}
 
 			return successResponse(
 				{
 					decision: {
-						id: updated.id,
-						title: updated.title,
-						updatedAt: updated.updatedAt.toISOString()
+						id: workflowResult.decisionId!,
+						title: workflowResult.title!,
+						updatedAt: workflowResult.updatedAt!
 					}
 				},
 				context
@@ -410,7 +413,9 @@ export const materialDecisionRouter = {
 	 * Soft delete a decision
 	 */
 	delete: orgProcedure
-		.input(z.object({ id: z.string() }))
+		.input(z.object({
+            idempotencyKey: z.string().uuid(),
+            id: z.string() }))
 		.output(
 			z.object({
 				ok: z.literal(true),
@@ -432,10 +437,20 @@ export const materialDecisionRouter = {
 
 			await context.cerbos.authorize('delete', 'material_decision', decision.id);
 
-			await prisma.materialDecision.update({
-				where: { id: input.id },
-				data: { deletedAt: new Date() }
-			});
+			// Use DBOS workflow for durable execution
+			const workflowResult = await startMaterialDecisionWorkflow(
+				{
+					action: 'DELETE',
+					organizationId: context.organization.id,
+					userId: context.user.id,
+					decisionId: input.id
+				},
+				input.idempotencyKey
+			);
+
+			if (!workflowResult.success) {
+				throw errors.NOT_FOUND({ message: workflowResult.error || 'Failed to delete decision' });
+			}
 
 			return successResponse({ deleted: true }, context);
 		})
