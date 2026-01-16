@@ -45,6 +45,13 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                 deletedAt: null
             },
             include: {
+                organization: {
+                    select: {
+                        id: true,
+                        name: true,
+                        type: true
+                    }
+                },
                 property: {
                     include: {
                         ownerOrg: {
@@ -91,6 +98,31 @@ export const load: PageServerLoad = async ({ params, parent }) => {
             throw error(404, 'Case not found');
         }
 
+        // Fetch document bindings for attachments
+        const documentBindings = await prisma.documentContextBinding.findMany({
+            where: {
+                contextType: 'CASE',
+                contextId: caseId
+            },
+            include: {
+                document: true
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Transform document bindings to attachment format
+        const attachments = documentBindings
+            .filter((b) => b.document.status === 'ACTIVE')
+            .map((b) => ({
+                id: b.document.id,
+                fileName: b.document.fileName,
+                fileSize: b.document.fileSize,
+                mimeType: b.document.mimeType,
+                fileUrl: b.document.fileUrl ?? '',
+                uploadedBy: b.document.uploadedBy,
+                createdAt: b.document.createdAt.toISOString()
+            }));
+
         // Get owner contact info from the property's owner organization
         const ownerMember = conciergeCase.property.ownerOrg?.memberships?.[0];
         const ownerContact = ownerMember ? {
@@ -126,6 +158,11 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                     name: conciergeCase.property.name,
                     addressLine1: conciergeCase.property.addressLine1
                 },
+                organization: conciergeCase.organization ? {
+                    id: conciergeCase.organization.id,
+                    name: conciergeCase.organization.name,
+                    type: conciergeCase.organization.type
+                } : null,
                 ownerContact,
                 statusHistory: conciergeCase.statusHistory.map(h => ({
                     id: h.id,
@@ -153,7 +190,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                     role: p.role,
                     partyName: p.party ? `${p.party.firstName ?? ''} ${p.party.lastName ?? ''}`.trim() || 'Unknown' : 'Unknown',
                     partyEmail: p.party?.email ?? null
-                }))
+                })),
+                attachments
             }
         };
     } catch (err) {

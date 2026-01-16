@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { BoardMotionStatus } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 
@@ -28,6 +28,7 @@ const validTransitions: Record<BoardMotionStatus, BoardMotionStatus[]> = {
 
 interface TransitionInput {
 	motionId: string;
+	organizationId: string;
 	toStatus: BoardMotionStatus;
 	userId: string;
 	secondedById?: string;
@@ -68,45 +69,51 @@ async function validateTransition(input: TransitionInput): Promise<{
 	};
 	error?: string;
 }> {
-	const motion = await prisma.boardMotion.findUnique({
-		where: { id: input.motionId }
-	});
+	return orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const motion = await tx.boardMotion.findUnique({
+				where: { id: input.motionId }
+			});
 
-	if (!motion) {
-		return { valid: false, currentStatus: 'PROPOSED', error: 'Motion not found' };
-	}
+			if (!motion) {
+				return { valid: false, currentStatus: 'PROPOSED' as BoardMotionStatus, error: 'Motion not found' };
+			}
 
-	const currentStatus = motion.status as BoardMotionStatus;
-	const allowedTransitions = validTransitions[currentStatus] || [];
+			const currentStatus = motion.status as BoardMotionStatus;
+			const allowedTransitions = validTransitions[currentStatus] || [];
 
-	if (!allowedTransitions.includes(input.toStatus)) {
-		return {
-			valid: false,
-			currentStatus,
-			error: `Invalid transition from ${currentStatus} to ${input.toStatus}`
-		};
-	}
+			if (!allowedTransitions.includes(input.toStatus)) {
+				return {
+					valid: false,
+					currentStatus,
+					error: `Invalid transition from ${currentStatus} to ${input.toStatus}`
+				};
+			}
 
-	// Additional validation for SECONDED transition
-	if (input.toStatus === 'SECONDED' && !input.secondedById) {
-		return {
-			valid: false,
-			currentStatus,
-			error: 'secondedById is required to second a motion'
-		};
-	}
+			// Additional validation for SECONDED transition
+			if (input.toStatus === 'SECONDED' && !input.secondedById) {
+				return {
+					valid: false,
+					currentStatus,
+					error: 'secondedById is required to second a motion'
+				};
+			}
 
-	return {
-		valid: true,
-		currentStatus,
-		motion: {
-			id: motion.id,
-			title: motion.title,
-			motionNumber: motion.motionNumber,
-			associationId: motion.associationId,
-			meetingId: motion.meetingId
-		}
-	};
+			return {
+				valid: true,
+				currentStatus,
+				motion: {
+					id: motion.id,
+					title: motion.title,
+					motionNumber: motion.motionNumber,
+					associationId: motion.associationId,
+					meetingId: motion.meetingId
+				}
+			};
+		},
+		{ userId: input.userId, reason: 'Validate motion transition' }
+	);
 }
 
 /**
@@ -147,10 +154,16 @@ async function updateMotionStatus(
 		updateData.outcome = 'TABLED';
 	}
 
-	await prisma.boardMotion.update({
-		where: { id: input.motionId },
-		data: updateData
-	});
+	await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.boardMotion.update({
+				where: { id: input.motionId },
+				data: updateData
+			});
+		},
+		{ userId: input.userId, reason: 'Update motion status' }
+	);
 }
 
 /**
@@ -174,24 +187,30 @@ async function queueNotifications(
 /**
  * Step 4: Tally votes if closing voting
  */
-async function tallyVotes(motionId: string): Promise<{
+async function tallyVotes(organizationId: string, userId: string, motionId: string): Promise<{
 	yes: number;
 	no: number;
 	abstain: number;
 	passed: boolean;
 }> {
-	const votes = await prisma.vote.findMany({
-		where: { motionId },
-		include: { ballots: true }
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const votes = await tx.vote.findMany({
+				where: { motionId },
+				include: { ballots: true }
+			});
 
-	const allBallots = votes.flatMap(v => v.ballots);
-	const yes = allBallots.filter(b => b.choice === 'YES').length;
-	const no = allBallots.filter(b => b.choice === 'NO').length;
-	const abstain = allBallots.filter(b => b.choice === 'ABSTAIN').length;
-	const passed = yes > no;
+			const allBallots = votes.flatMap(v => v.ballots);
+			const yes = allBallots.filter(b => b.choice === 'YES').length;
+			const no = allBallots.filter(b => b.choice === 'NO').length;
+			const abstain = allBallots.filter(b => b.choice === 'ABSTAIN').length;
+			const passed = yes > no;
 
-	return { yes, no, abstain, passed };
+			return { yes, no, abstain, passed };
+		},
+		{ userId, reason: 'Tally motion votes' }
+	);
 }
 
 /**
@@ -238,7 +257,7 @@ async function motionTransitionWorkflow(input: TransitionInput): Promise<Transit
 		let voteResults: { yes: number; no: number; abstain: number; passed: boolean } | undefined;
 		if (input.toStatus === 'APPROVED' || input.toStatus === 'DENIED') {
 			voteResults = await DBOS.runStep(
-				() => tallyVotes(input.motionId),
+				() => tallyVotes(input.organizationId, input.userId, input.motionId),
 				{ name: 'tallyVotes' }
 			);
 			await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'votes_tallied', results: voteResults });
@@ -322,7 +341,7 @@ export async function startMotionTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `motion-transition-${input.motionId}-${Date.now()}`;
-	await DBOS.startWorkflow(motionLifecycle_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(motionLifecycle_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

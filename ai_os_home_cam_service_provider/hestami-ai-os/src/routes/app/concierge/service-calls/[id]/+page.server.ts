@@ -66,6 +66,7 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
             property: data.property,
             notes: data.notes.filter((n: any) => !n.isInternal),
             statusHistory: data.statusHistory,
+            attachments: data.attachments ?? [],
             quotes
         };
     } catch (err) {

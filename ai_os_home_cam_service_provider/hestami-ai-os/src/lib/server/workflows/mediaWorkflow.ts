@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { MediaType } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
@@ -45,26 +45,28 @@ async function registerMedia(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const media = await prisma.jobMedia.create({
-		data: {
-			organizationId,
-			jobId: data.jobId as string,
-			jobVisitId: data.jobVisitId as string | undefined,
-			mediaType: data.mediaType as MediaType,
-			fileName: data.fileName as string,
-			fileSize: data.fileSize as number,
-			mimeType: data.mimeType as string,
-			storageKey: data.storageKey as string,
-			caption: data.caption as string | undefined,
-			latitude: data.latitude as number | undefined,
-			longitude: data.longitude as number | undefined,
-			capturedAt: data.capturedAt ? new Date(data.capturedAt as string) : null,
-			uploadedBy: userId,
-			isUploaded: false
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		const media = await tx.jobMedia.create({
+			data: {
+				organizationId,
+				jobId: data.jobId as string,
+				jobVisitId: data.jobVisitId as string | undefined,
+				mediaType: data.mediaType as MediaType,
+				fileName: data.fileName as string,
+				fileSize: data.fileSize as number,
+				mimeType: data.mimeType as string,
+				storageKey: data.storageKey as string,
+				caption: data.caption as string | undefined,
+				latitude: data.latitude as number | undefined,
+				longitude: data.longitude as number | undefined,
+				capturedAt: data.capturedAt ? new Date(data.capturedAt as string) : null,
+				uploadedBy: userId,
+				isUploaded: false
+			}
+		});
 
-	return media.id;
+		return media.id;
+	}, { userId, reason: 'Register media for job' });
 }
 
 async function markUploaded(
@@ -73,16 +75,18 @@ async function markUploaded(
 	mediaId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.jobMedia.update({
-		where: { id: mediaId },
-		data: {
-			isUploaded: true,
-			uploadedAt: new Date(),
-			storageUrl: data.storageUrl as string | undefined
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.jobMedia.update({
+			where: { id: mediaId },
+			data: {
+				isUploaded: true,
+				uploadedAt: new Date(),
+				storageUrl: data.storageUrl as string | undefined
+			}
+		});
 
-	return mediaId;
+		return mediaId;
+	}, { userId, reason: 'Mark media as uploaded' });
 }
 
 async function addVoiceNote(
@@ -90,27 +94,29 @@ async function addVoiceNote(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const media = await prisma.jobMedia.create({
-		data: {
-			organizationId,
-			jobId: data.jobId as string,
-			jobVisitId: data.jobVisitId as string | undefined,
-			mediaType: 'AUDIO',
-			fileName: data.fileName as string,
-			fileSize: data.fileSize as number,
-			mimeType: data.mimeType as string,
-			storageKey: data.storageKey as string,
-			caption: data.caption as string | undefined,
-			latitude: data.latitude as number | undefined,
-			longitude: data.longitude as number | undefined,
-			capturedAt: data.capturedAt ? new Date(data.capturedAt as string) : new Date(),
-			uploadedBy: userId,
-			isUploaded: false,
-			isTranscribed: false
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		const media = await tx.jobMedia.create({
+			data: {
+				organizationId,
+				jobId: data.jobId as string,
+				jobVisitId: data.jobVisitId as string | undefined,
+				mediaType: 'AUDIO',
+				fileName: data.fileName as string,
+				fileSize: data.fileSize as number,
+				mimeType: data.mimeType as string,
+				storageKey: data.storageKey as string,
+				caption: data.caption as string | undefined,
+				latitude: data.latitude as number | undefined,
+				longitude: data.longitude as number | undefined,
+				capturedAt: data.capturedAt ? new Date(data.capturedAt as string) : new Date(),
+				uploadedBy: userId,
+				isUploaded: false,
+				isTranscribed: false
+			}
+		});
 
-	return media.id;
+		return media.id;
+	}, { userId, reason: 'Add voice note to job' });
 }
 
 async function updateTranscription(
@@ -119,15 +125,17 @@ async function updateTranscription(
 	mediaId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.jobMedia.update({
-		where: { id: mediaId },
-		data: {
-			transcription: data.transcription as string,
-			isTranscribed: true
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.jobMedia.update({
+			where: { id: mediaId },
+			data: {
+				transcription: data.transcription as string,
+				isTranscribed: true
+			}
+		});
 
-	return mediaId;
+		return mediaId;
+	}, { userId, reason: 'Update media transcription' });
 }
 
 async function deleteMedia(
@@ -135,8 +143,10 @@ async function deleteMedia(
 	userId: string,
 	mediaId: string
 ): Promise<string> {
-	await prisma.jobMedia.delete({ where: { id: mediaId } });
-	return mediaId;
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.jobMedia.delete({ where: { id: mediaId } });
+		return mediaId;
+	}, { userId, reason: 'Delete media from job' });
 }
 
 // Main workflow function

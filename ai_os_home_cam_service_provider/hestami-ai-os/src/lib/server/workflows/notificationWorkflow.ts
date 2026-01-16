@@ -1,5 +1,5 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import {
     NotificationType,
@@ -44,21 +44,27 @@ async function createNotificationRecord(
     userId: string,
     data: NotificationWorkflowInput['data']
 ): Promise<string> {
-    const notification = await prisma.notification.create({
-        data: {
-            organizationId,
-            userId,
-            title: data.title,
-            message: data.message,
-            type: data.type,
-            category: data.category,
-            status: 'UNREAD',
-            link: data.link,
-            metadata: data.metadata ?? undefined
-        }
-    });
+    const notification = await orgTransaction(
+        organizationId,
+        async (tx) => {
+            return tx.notification.create({
+                data: {
+                    organizationId,
+                    userId,
+                    title: data.title,
+                    message: data.message,
+                    type: data.type,
+                    category: data.category,
+                    status: 'UNREAD',
+                    link: data.link,
+                    metadata: data.metadata ?? undefined
+                }
+            });
+        },
+        { userId, reason: 'Create notification record' }
+    );
 
-    console.log(`[NotificationWorkflow] Created notification ${notification.id} for user ${userId}`);
+    log.info('Created notification', { notificationId: notification.id, userId });
     return notification.id;
 }
 
@@ -78,20 +84,27 @@ async function shouldSendEmail(
 
 // Step 3: Send Email (Mock)
 async function sendEmailMock(
+    organizationId: string,
     userId: string,
     subject: string,
     body: string
 ) {
     // Look up user email
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true }
-    });
+    const user = await orgTransaction(
+        organizationId,
+        async (tx) => {
+            return tx.user.findUnique({
+                where: { id: userId },
+                select: { email: true }
+            });
+        },
+        { userId, reason: 'Look up user email for notification' }
+    );
 
     if (user?.email) {
-        console.log(`[MockEmailService] 📧 Sending email to ${user.email} | Subject: "${subject}"`);
+        log.info('Sending email', { email: user.email, subject });
     } else {
-        console.log(`[MockEmailService] ⚠️ Could not send email (User ${userId} has no email)`);
+        log.warn('Could not send email - user has no email', { userId });
     }
     return true;
 }
@@ -116,7 +129,7 @@ async function notificationWorkflow(input: NotificationWorkflowInput): Promise<N
             );
 
             if (shouldSend) {
-                await sendEmailMock(input.userId, input.data.title, input.data.message);
+                await sendEmailMock(input.organizationId, input.userId, input.data.title, input.data.message);
             }
         }, { name: 'handleEmailNotification' });
 

@@ -669,7 +669,7 @@ async function addNote(
 				data: {
 					caseId,
 					content,
-					noteType,
+					noteType: noteType as any,
 					isInternal,
 					createdBy: userId
 				}
@@ -680,7 +680,7 @@ async function addNote(
 			organizationId,
 			entityType: 'CONCIERGE_CASE',
 			entityId: caseId,
-			action: 'ADD_NOTE',
+			action: 'UPDATE',
 			eventCategory: 'EXECUTION',
 			summary: `Note added to case`,
 			performedById: userId,
@@ -731,7 +731,7 @@ async function addParticipant(
 			organizationId,
 			entityType: 'CONCIERGE_CASE',
 			entityId: caseId,
-			action: 'ADD_PARTICIPANT',
+			action: 'ASSIGN',
 			eventCategory: 'EXECUTION',
 			summary: `Participant added to case`,
 			performedById: userId,
@@ -767,7 +767,7 @@ async function removeParticipant(
 			organizationId,
 			entityType: 'CONCIERGE_CASE',
 			entityId: participant.caseId,
-			action: 'REMOVE_PARTICIPANT',
+			action: 'UNASSIGN',
 			eventCategory: 'EXECUTION',
 			summary: `Participant removed from case`,
 			performedById: userId,
@@ -974,7 +974,7 @@ async function unlinkCrossDomain(
 			organizationId,
 			entityType: 'CONCIERGE_CASE',
 			entityId: caseId,
-			action: 'UNLINK',
+			action: 'UPDATE',
 			eventCategory: 'EXECUTION',
 			summary: `Case unlinked from ${unlinked.join(', ')}`,
 			performedById: userId,
@@ -1635,11 +1635,11 @@ export const caseLifecycleWorkflow_v1 = DBOS.registerWorkflow(caseLifecycleWorkf
 
 export async function startCaseLifecycleWorkflow(
 	input: CaseLifecycleWorkflowInput,
-	workflowId?: string, idempotencyKey: string
+	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id =
 		workflowId || `case-${input.action.toLowerCase()}-${input.caseId || input.intentId || 'new'}-${Date.now()}`;
-	await DBOS.startWorkflow(caseLifecycleWorkflow_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(caseLifecycleWorkflow_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

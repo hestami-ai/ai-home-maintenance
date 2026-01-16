@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -64,31 +65,35 @@ async function createOwnerRequest(
 	});
 	const requestNumber = `REQ-${year}-${String(count + 1).padStart(5, '0')}`;
 
-	const request = await prisma.ownerRequest.create({
-		data: {
-			associationId,
-			unitId: data.unitId as string | undefined,
-			partyId: data.requesterPartyId as string,
-			requestNumber,
-			category: data.category as any,
-			subject: data.subject as string,
-			description: data.description as string,
-			status: 'DRAFT',
-			attachments: data.metadata as any
-		}
-	});
+	const request = await orgTransaction(organizationId, async (tx) => {
+		const req = await tx.ownerRequest.create({
+			data: {
+				associationId,
+				unitId: data.unitId as string | undefined,
+				partyId: data.requesterPartyId as string,
+				requestNumber,
+				category: data.category as any,
+				subject: data.subject as string,
+				description: data.description as string,
+				status: 'DRAFT',
+				attachments: data.metadata as any
+			}
+		});
 
-	// Create history record
-	await prisma.ownerRequestHistory.create({
-		data: {
-			requestId: request.id,
-			action: 'CREATED',
-			newStatus: 'DRAFT',
-			performedBy: userId
-		}
-	});
+		// Create history record
+		await tx.ownerRequestHistory.create({
+			data: {
+				requestId: req.id,
+				action: 'CREATED',
+				newStatus: 'DRAFT',
+				performedBy: userId
+			}
+		});
 
-	console.log(`[OwnerPortalWorkflow] CREATE_OWNER_REQUEST request:${request.id} by user ${userId}`);
+		return req;
+	}, { userId, reason: 'CREATE_OWNER_REQUEST' });
+
+	log.info(`CREATE_OWNER_REQUEST request:${request.id} by user ${userId}`);
 	return request.id;
 }
 
@@ -99,26 +104,30 @@ async function submitOwnerRequest(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const now = new Date();
-	const updated = await prisma.ownerRequest.update({
-		where: { id: requestId },
-		data: {
-			status: 'SUBMITTED',
-			submittedAt: now
-		}
-	});
+	const updated = await orgTransaction(organizationId, async (tx) => {
+		const req = await tx.ownerRequest.update({
+			where: { id: requestId },
+			data: {
+				status: 'SUBMITTED',
+				submittedAt: now
+			}
+		});
 
-	// Create history record
-	await prisma.ownerRequestHistory.create({
-		data: {
-			requestId,
-			action: 'SUBMITTED',
-			previousStatus: 'DRAFT',
-			newStatus: 'SUBMITTED',
-			performedBy: userId
-		}
-	});
+		// Create history record
+		await tx.ownerRequestHistory.create({
+			data: {
+				requestId,
+				action: 'SUBMITTED',
+				previousStatus: 'DRAFT',
+				newStatus: 'SUBMITTED',
+				performedBy: userId
+			}
+		});
 
-	console.log(`[OwnerPortalWorkflow] SUBMIT_OWNER_REQUEST request:${requestId} by user ${userId}`);
+		return req;
+	}, { userId, reason: 'SUBMIT_OWNER_REQUEST' });
+
+	log.info(`SUBMIT_OWNER_REQUEST request:${requestId} by user ${userId}`);
 	return updated.id;
 }
 
@@ -146,24 +155,28 @@ async function updateRequestStatus(
 		updateData.closedAt = now;
 	}
 
-	const updated = await prisma.ownerRequest.update({
-		where: { id: requestId },
-		data: updateData as any
-	});
+	const updated = await orgTransaction(organizationId, async (tx) => {
+		const req = await tx.ownerRequest.update({
+			where: { id: requestId },
+			data: updateData as any
+		});
 
-	// Create history record
-	await prisma.ownerRequestHistory.create({
-		data: {
-			requestId,
-			action: status,
-			previousStatus: previousStatus ?? null,
-			newStatus: status,
-			notes: notes ?? null,
-			performedBy: userId
-		}
-	});
+		// Create history record
+		await tx.ownerRequestHistory.create({
+			data: {
+				requestId,
+				action: status,
+				previousStatus: previousStatus ?? null,
+				newStatus: status,
+				notes: notes ?? null,
+				performedBy: userId
+			}
+		});
 
-	console.log(`[OwnerPortalWorkflow] UPDATE_REQUEST_STATUS request:${requestId} status:${status} by user ${userId}`);
+		return req;
+	}, { userId, reason: 'UPDATE_REQUEST_STATUS' });
+
+	log.info(`UPDATE_REQUEST_STATUS request:${requestId} status:${status} by user ${userId}`);
 	return updated.id;
 }
 
@@ -176,22 +189,26 @@ async function linkWorkOrder(
 	const workOrderId = data.workOrderId as string;
 	const workOrderNumber = data.workOrderNumber as string | undefined;
 
-	const updated = await prisma.ownerRequest.update({
-		where: { id: requestId },
-		data: { workOrderId }
-	});
+	const updated = await orgTransaction(organizationId, async (tx) => {
+		const req = await tx.ownerRequest.update({
+			where: { id: requestId },
+			data: { workOrderId }
+		});
 
-	// Create history record
-	await prisma.ownerRequestHistory.create({
-		data: {
-			requestId,
-			action: 'LINKED_TO_WORK_ORDER',
-			notes: workOrderNumber ? `Linked to work order ${workOrderNumber}` : `Linked to work order ${workOrderId}`,
-			performedBy: userId
-		}
-	});
+		// Create history record
+		await tx.ownerRequestHistory.create({
+			data: {
+				requestId,
+				action: 'LINKED_TO_WORK_ORDER',
+				notes: workOrderNumber ? `Linked to work order ${workOrderNumber}` : `Linked to work order ${workOrderId}`,
+				performedBy: userId
+			}
+		});
 
-	console.log(`[OwnerPortalWorkflow] LINK_WORK_ORDER request:${requestId} workOrder:${workOrderId} by user ${userId}`);
+		return req;
+	}, { userId, reason: 'LINK_WORK_ORDER' });
+
+	log.info(`LINK_WORK_ORDER request:${requestId} workOrder:${workOrderId} by user ${userId}`);
 	return updated.id;
 }
 
@@ -203,29 +220,31 @@ async function addPaymentMethod(
 	const partyId = data.partyId as string;
 	const isDefault = data.isDefault as boolean || false;
 
-	// If setting as default, unset other defaults
-	if (isDefault) {
-		await prisma.storedPaymentMethod.updateMany({
-			where: { partyId, isDefault: true, deletedAt: null },
-			data: { isDefault: false }
-		});
-	}
-
-	const method = await prisma.storedPaymentMethod.create({
-		data: {
-			partyId,
-			methodType: data.methodType as any,
-			lastFour: data.last4 as string,
-			expirationMonth: data.expirationMonth as number | undefined,
-			expirationYear: data.expirationYear as number | undefined,
-			bankName: data.bankName as string | undefined,
-			isDefault,
-			processorToken: (data.providerToken as string) || 'pending',
-			processorType: 'STRIPE'
+	const method = await orgTransaction(organizationId, async (tx) => {
+		// If setting as default, unset other defaults
+		if (isDefault) {
+			await tx.storedPaymentMethod.updateMany({
+				where: { partyId, isDefault: true, deletedAt: null },
+				data: { isDefault: false }
+			});
 		}
-	});
 
-	console.log(`[OwnerPortalWorkflow] ADD_PAYMENT_METHOD method:${method.id} party:${partyId} by user ${userId}`);
+		return tx.storedPaymentMethod.create({
+			data: {
+				partyId,
+				methodType: data.methodType as any,
+				lastFour: data.last4 as string,
+				expirationMonth: data.expirationMonth as number | undefined,
+				expirationYear: data.expirationYear as number | undefined,
+				bankName: data.bankName as string | undefined,
+				isDefault,
+				processorToken: (data.providerToken as string) || 'pending',
+				processorType: 'STRIPE'
+			}
+		});
+	}, { userId, reason: 'ADD_PAYMENT_METHOD' });
+
+	log.info(`ADD_PAYMENT_METHOD method:${method.id} party:${partyId} by user ${userId}`);
 	return method.id;
 }
 
@@ -237,18 +256,18 @@ async function setDefaultPayment(
 	const partyId = data.partyId as string;
 	const methodId = data.methodId as string;
 
-	await prisma.$transaction([
-		prisma.storedPaymentMethod.updateMany({
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.storedPaymentMethod.updateMany({
 			where: { partyId, isDefault: true, deletedAt: null },
 			data: { isDefault: false }
-		}),
-		prisma.storedPaymentMethod.update({
+		});
+		await tx.storedPaymentMethod.update({
 			where: { id: methodId },
 			data: { isDefault: true }
-		})
-	]);
+		});
+	}, { userId, reason: 'SET_DEFAULT_PAYMENT' });
 
-	console.log(`[OwnerPortalWorkflow] SET_DEFAULT_PAYMENT method:${methodId} party:${partyId} by user ${userId}`);
+	log.info(`SET_DEFAULT_PAYMENT method:${methodId} party:${partyId} by user ${userId}`);
 	return methodId;
 }
 
@@ -262,7 +281,7 @@ async function configureAutoPay(
 	const associationId = data.associationId as string;
 	const unitId = data.unitId as string | undefined;
 
-	// Find existing auto-pay setting
+	// Find existing auto-pay setting (read operation)
 	const existing = await prisma.autoPaySetting.findFirst({
 		where: {
 			partyId,
@@ -273,30 +292,34 @@ async function configureAutoPay(
 
 	let setting;
 	if (existing) {
-		setting = await prisma.autoPaySetting.update({
-			where: { id: existing.id },
-			data: {
-				paymentMethodId: methodId,
-				isEnabled: data.isEnabled as boolean ?? true,
-				maxAmount: data.maxAmount as number | undefined,
-				dayOfMonth: data.paymentDayOfMonth as number | undefined
-			}
-		});
+		setting = await orgTransaction(organizationId, async (tx) => {
+			return tx.autoPaySetting.update({
+				where: { id: existing.id },
+				data: {
+					paymentMethodId: methodId,
+					isEnabled: data.isEnabled as boolean ?? true,
+					maxAmount: data.maxAmount as number | undefined,
+					dayOfMonth: data.paymentDayOfMonth as number | undefined
+				}
+			});
+		}, { userId, reason: 'CONFIGURE_AUTO_PAY' });
 	} else {
-		setting = await prisma.autoPaySetting.create({
-			data: {
-				partyId,
-				associationId,
-				paymentMethodId: methodId,
-				isEnabled: data.isEnabled as boolean ?? true,
-				frequency: 'MONTHLY',
-				maxAmount: data.maxAmount as number | undefined,
-				dayOfMonth: data.paymentDayOfMonth as number | undefined
-			}
-		});
+		setting = await orgTransaction(organizationId, async (tx) => {
+			return tx.autoPaySetting.create({
+				data: {
+					partyId,
+					associationId,
+					paymentMethodId: methodId,
+					isEnabled: data.isEnabled as boolean ?? true,
+					frequency: 'MONTHLY',
+					maxAmount: data.maxAmount as number | undefined,
+					dayOfMonth: data.paymentDayOfMonth as number | undefined
+				}
+			});
+		}, { userId, reason: 'CONFIGURE_AUTO_PAY' });
 	}
 
-	console.log(`[OwnerPortalWorkflow] CONFIGURE_AUTO_PAY setting:${setting.id} party:${partyId} by user ${userId}`);
+	log.info(`CONFIGURE_AUTO_PAY setting:${setting.id} party:${partyId} by user ${userId}`);
 	return setting.id;
 }
 
@@ -308,27 +331,29 @@ async function grantDocumentAccess(
 	const documentId = data.documentId as string;
 	const partyId = data.partyId as string;
 
-	const grant = await prisma.documentAccessGrant.upsert({
-		where: {
-			documentId_partyId: {
+	const grant = await orgTransaction(organizationId, async (tx) => {
+		return tx.documentAccessGrant.upsert({
+			where: {
+				documentId_partyId: {
+					documentId,
+					partyId
+				}
+			},
+			update: {
+				revokedAt: null,
+				expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
+				grantedBy: userId
+			},
+			create: {
 				documentId,
-				partyId
+				partyId,
+				expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
+				grantedBy: userId
 			}
-		},
-		update: {
-			revokedAt: null,
-			expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
-			grantedBy: userId
-		},
-		create: {
-			documentId,
-			partyId,
-			expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
-			grantedBy: userId
-		}
-	});
+		});
+	}, { userId, reason: 'GRANT_DOCUMENT_ACCESS' });
 
-	console.log(`[OwnerPortalWorkflow] GRANT_DOCUMENT_ACCESS grant:${grant.id} document:${documentId} party:${partyId} by user ${userId}`);
+	log.info(`GRANT_DOCUMENT_ACCESS grant:${grant.id} document:${documentId} party:${partyId} by user ${userId}`);
 	return grant.id;
 }
 
@@ -340,12 +365,14 @@ async function revokeDocumentAccess(
 	const grantId = data.grantId as string;
 	const now = new Date();
 
-	await prisma.documentAccessGrant.update({
-		where: { id: grantId },
-		data: { revokedAt: now }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.documentAccessGrant.update({
+			where: { id: grantId },
+			data: { revokedAt: now }
+		});
+	}, { userId, reason: 'REVOKE_DOCUMENT_ACCESS' });
 
-	console.log(`[OwnerPortalWorkflow] REVOKE_DOCUMENT_ACCESS grant:${grantId} by user ${userId}`);
+	log.info(`REVOKE_DOCUMENT_ACCESS grant:${grantId} by user ${userId}`);
 	return grantId;
 }
 
@@ -354,17 +381,19 @@ async function logDocumentDownload(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const downloadLog = await prisma.documentDownloadLog.create({
-		data: {
-			documentId: data.documentId as string,
-			partyId: data.partyId as string | undefined,
-			userId,
-			ipAddress: data.ipAddress as string | undefined,
-			userAgent: data.userAgent as string | undefined
-		}
-	});
+	const downloadLog = await orgTransaction(organizationId, async (tx) => {
+		return tx.documentDownloadLog.create({
+			data: {
+				documentId: data.documentId as string,
+				partyId: data.partyId as string | undefined,
+				userId,
+				ipAddress: data.ipAddress as string | undefined,
+				userAgent: data.userAgent as string | undefined
+			}
+		});
+	}, { userId, reason: 'LOG_DOCUMENT_DOWNLOAD' });
 
-	console.log(`[OwnerPortalWorkflow] LOG_DOCUMENT_DOWNLOAD log:${downloadLog.id} document:${data.documentId} by user ${userId}`);
+	log.info(`LOG_DOCUMENT_DOWNLOAD log:${downloadLog.id} document:${data.documentId} by user ${userId}`);
 	return downloadLog.id;
 }
 
@@ -376,12 +405,14 @@ async function deletePaymentMethod(
 	const methodId = data.methodId as string;
 	const now = new Date();
 
-	await prisma.storedPaymentMethod.update({
-		where: { id: methodId },
-		data: { deletedAt: now }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.storedPaymentMethod.update({
+			where: { id: methodId },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'DELETE_PAYMENT_METHOD' });
 
-	console.log(`[OwnerPortalWorkflow] DELETE_PAYMENT_METHOD method:${methodId} by user ${userId}`);
+	log.info(`DELETE_PAYMENT_METHOD method:${methodId} by user ${userId}`);
 	return methodId;
 }
 
@@ -393,12 +424,14 @@ async function deleteAutoPay(
 	const autoPayId = data.autoPayId as string;
 	const now = new Date();
 
-	await prisma.autoPaySetting.update({
-		where: { id: autoPayId },
-		data: { deletedAt: now }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.autoPaySetting.update({
+			where: { id: autoPayId },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'DELETE_AUTO_PAY' });
 
-	console.log(`[OwnerPortalWorkflow] DELETE_AUTO_PAY setting:${autoPayId} by user ${userId}`);
+	log.info(`DELETE_AUTO_PAY setting:${autoPayId} by user ${userId}`);
 	return autoPayId;
 }
 
@@ -416,16 +449,18 @@ async function upsertUserProfile(
 		mailingAddress: data.mailingAddress as any
 	};
 
-	const profile = await prisma.userProfile.upsert({
-		where: { partyId },
-		create: {
-			partyId,
-			...profileData
-		},
-		update: profileData
-	});
+	const profile = await orgTransaction(organizationId, async (tx) => {
+		return tx.userProfile.upsert({
+			where: { partyId },
+			create: {
+				partyId,
+				...profileData
+			},
+			update: profileData
+		});
+	}, { userId, reason: 'UPSERT_USER_PROFILE' });
 
-	console.log(`[OwnerPortalWorkflow] UPSERT_USER_PROFILE profile:${profile.id} party:${partyId} by user ${userId}`);
+	log.info(`UPSERT_USER_PROFILE profile:${profile.id} party:${partyId} by user ${userId}`);
 	return profile.id;
 }
 
@@ -437,12 +472,14 @@ async function deleteUserProfile(
 	const partyId = data.partyId as string;
 	const now = new Date();
 
-	const result = await prisma.userProfile.updateMany({
-		where: { partyId, deletedAt: null },
-		data: { deletedAt: now }
-	});
+	const result = await orgTransaction(organizationId, async (tx) => {
+		return tx.userProfile.updateMany({
+			where: { partyId, deletedAt: null },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'DELETE_USER_PROFILE' });
 
-	console.log(`[OwnerPortalWorkflow] DELETE_USER_PROFILE party:${partyId} count:${result.count} by user ${userId}`);
+	log.info(`DELETE_USER_PROFILE party:${partyId} count:${result.count} by user ${userId}`);
 	return partyId;
 }
 
@@ -454,25 +491,27 @@ async function upsertContactPreference(
 	const partyId = data.partyId as string;
 	const channel = data.channel as any;
 
-	const preference = await prisma.contactPreference.upsert({
-		where: { partyId_channel: { partyId, channel } },
-		create: {
-			partyId,
-			channel,
-			isEnabled: data.isEnabled as boolean ?? true,
-			allowTransactional: data.allowTransactional as boolean ?? true,
-			allowMarketing: data.allowMarketing as boolean ?? false,
-			allowEmergency: data.allowEmergency as boolean ?? true
-		},
-		update: {
-			isEnabled: data.isEnabled as boolean ?? true,
-			allowTransactional: data.allowTransactional as boolean ?? true,
-			allowMarketing: data.allowMarketing as boolean ?? false,
-			allowEmergency: data.allowEmergency as boolean ?? true
-		}
-	});
+	const preference = await orgTransaction(organizationId, async (tx) => {
+		return tx.contactPreference.upsert({
+			where: { partyId_channel: { partyId, channel } },
+			create: {
+				partyId,
+				channel,
+				isEnabled: data.isEnabled as boolean ?? true,
+				allowTransactional: data.allowTransactional as boolean ?? true,
+				allowMarketing: data.allowMarketing as boolean ?? false,
+				allowEmergency: data.allowEmergency as boolean ?? true
+			},
+			update: {
+				isEnabled: data.isEnabled as boolean ?? true,
+				allowTransactional: data.allowTransactional as boolean ?? true,
+				allowMarketing: data.allowMarketing as boolean ?? false,
+				allowEmergency: data.allowEmergency as boolean ?? true
+			}
+		});
+	}, { userId, reason: 'UPSERT_CONTACT_PREFERENCE' });
 
-	console.log(`[OwnerPortalWorkflow] UPSERT_CONTACT_PREFERENCE preference:${preference.id} party:${partyId} channel:${channel} by user ${userId}`);
+	log.info(`UPSERT_CONTACT_PREFERENCE preference:${preference.id} party:${partyId} channel:${channel} by user ${userId}`);
 	return preference.id;
 }
 
@@ -485,12 +524,14 @@ async function deleteContactPreference(
 	const channel = data.channel as any;
 	const now = new Date();
 
-	const result = await prisma.contactPreference.updateMany({
-		where: { partyId, channel, deletedAt: null },
-		data: { deletedAt: now }
-	});
+	const result = await orgTransaction(organizationId, async (tx) => {
+		return tx.contactPreference.updateMany({
+			where: { partyId, channel, deletedAt: null },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'DELETE_CONTACT_PREFERENCE' });
 
-	console.log(`[OwnerPortalWorkflow] DELETE_CONTACT_PREFERENCE party:${partyId} channel:${channel} count:${result.count} by user ${userId}`);
+	log.info(`DELETE_CONTACT_PREFERENCE party:${partyId} channel:${channel} count:${result.count} by user ${userId}`);
 	return partyId;
 }
 
@@ -503,22 +544,24 @@ async function upsertNotificationSetting(
 	const category = data.category as any;
 	const channel = data.channel as any;
 
-	const setting = await prisma.notificationSetting.upsert({
-		where: {
-			partyId_category_channel: { partyId, category, channel }
-		},
-		create: {
-			partyId,
-			category,
-			channel,
-			isEnabled: data.isEnabled as boolean ?? true
-		},
-		update: {
-			isEnabled: data.isEnabled as boolean ?? true
-		}
-	});
+	const setting = await orgTransaction(organizationId, async (tx) => {
+		return tx.notificationSetting.upsert({
+			where: {
+				partyId_category_channel: { partyId, category, channel }
+			},
+			create: {
+				partyId,
+				category,
+				channel,
+				isEnabled: data.isEnabled as boolean ?? true
+			},
+			update: {
+				isEnabled: data.isEnabled as boolean ?? true
+			}
+		});
+	}, { userId, reason: 'UPSERT_NOTIFICATION_SETTING' });
 
-	console.log(`[OwnerPortalWorkflow] UPSERT_NOTIFICATION_SETTING setting:${setting.id} party:${partyId} category:${category} channel:${channel} by user ${userId}`);
+	log.info(`UPSERT_NOTIFICATION_SETTING setting:${setting.id} party:${partyId} category:${category} channel:${channel} by user ${userId}`);
 	return setting.id;
 }
 
@@ -532,12 +575,14 @@ async function deleteNotificationSetting(
 	const channel = data.channel as any;
 	const now = new Date();
 
-	const result = await prisma.notificationSetting.updateMany({
-		where: { partyId, category, channel, deletedAt: null },
-		data: { deletedAt: now }
-	});
+	const result = await orgTransaction(organizationId, async (tx) => {
+		return tx.notificationSetting.updateMany({
+			where: { partyId, category, channel, deletedAt: null },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'DELETE_NOTIFICATION_SETTING' });
 
-	console.log(`[OwnerPortalWorkflow] DELETE_NOTIFICATION_SETTING party:${partyId} category:${category} channel:${channel} count:${result.count} by user ${userId}`);
+	log.info(`DELETE_NOTIFICATION_SETTING party:${partyId} category:${category} channel:${channel} count:${result.count} by user ${userId}`);
 	return partyId;
 }
 
@@ -680,7 +725,7 @@ async function ownerPortalWorkflow(input: OwnerPortalWorkflowInput): Promise<Own
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[OwnerPortalWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

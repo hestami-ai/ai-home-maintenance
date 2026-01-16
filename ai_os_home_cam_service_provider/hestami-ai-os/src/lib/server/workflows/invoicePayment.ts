@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { JobInvoiceStatus } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -105,11 +106,12 @@ async function validateInvoiceTransition(input: InvoicePaymentInput): Promise<{
 
 async function updateInvoiceStatus(
 	input: InvoicePaymentInput,
-	fromStatus: JobInvoiceStatus
+	fromStatus: JobInvoiceStatus,
+	organizationId: string
 ): Promise<string | undefined> {
 	let paymentId: string | undefined;
 
-	await prisma.$transaction(async (tx) => {
+	await orgTransaction(organizationId, async (tx) => {
 		const updateData: Record<string, unknown> = {
 			status: input.toStatus
 		};
@@ -170,8 +172,8 @@ async function updateInvoiceStatus(
 			data: updateData
 		});
 
-		console.log(`[InvoiceWorkflow] Status changed from ${fromStatus} to ${input.toStatus}`);
-	});
+		log.info(`Status changed from ${fromStatus} to ${input.toStatus}`);
+	}, { userId: input.userId, reason: 'Update invoice status and record payment' });
 
 	return paymentId;
 }
@@ -247,7 +249,7 @@ async function invoicePaymentWorkflow(input: InvoicePaymentInput): Promise<Invoi
 		}
 
 		const paymentId = await DBOS.runStep(
-			() => updateInvoiceStatus(input, validation.currentStatus),
+			() => updateInvoiceStatus(input, validation.currentStatus, validation.organizationId!),
 			{ name: 'updateInvoiceStatus' }
 		);
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'updated', status: input.toStatus });
@@ -305,7 +307,7 @@ export async function startInvoicePayment(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `invoice-payment-${input.invoiceId}-${Date.now()}`;
-	await DBOS.startWorkflow(invoicePayment_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(invoicePayment_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

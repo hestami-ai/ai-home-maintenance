@@ -9,7 +9,9 @@
       "Bash(npx prisma generate:*)",
       "Bash(bunx prisma generate:*)",
       "Bash(npm run haos-guard:*)",
-      "Bash(bun:*)"
+      "Bash(bun:*)",
+      "Bash(npx tsc:*)",
+      "Bash(docker ps:*)"
     ]
   }
 }

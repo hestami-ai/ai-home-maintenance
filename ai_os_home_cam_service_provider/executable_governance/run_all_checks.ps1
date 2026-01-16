@@ -10,7 +10,8 @@ $checks = @(
     "policies",
     "timestamps",
     "security",
-    "trace"
+    "trace",
+    "rls"
 )
 
 # Create output directory if it doesn't exist

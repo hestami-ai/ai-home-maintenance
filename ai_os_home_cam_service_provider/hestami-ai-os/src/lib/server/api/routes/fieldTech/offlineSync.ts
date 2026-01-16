@@ -106,8 +106,8 @@ export const offlineSyncRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to queue item' });
 			}
 
-			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const item = await prisma.offlineSyncQueue.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ queueItem: formatSyncQueueItem(item) }, context);
@@ -297,8 +297,8 @@ export const offlineSyncRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark item as synced' });
 			}
 
-			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const item = await prisma.offlineSyncQueue.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ queueItem: formatSyncQueueItem(item) }, context);
@@ -355,8 +355,8 @@ export const offlineSyncRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark item as failed' });
 			}
 
-			const item = await prisma.offlineSyncQueue.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const item = await prisma.offlineSyncQueue.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ queueItem: formatSyncQueueItem(item) }, context);

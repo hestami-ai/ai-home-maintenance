@@ -6,9 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { orgTransaction } from '../db/rls.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('TimeEntryWorkflow');
 
 // Action types for the unified workflow
 export const TimeEntryAction = {
@@ -48,24 +51,30 @@ async function createEntry(
 	const hourlyRate = data.hourlyRate as number | undefined;
 	const localId = data.localId as string | undefined;
 
-	const entry = await prisma.jobTimeEntry.create({
-		data: {
-			organizationId,
-			jobId,
-			jobVisitId,
-			technicianId,
-			startTime: startTime ? new Date(startTime) : new Date(),
-			entryType: entryType as 'TRAVEL' | 'WORK' | 'BREAK',
-			notes,
-			isBillable,
-			hourlyRate,
-			localId,
-			isSynced: !localId,
-			syncedAt: localId ? new Date() : null
-		}
-	});
+	const entry = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.jobTimeEntry.create({
+				data: {
+					organizationId,
+					jobId,
+					jobVisitId,
+					technicianId,
+					startTime: startTime ? new Date(startTime) : new Date(),
+					entryType: entryType as 'TRAVEL' | 'WORK' | 'BREAK',
+					notes,
+					isBillable,
+					hourlyRate,
+					localId,
+					isSynced: !localId,
+					syncedAt: localId ? new Date() : null
+				}
+			});
+		},
+		{ userId, reason: 'Creating time entry' }
+	);
 
-	console.log(`[TimeEntryWorkflow] CREATE_ENTRY entry:${entry.id} by user ${userId}`);
+	log.info('CREATE_ENTRY completed', { entryId: entry.id, userId });
 	return entry.id;
 }
 
@@ -79,16 +88,22 @@ async function stopEntry(
 	const durationMinutes = data.durationMinutes as number;
 	const notes = data.notes as string | undefined;
 
-	await prisma.jobTimeEntry.update({
-		where: { id: entryId },
-		data: {
-			endTime: new Date(endTime),
-			durationMinutes,
-			notes: notes !== undefined ? notes : undefined
-		}
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.jobTimeEntry.update({
+				where: { id: entryId },
+				data: {
+					endTime: new Date(endTime),
+					durationMinutes,
+					notes: notes !== undefined ? notes : undefined
+				}
+			});
+		},
+		{ userId, reason: 'Stopping time entry' }
+	);
 
-	console.log(`[TimeEntryWorkflow] STOP_ENTRY entry:${entryId} by user ${userId}`);
+	log.info('STOP_ENTRY completed', { entryId, userId });
 	return entryId;
 }
 
@@ -108,12 +123,18 @@ async function updateEntry(
 		updateData.endTime = new Date(updateData.endTime as string);
 	}
 
-	await prisma.jobTimeEntry.update({
-		where: { id: entryId },
-		data: updateData
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.jobTimeEntry.update({
+				where: { id: entryId },
+				data: updateData
+			});
+		},
+		{ userId, reason: 'Updating time entry' }
+	);
 
-	console.log(`[TimeEntryWorkflow] UPDATE_ENTRY entry:${entryId} by user ${userId}`);
+	log.info('UPDATE_ENTRY completed', { entryId, userId });
 	return entryId;
 }
 
@@ -122,9 +143,15 @@ async function deleteEntry(
 	userId: string,
 	entryId: string
 ): Promise<string> {
-	await prisma.jobTimeEntry.delete({ where: { id: entryId } });
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.jobTimeEntry.delete({ where: { id: entryId } });
+		},
+		{ userId, reason: 'Deleting time entry' }
+	);
 
-	console.log(`[TimeEntryWorkflow] DELETE_ENTRY entry:${entryId} by user ${userId}`);
+	log.info('DELETE_ENTRY completed', { entryId, userId });
 	return entryId;
 }
 
@@ -170,7 +197,7 @@ async function timeEntryWorkflow(input: TimeEntryWorkflowInput): Promise<TimeEnt
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[TimeEntryWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error('Workflow error', { action: input.action, error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

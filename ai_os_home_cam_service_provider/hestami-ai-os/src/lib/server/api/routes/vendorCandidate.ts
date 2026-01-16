@@ -207,8 +207,8 @@ export const vendorCandidateRouter = {
 			}
 
 			// Fetch the created vendor candidate
-			const vendorCandidate = await prisma.vendorCandidate.findUnique({
-				where: { id: result.vendorCandidateId }
+			const vendorCandidate = await prisma.vendorCandidate.findFirstOrThrow({
+				where: { id: result.vendorCandidateId, organizationId: context.organization.id }
 			});
 
 			// Record activity event
@@ -401,8 +401,8 @@ export const vendorCandidateRouter = {
 			}
 
 			// Fetch updated vendor candidate
-			const vendorCandidate = await prisma.vendorCandidate.findUnique({
-				where: { id: input.id }
+			const vendorCandidate = await prisma.vendorCandidate.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			await recordExecution(context, {
@@ -487,8 +487,8 @@ export const vendorCandidateRouter = {
 			}
 
 			// Fetch updated vendor candidate
-			const vendorCandidate = await prisma.vendorCandidate.findUnique({
-				where: { id: input.id }
+			const vendorCandidate = await prisma.vendorCandidate.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			await recordExecution(context, {

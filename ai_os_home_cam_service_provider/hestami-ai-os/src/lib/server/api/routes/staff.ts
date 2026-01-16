@@ -143,8 +143,8 @@ export const staffRouter = {
 			}
 
 			// Fetch the created staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: result.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: result.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -439,8 +439,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -529,8 +529,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -624,8 +624,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -733,8 +733,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -828,8 +828,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -917,8 +917,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -1006,8 +1006,8 @@ export const staffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -1591,8 +1591,8 @@ export const orgStaffRouter = {
 			}
 
 			// Fetch the created staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: result.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: result.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -1708,8 +1708,8 @@ export const orgStaffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -1805,8 +1805,8 @@ export const orgStaffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {
@@ -1906,8 +1906,8 @@ export const orgStaffRouter = {
 			}
 
 			// Fetch updated staff for response
-			const staff = await prisma.staff.findUniqueOrThrow({
-				where: { id: input.staffId },
+			const staff = await prisma.staff.findFirstOrThrow({
+				where: { id: input.staffId, organizationId: context.organization!.id },
 				include: {
 					user: {
 						select: {

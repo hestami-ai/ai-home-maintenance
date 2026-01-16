@@ -128,8 +128,8 @@ export const inventoryLocationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create location' });
 			}
 
-			const location = await prisma.inventoryLocation.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const location = await prisma.inventoryLocation.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ location: formatLocation(location) }, context);
@@ -281,8 +281,8 @@ export const inventoryLocationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update location' });
 			}
 
-			const location = await prisma.inventoryLocation.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const location = await prisma.inventoryLocation.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ location: formatLocation(location) }, context);

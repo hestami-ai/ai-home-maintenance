@@ -46,9 +46,9 @@ const getAssociationOrThrow = async (organizationId: string, associationId: stri
 	return association;
 };
 
-const ensureUnitBelongs = async (unitId: string, associationId: string, errors: any) => {
+const ensureUnitBelongs = async (unitId: string, organizationId: string, associationId: string, errors: any) => {
 	const unit = await prisma.unit.findFirst({
-		where: { id: unitId, deletedAt: null },
+		where: { id: unitId, organizationId, deletedAt: null },
 		include: { property: true }
 	});
 	if (!unit || unit.property.associationId !== associationId) {
@@ -56,9 +56,9 @@ const ensureUnitBelongs = async (unitId: string, associationId: string, errors: 
 	}
 };
 
-const ensureCommitteeBelongs = async (committeeId: string, associationId: string, errors: any) => {
+const ensureCommitteeBelongs = async (committeeId: string, organizationId: string, associationId: string, errors: any) => {
 	const committee = await prisma.aRCCommittee.findFirst({
-		where: { id: committeeId, associationId, isActive: true }
+		where: { id: committeeId, organizationId, associationId, isActive: true }
 	});
 	if (!committee) throw errors.NOT_FOUND({ message: 'ARC Committee' });
 };
@@ -108,8 +108,8 @@ export const arcRequestRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			await getAssociationOrThrow(context.organization.id, rest.associationId, errors);
-			if (rest.unitId) await ensureUnitBelongs(rest.unitId, rest.associationId, errors);
-			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, rest.associationId, errors);
+			if (rest.unitId) await ensureUnitBelongs(rest.unitId, context.organization.id, rest.associationId, errors);
+			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, context.organization.id, rest.associationId, errors);
 			await ensurePartyBelongs(rest.requesterPartyId, context.organization.id, errors);
 
 			// Use DBOS workflow for durable execution
@@ -138,7 +138,7 @@ export const arcRequestRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create ARC request' });
 			}
 
-			const result = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const result = await prisma.aRCRequest.findFirstOrThrow({ where: { id: workflowResult.entityId, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordIntent(context, {
@@ -183,7 +183,7 @@ export const arcRequestRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.aRCRequest.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: {
 					association: true,
 					unit: true,
@@ -194,7 +194,7 @@ export const arcRequestRouter = {
 				}
 			});
 
-			if (!request || request.association.organizationId !== context.organization.id) {
+			if (!request) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -294,10 +294,10 @@ export const arcRequestRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const existing = await prisma.aRCRequest.findFirst({
-				where: { id: rest.id },
+				where: { id: rest.id, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -305,8 +305,8 @@ export const arcRequestRouter = {
 				throw errors.BAD_REQUEST({ message: 'Cannot update a finalized ARC request' });
 			}
 
-			if (rest.unitId) await ensureUnitBelongs(rest.unitId, existing.associationId, errors);
-			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, existing.associationId, errors);
+			if (rest.unitId) await ensureUnitBelongs(rest.unitId, context.organization.id, existing.associationId, errors);
+			if (rest.committeeId) await ensureCommitteeBelongs(rest.committeeId, context.organization.id, existing.associationId, errors);
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
@@ -331,7 +331,7 @@ export const arcRequestRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update ARC request' });
 			}
 
-			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: rest.id } });
+			const updated = await prisma.aRCRequest.findFirstOrThrow({ where: { id: rest.id, organizationId: context.organization.id } });
 
 			return successResponse({ request: { id: updated.id, status: updated.status } }, context);
 		}),
@@ -347,10 +347,10 @@ export const arcRequestRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const existing = await prisma.aRCRequest.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -377,7 +377,7 @@ export const arcRequestRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to submit ARC request' });
 			}
 
-			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.aRCRequest.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordExecution(context, {
@@ -407,10 +407,10 @@ export const arcRequestRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'arc_request', input.id);
 			const existing = await prisma.aRCRequest.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -437,7 +437,7 @@ export const arcRequestRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to withdraw ARC request' });
 			}
 
-			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.aRCRequest.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordExecution(context, {
@@ -478,10 +478,10 @@ export const arcRequestRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const request = await prisma.aRCRequest.findFirst({
-				where: { id: rest.requestId },
+				where: { id: rest.requestId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!request || request.association.organizationId !== context.organization.id) {
+			if (!request) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -537,10 +537,10 @@ export const arcRequestRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const request = await prisma.aRCRequest.findFirst({
-				where: { id: rest.requestId },
+				where: { id: rest.requestId, organizationId: context.organization.id },
 				include: { association: true }
 			});
-			if (!request || request.association.organizationId !== context.organization.id) {
+			if (!request) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -567,7 +567,7 @@ export const arcRequestRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to record decision' });
 			}
 
-			const updated = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: rest.requestId } });
+			const updated = await prisma.aRCRequest.findFirstOrThrow({ where: { id: rest.requestId, organizationId: context.organization.id } });
 
 			// Record activity event
 			const actionToEventAction: Record<string, 'APPROVE' | 'DENY' | 'STATUS_CHANGE'> = {
@@ -637,11 +637,11 @@ export const arcRequestRouter = {
 			await context.cerbos.authorize('view', 'arc_request', input.requestId);
 
 			const request = await prisma.aRCRequest.findFirst({
-				where: { id: input.requestId },
+				where: { id: input.requestId, organizationId: context.organization.id },
 				include: { association: true }
 			});
 
-			if (!request || request.association.organizationId !== context.organization.id) {
+			if (!request) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -649,6 +649,7 @@ export const arcRequestRouter = {
 			const unitPrecedents = input.unitId
 				? await prisma.aRCRequest.findMany({
 					where: {
+						organizationId: context.organization.id,
 						associationId: request.associationId,
 						unitId: input.unitId,
 						id: { not: input.requestId },
@@ -663,6 +664,7 @@ export const arcRequestRouter = {
 			const categoryPrecedents = input.category
 				? await prisma.aRCRequest.findMany({
 					where: {
+						organizationId: context.organization.id,
 						associationId: request.associationId,
 						category: input.category as ARCCategory,
 						id: { not: input.requestId },

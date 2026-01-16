@@ -91,9 +91,10 @@ export const workOrderViewRouter = {
 				}, context);
 			}
 
-			// Build query
+			// Build query - use relational filter for RLS defense-in-depth
 			const where: Record<string, unknown> = {
-				assignedVendorId: { in: vendorIds }
+				assignedVendorId: { in: vendorIds },
+				assignedVendor: { serviceProviderOrgId: org.id }
 			};
 			if (input?.status) where.status = input.status;
 			if (input?.priority) where.priority = input.priority;
@@ -208,7 +209,8 @@ export const workOrderViewRouter = {
 			const workOrder = await prisma.workOrder.findFirst({
 				where: {
 					id: input.id,
-					assignedVendorId: { in: vendorIds }
+					assignedVendorId: { in: vendorIds },
+					assignedVendor: { serviceProviderOrgId: org.id }
 				},
 				include: {
 					association: { select: { id: true, name: true } },
@@ -298,10 +300,11 @@ export const workOrderViewRouter = {
 				}, context);
 			}
 
-			// Get all work orders
+			// Get all work orders - use relational filter for RLS defense-in-depth
 			const workOrders = await prisma.workOrder.findMany({
 				where: {
 					assignedVendorId: { in: vendorIds },
+					assignedVendor: { serviceProviderOrgId: org.id },
 					status: { notIn: ['CLOSED', 'CANCELLED'] }
 				},
 				select: {

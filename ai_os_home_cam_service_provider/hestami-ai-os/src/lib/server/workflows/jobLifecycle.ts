@@ -19,9 +19,12 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { JobStatus } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+
+const log = createWorkflowLogger('jobLifecycleWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'job_status';
 const WORKFLOW_ERROR_EVENT = 'job_error';
@@ -389,7 +392,7 @@ export async function startJobTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `job-transition-${input.jobId}-${Date.now()}`;
-	await DBOS.startWorkflow(jobLifecycle_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(jobLifecycle_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

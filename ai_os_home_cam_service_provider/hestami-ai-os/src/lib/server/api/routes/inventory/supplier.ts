@@ -130,8 +130,8 @@ export const supplierRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create supplier' });
 			}
 
-			const supplier = await prisma.supplier.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const supplier = await prisma.supplier.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ supplier: formatSupplier(supplier) }, context);
@@ -291,8 +291,8 @@ export const supplierRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update supplier' });
 			}
 
-			const supplier = await prisma.supplier.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const supplier = await prisma.supplier.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ supplier: formatSupplier(supplier) }, context);

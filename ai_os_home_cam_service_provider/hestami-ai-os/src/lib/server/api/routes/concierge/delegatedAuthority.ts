@@ -65,13 +65,17 @@ export const delegatedAuthorityRouter = {
 			// Cerbos authorization
 			await context.cerbos.authorize('create', 'delegated_authority', 'new');
 
-			// Verify property ownership exists and belongs to this organization
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const propertyOwnership = await prisma.propertyOwnership.findFirst({
-				where: { id: input.propertyOwnershipId, deletedAt: null },
+				where: {
+					id: input.propertyOwnershipId,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: { property: true, party: true }
 			});
 
-			if (!propertyOwnership || propertyOwnership.property.ownerOrgId !== context.organization.id) {
+			if (!propertyOwnership) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
@@ -95,12 +99,16 @@ export const delegatedAuthorityRouter = {
 			}
 
 			// Check if similar delegation already exists
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.delegatedAuthority.findFirst({
 				where: {
 					propertyOwnershipId: input.propertyOwnershipId,
 					delegatePartyId: input.delegatePartyId,
 					authorityType: input.authorityType,
-					status: { in: ['ACTIVE', 'PENDING_ACCEPTANCE'] }
+					status: { in: ['ACTIVE', 'PENDING_ACCEPTANCE'] },
+					propertyOwnership: {
+						property: { ownerOrgId: context.organization.id }
+					}
 				}
 			});
 
@@ -199,8 +207,15 @@ export const delegatedAuthorityRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const delegatedAuthority = await prisma.delegatedAuthority.findFirst({
-				where: { id: input.id },
+				where: {
+					id: input.id,
+					propertyOwnership: {
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
+					}
+				},
 				include: {
 					propertyOwnership: {
 						include: {
@@ -212,10 +227,7 @@ export const delegatedAuthorityRouter = {
 				}
 			});
 
-			if (
-				!delegatedAuthority ||
-				delegatedAuthority.propertyOwnership.property.ownerOrgId !== context.organization.id
-			) {
+			if (!delegatedAuthority) {
 				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
@@ -313,27 +325,33 @@ export const delegatedAuthorityRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
-			// Verify property ownership exists and belongs to this organization
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const propertyOwnership = await prisma.propertyOwnership.findFirst({
-				where: { id: input.propertyOwnershipId, deletedAt: null },
+				where: {
+					id: input.propertyOwnershipId,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: { property: true }
 			});
 
-			if (!propertyOwnership || propertyOwnership.property.ownerOrgId !== context.organization.id) {
+			if (!propertyOwnership) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
 			// Cerbos authorization
 			await context.cerbos.authorize('view', 'property_ownership', propertyOwnership.id);
 
-			const whereClause = {
-				propertyOwnershipId: input.propertyOwnershipId,
-				...(input.status && { status: input.status }),
-				...(input.authorityType && { authorityType: input.authorityType })
-			};
-
+			// Defense in depth: explicit org filter in query for connection pool safety
 			const delegatedAuthorities = await prisma.delegatedAuthority.findMany({
-				where: whereClause,
+				where: {
+					propertyOwnershipId: input.propertyOwnershipId,
+					propertyOwnership: {
+						property: { ownerOrgId: context.organization.id }
+					},
+					...(input.status && { status: input.status }),
+					...(input.authorityType && { authorityType: input.authorityType })
+				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: [{ status: 'asc' }, { grantedAt: 'desc' }],
@@ -421,14 +439,16 @@ export const delegatedAuthorityRouter = {
 				partyUserId: party.userId ?? undefined
 			});
 
-			const whereClause = {
-				delegatePartyId: input.delegatePartyId,
-				...(input.status && { status: input.status }),
-				...(input.authorityType && { authorityType: input.authorityType })
-			};
-
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const delegatedAuthorities = await prisma.delegatedAuthority.findMany({
-				where: whereClause,
+				where: {
+					delegatePartyId: input.delegatePartyId,
+					propertyOwnership: {
+						property: { ownerOrgId: context.organization.id }
+					},
+					...(input.status && { status: input.status }),
+					...(input.authorityType && { authorityType: input.authorityType })
+				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: [{ status: 'asc' }, { grantedAt: 'desc' }],
@@ -500,18 +520,22 @@ export const delegatedAuthorityRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.delegatedAuthority.findFirst({
-				where: { id: input.id },
+				where: {
+					id: input.id,
+					propertyOwnership: {
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
+					}
+				},
 				include: {
 					propertyOwnership: { include: { property: true } },
 					delegateParty: true
 				}
 			});
 
-			if (
-				!existing ||
-				existing.propertyOwnership.property.ownerOrgId !== context.organization.id
-			) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
@@ -581,17 +605,21 @@ export const delegatedAuthorityRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.delegatedAuthority.findFirst({
-				where: { id: input.id },
+				where: {
+					id: input.id,
+					propertyOwnership: {
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
+					}
+				},
 				include: {
 					propertyOwnership: { include: { property: true } }
 				}
 			});
 
-			if (
-				!existing ||
-				existing.propertyOwnership.property.ownerOrgId !== context.organization.id
-			) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
@@ -674,13 +702,15 @@ export const delegatedAuthorityRouter = {
 			await context.cerbos.authorize('view', 'individual_property', property.id);
 
 			// Check if party is an owner or co-owner (has inherent authority)
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const ownership = await prisma.propertyOwnership.findFirst({
 				where: {
 					propertyId: input.propertyId,
 					partyId: input.partyId,
 					role: { in: ['OWNER', 'CO_OWNER'] },
 					status: 'ACTIVE',
-					deletedAt: null
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
 				}
 			});
 
@@ -698,6 +728,7 @@ export const delegatedAuthorityRouter = {
 			}
 
 			// Check for delegated authority
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const delegatedAuthority = await prisma.delegatedAuthority.findFirst({
 				where: {
 					delegatePartyId: input.partyId,
@@ -707,7 +738,8 @@ export const delegatedAuthorityRouter = {
 					propertyOwnership: {
 						propertyId: input.propertyId,
 						status: 'ACTIVE',
-						deletedAt: null
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
 					}
 				}
 			});

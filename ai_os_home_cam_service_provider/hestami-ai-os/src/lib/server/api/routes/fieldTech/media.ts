@@ -131,8 +131,8 @@ export const mediaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to register media' });
 			}
 
-			const media = await prisma.jobMedia.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const media = await prisma.jobMedia.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
@@ -186,8 +186,8 @@ export const mediaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark media as uploaded' });
 			}
 
-			const media = await prisma.jobMedia.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const media = await prisma.jobMedia.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
@@ -261,8 +261,8 @@ export const mediaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add voice note' });
 			}
 
-			const media = await prisma.jobMedia.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const media = await prisma.jobMedia.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);
@@ -321,8 +321,8 @@ export const mediaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update transcription' });
 			}
 
-			const media = await prisma.jobMedia.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const media = await prisma.jobMedia.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ media: formatJobMedia(media) }, context);

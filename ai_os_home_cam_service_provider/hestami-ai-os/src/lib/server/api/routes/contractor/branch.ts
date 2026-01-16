@@ -82,7 +82,7 @@ export const branchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update branch' });
 			}
 
-			const branch = await prisma.contractorBranch.findUniqueOrThrow({ where: { id: result.entityId } });
+			const branch = await prisma.contractorBranch.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -198,7 +198,7 @@ export const branchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to archive branch' });
 			}
 
-			const branch = await prisma.contractorBranch.findUniqueOrThrow({ where: { id: result.entityId } });
+			const branch = await prisma.contractorBranch.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			return successResponse({ branch: serializeBranch(branch) }, context);
 		})

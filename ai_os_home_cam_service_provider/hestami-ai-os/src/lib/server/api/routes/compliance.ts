@@ -629,12 +629,12 @@ export const complianceRouter = {
 					action: 'UPDATE_DEADLINE_STATUS',
 					organizationId: context.organization.id,
 					userId: context.user.id,
-					deadlineId: input.id,
+					entityId: input.id,
 					data: {
 						status: updateData.status,
 						notes: updateData.notes
 					}
-				},
+				} as any,
 				idempotencyKey
 			);
 
@@ -704,11 +704,11 @@ export const complianceRouter = {
 						action: 'ADD_EVIDENCE_DOCUMENT',
 						organizationId: context.organization.id,
 						userId: context.user.id,
-						deadlineId: input.deadlineId,
+						entityId: input.deadlineId,
 						data: {
 							documentId: input.documentId
 						}
-					},
+					} as any,
 					input.idempotencyKey
 				);
 
@@ -770,13 +770,13 @@ export const complianceRouter = {
 					action: 'UPDATE_CHECKLIST_ITEM',
 					organizationId: context.organization.id,
 					userId: context.user.id,
-					checklistItemId: id,
+					entityId: id,
 					data: {
 						isCompleted: updateData.isCompleted,
 						notes: updateData.notes,
 						evidenceDocumentId: updateData.evidenceDocumentId
 					}
-				},
+				} as any,
 				idempotencyKey
 			);
 

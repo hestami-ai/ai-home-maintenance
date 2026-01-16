@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ServiceContractStatus, RecurrenceFrequency } from '../../../../generated/prisma/client.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
@@ -16,6 +17,7 @@ const WORKFLOW_STATUS_EVENT = 'contract_status';
 const WORKFLOW_ERROR_EVENT = 'contract_error';
 
 interface ContractWorkflowInput {
+	organizationId: string;
 	contractId: string;
 	action: 'GENERATE_VISITS' | 'PROCESS_RENEWAL' | 'CALCULATE_SLA' | 'CHECK_EXPIRATION';
 	userId: string;
@@ -80,7 +82,9 @@ function calculateNextVisitDate(
 
 async function generateScheduledVisits(
 	contractId: string,
-	throughDate: Date
+	throughDate: Date,
+	organizationId: string,
+	userId: string
 ): Promise<number> {
 	const schedules = await prisma.contractSchedule.findMany({
 		where: { contractId, isActive: true }
@@ -126,16 +130,16 @@ async function generateScheduledVisits(
 		}
 
 		if (visits.length > 0) {
-			await prisma.$transaction([
-				prisma.scheduledVisit.createMany({ data: visits }),
-				prisma.contractSchedule.update({
+			await orgTransaction(organizationId, async (tx) => {
+				await tx.scheduledVisit.createMany({ data: visits });
+				await tx.contractSchedule.update({
 					where: { id: schedule.id },
 					data: {
 						lastGeneratedAt: new Date(),
 						nextGenerateAt: currentDate
 					}
-				})
-			]);
+				});
+			}, { userId, reason: 'Generate scheduled visits for maintenance contract' });
 			totalVisitsCreated += visits.length;
 		}
 	}
@@ -147,7 +151,8 @@ async function processContractRenewal(
 	contractId: string,
 	newEndDate: Date,
 	newContractValue: number | undefined,
-	userId: string
+	userId: string,
+	organizationId: string
 ): Promise<boolean> {
 	const contract = await prisma.serviceContract.findUnique({
 		where: { id: contractId }
@@ -167,8 +172,8 @@ async function processContractRenewal(
 		? ((newValue - previousValue) / previousValue) * 100
 		: 0;
 
-	await prisma.$transaction([
-		prisma.contractRenewal.create({
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.contractRenewal.create({
 			data: {
 				contractId,
 				renewalNumber: renewalCount + 1,
@@ -180,21 +185,25 @@ async function processContractRenewal(
 				renewedAt: new Date(),
 				renewedBy: userId
 			}
-		}),
-		prisma.serviceContract.update({
+		});
+		await tx.serviceContract.update({
 			where: { id: contractId },
 			data: {
 				status: 'ACTIVE',
 				endDate: newEndDate,
 				contractValue: newValue
 			}
-		})
-	]);
+		});
+	}, { userId, reason: 'Process contract renewal' });
 
 	return true;
 }
 
-async function calculateSLAScore(contractId: string): Promise<number> {
+async function calculateSLAScore(
+	contractId: string,
+	organizationId: string,
+	userId: string
+): Promise<number> {
 	const now = new Date();
 	const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -224,35 +233,41 @@ async function calculateSLAScore(contractId: string): Promise<number> {
 	const periodStart = thirtyDaysAgo;
 	const periodEnd = now;
 
-	await prisma.contractSLARecord.upsert({
-		where: {
-			contractId_periodStart_periodEnd: {
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.contractSLARecord.upsert({
+			where: {
+				contractId_periodStart_periodEnd: {
+					contractId,
+					periodStart,
+					periodEnd
+				}
+			},
+			create: {
 				contractId,
 				periodStart,
-				periodEnd
+				periodEnd,
+				scheduledVisits: visits.length,
+				completedVisits: visits.filter(v => v.status === 'COMPLETED').length,
+				missedVisits: visits.filter(v => v.status === 'MISSED').length,
+				visitCompliancePercent: score
+			},
+			update: {
+				scheduledVisits: visits.length,
+				completedVisits: visits.filter(v => v.status === 'COMPLETED').length,
+				missedVisits: visits.filter(v => v.status === 'MISSED').length,
+				visitCompliancePercent: score
 			}
-		},
-		create: {
-			contractId,
-			periodStart,
-			periodEnd,
-			scheduledVisits: visits.length,
-			completedVisits: visits.filter(v => v.status === 'COMPLETED').length,
-			missedVisits: visits.filter(v => v.status === 'MISSED').length,
-			visitCompliancePercent: score
-		},
-		update: {
-			scheduledVisits: visits.length,
-			completedVisits: visits.filter(v => v.status === 'COMPLETED').length,
-			missedVisits: visits.filter(v => v.status === 'MISSED').length,
-			visitCompliancePercent: score
-		}
-	});
+		});
+	}, { userId, reason: 'Calculate SLA score for contract' });
 
 	return score;
 }
 
-async function checkContractExpiration(contractId: string): Promise<{ expired: boolean; daysUntilExpiration: number }> {
+async function checkContractExpiration(
+	contractId: string,
+	organizationId: string,
+	userId: string
+): Promise<{ expired: boolean; daysUntilExpiration: number }> {
 	const contract = await prisma.serviceContract.findUnique({
 		where: { id: contractId },
 		select: { endDate: true, status: true, autoRenew: true }
@@ -267,10 +282,12 @@ async function checkContractExpiration(contractId: string): Promise<{ expired: b
 
 	if (daysUntilExpiration <= 0 && contract.status === 'ACTIVE') {
 		// Mark as expired
-		await prisma.serviceContract.update({
-			where: { id: contractId },
-			data: { status: 'EXPIRED' }
-		});
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.serviceContract.update({
+				where: { id: contractId },
+				data: { status: 'EXPIRED' }
+			});
+		}, { userId, reason: 'Mark contract as expired' });
 		return { expired: true, daysUntilExpiration };
 	}
 
@@ -308,7 +325,7 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 			case 'GENERATE_VISITS': {
 				const throughDate = input.throughDate ? new Date(input.throughDate) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 				const visitsGenerated = await DBOS.runStep(
-					() => generateScheduledVisits(input.contractId, throughDate),
+					() => generateScheduledVisits(input.contractId, throughDate, contract.organizationId, input.userId),
 					{ name: 'generateScheduledVisits' }
 				);
 
@@ -352,7 +369,7 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 				}
 
 				const renewed = await DBOS.runStep(
-					() => processContractRenewal(input.contractId, new Date(input.newEndDate!), input.newContractValue, input.userId),
+					() => processContractRenewal(input.contractId, new Date(input.newEndDate!), input.newContractValue, input.userId, contract.organizationId),
 					{ name: 'processContractRenewal' }
 				);
 
@@ -387,7 +404,7 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 
 			case 'CALCULATE_SLA': {
 				const slaScore = await DBOS.runStep(
-					() => calculateSLAScore(input.contractId),
+					() => calculateSLAScore(input.contractId, input.organizationId, input.userId),
 					{ name: 'calculateSLAScore' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'sla_calculated', score: slaScore });
@@ -404,7 +421,7 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 
 			case 'CHECK_EXPIRATION': {
 				const expirationStatus = await DBOS.runStep(
-					() => checkContractExpiration(input.contractId),
+					() => checkContractExpiration(input.contractId, input.organizationId, input.userId),
 					{ name: 'checkContractExpiration' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'expiration_checked', ...expirationStatus });
@@ -461,10 +478,10 @@ export const maintenanceContract_v1 = DBOS.registerWorkflow(maintenanceContractW
 
 export async function startMaintenanceContractWorkflow(
 	input: ContractWorkflowInput,
-	workflowId?: string, idempotencyKey: string
+	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `contract-${input.action.toLowerCase()}-${input.contractId}-${Date.now()}`;
-	await DBOS.startWorkflow(maintenanceContract_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(maintenanceContract_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

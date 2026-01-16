@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -54,55 +55,60 @@ async function logMaterialUsage(
 	quantity: number,
 	userId: string
 ): Promise<string> {
-	// Get item unit cost for calculating total
-	const item = await prisma.inventoryItem.findUnique({
-		where: { id: itemId },
-		select: { unitCost: true }
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		// Get item unit cost for calculating total
+		const item = await tx.inventoryItem.findUnique({
+			where: { id: itemId },
+			select: { unitCost: true }
+		});
 
-	const unitCost = item?.unitCost ?? 0;
-	const totalCost = Number(unitCost) * quantity;
+		const unitCost = item?.unitCost ?? 0;
+		const totalCost = Number(unitCost) * quantity;
 
-	// Create usage record
-	const usage = await prisma.materialUsage.create({
-		data: {
-			organizationId,
-			itemId,
-			locationId,
-			jobId,
-			quantity,
-			unitCost,
-			totalCost,
-			usedAt: new Date(),
-			usedBy: userId
-		}
-	});
+		// Create usage record
+		const usage = await tx.materialUsage.create({
+			data: {
+				organizationId,
+				itemId,
+				locationId,
+				jobId,
+				quantity,
+				unitCost,
+				totalCost,
+				usedAt: new Date(),
+				usedBy: userId
+			}
+		});
 
-	return usage.id;
+		return usage.id;
+	}, { userId, reason: 'Log material usage for inventory tracking' });
 }
 
 async function checkReorderLevels(
-	organizationId: string
+	organizationId: string,
+	userId: string
 ): Promise<Array<{ itemId: string; itemName: string; currentStock: number; reorderPoint: number }>> {
-	// Get all active items
-	const items = await prisma.inventoryItem.findMany({
-		where: {
-			organizationId,
-			isActive: true
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		// Get all active items
+		const items = await tx.inventoryItem.findMany({
+			where: {
+				organizationId,
+				isActive: true
+			}
+		});
 
-	// Filter items that have reorder points set
-	const reorderItems = items
-		.filter(item => item.reorderPoint !== null && item.reorderPoint !== undefined)
-		.map(item => ({
-			itemId: item.id,
-			itemName: item.name,
-			currentStock: 0, // Would need stock aggregation in production
-			reorderPoint: Number(item.reorderPoint)
-		}));
+		// Filter items that have reorder points set
+		const reorderItems = items
+			.filter(item => item.reorderPoint !== null && item.reorderPoint !== undefined)
+			.map(item => ({
+				itemId: item.id,
+				itemName: item.name,
+				currentStock: 0, // Would need stock aggregation in production
+				reorderPoint: Number(item.reorderPoint)
+			}));
 
-	return reorderItems;
+		return reorderItems;
+	}, { userId, reason: 'Check inventory reorder levels' });
 }
 
 async function createPurchaseOrder(
@@ -111,19 +117,19 @@ async function createPurchaseOrder(
 	items: Array<{ itemId: string; quantity: number; unitCost: number }>,
 	userId: string
 ): Promise<string> {
-	// Generate PO number
-	const year = new Date().getFullYear();
-	const count = await prisma.purchaseOrder.count({
-		where: {
-			organizationId,
-			poNumber: { startsWith: `PO-${year}-` }
-		}
-	});
-	const poNumber = `PO-${year}-${String(count + 1).padStart(6, '0')}`;
+	return orgTransaction(organizationId, async (tx) => {
+		// Generate PO number
+		const year = new Date().getFullYear();
+		const count = await tx.purchaseOrder.count({
+			where: {
+				organizationId,
+				poNumber: { startsWith: `PO-${year}-` }
+			}
+		});
+		const poNumber = `PO-${year}-${String(count + 1).padStart(6, '0')}`;
 
-	const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
+		const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
 
-	const po = await prisma.$transaction(async (tx) => {
 		const purchaseOrder = await tx.purchaseOrder.create({
 			data: {
 				organizationId,
@@ -148,35 +154,34 @@ async function createPurchaseOrder(
 			}))
 		});
 
-		return purchaseOrder;
-	});
-
-	return po.id;
+		return purchaseOrder.id;
+	}, { userId, reason: 'Create purchase order for inventory replenishment' });
 }
 
 async function receivePurchaseOrder(
+	organizationId: string,
 	purchaseOrderId: string,
 	userId: string
 ): Promise<boolean> {
-	const po = await prisma.purchaseOrder.findUnique({
-		where: { id: purchaseOrderId },
-		include: { lines: true }
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		const po = await tx.purchaseOrder.findUnique({
+			where: { id: purchaseOrderId },
+			include: { lines: true }
+		});
 
-	if (!po || po.status !== 'SUBMITTED') {
-		return false;
-	}
+		if (!po || po.status !== 'SUBMITTED') {
+			return false;
+		}
 
-	// Get first location for this org to use as receipt location
-	const location = await prisma.inventoryLocation.findFirst({
-		where: { organizationId: po.organizationId }
-	});
+		// Get first location for this org to use as receipt location
+		const location = await tx.inventoryLocation.findFirst({
+			where: { organizationId: po.organizationId }
+		});
 
-	if (!location) {
-		return false;
-	}
+		if (!location) {
+			return false;
+		}
 
-	await prisma.$transaction(async (tx) => {
 		// Create receipt
 		const receipt = await tx.purchaseOrderReceipt.create({
 			data: {
@@ -211,9 +216,9 @@ async function receivePurchaseOrder(
 			where: { id: purchaseOrderId },
 			data: { status: 'RECEIVED' }
 		});
-	});
 
-	return true;
+		return true;
+	}, { userId, reason: 'Receive purchase order and update inventory' });
 }
 
 async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<InventoryWorkflowResult> {
@@ -256,7 +261,7 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 
 			case 'CHECK_REORDER': {
 				const reorderItems = await DBOS.runStep(
-					() => checkReorderLevels(input.organizationId),
+					() => checkReorderLevels(input.organizationId, input.userId),
 					{ name: 'checkReorderLevels' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'reorder_checked', count: reorderItems.length });
@@ -309,7 +314,7 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 				}
 
 				const received = await DBOS.runStep(
-					() => receivePurchaseOrder(input.purchaseOrderId!, input.userId),
+					() => receivePurchaseOrder(input.organizationId, input.purchaseOrderId!, input.userId),
 					{ name: 'receivePurchaseOrder' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'po_received', success: received });
@@ -355,10 +360,10 @@ export const inventoryWorkflow_v1 = DBOS.registerWorkflow(inventoryWorkflow);
 
 export async function startInventoryWorkflow(
 	input: InventoryWorkflowInput,
-	workflowId?: string, idempotencyKey: string
+	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `inventory-${input.action.toLowerCase()}-${Date.now()}`;
-	await DBOS.startWorkflow(inventoryWorkflow_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(inventoryWorkflow_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

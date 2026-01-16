@@ -6,12 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { orgTransaction } from '../db/rls.js';
 
 // Action types for the unified workflow
 export const OfflineSyncAction = {
@@ -46,18 +46,23 @@ async function queueItem(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const item = await prisma.offlineSyncQueue.create({
-		data: {
-			organizationId,
-			technicianId: data.technicianId as string,
-			entityType: data.entityType as string,
-			entityId: data.entityId as string,
-			action: data.action as string,
-			payload: data.payload as Prisma.InputJsonValue
-		}
-	});
-
-	return item.id;
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const item = await tx.offlineSyncQueue.create({
+				data: {
+					organizationId,
+					technicianId: data.technicianId as string,
+					entityType: data.entityType as string,
+					entityId: data.entityId as string,
+					action: data.action as string,
+					payload: data.payload as Prisma.InputJsonValue
+				}
+			});
+			return item.id;
+		},
+		{ userId, reason: 'Queue offline sync item' }
+	);
 }
 
 async function batchQueue(
@@ -73,22 +78,27 @@ async function batchQueue(
 		payload: Prisma.InputJsonValue;
 	}>;
 
-	const created = await prisma.$transaction(
-		items.map((item) =>
-			prisma.offlineSyncQueue.create({
-				data: {
-					organizationId,
-					technicianId,
-					entityType: item.entityType,
-					entityId: item.entityId,
-					action: item.action,
-					payload: item.payload
-				}
-			})
-		)
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const created: { id: string }[] = [];
+			for (const item of items) {
+				const record = await tx.offlineSyncQueue.create({
+					data: {
+						organizationId,
+						technicianId,
+						entityType: item.entityType,
+						entityId: item.entityId,
+						action: item.action,
+						payload: item.payload
+					}
+				});
+				created.push(record);
+			}
+			return created.map((c) => c.id);
+		},
+		{ userId, reason: 'Batch queue offline sync items' }
 	);
-
-	return created.map((c) => c.id);
 }
 
 async function markSynced(
@@ -97,16 +107,21 @@ async function markSynced(
 	queueItemId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.offlineSyncQueue.update({
-		where: { id: queueItemId },
-		data: {
-			isSynced: true,
-			syncedAt: new Date(),
-			syncedId: data.syncedId as string
-		}
-	});
-
-	return queueItemId;
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			await tx.offlineSyncQueue.update({
+				where: { id: queueItemId },
+				data: {
+					isSynced: true,
+					syncedAt: new Date(),
+					syncedId: data.syncedId as string
+				}
+			});
+			return queueItemId;
+		},
+		{ userId, reason: 'Mark offline sync item as synced' }
+	);
 }
 
 async function markFailed(
@@ -117,16 +132,21 @@ async function markFailed(
 ): Promise<string> {
 	const existingAttempts = data.existingAttempts as number;
 
-	await prisma.offlineSyncQueue.update({
-		where: { id: queueItemId },
-		data: {
-			attempts: existingAttempts + 1,
-			lastAttemptAt: new Date(),
-			errorMessage: data.errorMessage as string
-		}
-	});
-
-	return queueItemId;
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			await tx.offlineSyncQueue.update({
+				where: { id: queueItemId },
+				data: {
+					attempts: existingAttempts + 1,
+					lastAttemptAt: new Date(),
+					errorMessage: data.errorMessage as string
+				}
+			});
+			return queueItemId;
+		},
+		{ userId, reason: 'Mark offline sync item as failed' }
+	);
 }
 
 async function clearSynced(
@@ -137,16 +157,21 @@ async function clearSynced(
 	const technicianId = data.technicianId as string;
 	const cutoffDate = new Date(data.cutoffDate as string);
 
-	const result = await prisma.offlineSyncQueue.deleteMany({
-		where: {
-			organizationId,
-			technicianId,
-			isSynced: true,
-			syncedAt: { lt: cutoffDate }
-		}
-	});
-
-	return result.count;
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const result = await tx.offlineSyncQueue.deleteMany({
+				where: {
+					organizationId,
+					technicianId,
+					isSynced: true,
+					syncedAt: { lt: cutoffDate }
+				}
+			});
+			return result.count;
+		},
+		{ userId, reason: 'Clear synced offline sync items' }
+	);
 }
 
 // Main workflow function

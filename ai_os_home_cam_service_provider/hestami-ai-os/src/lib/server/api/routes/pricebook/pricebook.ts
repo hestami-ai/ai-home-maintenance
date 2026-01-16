@@ -185,8 +185,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert pricebook' });
 			}
 
-			const pricebook = await prisma.pricebook.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const pricebook = await prisma.pricebook.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ pricebook: serializePricebook(pricebook) }, context);
@@ -320,8 +320,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create version' });
 			}
 
-			const version = await prisma.pricebookVersion.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const version = await prisma.pricebookVersion.findFirstOrThrow({
+				where: { id: result.entityId, pricebook: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ version: serializeVersion(version) }, context);
@@ -385,8 +385,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to publish version' });
 			}
 
-			const updatedVersion = await prisma.pricebookVersion.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updatedVersion = await prisma.pricebookVersion.findFirstOrThrow({
+				where: { id: result.entityId, pricebook: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ version: serializeVersion(updatedVersion) }, context);
@@ -432,8 +432,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate version' });
 			}
 
-			const updatedVersion = await prisma.pricebookVersion.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updatedVersion = await prisma.pricebookVersion.findFirstOrThrow({
+				where: { id: result.entityId, pricebook: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ version: serializeVersion(updatedVersion) }, context);
@@ -548,8 +548,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert item' });
 			}
 
-			const item = await prisma.pricebookItem.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const item = await prisma.pricebookItem.findFirstOrThrow({
+				where: { id: result.entityId, pricebookVersion: { pricebook: { organizationId: context.organization.id } } }
 			});
 
 			return successResponse({ item: serializeItem(item) }, context);
@@ -676,8 +676,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert rule' });
 			}
 
-			const rule = await prisma.priceRule.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const rule = await prisma.priceRule.findFirstOrThrow({
+				where: { id: result.entityId, pricebookVersion: { pricebook: { organizationId: context.organization.id } } }
 			});
 
 			return successResponse({ rule: serializeRule(rule) }, context);
@@ -796,8 +796,8 @@ export const pricebookRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to upsert job template' });
 			}
 
-			const result = await prisma.jobTemplate.findUniqueOrThrow({
-				where: { id: workflowResult.entityId },
+			const result = await prisma.jobTemplate.findFirstOrThrow({
+				where: { id: workflowResult.entityId, organizationId: context.organization.id },
 				include: { items: true }
 			});
 

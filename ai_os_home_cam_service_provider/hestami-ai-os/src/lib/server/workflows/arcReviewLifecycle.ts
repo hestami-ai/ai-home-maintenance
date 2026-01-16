@@ -258,7 +258,7 @@ async function queueNotifications(
 	// 2. Create notification records in the database
 	// 3. Trigger the notification delivery service
 
-	console.log(`[Workflow] Notification queued: ARC request ${requestId} transitioned from ${fromStatus} to ${toStatus} by user ${userId}`);
+	log.info(`Notification queued: ARC request ${requestId} transitioned from ${fromStatus} to ${toStatus} by user ${userId}`);
 
 	// Example notification rules:
 	// - SUBMITTED: Notify committee members
@@ -334,7 +334,7 @@ async function arcReviewTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Log expiration warning if applicable
 		if (expirationStatus.shouldExpire) {
-			console.warn(`[Workflow ${workflowId}] ARC request ${input.requestId} approval has EXPIRED`);
+			log.warn(`Workflow ${workflowId}: ARC request ${input.requestId} approval has EXPIRED`);
 		}
 
 		return {
@@ -383,7 +383,7 @@ export async function startARCReviewTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `arc-transition-${input.requestId}-${Date.now()}`;
-	await DBOS.startWorkflow(arcReviewLifecycle_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(arcReviewLifecycle_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

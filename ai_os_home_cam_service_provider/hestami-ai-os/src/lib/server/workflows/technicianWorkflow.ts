@@ -6,11 +6,11 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { ContractorTradeType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('TechnicianWorkflow');
 
@@ -51,28 +51,33 @@ async function upsertTechnician(
 	const parsedHire = hireDate ? new Date(hireDate as string) : undefined;
 	const parsedTermination = terminationDate ? new Date(terminationDate as string) : undefined;
 
-	let technician;
-	if (technicianId) {
-		technician = await prisma.technician.update({
-			where: { id: technicianId },
-			data: {
-				...rest,
-				branchId: (branchId as string) ?? null,
-				hireDate: parsedHire,
-				terminationDate: parsedTermination
+	const technician = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			if (technicianId) {
+				return tx.technician.update({
+					where: { id: technicianId },
+					data: {
+						...rest,
+						branchId: (branchId as string) ?? null,
+						hireDate: parsedHire,
+						terminationDate: parsedTermination
+					}
+				});
+			} else {
+				return tx.technician.create({
+					data: {
+						organizationId,
+						...rest,
+						branchId: (branchId as string) ?? null,
+						hireDate: parsedHire,
+						terminationDate: parsedTermination
+					} as Parameters<typeof tx.technician.create>[0]['data']
+				});
 			}
-		});
-	} else {
-		technician = await prisma.technician.create({
-			data: {
-				organizationId,
-				...rest,
-				branchId: (branchId as string) ?? null,
-				hireDate: parsedHire,
-				terminationDate: parsedTermination
-			} as Parameters<typeof prisma.technician.create>[0]['data']
-		});
-	}
+		},
+		{ userId, reason: 'Upsert technician' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -98,24 +103,30 @@ async function addSkill(
 	technicianId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const skill = await prisma.technicianSkill.upsert({
-		where: {
-			technicianId_trade: {
-				technicianId,
-				trade: data.trade as ContractorTradeType
-			}
+	const skill = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.technicianSkill.upsert({
+				where: {
+					technicianId_trade: {
+						technicianId,
+						trade: data.trade as ContractorTradeType
+					}
+				},
+				update: {
+					level: (data.level as number) ?? 1,
+					notes: data.notes as string | undefined
+				},
+				create: {
+					technicianId,
+					trade: data.trade as ContractorTradeType,
+					level: (data.level as number) ?? 1,
+					notes: data.notes as string | undefined
+				}
+			});
 		},
-		update: {
-			level: data.level as number ?? 1,
-			notes: data.notes as string | undefined
-		},
-		create: {
-			technicianId,
-			trade: data.trade as ContractorTradeType,
-			level: data.level as number ?? 1,
-			notes: data.notes as string | undefined
-		}
-	});
+		{ userId, reason: 'Add technician skill' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -141,17 +152,23 @@ async function addCertification(
 	technicianId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const cert = await prisma.technicianCertification.create({
-		data: {
-			technicianId,
-			name: data.name as string,
-			authority: data.authority as string | undefined,
-			certificationId: data.certificationId as string | undefined,
-			issuedAt: data.issuedAt ? new Date(data.issuedAt as string) : undefined,
-			expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
-			documentUrl: data.documentUrl as string | undefined
-		}
-	});
+	const cert = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.technicianCertification.create({
+				data: {
+					technicianId,
+					name: data.name as string,
+					authority: data.authority as string | undefined,
+					certificationId: data.certificationId as string | undefined,
+					issuedAt: data.issuedAt ? new Date(data.issuedAt as string) : undefined,
+					expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
+					documentUrl: data.documentUrl as string | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Add technician certification' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -177,11 +194,17 @@ async function setAvailability(
 	technicianId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const availability = await prisma.technicianAvailability.upsert({
-		where: { technicianId },
-		update: data as Parameters<typeof prisma.technicianAvailability.update>[0]['data'],
-		create: { technicianId, ...data } as Parameters<typeof prisma.technicianAvailability.create>[0]['data']
-	});
+	const availability = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.technicianAvailability.upsert({
+				where: { technicianId },
+				update: data as Parameters<typeof tx.technicianAvailability.update>[0]['data'],
+				create: { technicianId, ...data } as Parameters<typeof tx.technicianAvailability.create>[0]['data']
+			});
+		},
+		{ userId, reason: 'Set technician availability' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -207,14 +230,20 @@ async function addTimeOff(
 	technicianId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const timeOff = await prisma.technicianTimeOff.create({
-		data: {
-			technicianId,
-			startsAt: new Date(data.startsAt as string),
-			endsAt: new Date(data.endsAt as string),
-			reason: data.reason as string | undefined
-		}
-	});
+	const timeOff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.technicianTimeOff.create({
+				data: {
+					technicianId,
+					startsAt: new Date(data.startsAt as string),
+					endsAt: new Date(data.endsAt as string),
+					reason: data.reason as string | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Add technician time off' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -240,26 +269,32 @@ async function addTerritory(
 	technicianId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const isPrimary = data.isPrimary as boolean ?? false;
+	const isPrimary = (data.isPrimary as boolean) ?? false;
 
-	// If setting as primary, unset other primaries
-	if (isPrimary) {
-		await prisma.technicianTerritory.updateMany({
-			where: { technicianId, isPrimary: true },
-			data: { isPrimary: false }
-		});
-	}
-
-	const territory = await prisma.technicianTerritory.upsert({
-		where: {
-			technicianId_serviceAreaId: {
-				technicianId,
-				serviceAreaId: data.serviceAreaId as string
+	const territory = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// If setting as primary, unset other primaries
+			if (isPrimary) {
+				await tx.technicianTerritory.updateMany({
+					where: { technicianId, isPrimary: true },
+					data: { isPrimary: false }
+				});
 			}
+
+			return tx.technicianTerritory.upsert({
+				where: {
+					technicianId_serviceAreaId: {
+						technicianId,
+						serviceAreaId: data.serviceAreaId as string
+					}
+				},
+				update: { isPrimary },
+				create: { technicianId, serviceAreaId: data.serviceAreaId as string, isPrimary }
+			});
 		},
-		update: { isPrimary },
-		create: { technicianId, serviceAreaId: data.serviceAreaId as string, isPrimary }
-	});
+		{ userId, reason: 'Add technician territory' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -375,7 +410,7 @@ export const technicianWorkflow_v1 = DBOS.registerWorkflow(technicianWorkflow);
 
 export async function startTechnicianWorkflow(
 	input: TechnicianWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<TechnicianWorkflowResult> {
 	const handle = await DBOS.startWorkflow(technicianWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

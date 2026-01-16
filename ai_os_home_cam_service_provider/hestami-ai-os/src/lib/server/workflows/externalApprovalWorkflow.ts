@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ExternalApprovalStatus } from '../../../../generated/prisma/client.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -45,140 +46,176 @@ export interface ExternalApprovalWorkflowResult extends LifecycleWorkflowResult 
 }
 
 async function submitApproval(
+	organizationId: string,
 	approvalId: string,
 	userId: string,
 	approvalReference?: string
 ): Promise<{ status: string }> {
-	const approval = await prisma.externalHOAApproval.findUnique({
-		where: { id: approvalId }
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const approval = await tx.externalHOAApproval.findUnique({
+				where: { id: approvalId }
+			});
 
-	if (!approval) {
-		throw new Error('Approval not found');
-	}
+			if (!approval) {
+				throw new Error('Approval not found');
+			}
 
-	if (approval.status !== 'PENDING') {
-		throw new Error(`Cannot submit approval in status ${approval.status}`);
-	}
+			if (approval.status !== 'PENDING') {
+				throw new Error(`Cannot submit approval in status ${approval.status}`);
+			}
 
-	await prisma.externalHOAApproval.update({
-		where: { id: approvalId },
-		data: {
-			status: 'SUBMITTED',
-			submittedAt: new Date(),
-			...(approvalReference && { approvalReference })
-		}
-	});
+			await tx.externalHOAApproval.update({
+				where: { id: approvalId },
+				data: {
+					status: 'SUBMITTED',
+					submittedAt: new Date(),
+					...(approvalReference && { approvalReference })
+				}
+			});
 
-	return { status: 'SUBMITTED' };
+			return { status: 'SUBMITTED' };
+		},
+		{ userId, reason: 'Submit external HOA approval' }
+	);
 }
 
 async function recordResponse(
+	organizationId: string,
 	approvalId: string,
 	status: ExternalApprovalStatus,
 	userId: string,
 	expiresAt?: string,
 	notes?: string
 ): Promise<{ status: string }> {
-	const approval = await prisma.externalHOAApproval.findUnique({
-		where: { id: approvalId }
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const approval = await tx.externalHOAApproval.findUnique({
+				where: { id: approvalId }
+			});
 
-	if (!approval) {
-		throw new Error('Approval not found');
-	}
+			if (!approval) {
+				throw new Error('Approval not found');
+			}
 
-	if (approval.status !== 'SUBMITTED') {
-		throw new Error(`Cannot record response for approval in status ${approval.status}`);
-	}
+			if (approval.status !== 'SUBMITTED') {
+				throw new Error(`Cannot record response for approval in status ${approval.status}`);
+			}
 
-	if (!['APPROVED', 'DENIED'].includes(status)) {
-		throw new Error('Response status must be APPROVED or DENIED');
-	}
+			if (!['APPROVED', 'DENIED'].includes(status)) {
+				throw new Error('Response status must be APPROVED or DENIED');
+			}
 
-	await prisma.externalHOAApproval.update({
-		where: { id: approvalId },
-		data: {
-			status,
-			responseAt: new Date(),
-			...(expiresAt && { expiresAt: new Date(expiresAt) }),
-			...(notes && { notes })
-		}
-	});
+			await tx.externalHOAApproval.update({
+				where: { id: approvalId },
+				data: {
+					status,
+					responseAt: new Date(),
+					...(expiresAt && { expiresAt: new Date(expiresAt) }),
+					...(notes && { notes })
+				}
+			});
 
-	return { status };
+			return { status };
+		},
+		{ userId, reason: 'Record external HOA approval response' }
+	);
 }
 
 async function checkExpiringApprovals(
 	organizationId: string,
+	userId: string,
 	daysAhead: number = 30
 ): Promise<Array<{ id: string; approvalType: string; expiresAt: string; daysUntil: number }>> {
-	const now = new Date();
-	const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const now = new Date();
+			const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
 
-	const approvals = await prisma.externalHOAApproval.findMany({
-		where: {
-			externalHoaContext: { organizationId },
-			status: 'APPROVED',
-			expiresAt: { gte: now, lte: futureDate },
-			deletedAt: null
-		}
-	});
+			const approvals = await tx.externalHOAApproval.findMany({
+				where: {
+					externalHoaContext: { organizationId },
+					status: 'APPROVED',
+					expiresAt: { gte: now, lte: futureDate },
+					deletedAt: null
+				}
+			});
 
-	return approvals.map((a) => {
-		const daysUntil = Math.ceil((a.expiresAt!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-		return {
-			id: a.id,
-			approvalType: a.approvalType,
-			expiresAt: a.expiresAt!.toISOString(),
-			daysUntil
-		};
-	}).sort((a, b) => a.daysUntil - b.daysUntil);
+			return approvals
+				.map((a) => {
+					const daysUntil = Math.ceil((a.expiresAt!.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+					return {
+						id: a.id,
+						approvalType: a.approvalType,
+						expiresAt: a.expiresAt!.toISOString(),
+						daysUntil
+					};
+				})
+				.sort((a, b) => a.daysUntil - b.daysUntil);
+		},
+		{ userId, reason: 'Check expiring external HOA approvals' }
+	);
 }
 
-async function markExpiredApprovals(organizationId: string): Promise<number> {
+async function markExpiredApprovals(organizationId: string, userId: string): Promise<number> {
 	const now = new Date();
 
-	const result = await prisma.externalHOAApproval.updateMany({
-		where: {
-			externalHoaContext: { organizationId },
-			status: 'APPROVED',
-			expiresAt: { lt: now },
-			deletedAt: null
+	const result = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.externalHOAApproval.updateMany({
+				where: {
+					externalHoaContext: { organizationId },
+					status: 'APPROVED',
+					expiresAt: { lt: now },
+					deletedAt: null
+				},
+				data: { status: 'EXPIRED' }
+			});
 		},
-		data: { status: 'EXPIRED' }
-	});
+		{ userId, reason: 'Mark expired external HOA approvals' }
+	);
 
 	return result.count;
 }
 
 async function extendApproval(
+	organizationId: string,
 	approvalId: string,
 	newExpiresAt: string,
 	userId: string,
 	notes?: string
 ): Promise<{ expiresAt: string }> {
-	const approval = await prisma.externalHOAApproval.findUnique({
-		where: { id: approvalId }
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const approval = await tx.externalHOAApproval.findUnique({
+				where: { id: approvalId }
+			});
 
-	if (!approval) {
-		throw new Error('Approval not found');
-	}
+			if (!approval) {
+				throw new Error('Approval not found');
+			}
 
-	if (approval.status !== 'APPROVED') {
-		throw new Error('Can only extend approved approvals');
-	}
+			if (approval.status !== 'APPROVED') {
+				throw new Error('Can only extend approved approvals');
+			}
 
-	await prisma.externalHOAApproval.update({
-		where: { id: approvalId },
-		data: {
-			expiresAt: new Date(newExpiresAt),
-			...(notes && { notes: `${approval.notes || ''}\n[Extended] ${notes}`.trim() })
-		}
-	});
+			await tx.externalHOAApproval.update({
+				where: { id: approvalId },
+				data: {
+					expiresAt: new Date(newExpiresAt),
+					...(notes && { notes: `${approval.notes || ''}\n[Extended] ${notes}`.trim() })
+				}
+			});
 
-	return { expiresAt: newExpiresAt };
+			return { expiresAt: newExpiresAt };
+		},
+		{ userId, reason: 'Extend external HOA approval' }
+	);
 }
 
 async function externalApprovalWorkflow(
@@ -193,7 +230,7 @@ async function externalApprovalWorkflow(
 					throw new Error('Missing approvalId for SUBMIT_APPROVAL');
 				}
 				const result = await DBOS.runStep(
-					() => submitApproval(input.approvalId!, input.userId, input.approvalReference),
+					() => submitApproval(input.organizationId, input.approvalId!, input.userId, input.approvalReference),
 					{ name: 'submitApproval' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'approval_submitted', ...result });
@@ -213,6 +250,7 @@ async function externalApprovalWorkflow(
 				const result = await DBOS.runStep(
 					() =>
 						recordResponse(
+							input.organizationId,
 							input.approvalId!,
 							input.status!,
 							input.userId,
@@ -234,13 +272,13 @@ async function externalApprovalWorkflow(
 			case 'CHECK_EXPIRATIONS': {
 				// First mark any already expired
 				const expiredCount = await DBOS.runStep(
-					() => markExpiredApprovals(input.organizationId),
+					() => markExpiredApprovals(input.organizationId, input.userId),
 					{ name: 'markExpiredApprovals' }
 				);
 
 				// Then check upcoming expirations
 				const expiringApprovals = await DBOS.runStep(
-					() => checkExpiringApprovals(input.organizationId, input.daysAhead || 30),
+					() => checkExpiringApprovals(input.organizationId, input.userId, input.daysAhead || 30),
 					{ name: 'checkExpiringApprovals' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, {
@@ -261,7 +299,7 @@ async function externalApprovalWorkflow(
 					throw new Error('Missing approvalId or expiresAt for EXTEND_APPROVAL');
 				}
 				const result = await DBOS.runStep(
-					() => extendApproval(input.approvalId!, input.expiresAt!, input.userId, input.notes),
+					() => extendApproval(input.organizationId, input.approvalId!, input.expiresAt!, input.userId, input.notes),
 					{ name: 'extendApproval' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'approval_extended', ...result });
@@ -305,12 +343,12 @@ export const externalApprovalWorkflow_v1 = DBOS.registerWorkflow(externalApprova
 
 export async function startExternalApprovalWorkflow(
 	input: ExternalApprovalWorkflowInput,
-	workflowId?: string, idempotencyKey: string
+	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id =
 		workflowId ||
 		`approval-${input.action.toLowerCase()}-${input.approvalId || input.organizationId}-${Date.now()}`;
-	await DBOS.startWorkflow(externalApprovalWorkflow_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(externalApprovalWorkflow_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

@@ -7,11 +7,14 @@ import { createRouterClient, type RouterClient } from '@orpc/server';
 import { appRouter, type AppRouter, type RequestContext, createEmptyContext } from './index.js';
 import type { Organization, Association } from '../../../../generated/prisma/client.js';
 import { nanoid } from 'nanoid';
+import { createModuleLogger } from '../logger.js';
+
+const log = createModuleLogger('ServerClient');
 
 /**
  * Create a direct server-side oRPC client that calls procedures without HTTP.
  * This is more efficient than HTTP calls and properly handles authentication context.
- * 
+ *
  * @param context - The RequestContext built from SvelteKit locals
  * @returns A type-safe oRPC client for server-side use
  */
@@ -24,7 +27,7 @@ export function createDirectClient(context: RequestContext): RouterClient<AppRou
 /**
  * Build a RequestContext from SvelteKit locals for direct server-side oRPC calls.
  * This avoids HTTP round-trips and cookie forwarding issues in SSR.
- * 
+ *
  * @param locals - SvelteKit event.locals from the load function
  * @param options - Additional context options (orgRoles, staffRoles, pillarAccess, organization, association)
  * @returns RequestContext for use with createDirectClient
@@ -89,6 +92,22 @@ export function buildServerContext(
 	if (options?.pillarAccess) {
 		context.pillarAccess = options.pillarAccess;
 	}
+
+	// Debug logging for troubleshooting
+	log.debug('buildServerContext result', {
+		hasUser: !!context.user,
+		userId: context.user?.id,
+		hasOrganization: !!context.organization,
+		orgId: context.organization?.id,
+		role: context.role,
+		isStaff: context.isStaff,
+		hasOrgRoles: !!context.orgRoles && Object.keys(context.orgRoles).length > 0,
+		staffRolesCount: context.staffRoles?.length ?? 0,
+		pillarAccessCount: context.pillarAccess?.length ?? 0,
+		// Log source of org and user
+		orgSource: options?.organization ? 'options' : (locals.organization ? 'locals' : 'none'),
+		userSource: locals.user ? 'locals' : 'none'
+	});
 
 	return context;
 }

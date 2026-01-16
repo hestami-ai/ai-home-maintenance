@@ -6,9 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
-import type { Prisma } from '../../../../generated/prisma/client.js';
-import { type EntityWorkflowResult } from './schemas.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
@@ -70,23 +68,6 @@ export interface GovernanceWorkflowResult {
 	error?: string;
 }
 
-// Helper function to record board history
-async function recordBoardHistory(
-	boardId: string,
-	changeType: string,
-	detail: Prisma.InputJsonValue | undefined,
-	changedBy: string | undefined
-) {
-	await prisma.boardHistory.create({
-		data: {
-			boardId,
-			changeType,
-			detail,
-			changedBy
-		}
-	});
-}
-
 // Step functions for each operation
 async function createBoard(
 	organizationId: string,
@@ -97,19 +78,30 @@ async function createBoard(
 	const name = data.name as string;
 	const description = data.description as string | undefined;
 
-	const board = await prisma.board.create({
-		data: {
-			organizationId,
-			associationId,
-			name,
-			description
-		}
-	});
+	const boardId = await orgTransaction(organizationId, async (tx) => {
+		const board = await tx.board.create({
+			data: {
+				organizationId,
+				associationId,
+				name,
+				description
+			}
+		});
 
-	await recordBoardHistory(board.id, 'BOARD_CREATED', { name }, userId);
+		await tx.boardHistory.create({
+			data: {
+				boardId: board.id,
+				changeType: 'BOARD_CREATED',
+				detail: { name },
+				changedBy: userId
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] CREATE_BOARD board:${board.id} by user ${userId}`);
-	return board.id;
+		return board.id;
+	}, { userId, reason: 'Creating board via workflow' });
+
+	log.info('CREATE_BOARD completed', { boardId, userId });
+	return boardId;
 }
 
 async function createMeeting(
@@ -125,29 +117,40 @@ async function createMeeting(
 	const description = data.description as string | undefined;
 	const associationId = data.associationId as string | undefined;
 
-	// Get board to find associationId if not provided
-	const board = await prisma.board.findUnique({ where: { id: boardId } });
-	if (!board) throw new Error('Board not found');
+	const meetingId = await orgTransaction(organizationId, async (tx) => {
+		// Get board to find associationId if not provided
+		const board = await tx.board.findUnique({ where: { id: boardId } });
+		if (!board) throw new Error('Board not found');
 
-	const meeting = await prisma.meeting.create({
-		data: {
-			organizationId,
-			associationId: associationId || board.associationId,
-			boardId,
-			title,
-			type: meetingType as any,
-			status: 'SCHEDULED',
-			scheduledFor: new Date(scheduledAt),
-			location,
-			description,
-			createdBy: userId
-		}
-	});
+		const meeting = await tx.meeting.create({
+			data: {
+				organizationId,
+				associationId: associationId || board.associationId,
+				boardId,
+				title,
+				type: meetingType as any,
+				status: 'SCHEDULED',
+				scheduledFor: new Date(scheduledAt),
+				location,
+				description,
+				createdBy: userId
+			}
+		});
 
-	await recordBoardHistory(boardId, 'MEETING_SCHEDULED', { meetingId: meeting.id, title }, userId);
+		await tx.boardHistory.create({
+			data: {
+				boardId,
+				changeType: 'MEETING_SCHEDULED',
+				detail: { meetingId: meeting.id, title },
+				changedBy: userId
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] CREATE_MEETING meeting:${meeting.id} by user ${userId}`);
-	return meeting.id;
+		return meeting.id;
+	}, { userId, reason: 'Creating meeting via workflow' });
+
+	log.info('CREATE_MEETING completed', { meetingId, userId });
+	return meetingId;
 }
 
 async function createMotion(
@@ -163,33 +166,37 @@ async function createMotion(
 	const secondedBy = data.secondedBy as string | undefined;
 	const category = data.category as string | undefined;
 
-	// Generate motion number
-	const year = new Date().getFullYear();
-	const count = await prisma.boardMotion.count({
-		where: {
-			associationId,
-			motionNumber: { startsWith: `MOT-${year}-` }
-		}
-	});
-	const motionNumber = `MOT-${year}-${String(count + 1).padStart(4, '0')}`;
+	const motionId = await orgTransaction(organizationId, async (tx) => {
+		// Generate motion number
+		const year = new Date().getFullYear();
+		const count = await tx.boardMotion.count({
+			where: {
+				associationId,
+				motionNumber: { startsWith: `MOT-${year}-` }
+			}
+		});
+		const motionNumber = `MOT-${year}-${String(count + 1).padStart(4, '0')}`;
 
-	const motion = await prisma.boardMotion.create({
-		data: {
-			associationId,
-			meetingId,
-			motionNumber,
-			title,
-			description,
-			movedById: movedBy,
-			secondedById: secondedBy,
-			category: category as any,
-			status: 'PROPOSED',
-			createdBy: userId
-		}
-	});
+		const motion = await tx.boardMotion.create({
+			data: {
+				associationId,
+				meetingId,
+				motionNumber,
+				title,
+				description,
+				movedById: movedBy,
+				secondedById: secondedBy,
+				category: category as any,
+				status: 'PROPOSED',
+				createdBy: userId
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] CREATE_MOTION motion:${motion.id} by user ${userId}`);
-	return motion.id;
+		return motion.id;
+	}, { userId, reason: 'Creating motion via workflow' });
+
+	log.info('CREATE_MOTION completed', { motionId, userId });
+	return motionId;
 }
 
 async function updateMotion(
@@ -198,24 +205,28 @@ async function updateMotion(
 	motionId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const motion = await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: {
-			...(data.title && { title: data.title as string }),
-			...(data.description !== undefined && { description: data.description as string | null }),
-			...(data.category && { category: data.category as any }),
-			...(data.rationale !== undefined && { rationale: data.rationale as string | null }),
-			...(data.effectiveDate !== undefined && {
-				effectiveDate: data.effectiveDate ? new Date(data.effectiveDate as string) : null
-			}),
-			...(data.expiresAt !== undefined && {
-				expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : null
-			})
-		}
-	});
+	const updateData: Record<string, unknown> = {};
+	if (data.title) updateData.title = data.title as string;
+	if (data.description !== undefined) updateData.description = data.description as string | null;
+	if (data.category) updateData.category = data.category;
+	if (data.rationale !== undefined) updateData.rationale = data.rationale as string | null;
+	if (data.effectiveDate !== undefined) {
+		updateData.effectiveDate = data.effectiveDate ? new Date(data.effectiveDate as string) : null;
+	}
+	if (data.expiresAt !== undefined) {
+		updateData.expiresAt = data.expiresAt ? new Date(data.expiresAt as string) : null;
+	}
 
-	console.log(`[GovernanceWorkflow] UPDATE_MOTION motion:${motion.id} by user ${userId}`);
-	return motion.id;
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		const motion = await tx.boardMotion.update({
+			where: { id: motionId },
+			data: updateData as any
+		});
+		return motion.id;
+	}, { userId, reason: 'Updating motion via workflow' });
+
+	log.info('UPDATE_MOTION completed', { motionId: resultId, userId });
+	return resultId;
 }
 
 async function createResolution(
@@ -227,23 +238,24 @@ async function createResolution(
 	const title = data.title as string;
 	const content = data.content as string;
 	const effectiveDate = data.effectiveDate as string | undefined;
-	const expirationDate = data.expirationDate as string | undefined;
-	const category = data.category as string | undefined;
 	const motionId = data.motionId as string | undefined;
 
-	const resolution = await prisma.resolution.create({
-		data: {
-			associationId,
-			title,
-			summary: content,
-			effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
-			motionId,
-			status: 'PROPOSED'
-		}
-	});
+	const resolutionId = await orgTransaction(organizationId, async (tx) => {
+		const resolution = await tx.resolution.create({
+			data: {
+				associationId,
+				title,
+				summary: content,
+				effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
+				motionId,
+				status: 'PROPOSED'
+			}
+		});
+		return resolution.id;
+	}, { userId, reason: 'Creating resolution via workflow' });
 
-	console.log(`[GovernanceWorkflow] CREATE_RESOLUTION resolution:${resolution.id} by user ${userId}`);
-	return resolution.id;
+	log.info('CREATE_RESOLUTION completed', { resolutionId, userId });
+	return resolutionId;
 }
 
 async function secondMotion(
@@ -254,16 +266,19 @@ async function secondMotion(
 ): Promise<string> {
 	const secondedById = data.secondedById as string;
 
-	await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: {
-			secondedById,
-			status: 'SECONDED'
-		}
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.boardMotion.update({
+			where: { id: motionId },
+			data: {
+				secondedById,
+				status: 'SECONDED'
+			}
+		});
+		return motionId;
+	}, { userId, reason: 'Seconding motion via workflow' });
 
-	console.log(`[GovernanceWorkflow] SECOND_MOTION motion:${motionId} by user ${userId}`);
-	return motionId;
+	log.info('SECOND_MOTION completed', { motionId: resultId, userId });
+	return resultId;
 }
 
 async function updateMotionStatus(
@@ -275,16 +290,19 @@ async function updateMotionStatus(
 	const status = data.status as string;
 	const outcomeNotes = data.notes as string | undefined;
 
-	await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: {
-			status: status as any,
-			outcomeNotes
-		}
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.boardMotion.update({
+			where: { id: motionId },
+			data: {
+				status: status as any,
+				outcomeNotes
+			}
+		});
+		return motionId;
+	}, { userId, reason: 'Updating motion status via workflow' });
 
-	console.log(`[GovernanceWorkflow] UPDATE_MOTION_STATUS motion:${motionId} status:${status} by user ${userId}`);
-	return motionId;
+	log.info('UPDATE_MOTION_STATUS completed', { motionId: resultId, status, userId });
+	return resultId;
 }
 
 async function recordMotionOutcome(
@@ -296,17 +314,20 @@ async function recordMotionOutcome(
 	const outcome = data.outcome as string;
 	const outcomeNotes = data.notes as string | undefined;
 
-	await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: {
-			outcome: outcome as any,
-			outcomeNotes,
-			decidedAt: new Date()
-		}
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.boardMotion.update({
+			where: { id: motionId },
+			data: {
+				outcome: outcome as any,
+				outcomeNotes,
+				decidedAt: new Date()
+			}
+		});
+		return motionId;
+	}, { userId, reason: 'Recording motion outcome via workflow' });
 
-	console.log(`[GovernanceWorkflow] RECORD_MOTION_OUTCOME motion:${motionId} outcome:${outcome} by user ${userId}`);
-	return motionId;
+	log.info('RECORD_MOTION_OUTCOME completed', { motionId: resultId, outcome, userId });
+	return resultId;
 }
 
 async function withdrawMotion(
@@ -317,17 +338,20 @@ async function withdrawMotion(
 ): Promise<string> {
 	const reason = data.reason as string | undefined;
 
-	await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: {
-			status: 'WITHDRAWN',
-			outcome: 'WITHDRAWN',
-			outcomeNotes: reason
-		}
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.boardMotion.update({
+			where: { id: motionId },
+			data: {
+				status: 'WITHDRAWN',
+				outcome: 'WITHDRAWN',
+				outcomeNotes: reason
+			}
+		});
+		return motionId;
+	}, { userId, reason: 'Withdrawing motion via workflow' });
 
-	console.log(`[GovernanceWorkflow] WITHDRAW_MOTION motion:${motionId} by user ${userId}`);
-	return motionId;
+	log.info('WITHDRAW_MOTION completed', { motionId: resultId, userId });
+	return resultId;
 }
 
 async function openVoting(
@@ -339,22 +363,26 @@ async function openVoting(
 	const meetingId = data.meetingId as string;
 	const question = data.question as string || 'Motion vote';
 
-	const vote = await prisma.vote.create({
-		data: {
-			meetingId,
-			motionId,
-			question,
-			createdBy: userId
-		}
-	});
+	const voteId = await orgTransaction(organizationId, async (tx) => {
+		const vote = await tx.vote.create({
+			data: {
+				meetingId,
+				motionId,
+				question,
+				createdBy: userId
+			}
+		});
 
-	await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: { status: 'UNDER_VOTE', voteId: vote.id }
-	});
+		await tx.boardMotion.update({
+			where: { id: motionId },
+			data: { status: 'UNDER_VOTE', voteId: vote.id }
+		});
 
-	console.log(`[GovernanceWorkflow] OPEN_VOTING vote:${vote.id} for motion:${motionId} by user ${userId}`);
-	return vote.id;
+		return vote.id;
+	}, { userId, reason: 'Opening voting on motion via workflow' });
+
+	log.info('OPEN_VOTING completed', { voteId, motionId, userId });
+	return voteId;
 }
 
 async function closeVoting(
@@ -366,7 +394,7 @@ async function closeVoting(
 	const outcome = data.outcome as string;
 	const outcomeNotes = data.outcomeNotes as string | undefined;
 
-	await prisma.$transaction(async (tx) => {
+	const resultId = await orgTransaction(organizationId, async (tx) => {
 		// Close all votes for this motion
 		await tx.vote.updateMany({
 			where: { motionId },
@@ -383,10 +411,12 @@ async function closeVoting(
 				decidedAt: new Date()
 			}
 		});
-	});
 
-	console.log(`[GovernanceWorkflow] CLOSE_VOTING motion:${motionId} outcome:${outcome} by user ${userId}`);
-	return motionId;
+		return motionId;
+	}, { userId, reason: 'Closing voting on motion via workflow' });
+
+	log.info('CLOSE_VOTING completed', { motionId: resultId, outcome, userId });
+	return resultId;
 }
 
 async function tableMotion(
@@ -397,17 +427,20 @@ async function tableMotion(
 ): Promise<string> {
 	const reason = data.reason as string | undefined;
 
-	await prisma.boardMotion.update({
-		where: { id: motionId },
-		data: {
-			status: 'TABLED',
-			outcome: 'TABLED',
-			outcomeNotes: reason
-		}
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.boardMotion.update({
+			where: { id: motionId },
+			data: {
+				status: 'TABLED',
+				outcome: 'TABLED',
+				outcomeNotes: reason
+			}
+		});
+		return motionId;
+	}, { userId, reason: 'Tabling motion via workflow' });
 
-	console.log(`[GovernanceWorkflow] TABLE_MOTION motion:${motionId} by user ${userId}`);
-	return motionId;
+	log.info('TABLE_MOTION completed', { motionId: resultId, userId });
+	return resultId;
 }
 
 async function linkArcToMotion(
@@ -421,16 +454,19 @@ async function linkArcToMotion(
 
 	const newArcStatus = motionStatus === 'APPROVED' ? 'APPROVED' : 'DENIED';
 
-	await prisma.aRCRequest.update({
-		where: { id: arcRequestId },
-		data: {
-			status: newArcStatus as any,
-			decisionDate: new Date()
-		}
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.aRCRequest.update({
+			where: { id: arcRequestId },
+			data: {
+				status: newArcStatus as any,
+				decisionDate: new Date()
+			}
+		});
+		return arcRequestId;
+	}, { userId, reason: 'Linking ARC request to motion via workflow' });
 
-	console.log(`[GovernanceWorkflow] LINK_ARC_TO_MOTION arc:${arcRequestId} motion:${motionId} status:${newArcStatus} by user ${userId}`);
-	return arcRequestId;
+	log.info('LINK_ARC_TO_MOTION completed', { arcRequestId: resultId, motionId, status: newArcStatus, userId });
+	return resultId;
 }
 
 async function updateResolutionStatus(
@@ -441,13 +477,16 @@ async function updateResolutionStatus(
 ): Promise<string> {
 	const status = data.status as string;
 
-	await prisma.resolution.update({
-		where: { id: resolutionId },
-		data: { status: status as any }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.resolution.update({
+			where: { id: resolutionId },
+			data: { status: status as any }
+		});
+		return resolutionId;
+	}, { userId, reason: 'Updating resolution status via workflow' });
 
-	console.log(`[GovernanceWorkflow] UPDATE_RESOLUTION_STATUS resolution:${resolutionId} status:${status} by user ${userId}`);
-	return resolutionId;
+	log.info('UPDATE_RESOLUTION_STATUS completed', { resolutionId: resultId, status, userId });
+	return resultId;
 }
 
 async function createPolicy(
@@ -455,19 +494,22 @@ async function createPolicy(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const policy = await prisma.policyDocument.create({
-		data: {
-			organizationId,
-			associationId: data.associationId as string,
-			resolutionId: data.resolutionId as string | undefined,
-			title: data.title as string,
-			description: data.description as string | undefined,
-			status: 'DRAFT'
-		}
-	});
+	const policyId = await orgTransaction(organizationId, async (tx) => {
+		const policy = await tx.policyDocument.create({
+			data: {
+				organizationId,
+				associationId: data.associationId as string,
+				resolutionId: data.resolutionId as string | undefined,
+				title: data.title as string,
+				description: data.description as string | undefined,
+				status: 'DRAFT'
+			}
+		});
+		return policy.id;
+	}, { userId, reason: 'Creating policy document via workflow' });
 
-	console.log(`[GovernanceWorkflow] CREATE_POLICY policy:${policy.id} by user ${userId}`);
-	return policy.id;
+	log.info('CREATE_POLICY completed', { policyId, userId });
+	return policyId;
 }
 
 async function createPolicyVersion(
@@ -477,23 +519,27 @@ async function createPolicyVersion(
 ): Promise<string> {
 	const policyDocumentId = data.policyDocumentId as string;
 
-	// Get current max version count
-	const versionCount = await prisma.policyVersion.count({
-		where: { policyDocumentId }
-	});
-	const nextVersion = `v${versionCount + 1}`;
+	const versionId = await orgTransaction(organizationId, async (tx) => {
+		// Get current max version count
+		const versionCount = await tx.policyVersion.count({
+			where: { policyDocumentId }
+		});
+		const nextVersion = `v${versionCount + 1}`;
 
-	const version = await prisma.policyVersion.create({
-		data: {
-			policyDocumentId,
-			version: nextVersion,
-			content: data.content as string,
-			status: 'DRAFT'
-		}
-	});
+		const version = await tx.policyVersion.create({
+			data: {
+				policyDocumentId,
+				version: nextVersion,
+				content: data.content as string,
+				status: 'DRAFT'
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] CREATE_POLICY_VERSION version:${version.id} ${nextVersion} by user ${userId}`);
-	return version.id;
+		return version.id;
+	}, { userId, reason: 'Creating policy version via workflow' });
+
+	log.info('CREATE_POLICY_VERSION completed', { versionId, userId });
+	return versionId;
 }
 
 async function setActivePolicyVersion(
@@ -504,11 +550,11 @@ async function setActivePolicyVersion(
 	const policyDocumentId = data.policyDocumentId as string;
 	const versionId = data.versionId as string;
 
-	// Get the version string
-	const version = await prisma.policyVersion.findUnique({ where: { id: versionId } });
-	if (!version) throw new Error('Policy version not found');
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		// Get the version string
+		const version = await tx.policyVersion.findUnique({ where: { id: versionId } });
+		if (!version) throw new Error('Policy version not found');
 
-	await prisma.$transaction(async (tx) => {
 		// Deactivate all versions
 		await tx.policyVersion.updateMany({
 			where: { policyDocumentId },
@@ -526,10 +572,12 @@ async function setActivePolicyVersion(
 			where: { id: policyDocumentId },
 			data: { currentVersion: version.version, status: 'ACTIVE' }
 		});
-	});
 
-	console.log(`[GovernanceWorkflow] SET_ACTIVE_POLICY_VERSION policy:${policyDocumentId} version:${versionId} by user ${userId}`);
-	return policyDocumentId;
+		return policyDocumentId;
+	}, { userId, reason: 'Setting active policy version via workflow' });
+
+	log.info('SET_ACTIVE_POLICY_VERSION completed', { policyDocumentId: resultId, versionId, userId });
+	return resultId;
 }
 
 async function linkResolutionToMotion(
@@ -540,13 +588,16 @@ async function linkResolutionToMotion(
 ): Promise<string> {
 	const motionId = data.motionId as string;
 
-	await prisma.resolution.update({
-		where: { id: resolutionId },
-		data: { motionId }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.resolution.update({
+			where: { id: resolutionId },
+			data: { motionId }
+		});
+		return resolutionId;
+	}, { userId, reason: 'Linking resolution to motion via workflow' });
 
-	console.log(`[GovernanceWorkflow] LINK_RESOLUTION_TO_MOTION resolution:${resolutionId} motion:${motionId} by user ${userId}`);
-	return resolutionId;
+	log.info('LINK_RESOLUTION_TO_MOTION completed', { resolutionId: resultId, motionId, userId });
+	return resultId;
 }
 
 async function addAgendaItem(
@@ -556,24 +607,28 @@ async function addAgendaItem(
 ): Promise<string> {
 	const meetingId = data.meetingId as string;
 
-	// Get max order
-	const maxOrder = await prisma.meetingAgendaItem.aggregate({
-		where: { meetingId },
-		_max: { order: true }
-	});
+	const itemId = await orgTransaction(organizationId, async (tx) => {
+		// Get max order
+		const maxOrder = await tx.meetingAgendaItem.aggregate({
+			where: { meetingId },
+			_max: { order: true }
+		});
 
-	const item = await prisma.meetingAgendaItem.create({
-		data: {
-			meetingId,
-			title: data.title as string,
-			description: data.description as string | undefined,
-			timeAllotment: data.duration as number | undefined,
-			order: (maxOrder._max.order ?? 0) + 1
-		}
-	});
+		const item = await tx.meetingAgendaItem.create({
+			data: {
+				meetingId,
+				title: data.title as string,
+				description: data.description as string | undefined,
+				timeAllotment: data.duration as number | undefined,
+				order: (maxOrder._max.order ?? 0) + 1
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] ADD_AGENDA_ITEM item:${item.id} meeting:${meetingId} by user ${userId}`);
-	return item.id;
+		return item.id;
+	}, { userId, reason: 'Adding agenda item via workflow' });
+
+	log.info('ADD_AGENDA_ITEM completed', { itemId, meetingId, userId });
+	return itemId;
 }
 
 async function addMeetingMinutes(
@@ -583,16 +638,19 @@ async function addMeetingMinutes(
 ): Promise<string> {
 	const meetingId = data.meetingId as string;
 
-	const minutes = await prisma.meetingMinutes.create({
-		data: {
-			meetingId,
-			content: data.content as string,
-			recordedBy: userId
-		}
-	});
+	const minutesId = await orgTransaction(organizationId, async (tx) => {
+		const minutes = await tx.meetingMinutes.create({
+			data: {
+				meetingId,
+				content: data.content as string,
+				recordedBy: userId
+			}
+		});
+		return minutes.id;
+	}, { userId, reason: 'Adding meeting minutes via workflow' });
 
-	console.log(`[GovernanceWorkflow] ADD_MEETING_MINUTES minutes:${minutes.id} meeting:${meetingId} by user ${userId}`);
-	return minutes.id;
+	log.info('ADD_MEETING_MINUTES completed', { minutesId, meetingId, userId });
+	return minutesId;
 }
 
 async function recordAttendance(
@@ -603,24 +661,27 @@ async function recordAttendance(
 	const meetingId = data.meetingId as string;
 	const partyId = data.partyId as string;
 
-	const attendance = await prisma.meetingAttendance.upsert({
-		where: {
-			meetingId_partyId: { meetingId, partyId }
-		},
-		create: {
-			meetingId,
-			partyId,
-			status: (data.status as any) || 'PRESENT',
-			checkedInAt: new Date()
-		},
-		update: {
-			status: (data.status as any) || 'PRESENT',
-			checkedInAt: new Date()
-		}
-	});
+	const attendanceId = await orgTransaction(organizationId, async (tx) => {
+		const attendance = await tx.meetingAttendance.upsert({
+			where: {
+				meetingId_partyId: { meetingId, partyId }
+			},
+			create: {
+				meetingId,
+				partyId,
+				status: (data.status as any) || 'PRESENT',
+				checkedInAt: new Date()
+			},
+			update: {
+				status: (data.status as any) || 'PRESENT',
+				checkedInAt: new Date()
+			}
+		});
+		return attendance.id;
+	}, { userId, reason: 'Recording attendance via workflow' });
 
-	console.log(`[GovernanceWorkflow] RECORD_ATTENDANCE attendance:${attendance.id} meeting:${meetingId} by user ${userId}`);
-	return attendance.id;
+	log.info('RECORD_ATTENDANCE completed', { attendanceId, meetingId, userId });
+	return attendanceId;
 }
 
 async function createVote(
@@ -630,19 +691,22 @@ async function createVote(
 ): Promise<string> {
 	const meetingId = data.meetingId as string;
 
-	const vote = await prisma.vote.create({
-		data: {
-			meetingId,
-			agendaItemId: data.agendaItemId as string | undefined,
-			question: data.question as string,
-			method: (data.method as any) || 'IN_PERSON',
-			quorumRequired: data.quorumRequired as number | undefined,
-			createdBy: userId
-		}
-	});
+	const voteId = await orgTransaction(organizationId, async (tx) => {
+		const vote = await tx.vote.create({
+			data: {
+				meetingId,
+				agendaItemId: data.agendaItemId as string | undefined,
+				question: data.question as string,
+				method: (data.method as any) || 'IN_PERSON',
+				quorumRequired: data.quorumRequired as number | undefined,
+				createdBy: userId
+			}
+		});
+		return vote.id;
+	}, { userId, reason: 'Creating vote via workflow' });
 
-	console.log(`[GovernanceWorkflow] CREATE_VOTE vote:${vote.id} meeting:${meetingId} by user ${userId}`);
-	return vote.id;
+	log.info('CREATE_VOTE completed', { voteId, meetingId, userId });
+	return voteId;
 }
 
 async function castBallot(
@@ -653,76 +717,89 @@ async function castBallot(
 	const voteId = data.voteId as string;
 	const voterPartyId = data.voterPartyId as string;
 
-	const ballot = await prisma.voteBallot.upsert({
-		where: {
-			voteId_voterPartyId: { voteId, voterPartyId }
-		},
-		create: {
-			voteId,
-			voterPartyId,
-			choice: data.choice as any
-		},
-		update: {
-			choice: data.choice as any,
-			castAt: new Date()
-		}
-	});
+	const ballotId = await orgTransaction(organizationId, async (tx) => {
+		const ballot = await tx.voteBallot.upsert({
+			where: {
+				voteId_voterPartyId: { voteId, voterPartyId }
+			},
+			create: {
+				voteId,
+				voterPartyId,
+				choice: data.choice as any
+			},
+			update: {
+				choice: data.choice as any,
+				castAt: new Date()
+			}
+		});
+		return ballot.id;
+	}, { userId, reason: 'Casting ballot via workflow' });
 
-	console.log(`[GovernanceWorkflow] CAST_BALLOT ballot:${ballot.id} vote:${voteId} by user ${userId}`);
-	return ballot.id;
+	log.info('CAST_BALLOT completed', { ballotId, voteId, userId });
+	return ballotId;
 }
 
 async function closeVoteSession(
 	organizationId: string,
 	userId: string,
 	voteId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.vote.update({
-		where: { id: voteId },
-		data: { closedAt: new Date() }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.vote.update({
+			where: { id: voteId },
+			data: { closedAt: new Date() }
+		});
+		return voteId;
+	}, { userId, reason: 'Closing vote session via workflow' });
 
-	console.log(`[GovernanceWorkflow] CLOSE_VOTE vote:${voteId} by user ${userId}`);
-	return voteId;
+	log.info('CLOSE_VOTE completed', { voteId: resultId, userId });
+	return resultId;
 }
 
 async function startMeeting(
 	organizationId: string,
 	userId: string,
 	meetingId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.meeting.update({
-		where: { id: meetingId },
-		data: { status: 'IN_SESSION' }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.meeting.update({
+			where: { id: meetingId },
+			data: { status: 'IN_SESSION' }
+		});
+		return meetingId;
+	}, { userId, reason: 'Starting meeting via workflow' });
 
-	console.log(`[GovernanceWorkflow] START_MEETING meeting:${meetingId} by user ${userId}`);
-	return meetingId;
+	log.info('START_MEETING completed', { meetingId: resultId, userId });
+	return resultId;
 }
 
 async function adjournMeeting(
 	organizationId: string,
 	userId: string,
 	meetingId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.meeting.update({
-		where: { id: meetingId },
-		data: { status: 'ADJOURNED' }
-	});
-
-	// Create minutes placeholder if not exists
-	const existingMinutes = await prisma.meetingMinutes.findUnique({ where: { meetingId } });
-	if (!existingMinutes) {
-		await prisma.meetingMinutes.create({
-			data: { meetingId, recordedBy: userId, content: '' }
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.meeting.update({
+			where: { id: meetingId },
+			data: { status: 'ADJOURNED' }
 		});
-	}
 
-	console.log(`[GovernanceWorkflow] ADJOURN_MEETING meeting:${meetingId} by user ${userId}`);
-	return meetingId;
+		// Create minutes placeholder if not exists
+		const existingMinutes = await tx.meetingMinutes.findUnique({ where: { meetingId } });
+		if (!existingMinutes) {
+			await tx.meetingMinutes.create({
+				data: { meetingId, recordedBy: userId, content: '' }
+			});
+		}
+
+		return meetingId;
+	}, { userId, reason: 'Adjourning meeting via workflow' });
+
+	log.info('ADJOURN_MEETING completed', { meetingId: resultId, userId });
+	return resultId;
 }
 
 async function updateMinutes(
@@ -733,63 +810,73 @@ async function updateMinutes(
 ): Promise<string> {
 	const content = data.content as string;
 
-	// Update or create minutes
-	const existing = await prisma.meetingMinutes.findFirst({ where: { meetingId } });
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		// Update or create minutes
+		const existing = await tx.meetingMinutes.findFirst({ where: { meetingId } });
 
-	if (existing) {
-		await prisma.meetingMinutes.update({
-			where: { id: existing.id },
-			data: { content }
+		if (existing) {
+			await tx.meetingMinutes.update({
+				where: { id: existing.id },
+				data: { content }
+			});
+		} else {
+			await tx.meetingMinutes.create({
+				data: {
+					meetingId,
+					content,
+					recordedBy: userId
+				}
+			});
+		}
+
+		// Update meeting status to indicate minutes are in draft
+		await tx.meeting.update({
+			where: { id: meetingId },
+			data: { status: 'MINUTES_DRAFT' }
 		});
-	} else {
-		await prisma.meetingMinutes.create({
-			data: {
-				meetingId,
-				content,
-				recordedBy: userId
-			}
-		});
-	}
 
-	// Update meeting status to indicate minutes are in draft
-	await prisma.meeting.update({
-		where: { id: meetingId },
-		data: { status: 'MINUTES_DRAFT' }
-	});
+		return meetingId;
+	}, { userId, reason: 'Updating meeting minutes via workflow' });
 
-	console.log(`[GovernanceWorkflow] UPDATE_MINUTES meeting:${meetingId} by user ${userId}`);
-	return meetingId;
+	log.info('UPDATE_MINUTES completed', { meetingId: resultId, userId });
+	return resultId;
 }
 
 async function approveMinutes(
 	organizationId: string,
 	userId: string,
 	meetingId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<string> {
-	// Update meeting status to indicate minutes are approved
-	await prisma.meeting.update({
-		where: { id: meetingId },
-		data: { status: 'MINUTES_APPROVED' }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		// Update meeting status to indicate minutes are approved
+		await tx.meeting.update({
+			where: { id: meetingId },
+			data: { status: 'MINUTES_APPROVED' }
+		});
+		return meetingId;
+	}, { userId, reason: 'Approving meeting minutes via workflow' });
 
-	console.log(`[GovernanceWorkflow] APPROVE_MINUTES meeting:${meetingId} by user ${userId}`);
-	return meetingId;
+	log.info('APPROVE_MINUTES completed', { meetingId: resultId, userId });
+	return resultId;
 }
 
 async function archiveMeeting(
 	organizationId: string,
 	userId: string,
 	meetingId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.meeting.update({
-		where: { id: meetingId },
-		data: { status: 'ARCHIVED' }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.meeting.update({
+			where: { id: meetingId },
+			data: { status: 'ARCHIVED' }
+		});
+		return meetingId;
+	}, { userId, reason: 'Archiving meeting via workflow' });
 
-	console.log(`[GovernanceWorkflow] ARCHIVE_MEETING meeting:${meetingId} by user ${userId}`);
-	return meetingId;
+	log.info('ARCHIVE_MEETING completed', { meetingId: resultId, userId });
+	return resultId;
 }
 
 async function addBoardMember(
@@ -801,34 +888,38 @@ async function addBoardMember(
 	const partyId = data.partyId as string;
 	const termStart = new Date(data.termStart as string);
 
-	// Check if member already exists
-	const existing = await prisma.boardMember.findFirst({
-		where: { boardId, partyId, termStart }
-	});
-	if (existing) return existing.id;
+	const memberId = await orgTransaction(organizationId, async (tx) => {
+		// Check if member already exists
+		const existing = await tx.boardMember.findFirst({
+			where: { boardId, partyId, termStart }
+		});
+		if (existing) return existing.id;
 
-	const member = await prisma.boardMember.create({
-		data: {
-			boardId,
-			partyId,
-			role: data.role as any,
-			termStart,
-			termEnd: data.termEnd ? new Date(data.termEnd as string) : undefined
-		}
-	});
+		const member = await tx.boardMember.create({
+			data: {
+				boardId,
+				partyId,
+				role: data.role as any,
+				termStart,
+				termEnd: data.termEnd ? new Date(data.termEnd as string) : undefined
+			}
+		});
 
-	// Record history
-	await prisma.boardHistory.create({
-		data: {
-			boardId,
-			changeType: 'MEMBER_ADDED',
-			detail: { memberId: member.id, partyId: member.partyId, role: member.role },
-			changedBy: userId
-		}
-	});
+		// Record history
+		await tx.boardHistory.create({
+			data: {
+				boardId,
+				changeType: 'MEMBER_ADDED',
+				detail: { memberId: member.id, partyId: member.partyId, role: member.role },
+				changedBy: userId
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] ADD_BOARD_MEMBER member:${member.id} board:${boardId} by user ${userId}`);
-	return member.id;
+		return member.id;
+	}, { userId, reason: 'Adding board member via workflow' });
+
+	log.info('ADD_BOARD_MEMBER completed', { memberId, boardId, userId });
+	return memberId;
 }
 
 async function removeBoardMember(
@@ -839,23 +930,27 @@ async function removeBoardMember(
 	const boardId = data.boardId as string;
 	const memberId = data.memberId as string;
 
-	const member = await prisma.boardMember.update({
-		where: { id: memberId },
-		data: { isActive: false, termEnd: new Date() }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		const member = await tx.boardMember.update({
+			where: { id: memberId },
+			data: { isActive: false, termEnd: new Date() }
+		});
 
-	// Record history
-	await prisma.boardHistory.create({
-		data: {
-			boardId,
-			changeType: 'MEMBER_REMOVED',
-			detail: { memberId, reason: 'removed' },
-			changedBy: userId
-		}
-	});
+		// Record history
+		await tx.boardHistory.create({
+			data: {
+				boardId,
+				changeType: 'MEMBER_REMOVED',
+				detail: { memberId, reason: 'removed' },
+				changedBy: userId
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] REMOVE_BOARD_MEMBER member:${memberId} board:${boardId} by user ${userId}`);
-	return member.id;
+		return member.id;
+	}, { userId, reason: 'Removing board member via workflow' });
+
+	log.info('REMOVE_BOARD_MEMBER completed', { memberId: resultId, boardId, userId });
+	return resultId;
 }
 
 // -----------------------------------------------------------------------------
@@ -873,19 +968,22 @@ async function createCommittee(
 	const committeeType = data.committeeType as string;
 	const isArcLinked = data.isArcLinked as boolean | undefined;
 
-	const committee = await prisma.committee.create({
-		data: {
-			organizationId,
-			associationId,
-			name,
-			description,
-			committeeType: committeeType as any,
-			isArcLinked: isArcLinked ?? false
-		}
-	});
+	const committeeId = await orgTransaction(organizationId, async (tx) => {
+		const committee = await tx.committee.create({
+			data: {
+				organizationId,
+				associationId,
+				name,
+				description,
+				committeeType: committeeType as any,
+				isArcLinked: isArcLinked ?? false
+			}
+		});
+		return committee.id;
+	}, { userId, reason: 'Creating committee via workflow' });
 
-	console.log(`[GovernanceWorkflow] CREATE_COMMITTEE committee:${committee.id} by user ${userId}`);
-	return committee.id;
+	log.info('CREATE_COMMITTEE completed', { committeeId, userId });
+	return committeeId;
 }
 
 async function updateCommittee(
@@ -901,13 +999,16 @@ async function updateCommittee(
 	if (data.isArcLinked !== undefined) updateData.isArcLinked = data.isArcLinked;
 	if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
-	await prisma.committee.update({
-		where: { id: committeeId },
-		data: updateData
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		await tx.committee.update({
+			where: { id: committeeId },
+			data: updateData
+		});
+		return committeeId;
+	}, { userId, reason: 'Updating committee via workflow' });
 
-	console.log(`[GovernanceWorkflow] UPDATE_COMMITTEE committee:${committeeId} by user ${userId}`);
-	return committeeId;
+	log.info('UPDATE_COMMITTEE completed', { committeeId: resultId, userId });
+	return resultId;
 }
 
 async function addCommitteeMember(
@@ -919,24 +1020,28 @@ async function addCommitteeMember(
 	const partyId = data.partyId as string;
 	const termStart = new Date(data.termStart as string);
 
-	// Check if member already exists
-	const existing = await prisma.committeeMember.findFirst({
-		where: { committeeId, partyId, termStart }
-	});
-	if (existing) return existing.id;
+	const memberId = await orgTransaction(organizationId, async (tx) => {
+		// Check if member already exists
+		const existing = await tx.committeeMember.findFirst({
+			where: { committeeId, partyId, termStart }
+		});
+		if (existing) return existing.id;
 
-	const member = await prisma.committeeMember.create({
-		data: {
-			committeeId,
-			partyId,
-			role: data.role as any,
-			termStart,
-			termEnd: data.termEnd ? new Date(data.termEnd as string) : undefined
-		}
-	});
+		const member = await tx.committeeMember.create({
+			data: {
+				committeeId,
+				partyId,
+				role: data.role as any,
+				termStart,
+				termEnd: data.termEnd ? new Date(data.termEnd as string) : undefined
+			}
+		});
 
-	console.log(`[GovernanceWorkflow] ADD_COMMITTEE_MEMBER member:${member.id} committee:${committeeId} by user ${userId}`);
-	return member.id;
+		return member.id;
+	}, { userId, reason: 'Adding committee member via workflow' });
+
+	log.info('ADD_COMMITTEE_MEMBER completed', { memberId, committeeId, userId });
+	return memberId;
 }
 
 async function removeCommitteeMember(
@@ -946,13 +1051,16 @@ async function removeCommitteeMember(
 ): Promise<string> {
 	const memberId = data.memberId as string;
 
-	const member = await prisma.committeeMember.update({
-		where: { id: memberId },
-		data: { isActive: false, termEnd: new Date() }
-	});
+	const resultId = await orgTransaction(organizationId, async (tx) => {
+		const member = await tx.committeeMember.update({
+			where: { id: memberId },
+			data: { isActive: false, termEnd: new Date() }
+		});
+		return member.id;
+	}, { userId, reason: 'Removing committee member via workflow' });
 
-	console.log(`[GovernanceWorkflow] REMOVE_COMMITTEE_MEMBER member:${memberId} by user ${userId}`);
-	return member.id;
+	log.info('REMOVE_COMMITTEE_MEMBER completed', { memberId: resultId, userId });
+	return resultId;
 }
 
 // Main workflow function
@@ -1215,7 +1323,7 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[GovernanceWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error('Workflow error', { action: input.action, error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
@@ -1234,6 +1342,6 @@ export async function startGovernanceWorkflow(
 	idempotencyKey: string
 ): Promise<GovernanceWorkflowResult> {
 	const workflowId = idempotencyKey || `governance-${input.action}-${Date.now()}`;
-	const handle = await DBOS.startWorkflow(governanceWorkflow_v1, { workflowID: idempotencyKey})(input);
+	const handle = await DBOS.startWorkflow(governanceWorkflow_v1, { workflowID: workflowId })(input);
 	return handle.getResult();
 }

@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
@@ -42,28 +42,34 @@ async function createSupplier(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const supplier = await prisma.supplier.create({
-		data: {
-			organizationId,
-			name: data.name as string,
-			code: data.code as string | undefined,
-			contactName: data.contactName as string | undefined,
-			email: data.email as string | undefined,
-			phone: data.phone as string | undefined,
-			website: data.website as string | undefined,
-			addressLine1: data.addressLine1 as string | undefined,
-			addressLine2: data.addressLine2 as string | undefined,
-			city: data.city as string | undefined,
-			state: data.state as string | undefined,
-			postalCode: data.postalCode as string | undefined,
-			country: data.country as string | undefined,
-			paymentTermsDays: data.paymentTermsDays as number | undefined,
-			creditLimit: data.creditLimit as number | undefined,
-			vendorId: data.vendorId as string | undefined,
-			notes: data.notes as string | undefined,
-			isActive: true
-		}
-	});
+	const supplier = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.supplier.create({
+				data: {
+					organizationId,
+					name: data.name as string,
+					code: data.code as string | undefined,
+					contactName: data.contactName as string | undefined,
+					email: data.email as string | undefined,
+					phone: data.phone as string | undefined,
+					website: data.website as string | undefined,
+					addressLine1: data.addressLine1 as string | undefined,
+					addressLine2: data.addressLine2 as string | undefined,
+					city: data.city as string | undefined,
+					state: data.state as string | undefined,
+					postalCode: data.postalCode as string | undefined,
+					country: data.country as string | undefined,
+					paymentTermsDays: data.paymentTermsDays as number | undefined,
+					creditLimit: data.creditLimit as number | undefined,
+					vendorId: data.vendorId as string | undefined,
+					notes: data.notes as string | undefined,
+					isActive: true
+				}
+			});
+		},
+		{ userId, reason: 'Create supplier' }
+	);
 
 	return supplier.id;
 }
@@ -76,10 +82,16 @@ async function updateSupplier(
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
 
-	await prisma.supplier.update({
-		where: { id: supplierId },
-		data: updateData
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.supplier.update({
+				where: { id: supplierId },
+				data: updateData
+			});
+		},
+		{ userId, reason: 'Update supplier' }
+	);
 
 	return supplierId;
 }
@@ -89,10 +101,16 @@ async function deleteSupplier(
 	userId: string,
 	supplierId: string
 ): Promise<string> {
-	await prisma.supplier.update({
-		where: { id: supplierId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.supplier.update({
+				where: { id: supplierId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Delete supplier' }
+	);
 
 	return supplierId;
 }

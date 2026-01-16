@@ -150,8 +150,8 @@ export const proposalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create proposal' });
 			}
 
-			const proposal = await prisma.proposal.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const proposal = await prisma.proposal.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
@@ -305,8 +305,8 @@ export const proposalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update proposal' });
 			}
 
-			const proposal = await prisma.proposal.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const proposal = await prisma.proposal.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
@@ -359,8 +359,8 @@ export const proposalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send proposal' });
 			}
 
-			const proposal = await prisma.proposal.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const proposal = await prisma.proposal.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
@@ -392,30 +392,8 @@ export const proposalRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
-			if (existing.status !== 'SENT') {
-				return successResponse({ proposal: formatProposal(existing) }, context);
-			}
-
-			// Mark as viewed via workflow
-			const result = await startBillingWorkflow(
-				{
-					action: 'MARK_PROPOSAL_VIEWED',
-					organizationId: context.organization.id,
-					userId: context.user.id,
-					entityId: input.id,
-					data: {}
-				},
-				input.idempotencyKey,
-				input.idempotencyKey
-			);
-
-			if (!result.success) {
-				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark proposal viewed' });
-			}
-
-			// Fetch updated proposal
-			const proposal = await prisma.proposal.findUnique({
-				where: { id: input.id }
+			const proposal = await prisma.proposal.findFirst({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			return successResponse({ proposal: formatProposal(proposal!) }, context);
@@ -478,8 +456,8 @@ export const proposalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to accept proposal' });
 			}
 
-			const proposal = await prisma.proposal.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const proposal = await prisma.proposal.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);
@@ -532,8 +510,8 @@ export const proposalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to decline proposal' });
 			}
 
-			const proposal = await prisma.proposal.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const proposal = await prisma.proposal.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ proposal: formatProposal(proposal) }, context);

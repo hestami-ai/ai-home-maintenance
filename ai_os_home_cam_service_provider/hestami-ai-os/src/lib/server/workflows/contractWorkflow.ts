@@ -6,8 +6,8 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
-import type { ServiceContractStatus, RecurrenceFrequency, ServiceContractType } from '../../../../generated/prisma/client.js';
+import { orgTransaction } from '../db/rls.js';
+import type { RecurrenceFrequency, ServiceContractType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -50,24 +50,26 @@ async function createContract(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const contract = await prisma.serviceContract.create({
-		data: {
-			organizationId,
-			contractNumber: data.contractNumber as string,
-			customerId: data.customerId as string | undefined,
-			name: data.name as string,
-			type: data.type as ServiceContractType,
-			description: data.description as string | undefined,
-			status: 'DRAFT',
-			startDate: new Date(data.startDate as string),
-			endDate: new Date(data.endDate as string),
-			billingFrequency: data.billingFrequency as RecurrenceFrequency,
-			billingAmount: data.billingAmount as number,
-			contractValue: data.contractValue as number,
-			autoRenew: data.autoRenew as boolean ?? false,
-			createdBy: userId
-		}
-	});
+	const contract = await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.create({
+			data: {
+				organizationId,
+				contractNumber: data.contractNumber as string,
+				customerId: data.customerId as string | undefined,
+				name: data.name as string,
+				type: data.type as ServiceContractType,
+				description: data.description as string | undefined,
+				status: 'DRAFT',
+				startDate: new Date(data.startDate as string),
+				endDate: new Date(data.endDate as string),
+				billingFrequency: data.billingFrequency as RecurrenceFrequency,
+				billingAmount: data.billingAmount as number,
+				contractValue: data.contractValue as number,
+				autoRenew: data.autoRenew as boolean ?? false,
+				createdBy: userId
+			}
+		});
+	}, { userId, reason: 'Create service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -92,19 +94,21 @@ async function updateContract(
 	contractId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const contract = await prisma.serviceContract.update({
-		where: { id: contractId },
-		data: {
-			name: data.name as string | undefined,
-			description: data.description as string | undefined,
-			startDate: data.startDate ? new Date(data.startDate as string) : undefined,
-			endDate: data.endDate ? new Date(data.endDate as string) : undefined,
-			billingFrequency: data.billingFrequency as RecurrenceFrequency | undefined,
-			billingAmount: data.billingAmount as number | undefined,
-			contractValue: data.contractValue as number | undefined,
-			autoRenew: data.autoRenew as boolean | undefined
-		}
-	});
+	const contract = await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.update({
+			where: { id: contractId },
+			data: {
+				name: data.name as string | undefined,
+				description: data.description as string | undefined,
+				startDate: data.startDate ? new Date(data.startDate as string) : undefined,
+				endDate: data.endDate ? new Date(data.endDate as string) : undefined,
+				billingFrequency: data.billingFrequency as RecurrenceFrequency | undefined,
+				billingAmount: data.billingAmount as number | undefined,
+				contractValue: data.contractValue as number | undefined,
+				autoRenew: data.autoRenew as boolean | undefined
+			}
+		});
+	}, { userId, reason: 'Update service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -128,12 +132,14 @@ async function activateContract(
 	userId: string,
 	contractId: string
 ): Promise<{ id: string }> {
-	const contract = await prisma.serviceContract.update({
-		where: { id: contractId },
-		data: {
-			status: 'ACTIVE'
-		}
-	});
+	const contract = await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.update({
+			where: { id: contractId },
+			data: {
+				status: 'ACTIVE'
+			}
+		});
+	}, { userId, reason: 'Activate service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -158,13 +164,15 @@ async function suspendContract(
 	contractId: string,
 	reason?: string
 ): Promise<{ id: string }> {
-	const contract = await prisma.serviceContract.update({
-		where: { id: contractId },
-		data: {
-			status: 'SUSPENDED',
-			notes: reason
-		}
-	});
+	const contract = await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.update({
+			where: { id: contractId },
+			data: {
+				status: 'SUSPENDED',
+				notes: reason
+			}
+		});
+	}, { userId, reason: 'Suspend service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -189,13 +197,15 @@ async function cancelContract(
 	contractId: string,
 	reason?: string
 ): Promise<{ id: string }> {
-	const contract = await prisma.serviceContract.update({
-		where: { id: contractId },
-		data: {
-			status: 'CANCELLED',
-			notes: reason
-		}
-	});
+	const contract = await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.update({
+			where: { id: contractId },
+			data: {
+				status: 'CANCELLED',
+				notes: reason
+			}
+		});
+	}, { userId, reason: 'Cancel service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -220,14 +230,16 @@ async function renewContract(
 	contractId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const contract = await prisma.serviceContract.update({
-		where: { id: contractId },
-		data: {
-			status: 'ACTIVE',
-			startDate: new Date(data.newStartDate as string),
-			endDate: new Date(data.newEndDate as string)
-		}
-	});
+	const contract = await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.update({
+			where: { id: contractId },
+			data: {
+				status: 'ACTIVE',
+				startDate: new Date(data.newStartDate as string),
+				endDate: new Date(data.newEndDate as string)
+			}
+		});
+	}, { userId, reason: 'Renew service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -251,10 +263,12 @@ async function deleteContract(
 	userId: string,
 	contractId: string
 ): Promise<{ id: string }> {
-	await prisma.serviceContract.update({
-		where: { id: contractId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.serviceContract.update({
+			where: { id: contractId },
+			data: { deletedAt: new Date() }
+		});
+	}, { userId, reason: 'Delete service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -279,18 +293,20 @@ async function addServiceItem(
 	contractId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const item = await prisma.contractServiceItem.create({
-		data: {
-			contractId,
-			name: data.name as string,
-			pricebookItemId: data.pricebookItemId as string | undefined,
-			quantity: data.quantity as number ?? 1,
-			unitPrice: data.unitPrice as number,
-			lineTotal: data.lineTotal as number,
-			frequency: data.frequency as RecurrenceFrequency,
-			notes: data.notes as string | undefined
-		}
-	});
+	const item = await orgTransaction(organizationId, async (tx) => {
+		return tx.contractServiceItem.create({
+			data: {
+				contractId,
+				name: data.name as string,
+				pricebookItemId: data.pricebookItemId as string | undefined,
+				quantity: data.quantity as number ?? 1,
+				unitPrice: data.unitPrice as number,
+				lineTotal: data.lineTotal as number,
+				frequency: data.frequency as RecurrenceFrequency,
+				notes: data.notes as string | undefined
+			}
+		});
+	}, { userId, reason: 'Add service item to contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -314,9 +330,11 @@ async function removeServiceItem(
 	userId: string,
 	serviceItemId: string
 ): Promise<{ id: string }> {
-	await prisma.contractServiceItem.delete({
-		where: { id: serviceItemId }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.contractServiceItem.delete({
+			where: { id: serviceItemId }
+		});
+	}, { userId, reason: 'Remove service item from contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -458,7 +476,7 @@ export const contractWorkflow_v1 = DBOS.registerWorkflow(contractWorkflow);
 
 export async function startServiceContractWorkflow(
 	input: ServiceContractWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<ServiceContractWorkflowResult> {
 	const handle = await DBOS.startWorkflow(contractWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

@@ -82,7 +82,7 @@ export const associationRouter = {
 				},
 				coaTemplateId: input.coaTemplateId,
 				contractData: input.contractData
-			}, { workflowID: idempotencyKey });
+			});
 
 			const result = await handle.getResult();
 
@@ -91,8 +91,8 @@ export const associationRouter = {
 			}
 
 			// Fetch the created association to return its data
-			const association = await prisma.association.findUnique({
-				where: { id: result.associationId }
+			const association = await prisma.association.findFirst({
+				where: { id: result.associationId, organizationId: context.organization.id }
 			});
 
 			if (!association) {
@@ -327,8 +327,8 @@ export const associationRouter = {
 			}
 
 			// Fetch updated association
-			const association = await prisma.association.findUnique({
-				where: { id }
+			const association = await prisma.association.findFirstOrThrow({
+				where: { id, organizationId: context.organization.id }
 			});
 
 			return successResponse(

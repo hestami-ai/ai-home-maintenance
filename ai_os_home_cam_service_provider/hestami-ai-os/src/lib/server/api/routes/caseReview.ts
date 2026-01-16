@@ -124,8 +124,8 @@ export const caseReviewRouter = {
 			}
 
 			// Check if review already exists
-			const existingReview = await prisma.caseReview.findUnique({
-				where: { caseId: input.caseId }
+			const existingReview = await prisma.caseReview.findFirst({
+				where: { caseId: input.caseId, case: { organizationId: context.organization.id } }
 			});
 
 			if (existingReview) {
@@ -163,8 +163,8 @@ export const caseReviewRouter = {
 			}
 
 			// Fetch created review with relations
-			const review = await prisma.caseReview.findUnique({
-				where: { id: result.reviewId },
+			const review = await prisma.caseReview.findFirstOrThrow({
+				where: { id: result.reviewId, case: { organizationId: context.organization.id } },
 				include: { reviewedBy: true }
 			});
 
@@ -217,8 +217,8 @@ export const caseReviewRouter = {
 
 			await context.cerbos.authorize('view', 'case_review', input.caseId);
 
-			const review = await prisma.caseReview.findUnique({
-				where: { caseId: input.caseId },
+			const review = await prisma.caseReview.findFirst({
+				where: { caseId: input.caseId, case: { organizationId: context.organization.id } },
 				include: { reviewedBy: true }
 			});
 
@@ -262,12 +262,12 @@ export const caseReviewRouter = {
 			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.handler(async ({ input, context, errors }) => {
-			const existing = await prisma.caseReview.findUnique({
-				where: { caseId: input.caseId },
+			const existing = await prisma.caseReview.findFirst({
+				where: { caseId: input.caseId, case: { organizationId: context.organization.id } },
 				include: { case: true }
 			});
 
-			if (!existing || existing.case?.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'CaseReview' });
 			}
 
@@ -302,8 +302,8 @@ export const caseReviewRouter = {
 			}
 
 			// Fetch updated review with relations
-			const review = await prisma.caseReview.findUnique({
-				where: { caseId: input.caseId },
+			const review = await prisma.caseReview.findFirstOrThrow({
+				where: { caseId: input.caseId, case: { organizationId: context.organization.id } },
 				include: { reviewedBy: true }
 			});
 

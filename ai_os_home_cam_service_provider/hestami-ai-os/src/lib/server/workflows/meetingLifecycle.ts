@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { MeetingStatus } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 
@@ -27,6 +27,7 @@ const validTransitions: Record<MeetingStatus, MeetingStatus[]> = {
 
 interface TransitionInput {
 	meetingId: string;
+	organizationId: string;
 	toStatus: MeetingStatus;
 	userId: string;
 	notes?: string;
@@ -59,50 +60,56 @@ async function validateTransition(input: TransitionInput): Promise<{
 	};
 	error?: string;
 }> {
-	const meeting = await prisma.meeting.findUnique({
-		where: { id: input.meetingId }
-	});
+	return orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const meeting = await tx.meeting.findUnique({
+				where: { id: input.meetingId }
+			});
 
-	if (!meeting) {
-		return { valid: false, currentStatus: 'SCHEDULED', error: 'Meeting not found' };
-	}
+			if (!meeting) {
+				return { valid: false, currentStatus: 'SCHEDULED' as MeetingStatus, error: 'Meeting not found' };
+			}
 
-	const currentStatus = meeting.status as MeetingStatus;
-	const allowedTransitions = validTransitions[currentStatus] || [];
+			const currentStatus = meeting.status as MeetingStatus;
+			const allowedTransitions = validTransitions[currentStatus] || [];
 
-	if (!allowedTransitions.includes(input.toStatus)) {
-		return {
-			valid: false,
-			currentStatus,
-			error: `Invalid transition from ${currentStatus} to ${input.toStatus}`
-		};
-	}
+			if (!allowedTransitions.includes(input.toStatus)) {
+				return {
+					valid: false,
+					currentStatus,
+					error: `Invalid transition from ${currentStatus} to ${input.toStatus}`
+				};
+			}
 
-	// Additional validation for IN_SESSION transition
-	if (input.toStatus === 'IN_SESSION') {
-		// Check if meeting has agenda items
-		const agendaCount = await prisma.meetingAgendaItem.count({
-			where: { meetingId: input.meetingId }
-		});
-		if (agendaCount === 0) {
+			// Additional validation for IN_SESSION transition
+			if (input.toStatus === 'IN_SESSION') {
+				// Check if meeting has agenda items
+				const agendaCount = await tx.meetingAgendaItem.count({
+					where: { meetingId: input.meetingId }
+				});
+				if (agendaCount === 0) {
+					return {
+						valid: false,
+						currentStatus,
+						error: 'Meeting must have at least one agenda item before starting session'
+					};
+				}
+			}
+
 			return {
-				valid: false,
+				valid: true,
 				currentStatus,
-				error: 'Meeting must have at least one agenda item before starting session'
+				meeting: {
+					id: meeting.id,
+					title: meeting.title,
+					associationId: meeting.associationId,
+					scheduledFor: meeting.scheduledFor
+				}
 			};
-		}
-	}
-
-	return {
-		valid: true,
-		currentStatus,
-		meeting: {
-			id: meeting.id,
-			title: meeting.title,
-			associationId: meeting.associationId,
-			scheduledFor: meeting.scheduledFor
-		}
-	};
+		},
+		{ userId: input.userId, reason: 'Validate meeting transition' }
+	);
 }
 
 /**
@@ -112,10 +119,16 @@ async function updateMeetingStatus(
 	input: TransitionInput,
 	fromStatus: MeetingStatus
 ): Promise<void> {
-	await prisma.meeting.update({
-		where: { id: input.meetingId },
-		data: { status: input.toStatus }
-	});
+	await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.meeting.update({
+				where: { id: input.meetingId },
+				data: { status: input.toStatus }
+			});
+		},
+		{ userId: input.userId, reason: 'Update meeting status' }
+	);
 }
 
 /**
@@ -139,23 +152,30 @@ async function queueNotifications(
  * Step 4: Create minutes placeholder if meeting was held
  */
 async function createMinutesPlaceholder(
+	organizationId: string,
 	meetingId: string,
 	userId: string
 ): Promise<void> {
-	// Check if minutes already exist
-	const existingMinutes = await prisma.meetingMinutes.findUnique({
-		where: { meetingId }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// Check if minutes already exist
+			const existingMinutes = await tx.meetingMinutes.findUnique({
+				where: { meetingId }
+			});
 
-	if (!existingMinutes) {
-		await prisma.meetingMinutes.create({
-			data: {
-				meetingId,
-				recordedBy: userId,
-				content: ''
+			if (!existingMinutes) {
+				await tx.meetingMinutes.create({
+					data: {
+						meetingId,
+						recordedBy: userId,
+						content: ''
+					}
+				});
 			}
-		});
-	}
+		},
+		{ userId, reason: 'Create meeting minutes placeholder' }
+	);
 }
 
 // ============================================================================
@@ -204,7 +224,7 @@ async function meetingTransitionWorkflow(input: TransitionInput): Promise<Transi
 		// Step 4: Create minutes placeholder if meeting was adjourned
 		if (input.toStatus === 'ADJOURNED') {
 			await DBOS.runStep(
-				() => createMinutesPlaceholder(input.meetingId, input.userId),
+				() => createMinutesPlaceholder(input.organizationId, input.meetingId, input.userId),
 				{ name: 'createMinutesPlaceholder' }
 			);
 			await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'minutes_created' });
@@ -252,7 +272,7 @@ export async function startMeetingTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `meeting-transition-${input.meetingId}-${Date.now()}`;
-	await DBOS.startWorkflow(meetingLifecycle_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(meetingLifecycle_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

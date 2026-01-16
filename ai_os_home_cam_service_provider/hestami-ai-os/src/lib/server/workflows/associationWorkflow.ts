@@ -1,5 +1,6 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -55,7 +56,7 @@ async function createManagedAssociation_v1(input: CreateManagedAssociationInput)
         // 1. Create Association and (optionally) Management Contract in a transaction
         const { association, contract } = await DBOS.runStep(
             async () => {
-                return prisma.$transaction(async (tx) => {
+                return orgTransaction(input.organizationId, async (tx) => {
                     // Create association
                     const association = await tx.association.create({
                         data: {
@@ -84,7 +85,7 @@ async function createManagedAssociation_v1(input: CreateManagedAssociationInput)
                     }
 
                     return { association, contract };
-                });
+                }, { userId: input.userId, reason: 'Create managed association and optional management contract' });
             },
             { name: 'createAssociationAndContract' }
         );
@@ -166,18 +167,22 @@ export interface AssociationManagementResult {
 }
 
 async function updateAssociationStep(
+    organizationId: string,
+    userId: string,
     associationId: string,
     data: NonNullable<AssociationManagementInput['data']>
 ): Promise<{ id: string }> {
     const { settings, ...updateData } = data;
-    const association = await prisma.association.update({
-        where: { id: associationId },
-        data: {
-            ...updateData,
-            ...(settings !== undefined && { settings: settings as Prisma.InputJsonValue })
-        }
-    });
-    return { id: association.id };
+    return orgTransaction(organizationId, async (tx) => {
+        const association = await tx.association.update({
+            where: { id: associationId },
+            data: {
+                ...updateData,
+                ...(settings !== undefined && { settings: settings as Prisma.InputJsonValue })
+            }
+        });
+        return { id: association.id };
+    }, { userId, reason: 'Update association details' });
 }
 
 async function setDefaultAssociationStep(
@@ -185,32 +190,38 @@ async function setDefaultAssociationStep(
     organizationId: string,
     associationId: string
 ): Promise<void> {
-    await prisma.userAssociationPreference.upsert({
-        where: {
-            userId_organizationId: {
+    await orgTransaction(organizationId, async (tx) => {
+        await tx.userAssociationPreference.upsert({
+            where: {
+                userId_organizationId: {
+                    userId,
+                    organizationId
+                }
+            },
+            create: {
                 userId,
-                organizationId
+                organizationId,
+                associationId
+            },
+            update: {
+                associationId
             }
-        },
-        create: {
-            userId,
-            organizationId,
-            associationId
-        },
-        update: {
-            associationId
-        }
-    });
+        });
+    }, { userId, reason: 'Set default association preference for user' });
 }
 
 async function deleteAssociationStep(
+    organizationId: string,
+    userId: string,
     associationId: string
 ): Promise<{ deletedAt: Date }> {
     const now = new Date();
-    await prisma.association.update({
-        where: { id: associationId },
-        data: { deletedAt: now }
-    });
+    await orgTransaction(organizationId, async (tx) => {
+        await tx.association.update({
+            where: { id: associationId },
+            data: { deletedAt: now }
+        });
+    }, { userId, reason: 'Soft delete association' });
     return { deletedAt: now };
 }
 
@@ -225,7 +236,7 @@ async function associationManagementWorkflow(input: AssociationManagementInput):
                     return { success: false, error: 'Update data is required' };
                 }
                 const result = await DBOS.runStep(
-                    () => updateAssociationStep(input.associationId, input.data!),
+                    () => updateAssociationStep(input.organizationId, input.userId, input.associationId, input.data!),
                     { name: 'updateAssociation' }
                 );
                 return { success: true, associationId: result.id };
@@ -241,7 +252,7 @@ async function associationManagementWorkflow(input: AssociationManagementInput):
 
             case 'DELETE': {
                 await DBOS.runStep(
-                    () => deleteAssociationStep(input.associationId),
+                    () => deleteAssociationStep(input.organizationId, input.userId, input.associationId!),
                     { name: 'deleteAssociation' }
                 );
                 return { success: true, associationId: input.associationId };

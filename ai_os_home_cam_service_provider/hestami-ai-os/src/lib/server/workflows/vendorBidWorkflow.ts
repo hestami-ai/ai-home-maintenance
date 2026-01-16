@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -56,71 +56,81 @@ export interface VendorBidWorkflowResult extends EntityWorkflowResult {
 // Step functions
 
 async function createVendorBid(
+	organizationId: string,
+	userId: string,
 	data: VendorBidWorkflowInput['data']
 ): Promise<{ bidId: string; vendorCandidateId: string }> {
-	const bid = await prisma.vendorBid.create({
-		data: {
-			vendorCandidateId: data.vendorCandidateId!,
-			caseId: data.caseId!,
-			scopeVersion: data.scopeVersion,
-			amount: data.amount,
-			currency: data.currency || 'USD',
-			validUntil: data.validUntil,
-			laborCost: data.laborCost,
-			materialsCost: data.materialsCost,
-			otherCosts: data.otherCosts,
-			estimatedStartDate: data.estimatedStartDate,
-			estimatedDuration: data.estimatedDuration,
-			estimatedEndDate: data.estimatedEndDate,
-			notes: data.notes,
-			status: 'PENDING',
-			receivedAt: new Date()
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		const bid = await tx.vendorBid.create({
+			data: {
+				vendorCandidateId: data.vendorCandidateId!,
+				caseId: data.caseId!,
+				scopeVersion: data.scopeVersion,
+				amount: data.amount,
+				currency: data.currency || 'USD',
+				validUntil: data.validUntil,
+				laborCost: data.laborCost,
+				materialsCost: data.materialsCost,
+				otherCosts: data.otherCosts,
+				estimatedStartDate: data.estimatedStartDate,
+				estimatedDuration: data.estimatedDuration,
+				estimatedEndDate: data.estimatedEndDate,
+				notes: data.notes,
+				status: 'PENDING',
+				receivedAt: new Date()
+			}
+		});
 
-	// Update vendor candidate status to QUOTED
-	await prisma.vendorCandidate.update({
-		where: { id: data.vendorCandidateId! },
-		data: {
-			status: 'QUOTED',
-			statusChangedAt: new Date()
-		}
-	});
+		// Update vendor candidate status to QUOTED
+		await tx.vendorCandidate.update({
+			where: { id: data.vendorCandidateId! },
+			data: {
+				status: 'QUOTED',
+				statusChangedAt: new Date()
+			}
+		});
 
-	log.info('CREATE completed', { bidId: bid.id, vendorCandidateId: data.vendorCandidateId });
-	return { bidId: bid.id, vendorCandidateId: data.vendorCandidateId! };
+		log.info('CREATE completed', { bidId: bid.id, vendorCandidateId: data.vendorCandidateId });
+		return { bidId: bid.id, vendorCandidateId: data.vendorCandidateId! };
+	}, { userId, reason: 'VendorBidWorkflow: CREATE' });
 }
 
 async function updateVendorBid(
+	organizationId: string,
+	userId: string,
 	bidId: string,
 	data: VendorBidWorkflowInput['data']
 ): Promise<{ bidId: string }> {
-	await prisma.vendorBid.update({
-		where: { id: bidId },
-		data: {
-			...(data.scopeVersion !== undefined && { scopeVersion: data.scopeVersion }),
-			...(data.amount !== undefined && { amount: data.amount }),
-			...(data.validUntil !== undefined && { validUntil: data.validUntil }),
-			...(data.laborCost !== undefined && { laborCost: data.laborCost }),
-			...(data.materialsCost !== undefined && { materialsCost: data.materialsCost }),
-			...(data.otherCosts !== undefined && { otherCosts: data.otherCosts }),
-			...(data.estimatedStartDate !== undefined && { estimatedStartDate: data.estimatedStartDate }),
-			...(data.estimatedDuration !== undefined && { estimatedDuration: data.estimatedDuration }),
-			...(data.estimatedEndDate !== undefined && { estimatedEndDate: data.estimatedEndDate }),
-			...(data.notes !== undefined && { notes: data.notes })
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.vendorBid.update({
+			where: { id: bidId },
+			data: {
+				...(data.scopeVersion !== undefined && { scopeVersion: data.scopeVersion }),
+				...(data.amount !== undefined && { amount: data.amount }),
+				...(data.validUntil !== undefined && { validUntil: data.validUntil }),
+				...(data.laborCost !== undefined && { laborCost: data.laborCost }),
+				...(data.materialsCost !== undefined && { materialsCost: data.materialsCost }),
+				...(data.otherCosts !== undefined && { otherCosts: data.otherCosts }),
+				...(data.estimatedStartDate !== undefined && { estimatedStartDate: data.estimatedStartDate }),
+				...(data.estimatedDuration !== undefined && { estimatedDuration: data.estimatedDuration }),
+				...(data.estimatedEndDate !== undefined && { estimatedEndDate: data.estimatedEndDate }),
+				...(data.notes !== undefined && { notes: data.notes })
+			}
+		});
 
-	log.info('UPDATE completed', { bidId });
-	return { bidId };
+		log.info('UPDATE completed', { bidId });
+		return { bidId };
+	}, { userId, reason: 'VendorBidWorkflow: UPDATE' });
 }
 
 async function acceptVendorBid(
+	organizationId: string,
+	userId: string,
 	bidId: string,
 	vendorCandidateId: string,
 	caseId: string
 ): Promise<{ bidId: string }> {
-	await prisma.$transaction(async (tx) => {
+	return orgTransaction(organizationId, async (tx) => {
 		// Accept this bid
 		await tx.vendorBid.update({
 			where: { id: bidId },
@@ -151,19 +161,21 @@ async function acceptVendorBid(
 				respondedAt: new Date()
 			}
 		});
-	});
 
-	log.info('ACCEPT completed', { bidId, vendorCandidateId, caseId });
-	return { bidId };
+		log.info('ACCEPT completed', { bidId, vendorCandidateId, caseId });
+		return { bidId };
+	}, { userId, reason: 'VendorBidWorkflow: ACCEPT' });
 }
 
 async function rejectVendorBid(
+	organizationId: string,
+	userId: string,
 	bidId: string,
 	vendorCandidateId: string,
 	existingNotes: string | null,
 	reason?: string
 ): Promise<{ bidId: string }> {
-	await prisma.$transaction(async (tx) => {
+	return orgTransaction(organizationId, async (tx) => {
 		await tx.vendorBid.update({
 			where: { id: bidId },
 			data: {
@@ -185,10 +197,10 @@ async function rejectVendorBid(
 				statusChangedAt: new Date()
 			}
 		});
-	});
 
-	log.info('REJECT completed', { bidId, vendorCandidateId });
-	return { bidId };
+		log.info('REJECT completed', { bidId, vendorCandidateId });
+		return { bidId };
+	}, { userId, reason: 'VendorBidWorkflow: REJECT' });
 }
 
 // Main workflow function
@@ -197,7 +209,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 		switch (input.action) {
 			case 'CREATE': {
 				const result = await DBOS.runStep(
-					() => createVendorBid(input.data),
+					() => createVendorBid(input.organizationId, input.userId, input.data),
 					{ name: 'createVendorBid' }
 				);
 				return {
@@ -210,7 +222,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 
 			case 'UPDATE': {
 				const result = await DBOS.runStep(
-					() => updateVendorBid(input.bidId!, input.data),
+					() => updateVendorBid(input.organizationId, input.userId, input.bidId!, input.data),
 					{ name: 'updateVendorBid' }
 				);
 				return { success: true, entityId: result.bidId, bidId: result.bidId };
@@ -218,7 +230,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 
 			case 'ACCEPT': {
 				const result = await DBOS.runStep(
-					() => acceptVendorBid(input.bidId!, input.data.vendorCandidateId!, input.data.caseId!),
+					() => acceptVendorBid(input.organizationId, input.userId, input.bidId!, input.data.vendorCandidateId!, input.data.caseId!),
 					{ name: 'acceptVendorBid' }
 				);
 				return { success: true, entityId: result.bidId, bidId: result.bidId };
@@ -227,6 +239,8 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 			case 'REJECT': {
 				const result = await DBOS.runStep(
 					() => rejectVendorBid(
+						input.organizationId,
+						input.userId,
 						input.bidId!,
 						input.data.vendorCandidateId!,
 						input.data.notes ?? null,
@@ -243,7 +257,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[VendorBidWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
 			errorCode: 'WORKFLOW_FAILED',

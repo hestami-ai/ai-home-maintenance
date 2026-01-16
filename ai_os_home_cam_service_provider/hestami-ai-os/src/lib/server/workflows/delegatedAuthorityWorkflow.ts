@@ -6,12 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
+import { orgTransaction } from '../db/rls.js';
 
 const WORKFLOW_STATUS_EVENT = 'delegated_authority_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'delegated_authority_workflow_error';
@@ -76,24 +76,30 @@ async function grantAuthority(
 	grantedAt: string;
 	grantedBy: string;
 }> {
-	const delegatedAuthority = await prisma.delegatedAuthority.create({
-		data: {
-			propertyOwnershipId: input.propertyOwnershipId!,
-			delegatePartyId: input.delegatePartyId!,
-			authorityType: input.authorityType as 'FULL_AUTHORITY' | 'FINANCIAL' | 'MAINTENANCE' | 'ADMINISTRATIVE' | 'LIMITED',
-			status: 'PENDING_ACCEPTANCE',
-			monetaryLimit: input.monetaryLimit,
-			scopeDescription: input.scopeDescription,
-			scopeRestrictions: input.scopeRestrictions as Prisma.InputJsonValue | undefined,
-			expiresAt: input.expiresAt,
-			grantedBy: input.userId
-		}
-	});
+	const delegatedAuthority = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.delegatedAuthority.create({
+				data: {
+					propertyOwnershipId: input.propertyOwnershipId!,
+					delegatePartyId: input.delegatePartyId!,
+					authorityType: input.authorityType as any,
+					status: 'PENDING_ACCEPTANCE',
+					monetaryLimit: input.monetaryLimit,
+					scopeDescription: input.scopeDescription,
+					scopeRestrictions: input.scopeRestrictions as Prisma.InputJsonValue | undefined,
+					expiresAt: input.expiresAt,
+					grantedBy: input.userId
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Grant delegated authority' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'DELEGATED_AUTHORITY',
+		entityType: 'OWNERSHIP',
 		entityId: delegatedAuthority.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -130,18 +136,24 @@ async function acceptAuthority(
 	userId: string
 ): Promise<{ id: string; status: string; acceptedAt: string }> {
 	const now = new Date();
-	const delegatedAuthority = await prisma.delegatedAuthority.update({
-		where: { id: delegatedAuthorityId },
-		data: {
-			status: 'ACTIVE',
-			acceptedAt: now
-		}
-	});
+	const delegatedAuthority = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.delegatedAuthority.update({
+				where: { id: delegatedAuthorityId },
+				data: {
+					status: 'ACTIVE',
+					acceptedAt: now
+				}
+			});
+		},
+		{ userId, reason: 'Accept delegated authority' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'DELEGATED_AUTHORITY',
+		entityType: 'OWNERSHIP',
 		entityId: delegatedAuthority.id,
 		action: 'STATUS_CHANGE',
 		eventCategory: 'EXECUTION',
@@ -169,20 +181,26 @@ async function revokeAuthority(
 	reason?: string
 ): Promise<{ id: string; status: string; revokedAt: string; revokedBy: string }> {
 	const now = new Date();
-	const delegatedAuthority = await prisma.delegatedAuthority.update({
-		where: { id: delegatedAuthorityId },
-		data: {
-			status: 'REVOKED',
-			revokedAt: now,
-			revokedBy: userId,
-			revokeReason: reason
-		}
-	});
+	const delegatedAuthority = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.delegatedAuthority.update({
+				where: { id: delegatedAuthorityId },
+				data: {
+					status: 'REVOKED',
+					revokedAt: now,
+					revokedBy: userId,
+					revokeReason: reason
+				}
+			});
+		},
+		{ userId, reason: 'Revoke delegated authority' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'DELEGATED_AUTHORITY',
+		entityType: 'OWNERSHIP',
 		entityId: delegatedAuthority.id,
 		action: 'STATUS_CHANGE',
 		eventCategory: 'EXECUTION',

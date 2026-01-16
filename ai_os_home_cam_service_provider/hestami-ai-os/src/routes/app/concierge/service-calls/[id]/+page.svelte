@@ -13,7 +13,13 @@
 		Calendar,
 		Check,
 		X,
-		Star
+		Star,
+		FileText,
+		Image,
+		Video,
+		File,
+		Download,
+		Paperclip
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
@@ -80,12 +86,23 @@
 		receivedAt: string;
 	}
 
+	interface Attachment {
+		id: string;
+		fileName: string;
+		fileSize: number;
+		mimeType: string;
+		fileUrl: string;
+		uploadedBy: string;
+		createdAt: string;
+	}
+
 	interface Props {
 		data: {
 			serviceCall: ServiceCall;
 			property: Property;
 			notes: Note[];
 			statusHistory: StatusHistory[];
+			attachments: Attachment[];
 			quotes: Quote[];
 		};
 	}
@@ -96,6 +113,7 @@
 	let property = $derived(data.property);
 	let notes = $state<Note[]>([]);
 	let statusHistory = $derived(data.statusHistory);
+	let attachments = $derived(data.attachments);
 	let quotes = $state<Quote[]>([]);
 	let isLoading = $state(false);
 	let isLoadingQuotes = $state(false);
@@ -103,6 +121,21 @@
 	let error = $state<string | null>(null);
 
 	const caseId = $derived(serviceCall.id);
+
+	// Helper to get file icon based on MIME type
+	function getFileIcon(mimeType: string) {
+		if (mimeType.startsWith('image/')) return Image;
+		if (mimeType.startsWith('video/')) return Video;
+		if (mimeType.includes('pdf')) return FileText;
+		return File;
+	}
+
+	// Helper to format file size
+	function formatFileSize(bytes: number): string {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
 
 
 	// New note form
@@ -282,6 +315,44 @@
 							{serviceCall.description}
 						</div>
 					</Card>
+
+					<!-- Attachments -->
+					{#if attachments && attachments.length > 0}
+						<Card variant="outlined" padding="md">
+							<div class="mb-4 flex items-center gap-2">
+								<Paperclip class="h-5 w-5 text-surface-500" />
+								<h2 class="font-semibold">Attachments</h2>
+								<span class="rounded-full bg-surface-500/10 px-2 py-0.5 text-xs font-medium text-surface-500">
+									{attachments.length}
+								</span>
+							</div>
+							<div class="space-y-2">
+								{#each attachments as attachment (attachment.id)}
+									{@const FileIcon = getFileIcon(attachment.mimeType)}
+									<div class="flex items-center gap-3 rounded-lg border border-surface-300-700 bg-surface-50-950 p-3">
+										<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-200-800">
+											<FileIcon class="h-5 w-5 text-surface-500" />
+										</div>
+										<div class="min-w-0 flex-1">
+											<p class="truncate text-sm font-medium">{attachment.fileName}</p>
+											<p class="text-xs text-surface-500">
+												{formatFileSize(attachment.fileSize)} • {formatRelativeTime(attachment.createdAt)}
+											</p>
+										</div>
+										<a
+											href={attachment.fileUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="btn btn-sm preset-tonal-primary"
+											title="Download {attachment.fileName}"
+										>
+											<Download class="h-4 w-4" />
+										</a>
+									</div>
+								{/each}
+							</div>
+						</Card>
+					{/if}
 
 					<!-- Resolution (if resolved) -->
 					{#if serviceCall.resolutionSummary}

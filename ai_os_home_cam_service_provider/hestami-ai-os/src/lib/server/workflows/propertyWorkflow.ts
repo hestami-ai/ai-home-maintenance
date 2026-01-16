@@ -6,11 +6,11 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import type { PropertyType } from '../../../../generated/prisma/client.js';
+import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('PropertyWorkflow');
 
@@ -55,68 +55,79 @@ export interface PropertyWorkflowResult extends EntityWorkflowResult {
 
 async function createPropertyStep(
 	organizationId: string,
+	userId: string,
 	data: PropertyWorkflowInput['data']
 ): Promise<{ propertyId: string }> {
-	const property = await prisma.property.create({
-		data: {
-			organizationId,
-			associationId: data.associationId!,
-			name: data.name!,
-			propertyType: data.propertyType as PropertyType,
-			addressLine1: data.addressLine1!,
-			addressLine2: data.addressLine2,
-			city: data.city!,
-			state: data.state!,
-			postalCode: data.postalCode!,
-			country: data.country ?? 'US',
-			latitude: data.latitude,
-			longitude: data.longitude,
-			yearBuilt: data.yearBuilt,
-			totalUnits: data.totalUnits ?? 0,
-			totalAcres: data.totalAcres
-		}
-	});
+	const property = await orgTransaction(organizationId, async (tx) => {
+		return tx.property.create({
+			data: {
+				organizationId,
+				associationId: data.associationId!,
+				name: data.name!,
+				propertyType: data.propertyType as PropertyType,
+				addressLine1: data.addressLine1!,
+				addressLine2: data.addressLine2,
+				city: data.city!,
+				state: data.state!,
+				postalCode: data.postalCode!,
+				country: data.country ?? 'US',
+				latitude: data.latitude,
+				longitude: data.longitude,
+				yearBuilt: data.yearBuilt,
+				totalUnits: data.totalUnits ?? 0,
+				totalAcres: data.totalAcres
+			}
+		});
+	}, { userId, reason: 'Create property' });
 
 	log.info('CREATE completed', { propertyId: property.id, associationId: data.associationId });
 	return { propertyId: property.id };
 }
 
 async function updatePropertyStep(
+	organizationId: string,
+	userId: string,
 	propertyId: string,
 	data: PropertyWorkflowInput['data']
 ): Promise<{ propertyId: string }> {
 	const { associationId, ...updateData } = data;
-	await prisma.property.update({
-		where: { id: propertyId },
-		data: {
-			...(updateData.name !== undefined && { name: updateData.name }),
-			...(updateData.propertyType !== undefined && { propertyType: updateData.propertyType as PropertyType }),
-			...(updateData.addressLine1 !== undefined && { addressLine1: updateData.addressLine1 }),
-			...(updateData.addressLine2 !== undefined && { addressLine2: updateData.addressLine2 }),
-			...(updateData.city !== undefined && { city: updateData.city }),
-			...(updateData.state !== undefined && { state: updateData.state }),
-			...(updateData.postalCode !== undefined && { postalCode: updateData.postalCode }),
-			...(updateData.country !== undefined && { country: updateData.country }),
-			...(updateData.latitude !== undefined && { latitude: updateData.latitude }),
-			...(updateData.longitude !== undefined && { longitude: updateData.longitude }),
-			...(updateData.yearBuilt !== undefined && { yearBuilt: updateData.yearBuilt }),
-			...(updateData.totalUnits !== undefined && { totalUnits: updateData.totalUnits }),
-			...(updateData.totalAcres !== undefined && { totalAcres: updateData.totalAcres })
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.property.update({
+			where: { id: propertyId },
+			data: {
+				...(updateData.name !== undefined && { name: updateData.name }),
+				...(updateData.propertyType !== undefined && { propertyType: updateData.propertyType as PropertyType }),
+				...(updateData.addressLine1 !== undefined && { addressLine1: updateData.addressLine1 }),
+				...(updateData.addressLine2 !== undefined && { addressLine2: updateData.addressLine2 }),
+				...(updateData.city !== undefined && { city: updateData.city }),
+				...(updateData.state !== undefined && { state: updateData.state }),
+				...(updateData.postalCode !== undefined && { postalCode: updateData.postalCode }),
+				...(updateData.country !== undefined && { country: updateData.country }),
+				...(updateData.latitude !== undefined && { latitude: updateData.latitude }),
+				...(updateData.longitude !== undefined && { longitude: updateData.longitude }),
+				...(updateData.yearBuilt !== undefined && { yearBuilt: updateData.yearBuilt }),
+				...(updateData.totalUnits !== undefined && { totalUnits: updateData.totalUnits }),
+				...(updateData.totalAcres !== undefined && { totalAcres: updateData.totalAcres })
+			}
+		});
+	}, { userId, reason: 'Update property' });
 
 	log.info('UPDATE completed', { propertyId });
 	return { propertyId };
 }
 
 async function deletePropertyStep(
+	organizationId: string,
+	userId: string,
 	propertyId: string
 ): Promise<{ propertyId: string; deletedAt: Date }> {
 	const now = new Date();
-	await prisma.property.update({
-		where: { id: propertyId },
-		data: { deletedAt: now }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.property.update({
+			where: { id: propertyId },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'Delete property (soft delete)' });
 
 	log.info('DELETE completed', { propertyId });
 	return { propertyId, deletedAt: now };
@@ -128,7 +139,7 @@ async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyW
 		switch (input.action) {
 			case 'CREATE': {
 				const result = await DBOS.runStep(
-					() => createPropertyStep(input.organizationId, input.data),
+					() => createPropertyStep(input.organizationId, input.userId, input.data),
 					{ name: 'createProperty' }
 				);
 				return {
@@ -140,7 +151,7 @@ async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyW
 
 			case 'UPDATE': {
 				const result = await DBOS.runStep(
-					() => updatePropertyStep(input.propertyId!, input.data),
+					() => updatePropertyStep(input.organizationId, input.userId, input.propertyId!, input.data),
 					{ name: 'updateProperty' }
 				);
 				return { success: true, entityId: result.propertyId, propertyId: result.propertyId };
@@ -148,7 +159,7 @@ async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyW
 
 			case 'DELETE': {
 				const result = await DBOS.runStep(
-					() => deletePropertyStep(input.propertyId!),
+					() => deletePropertyStep(input.organizationId, input.userId, input.propertyId!),
 					{ name: 'deleteProperty' }
 				);
 				return { success: true, entityId: result.propertyId, propertyId: result.propertyId };

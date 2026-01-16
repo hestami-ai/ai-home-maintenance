@@ -83,7 +83,7 @@ export const profileRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update profile' });
 			}
 
-			const profile = await prisma.contractorProfile.findUniqueOrThrow({ where: { id: result.entityId } });
+			const profile = await prisma.contractorProfile.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordExecution(context, {

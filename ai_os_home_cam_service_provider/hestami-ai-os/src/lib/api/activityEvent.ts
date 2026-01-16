@@ -156,6 +156,8 @@ export const ENTITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
 	STAFF_ASSIGNMENT: 'Staff Assignment',
 	VENDOR_CANDIDATE: 'Vendor Candidate',
 	VENDOR_BID: 'Vendor Bid',
+	PARTY: 'Party',
+	OWNERSHIP: 'Ownership',
 	OTHER: 'Other'
 };
 

@@ -179,8 +179,8 @@ export const caseCommunicationRouter = {
 			}
 
 			// Fetch created communication with relations
-			const communication = await prisma.caseCommunication.findUnique({
-				where: { id: result.communicationId },
+			const communication = await prisma.caseCommunication.findFirstOrThrow({
+				where: { id: result.communicationId, case: { organizationId: context.organization.id } },
 				include: { fromUser: true }
 			});
 
@@ -219,14 +219,14 @@ export const caseCommunicationRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const communication = await prisma.caseCommunication.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: {
 					fromUser: true,
 					case: true
 				}
 			});
 
-			if (!communication || communication.case?.organizationId !== context.organization.id) {
+			if (!communication) {
 				throw errors.NOT_FOUND({ message: 'CaseCommunication' });
 			}
 
@@ -279,6 +279,7 @@ export const caseCommunicationRouter = {
 			const communications = await prisma.caseCommunication.findMany({
 				where: {
 					caseId: input.caseId,
+					case: { organizationId: context.organization.id },
 					...(input.channel && { channel: input.channel as CommunicationChannel }),
 					...(input.direction && { direction: input.direction as CommunicationDirection }),
 					...(input.threadId && { threadId: input.threadId })
@@ -334,13 +335,13 @@ export const caseCommunicationRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.caseCommunication.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: {
 					case: true
 				}
 			});
 
-			if (!existing || existing.case?.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'CaseCommunication' });
 			}
 
@@ -368,8 +369,8 @@ export const caseCommunicationRouter = {
 			}
 
 			// Fetch updated communication with relations
-			const communication = await prisma.caseCommunication.findUnique({
-				where: { id: input.id },
+			const communication = await prisma.caseCommunication.findFirstOrThrow({
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: { fromUser: true }
 			});
 
@@ -418,7 +419,7 @@ export const caseCommunicationRouter = {
 			// Get thread summaries
 			const threads = await prisma.caseCommunication.groupBy({
 				by: ['threadId'],
-				where: { caseId: input.caseId },
+				where: { caseId: input.caseId, case: { organizationId: context.organization.id } },
 				_count: { id: true },
 				_max: { createdAt: true }
 			});
@@ -429,7 +430,8 @@ export const caseCommunicationRouter = {
 					const firstMessage = await prisma.caseCommunication.findFirst({
 						where: {
 							caseId: input.caseId,
-							threadId: thread.threadId
+							threadId: thread.threadId,
+							case: { organizationId: context.organization.id }
 						},
 						orderBy: { createdAt: 'asc' },
 						select: { subject: true }

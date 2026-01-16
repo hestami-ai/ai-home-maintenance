@@ -445,12 +445,17 @@ export const externalHoaRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via context relationship for connection pool safety
 			const approval = await prisma.externalHOAApproval.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					externalHoaContext: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { externalHoaContext: true }
 			});
 
-			if (!approval || approval.externalHoaContext.organizationId !== context.organization.id) {
+			if (!approval) {
 				throw errors.NOT_FOUND({ message: 'ExternalHOAApproval not found' });
 			}
 
@@ -586,12 +591,17 @@ export const externalHoaRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via context relationship for connection pool safety
 			const rule = await prisma.externalHOARule.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					externalHoaContext: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { externalHoaContext: true }
 			});
 
-			if (!rule || rule.externalHoaContext.organizationId !== context.organization.id) {
+			if (!rule) {
 				throw errors.NOT_FOUND({ message: 'ExternalHOARule not found' });
 			}
 

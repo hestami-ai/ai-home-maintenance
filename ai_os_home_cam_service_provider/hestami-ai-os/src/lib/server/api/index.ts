@@ -121,6 +121,9 @@ import { caseReviewRouter } from './routes/caseReview.js';
 // Phase 22: Permissions Admin
 import { permissionsAdminRouter } from './routes/permissionsAdmin.js';
 
+// Phase 37: Organization Admin (Staff Portal)
+import { organizationAdminRouter } from './routes/organizationAdmin.js';
+
 // Phase 15: Reporting & Analytics
 import {
 	reportDefinitionRouter,
@@ -279,7 +282,10 @@ export const appRouter = {
 	caseReview: caseReviewRouter,
 
 	// Phase 22: Permissions Admin
-	permissionsAdmin: permissionsAdminRouter
+	permissionsAdmin: permissionsAdminRouter,
+
+	// Phase 37: Organization Admin (Staff Portal)
+	organizationAdmin: organizationAdminRouter
 };
 
 export type AppRouter = typeof appRouter;

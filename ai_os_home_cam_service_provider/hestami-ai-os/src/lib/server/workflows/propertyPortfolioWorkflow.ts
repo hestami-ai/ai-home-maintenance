@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -63,18 +63,24 @@ async function createPortfolio(
 	createdAt: string;
 	updatedAt: string;
 }> {
-	const portfolio = await prisma.propertyPortfolio.create({
-		data: {
-			organizationId: input.organizationId,
-			name: input.name!,
-			description: input.description ?? null,
-			isActive: true
-		}
-	});
+	const portfolio = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.propertyPortfolio.create({
+				data: {
+					organizationId: input.organizationId,
+					name: input.name!,
+					description: input.description ?? null,
+					isActive: true
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create property portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PROPERTY_PORTFOLIO',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolio.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -109,23 +115,29 @@ async function updatePortfolio(
 	createdAt: string;
 	updatedAt: string;
 }> {
-	const portfolio = await prisma.propertyPortfolio.update({
-		where: { id: input.portfolioId },
-		data: {
-			...(input.name !== undefined && { name: input.name }),
-			...(input.description !== undefined && { description: input.description }),
-			...(input.isActive !== undefined && { isActive: input.isActive })
+	const portfolio = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.propertyPortfolio.update({
+				where: { id: input.portfolioId },
+				data: {
+					...(input.name !== undefined && { name: input.name }),
+					...(input.description !== undefined && { description: input.description }),
+					...(input.isActive !== undefined && { isActive: input.isActive })
+				},
+				include: {
+					_count: {
+						select: { properties: true }
+					}
+				}
+			});
 		},
-		include: {
-			_count: {
-				select: { properties: true }
-			}
-		}
-	});
+		{ userId: input.userId, reason: 'Update property portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PROPERTY_PORTFOLIO',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolio.id,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -154,14 +166,20 @@ async function deletePortfolio(
 	organizationId: string,
 	userId: string
 ): Promise<{ deleted: boolean }> {
-	await prisma.propertyPortfolio.update({
-		where: { id: portfolioId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.propertyPortfolio.update({
+				where: { id: portfolioId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Delete property portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'PROPERTY_PORTFOLIO',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolioId,
 		action: 'DELETE',
 		eventCategory: 'EXECUTION',
@@ -190,44 +208,54 @@ async function getOrCreateDefaultPortfolio(
 	updatedAt: string;
 	created: boolean;
 }> {
-	// Check for existing default portfolio
-	let portfolio = await prisma.propertyPortfolio.findFirst({
-		where: {
-			organizationId,
-			deletedAt: null,
-			isActive: true
-		},
-		orderBy: { createdAt: 'asc' },
-		include: {
-			_count: {
-				select: { properties: true }
-			}
-		}
-	});
-
-	let created = false;
-
-	if (!portfolio) {
-		// Create default portfolio
-		portfolio = await prisma.propertyPortfolio.create({
-			data: {
-				organizationId,
-				name: 'My Properties',
-				description: 'Default property portfolio',
-				isActive: true
-			},
-			include: {
-				_count: {
-					select: { properties: true }
+	const result = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// Check for existing default portfolio
+			let portfolio = await tx.propertyPortfolio.findFirst({
+				where: {
+					organizationId,
+					deletedAt: null,
+					isActive: true
+				},
+				orderBy: { createdAt: 'asc' },
+				include: {
+					_count: {
+						select: { properties: true }
+					}
 				}
-			}
-		});
-		created = true;
+			});
 
+			let created = false;
+
+			if (!portfolio) {
+				// Create default portfolio
+				portfolio = await tx.propertyPortfolio.create({
+					data: {
+						organizationId,
+						name: 'My Properties',
+						description: 'Default property portfolio',
+						isActive: true
+					},
+					include: {
+						_count: {
+							select: { properties: true }
+						}
+					}
+				});
+				created = true;
+			}
+
+			return { portfolio, created };
+		},
+		{ userId, reason: 'Get or create default property portfolio' }
+	);
+
+	if (result.created) {
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'PROPERTY_PORTFOLIO',
-			entityId: portfolio.id,
+			entityType: 'INDIVIDUAL_PROPERTY',
+			entityId: result.portfolio.id,
 			action: 'CREATE',
 			eventCategory: 'EXECUTION',
 			summary: 'Default property portfolio created',
@@ -241,14 +269,14 @@ async function getOrCreateDefaultPortfolio(
 	}
 
 	return {
-		portfolioId: portfolio.id,
-		name: portfolio.name,
-		description: portfolio.description,
-		isActive: portfolio.isActive,
-		propertyCount: portfolio._count.properties,
-		createdAt: portfolio.createdAt.toISOString(),
-		updatedAt: portfolio.updatedAt.toISOString(),
-		created
+		portfolioId: result.portfolio.id,
+		name: result.portfolio.name,
+		description: result.portfolio.description,
+		isActive: result.portfolio.isActive,
+		propertyCount: result.portfolio._count.properties,
+		createdAt: result.portfolio.createdAt.toISOString(),
+		updatedAt: result.portfolio.updatedAt.toISOString(),
+		created: result.created
 	};
 }
 

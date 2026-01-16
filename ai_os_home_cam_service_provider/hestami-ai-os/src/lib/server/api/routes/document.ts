@@ -14,9 +14,9 @@ import {
 import { startDocumentWorkflow, getOrgQueueDepth } from '../../workflows/documentWorkflow.js';
 import { recordActivityFromContext } from '../middleware/activityEvent.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { createHash } from 'crypto';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { recordSpanError } from '../middleware/tracing.js';
 import { createLogger, createModuleLogger } from '../../logger.js';
 import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
@@ -295,7 +295,7 @@ export const documentRouter = {
 
 				reqLog.debug('Document workflow completed', { documentId: workflowResult.entityId });
 
-				const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+				const document = await prisma.document.findFirstOrThrow({ where: { id: workflowResult.entityId, organizationId: context.organization.id } });
 
 				reqLog.info('Document upload completed', {
 					documentId: document.id,
@@ -423,7 +423,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document version' });
 			}
 
-			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const document = await prisma.document.findFirstOrThrow({ where: { id: workflowResult.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -518,7 +518,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document' });
 			}
 
-			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const document = await prisma.document.findFirstOrThrow({ where: { id: workflowResult.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -1039,7 +1039,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update document' });
 			}
 
-			const updated = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.document.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -1177,7 +1177,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to create document version' });
 			}
 
-			const document = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const document = await prisma.document.findFirstOrThrow({ where: { id: workflowResult.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -1231,6 +1231,7 @@ export const documentRouter = {
 			const versions = await prisma.document.findMany({
 				where: {
 					OR: [{ id: rootId }, { parentDocumentId: rootId }],
+					organizationId: context.organization.id,
 					deletedAt: null
 				},
 				orderBy: { version: 'desc' }
@@ -1286,7 +1287,7 @@ export const documentRouter = {
 			}
 
 			const target = await prisma.document.findFirst({
-				where: { id: input.targetVersionId, deletedAt: null }
+				where: { id: input.targetVersionId, organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!target) throw errors.NOT_FOUND({ message: 'Target version' });
@@ -1311,7 +1312,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to restore document version' });
 			}
 
-			const reverted = await prisma.document.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const reverted = await prisma.document.findFirstOrThrow({ where: { id: workflowResult.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -1376,7 +1377,7 @@ export const documentRouter = {
 			}
 
 			// Get the archived document to return the timestamp
-			const archived = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
+			const archived = await prisma.document.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 			return successResponse({ success: true, archivedAt: archived.archivedAt!.toISOString() }, context);
 		}),
 
@@ -1615,7 +1616,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to change document category' });
 			}
 
-			const updated = await prisma.document.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.document.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			// Record audit event for classification change
 			await recordActivityFromContext(context, {
@@ -1707,7 +1708,7 @@ export const documentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to link document to context' });
 			}
 
-			const binding = await prisma.documentContextBinding.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const binding = await prisma.documentContextBinding.findFirstOrThrow({ where: { id: workflowResult.entityId, document: { organizationId: context.organization.id } } });
 
 			// Record audit event for document reference
 			await recordActivityFromContext(context, {

@@ -181,14 +181,12 @@ export const portfolioRouter = {
 			// Cerbos authorization for listing
 			await context.cerbos.authorize('view', 'property_portfolio', 'list');
 
-			const whereClause = {
-				organizationId: context.organization.id,
-				deletedAt: null,
-				...(!input.includeInactive && { isActive: true })
-			};
-
 			const portfolios = await prisma.propertyPortfolio.findMany({
-				where: whereClause,
+				where: {
+					organizationId: context.organization.id,
+					deletedAt: null,
+					...(!input.includeInactive && { isActive: true })
+				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: { name: 'asc' },
@@ -431,7 +429,8 @@ export const portfolioRouter = {
 				where: {
 					portfolioId: input.portfolioId,
 					propertyId: input.propertyId,
-					removedAt: null
+					removedAt: null,
+					portfolio: { organizationId: context.organization.id }
 				}
 			});
 
@@ -516,7 +515,8 @@ export const portfolioRouter = {
 				where: {
 					portfolioId: input.portfolioId,
 					propertyId: input.propertyId,
-					removedAt: null
+					removedAt: null,
+					portfolio: { organizationId: context.organization.id }
 				}
 			});
 
@@ -602,7 +602,8 @@ export const portfolioRouter = {
 			const portfolioProperties = await prisma.portfolioProperty.findMany({
 				where: {
 					portfolioId: input.portfolioId,
-					removedAt: null
+					removedAt: null,
+					portfolio: { organizationId: context.organization.id }
 				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
@@ -685,7 +686,8 @@ export const portfolioRouter = {
 			const portfolioProperties = await prisma.portfolioProperty.findMany({
 				where: {
 					portfolioId: input.id,
-					removedAt: null
+					removedAt: null,
+					portfolio: { organizationId: context.organization.id }
 				},
 				include: { property: true }
 			});

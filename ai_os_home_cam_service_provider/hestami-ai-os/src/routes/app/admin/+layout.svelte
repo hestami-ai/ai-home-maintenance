@@ -40,7 +40,7 @@
 			title: 'Management',
 			items: [
 				{ label: 'Properties', href: '/app/admin/properties', icon: Home },
-				{ label: 'Customers', href: '/app/admin/customers', icon: Users },
+				{ label: 'Organizations', href: '/app/admin/organizations', icon: Building2 },
 				{ label: 'Documents', href: '/app/admin/documents', icon: FileText }
 			]
 		},

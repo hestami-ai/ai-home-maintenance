@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { NoticeType } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -53,18 +54,24 @@ async function createTemplate(
 		throw new Error('Notice template with this name already exists');
 	}
 
-	const template = await prisma.noticeTemplate.create({
-		data: {
-			associationId,
-			name,
-			noticeType: data.noticeType as NoticeType,
-			subject: data.subject as string,
-			bodyTemplate: data.bodyTemplate as string,
-			defaultCurePeriodDays: data.defaultCurePeriodDays as number | undefined
-		}
-	});
+	const template = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.noticeTemplate.create({
+				data: {
+					associationId,
+					name,
+					noticeType: data.noticeType as NoticeType,
+					subject: data.subject as string,
+					bodyTemplate: data.bodyTemplate as string,
+					defaultCurePeriodDays: data.defaultCurePeriodDays as number | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Creating notice template' }
+	);
 
-	console.log(`[NoticeTemplateWorkflow] CREATE_TEMPLATE template:${template.id} by user ${userId}`);
+	log.info(`CREATE_TEMPLATE template:${template.id} by user ${userId}`);
 	return template.id;
 }
 
@@ -91,18 +98,24 @@ async function updateTemplate(
 		}
 	}
 
-	await prisma.noticeTemplate.update({
-		where: { id: templateId },
-		data: {
-			name,
-			subject: data.subject as string | undefined,
-			bodyTemplate: data.bodyTemplate as string | undefined,
-			defaultCurePeriodDays: data.defaultCurePeriodDays as number | null | undefined,
-			isActive: data.isActive as boolean | undefined
-		}
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.noticeTemplate.update({
+				where: { id: templateId },
+				data: {
+					name,
+					subject: data.subject as string | undefined,
+					bodyTemplate: data.bodyTemplate as string | undefined,
+					defaultCurePeriodDays: data.defaultCurePeriodDays as number | null | undefined,
+					isActive: data.isActive as boolean | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Updating notice template' }
+	);
 
-	console.log(`[NoticeTemplateWorkflow] UPDATE_TEMPLATE template:${templateId} by user ${userId}`);
+	log.info(`UPDATE_TEMPLATE template:${templateId} by user ${userId}`);
 	return templateId;
 }
 
@@ -121,18 +134,25 @@ async function deleteTemplate(
 	const usedInSequence = await prisma.noticeSequenceStep.findFirst({
 		where: { templateId }
 	});
-	if (usedInSequence) {
-		// Soft delete by deactivating
-		await prisma.noticeTemplate.update({
-			where: { id: templateId },
-			data: { isActive: false }
-		});
-	} else {
-		// Hard delete if not used
-		await prisma.noticeTemplate.delete({ where: { id: templateId } });
-	}
 
-	console.log(`[NoticeTemplateWorkflow] DELETE_TEMPLATE template:${templateId} by user ${userId}`);
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			if (usedInSequence) {
+				// Soft delete by deactivating
+				await tx.noticeTemplate.update({
+					where: { id: templateId },
+					data: { isActive: false }
+				});
+			} else {
+				// Hard delete if not used
+				await tx.noticeTemplate.delete({ where: { id: templateId } });
+			}
+		},
+		{ userId, reason: 'Deleting notice template' }
+	);
+
+	log.info(`DELETE_TEMPLATE template:${templateId} by user ${userId}`);
 	return templateId;
 }
 
@@ -171,7 +191,7 @@ async function noticeTemplateWorkflow(input: NoticeTemplateWorkflowInput): Promi
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[NoticeTemplateWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

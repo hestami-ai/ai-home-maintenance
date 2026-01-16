@@ -126,8 +126,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create visit' });
 			}
 
-			const visit = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const visit = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(visit) }, context);
@@ -284,8 +284,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign visit' });
 			}
 
-			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updated = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
@@ -338,8 +338,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to confirm visit' });
 			}
 
-			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updated = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
@@ -392,8 +392,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to start visit' });
 			}
 
-			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updated = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
@@ -454,8 +454,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to complete visit' });
 			}
 
-			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updated = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
@@ -508,8 +508,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel visit' });
 			}
 
-			const updated = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updated = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
@@ -587,8 +587,8 @@ export const scheduledVisitRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reschedule visit' });
 			}
 
-			const newVisit = await prisma.scheduledVisit.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const newVisit = await prisma.scheduledVisit.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ visit: formatVisit(newVisit) }, context);

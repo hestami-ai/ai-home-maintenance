@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -120,13 +120,13 @@ async function createProperty(
 	property: IndividualPropertyWorkflowResult['property'];
 	externalHoa: IndividualPropertyWorkflowResult['externalHoa'];
 }> {
-	const result = await prisma.$transaction(async (tx) => {
+	const result = await orgTransaction(input.organizationId, async (tx) => {
 		// Create the property
 		const property = await tx.individualProperty.create({
 			data: {
 				ownerOrgId: input.organizationId,
 				name: input.name!,
-				propertyType: input.propertyType as 'SINGLE_FAMILY' | 'CONDO' | 'TOWNHOUSE' | 'MULTI_FAMILY' | 'COMMERCIAL' | 'LAND' | 'OTHER',
+				propertyType: input.propertyType as any,
 				addressLine1: input.addressLine1!,
 				addressLine2: input.addressLine2 ?? null,
 				city: input.city!,
@@ -171,7 +171,7 @@ async function createProperty(
 		}
 
 		return { property, externalHoa };
-	});
+	}, { userId: input.userId, reason: 'CREATE_INDIVIDUAL_PROPERTY' });
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -241,10 +241,12 @@ async function updateProperty(
 	if (input.bathrooms !== undefined) updateData.bathrooms = input.bathrooms;
 	if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
-	const property = await prisma.individualProperty.update({
-		where: { id: input.propertyId },
-		data: updateData
-	});
+	const property = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.individualProperty.update({
+			where: { id: input.propertyId },
+			data: updateData
+		});
+	}, { userId: input.userId, reason: 'UPDATE_INDIVIDUAL_PROPERTY' });
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -292,10 +294,12 @@ async function deleteProperty(
 	organizationId: string,
 	userId: string
 ): Promise<{ deleted: boolean }> {
-	await prisma.individualProperty.update({
-		where: { id: propertyId },
-		data: { isActive: false }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.individualProperty.update({
+			where: { id: propertyId },
+			data: { isActive: false }
+		});
+	}, { userId, reason: 'DELETE_INDIVIDUAL_PROPERTY' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -321,26 +325,34 @@ async function addToPortfolio(
 	organizationId: string,
 	userId: string
 ): Promise<{ added: boolean; portfolioPropertyId?: string }> {
-	// Check if already in portfolio
-	const existing = await prisma.portfolioProperty.findFirst({
-		where: {
-			propertyId,
-			portfolioId,
-			removedAt: null
-		}
-	});
+	// Check if already in portfolio and create if not - all in one transaction
+	const result = await orgTransaction(organizationId, async (tx) => {
+		const existing = await tx.portfolioProperty.findFirst({
+			where: {
+				propertyId,
+				portfolioId,
+				removedAt: null
+			}
+		});
 
-	if (existing) {
+		if (existing) {
+			return { added: false, portfolioPropertyId: undefined };
+		}
+
+		const membership = await tx.portfolioProperty.create({
+			data: {
+				propertyId,
+				portfolioId,
+				addedBy: userId
+			}
+		});
+
+		return { added: true, portfolioPropertyId: membership.id };
+	}, { userId, reason: 'ADD_TO_PORTFOLIO' });
+
+	if (!result.added) {
 		return { added: false };
 	}
-
-	const membership = await prisma.portfolioProperty.create({
-		data: {
-			propertyId,
-			portfolioId,
-			addedBy: userId
-		}
-	});
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -357,7 +369,7 @@ async function addToPortfolio(
 		newState: { portfolioId }
 	});
 
-	return { added: true, portfolioPropertyId: membership.id };
+	return { added: true, portfolioPropertyId: result.portfolioPropertyId };
 }
 
 async function removeFromPortfolio(
@@ -367,27 +379,36 @@ async function removeFromPortfolio(
 	userId: string,
 	portfolioPropertyId?: string
 ): Promise<{ removed: boolean }> {
-	// Use provided portfolioPropertyId if available, otherwise look up
-	let membershipId = portfolioPropertyId;
-	if (!membershipId) {
-		const membership = await prisma.portfolioProperty.findFirst({
-			where: {
-				propertyId,
-				portfolioId,
-				removedAt: null
+	// Look up and update in one transaction
+	const removed = await orgTransaction(organizationId, async (tx) => {
+		// Use provided portfolioPropertyId if available, otherwise look up
+		let membershipId = portfolioPropertyId;
+		if (!membershipId) {
+			const membership = await tx.portfolioProperty.findFirst({
+				where: {
+					propertyId,
+					portfolioId,
+					removedAt: null
+				}
+			});
+
+			if (!membership) {
+				return false;
 			}
+			membershipId = membership.id;
+		}
+
+		await tx.portfolioProperty.update({
+			where: { id: membershipId },
+			data: { removedAt: new Date() }
 		});
 
-		if (!membership) {
-			return { removed: false };
-		}
-		membershipId = membership.id;
-	}
+		return true;
+	}, { userId, reason: 'REMOVE_FROM_PORTFOLIO' });
 
-	await prisma.portfolioProperty.update({
-		where: { id: membershipId },
-		data: { removedAt: new Date() }
-	});
+	if (!removed) {
+		return { removed: false };
+	}
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -409,50 +430,56 @@ async function removeFromPortfolio(
 
 async function updateExternalHoa(
 	input: IndividualPropertyWorkflowInput
-): Promise<{ externalHoa: IndividualPropertyWorkflowResult['externalHoa'] }> {
-	// Check for existing HOA context
-	const existing = await prisma.externalHOAContext.findFirst({
-		where: { propertyId: input.propertyId }
-	});
-
-	let externalHoa;
-
-	if (existing) {
-		// Update existing
-		externalHoa = await prisma.externalHOAContext.update({
-			where: { id: existing.id },
-			data: {
-				hoaName: input.hoaName!,
-				hoaContactName: input.hoaContactName ?? null,
-				hoaContactEmail: input.hoaContactEmail ?? null,
-				hoaContactPhone: input.hoaContactPhone ?? null,
-				hoaAddress: input.hoaAddress ?? null,
-				notes: input.notes ?? null
-			}
+): Promise<{ externalHoa: IndividualPropertyWorkflowResult['externalHoa']; wasExisting: boolean }> {
+	// Check for existing HOA context and update/create in one transaction
+	const result = await orgTransaction(input.organizationId, async (tx) => {
+		const existing = await tx.externalHOAContext.findFirst({
+			where: { propertyId: input.propertyId }
 		});
-	} else {
-		// Create new
-		externalHoa = await prisma.externalHOAContext.create({
-			data: {
-				organizationId: input.organizationId,
-				propertyId: input.propertyId!,
-				hoaName: input.hoaName!,
-				hoaContactName: input.hoaContactName ?? null,
-				hoaContactEmail: input.hoaContactEmail ?? null,
-				hoaContactPhone: input.hoaContactPhone ?? null,
-				hoaAddress: input.hoaAddress ?? null,
-				notes: input.notes ?? null
-			}
-		});
-	}
+
+		let externalHoa;
+
+		if (existing) {
+			// Update existing
+			externalHoa = await tx.externalHOAContext.update({
+				where: { id: existing.id },
+				data: {
+					hoaName: input.hoaName!,
+					hoaContactName: input.hoaContactName ?? null,
+					hoaContactEmail: input.hoaContactEmail ?? null,
+					hoaContactPhone: input.hoaContactPhone ?? null,
+					hoaAddress: input.hoaAddress ?? null,
+					notes: input.notes ?? null
+				}
+			});
+		} else {
+			// Create new
+			externalHoa = await tx.externalHOAContext.create({
+				data: {
+					organizationId: input.organizationId,
+					propertyId: input.propertyId!,
+					hoaName: input.hoaName!,
+					hoaContactName: input.hoaContactName ?? null,
+					hoaContactEmail: input.hoaContactEmail ?? null,
+					hoaContactPhone: input.hoaContactPhone ?? null,
+					hoaAddress: input.hoaAddress ?? null,
+					notes: input.notes ?? null
+				}
+			});
+		}
+
+		return { externalHoa, wasExisting: !!existing };
+	}, { userId: input.userId, reason: 'UPDATE_EXTERNAL_HOA' });
+
+	const { externalHoa, wasExisting } = result;
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
 		entityType: 'EXTERNAL_HOA',
 		entityId: externalHoa.id,
-		action: existing ? 'UPDATE' : 'CREATE',
+		action: wasExisting ? 'UPDATE' : 'CREATE',
 		eventCategory: 'EXECUTION',
-		summary: `External HOA ${existing ? 'updated' : 'created'}: ${input.hoaName}`,
+		summary: `External HOA ${wasExisting ? 'updated' : 'created'}: ${input.hoaName}`,
 		performedById: input.userId,
 		performedByType: 'HUMAN',
 		workflowId: 'individualPropertyWorkflow_v1',
@@ -470,7 +497,8 @@ async function updateExternalHoa(
 			hoaContactPhone: externalHoa.hoaContactPhone,
 			hoaAddress: externalHoa.hoaAddress,
 			notes: externalHoa.notes
-		}
+		},
+		wasExisting
 	};
 }
 

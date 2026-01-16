@@ -6,10 +6,10 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { ContractorTradeType, PricebookItemType, PriceRuleType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { orgTransaction } from '../db/rls.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
@@ -52,26 +52,33 @@ async function upsertPricebook(
 	pricebookId: string | undefined,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	let pricebook;
-	if (pricebookId) {
-		pricebook = await prisma.pricebook.update({
-			where: { id: pricebookId },
-			data: {
-				name: data.name as string | undefined,
-				description: data.description as string | undefined,
-				isActive: data.isActive as boolean | undefined
+	const pricebook = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			if (pricebookId) {
+				return tx.pricebook.update({
+					where: { id: pricebookId },
+					data: {
+						name: data.name as string | undefined,
+						description: data.description as string | undefined,
+						isActive: data.isActive as boolean | undefined
+					}
+				});
+			} else {
+				return tx.pricebook.create({
+					data: {
+						organizationId,
+						name: data.name as string,
+						description: data.description as string | undefined,
+						isActive: data.isActive as boolean ?? true
+					}
+				});
 			}
-		});
-	} else {
-		pricebook = await prisma.pricebook.create({
-			data: {
-				organizationId,
-				name: data.name as string,
-				description: data.description as string | undefined,
-				isActive: data.isActive as boolean ?? true
-			}
-		});
-	}
+		},
+		{ userId, reason: pricebookId ? 'Updating pricebook' : 'Creating pricebook' }
+	);
+
+	log.info(`Pricebook ${pricebookId ? 'updated' : 'created'}: ${pricebook.name}`, { pricebookId: pricebook.id, action: pricebookId ? 'updated' : 'created' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -97,14 +104,22 @@ async function createVersion(
 	versionNumber: number,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const version = await prisma.pricebookVersion.create({
-		data: {
-			pricebookId,
-			versionNumber,
-			notes: data.notes as string | undefined,
-			status: 'DRAFT'
-		}
-	});
+	const version = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.pricebookVersion.create({
+				data: {
+					pricebookId,
+					versionNumber,
+					notes: data.notes as string | undefined,
+					status: 'DRAFT'
+				}
+			});
+		},
+		{ userId, reason: 'Creating pricebook version' }
+	);
+
+	log.info(`Pricebook version created: v${versionNumber}`, { versionId: version.id, versionNumber });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -128,14 +143,22 @@ async function publishVersion(
 	userId: string,
 	versionId: string
 ): Promise<{ id: string }> {
-	const version = await prisma.pricebookVersion.update({
-		where: { id: versionId },
-		data: {
-			status: 'PUBLISHED',
-			publishedAt: new Date(),
-			publishedBy: userId
-		}
-	});
+	const version = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.pricebookVersion.update({
+				where: { id: versionId },
+				data: {
+					status: 'PUBLISHED',
+					publishedAt: new Date(),
+					publishedBy: userId
+				}
+			});
+		},
+		{ userId, reason: 'Publishing pricebook version' }
+	);
+
+	log.info('Pricebook version published', { versionId: version.id });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -160,16 +183,24 @@ async function activateVersion(
 	versionId: string,
 	pricebookId: string
 ): Promise<{ id: string }> {
-	// Deactivate other active versions
-	await prisma.pricebookVersion.updateMany({
-		where: { pricebookId, status: 'ACTIVE', NOT: { id: versionId } },
-		data: { status: 'ARCHIVED' }
-	});
+	const version = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// Deactivate other active versions
+			await tx.pricebookVersion.updateMany({
+				where: { pricebookId, status: 'ACTIVE', NOT: { id: versionId } },
+				data: { status: 'ARCHIVED' }
+			});
 
-	const version = await prisma.pricebookVersion.update({
-		where: { id: versionId },
-		data: { status: 'ACTIVE', activatedAt: new Date() }
-	});
+			return tx.pricebookVersion.update({
+				where: { id: versionId },
+				data: { status: 'ACTIVE', activatedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Activating pricebook version' }
+	);
+
+	log.info('Pricebook version activated', { versionId: version.id, pricebookId });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -195,34 +226,41 @@ async function upsertItem(
 	itemId: string | undefined,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	let item;
-	if (itemId) {
-		item = await prisma.pricebookItem.update({
-			where: { id: itemId },
-			data: {
-				code: data.code as string | undefined,
-				name: data.name as string | undefined,
-				description: data.description as string | undefined,
-				type: data.type as PricebookItemType | undefined,
-				trade: data.trade as ContractorTradeType | undefined,
-				basePrice: data.basePrice as number | undefined,
-				unitOfMeasure: data.unitOfMeasure as string | undefined
+	const item = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			if (itemId) {
+				return tx.pricebookItem.update({
+					where: { id: itemId },
+					data: {
+						code: data.code as string | undefined,
+						name: data.name as string | undefined,
+						description: data.description as string | undefined,
+						type: data.type as PricebookItemType | undefined,
+						trade: data.trade as ContractorTradeType | undefined,
+						basePrice: data.basePrice as number | undefined,
+						unitOfMeasure: data.unitOfMeasure as string | undefined
+					}
+				});
+			} else {
+				return tx.pricebookItem.create({
+					data: {
+						pricebookVersionId: versionId,
+						code: data.code as string,
+						name: data.name as string,
+						description: data.description as string | undefined,
+						type: data.type as PricebookItemType,
+						trade: data.trade as ContractorTradeType | undefined,
+						basePrice: data.basePrice as number,
+						unitOfMeasure: data.unitOfMeasure as string | undefined
+					}
+				});
 			}
-		});
-	} else {
-		item = await prisma.pricebookItem.create({
-			data: {
-				pricebookVersionId: versionId,
-				code: data.code as string,
-				name: data.name as string,
-				description: data.description as string | undefined,
-				type: data.type as PricebookItemType,
-				trade: data.trade as ContractorTradeType | undefined,
-				basePrice: data.basePrice as number,
-				unitOfMeasure: data.unitOfMeasure as string | undefined
-			}
-		});
-	}
+		},
+		{ userId, reason: itemId ? 'Updating pricebook item' : 'Creating pricebook item' }
+	);
+
+	log.info(`Pricebook item ${itemId ? 'updated' : 'created'}: ${item.name}`, { itemId: item.id, action: itemId ? 'updated' : 'created' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -248,32 +286,39 @@ async function upsertRule(
 	ruleId: string | undefined,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	let rule;
-	if (ruleId) {
-		rule = await prisma.priceRule.update({
-			where: { id: ruleId },
-			data: {
-				name: data.name as string | undefined,
-				description: data.description as string | undefined,
-				ruleType: data.ruleType as PriceRuleType | undefined,
-				priority: data.priority as number | undefined,
-				percentageAdjustment: data.percentageAdjustment as number | undefined,
-				amountAdjustment: data.amountAdjustment as number | undefined
+	const rule = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			if (ruleId) {
+				return tx.priceRule.update({
+					where: { id: ruleId },
+					data: {
+						name: data.name as string | undefined,
+						description: data.description as string | undefined,
+						ruleType: data.ruleType as PriceRuleType | undefined,
+						priority: data.priority as number | undefined,
+						percentageAdjustment: data.percentageAdjustment as number | undefined,
+						amountAdjustment: data.amountAdjustment as number | undefined
+					}
+				});
+			} else {
+				return tx.priceRule.create({
+					data: {
+						pricebookVersionId: versionId,
+						name: data.name as string,
+						description: data.description as string | undefined,
+						ruleType: data.ruleType as PriceRuleType,
+						priority: data.priority as number ?? 0,
+						percentageAdjustment: data.percentageAdjustment as number | undefined,
+						amountAdjustment: data.amountAdjustment as number | undefined
+					}
+				});
 			}
-		});
-	} else {
-		rule = await prisma.priceRule.create({
-			data: {
-				pricebookVersionId: versionId,
-				name: data.name as string,
-				description: data.description as string | undefined,
-				ruleType: data.ruleType as PriceRuleType,
-				priority: data.priority as number ?? 0,
-				percentageAdjustment: data.percentageAdjustment as number | undefined,
-				amountAdjustment: data.amountAdjustment as number | undefined
-			}
-		});
-	}
+		},
+		{ userId, reason: ruleId ? 'Updating price rule' : 'Creating price rule' }
+	);
+
+	log.info(`Price rule ${ruleId ? 'updated' : 'created'}: ${rule.name}`, { ruleId: rule.id, action: ruleId ? 'updated' : 'created' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -299,29 +344,36 @@ async function upsertTemplate(
 	templateId: string | undefined,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	let template;
-	if (templateId) {
-		template = await prisma.jobTemplate.update({
-			where: { id: templateId },
-			data: {
-				name: data.name as string | undefined,
-				description: data.description as string | undefined,
-				defaultTrade: data.trade as ContractorTradeType | undefined,
-				isActive: data.isActive as boolean | undefined
+	const template = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			if (templateId) {
+				return tx.jobTemplate.update({
+					where: { id: templateId },
+					data: {
+						name: data.name as string | undefined,
+						description: data.description as string | undefined,
+						defaultTrade: data.trade as ContractorTradeType | undefined,
+						isActive: data.isActive as boolean | undefined
+					}
+				});
+			} else {
+				return tx.jobTemplate.create({
+					data: {
+						organizationId,
+						pricebookVersionId: versionId,
+						name: data.name as string,
+						description: data.description as string | undefined,
+						defaultTrade: data.trade as ContractorTradeType | undefined,
+						isActive: data.isActive as boolean ?? true
+					}
+				});
 			}
-		});
-	} else {
-		template = await prisma.jobTemplate.create({
-			data: {
-				organizationId,
-				pricebookVersionId: versionId,
-				name: data.name as string,
-				description: data.description as string | undefined,
-				defaultTrade: data.trade as ContractorTradeType | undefined,
-				isActive: data.isActive as boolean ?? true
-			}
-		});
-	}
+		},
+		{ userId, reason: templateId ? 'Updating job template' : 'Creating job template' }
+	);
+
+	log.info(`Job template ${templateId ? 'updated' : 'created'}: ${template.name}`, { templateId: template.id, action: templateId ? 'updated' : 'created' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -446,7 +498,7 @@ export const pricebookWorkflow_v1 = DBOS.registerWorkflow(pricebookWorkflow);
 
 export async function startPricebookWorkflow(
 	input: PricebookWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<PricebookWorkflowResult> {
 	const handle = await DBOS.startWorkflow(pricebookWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

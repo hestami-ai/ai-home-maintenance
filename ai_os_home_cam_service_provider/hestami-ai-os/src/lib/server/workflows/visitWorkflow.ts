@@ -6,10 +6,9 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
-import type { ScheduledVisitStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { orgTransaction } from '../db/rls.js';
 
 const WORKFLOW_STATUS_EVENT = 'visit_status';
 const WORKFLOW_ERROR_EVENT = 'visit_error';
@@ -44,19 +43,25 @@ async function createVisit(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const visit = await prisma.scheduledVisit.create({
-		data: {
-			contractId: data.contractId as string,
-			scheduleId: data.scheduleId as string | undefined,
-			visitNumber: data.visitNumber as number,
-			scheduledDate: new Date(data.scheduledDate as string),
-			scheduledStart: data.scheduledStart ? new Date(data.scheduledStart as string) : undefined,
-			scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd as string) : undefined,
-			technicianId: data.technicianId as string | undefined,
-			status: 'SCHEDULED',
-			serviceNotes: data.notes as string | undefined
-		}
-	});
+	const visit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.scheduledVisit.create({
+				data: {
+					contractId: data.contractId as string,
+					scheduleId: data.scheduleId as string | undefined,
+					visitNumber: data.visitNumber as number,
+					scheduledDate: new Date(data.scheduledDate as string),
+					scheduledStart: data.scheduledStart ? new Date(data.scheduledStart as string) : undefined,
+					scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd as string) : undefined,
+					technicianId: data.technicianId as string | undefined,
+					status: 'SCHEDULED',
+					serviceNotes: data.notes as string | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Creating scheduled visit' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -81,13 +86,19 @@ async function assignVisit(
 	visitId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const visit = await prisma.scheduledVisit.update({
-		where: { id: visitId },
-		data: {
-			technicianId: data.technicianId as string,
-			assignedAt: new Date()
-		}
-	});
+	const visit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.scheduledVisit.update({
+				where: { id: visitId },
+				data: {
+					technicianId: data.technicianId as string,
+					assignedAt: new Date()
+				}
+			});
+		},
+		{ userId, reason: 'Assigning visit to technician' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -111,13 +122,19 @@ async function confirmVisit(
 	userId: string,
 	visitId: string
 ): Promise<{ id: string }> {
-	const visit = await prisma.scheduledVisit.update({
-		where: { id: visitId },
-		data: {
-			status: 'CONFIRMED',
-			confirmedAt: new Date()
-		}
-	});
+	const visit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.scheduledVisit.update({
+				where: { id: visitId },
+				data: {
+					status: 'CONFIRMED',
+					confirmedAt: new Date()
+				}
+			});
+		},
+		{ userId, reason: 'Confirming visit' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -141,13 +158,19 @@ async function startVisit(
 	userId: string,
 	visitId: string
 ): Promise<{ id: string }> {
-	const visit = await prisma.scheduledVisit.update({
-		where: { id: visitId },
-		data: {
-			status: 'IN_PROGRESS',
-			actualStart: new Date()
-		}
-	});
+	const visit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.scheduledVisit.update({
+				where: { id: visitId },
+				data: {
+					status: 'IN_PROGRESS',
+					actualStart: new Date()
+				}
+			});
+		},
+		{ userId, reason: 'Starting visit' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -172,15 +195,21 @@ async function completeVisit(
 	visitId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const visit = await prisma.scheduledVisit.update({
-		where: { id: visitId },
-		data: {
-			status: 'COMPLETED',
-			actualEnd: new Date(),
-			completedAt: new Date(),
-			completionNotes: data.completionNotes as string | undefined
-		}
-	});
+	const visit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.scheduledVisit.update({
+				where: { id: visitId },
+				data: {
+					status: 'COMPLETED',
+					actualEnd: new Date(),
+					completedAt: new Date(),
+					completionNotes: data.completionNotes as string | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Completing visit' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -203,14 +232,20 @@ async function cancelVisit(
 	organizationId: string,
 	userId: string,
 	visitId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const visit = await prisma.scheduledVisit.update({
-		where: { id: visitId },
-		data: {
-			status: 'CANCELLED'
-		}
-	});
+	const visit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.scheduledVisit.update({
+				where: { id: visitId },
+				data: {
+					status: 'CANCELLED'
+				}
+			});
+		},
+		{ userId, reason: 'Cancelling visit' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -235,28 +270,34 @@ async function rescheduleVisit(
 	visitId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	// Cancel old visit and create new one
-	await prisma.scheduledVisit.update({
-		where: { id: visitId },
-		data: {
-			status: 'RESCHEDULED'
-		}
-	});
+	// Cancel old visit and create new one in a single transaction
+	const newVisit = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			await tx.scheduledVisit.update({
+				where: { id: visitId },
+				data: {
+					status: 'RESCHEDULED'
+				}
+			});
 
-	const newVisit = await prisma.scheduledVisit.create({
-		data: {
-			contractId: data.contractId as string,
-			scheduleId: data.scheduleId as string | undefined,
-			visitNumber: data.visitNumber as number,
-			scheduledDate: new Date(data.newScheduledDate as string),
-			scheduledStart: data.newScheduledStart ? new Date(data.newScheduledStart as string) : undefined,
-			scheduledEnd: data.newScheduledEnd ? new Date(data.newScheduledEnd as string) : undefined,
-			technicianId: data.technicianId as string | undefined,
-			status: 'SCHEDULED',
-			rescheduleReason: data.reason as string | undefined,
-			rescheduledFrom: visitId
-		}
-	});
+			return tx.scheduledVisit.create({
+				data: {
+					contractId: data.contractId as string,
+					scheduleId: data.scheduleId as string | undefined,
+					visitNumber: data.visitNumber as number,
+					scheduledDate: new Date(data.newScheduledDate as string),
+					scheduledStart: data.newScheduledStart ? new Date(data.newScheduledStart as string) : undefined,
+					scheduledEnd: data.newScheduledEnd ? new Date(data.newScheduledEnd as string) : undefined,
+					technicianId: data.technicianId as string | undefined,
+					status: 'SCHEDULED',
+					rescheduleReason: data.reason as string | undefined,
+					rescheduledFrom: visitId
+				}
+			});
+		},
+		{ userId, reason: 'Rescheduling visit' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -380,7 +421,7 @@ export const visitWorkflow_v1 = DBOS.registerWorkflow(visitWorkflow);
 
 export async function startVisitWorkflow(
 	input: VisitWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<VisitWorkflowResult> {
 	const handle = await DBOS.startWorkflow(visitWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

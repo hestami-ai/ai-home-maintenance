@@ -6,12 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { Prisma } from '../../../../generated/prisma/client.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const WORKFLOW_STATUS_EVENT = 'owner_intent_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'owner_intent_workflow_error';
@@ -95,20 +95,26 @@ async function createIntent(
 	status: string;
 	createdAt: string;
 }> {
-	const intent = await prisma.ownerIntent.create({
-		data: {
-			organizationId: input.organizationId,
-			propertyId: input.propertyId!,
-			title: input.title!,
-			description: input.description!,
-			category: input.category as 'MAINTENANCE' | 'IMPROVEMENT' | 'ISSUE' | 'INQUIRY' | 'EMERGENCY' | 'OTHER',
-			priority: (input.priority ?? 'NORMAL') as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT',
-			status: 'DRAFT',
-			constraints: (input.constraints ?? undefined) as Prisma.InputJsonValue | undefined,
-			attachments: input.attachments,
-			submittedByPartyId: input.submittedByPartyId
-		}
-	});
+	const intent = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.ownerIntent.create({
+				data: {
+					organizationId: input.organizationId,
+					propertyId: input.propertyId!,
+					title: input.title!,
+					description: input.description!,
+					category: input.category as any,
+					priority: (input.priority ?? 'NORMAL') as any,
+					status: 'DRAFT',
+					constraints: (input.constraints ?? undefined) as Prisma.InputJsonValue | undefined,
+					attachments: input.attachments,
+					submittedByPartyId: input.submittedByPartyId
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -146,25 +152,31 @@ async function updateIntent(
 	priority: string;
 	updatedAt: string;
 }> {
-	const intent = await prisma.ownerIntent.update({
-		where: { id: input.intentId },
-		data: {
-			...(input.title !== undefined && { title: input.title }),
-			...(input.description !== undefined && { description: input.description }),
-			...(input.category !== undefined && { category: input.category as 'MAINTENANCE' | 'IMPROVEMENT' | 'ISSUE' | 'INQUIRY' | 'EMERGENCY' | 'OTHER' }),
-			...(input.priority !== undefined && { priority: input.priority as 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' }),
-			...(input.constraints !== undefined && {
-				constraints: input.constraints === null
-					? Prisma.DbNull
-					: (input.constraints as Prisma.InputJsonValue)
-			}),
-			...(input.attachments !== undefined && {
-				attachments: input.attachments === null
-					? Prisma.DbNull
-					: (input.attachments as Prisma.InputJsonValue)
-			})
-		}
-	});
+	const intent = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: input.intentId },
+				data: {
+					...(input.title !== undefined && { title: input.title }),
+					...(input.description !== undefined && { description: input.description }),
+					...(input.category !== undefined && { category: input.category as any }),
+					...(input.priority !== undefined && { priority: input.priority as any }),
+					...(input.constraints !== undefined && {
+						constraints: input.constraints === null
+							? Prisma.DbNull
+							: (input.constraints as Prisma.InputJsonValue)
+					}),
+					...(input.attachments !== undefined && {
+						attachments: input.attachments === null
+							? Prisma.DbNull
+							: (input.attachments as Prisma.InputJsonValue)
+					})
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Update owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -202,13 +214,19 @@ async function submitIntent(
 	submittedAt: string;
 }> {
 	const now = new Date();
-	const intent = await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: {
-			status: 'SUBMITTED',
-			submittedAt: now
-		}
-	});
+	const intent = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: intentId },
+				data: {
+					status: 'SUBMITTED',
+					submittedAt: now
+				}
+			});
+		},
+		{ userId, reason: 'Submit owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -246,14 +264,20 @@ async function acknowledgeIntent(
 	acknowledgedBy: string;
 }> {
 	const now = new Date();
-	const intent = await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: {
-			status: 'ACKNOWLEDGED',
-			acknowledgedAt: now,
-			acknowledgedBy: userId
-		}
-	});
+	const intent = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: intentId },
+				data: {
+					status: 'ACKNOWLEDGED',
+					acknowledgedAt: now,
+					acknowledgedBy: userId
+				}
+			});
+		},
+		{ userId, reason: 'Acknowledge owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -294,14 +318,20 @@ async function convertToCase(
 	convertedAt: string;
 }> {
 	const now = new Date();
-	const intent = await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: {
-			status: 'CONVERTED_TO_CASE',
-			convertedCaseId: caseId,
-			convertedAt: now
-		}
-	});
+	const intent = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: intentId },
+				data: {
+					status: 'CONVERTED_TO_CASE',
+					convertedCaseId: caseId,
+					convertedAt: now
+				}
+			});
+		},
+		{ userId, reason: 'Convert owner intent to case' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -343,15 +373,21 @@ async function declineIntent(
 	declinedBy: string;
 }> {
 	const now = new Date();
-	const intent = await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: {
-			status: 'DECLINED',
-			declinedAt: now,
-			declinedBy: userId,
-			declineReason: reason
-		}
-	});
+	const intent = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: intentId },
+				data: {
+					status: 'DECLINED',
+					declinedAt: now,
+					declinedBy: userId,
+					declineReason: reason
+				}
+			});
+		},
+		{ userId, reason: 'Decline owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -380,7 +416,7 @@ async function declineIntent(
 
 async function withdrawIntent(
 	intentId: string,
-	reason: string | undefined,
+	withdrawReason: string | undefined,
 	organizationId: string,
 	userId: string,
 	propertyId: string,
@@ -391,14 +427,20 @@ async function withdrawIntent(
 	withdrawnAt: string;
 }> {
 	const now = new Date();
-	const intent = await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: {
-			status: 'WITHDRAWN',
-			withdrawnAt: now,
-			withdrawReason: reason
-		}
-	});
+	const intent = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: intentId },
+				data: {
+					status: 'WITHDRAWN',
+					withdrawnAt: now,
+					withdrawReason
+				}
+			});
+		},
+		{ userId, reason: 'Withdraw owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -406,7 +448,7 @@ async function withdrawIntent(
 		entityId: intentId,
 		action: 'CANCEL',
 		eventCategory: 'INTENT',
-		summary: `Owner withdrew intent${reason ? `: ${reason}` : ''}`,
+		summary: `Owner withdrew intent${withdrawReason ? `: ${withdrawReason}` : ''}`,
 		performedById: userId,
 		performedByType: 'HUMAN',
 		workflowId: 'ownerIntentWorkflow_v1',
@@ -414,7 +456,7 @@ async function withdrawIntent(
 		workflowVersion: 'v1',
 		propertyId,
 		previousState: { status: previousStatus },
-		newState: { status: 'WITHDRAWN', withdrawReason: reason }
+		newState: { status: 'WITHDRAWN', withdrawReason }
 	});
 
 	return {
@@ -438,18 +480,24 @@ async function addNote(
 	createdBy: string;
 	createdAt: string;
 }> {
-	const note = await prisma.intentNote.create({
-		data: {
-			intentId,
-			content,
-			isInternal,
-			createdBy: userId
-		}
-	});
+	const note = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.intentNote.create({
+				data: {
+					intentId,
+					content,
+					isInternal,
+					createdBy: userId
+				}
+			});
+		},
+		{ userId, reason: 'Add note to owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INTENT_NOTE',
+		entityType: 'OWNER_INTENT',
 		entityId: note.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -478,10 +526,16 @@ async function deleteIntent(
 	userId: string
 ): Promise<{ deletedAt: string }> {
 	const now = new Date();
-	await prisma.ownerIntent.update({
-		where: { id: intentId },
-		data: { deletedAt: now }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.ownerIntent.update({
+				where: { id: intentId },
+				data: { deletedAt: now }
+			});
+		},
+		{ userId, reason: 'Delete owner intent' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,

@@ -7,8 +7,10 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 
     if (!organization) {
         return {
-            properties: []
-        , association: null};
+            properties: [],
+            organization: null,
+            association: null
+        };
     }
 
     // Build context using data from parent layout
@@ -19,7 +21,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
     const staffRoles = staff?.roles ?? [];
     const pillarAccess = staff?.pillarAccess ?? [];
     const role = orgRoles[organization.id];
-    
+
     const context = buildServerContext(locals, { orgRoles, staffRoles, pillarAccess, organization, role });
     const client = createDirectClient(context);
 
@@ -36,12 +38,16 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
         }));
 
         return {
-            properties
-        , association: null};
+            properties,
+            organization,
+            association: null
+        };
     } catch (err) {
         console.error('Failed to load properties for new service call:', err);
         return {
-            properties: []
-        , association: null};
+            properties: [],
+            organization,
+            association: null
+        };
     }
 };

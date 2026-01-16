@@ -139,8 +139,8 @@ export const timeEntryRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create time entry' });
 			}
 
-			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const timeEntry = await prisma.jobTimeEntry.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ timeEntry: formatTimeEntry(timeEntry) }, context);
@@ -210,8 +210,8 @@ export const timeEntryRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to stop time entry' });
 			}
 
-			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const timeEntry = await prisma.jobTimeEntry.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ timeEntry: formatTimeEntry(timeEntry) }, context);
@@ -440,8 +440,8 @@ export const timeEntryRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update time entry' });
 			}
 
-			const timeEntry = await prisma.jobTimeEntry.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const timeEntry = await prisma.jobTimeEntry.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ timeEntry: formatTimeEntry(timeEntry) }, context);

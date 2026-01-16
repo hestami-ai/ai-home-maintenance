@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -79,7 +79,7 @@ async function createPropertyOwnership(
 	createdAt: string;
 }> {
 	// Use a transaction to ensure atomicity of primary contact update and create
-	const propertyOwnership = await prisma.$transaction(async (tx) => {
+	const propertyOwnership = await orgTransaction(input.organizationId, async (tx) => {
 		// If setting as primary contact, unset other primaries for this property
 		if (input.isPrimaryContact) {
 			await tx.propertyOwnership.updateMany({
@@ -101,11 +101,11 @@ async function createPropertyOwnership(
 				notes: input.notes
 			}
 		});
-	});
+	}, { userId: input.userId, reason: 'Create property ownership record' });
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PROPERTY_OWNERSHIP',
+		entityType: 'OWNERSHIP',
 		entityId: propertyOwnership.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -143,7 +143,7 @@ async function updatePropertyOwnership(
 	updatedAt: string;
 }> {
 	// Use a transaction to ensure atomicity of primary contact update
-	const propertyOwnership = await prisma.$transaction(async (tx) => {
+	const propertyOwnership = await orgTransaction(input.organizationId, async (tx) => {
 		// If setting as primary contact, unset other primaries for this property
 		if (input.isPrimaryContact === true) {
 			await tx.propertyOwnership.updateMany({
@@ -165,11 +165,11 @@ async function updatePropertyOwnership(
 				...(input.notes !== undefined && { notes: input.notes })
 			}
 		});
-	});
+	}, { userId: input.userId, reason: 'Update property ownership record' });
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PROPERTY_OWNERSHIP',
+		entityType: 'OWNERSHIP',
 		entityId: propertyOwnership.id,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -202,18 +202,20 @@ async function verifyPropertyOwnership(
 	verifiedBy: string;
 }> {
 	const now = new Date();
-	const propertyOwnership = await prisma.propertyOwnership.update({
-		where: { id: propertyOwnershipId },
-		data: {
-			status: 'ACTIVE',
-			verifiedAt: now,
-			verifiedBy: userId
-		}
-	});
+	const propertyOwnership = await orgTransaction(organizationId, async (tx) => {
+		return tx.propertyOwnership.update({
+			where: { id: propertyOwnershipId },
+			data: {
+				status: 'ACTIVE',
+				verifiedAt: now,
+				verifiedBy: userId
+			}
+		});
+	}, { userId, reason: 'Verify property ownership record' });
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'PROPERTY_OWNERSHIP',
+		entityType: 'OWNERSHIP',
 		entityId: propertyOwnershipId,
 		action: 'STATUS_CHANGE',
 		eventCategory: 'EXECUTION',
@@ -245,7 +247,7 @@ async function terminatePropertyOwnership(
 	effectiveTo: string;
 }> {
 	// Use a transaction to terminate ownership and revoke delegated authorities
-	const propertyOwnership = await prisma.$transaction(async (tx) => {
+	const propertyOwnership = await orgTransaction(organizationId, async (tx) => {
 		const ownership = await tx.propertyOwnership.update({
 			where: { id: propertyOwnershipId },
 			data: {
@@ -270,11 +272,11 @@ async function terminatePropertyOwnership(
 		});
 
 		return ownership;
-	});
+	}, { userId, reason: 'Terminate property ownership' });
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'PROPERTY_OWNERSHIP',
+		entityType: 'OWNERSHIP',
 		entityId: propertyOwnershipId,
 		action: 'STATUS_CHANGE',
 		eventCategory: 'EXECUTION',
@@ -302,7 +304,7 @@ async function deletePropertyOwnership(
 	const now = new Date();
 
 	// Use a transaction to soft delete ownership and revoke delegated authorities
-	await prisma.$transaction(async (tx) => {
+	await orgTransaction(organizationId, async (tx) => {
 		await tx.propertyOwnership.update({
 			where: { id: propertyOwnershipId },
 			data: { deletedAt: now }
@@ -318,11 +320,11 @@ async function deletePropertyOwnership(
 				revokeReason: 'Property ownership deleted'
 			}
 		});
-	});
+	}, { userId, reason: 'Delete property ownership' });
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'PROPERTY_OWNERSHIP',
+		entityType: 'OWNERSHIP',
 		entityId: propertyOwnershipId,
 		action: 'DELETE',
 		eventCategory: 'EXECUTION',

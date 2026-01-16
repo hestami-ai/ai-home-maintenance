@@ -53,7 +53,7 @@ export const arcReviewRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add member' });
 			}
 
-			const member = await prisma.aRCCommitteeMember.findUniqueOrThrow({ where: { id: result.entityId } });
+			const member = await prisma.aRCCommitteeMember.findFirstOrThrow({ where: { id: result.entityId, committee: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{ member: { id: member.id, committeeId: member.committeeId, partyId: member.partyId } },
@@ -132,10 +132,10 @@ export const arcReviewRouter = {
 			await context.cerbos.authorize('view', 'arc_request', input.committeeId);
 
 			const committee = await prisma.aRCCommittee.findFirst({
-				where: { id: input.committeeId },
+				where: { id: input.committeeId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!committee || committee.association.organizationId !== context.organization.id) {
+			if (!committee) {
 				throw errors.NOT_FOUND({ message: 'ARC Committee' });
 			}
 
@@ -252,7 +252,7 @@ export const arcReviewRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit review' });
 			}
 
-			const review = await prisma.aRCReview.findUniqueOrThrow({ where: { id: result.entityId } });
+			const review = await prisma.aRCReview.findFirstOrThrow({ where: { id: result.entityId, request: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{ review: { id: review.id, requestId: review.requestId, action: review.action } },
@@ -357,11 +357,11 @@ export const arcReviewRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.aRCRequest.findFirst({
-				where: { id: input.requestId },
+				where: { id: input.requestId, organizationId: context.organization.id },
 				include: { association: true, committee: true }
 			});
 
-			if (!request || request.association.organizationId !== context.organization.id) {
+			if (!request) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
@@ -388,7 +388,7 @@ export const arcReviewRouter = {
 
 			if (request.committeeId && request.committee) {
 				activeMembers = await prisma.aRCCommitteeMember.count({
-					where: { committeeId: request.committeeId, leftAt: null }
+					where: { committeeId: request.committeeId, leftAt: null, committee: { association: { organizationId: context.organization.id } } }
 				});
 				quorumRequired = request.committee.quorum;
 				thresholdRequired = request.committee.approvalThreshold ? Number(request.committee.approvalThreshold) : null;
@@ -462,11 +462,11 @@ export const arcReviewRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const request = await prisma.aRCRequest.findFirst({
-				where: { id: input.requestId },
+				where: { id: input.requestId, organizationId: context.organization.id },
 				include: { association: true, committee: true }
 			});
 
-			if (!request || request.association.organizationId !== context.organization.id) {
+			if (!request) {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 

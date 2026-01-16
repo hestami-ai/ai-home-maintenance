@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -82,33 +83,35 @@ export interface JournalEntryWorkflowResult extends EntityWorkflowResult {
 async function createJournalEntry(
 	input: JournalEntryWorkflowInput
 ): Promise<{ id: string; entryNumber: string; entryDate: string; description: string; status: string }> {
-	const journalEntry = await prisma.journalEntry.create({
-		data: {
-			associationId: input.associationId!,
-			entryNumber: input.entryNumber!,
-			entryDate: new Date(input.entryDate!),
-			description: input.description!,
-			memo: input.memo,
-			createdBy: input.userId,
-			status: 'DRAFT',
-			lines: {
-				create: input.lines!.map((line, index) => ({
-					accountId: line.accountId,
-					debitAmount: line.debitAmount,
-					creditAmount: line.creditAmount,
-					description: line.description,
-					referenceType: line.referenceType,
-					referenceId: line.referenceId,
-					lineNumber: index + 1
-				}))
+	const journalEntry = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.journalEntry.create({
+			data: {
+				associationId: input.associationId!,
+				entryNumber: input.entryNumber!,
+				entryDate: new Date(input.entryDate!),
+				description: input.description!,
+				memo: input.memo,
+				createdBy: input.userId,
+				status: 'DRAFT',
+				lines: {
+					create: input.lines!.map((line, index) => ({
+						accountId: line.accountId,
+						debitAmount: line.debitAmount,
+						creditAmount: line.creditAmount,
+						description: line.description,
+						referenceType: line.referenceType,
+						referenceId: line.referenceId,
+						lineNumber: index + 1
+					}))
+				}
 			}
-		}
-	});
+		});
+	}, { userId: input.userId, reason: 'Creating journal entry' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOURNAL_ENTRY',
+		entityType: 'ORGANIZATION',
 		entityId: journalEntry.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -133,19 +136,19 @@ async function createJournalEntry(
 async function postJournalEntry(
 	input: JournalEntryWorkflowInput
 ): Promise<{ id: string; status: string; postedAt: string }> {
-	const entry = await prisma.journalEntry.findUnique({
-		where: { id: input.entryId },
-		include: { lines: true }
-	});
-
-	if (!entry) {
-		throw new Error('Journal entry not found');
-	}
-
 	const now = new Date();
 
-	// Update GL account balances and post entry in a transaction
-	await prisma.$transaction(async (tx) => {
+	// Update GL account balances and post entry in a transaction with RLS context
+	await orgTransaction(input.organizationId, async (tx) => {
+		const entry = await tx.journalEntry.findUnique({
+			where: { id: input.entryId },
+			include: { lines: true }
+		});
+
+		if (!entry) {
+			throw new Error('Journal entry not found');
+		}
+
 		for (const line of entry.lines) {
 			const account = await tx.gLAccount.findUnique({
 				where: { id: line.accountId }
@@ -176,12 +179,12 @@ async function postJournalEntry(
 				approvedAt: now
 			}
 		});
-	});
+	}, { userId: input.userId, reason: 'Posting journal entry and updating GL balances' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOURNAL_ENTRY',
+		entityType: 'ORGANIZATION',
 		entityId: input.entryId!,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -207,8 +210,8 @@ async function reverseJournalEntry(
 	const originalEntry = input.originalEntry!;
 	const now = new Date();
 
-	// Create reversal entry and update GL balances in a transaction
-	const reversalEntry = await prisma.$transaction(async (tx) => {
+	// Create reversal entry and update GL balances in a transaction with RLS context
+	const reversalEntry = await orgTransaction(input.organizationId, async (tx) => {
 		const reversal = await tx.journalEntry.create({
 			data: {
 				associationId: input.associationId!,
@@ -265,12 +268,12 @@ async function reverseJournalEntry(
 		}
 
 		return reversal;
-	});
+	}, { userId: input.userId, reason: 'Reversing journal entry and updating GL balances' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOURNAL_ENTRY',
+		entityType: 'ORGANIZATION',
 		entityId: reversalEntry.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -422,5 +425,6 @@ export async function startJournalEntryWorkflow(
 	input: JournalEntryWorkflowInput,
 	idempotencyKey: string
 ): Promise<JournalEntryWorkflowResult> {
-	return DBOS.startWorkflow(journalEntryWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(journalEntryWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

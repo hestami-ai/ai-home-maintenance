@@ -102,15 +102,15 @@ export const reportScheduleRouter = {
 						recipientsJson: input.recipientsJson
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create schedule' });
 			}
 
-			const schedule = await prisma.reportSchedule.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const schedule = await prisma.reportSchedule.findFirstOrThrow({
+				where: { id: result.entityId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({
@@ -315,15 +315,15 @@ export const reportScheduleRouter = {
 						isActive: input.isActive
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update schedule' });
 			}
 
-			const schedule = await prisma.reportSchedule.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const schedule = await prisma.reportSchedule.findFirstOrThrow({
+				where: { id: result.entityId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({
@@ -367,7 +367,7 @@ export const reportScheduleRouter = {
 					scheduleId: input.id,
 					data: {}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
@@ -413,15 +413,15 @@ export const reportScheduleRouter = {
 					scheduleId: input.id,
 					data: {}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to run schedule' });
 			}
 
-			const execution = await prisma.reportExecution.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const execution = await prisma.reportExecution.findFirstOrThrow({
+				where: { id: result.entityId, schedule: { association: { organizationId: context.organization.id } } }
 			});
 
 			return successResponse({

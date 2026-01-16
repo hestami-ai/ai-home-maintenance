@@ -173,7 +173,7 @@ export const violationApi = {
 			deliveryMethod: 'EMAIL' | 'PORTAL' | 'MAIL' | 'CERTIFIED_MAIL' | 'POSTED' | 'HAND_DELIVERED';
 			curePeriodDays?: number;
 		}
-	) => orpc.violation.sendNotice({ violationId: id, ...data }),
+	) => orpc.violation.sendNotice({ violationId: id, ...data, idempotencyKey: crypto.randomUUID() }),
 
 	scheduleHearing: (
 		id: string,
@@ -211,9 +211,9 @@ export const violationApi = {
 
 	getAppeal: (violationId: string) => orpc.violation.getAppeal({ violationId }),
 
-	cure: (id: string, data?: { notes?: string }) => orpc.violation.cure({ id, ...data }),
+	cure: (id: string, data?: { notes?: string }) => orpc.violation.cure({ id, ...data, idempotencyKey: crypto.randomUUID() }),
 
-	close: (id: string, data?: { notes?: string }) => orpc.violation.close({ id, ...data }),
+	close: (id: string, data?: { notes?: string }) => orpc.violation.close({ id, ...data, idempotencyKey: crypto.randomUUID() }),
 
 	escalate: (id: string, data: { reason: string; idempotencyKey: string }) =>
 		orpc.violation.escalate({ id, ...data }),
@@ -232,7 +232,7 @@ export const violationApi = {
 		capturedAt?: string;
 		gpsLatitude?: number;
 		gpsLongitude?: number;
-	}) => orpc.violation.addEvidence(data),
+	}) => orpc.violation.addEvidence({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	listEvidence: (violationId: string) => orpc.violation.listEvidence({ violationId }),
 
@@ -380,12 +380,12 @@ export const workOrderApi = {
 		orpc.workOrder.complete({ id, ...data }),
 
 	authorize: (data: { workOrderId: string; rationale: string; budgetSource: 'OPERATING' | 'RESERVE' | 'SPECIAL'; approvedAmount: number; constraints?: string }) =>
-		orpc.workOrder.authorize(data),
+		orpc.workOrder.authorize({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	getStatusHistory: (id: string) => orpc.workOrder.getStatusHistory({ workOrderId: id }),
 
 	addComment: (data: { workOrderId: string; comment: string; isInternal?: boolean }) =>
-		orpc.workOrder.addComment(data),
+		orpc.workOrder.addComment({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	transitionStatus: (id: string, data: { toStatus: WorkOrderStatus; notes?: string; idempotencyKey: string }) =>
 		orpc.workOrder.transitionStatus({ workOrderId: id, ...data })
@@ -424,7 +424,7 @@ export const unitApi = {
 		parkingSpaces?: number;
 		assessmentClass?: string;
 		votingWeight?: number;
-	}) => orpc.unit.create(data),
+	}) => orpc.unit.create({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	update: (id: string, data: {
 		unitNumber?: string;
@@ -441,7 +441,7 @@ export const unitApi = {
 		parkingSpaces?: number;
 		assessmentClass?: string;
 		votingWeight?: number;
-	}) => orpc.unit.update({ id, ...data })
+	}) => orpc.unit.update({ id, ...data, idempotencyKey: crypto.randomUUID() })
 };
 
 // ============================================================================
@@ -475,7 +475,7 @@ export const propertyApi = {
 		yearBuilt?: number;
 		totalUnits?: number;
 		totalAcres?: number;
-	}) => orpc.property.create(data),
+	}) => orpc.property.create({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	update: (id: string, data: {
 		name?: string;
@@ -490,7 +490,7 @@ export const propertyApi = {
 		yearBuilt?: number;
 		totalUnits?: number;
 		totalAcres?: number;
-	}) => orpc.property.update({ id, ...data })
+	}) => orpc.property.update({ id, ...data, idempotencyKey: crypto.randomUUID() })
 };
 
 // ============================================================================
@@ -522,7 +522,7 @@ export const vendorApi = {
 		licenseExpiry?: string;
 		insuranceExpiry?: string;
 		notes?: string;
-	}) => orpc.vendor.create(data),
+	}) => orpc.vendor.create({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	update: (id: string, data: {
 		name?: string;
@@ -540,7 +540,7 @@ export const vendorApi = {
 		insuranceExpiry?: string;
 		notes?: string;
 		isActive?: boolean;
-	}) => orpc.vendor.update({ id, ...data })
+	}) => orpc.vendor.update({ id, ...data, idempotencyKey: crypto.randomUUID() })
 };
 
 // ============================================================================
@@ -607,7 +607,7 @@ export const documentApi = {
 		documentId: string;
 		contextType: DocumentContextType;
 		contextId: string;
-	}) => orpc.document.unlinkFromContext(data),
+	}) => orpc.document.unlinkFromContext({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	getReferences: (documentId: string) => orpc.document.getReferences({ documentId }),
 
@@ -991,11 +991,11 @@ export const accountingApi = {
 			gracePeriodDays?: number;
 			isRecurring?: boolean;
 			prorateOnTransfer?: boolean;
-		}) => orpc.assessment.createType(data),
+		}) => orpc.assessment.createType({ ...data, idempotencyKey: crypto.randomUUID() }),
 		listTypes: (params?: { isActive?: boolean }) =>
 			orpc.assessment.listTypes(params || {}),
 		createCharge: (data: { unitId: string; assessmentTypeId: string; chargeDate: string; dueDate: string; amount: number; periodStart?: string; periodEnd?: string; description?: string; postToGL?: boolean }) =>
-			orpc.assessment.createCharge(data),
+			orpc.assessment.createCharge({ ...data, idempotencyKey: crypto.randomUUID() }),
 		listCharges: (params?: { unitId?: string; status?: 'PENDING' | 'BILLED' | 'PARTIALLY_PAID' | 'PAID' | 'WRITTEN_OFF' | 'CREDITED'; fromDate?: string; toDate?: string }) =>
 			orpc.assessment.listCharges(params || {}),
 		getUnitBalance: (unitId: string) => orpc.assessment.getUnitBalance({ unitId })
@@ -1048,7 +1048,7 @@ export const dashboardApi = {
 		card?: string;
 		targetUrl?: string;
 		filters?: DashboardFilters;
-	}) => orpc.dashboard.recordView(data),
+	}) => orpc.dashboard.recordView({ ...data, idempotencyKey: crypto.randomUUID() }),
 
 	getSummary: () => orpc.dashboard.getSummary({})
 };

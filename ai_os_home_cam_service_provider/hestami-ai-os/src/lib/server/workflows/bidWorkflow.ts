@@ -6,10 +6,10 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('BidWorkflow');
 
@@ -69,18 +69,25 @@ async function requestBids(
 	const dueDate = data.dueDate!;
 	const notes = data.notes;
 
-	const bids = await prisma.$transaction(
-		vendorIds.map(vendorId =>
-			prisma.workOrderBid.create({
-				data: {
-					workOrderId,
-					vendorId,
-					status: 'REQUESTED',
-					validUntil: new Date(dueDate),
-					notes
-				}
-			})
-		)
+	const bids = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			const createdBids = [];
+			for (const vendorId of vendorIds) {
+				const bid = await tx.workOrderBid.create({
+					data: {
+						workOrderId,
+						vendorId,
+						status: 'REQUESTED',
+						validUntil: new Date(dueDate),
+						notes
+					}
+				});
+				createdBids.push(bid);
+			}
+			return createdBids;
+		},
+		{ userId, reason: 'Request bids from vendors for work order' }
 	);
 
 	log.info('REQUEST_BIDS completed', { workOrderId, vendorIds, userId });
@@ -95,20 +102,26 @@ async function submitBid(
 ): Promise<string> {
 	const totalAmount = (data.laborCost || 0) + (data.materialsCost || 0);
 
-	const updated = await prisma.workOrderBid.update({
-		where: { id: bidId },
-		data: {
-			laborCost: data.laborCost,
-			materialsCost: data.materialsCost,
-			totalAmount,
-			estimatedHours: data.estimatedHours,
-			proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate) : null,
-			proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate) : null,
-			notes: data.notes,
-			status: 'SUBMITTED',
-			submittedAt: new Date()
-		}
-	});
+	const updated = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.workOrderBid.update({
+				where: { id: bidId },
+				data: {
+					laborCost: data.laborCost,
+					materialsCost: data.materialsCost,
+					totalAmount,
+					estimatedHours: data.estimatedHours,
+					proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate) : null,
+					proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate) : null,
+					notes: data.notes,
+					status: 'SUBMITTED',
+					submittedAt: new Date()
+				}
+			});
+		},
+		{ userId, reason: 'Submit bid for work order' }
+	);
 
 	log.info('SUBMIT_BID completed', { bidId, totalAmount, userId });
 	return updated.id;
@@ -119,10 +132,16 @@ async function expireBid(
 	userId: string,
 	bidId: string
 ): Promise<string> {
-	await prisma.workOrderBid.update({
-		where: { id: bidId },
-		data: { status: 'EXPIRED' }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.workOrderBid.update({
+				where: { id: bidId },
+				data: { status: 'EXPIRED' }
+			});
+		},
+		{ userId, reason: 'Expire work order bid' }
+	);
 
 	log.info('EXPIRE_BID completed', { bidId, userId });
 	return bidId;
@@ -142,55 +161,59 @@ async function acceptBid(
 	const estimatedHours = data.estimatedHours;
 	const notes = data.notes;
 
-	await prisma.$transaction(async (tx) => {
-		// Accept this bid
-		await tx.workOrderBid.update({
-			where: { id: bidId },
-			data: {
-				status: 'ACCEPTED',
-				respondedAt: new Date(),
-				respondedBy: userId
-			}
-		});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// Accept this bid
+			await tx.workOrderBid.update({
+				where: { id: bidId },
+				data: {
+					status: 'ACCEPTED',
+					respondedAt: new Date(),
+					respondedBy: userId
+				}
+			});
 
-		// Reject all other bids for this work order
-		await tx.workOrderBid.updateMany({
-			where: {
-				workOrderId,
-				id: { not: bidId },
-				status: { in: ['REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW'] }
-			},
-			data: {
-				status: 'REJECTED',
-				respondedAt: new Date(),
-				respondedBy: userId
-			}
-		});
+			// Reject all other bids for this work order
+			await tx.workOrderBid.updateMany({
+				where: {
+					workOrderId,
+					id: { not: bidId },
+					status: { in: ['REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW'] }
+				},
+				data: {
+					status: 'REJECTED',
+					respondedAt: new Date(),
+					respondedBy: userId
+				}
+			});
 
-		// Assign vendor to work order
-		await tx.workOrder.update({
-			where: { id: workOrderId },
-			data: {
-				assignedVendorId: vendorId,
-				assignedAt: new Date(),
-				assignedBy: userId,
-				status: 'ASSIGNED',
-				estimatedCost: totalAmount,
-				estimatedHours
-			}
-		});
+			// Assign vendor to work order
+			await tx.workOrder.update({
+				where: { id: workOrderId },
+				data: {
+					assignedVendorId: vendorId,
+					assignedAt: new Date(),
+					assignedBy: userId,
+					status: 'ASSIGNED',
+					estimatedCost: totalAmount,
+					estimatedHours
+				}
+			});
 
-		// Record status change
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId,
-				fromStatus: workOrderStatus,
-				toStatus: 'ASSIGNED',
-				changedBy: userId,
-				notes: notes || `Bid accepted from ${vendorName}`
-			}
-		});
-	});
+			// Record status change
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId,
+					fromStatus: workOrderStatus as any,
+					toStatus: 'ASSIGNED' as any,
+					changedBy: userId,
+					notes: notes || `Bid accepted from ${vendorName}`
+				}
+			});
+		},
+		{ userId, reason: 'Accept bid and assign vendor to work order' }
+	);
 
 	log.info('ACCEPT_BID completed', { bidId, workOrderId, vendorId, userId });
 	return bidId;
@@ -202,17 +225,23 @@ async function rejectBid(
 	bidId: string,
 	data: BidWorkflowInput['data']
 ): Promise<string> {
-	const bid = await prisma.workOrderBid.findUnique({ where: { id: bidId } });
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			const bid = await tx.workOrderBid.findUnique({ where: { id: bidId } });
 
-	await prisma.workOrderBid.update({
-		where: { id: bidId },
-		data: {
-			status: 'REJECTED',
-			respondedAt: new Date(),
-			respondedBy: userId,
-			notes: data.reason ? `Rejected: ${data.reason}` : bid?.notes
-		}
-	});
+			await tx.workOrderBid.update({
+				where: { id: bidId },
+				data: {
+					status: 'REJECTED',
+					respondedAt: new Date(),
+					respondedBy: userId,
+					notes: data.reason ? `Rejected: ${data.reason}` : bid?.notes
+				}
+			});
+		},
+		{ userId, reason: 'Reject work order bid' }
+	);
 
 	log.info('REJECT_BID completed', { bidId, userId });
 	return bidId;
@@ -224,15 +253,21 @@ async function withdrawBid(
 	bidId: string,
 	data: BidWorkflowInput['data']
 ): Promise<string> {
-	const bid = await prisma.workOrderBid.findUnique({ where: { id: bidId } });
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			const bid = await tx.workOrderBid.findUnique({ where: { id: bidId } });
 
-	await prisma.workOrderBid.update({
-		where: { id: bidId },
-		data: {
-			status: 'WITHDRAWN',
-			notes: data.reason ? `Withdrawn: ${data.reason}` : bid?.notes
-		}
-	});
+			await tx.workOrderBid.update({
+				where: { id: bidId },
+				data: {
+					status: 'WITHDRAWN',
+					notes: data.reason ? `Withdrawn: ${data.reason}` : bid?.notes
+				}
+			});
+		},
+		{ userId, reason: 'Withdraw work order bid' }
+	);
 
 	log.info('WITHDRAW_BID completed', { bidId, userId });
 	return bidId;

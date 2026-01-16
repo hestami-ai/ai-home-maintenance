@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -40,28 +40,34 @@ async function createItem(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const item = await prisma.inventoryItem.create({
-		data: {
-			organizationId,
-			sku: data.sku as string,
-			name: data.name as string,
-			description: data.description as string | undefined,
-			category: data.category as string | undefined,
-			unitOfMeasure: data.unitOfMeasure as 'EACH' | 'BOX' | 'CASE' | 'PACK' | 'ROLL' | 'GALLON' | 'QUART' | 'PINT' | 'OUNCE' | 'POUND' | 'FOOT' | 'YARD' | 'METER' | 'SQUARE_FOOT' | 'CUBIC_FOOT' | 'HOUR' | 'DAY',
-			unitCost: data.unitCost as number | undefined,
-			reorderPoint: data.reorderPoint as number | undefined,
-			reorderQuantity: data.reorderQuantity as number | undefined,
-			minStockLevel: data.minStockLevel as number | undefined,
-			maxStockLevel: data.maxStockLevel as number | undefined,
-			isSerialTracked: data.isSerialTracked as boolean | undefined,
-			isLotTracked: data.isLotTracked as boolean | undefined,
-			preferredSupplierId: data.preferredSupplierId as string | undefined,
-			pricebookItemId: data.pricebookItemId as string | undefined,
-			isActive: true
-		}
-	});
+	const item = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.inventoryItem.create({
+				data: {
+					organizationId,
+					sku: data.sku as string,
+					name: data.name as string,
+					description: data.description as string | undefined,
+					category: data.category as string | undefined,
+					unitOfMeasure: data.unitOfMeasure as 'EACH' | 'BOX' | 'CASE' | 'PACK' | 'ROLL' | 'GALLON' | 'QUART' | 'PINT' | 'OUNCE' | 'POUND' | 'FOOT' | 'YARD' | 'METER' | 'SQUARE_FOOT' | 'CUBIC_FOOT' | 'HOUR' | 'DAY',
+					unitCost: data.unitCost as number | undefined,
+					reorderPoint: data.reorderPoint as number | undefined,
+					reorderQuantity: data.reorderQuantity as number | undefined,
+					minStockLevel: data.minStockLevel as number | undefined,
+					maxStockLevel: data.maxStockLevel as number | undefined,
+					isSerialTracked: data.isSerialTracked as boolean | undefined,
+					isLotTracked: data.isLotTracked as boolean | undefined,
+					preferredSupplierId: data.preferredSupplierId as string | undefined,
+					pricebookItemId: data.pricebookItemId as string | undefined,
+					isActive: true
+				}
+			});
+		},
+		{ userId, reason: 'Create inventory item' }
+	);
 
-	console.log(`[InventoryItemWorkflow] CREATE_ITEM item:${item.id} by user ${userId}`);
+	log.info('CREATE_ITEM completed', { itemId: item.id, userId });
 	return item.id;
 }
 
@@ -73,12 +79,18 @@ async function updateItem(
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
 
-	await prisma.inventoryItem.update({
-		where: { id: itemId },
-		data: updateData
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.inventoryItem.update({
+				where: { id: itemId },
+				data: updateData
+			});
+		},
+		{ userId, reason: 'Update inventory item' }
+	);
 
-	console.log(`[InventoryItemWorkflow] UPDATE_ITEM item:${itemId} by user ${userId}`);
+	log.info('UPDATE_ITEM completed', { itemId, userId });
 	return itemId;
 }
 
@@ -87,12 +99,18 @@ async function deleteItem(
 	userId: string,
 	itemId: string
 ): Promise<string> {
-	await prisma.inventoryItem.update({
-		where: { id: itemId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.inventoryItem.update({
+				where: { id: itemId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Delete inventory item' }
+	);
 
-	console.log(`[InventoryItemWorkflow] DELETE_ITEM item:${itemId} by user ${userId}`);
+	log.info('DELETE_ITEM completed', { itemId, userId });
 	return itemId;
 }
 
@@ -131,7 +149,7 @@ async function inventoryItemWorkflow(input: InventoryItemWorkflowInput): Promise
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[InventoryItemWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

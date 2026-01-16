@@ -33,9 +33,9 @@ const getAssociationOrThrow = async (associationId: string, organizationId: stri
 	return association;
 };
 
-const ensureBoardBelongs = async (boardId: string | null | undefined, associationId: string, errors: any) => {
+const ensureBoardBelongs = async (boardId: string | null | undefined, associationId: string, organizationId: string, errors: any) => {
 	if (!boardId) return;
-	const board = await prisma.board.findFirst({ where: { id: boardId, associationId } });
+	const board = await prisma.board.findFirst({ where: { id: boardId, organizationId, associationId } });
 	if (!board) throw errors.NOT_FOUND({ message: 'Board' });
 };
 
@@ -44,9 +44,9 @@ const ensurePartyBelongs = async (partyId: string, organizationId: string, error
 	if (!party) throw errors.NOT_FOUND({ message: 'Party' });
 };
 
-const getVoteResults = async (voteId: string) => {
+const getVoteResults = async (voteId: string, organizationId: string) => {
 	const vote = await prisma.vote.findFirst({
-		where: { id: voteId },
+		where: { id: voteId, meeting: { association: { organizationId } } },
 		include: {
 			ballots: {
 				select: { choice: true }
@@ -119,7 +119,7 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			await getAssociationOrThrow(rest.associationId, context.organization.id, errors);
-			await ensureBoardBelongs(rest.boardId, rest.associationId, errors);
+			await ensureBoardBelongs(rest.boardId, rest.associationId, context.organization.id, errors);
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
@@ -143,7 +143,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create meeting' });
 			}
 
-			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: result.entityId } });
+			const meeting = await prisma.meeting.findFirstOrThrow({ where: { id: result.entityId, association: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{ meeting: { id: meeting.id, associationId: rest.associationId, status: meeting.status } },
@@ -165,7 +165,7 @@ export const governanceMeetingRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: {
 					association: true,
 					board: true,
@@ -175,7 +175,7 @@ export const governanceMeetingRouter = {
 					votes: { include: { ballots: true } }
 				}
 			});
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 			await context.cerbos.authorize('view', 'governance_meeting', meeting.id);
@@ -263,10 +263,10 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: rest.meetingId },
+				where: { id: rest.meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -290,7 +290,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add agenda item' });
 			}
 
-			const agendaItem = await prisma.meetingAgendaItem.findUniqueOrThrow({ where: { id: result.entityId } });
+			const agendaItem = await prisma.meetingAgendaItem.findFirstOrThrow({ where: { id: result.entityId, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse({ agendaItem: { id: agendaItem.id, meetingId: agendaItem.meetingId } }, context);
 		}),
@@ -320,15 +320,15 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: rest.meetingId },
+				where: { id: rest.meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
 			// Check if minutes already exist
-			const existing = await prisma.meetingMinutes.findFirst({ where: { meetingId: rest.meetingId } });
+			const existing = await prisma.meetingMinutes.findFirst({ where: { meetingId: rest.meetingId, meeting: { association: { organizationId: context.organization.id } } } });
 			if (existing) {
 				return successResponse({ minutes: { id: existing.id, meetingId: existing.meetingId } }, context);
 			}
@@ -351,7 +351,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record minutes' });
 			}
 
-			const minutes = await prisma.meetingMinutes.findUniqueOrThrow({ where: { id: result.entityId } });
+			const minutes = await prisma.meetingMinutes.findFirstOrThrow({ where: { id: result.entityId, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse({ minutes: { id: minutes.id, meetingId: minutes.meetingId } }, context);
 		}),
@@ -384,13 +384,13 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: rest.meetingId },
+				where: { id: rest.meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
-			await ensurePartyBelongs(rest.partyId, meeting.association.organizationId, errors);
+			await ensurePartyBelongs(rest.partyId, context.organization.id, errors);
 			if (rest.proxyForPartyId) {
 				await ensurePartyBelongs(rest.proxyForPartyId, meeting.association.organizationId, errors);
 			}
@@ -414,7 +414,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record attendance' });
 			}
 
-			const attendance = await prisma.meetingAttendance.findUniqueOrThrow({ where: { id: result.entityId } });
+			const attendance = await prisma.meetingAttendance.findFirstOrThrow({ where: { id: result.entityId, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse(
 				{ attendance: { id: attendance.id, meetingId: attendance.meetingId, partyId: attendance.partyId } },
@@ -457,15 +457,15 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: rest.meetingId },
+				where: { id: rest.meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 			if (rest.agendaItemId) {
 				const agendaItem = await prisma.meetingAgendaItem.findFirst({
-					where: { id: rest.agendaItemId, meetingId: rest.meetingId }
+					where: { id: rest.agendaItemId, meetingId: rest.meetingId, meeting: { association: { organizationId: context.organization.id } } }
 				});
 				if (!agendaItem) throw errors.NOT_FOUND({ message: 'Agenda item' });
 			}
@@ -491,7 +491,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to open vote' });
 			}
 
-			const vote = await prisma.vote.findUniqueOrThrow({ where: { id: result.entityId } });
+			const vote = await prisma.vote.findFirstOrThrow({ where: { id: result.entityId, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse(
 				{
@@ -543,10 +543,10 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const vote = await prisma.vote.findFirst({
-				where: { id: rest.voteId },
+				where: { id: rest.voteId, meeting: { association: { organizationId: context.organization.id } } },
 				include: { meeting: { include: { association: true } } }
 			});
-			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+			if (!vote) {
 				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 			if (vote.closedAt) {
@@ -557,7 +557,7 @@ export const governanceMeetingRouter = {
 
 			// Enforce vote immutability - once cast, cannot be changed
 			const existing = await prisma.voteBallot.findFirst({
-				where: { voteId: rest.voteId, voterPartyId: rest.voterPartyId }
+				where: { voteId: rest.voteId, voterPartyId: rest.voterPartyId, vote: { meeting: { association: { organizationId: context.organization.id } } } }
 			});
 			if (existing) {
 				throw errors.BAD_REQUEST({ message: 'Ballot already cast and cannot be changed' });
@@ -582,7 +582,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cast ballot' });
 			}
 
-			const ballot = await prisma.voteBallot.findUniqueOrThrow({ where: { id: result.entityId } });
+			const ballot = await prisma.voteBallot.findFirstOrThrow({ where: { id: result.entityId, vote: { meeting: { association: { organizationId: context.organization.id } } } } });
 
 			return successResponse(
 				{
@@ -625,7 +625,7 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('view', 'governance_vote', input.voteId);
 
 			const vote = await prisma.vote.findFirst({
-				where: { id: input.voteId },
+				where: { id: input.voteId, meeting: { association: { organizationId: context.organization.id } } },
 				include: {
 					meeting: {
 						include: {
@@ -640,7 +640,7 @@ export const governanceMeetingRouter = {
 				}
 			});
 
-			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+			if (!vote) {
 				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 
@@ -689,14 +689,14 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('view', 'governance_vote', input.voteId);
 
 			const vote = await prisma.vote.findFirst({
-				where: { id: input.voteId },
+				where: { id: input.voteId, meeting: { association: { organizationId: context.organization.id } } },
 				include: { meeting: { include: { association: true } } }
 			});
-			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+			if (!vote) {
 				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 
-			const results = await getVoteResults(input.voteId);
+			const results = await getVoteResults(input.voteId, context.organization.id);
 			if (!results) throw errors.NOT_FOUND({ message: 'Vote' });
 
 			return successResponse({ results }, context);
@@ -742,14 +742,14 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, voteId } = input;
 
 			const vote = await prisma.vote.findFirst({
-				where: { id: voteId },
+				where: { id: voteId, meeting: { association: { organizationId: context.organization.id } } },
 				include: { meeting: { include: { association: true } } }
 			});
-			if (!vote || vote.meeting.association.organizationId !== context.organization.id) {
+			if (!vote) {
 				throw errors.NOT_FOUND({ message: 'Vote' });
 			}
 			if (vote.closedAt) {
-				const results = await getVoteResults(vote.id);
+				const results = await getVoteResults(vote.id, context.organization.id);
 				return successResponse(
 					{
 						vote: {
@@ -762,7 +762,7 @@ export const governanceMeetingRouter = {
 				);
 			}
 
-			const results = await getVoteResults(vote.id);
+			const results = await getVoteResults(vote.id, context.organization.id);
 			if (!results) throw errors.NOT_FOUND({ message: 'Vote' });
 			if (results.quorumRequired !== null && !results.quorumMet) {
 				throw errors.BAD_REQUEST({ message: 'Quorum not met' });
@@ -784,7 +784,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to close vote' });
 			}
 
-			const updatedVote = await prisma.vote.findUniqueOrThrow({ where: { id: voteId } });
+			const updatedVote = await prisma.vote.findFirstOrThrow({ where: { id: voteId, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse(
 				{
@@ -822,7 +822,7 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, meetingId } = input;
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: meetingId },
+				where: { id: meetingId, association: { organizationId: context.organization.id } },
 				include: {
 					association: true,
 					agendaItems: true,
@@ -830,7 +830,7 @@ export const governanceMeetingRouter = {
 				}
 			});
 
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -866,7 +866,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to start meeting session' });
 			}
 
-			const updated = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
+			const updated = await prisma.meeting.findFirstOrThrow({ where: { id: meetingId, association: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{
@@ -896,11 +896,11 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, meetingId } = input;
 
 			const existing = await prisma.meeting.findFirst({
-				where: { id: meetingId },
+				where: { id: meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
 
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -925,7 +925,7 @@ export const governanceMeetingRouter = {
 			}
 
 			// Minutes placeholder is now created by the workflow
-			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
+			const meeting = await prisma.meeting.findFirstOrThrow({ where: { id: meetingId, association: { organizationId: context.organization.id } } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -956,11 +956,11 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, meetingId, content } = input;
 
 			const existing = await prisma.meeting.findFirst({
-				where: { id: meetingId },
+				where: { id: meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true, minutes: true }
 			});
 
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -984,7 +984,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit minutes draft' });
 			}
 
-			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
+			const meeting = await prisma.meeting.findFirstOrThrow({ where: { id: meetingId, association: { organizationId: context.organization.id } } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -1008,11 +1008,11 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, meetingId } = input;
 
 			const existing = await prisma.meeting.findFirst({
-				where: { id: meetingId },
+				where: { id: meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true, minutes: true }
 			});
 
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -1040,7 +1040,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to approve minutes' });
 			}
 
-			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
+			const meeting = await prisma.meeting.findFirstOrThrow({ where: { id: meetingId, association: { organizationId: context.organization.id } } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -1064,11 +1064,11 @@ export const governanceMeetingRouter = {
 			const { idempotencyKey, meetingId } = input;
 
 			const existing = await prisma.meeting.findFirst({
-				where: { id: meetingId },
+				where: { id: meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
 
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -1092,7 +1092,7 @@ export const governanceMeetingRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to archive meeting' });
 			}
 
-			const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } });
+			const meeting = await prisma.meeting.findFirstOrThrow({ where: { id: meetingId, association: { organizationId: context.organization.id } } });
 
 			return successResponse({ meeting: { id: meeting.id, status: meeting.status } }, context);
 		}),
@@ -1118,14 +1118,14 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('view', 'governance_meeting', input.meetingId);
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: input.meetingId },
+				where: { id: input.meetingId, association: { organizationId: context.organization.id } },
 				include: {
 					association: true,
 					attendance: { select: { partyId: true, status: true } }
 				}
 			});
 
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
@@ -1178,11 +1178,11 @@ export const governanceMeetingRouter = {
 			await context.cerbos.authorize('edit', 'governance_meeting', input.meetingId);
 
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: input.meetingId },
+				where: { id: input.meetingId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
 
-			if (!meeting || meeting.association.organizationId !== context.organization.id) {
+			if (!meeting) {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 

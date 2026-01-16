@@ -6,6 +6,7 @@
 	import UserMenu from './UserMenu.svelte';
 	import AssociationSwitcher from './AssociationSwitcher.svelte';
 	import { camStore } from '$lib/stores';
+	import type { OrganizationType } from '$lib/schemas';
 	import type { operations } from '$lib/api/types.generated';
 
 	// Extract types from OpenAPI spec (avoids importing massive Prisma types)
@@ -37,6 +38,14 @@
 	const isInCamContext = $derived($page.url.pathname.startsWith('/app/cam'));
 	const camState = $derived($camStore);
 
+	const DASHBOARD_BY_ORG_TYPE: Partial<Record<OrganizationType, string>> = {
+		COMMUNITY_ASSOCIATION: '/app/cam',
+		MANAGEMENT_COMPANY: '/app/cam',
+		SERVICE_PROVIDER: '/app/contractor',
+		INDIVIDUAL_PROPERTY_OWNER: '/app/concierge',
+		TRUST_OR_LLC: '/app/concierge'
+	};
+
 	// Determine the dashboard URL based on user role
 	const dashboardUrl = $derived(() => {
 		if (!user) return '/';
@@ -48,16 +57,7 @@
 		
 		// Check organization type for other users
 		if (currentOrganization) {
-			const orgType = currentOrganization.type;
-			switch (orgType) {
-				case 'CAM_COMPANY':
-					return '/app/cam';
-				case 'SERVICE_PROVIDER':
-					return '/app/contractor';
-				case 'INDIVIDUAL':
-				default:
-					return '/app/concierge';
-			}
+			return DASHBOARD_BY_ORG_TYPE[currentOrganization.type as OrganizationType] ?? '/app/concierge';
 		}
 		
 		// Default for logged-in users without org context

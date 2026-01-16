@@ -5,7 +5,7 @@
 	import * as tus from 'tus-js-client';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { 
+	import {
 		CONCIERGE_DOCUMENT_CATEGORIES,
 		CONCIERGE_CATEGORY_LABELS,
 		type ConciergeDocumentCategory
@@ -68,7 +68,6 @@
 	let uploadIdempotencyKey = $state<string | null>(null);
 	let isDragging = $state(false);
 	let uploadProgress = $state(0);
-	let isProcessing = $state(false);
 
 	// Form validation
 	const isValid = $derived(
@@ -161,39 +160,6 @@
 		return File;
 	}
 
-	async function pollDocumentStatus(documentId: string, orgId: string) {
-		const orgClient = createOrgClient(orgId);
-		let attempts = 0;
-		const maxAttempts = 30; // 30 seconds poll
-
-		const interval = setInterval(async () => {
-			attempts++;
-			try {
-				const result = await orgClient.document.getDocument({ id: documentId });
-				if (result.ok) {
-					const status = result.data.document.status;
-					if (status === 'ACTIVE') {
-						clearInterval(interval);
-						goto(`/app/concierge/documents/${documentId}?success=true`);
-					} else if (status === 'INFECTED') {
-						clearInterval(interval);
-						goto(`/app/concierge/documents/${documentId}?infected=true`);
-					} else if (status === 'PROCESSING_FAILED') {
-						clearInterval(interval);
-						goto(`/app/concierge/documents/${documentId}?error=true`);
-					}
-				}
-			} catch (err) {
-				console.error('Polling error:', err);
-			}
-
-			if (attempts >= maxAttempts) {
-				clearInterval(interval);
-				goto(`/app/concierge/documents/${documentId}`);
-			}
-		}, 1000);
-	}
-
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
 		if (!isValid || isSubmitting || !selectedFile || !data.organization) return;
@@ -241,8 +207,8 @@
 				},
 				onSuccess: () => {
 					console.log('TUS upload successful');
-					isProcessing = true;
-					pollDocumentStatus(documentId, data.organization!.id);
+					// Redirect immediately - document detail page will show processing status
+					goto(`/app/concierge/documents/${documentId}`);
 				}
 			});
 
@@ -428,11 +394,7 @@
 					>
 						{#if isSubmitting}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							{#if isProcessing}
-								Scanning for security...
-							{:else}
-								{uploadProgress > 0 ? `Uploading ${uploadProgress}%...` : 'Starting...'}
-							{/if}
+							{uploadProgress > 0 ? `Uploading ${uploadProgress}%...` : 'Starting...'}
 						{:else}
 							<Check class="mr-2 h-4 w-4" />
 							Upload Document

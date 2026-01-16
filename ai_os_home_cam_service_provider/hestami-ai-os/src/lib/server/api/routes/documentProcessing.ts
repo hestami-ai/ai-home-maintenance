@@ -153,6 +153,7 @@ export const documentProcessingRouter = {
             const result = await startSystemSettingsWorkflow(
                 {
                     action: 'UPSERT_SETTING',
+                    organizationId: context.organization!.id,
                     userId: context.user!.id,
                     data: {
                         key: 'dpq_settings',

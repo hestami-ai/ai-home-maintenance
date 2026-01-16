@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -77,22 +77,28 @@ async function createDecision(
 	createdAt: string;
 }> {
 	const now = new Date();
-	const decision = await prisma.materialDecision.create({
-		data: {
-			organizationId: input.organizationId,
-			caseId: input.caseId,
-			category: input.category as 'FINANCIAL' | 'LEGAL' | 'OPERATIONAL' | 'VENDOR_SELECTION' | 'MAINTENANCE' | 'EMERGENCY' | 'POLICY' | 'COMPLAINT_RESOLUTION' | 'OTHER',
-			title: input.title!,
-			description: input.description!,
-			rationale: input.rationale!,
-			decidedByUserId: input.userId,
-			decidedAt: now,
-			optionsConsidered: input.optionsConsidered ?? [],
-			estimatedImpact: input.estimatedImpact,
-			relatedDocumentIds: input.relatedDocumentIds ?? [],
-			relatedActionIds: input.relatedActionIds ?? []
-		}
-	});
+	const decision = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.materialDecision.create({
+				data: {
+					organizationId: input.organizationId,
+					caseId: input.caseId,
+					category: input.category as any,
+					title: input.title!,
+					description: input.description!,
+					rationale: input.rationale!,
+					decidedByUserId: input.userId,
+					decidedAt: now,
+					optionsConsidered: (input.optionsConsidered ?? []) as any,
+					estimatedImpact: input.estimatedImpact,
+					relatedDocumentIds: input.relatedDocumentIds ?? [],
+					relatedActionIds: input.relatedActionIds ?? []
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create material decision' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -131,13 +137,19 @@ async function recordOutcome(
 	outcomeRecordedAt: string;
 }> {
 	const now = new Date();
-	const updated = await prisma.materialDecision.update({
-		where: { id: decisionId },
-		data: {
-			actualOutcome,
-			outcomeRecordedAt: now
-		}
-	});
+	const updated = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.materialDecision.update({
+				where: { id: decisionId },
+				data: {
+					actualOutcome,
+					outcomeRecordedAt: now
+				}
+			});
+		},
+		{ userId, reason: 'Record material decision outcome' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -177,10 +189,16 @@ async function updateDecision(
 	if (input.relatedDocumentIds !== undefined) updateData.relatedDocumentIds = input.relatedDocumentIds;
 	if (input.relatedActionIds !== undefined) updateData.relatedActionIds = input.relatedActionIds;
 
-	const updated = await prisma.materialDecision.update({
-		where: { id: input.decisionId },
-		data: updateData
-	});
+	const updated = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.materialDecision.update({
+				where: { id: input.decisionId },
+				data: updateData
+			});
+		},
+		{ userId: input.userId, reason: 'Update material decision' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -209,10 +227,16 @@ async function deleteDecision(
 	organizationId: string,
 	userId: string
 ): Promise<{ deleted: boolean }> {
-	await prisma.materialDecision.update({
-		where: { id: decisionId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.materialDecision.update({
+				where: { id: decisionId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Delete material decision' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,

@@ -13,12 +13,16 @@ export async function verifyDeepTrace(config: Config): Promise<Violation[]> {
     const violations: Violation[] = [];
     const projectRoot = getAbsolutePath(config.projectRoot, '.');
 
-    // 1. Scan oRPC route files
-    const globPath = path.join(projectRoot, 'src/lib/server/api/routes/**/*.ts').replace(/\\/g, '/');
+    // Scan all TypeScript files - don't rely on directory conventions
+    // Code patterns (isOrpcHandler) determine what gets checked
+    const globPath = path.join(projectRoot, 'src/**/*.ts').replace(/\\/g, '/');
     const files = project.addSourceFilesAtPaths(globPath);
 
     for (const file of files) {
         const relativePath = path.relative(projectRoot, file.getFilePath()).replace(/\\/g, '/');
+
+        // Skip generated files
+        if (relativePath.includes('/generated/') || relativePath.includes('.generated.')) continue;
         const calls = file.getDescendantsOfKind(SyntaxKind.CallExpression);
 
         for (const call of calls) {

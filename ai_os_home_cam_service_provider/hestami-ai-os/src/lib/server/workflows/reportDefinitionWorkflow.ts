@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ReportCategory, ReportFormat } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -53,24 +54,27 @@ async function createReport(
 		throw new Error('Report with this code already exists');
 	}
 
-	const report = await prisma.reportDefinition.create({
-		data: {
-			associationId,
-			code,
-			name: data.name as string,
-			description: data.description as string | undefined,
-			category: data.category as ReportCategory,
-			queryTemplate: data.queryTemplate as string,
-			parametersJson: data.parametersJson as string | undefined,
-			columnsJson: data.columnsJson as string | undefined,
-			defaultFormat: (data.defaultFormat as ReportFormat) || 'PDF',
-			allowedFormats: (data.allowedFormats as ReportFormat[]) || ['PDF', 'EXCEL', 'CSV'],
-			isSystemReport: false
-		}
-	});
+	const reportId = await orgTransaction(organizationId, async (tx) => {
+		const report = await tx.reportDefinition.create({
+			data: {
+				associationId,
+				code,
+				name: data.name as string,
+				description: data.description as string | undefined,
+				category: data.category as ReportCategory,
+				queryTemplate: data.queryTemplate as string,
+				parametersJson: data.parametersJson as string | undefined,
+				columnsJson: data.columnsJson as string | undefined,
+				defaultFormat: (data.defaultFormat as ReportFormat) || 'PDF',
+				allowedFormats: (data.allowedFormats as ReportFormat[]) || ['PDF', 'EXCEL', 'CSV'],
+				isSystemReport: false
+			}
+		});
+		return report.id;
+	}, { userId, reason: 'Create report definition' });
 
-	console.log(`[ReportDefinitionWorkflow] CREATE_REPORT report:${report.id} by user ${userId}`);
-	return report.id;
+	log.info(`CREATE_REPORT report:${reportId} by user ${userId}`);
+	return reportId;
 }
 
 async function updateReport(
@@ -88,21 +92,23 @@ async function updateReport(
 		throw new Error('Cannot modify system reports');
 	}
 
-	await prisma.reportDefinition.update({
-		where: { id: reportId },
-		data: {
-			name: data.name as string | undefined,
-			description: data.description as string | null | undefined,
-			queryTemplate: data.queryTemplate as string | undefined,
-			parametersJson: data.parametersJson as string | null | undefined,
-			columnsJson: data.columnsJson as string | null | undefined,
-			defaultFormat: data.defaultFormat as ReportFormat | undefined,
-			allowedFormats: data.allowedFormats as ReportFormat[] | undefined,
-			isActive: data.isActive as boolean | undefined
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.reportDefinition.update({
+			where: { id: reportId },
+			data: {
+				name: data.name as string | undefined,
+				description: data.description as string | null | undefined,
+				queryTemplate: data.queryTemplate as string | undefined,
+				parametersJson: data.parametersJson as string | null | undefined,
+				columnsJson: data.columnsJson as string | null | undefined,
+				defaultFormat: data.defaultFormat as ReportFormat | undefined,
+				allowedFormats: data.allowedFormats as ReportFormat[] | undefined,
+				isActive: data.isActive as boolean | undefined
+			}
+		});
+	}, { userId, reason: 'Update report definition' });
 
-	console.log(`[ReportDefinitionWorkflow] UPDATE_REPORT report:${reportId} by user ${userId}`);
+	log.info(`UPDATE_REPORT report:${reportId} by user ${userId}`);
 	return reportId;
 }
 
@@ -120,9 +126,11 @@ async function deleteReport(
 		throw new Error('Cannot delete system reports');
 	}
 
-	await prisma.reportDefinition.delete({ where: { id: reportId } });
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.reportDefinition.delete({ where: { id: reportId } });
+	}, { userId, reason: 'Delete report definition' });
 
-	console.log(`[ReportDefinitionWorkflow] DELETE_REPORT report:${reportId} by user ${userId}`);
+	log.info(`DELETE_REPORT report:${reportId} by user ${userId}`);
 	return reportId;
 }
 
@@ -161,7 +169,7 @@ async function reportDefinitionWorkflow(input: ReportDefinitionWorkflowInput): P
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ReportDefinitionWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

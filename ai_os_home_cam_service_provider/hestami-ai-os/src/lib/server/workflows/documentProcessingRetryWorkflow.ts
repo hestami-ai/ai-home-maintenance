@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import {
     DocumentStatus,
     type EntityWorkflowResult
@@ -325,7 +326,7 @@ async function scheduledRetryPoll(scheduledTime: Date, actualTime: Date): Promis
             await DBOS.startWorkflow(documentProcessingRetryWorkflow_v1, { workflowID: idempotencyKey })({
                 documentId: doc.id,
                 triggeredBy: 'SYSTEM'
-            }, { workflowID: idempotencyKey });
+            });
 
             await DBOS.runStep(
                 () => recordWorkflowEvent({

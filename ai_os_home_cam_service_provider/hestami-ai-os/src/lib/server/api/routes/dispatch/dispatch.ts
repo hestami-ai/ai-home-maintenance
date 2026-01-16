@@ -324,8 +324,8 @@ export const dispatchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create assignment' });
 			}
 
-			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const assignment = await prisma.dispatchAssignment.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
@@ -411,8 +411,8 @@ export const dispatchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reassign dispatch' });
 			}
 
-			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const assignment = await prisma.dispatchAssignment.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
@@ -487,8 +487,8 @@ export const dispatchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update dispatch status' });
 			}
 
-			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const assignment = await prisma.dispatchAssignment.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
@@ -602,14 +602,12 @@ export const dispatchRouter = {
 			const dateTo = new Date(input.dateTo);
 
 			// Get technicians
-			const techWhere = {
-				organizationId: context.organization!.id,
-				isActive: true,
-				...(input.technicianIds && { id: { in: input.technicianIds } })
-			};
-
 			const technicians = await prisma.technician.findMany({
-				where: techWhere,
+				where: {
+					organizationId: context.organization!.id,
+					isActive: true,
+					...(input.technicianIds && { id: { in: input.technicianIds } })
+				},
 				include: {
 					dispatchAssignments: {
 						where: {
@@ -722,8 +720,8 @@ export const dispatchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reschedule dispatch' });
 			}
 
-			const assignment = await prisma.dispatchAssignment.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const assignment = await prisma.dispatchAssignment.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ assignment: formatDispatchAssignment(assignment) }, context);
@@ -784,7 +782,6 @@ export const dispatchRouter = {
 							routeDate: input.routeDate
 						}
 					},
-					'dispatch',
 					input.idempotencyKey
 				);
 
@@ -792,8 +789,8 @@ export const dispatchRouter = {
 					throw errors.NOT_FOUND({ message: result.error || 'Failed to create route plan' });
 				}
 
-				routePlan = await prisma.routePlan.findUniqueOrThrow({
-					where: { id: result.entityId }
+				routePlan = await prisma.routePlan.findFirstOrThrow({
+					where: { id: result.entityId, organizationId: context.organization.id }
 				});
 			}
 
@@ -879,8 +876,8 @@ export const dispatchRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to optimize route' });
 			}
 
-			const routePlan = await prisma.routePlan.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const routePlan = await prisma.routePlan.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ routePlan: formatRoutePlan(routePlan) }, context);

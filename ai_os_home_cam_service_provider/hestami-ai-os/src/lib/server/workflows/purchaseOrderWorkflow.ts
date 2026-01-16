@@ -6,8 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
-import type { PurchaseOrderStatus } from '../../../../generated/prisma/client.js';
+import { orgTransaction, type PrismaTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
@@ -45,8 +44,8 @@ export interface PurchaseOrderWorkflowResult extends EntityWorkflowResult {
 }
 
 // Helper to generate PO number
-async function generatePONumber(organizationId: string): Promise<string> {
-	const count = await prisma.purchaseOrder.count({ where: { organizationId } });
+async function generatePONumber(tx: PrismaTransaction, organizationId: string): Promise<string> {
+	const count = await tx.purchaseOrder.count({ where: { organizationId } });
 	return `PO-${String(count + 1).padStart(6, '0')}`;
 }
 
@@ -69,48 +68,50 @@ async function createPO(
 		unitCost: number;
 	}> | undefined;
 
-	const poNumber = await generatePONumber(organizationId);
+	return orgTransaction(organizationId, async (tx) => {
+		const poNumber = await generatePONumber(tx, organizationId);
 
-	const linesWithTotals = (lines ?? []).map((line, idx) => ({
-		...line,
-		lineNumber: idx + 1,
-		lineTotal: line.quantity * line.unitCost
-	}));
+		const linesWithTotals = (lines ?? []).map((line, idx) => ({
+			...line,
+			lineNumber: idx + 1,
+			lineTotal: line.quantity * line.unitCost
+		}));
 
-	const subtotal = linesWithTotals.reduce((sum, l) => sum + l.lineTotal, 0);
-	const totalAmount = subtotal + (taxAmount ?? 0) + (shippingCost ?? 0);
+		const subtotal = linesWithTotals.reduce((sum, l) => sum + l.lineTotal, 0);
+		const totalAmount = subtotal + (taxAmount ?? 0) + (shippingCost ?? 0);
 
-	const po = await prisma.purchaseOrder.create({
-		data: {
-			organizationId,
-			poNumber,
-			supplierId,
-			expectedDate: expectedDate ? new Date(expectedDate) : null,
-			deliveryLocationId,
-			subtotal,
-			taxAmount: taxAmount ?? 0,
-			shippingCost: shippingCost ?? 0,
-			totalAmount,
-			notes,
-			createdBy: userId
-		}
-	});
-
-	if (linesWithTotals.length > 0) {
-		await prisma.purchaseOrderLine.createMany({
-			data: linesWithTotals.map((line) => ({
-				purchaseOrderId: po.id,
-				lineNumber: line.lineNumber,
-				itemId: line.itemId,
-				description: line.description,
-				quantity: line.quantity,
-				unitCost: line.unitCost,
-				lineTotal: line.lineTotal
-			}))
+		const po = await tx.purchaseOrder.create({
+			data: {
+				organizationId,
+				poNumber,
+				supplierId,
+				expectedDate: expectedDate ? new Date(expectedDate) : null,
+				deliveryLocationId,
+				subtotal,
+				taxAmount: taxAmount ?? 0,
+				shippingCost: shippingCost ?? 0,
+				totalAmount,
+				notes,
+				createdBy: userId
+			}
 		});
-	}
 
-	return po.id;
+		if (linesWithTotals.length > 0) {
+			await tx.purchaseOrderLine.createMany({
+				data: linesWithTotals.map((line) => ({
+					purchaseOrderId: po.id,
+					lineNumber: line.lineNumber,
+					itemId: line.itemId,
+					description: line.description,
+					quantity: line.quantity,
+					unitCost: line.unitCost,
+					lineTotal: line.lineTotal
+				}))
+			});
+		}
+
+		return po.id;
+	}, { userId, reason: 'Create purchase order' });
 }
 
 async function updatePO(
@@ -121,12 +122,14 @@ async function updatePO(
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
 
-	await prisma.purchaseOrder.update({
-		where: { id: poId },
-		data: updateData
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrder.update({
+			where: { id: poId },
+			data: updateData
+		});
 
-	return poId;
+		return poId;
+	}, { userId, reason: 'Update purchase order' });
 }
 
 async function addLine(
@@ -135,22 +138,24 @@ async function addLine(
 	poId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.purchaseOrderLine.create({
-		data: {
-			purchaseOrderId: poId,
-			lineNumber: data.lineNumber as number,
-			itemId: data.itemId as string,
-			description: data.description as string,
-			quantity: data.quantity as number,
-			unitCost: data.unitCost as number,
-			lineTotal: data.lineTotal as number
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrderLine.create({
+			data: {
+				purchaseOrderId: poId,
+				lineNumber: data.lineNumber as number,
+				itemId: data.itemId as string,
+				description: data.description as string,
+				quantity: data.quantity as number,
+				unitCost: data.unitCost as number,
+				lineTotal: data.lineTotal as number
+			}
+		});
 
-	// Recalculate PO total
-	await recalculatePOTotal(poId);
+		// Recalculate PO total
+		await recalculatePOTotal(tx, poId);
 
-	return poId;
+		return poId;
+	}, { userId, reason: 'Add purchase order line' });
 }
 
 async function removeLine(
@@ -159,12 +164,14 @@ async function removeLine(
 	poId: string,
 	lineId: string
 ): Promise<string> {
-	await prisma.purchaseOrderLine.delete({ where: { id: lineId } });
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrderLine.delete({ where: { id: lineId } });
 
-	// Recalculate PO total
-	await recalculatePOTotal(poId);
+		// Recalculate PO total
+		await recalculatePOTotal(tx, poId);
 
-	return poId;
+		return poId;
+	}, { userId, reason: 'Remove purchase order line' });
 }
 
 async function submitPO(
@@ -172,15 +179,17 @@ async function submitPO(
 	userId: string,
 	poId: string
 ): Promise<string> {
-	await prisma.purchaseOrder.update({
-		where: { id: poId },
-		data: {
-			status: 'SUBMITTED',
-			submittedAt: new Date()
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrder.update({
+			where: { id: poId },
+			data: {
+				status: 'SUBMITTED',
+				submittedAt: new Date()
+			}
+		});
 
-	return poId;
+		return poId;
+	}, { userId, reason: 'Submit purchase order' });
 }
 
 async function confirmPO(
@@ -188,15 +197,17 @@ async function confirmPO(
 	userId: string,
 	poId: string
 ): Promise<string> {
-	await prisma.purchaseOrder.update({
-		where: { id: poId },
-		data: {
-			status: 'CONFIRMED',
-			confirmedAt: new Date()
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrder.update({
+			where: { id: poId },
+			data: {
+				status: 'CONFIRMED',
+				confirmedAt: new Date()
+			}
+		});
 
-	return poId;
+		return poId;
+	}, { userId, reason: 'Confirm purchase order' });
 }
 
 async function receivePO(
@@ -222,105 +233,107 @@ async function receivePO(
 		expirationDate?: string;
 	}>;
 
-	// Create receipt
-	const receiptCount = await prisma.purchaseOrderReceipt.count({
-		where: { purchaseOrderId: poId }
-	});
-	const receiptNumber = `${poNumber}-R${receiptCount + 1}`;
+	return orgTransaction(organizationId, async (tx) => {
+		// Create receipt
+		const receiptCount = await tx.purchaseOrderReceipt.count({
+			where: { purchaseOrderId: poId }
+		});
+		const receiptNumber = `${poNumber}-R${receiptCount + 1}`;
 
-	const receipt = await prisma.purchaseOrderReceipt.create({
-		data: {
-			purchaseOrderId: poId,
-			receiptNumber,
-			receivedBy: userId,
-			locationId,
-			notes
-		}
-	});
+		const receipt = await tx.purchaseOrderReceipt.create({
+			data: {
+				purchaseOrderId: poId,
+				receiptNumber,
+				receivedBy: userId,
+				locationId,
+				notes
+			}
+		});
 
-	// Process each line
-	for (const recvLine of lines) {
-		const poLine = existingLines.find((l) => l.id === recvLine.lineId);
-		if (!poLine) continue;
+		// Process each line
+		for (const recvLine of lines) {
+			const poLine = existingLines.find((l) => l.id === recvLine.lineId);
+			if (!poLine) continue;
 
-		if (recvLine.quantityReceived > 0) {
-			// Create receipt line
-			await prisma.purchaseOrderReceiptLine.create({
-				data: {
-					receiptId: receipt.id,
-					itemId: poLine.itemId,
-					quantityReceived: recvLine.quantityReceived,
-					lotNumber: recvLine.lotNumber,
-					serialNumber: recvLine.serialNumber,
-					expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : null
-				}
-			});
-
-			// Update PO line received quantity
-			await prisma.purchaseOrderLine.update({
-				where: { id: recvLine.lineId },
-				data: { quantityReceived: poLine.quantityReceived + recvLine.quantityReceived }
-			});
-
-			// Add to inventory
-			let level = await prisma.inventoryLevel.findFirst({
-				where: {
-					itemId: poLine.itemId,
-					locationId,
-					lotNumber: recvLine.lotNumber ?? null,
-					serialNumber: recvLine.serialNumber ?? null
-				}
-			});
-
-			if (level) {
-				await prisma.inventoryLevel.update({
-					where: { id: level.id },
+			if (recvLine.quantityReceived > 0) {
+				// Create receipt line
+				await tx.purchaseOrderReceiptLine.create({
 					data: {
-						quantityOnHand: level.quantityOnHand + recvLine.quantityReceived,
-						quantityAvailable: level.quantityAvailable + recvLine.quantityReceived,
-						expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : level.expirationDate
-					}
-				});
-			} else {
-				await prisma.inventoryLevel.create({
-					data: {
+						receiptId: receipt.id,
 						itemId: poLine.itemId,
-						locationId,
-						quantityOnHand: recvLine.quantityReceived,
-						quantityAvailable: recvLine.quantityReceived,
+						quantityReceived: recvLine.quantityReceived,
 						lotNumber: recvLine.lotNumber,
 						serialNumber: recvLine.serialNumber,
 						expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : null
 					}
 				});
+
+				// Update PO line received quantity
+				await tx.purchaseOrderLine.update({
+					where: { id: recvLine.lineId },
+					data: { quantityReceived: poLine.quantityReceived + recvLine.quantityReceived }
+				});
+
+				// Add to inventory
+				const level = await tx.inventoryLevel.findFirst({
+					where: {
+						itemId: poLine.itemId,
+						locationId,
+						lotNumber: recvLine.lotNumber ?? null,
+						serialNumber: recvLine.serialNumber ?? null
+					}
+				});
+
+				if (level) {
+					await tx.inventoryLevel.update({
+						where: { id: level.id },
+						data: {
+							quantityOnHand: level.quantityOnHand + recvLine.quantityReceived,
+							quantityAvailable: level.quantityAvailable + recvLine.quantityReceived,
+							expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : level.expirationDate
+						}
+					});
+				} else {
+					await tx.inventoryLevel.create({
+						data: {
+							itemId: poLine.itemId,
+							locationId,
+							quantityOnHand: recvLine.quantityReceived,
+							quantityAvailable: recvLine.quantityReceived,
+							lotNumber: recvLine.lotNumber,
+							serialNumber: recvLine.serialNumber,
+							expirationDate: recvLine.expirationDate ? new Date(recvLine.expirationDate) : null
+						}
+					});
+				}
 			}
 		}
-	}
 
-	// Check if fully received
-	const updatedLines = await prisma.purchaseOrderLine.findMany({
-		where: { purchaseOrderId: poId }
-	});
+		// Check if fully received
+		const updatedLines = await tx.purchaseOrderLine.findMany({
+			where: { purchaseOrderId: poId }
+		});
 
-	const fullyReceived = updatedLines.every((l) => l.quantityReceived >= l.quantity);
-	const partiallyReceived = updatedLines.some((l) => l.quantityReceived > 0);
+		const fullyReceived = updatedLines.every((l) => l.quantityReceived >= l.quantity);
+		const partiallyReceived = updatedLines.some((l) => l.quantityReceived > 0);
 
-	let newStatus: 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' = 'CONFIRMED';
-	if (fullyReceived) {
-		newStatus = 'RECEIVED';
-	} else if (partiallyReceived) {
-		newStatus = 'PARTIALLY_RECEIVED';
-	}
-
-	await prisma.purchaseOrder.update({
-		where: { id: poId },
-		data: {
-			status: newStatus,
-			receivedAt: fullyReceived ? new Date() : null
+		let newStatus: 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' = 'CONFIRMED';
+		if (fullyReceived) {
+			newStatus = 'RECEIVED';
+		} else if (partiallyReceived) {
+			newStatus = 'PARTIALLY_RECEIVED';
 		}
-	});
 
-	return poId;
+		await tx.purchaseOrder.update({
+			where: { id: poId },
+			data: {
+				status: newStatus,
+				receivedAt: fullyReceived ? new Date() : null
+			}
+		});
+
+		return poId;
+	}, { userId, reason: 'Receive purchase order items' });
 }
 
 async function cancelPO(
@@ -328,14 +341,16 @@ async function cancelPO(
 	userId: string,
 	poId: string
 ): Promise<string> {
-	await prisma.purchaseOrder.update({
-		where: { id: poId },
-		data: {
-			status: 'CANCELLED'
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrder.update({
+			where: { id: poId },
+			data: {
+				status: 'CANCELLED'
+			}
+		});
 
-	return poId;
+		return poId;
+	}, { userId, reason: 'Cancel purchase order' });
 }
 
 async function deletePO(
@@ -343,19 +358,21 @@ async function deletePO(
 	userId: string,
 	poId: string
 ): Promise<string> {
-	await prisma.purchaseOrder.delete({ where: { id: poId } });
-	return poId;
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.purchaseOrder.delete({ where: { id: poId } });
+		return poId;
+	}, { userId, reason: 'Delete purchase order' });
 }
 
-async function recalculatePOTotal(poId: string): Promise<void> {
-	const lines = await prisma.purchaseOrderLine.findMany({ where: { purchaseOrderId: poId } });
+async function recalculatePOTotal(tx: PrismaTransaction, poId: string): Promise<void> {
+	const lines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: poId } });
 
 	let totalAmount = 0;
 	for (const line of lines) {
 		totalAmount += Number(line.lineTotal);
 	}
 
-	await prisma.purchaseOrder.update({
+	await tx.purchaseOrder.update({
 		where: { id: poId },
 		data: { totalAmount }
 	});

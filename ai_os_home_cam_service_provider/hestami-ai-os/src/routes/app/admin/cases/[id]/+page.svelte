@@ -22,7 +22,13 @@
 		MapPin,
 		Phone,
 		Mail,
-		ExternalLink
+		ExternalLink,
+		Image,
+		Video,
+		File,
+		Download,
+		Paperclip,
+		Building2
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { invalidate } from '$app/navigation';
@@ -121,6 +127,34 @@
 		{ id: 'review', label: 'Review', icon: FileText },
 		{ id: 'audit', label: 'Audit', icon: Shield }
 	];
+
+	// Attachment type for type safety
+	interface Attachment {
+		id: string;
+		fileName: string;
+		fileSize: number;
+		mimeType: string;
+		fileUrl: string;
+		uploadedBy?: string;
+		createdAt: string;
+	}
+
+	// Derive attachments from caseDetail
+	const attachments = $derived((caseDetail?.attachments ?? []) as Attachment[]);
+
+	function getFileIcon(mimeType: string) {
+		if (mimeType.startsWith('image/')) return Image;
+		if (mimeType.startsWith('video/')) return Video;
+		return File;
+	}
+
+	function formatFileSize(bytes: number): string {
+		if (bytes === 0) return '0 Bytes';
+		const k = 1024;
+		const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+	}
 </script>
 
 <svelte:head>
@@ -284,6 +318,45 @@
 								</div>
 							</Card>
 						{/if}
+
+						<!-- Attachments (Read-only) -->
+						<Card variant="outlined" padding="lg">
+							<div class="flex items-center gap-2">
+								<Paperclip class="h-5 w-5 text-primary-500" />
+								<h2 class="text-lg font-semibold">Attachments</h2>
+							</div>
+							{#if attachments.length > 0}
+								<div class="mt-4 space-y-3">
+									{#each attachments as attachment}
+										{@const FileIcon = getFileIcon(attachment.mimeType)}
+										<div class="flex items-center justify-between rounded-lg border border-surface-300-700 p-3">
+											<div class="flex items-center gap-3">
+												<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-100-900">
+													<FileIcon class="h-5 w-5 text-surface-500" />
+												</div>
+												<div>
+													<p class="font-medium text-sm">{attachment.fileName}</p>
+													<p class="text-xs text-surface-500">
+														{formatFileSize(attachment.fileSize)} • {formatShortDate(attachment.createdAt)}
+													</p>
+												</div>
+											</div>
+											<a
+												href={attachment.fileUrl}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="btn preset-outlined-surface-500 btn-sm"
+												title="Download {attachment.fileName}"
+											>
+												<Download class="h-4 w-4" />
+											</a>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								<p class="mt-4 text-sm text-surface-500">No attachments uploaded for this case.</p>
+							{/if}
+						</Card>
 
 					{:else if activeTab === 'context'}
 						<!-- Context Tab -->
@@ -550,6 +623,28 @@
 							</button>
 						</div>
 					</Card>
+
+					<!-- Organization Info -->
+					{#if caseDetail.organization}
+						<Card variant="outlined" padding="lg">
+							<h3 class="font-semibold">Organization</h3>
+							<div class="mt-4">
+								<a
+									href="/app/admin/organizations/{caseDetail.organization.id}"
+									class="flex items-center gap-3 group"
+								>
+									<div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-500/10">
+										<Building2 class="h-5 w-5 text-primary-500" />
+									</div>
+									<div>
+										<p class="font-medium group-hover:text-primary-500 transition-colors">{caseDetail.organization.name}</p>
+										<p class="text-sm text-surface-500">{caseDetail.organization.type.replace(/_/g, ' ')}</p>
+									</div>
+									<ChevronRight class="ml-auto h-4 w-4 text-surface-400 group-hover:text-primary-500 transition-colors" />
+								</a>
+							</div>
+						</Card>
+					{/if}
 
 					<!-- Assignment Info -->
 					<Card variant="outlined" padding="lg">

@@ -84,8 +84,8 @@ export const propertyRouter = {
 			}
 
 			// Fetch the created property
-			const property = await prisma.property.findUnique({
-				where: { id: result.propertyId }
+			const property = await prisma.property.findFirstOrThrow({
+				where: { id: result.propertyId, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -139,11 +139,11 @@ export const propertyRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const property = await prisma.property.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: { association: true }
 			});
 
-			if (!property || property.association.organizationId !== context.organization.id) {
+			if (!property) {
 				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 

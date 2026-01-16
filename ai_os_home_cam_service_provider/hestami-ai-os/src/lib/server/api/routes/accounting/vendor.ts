@@ -164,6 +164,7 @@ export const vendorRouter = {
 			}
 
 			const where: Prisma.VendorWhereInput = {
+				organizationId: context.organization.id,
 				associationId: association.id,
 				deletedAt: null
 			};
@@ -245,7 +246,7 @@ export const vendorRouter = {
 			}
 
 			const vendor = await prisma.vendor.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!vendor) {
@@ -329,7 +330,7 @@ export const vendorRouter = {
 			}
 
 			const existing = await prisma.vendor.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!existing) {
@@ -407,7 +408,7 @@ export const vendorRouter = {
 			}
 
 			const vendor = await prisma.vendor.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!vendor) {

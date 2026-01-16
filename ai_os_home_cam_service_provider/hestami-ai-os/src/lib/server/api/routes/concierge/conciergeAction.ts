@@ -187,15 +187,20 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: {
 					case: true,
 					logs: { orderBy: { createdAt: 'desc' } }
 				}
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
@@ -277,6 +282,7 @@ export const conciergeActionRouter = {
 
 			const where: Prisma.ConciergeActionWhereInput = {
 				caseId: input.caseId,
+				case: { organizationId: context.organization.id },
 				deletedAt: null,
 				...(input.status && { status: input.status }),
 				...(input.actionType && { actionType: input.actionType })
@@ -338,12 +344,17 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { case: true }
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
@@ -422,12 +433,17 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { case: true }
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
@@ -506,12 +522,17 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { case: true }
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
@@ -587,12 +608,17 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { case: true }
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
@@ -668,12 +694,17 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { case: true }
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 
@@ -752,12 +783,17 @@ export const conciergeActionRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via case relationship for connection pool safety
 			const action = await prisma.conciergeAction.findFirst({
-				where: { id: input.actionId, deletedAt: null },
+				where: {
+					id: input.actionId,
+					deletedAt: null,
+					case: { organizationId: context.organization.id, deletedAt: null }
+				},
 				include: { case: true }
 			});
 
-			if (!action || action.case.organizationId !== context.organization.id) {
+			if (!action) {
 				throw errors.NOT_FOUND({ message: 'ConciergeAction not found' });
 			}
 

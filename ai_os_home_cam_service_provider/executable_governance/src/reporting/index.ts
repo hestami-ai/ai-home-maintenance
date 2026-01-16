@@ -1,5 +1,7 @@
 import chalk from 'chalk';
 
+export type ViolationSeverity = 'error' | 'warning' | 'info';
+
 export interface Violation {
     rule: string;
     file: string;
@@ -7,6 +9,7 @@ export interface Violation {
     suggestion?: string;
     line?: number;
     column?: number;
+    severity?: ViolationSeverity; // Defaults to 'error' if not specified
 }
 
 export interface Report {
@@ -20,17 +23,45 @@ export function printReport(report: Report, jsonMode: boolean) {
         return;
     }
 
+    const errors = report.violations.filter(v => !v.severity || v.severity === 'error');
+    const warnings = report.violations.filter(v => v.severity === 'warning');
+    const infos = report.violations.filter(v => v.severity === 'info');
+
     if (report.status === 'pass') {
         console.log(chalk.green('✔ All governance checks passed!'));
+        if (warnings.length > 0 || infos.length > 0) {
+            console.log(chalk.gray(`  (${warnings.length} warnings, ${infos.length} info)`));
+        }
         return;
     }
 
-    console.log(chalk.red(`✖ Found ${report.violations.length} violations:`));
+    console.log(chalk.red(`✖ Found ${errors.length} errors, ${warnings.length} warnings, ${infos.length} info:`));
     console.log('');
 
-    report.violations.forEach((v, i) => {
-        console.log(`${chalk.bold(v.rule)}: ${v.file}${v.line ? `:${v.line}` : ''}${v.column ? `:${v.column}` : ''}`);
+    // Print errors first
+    errors.forEach((v) => {
+        console.log(`${chalk.red('ERROR')} ${chalk.bold(v.rule)}: ${v.file}${v.line ? `:${v.line}` : ''}${v.column ? `:${v.column}` : ''}`);
         console.log(chalk.yellow(`  Reason: ${v.reason}`));
+        if (v.suggestion) {
+            console.log(chalk.blue(`  Suggestion: ${v.suggestion}`));
+        }
+        console.log('');
+    });
+
+    // Print warnings
+    warnings.forEach((v) => {
+        console.log(`${chalk.yellow('WARN')} ${chalk.bold(v.rule)}: ${v.file}${v.line ? `:${v.line}` : ''}${v.column ? `:${v.column}` : ''}`);
+        console.log(chalk.gray(`  Reason: ${v.reason}`));
+        if (v.suggestion) {
+            console.log(chalk.blue(`  Suggestion: ${v.suggestion}`));
+        }
+        console.log('');
+    });
+
+    // Print info
+    infos.forEach((v) => {
+        console.log(`${chalk.cyan('INFO')} ${chalk.bold(v.rule)}: ${v.file}${v.line ? `:${v.line}` : ''}${v.column ? `:${v.column}` : ''}`);
+        console.log(chalk.gray(`  Reason: ${v.reason}`));
         if (v.suggestion) {
             console.log(chalk.blue(`  Suggestion: ${v.suggestion}`));
         }

@@ -6,8 +6,11 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('SignatureWorkflow');
 import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
@@ -36,27 +39,33 @@ async function captureSignature(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const signature = await prisma.jobSignature.create({
-		data: {
-			organizationId,
-			jobId: data.jobId as string,
-			jobVisitId: data.jobVisitId as string | undefined,
-			signerName: data.signerName as string,
-			signerEmail: data.signerEmail as string | undefined,
-			signerRole: data.signerRole as string,
-			signatureData: data.signatureData as string,
-			signedAt: data.signedAt ? new Date(data.signedAt as string) : new Date(),
-			latitude: data.latitude as number | undefined,
-			longitude: data.longitude as number | undefined,
-			documentType: data.documentType as string,
-			documentId: data.documentId as string | undefined,
-			ipAddress: data.ipAddress as string | undefined,
-			deviceInfo: data.deviceInfo as string | undefined,
-			capturedBy: userId
-		}
-	});
+	const signature = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.jobSignature.create({
+				data: {
+					organizationId,
+					jobId: data.jobId as string,
+					jobVisitId: data.jobVisitId as string | undefined,
+					signerName: data.signerName as string,
+					signerEmail: data.signerEmail as string | undefined,
+					signerRole: data.signerRole as string,
+					signatureData: data.signatureData as string,
+					signedAt: data.signedAt ? new Date(data.signedAt as string) : new Date(),
+					latitude: data.latitude as number | undefined,
+					longitude: data.longitude as number | undefined,
+					documentType: data.documentType as string,
+					documentId: data.documentId as string | undefined,
+					ipAddress: data.ipAddress as string | undefined,
+					deviceInfo: data.deviceInfo as string | undefined,
+					capturedBy: userId
+				}
+			});
+		},
+		{ userId, reason: 'Capture job signature' }
+	);
 
-	console.log(`[SignatureWorkflow] CAPTURE_SIGNATURE signature:${signature.id} by user ${userId}`);
+	log.info('CAPTURE_SIGNATURE completed', { signatureId: signature.id, userId });
 	return signature.id;
 }
 
@@ -65,9 +74,15 @@ async function deleteSignature(
 	userId: string,
 	signatureId: string
 ): Promise<string> {
-	await prisma.jobSignature.delete({ where: { id: signatureId } });
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.jobSignature.delete({ where: { id: signatureId } });
+		},
+		{ userId, reason: 'Delete job signature' }
+	);
 
-	console.log(`[SignatureWorkflow] DELETE_SIGNATURE signature:${signatureId} by user ${userId}`);
+	log.info('DELETE_SIGNATURE completed', { signatureId, userId });
 	return signatureId;
 }
 
@@ -99,7 +114,7 @@ async function signatureWorkflow(input: SignatureWorkflowInput): Promise<Signatu
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[SignatureWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

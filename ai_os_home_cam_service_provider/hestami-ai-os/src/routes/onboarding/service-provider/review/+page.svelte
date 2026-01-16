@@ -19,13 +19,14 @@
 		try {
 			// Type-safe oRPC call
 			const result = await orpc.organization.create({
+				idempotencyKey: crypto.randomUUID(),
 				name: $serviceProviderOnboarding.businessDetails.name,
 				slug: $serviceProviderOnboarding.businessDetails.slug,
 				type: 'SERVICE_PROVIDER'
 			});
 
 			const org = result.data.organization;
-			await orpc.organization.setDefault({ organizationId: org.id });
+			await orpc.organization.setDefault({ idempotencyKey: crypto.randomUUID(), organizationId: org.id });
 
 			// Store update removed
 

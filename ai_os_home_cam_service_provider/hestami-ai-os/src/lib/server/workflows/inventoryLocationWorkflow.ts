@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -40,25 +40,31 @@ async function createLocation(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const location = await prisma.inventoryLocation.create({
-		data: {
-			organizationId,
-			name: data.name as string,
-			code: data.code as string | undefined,
-			type: data.type as 'WAREHOUSE' | 'TRUCK' | 'BRANCH' | 'VENDOR_CONSIGNMENT',
-			description: data.description as string | undefined,
-			addressLine1: data.addressLine1 as string | undefined,
-			addressLine2: data.addressLine2 as string | undefined,
-			city: data.city as string | undefined,
-			state: data.state as string | undefined,
-			postalCode: data.postalCode as string | undefined,
-			technicianId: data.technicianId as string | undefined,
-			branchId: data.branchId as string | undefined,
-			isActive: true
-		}
-	});
+	const location = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.inventoryLocation.create({
+				data: {
+					organizationId,
+					name: data.name as string,
+					code: data.code as string | undefined,
+					type: data.type as 'WAREHOUSE' | 'TRUCK' | 'BRANCH' | 'VENDOR_CONSIGNMENT',
+					description: data.description as string | undefined,
+					addressLine1: data.addressLine1 as string | undefined,
+					addressLine2: data.addressLine2 as string | undefined,
+					city: data.city as string | undefined,
+					state: data.state as string | undefined,
+					postalCode: data.postalCode as string | undefined,
+					technicianId: data.technicianId as string | undefined,
+					branchId: data.branchId as string | undefined,
+					isActive: true
+				}
+			});
+		},
+		{ userId, reason: 'Create inventory location' }
+	);
 
-	console.log(`[InventoryLocationWorkflow] CREATE_LOCATION location:${location.id} by user ${userId}`);
+	log.info('CREATE_LOCATION completed', { locationId: location.id, userId });
 	return location.id;
 }
 
@@ -70,12 +76,18 @@ async function updateLocation(
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
 
-	await prisma.inventoryLocation.update({
-		where: { id: locationId },
-		data: updateData
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.inventoryLocation.update({
+				where: { id: locationId },
+				data: updateData
+			});
+		},
+		{ userId, reason: 'Update inventory location' }
+	);
 
-	console.log(`[InventoryLocationWorkflow] UPDATE_LOCATION location:${locationId} by user ${userId}`);
+	log.info('UPDATE_LOCATION completed', { locationId, userId });
 	return locationId;
 }
 
@@ -84,12 +96,18 @@ async function deleteLocation(
 	userId: string,
 	locationId: string
 ): Promise<string> {
-	await prisma.inventoryLocation.update({
-		where: { id: locationId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.inventoryLocation.update({
+				where: { id: locationId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Delete inventory location' }
+	);
 
-	console.log(`[InventoryLocationWorkflow] DELETE_LOCATION location:${locationId} by user ${userId}`);
+	log.info('DELETE_LOCATION completed', { locationId, userId });
 	return locationId;
 }
 
@@ -128,7 +146,7 @@ async function inventoryLocationWorkflow(input: InventoryLocationWorkflowInput):
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[InventoryLocationWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

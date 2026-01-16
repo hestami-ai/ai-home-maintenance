@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -74,20 +75,26 @@ async function createStaff(
 		activationCodeExpiresAt: Date;
 	}
 ): Promise<{ id: string; displayName: string; status: StaffStatus }> {
-	const staff = await prisma.staff.create({
-		data: {
-			userId: targetUserId,
-			...(organizationId !== 'hestami-platform' && { organizationId }),
-			displayName: data.displayName,
-			title: data.title,
-			roles: data.roles,
-			pillarAccess: data.pillarAccess,
-			canBeAssignedCases: data.canBeAssignedCases,
-			status: 'PENDING',
-			activationCodeEncrypted: data.activationCodeEncrypted,
-			activationCodeExpiresAt: data.activationCodeExpiresAt
-		}
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.create({
+				data: {
+					userId: targetUserId,
+					...(organizationId !== 'hestami-platform' && { organizationId }),
+					displayName: data.displayName,
+					title: data.title,
+					roles: data.roles,
+					pillarAccess: data.pillarAccess,
+					canBeAssignedCases: data.canBeAssignedCases,
+					status: 'PENDING',
+					activationCodeEncrypted: data.activationCodeEncrypted,
+					activationCodeExpiresAt: data.activationCodeExpiresAt
+				}
+			});
+		},
+		{ userId, reason: 'Create staff member' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -134,10 +141,16 @@ async function updateStaff(
 	if (data.roles !== undefined) updateData.roles = data.roles;
 	if (data.pillarAccess !== undefined) updateData.pillarAccess = data.pillarAccess;
 
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: updateData
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: updateData
+			});
+		},
+		{ userId, reason: 'Update staff member' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -170,13 +183,19 @@ async function activateStaff(
 	userId: string
 ): Promise<{ id: string; activatedAt: string }> {
 	const now = new Date();
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: {
-			status: 'ACTIVE',
-			activatedAt: now
-		}
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: {
+					status: 'ACTIVE',
+					activatedAt: now
+				}
+			});
+		},
+		{ userId, reason: 'Activate staff member' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -206,29 +225,32 @@ async function suspendStaff(
 ): Promise<{ id: string; suspendedAt: string; escalatedCaseCount: number }> {
 	const now = new Date();
 
-	// Suspend staff and unassign all cases in a transaction
-	const [staff, updateResult] = await prisma.$transaction([
-		prisma.staff.update({
-			where: { id: staffId },
-			data: {
-				status: 'SUSPENDED',
-				suspendedAt: now,
-				suspensionReason: reason
-			}
-		}),
-		prisma.staffCaseAssignment.updateMany({
-			where: {
-				staffId,
-				unassignedAt: null
-			},
-			data: {
-				unassignedAt: now,
-				justification: `Staff suspended: ${reason}`
-			}
-		})
-	]);
-
-	const escalatedCaseCount = updateResult.count;
+	// Suspend staff and unassign all cases in a transaction with RLS context
+	const { staff, escalatedCaseCount } = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			const staffResult = await tx.staff.update({
+				where: { id: staffId },
+				data: {
+					status: 'SUSPENDED',
+					suspendedAt: now,
+					suspensionReason: reason
+				}
+			});
+			const updateResult = await tx.staffCaseAssignment.updateMany({
+				where: {
+					staffId,
+					unassignedAt: null
+				},
+				data: {
+					unassignedAt: now,
+					justification: `Staff suspended: ${reason}`
+				}
+			});
+			return { staff: staffResult, escalatedCaseCount: updateResult.count };
+		},
+		{ userId, reason: 'Suspend staff member' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -262,15 +284,21 @@ async function deactivateStaff(
 	previousStatus: StaffStatus
 ): Promise<{ id: string; deactivatedAt: string }> {
 	const now = new Date();
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: {
-			status: 'DEACTIVATED',
-			deactivatedAt: now,
-			deactivationReason: reason,
-			canBeAssignedCases: false
-		}
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: {
+					status: 'DEACTIVATED',
+					deactivatedAt: now,
+					deactivationReason: reason,
+					canBeAssignedCases: false
+				}
+			});
+		},
+		{ userId, reason: 'Deactivate staff member' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -301,13 +329,19 @@ async function reactivateStaff(
 	userId: string,
 	previousStatus: StaffStatus
 ): Promise<{ id: string }> {
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: {
-			status: 'ACTIVE',
-			canBeAssignedCases: true
-		}
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: {
+					status: 'ACTIVE',
+					canBeAssignedCases: true
+				}
+			});
+		},
+		{ userId, reason: 'Reactivate staff member' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -335,10 +369,16 @@ async function updateRoles(
 	roles: StaffRole[],
 	previousRoles: StaffRole[]
 ): Promise<{ id: string }> {
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: { roles }
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: { roles }
+			});
+		},
+		{ userId, reason: 'Update staff roles' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -366,10 +406,16 @@ async function updatePillarAccess(
 	pillarAccess: PillarAccess[],
 	previousPillarAccess: PillarAccess[]
 ): Promise<{ id: string }> {
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: { pillarAccess }
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: { pillarAccess }
+			});
+		},
+		{ userId, reason: 'Update staff pillar access' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -397,13 +443,19 @@ async function regenerateActivationCode(
 	activationCodeEncrypted: string,
 	activationCodeExpiresAt: Date
 ): Promise<{ id: string; expiresAt: string }> {
-	const staff = await prisma.staff.update({
-		where: { id: staffId },
-		data: {
-			activationCodeEncrypted,
-			activationCodeExpiresAt
-		}
-	});
+	const staff = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: {
+					activationCodeEncrypted,
+					activationCodeExpiresAt
+				}
+			});
+		},
+		{ userId, reason: 'Regenerate activation code' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -432,15 +484,21 @@ async function activateWithCode(
 	displayName: string
 ): Promise<{ id: string; activatedAt: string }> {
 	const now = new Date();
-	await prisma.staff.update({
-		where: { id: staffId },
-		data: {
-			status: 'ACTIVE',
-			activatedAt: now,
-			activationCodeEncrypted: null,
-			activationCodeExpiresAt: null
-		}
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.staff.update({
+				where: { id: staffId },
+				data: {
+					status: 'ACTIVE',
+					activatedAt: now,
+					activationCodeEncrypted: null,
+					activationCodeExpiresAt: null
+				}
+			});
+		},
+		{ userId, reason: 'Activate staff with code' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,

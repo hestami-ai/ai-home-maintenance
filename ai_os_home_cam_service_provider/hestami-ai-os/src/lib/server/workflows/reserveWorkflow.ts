@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -43,27 +43,29 @@ async function createComponent(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const component = await prisma.reserveComponent.create({
-		data: {
-			associationId: data.associationId as string,
-			name: data.name as string,
-			description: data.description as string | undefined,
-			category: data.category as any,
-			location: data.location as string | undefined,
-			quantity: (data.quantity as number) ?? 1,
-			unitOfMeasure: data.unitOfMeasure as string | undefined,
-			conditionRating: data.conditionRating as number | undefined,
-			placedInServiceDate: data.placedInServiceDate ? new Date(data.placedInServiceDate as string) : undefined,
-			usefulLife: data.usefulLife as number,
-			remainingLife: data.remainingLife as number,
-			currentReplacementCost: data.currentReplacementCost as number,
-			inflationRate: (data.inflationRate as number) ?? 3.0,
-			notes: data.notes as string | undefined
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		const component = await tx.reserveComponent.create({
+			data: {
+				associationId: data.associationId as string,
+				name: data.name as string,
+				description: data.description as string | undefined,
+				category: data.category as any,
+				location: data.location as string | undefined,
+				quantity: (data.quantity as number) ?? 1,
+				unitOfMeasure: data.unitOfMeasure as string | undefined,
+				conditionRating: data.conditionRating as number | undefined,
+				placedInServiceDate: data.placedInServiceDate ? new Date(data.placedInServiceDate as string) : undefined,
+				usefulLife: data.usefulLife as number,
+				remainingLife: data.remainingLife as number,
+				currentReplacementCost: data.currentReplacementCost as number,
+				inflationRate: (data.inflationRate as number) ?? 3.0,
+				notes: data.notes as string | undefined
+			}
+		});
 
-	console.log(`[ReserveWorkflow] CREATE_COMPONENT component:${component.id} by user ${userId}`);
-	return component.id;
+		log.info(`CREATE_COMPONENT component:${component.id} by user ${userId}`);
+		return component.id;
+	}, { userId, reason: 'CREATE_COMPONENT' });
 }
 
 async function updateComponent(
@@ -72,27 +74,29 @@ async function updateComponent(
 	componentId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.reserveComponent.update({
-		where: { id: componentId },
-		data: {
-			name: data.name as string | undefined,
-			description: data.description as string | undefined,
-			category: data.category as any,
-			location: data.location as string | undefined,
-			quantity: data.quantity as number | undefined,
-			unitOfMeasure: data.unitOfMeasure as string | undefined,
-			conditionRating: data.conditionRating as number | undefined,
-			placedInServiceDate: data.placedInServiceDate ? new Date(data.placedInServiceDate as string) : undefined,
-			usefulLife: data.usefulLife as number | undefined,
-			remainingLife: data.remainingLife as number | undefined,
-			currentReplacementCost: data.currentReplacementCost as number | undefined,
-			inflationRate: data.inflationRate as number | undefined,
-			notes: data.notes as string | undefined
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.reserveComponent.update({
+			where: { id: componentId },
+			data: {
+				name: data.name as string | undefined,
+				description: data.description as string | undefined,
+				category: data.category as any,
+				location: data.location as string | undefined,
+				quantity: data.quantity as number | undefined,
+				unitOfMeasure: data.unitOfMeasure as string | undefined,
+				conditionRating: data.conditionRating as number | undefined,
+				placedInServiceDate: data.placedInServiceDate ? new Date(data.placedInServiceDate as string) : undefined,
+				usefulLife: data.usefulLife as number | undefined,
+				remainingLife: data.remainingLife as number | undefined,
+				currentReplacementCost: data.currentReplacementCost as number | undefined,
+				inflationRate: data.inflationRate as number | undefined,
+				notes: data.notes as string | undefined
+			}
+		});
 
-	console.log(`[ReserveWorkflow] UPDATE_COMPONENT component:${componentId} by user ${userId}`);
-	return componentId;
+		log.info(`UPDATE_COMPONENT component:${componentId} by user ${userId}`);
+		return componentId;
+	}, { userId, reason: 'UPDATE_COMPONENT' });
 }
 
 async function deleteComponent(
@@ -100,13 +104,15 @@ async function deleteComponent(
 	userId: string,
 	componentId: string
 ): Promise<string> {
-	await prisma.reserveComponent.update({
-		where: { id: componentId },
-		data: { deletedAt: new Date() }
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.reserveComponent.update({
+			where: { id: componentId },
+			data: { deletedAt: new Date() }
+		});
 
-	console.log(`[ReserveWorkflow] DELETE_COMPONENT component:${componentId} by user ${userId}`);
-	return componentId;
+		log.info(`DELETE_COMPONENT component:${componentId} by user ${userId}`);
+		return componentId;
+	}, { userId, reason: 'DELETE_COMPONENT' });
 }
 
 async function createStudy(
@@ -114,26 +120,28 @@ async function createStudy(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const study = await prisma.reserveStudy.create({
-		data: {
-			associationId: data.associationId as string,
-			studyDate: new Date(data.studyDate as string),
-			effectiveDate: new Date(data.effectiveDate as string || data.studyDate as string),
-			studyType: data.studyType as any,
-			preparerName: data.preparerName as string,
-			preparerCompany: data.preparerCompany as string | undefined,
-			preparerCredentials: data.preparerCredentials as string | undefined,
-			reserveBalance: data.reserveBalance as number,
-			percentFunded: data.percentFunded as number,
-			fullyFundedBalance: data.fullyFundedBalance as number,
-			recommendedContribution: data.recommendedContribution as number,
-			fundingPlanType: data.fundingPlanType as any,
-			notes: data.notes as string | undefined
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		const study = await tx.reserveStudy.create({
+			data: {
+				associationId: data.associationId as string,
+				studyDate: new Date(data.studyDate as string),
+				effectiveDate: new Date(data.effectiveDate as string || data.studyDate as string),
+				studyType: data.studyType as any,
+				preparerName: data.preparerName as string,
+				preparerCompany: data.preparerCompany as string | undefined,
+				preparerCredentials: data.preparerCredentials as string | undefined,
+				reserveBalance: data.reserveBalance as number,
+				percentFunded: data.percentFunded as number,
+				fullyFundedBalance: data.fullyFundedBalance as number,
+				recommendedContribution: data.recommendedContribution as number,
+				fundingPlanType: data.fundingPlanType as any,
+				notes: data.notes as string | undefined
+			}
+		});
 
-	console.log(`[ReserveWorkflow] CREATE_STUDY study:${study.id} by user ${userId}`);
-	return study.id;
+		log.info(`CREATE_STUDY study:${study.id} by user ${userId}`);
+		return study.id;
+	}, { userId, reason: 'CREATE_STUDY' });
 }
 
 async function addStudyComponent(
@@ -144,25 +152,27 @@ async function addStudyComponent(
 	const studyId = data.studyId as string;
 	const componentId = data.componentId as string;
 
-	const component = await prisma.reserveComponent.findUnique({ where: { id: componentId } });
-	if (!component) throw new Error('ReserveComponent not found');
+	return orgTransaction(organizationId, async (tx) => {
+		const component = await tx.reserveComponent.findUnique({ where: { id: componentId } });
+		if (!component) throw new Error('ReserveComponent not found');
 
-	const snapshot = await prisma.reserveStudyComponent.create({
-		data: {
-			studyId,
-			componentId,
-			usefulLife: component.usefulLife,
-			remainingLife: component.remainingLife,
-			currentCost: component.currentReplacementCost,
-			futureCost: data.futureCost as number || component.currentReplacementCost,
-			conditionRating: component.conditionRating,
-			fundedAmount: data.fundedAmount as number || 0,
-			percentFunded: data.percentFunded as number || 0
-		}
-	});
+		const snapshot = await tx.reserveStudyComponent.create({
+			data: {
+				studyId,
+				componentId,
+				usefulLife: component.usefulLife,
+				remainingLife: component.remainingLife,
+				currentCost: component.currentReplacementCost,
+				futureCost: data.futureCost as number || component.currentReplacementCost,
+				conditionRating: component.conditionRating,
+				fundedAmount: data.fundedAmount as number || 0,
+				percentFunded: data.percentFunded as number || 0
+			}
+		});
 
-	console.log(`[ReserveWorkflow] ADD_STUDY_COMPONENT snapshot:${snapshot.id} by user ${userId}`);
-	return snapshot.id;
+		log.info(`ADD_STUDY_COMPONENT snapshot:${snapshot.id} by user ${userId}`);
+		return snapshot.id;
+	}, { userId, reason: 'ADD_STUDY_COMPONENT' });
 }
 
 async function generateFundingSchedule(
@@ -180,33 +190,35 @@ async function generateFundingSchedule(
 		percentFunded: number;
 	}>;
 
-	// Delete existing schedule
-	await prisma.reserveFundingSchedule.deleteMany({
-		where: { studyId }
-	});
-
-	// Create new schedule entries
-	for (const entry of yearlyContributions) {
-		await prisma.reserveFundingSchedule.create({
-			data: {
-				studyId,
-				fiscalYear: entry.fiscalYear,
-				projectedBalance: entry.projectedBalance,
-				recommendedContribution: entry.recommendedContribution,
-				projectedExpenditures: entry.projectedExpenditures,
-				percentFunded: entry.percentFunded
-			}
+	return orgTransaction(organizationId, async (tx) => {
+		// Delete existing schedule
+		await tx.reserveFundingSchedule.deleteMany({
+			where: { studyId }
 		});
-	}
 
-	// Update study with funding plan type
-	await prisma.reserveStudy.update({
-		where: { id: studyId },
-		data: { fundingPlanType: planType as any }
-	});
+		// Create new schedule entries
+		for (const entry of yearlyContributions) {
+			await tx.reserveFundingSchedule.create({
+				data: {
+					studyId,
+					fiscalYear: entry.fiscalYear,
+					projectedBalance: entry.projectedBalance,
+					recommendedContribution: entry.recommendedContribution,
+					projectedExpenditures: entry.projectedExpenditures,
+					percentFunded: entry.percentFunded
+				}
+			});
+		}
 
-	console.log(`[ReserveWorkflow] GENERATE_FUNDING_SCHEDULE study:${studyId} entries:${yearlyContributions.length} by user ${userId}`);
-	return studyId;
+		// Update study with funding plan type
+		await tx.reserveStudy.update({
+			where: { id: studyId },
+			data: { fundingPlanType: planType as any }
+		});
+
+		log.info(`GENERATE_FUNDING_SCHEDULE study:${studyId} entries:${yearlyContributions.length} by user ${userId}`);
+		return studyId;
+	}, { userId, reason: 'GENERATE_FUNDING_SCHEDULE' });
 }
 
 // Main workflow function
@@ -265,7 +277,7 @@ async function reserveWorkflow(input: ReserveWorkflowInput): Promise<ReserveWork
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ReserveWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

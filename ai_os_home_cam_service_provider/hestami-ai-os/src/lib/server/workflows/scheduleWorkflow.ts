@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { RecurrenceFrequency } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -44,21 +45,23 @@ async function createSchedule(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const schedule = await prisma.contractSchedule.create({
-		data: {
-			contractId: data.contractId as string,
-			name: data.name as string,
-			description: data.description as string | undefined,
-			frequency: data.frequency as RecurrenceFrequency,
-			startDate: new Date(data.startDate as string),
-			endDate: data.endDate ? new Date(data.endDate as string) : undefined,
-			preferredDayOfWeek: data.dayOfWeek as number | undefined,
-			preferredDayOfMonth: data.dayOfMonth as number | undefined,
-			preferredTimeStart: data.preferredStartTime as string | undefined,
-			preferredTimeEnd: data.preferredEndTime as string | undefined,
-			isActive: data.isActive as boolean ?? true
-		}
-	});
+	const schedule = await orgTransaction(organizationId, async (tx) => {
+		return tx.contractSchedule.create({
+			data: {
+				contractId: data.contractId as string,
+				name: data.name as string,
+				description: data.description as string | undefined,
+				frequency: data.frequency as RecurrenceFrequency,
+				startDate: new Date(data.startDate as string),
+				endDate: data.endDate ? new Date(data.endDate as string) : undefined,
+				preferredDayOfWeek: data.dayOfWeek as number | undefined,
+				preferredDayOfMonth: data.dayOfMonth as number | undefined,
+				preferredTimeStart: data.preferredStartTime as string | undefined,
+				preferredTimeEnd: data.preferredEndTime as string | undefined,
+				isActive: data.isActive as boolean ?? true
+			}
+		});
+	}, { userId, reason: 'Create contract schedule' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -83,21 +86,23 @@ async function updateSchedule(
 	scheduleId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const schedule = await prisma.contractSchedule.update({
-		where: { id: scheduleId },
-		data: {
-			name: data.name as string | undefined,
-			description: data.description as string | undefined,
-			frequency: data.frequency as RecurrenceFrequency | undefined,
-			startDate: data.startDate ? new Date(data.startDate as string) : undefined,
-			endDate: data.endDate ? new Date(data.endDate as string) : undefined,
-			preferredDayOfWeek: data.dayOfWeek as number | undefined,
-			preferredDayOfMonth: data.dayOfMonth as number | undefined,
-			preferredTimeStart: data.preferredStartTime as string | undefined,
-			preferredTimeEnd: data.preferredEndTime as string | undefined,
-			isActive: data.isActive as boolean | undefined
-		}
-	});
+	const schedule = await orgTransaction(organizationId, async (tx) => {
+		return tx.contractSchedule.update({
+			where: { id: scheduleId },
+			data: {
+				name: data.name as string | undefined,
+				description: data.description as string | undefined,
+				frequency: data.frequency as RecurrenceFrequency | undefined,
+				startDate: data.startDate ? new Date(data.startDate as string) : undefined,
+				endDate: data.endDate ? new Date(data.endDate as string) : undefined,
+				preferredDayOfWeek: data.dayOfWeek as number | undefined,
+				preferredDayOfMonth: data.dayOfMonth as number | undefined,
+				preferredTimeStart: data.preferredStartTime as string | undefined,
+				preferredTimeEnd: data.preferredEndTime as string | undefined,
+				isActive: data.isActive as boolean | undefined
+			}
+		});
+	}, { userId, reason: 'Update contract schedule' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -121,9 +126,11 @@ async function deleteSchedule(
 	userId: string,
 	scheduleId: string
 ): Promise<{ id: string }> {
-	await prisma.contractSchedule.delete({
-		where: { id: scheduleId }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.contractSchedule.delete({
+			where: { id: scheduleId }
+		});
+	}, { userId, reason: 'Delete contract schedule' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -319,7 +326,7 @@ export const scheduleWorkflow_v1 = DBOS.registerWorkflow(scheduleWorkflow);
 
 export async function startScheduleWorkflow(
 	input: ScheduleWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<ScheduleWorkflowResult> {
 	const handle = await DBOS.startWorkflow(scheduleWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

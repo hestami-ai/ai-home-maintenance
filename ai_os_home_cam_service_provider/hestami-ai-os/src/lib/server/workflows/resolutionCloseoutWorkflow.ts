@@ -7,8 +7,12 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { DecisionCategory } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+
+const log = createWorkflowLogger('resolutionCloseoutWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'resolution_closeout_status';
 const WORKFLOW_ERROR_EVENT = 'resolution_closeout_error';
@@ -87,18 +91,24 @@ async function recordResolutionDecision(
 	description: string,
 	rationale: string
 ): Promise<{ decisionId: string }> {
-	const decision = await prisma.materialDecision.create({
-		data: {
-			organizationId,
-			caseId,
-			category,
-			title,
-			description,
-			rationale,
-			decidedByUserId: userId,
-			decidedAt: new Date()
-		}
-	});
+	const decision = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.materialDecision.create({
+				data: {
+					organizationId,
+					caseId,
+					category,
+					title,
+					description,
+					rationale,
+					decidedByUserId: userId,
+					decidedAt: new Date()
+				}
+			});
+		},
+		{ userId, reason: 'Record resolution decision' }
+	);
 
 	return { decisionId: decision.id };
 }
@@ -106,59 +116,66 @@ async function recordResolutionDecision(
 async function resolveAndCloseCase(
 	caseId: string,
 	resolutionSummary: string,
-	userId: string
+	userId: string,
+	organizationId: string
 ): Promise<{ status: string }> {
-	const caseRecord = await prisma.conciergeCase.findUnique({
-		where: { id: caseId }
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const caseRecord = await tx.conciergeCase.findUnique({
+				where: { id: caseId }
+			});
 
-	if (!caseRecord) {
-		throw new Error('Case not found');
-	}
-
-	// If not already resolved, resolve first
-	if (caseRecord.status !== 'RESOLVED') {
-		await prisma.conciergeCase.update({
-			where: { id: caseId },
-			data: {
-				status: 'RESOLVED',
-				resolutionSummary,
-				resolvedBy: userId,
-				resolvedAt: new Date()
+			if (!caseRecord) {
+				throw new Error('Case not found');
 			}
-		});
 
-		await prisma.caseStatusHistory.create({
-			data: {
-				caseId,
-				fromStatus: caseRecord.status,
-				toStatus: 'RESOLVED',
-				reason: resolutionSummary,
-				changedBy: userId
+			// If not already resolved, resolve first
+			if (caseRecord.status !== 'RESOLVED') {
+				await tx.conciergeCase.update({
+					where: { id: caseId },
+					data: {
+						status: 'RESOLVED',
+						resolutionSummary,
+						resolvedBy: userId,
+						resolvedAt: new Date()
+					}
+				});
+
+				await tx.caseStatusHistory.create({
+					data: {
+						caseId,
+						fromStatus: caseRecord.status,
+						toStatus: 'RESOLVED',
+						reason: resolutionSummary,
+						changedBy: userId
+					}
+				});
 			}
-		});
-	}
 
-	// Now close
-	await prisma.conciergeCase.update({
-		where: { id: caseId },
-		data: {
-			status: 'CLOSED',
-			closedAt: new Date()
-		}
-	});
+			// Now close
+			await tx.conciergeCase.update({
+				where: { id: caseId },
+				data: {
+					status: 'CLOSED',
+					closedAt: new Date()
+				}
+			});
 
-	await prisma.caseStatusHistory.create({
-		data: {
-			caseId,
-			fromStatus: 'RESOLVED',
-			toStatus: 'CLOSED',
-			reason: 'Case closed after resolution',
-			changedBy: userId
-		}
-	});
+			await tx.caseStatusHistory.create({
+				data: {
+					caseId,
+					fromStatus: 'RESOLVED',
+					toStatus: 'CLOSED',
+					reason: 'Case closed after resolution',
+					changedBy: userId
+				}
+			});
 
-	return { status: 'CLOSED' };
+			return { status: 'CLOSED' };
+		},
+		{ userId, reason: 'Resolve and close case' }
+	);
 }
 
 async function createOwnerNotification(
@@ -168,19 +185,26 @@ async function createOwnerNotification(
 ): Promise<void> {
 	// Create an internal note indicating owner should be notified
 	// In a full implementation, this would trigger an actual notification
-	await prisma.caseNote.create({
-		data: {
-			caseId,
-			content: 'Owner notification: Case has been resolved and closed.',
-			createdBy: userId,
-			isInternal: false // Visible to owner
-		}
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			await tx.caseNote.create({
+				data: {
+					caseId,
+					content: 'Owner notification: Case has been resolved and closed.',
+					createdBy: userId,
+					isInternal: false // Visible to owner
+				}
+			});
+		},
+		{ userId, reason: 'Create owner notification' }
+	);
 }
 
 async function resolutionCloseoutWorkflow(
 	input: ResolutionCloseoutWorkflowInput
 ): Promise<ResolutionCloseoutWorkflowResult> {
+	const startTime = logWorkflowStart(log, input.action, { caseId: input.caseId, organizationId: input.organizationId }, 'resolutionCloseoutWorkflow');
 	try {
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
@@ -190,13 +214,15 @@ async function resolutionCloseoutWorkflow(
 					name: 'validateResolution'
 				});
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'validation_complete', ...validation });
-				return {
+				const result = {
 					success: validation.isValid,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
 					validationIssues: validation.issues
 				};
+				logWorkflowEnd(log, input.action, validation.isValid, startTime, result);
+				return result;
 			}
 
 			case 'RECORD_DECISION': {
@@ -208,7 +234,7 @@ async function resolutionCloseoutWorkflow(
 				) {
 					throw new Error('Missing decision fields for RECORD_DECISION');
 				}
-				const result = await DBOS.runStep(
+				const decisionResult = await DBOS.runStep(
 					() =>
 						recordResolutionDecision(
 							input.caseId,
@@ -221,32 +247,36 @@ async function resolutionCloseoutWorkflow(
 						),
 					{ name: 'recordResolutionDecision' }
 				);
-				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'decision_recorded', ...result });
-				return {
+				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'decision_recorded', ...decisionResult });
+				const result = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
-					decisionId: result.decisionId
+					decisionId: decisionResult.decisionId
 				};
+				logWorkflowEnd(log, input.action, true, startTime, result);
+				return result;
 			}
 
 			case 'CLOSE_CASE': {
 				if (!input.resolutionSummary) {
 					throw new Error('Missing resolutionSummary for CLOSE_CASE');
 				}
-				const result = await DBOS.runStep(
-					() => resolveAndCloseCase(input.caseId, input.resolutionSummary!, input.userId),
+				const closeResult = await DBOS.runStep(
+					() => resolveAndCloseCase(input.caseId, input.resolutionSummary!, input.userId, input.organizationId),
 					{ name: 'resolveAndCloseCase' }
 				);
-				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_closed', ...result });
-				return {
+				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_closed', ...closeResult });
+				const result = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					caseId: input.caseId,
-					status: result.status
+					status: closeResult.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, result);
+				return result;
 			}
 
 			case 'FULL_CLOSEOUT': {
@@ -261,7 +291,7 @@ async function resolutionCloseoutWorkflow(
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'validation_complete', ...validation });
 
 				if (!validation.isValid) {
-					return {
+					const failResult = {
 						success: false,
 						action: input.action,
 						timestamp: new Date().toISOString(),
@@ -269,6 +299,8 @@ async function resolutionCloseoutWorkflow(
 						validationIssues: validation.issues,
 						error: 'Validation failed'
 					};
+					logWorkflowEnd(log, input.action, false, startTime, failResult);
+					return failResult;
 				}
 
 				// Step 2: Record decision if provided
@@ -293,7 +325,7 @@ async function resolutionCloseoutWorkflow(
 
 				// Step 3: Close case
 				const closeResult = await DBOS.runStep(
-					() => resolveAndCloseCase(input.caseId, input.resolutionSummary!, input.userId),
+					() => resolveAndCloseCase(input.caseId, input.resolutionSummary!, input.userId, input.organizationId),
 					{ name: 'resolveAndCloseCase' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_closed', ...closeResult });
@@ -307,7 +339,7 @@ async function resolutionCloseoutWorkflow(
 					await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'owner_notified' });
 				}
 
-				return {
+				const result = {
 					success: true,
 					action: input.action,
 					timestamp: new Date().toISOString(),
@@ -315,15 +347,20 @@ async function resolutionCloseoutWorkflow(
 					decisionId,
 					status: closeResult.status
 				};
+				logWorkflowEnd(log, input.action, true, startTime, result);
+				return result;
 			}
 
-			default:
-				return {
+			default: {
+				const result = {
 					success: false,
 					action: input.action,
 					timestamp: new Date().toISOString(),
 					error: `Unknown action: ${input.action}`
 				};
+				logWorkflowEnd(log, input.action, false, startTime, result);
+				return result;
+			}
 		}
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
@@ -337,12 +374,16 @@ async function resolutionCloseoutWorkflow(
 			errorType: 'RESOLUTION_CLOSEOUT_WORKFLOW_ERROR'
 		});
 
-		return {
+		logStepError(log, input.action, errorObj, { caseId: input.caseId });
+
+		const result = {
 			success: false,
 			action: input.action,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(log, input.action, false, startTime, result);
+		return result;
 	}
 }
 

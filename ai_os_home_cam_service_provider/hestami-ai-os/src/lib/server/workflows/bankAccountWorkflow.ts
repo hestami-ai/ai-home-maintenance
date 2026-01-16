@@ -6,11 +6,11 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 import type { BankAccountType, FundType } from '../../../../generated/prisma/client.js';
 
 const WORKFLOW_STATUS_EVENT = 'bank_account_workflow_status';
@@ -68,113 +68,117 @@ export interface BankAccountWorkflowResult extends EntityWorkflowResult {
 async function createBankAccount(
 	input: BankAccountWorkflowInput
 ): Promise<{ id: string; bankName: string; accountName: string; accountNumber: string; accountType: string; fundType: string; isPrimary: boolean }> {
-	// If setting as primary, unset other primary accounts of same fund type
-	if (input.isPrimary) {
-		await prisma.bankAccount.updateMany({
-			where: {
-				associationId: input.associationId,
-				fundType: input.fundType,
-				isPrimary: true
-			},
-			data: { isPrimary: false }
-		});
-	}
-
-	const bankAccount = await prisma.bankAccount.create({
-		data: {
-			organizationId: input.organizationId,
-			associationId: input.associationId!,
-			glAccountId: input.glAccountId!,
-			bankName: input.bankName!,
-			accountName: input.accountName!,
-			accountNumber: input.accountNumber!,
-			routingNumber: input.routingNumber,
-			accountType: input.accountType!,
-			fundType: input.fundType ?? 'OPERATING',
-			isPrimary: input.isPrimary ?? false
+	return orgTransaction(input.organizationId, async (tx) => {
+		// If setting as primary, unset other primary accounts of same fund type
+		if (input.isPrimary) {
+			await tx.bankAccount.updateMany({
+				where: {
+					associationId: input.associationId,
+					fundType: input.fundType,
+					isPrimary: true
+				},
+				data: { isPrimary: false }
+			});
 		}
-	});
 
-	// Record activity event
-	await recordWorkflowEvent({
-		organizationId: input.organizationId,
-		entityType: 'BANK_ACCOUNT',
-		entityId: bankAccount.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
-		summary: `Bank account created: ${bankAccount.bankName} - ${bankAccount.accountName}`,
-		performedById: input.userId,
-		performedByType: 'HUMAN',
-		workflowId: 'bankAccountWorkflow_v1',
-		workflowStep: 'CREATE',
-		workflowVersion: 'v1',
-		newState: { bankName: bankAccount.bankName, accountName: bankAccount.accountName, fundType: bankAccount.fundType }
-	});
+		const bankAccount = await tx.bankAccount.create({
+			data: {
+				organizationId: input.organizationId,
+				associationId: input.associationId!,
+				glAccountId: input.glAccountId!,
+				bankName: input.bankName!,
+				accountName: input.accountName!,
+				accountNumber: input.accountNumber!,
+				routingNumber: input.routingNumber,
+				accountType: input.accountType!,
+				fundType: input.fundType ?? 'OPERATING',
+				isPrimary: input.isPrimary ?? false
+			}
+		});
 
-	return {
-		id: bankAccount.id,
-		bankName: bankAccount.bankName,
-		accountName: bankAccount.accountName,
-		accountNumber: bankAccount.accountNumber,
-		accountType: bankAccount.accountType,
-		fundType: bankAccount.fundType,
-		isPrimary: bankAccount.isPrimary
-	};
+		// Record activity event
+		await recordWorkflowEvent({
+			organizationId: input.organizationId,
+			entityType: 'ORGANIZATION',
+			entityId: bankAccount.id,
+			action: 'CREATE',
+			eventCategory: 'EXECUTION',
+			summary: `Bank account created: ${bankAccount.bankName} - ${bankAccount.accountName}`,
+			performedById: input.userId,
+			performedByType: 'HUMAN',
+			workflowId: 'bankAccountWorkflow_v1',
+			workflowStep: 'CREATE',
+			workflowVersion: 'v1',
+			newState: { bankName: bankAccount.bankName, accountName: bankAccount.accountName, fundType: bankAccount.fundType }
+		});
+
+		return {
+			id: bankAccount.id,
+			bankName: bankAccount.bankName,
+			accountName: bankAccount.accountName,
+			accountNumber: bankAccount.accountNumber,
+			accountType: bankAccount.accountType,
+			fundType: bankAccount.fundType,
+			isPrimary: bankAccount.isPrimary
+		};
+	}, { userId: input.userId, reason: 'Creating bank account' });
 }
 
 async function updateBankAccount(
 	input: BankAccountWorkflowInput,
 	existingFundType: FundType
 ): Promise<{ id: string; bankName: string; accountName: string; isPrimary: boolean; isActive: boolean }> {
-	// If setting as primary, unset other primary accounts of same fund type
-	if (input.isPrimary === true) {
-		await prisma.bankAccount.updateMany({
-			where: {
-				associationId: input.associationId,
-				fundType: existingFundType,
-				isPrimary: true,
-				id: { not: input.bankAccountId }
-			},
-			data: { isPrimary: false }
+	return orgTransaction(input.organizationId, async (tx) => {
+		// If setting as primary, unset other primary accounts of same fund type
+		if (input.isPrimary === true) {
+			await tx.bankAccount.updateMany({
+				where: {
+					associationId: input.associationId,
+					fundType: existingFundType,
+					isPrimary: true,
+					id: { not: input.bankAccountId }
+				},
+				data: { isPrimary: false }
+			});
+		}
+
+		const updateData: Record<string, unknown> = {};
+		if (input.bankName !== undefined) updateData.bankName = input.bankName;
+		if (input.accountName !== undefined) updateData.accountName = input.accountName;
+		if (input.accountNumber !== undefined) updateData.accountNumber = input.accountNumber;
+		if (input.routingNumber !== undefined) updateData.routingNumber = input.routingNumber;
+		if (input.isPrimary !== undefined) updateData.isPrimary = input.isPrimary;
+		if (input.isActive !== undefined) updateData.isActive = input.isActive;
+
+		const bankAccount = await tx.bankAccount.update({
+			where: { id: input.bankAccountId },
+			data: updateData
 		});
-	}
 
-	const updateData: Record<string, unknown> = {};
-	if (input.bankName !== undefined) updateData.bankName = input.bankName;
-	if (input.accountName !== undefined) updateData.accountName = input.accountName;
-	if (input.accountNumber !== undefined) updateData.accountNumber = input.accountNumber;
-	if (input.routingNumber !== undefined) updateData.routingNumber = input.routingNumber;
-	if (input.isPrimary !== undefined) updateData.isPrimary = input.isPrimary;
-	if (input.isActive !== undefined) updateData.isActive = input.isActive;
+		// Record activity event
+		await recordWorkflowEvent({
+			organizationId: input.organizationId,
+			entityType: 'ORGANIZATION',
+			entityId: bankAccount.id,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Bank account updated: ${bankAccount.bankName}`,
+			performedById: input.userId,
+			performedByType: 'HUMAN',
+			workflowId: 'bankAccountWorkflow_v1',
+			workflowStep: 'UPDATE',
+			workflowVersion: 'v1',
+			newState: updateData
+		});
 
-	const bankAccount = await prisma.bankAccount.update({
-		where: { id: input.bankAccountId },
-		data: updateData
-	});
-
-	// Record activity event
-	await recordWorkflowEvent({
-		organizationId: input.organizationId,
-		entityType: 'BANK_ACCOUNT',
-		entityId: bankAccount.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
-		summary: `Bank account updated: ${bankAccount.bankName}`,
-		performedById: input.userId,
-		performedByType: 'HUMAN',
-		workflowId: 'bankAccountWorkflow_v1',
-		workflowStep: 'UPDATE',
-		workflowVersion: 'v1',
-		newState: updateData
-	});
-
-	return {
-		id: bankAccount.id,
-		bankName: bankAccount.bankName,
-		accountName: bankAccount.accountName,
-		isPrimary: bankAccount.isPrimary,
-		isActive: bankAccount.isActive
-	};
+		return {
+			id: bankAccount.id,
+			bankName: bankAccount.bankName,
+			accountName: bankAccount.accountName,
+			isPrimary: bankAccount.isPrimary,
+			isActive: bankAccount.isActive
+		};
+	}, { userId: input.userId, reason: 'Updating bank account' });
 }
 
 async function deactivateBankAccount(
@@ -182,66 +186,70 @@ async function deactivateBankAccount(
 	organizationId: string,
 	userId: string
 ): Promise<{ success: boolean }> {
-	await prisma.bankAccount.update({
-		where: { id: bankAccountId },
-		data: { isActive: false, isPrimary: false }
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		await tx.bankAccount.update({
+			where: { id: bankAccountId },
+			data: { isActive: false, isPrimary: false }
+		});
 
-	// Record activity event
-	await recordWorkflowEvent({
-		organizationId,
-		entityType: 'BANK_ACCOUNT',
-		entityId: bankAccountId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
-		summary: `Bank account deactivated`,
-		performedById: userId,
-		performedByType: 'HUMAN',
-		workflowId: 'bankAccountWorkflow_v1',
-		workflowStep: 'DEACTIVATE',
-		workflowVersion: 'v1',
-		newState: { isActive: false, isPrimary: false }
-	});
+		// Record activity event
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: 'ORGANIZATION',
+			entityId: bankAccountId,
+			action: 'DELETE',
+			eventCategory: 'EXECUTION',
+			summary: `Bank account deactivated`,
+			performedById: userId,
+			performedByType: 'HUMAN',
+			workflowId: 'bankAccountWorkflow_v1',
+			workflowStep: 'DEACTIVATE',
+			workflowVersion: 'v1',
+			newState: { isActive: false, isPrimary: false }
+		});
 
-	return { success: true };
+		return { success: true };
+	}, { userId, reason: 'Deactivating bank account' });
 }
 
 async function updateBankBalance(
 	input: BankAccountWorkflowInput
 ): Promise<{ id: string; bookBalance: string; bankBalance: string; difference: string; lastReconciled: string | null }> {
-	const bankAccount = await prisma.bankAccount.update({
-		where: { id: input.bankAccountId },
-		data: {
-			bankBalance: input.bankBalance,
-			lastReconciled: input.reconcileDate ? new Date(input.reconcileDate) : new Date()
-		}
-	});
+	return orgTransaction(input.organizationId, async (tx) => {
+		const bankAccount = await tx.bankAccount.update({
+			where: { id: input.bankAccountId },
+			data: {
+				bankBalance: input.bankBalance,
+				lastReconciled: input.reconcileDate ? new Date(input.reconcileDate) : new Date()
+			}
+		});
 
-	const difference = Number(bankAccount.bookBalance) - Number(bankAccount.bankBalance);
+		const difference = Number(bankAccount.bookBalance) - Number(bankAccount.bankBalance);
 
-	// Record activity event
-	await recordWorkflowEvent({
-		organizationId: input.organizationId,
-		entityType: 'BANK_ACCOUNT',
-		entityId: bankAccount.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
-		summary: `Bank balance updated for reconciliation`,
-		performedById: input.userId,
-		performedByType: 'HUMAN',
-		workflowId: 'bankAccountWorkflow_v1',
-		workflowStep: 'UPDATE_BALANCE',
-		workflowVersion: 'v1',
-		newState: { bankBalance: bankAccount.bankBalance.toString(), lastReconciled: bankAccount.lastReconciled?.toISOString() }
-	});
+		// Record activity event
+		await recordWorkflowEvent({
+			organizationId: input.organizationId,
+			entityType: 'ORGANIZATION',
+			entityId: bankAccount.id,
+			action: 'UPDATE',
+			eventCategory: 'EXECUTION',
+			summary: `Bank balance updated for reconciliation`,
+			performedById: input.userId,
+			performedByType: 'HUMAN',
+			workflowId: 'bankAccountWorkflow_v1',
+			workflowStep: 'UPDATE_BALANCE',
+			workflowVersion: 'v1',
+			newState: { bankBalance: bankAccount.bankBalance.toString(), lastReconciled: bankAccount.lastReconciled?.toISOString() }
+		});
 
-	return {
-		id: bankAccount.id,
-		bookBalance: bankAccount.bookBalance.toString(),
-		bankBalance: bankAccount.bankBalance.toString(),
-		difference: difference.toFixed(2),
-		lastReconciled: bankAccount.lastReconciled?.toISOString() ?? null
-	};
+		return {
+			id: bankAccount.id,
+			bookBalance: bankAccount.bookBalance.toString(),
+			bankBalance: bankAccount.bankBalance.toString(),
+			difference: difference.toFixed(2),
+			lastReconciled: bankAccount.lastReconciled?.toISOString() ?? null
+		};
+	}, { userId: input.userId, reason: 'Updating bank balance for reconciliation' });
 }
 
 // Main workflow function
@@ -403,5 +411,6 @@ export async function startBankAccountWorkflow(
 	input: BankAccountWorkflowInput & { existingFundType?: FundType },
 	idempotencyKey: string
 ): Promise<BankAccountWorkflowResult> {
-	return DBOS.startWorkflow(bankAccountWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(bankAccountWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

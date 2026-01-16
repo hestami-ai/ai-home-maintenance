@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ReportFormat } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -63,46 +64,53 @@ async function generateReport(
 		throw new Error(`Format ${format} is not allowed for this report`);
 	}
 
-	// Create execution record
-	const execution = await prisma.reportExecution.create({
-		data: {
-			reportId,
-			associationId,
-			status: 'PENDING',
-			parametersJson: data.parametersJson as string | undefined,
-			format: format as ReportFormat,
-			executedBy: userId
-		}
-	});
+	// Create execution record and update status within RLS-protected transaction
+	const execution = await orgTransaction(organizationId, async (tx) => {
+		const exec = await tx.reportExecution.create({
+			data: {
+				reportId,
+				associationId,
+				status: 'PENDING',
+				parametersJson: data.parametersJson as string | undefined,
+				format: format as ReportFormat,
+				executedBy: userId
+			}
+		});
 
-	// In a full implementation, this would trigger async report generation
-	// For now, we'll simulate immediate completion with stub data
-	await prisma.reportExecution.update({
-		where: { id: execution.id },
-		data: {
-			status: 'RUNNING',
-			startedAt: new Date()
-		}
-	});
+		// In a full implementation, this would trigger async report generation
+		// For now, we'll simulate immediate completion with stub data
+		await tx.reportExecution.update({
+			where: { id: exec.id },
+			data: {
+				status: 'RUNNING',
+				startedAt: new Date()
+			}
+		});
+
+		return exec;
+	}, { userId, reason: 'Generate report execution' });
 
 	// Stub: Mark as completed (real implementation would be async)
+	// Note: This async update also needs RLS protection
 	setTimeout(async () => {
 		try {
-			await prisma.reportExecution.update({
-				where: { id: execution.id },
-				data: {
-					status: 'COMPLETED',
-					completedAt: new Date(),
-					outputUrl: `/reports/${execution.id}.${format.toLowerCase()}`,
-					rowCount: 0
-				}
-			});
+			await orgTransaction(organizationId, async (tx) => {
+				await tx.reportExecution.update({
+					where: { id: execution.id },
+					data: {
+						status: 'COMPLETED',
+						completedAt: new Date(),
+						outputUrl: `/reports/${execution.id}.${format.toLowerCase()}`,
+						rowCount: 0
+					}
+				});
+			}, { userId, reason: 'Complete report execution (stub)' });
 		} catch {
 			// Ignore errors in stub
 		}
 	}, 1000);
 
-	console.log(`[ReportExecutionWorkflow] GENERATE_REPORT execution:${execution.id} by user ${userId}`);
+	log.info(`GENERATE_REPORT execution:${execution.id} by user ${userId}`);
 	return execution.id;
 }
 
@@ -121,12 +129,14 @@ async function cancelExecution(
 		throw new Error('Can only cancel pending or running executions');
 	}
 
-	await prisma.reportExecution.update({
-		where: { id: executionId },
-		data: { status: 'CANCELLED' }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.reportExecution.update({
+			where: { id: executionId },
+			data: { status: 'CANCELLED' }
+		});
+	}, { userId, reason: 'Cancel report execution' });
 
-	console.log(`[ReportExecutionWorkflow] CANCEL_EXECUTION execution:${executionId} by user ${userId}`);
+	log.info(`CANCEL_EXECUTION execution:${executionId} by user ${userId}`);
 	return executionId;
 }
 
@@ -158,7 +168,7 @@ async function reportExecutionWorkflow(input: ReportExecutionWorkflowInput): Pro
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ReportExecutionWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

@@ -195,8 +195,8 @@ export const vendorBidRouter = {
 			}
 
 			// Fetch the created bid
-			const bid = await prisma.vendorBid.findUnique({
-				where: { id: result.bidId },
+			const bid = await prisma.vendorBid.findFirstOrThrow({
+				where: { id: result.bidId, case: { organizationId: context.organization.id } },
 				include: { vendorCandidate: true }
 			});
 
@@ -234,14 +234,14 @@ export const vendorBidRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const bid = await prisma.vendorBid.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: {
 					vendorCandidate: true,
 					case: true
 				}
 			});
 
-			if (!bid || bid.case?.organizationId !== context.organization.id) {
+			if (!bid) {
 				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
@@ -291,6 +291,7 @@ export const vendorBidRouter = {
 			const limit = input.limit ?? 50;
 			const bids = await prisma.vendorBid.findMany({
 				where: {
+					case: { organizationId: context.organization.id },
 					caseId: input.caseId,
 					...(input.status && { status: input.status })
 				},
@@ -350,14 +351,14 @@ export const vendorBidRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorBid.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: {
 					vendorCandidate: true,
 					case: true
 				}
 			});
 
-			if (!existing || existing.case?.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
@@ -391,8 +392,8 @@ export const vendorBidRouter = {
 			}
 
 			// Fetch updated bid
-			const bid = await prisma.vendorBid.findUnique({
-				where: { id: input.id },
+			const bid = await prisma.vendorBid.findFirstOrThrow({
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: { vendorCandidate: true }
 			});
 
@@ -432,14 +433,14 @@ export const vendorBidRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorBid.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: {
 					vendorCandidate: true,
 					case: true
 				}
 			});
 
-			if (!existing || existing.case?.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
@@ -469,8 +470,8 @@ export const vendorBidRouter = {
 			}
 
 			// Fetch updated bid
-			const bid = await prisma.vendorBid.findUnique({
-				where: { id: input.id },
+			const bid = await prisma.vendorBid.findFirstOrThrow({
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: { vendorCandidate: true }
 			});
 
@@ -512,14 +513,14 @@ export const vendorBidRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.vendorBid.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: {
 					vendorCandidate: true,
 					case: true
 				}
 			});
 
-			if (!existing || existing.case?.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
@@ -550,8 +551,8 @@ export const vendorBidRouter = {
 			}
 
 			// Fetch updated bid
-			const bid = await prisma.vendorBid.findUnique({
-				where: { id: input.id },
+			const bid = await prisma.vendorBid.findFirstOrThrow({
+				where: { id: input.id, case: { organizationId: context.organization.id } },
 				include: { vendorCandidate: true }
 			});
 
@@ -621,7 +622,7 @@ export const vendorBidRouter = {
 			await context.cerbos.authorize('view', 'vendor_bid', 'list');
 
 			const bids = await prisma.vendorBid.findMany({
-				where: { caseId: input.caseId },
+				where: { caseId: input.caseId, case: { organizationId: context.organization.id } },
 				include: { vendorCandidate: true },
 				orderBy: { amount: 'asc' }
 			});

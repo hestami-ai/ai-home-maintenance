@@ -60,11 +60,11 @@ export const unitRouter = {
 
 			// Verify property belongs to this organization
 			const property = await prisma.property.findFirst({
-				where: { id: input.propertyId, deletedAt: null },
+				where: { id: input.propertyId, organizationId: context.organization.id, deletedAt: null },
 				include: { association: true }
 			});
 
-			if (!property || property.association.organizationId !== context.organization.id) {
+			if (!property) {
 				throw errors.NOT_FOUND({ message: 'Property' });
 			}
 
@@ -148,11 +148,11 @@ export const unitRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const unit = await prisma.unit.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
@@ -235,7 +235,7 @@ export const unitRouter = {
 			const cerbosFilter = queryPlan.kind === 'conditional' ? queryPlan.filter : {};
 			const units = await prisma.unit.findMany({
 				where: {
-					property: { association: { organizationId: context.organization.id } },
+					organizationId: context.organization.id,
 					deletedAt: null,
 					...(input.propertyId && { propertyId: input.propertyId }),
 					...(input.unitType && { unitType: input.unitType }),
@@ -311,11 +311,11 @@ export const unitRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.unit.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!existing || existing.property.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
@@ -390,11 +390,11 @@ export const unitRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const unit = await prisma.unit.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: { id: input.id, organizationId: context.organization.id, deletedAt: null },
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 

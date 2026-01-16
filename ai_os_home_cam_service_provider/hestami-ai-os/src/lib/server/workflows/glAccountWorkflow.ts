@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -62,26 +62,28 @@ async function createGLAccount(
 	// Determine normal balance based on account type
 	const normalDebit = ['ASSET', 'EXPENSE'].includes(input.accountType!);
 
-	const account = await prisma.gLAccount.create({
-		data: {
-			organizationId: input.organizationId,
-			associationId: input.associationId!,
-			accountNumber: input.accountNumber!,
-			name: input.name!,
-			description: input.description,
-			accountType: input.accountType!,
-			category: input.category!,
-			fundType: input.fundType ?? 'OPERATING',
-			parentId: input.parentId,
-			isActive: input.isActive ?? true,
-			normalDebit
-		}
-	});
+	const account = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.gLAccount.create({
+			data: {
+				organizationId: input.organizationId,
+				associationId: input.associationId!,
+				accountNumber: input.accountNumber!,
+				name: input.name!,
+				description: input.description,
+				accountType: input.accountType!,
+				category: input.category!,
+				fundType: input.fundType ?? 'OPERATING',
+				parentId: input.parentId,
+				isActive: input.isActive ?? true,
+				normalDebit
+			}
+		});
+	}, { userId: input.userId, reason: 'Create GL Account' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'GL_ACCOUNT',
+		entityType: 'ORGANIZATION',
 		entityId: account.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -114,15 +116,17 @@ async function updateGLAccount(
 	if (input.isActive !== undefined) updateData.isActive = input.isActive;
 	if (input.parentId !== undefined) updateData.parentId = input.parentId;
 
-	const account = await prisma.gLAccount.update({
-		where: { id: input.accountId },
-		data: updateData
-	});
+	const account = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.gLAccount.update({
+			where: { id: input.accountId },
+			data: updateData
+		});
+	}, { userId: input.userId, reason: 'Update GL Account' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'GL_ACCOUNT',
+		entityType: 'ORGANIZATION',
 		entityId: account.id,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -148,15 +152,17 @@ async function deleteGLAccount(
 	organizationId: string,
 	userId: string
 ): Promise<{ success: boolean }> {
-	await prisma.gLAccount.update({
-		where: { id: accountId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.gLAccount.update({
+			where: { id: accountId },
+			data: { deletedAt: new Date() }
+		});
+	}, { userId, reason: 'Soft delete GL Account' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'GL_ACCOUNT',
+		entityType: 'ORGANIZATION',
 		entityId: accountId,
 		action: 'DELETE',
 		eventCategory: 'EXECUTION',
@@ -305,5 +311,6 @@ export async function startGLAccountWorkflow(
 	input: GLAccountWorkflowInput,
 	idempotencyKey: string
 ): Promise<GLAccountWorkflowResult> {
-	return DBOS.startWorkflow(glAccountWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(glAccountWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

@@ -224,8 +224,8 @@ export const stockRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to adjust stock' });
 			}
 
-			const level = await prisma.inventoryLevel.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const level = await prisma.inventoryLevel.findFirstOrThrow({
+				where: { id: result.entityId, location: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ level: formatInventoryLevel(level) }, context);
@@ -284,8 +284,8 @@ export const stockRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to reserve stock' });
 			}
 
-			const level = await prisma.inventoryLevel.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const level = await prisma.inventoryLevel.findFirstOrThrow({
+				where: { id: result.entityId, location: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ level: formatInventoryLevel(level) }, context);
@@ -343,8 +343,8 @@ export const stockRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to release stock' });
 			}
 
-			const level = await prisma.inventoryLevel.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const level = await prisma.inventoryLevel.findFirstOrThrow({
+				where: { id: result.entityId, location: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ level: formatInventoryLevel(level) }, context);
@@ -418,8 +418,8 @@ export const stockRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record count' });
 			}
 
-			const level = await prisma.inventoryLevel.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const level = await prisma.inventoryLevel.findFirstOrThrow({
+				where: { id: result.entityId, location: { organizationId: context.organization.id } }
 			});
 
 			return successResponse(

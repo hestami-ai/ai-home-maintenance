@@ -6,7 +6,6 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
@@ -51,10 +50,10 @@ const terminalStatuses: ARCRequestStatus[] = [
 	ARCRequestStatus.EXPIRED
 ];
 
-// Helper to generate request number
-async function generateRequestNumber(associationId: string): Promise<string> {
+// Helper to generate request number - requires transaction context
+async function generateRequestNumber(tx: any, associationId: string): Promise<string> {
 	const year = new Date().getFullYear();
-	const count = await prisma.aRCRequest.count({
+	const count = await tx.aRCRequest.count({
 		where: {
 			associationId,
 			createdAt: {
@@ -73,10 +72,10 @@ async function createRequest(
 	data: Record<string, unknown>
 ): Promise<{ entityId: string; newStatus: string }> {
 	const associationId = data.associationId as string;
-	const requestNumber = await generateRequestNumber(associationId);
 
 	try {
 		const created = await orgTransaction(organizationId, async (tx) => {
+			const requestNumber = await generateRequestNumber(tx, associationId);
 			return tx.aRCRequest.create({
 				data: {
 					organizationId,
@@ -109,24 +108,24 @@ async function updateRequest(
 	requestId: string,
 	data: Record<string, unknown>
 ): Promise<{ entityId: string; previousStatus: string; newStatus: string }> {
-	const request = await prisma.aRCRequest.findFirst({
-		where: { id: requestId },
-		include: { association: true }
-	});
-
-	if (!request || request.association.organizationId !== organizationId) {
-		throw new Error('ARC Request not found');
-	}
-
-	if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
-		throw new Error('Cannot update a finalized ARC request');
-	}
-
-	const previousStatus = request.status;
-
 	try {
-		const updated = await orgTransaction(organizationId, async (tx) => {
-			return tx.aRCRequest.update({
+		const result = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findFirst({
+				where: { id: requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== organizationId) {
+				throw new Error('ARC Request not found');
+			}
+
+			if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
+				throw new Error('Cannot update a finalized ARC request');
+			}
+
+			const previousStatus = request.status;
+
+			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
 					title: data.title as string | undefined,
@@ -137,10 +136,12 @@ async function updateRequest(
 					proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate as string) : undefined
 				}
 			});
+
+			return { entityId: updated.id, previousStatus, newStatus: updated.status };
 		}, { userId, reason: 'Updating ARC request via workflow' });
 
 		log.info('UPDATE_REQUEST completed', { requestId, userId });
-		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		return result;
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -150,36 +151,38 @@ async function submitRequest(
 	organizationId: string,
 	userId: string,
 	requestId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<{ entityId: string; previousStatus: string; newStatus: string }> {
-	const request = await prisma.aRCRequest.findFirst({
-		where: { id: requestId },
-		include: { association: true }
-	});
-
-	if (!request || request.association.organizationId !== organizationId) {
-		throw new Error('ARC Request not found');
-	}
-
-	if (request.status !== 'DRAFT') {
-		throw new Error('Only draft requests can be submitted');
-	}
-
-	const previousStatus = request.status;
-
 	try {
-		const updated = await orgTransaction(organizationId, async (tx) => {
-			return tx.aRCRequest.update({
+		const result = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findFirst({
+				where: { id: requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== organizationId) {
+				throw new Error('ARC Request not found');
+			}
+
+			if (request.status !== 'DRAFT') {
+				throw new Error('Only draft requests can be submitted');
+			}
+
+			const previousStatus = request.status;
+
+			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
 					status: 'SUBMITTED',
 					submittedAt: new Date()
 				}
 			});
+
+			return { entityId: updated.id, previousStatus, newStatus: updated.status };
 		}, { userId, reason: 'Submitting ARC request via workflow' });
 
 		log.info('SUBMIT_REQUEST completed', { requestId, userId });
-		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		return result;
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -189,36 +192,38 @@ async function withdrawRequest(
 	organizationId: string,
 	userId: string,
 	requestId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<{ entityId: string; previousStatus: string; newStatus: string }> {
-	const request = await prisma.aRCRequest.findFirst({
-		where: { id: requestId },
-		include: { association: true }
-	});
-
-	if (!request || request.association.organizationId !== organizationId) {
-		throw new Error('ARC Request not found');
-	}
-
-	if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
-		throw new Error('Cannot withdraw a finalized ARC request');
-	}
-
-	const previousStatus = request.status;
-
 	try {
-		const updated = await orgTransaction(organizationId, async (tx) => {
-			return tx.aRCRequest.update({
+		const result = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findFirst({
+				where: { id: requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== organizationId) {
+				throw new Error('ARC Request not found');
+			}
+
+			if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
+				throw new Error('Cannot withdraw a finalized ARC request');
+			}
+
+			const previousStatus = request.status;
+
+			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
 					status: 'WITHDRAWN',
 					withdrawnAt: new Date()
 				}
 			});
+
+			return { entityId: updated.id, previousStatus, newStatus: updated.status };
 		}, { userId, reason: 'Withdrawing ARC request via workflow' });
 
 		log.info('WITHDRAW_REQUEST completed', { requestId, userId });
-		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		return result;
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -231,12 +236,12 @@ async function addDocument(
 	data: Record<string, unknown>
 ): Promise<{ entityId: string }> {
 	try {
-		const request = await prisma.aRCRequest.findUniqueOrThrow({
-			where: { id: requestId },
-			select: { associationId: true }
-		});
-
 		const document = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findUniqueOrThrow({
+				where: { id: requestId },
+				select: { associationId: true }
+			});
+
 			return tx.document.create({
 				data: {
 					organizationId,
@@ -297,26 +302,26 @@ async function recordDecision(
 	requestId: string,
 	data: Record<string, unknown>
 ): Promise<{ entityId: string; previousStatus: string; newStatus: string }> {
-	const request = await prisma.aRCRequest.findFirst({
-		where: { id: requestId },
-		include: { association: true }
-	});
-
-	if (!request || request.association.organizationId !== organizationId) {
-		throw new Error('ARC Request not found');
-	}
-
-	const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
-	if (!reviewableStatuses.includes(request.status as ARCRequestStatus)) {
-		throw new Error('Request is not in a reviewable status');
-	}
-
-	const previousStatus = request.status;
-	const action = data.action as string;
-	const newStatus = action === 'APPROVE' ? 'APPROVED' : action === 'DENY' ? 'DENIED' : 'UNDER_REVIEW';
-
 	try {
-		const updated = await orgTransaction(organizationId, async (tx) => {
+		const result = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findFirst({
+				where: { id: requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== organizationId) {
+				throw new Error('ARC Request not found');
+			}
+
+			const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
+			if (!reviewableStatuses.includes(request.status as ARCRequestStatus)) {
+				throw new Error('Request is not in a reviewable status');
+			}
+
+			const previousStatus = request.status;
+			const action = data.action as string;
+			const newStatus = action === 'APPROVE' ? 'APPROVED' : action === 'DENY' ? 'DENIED' : 'UNDER_REVIEW';
+
 			// Create review record
 			await tx.aRCReview.create({
 				data: {
@@ -329,17 +334,19 @@ async function recordDecision(
 			});
 
 			// Update request status
-			return tx.aRCRequest.update({
+			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
 					status: newStatus as any,
 					...(newStatus === 'APPROVED' || newStatus === 'DENIED' ? { decisionDate: new Date() } : {})
 				}
 			});
+
+			return { entityId: updated.id, previousStatus, newStatus: updated.status, action };
 		}, { userId, reason: 'Recording decision on ARC request via workflow' });
 
-		log.info('RECORD_DECISION completed', { requestId, action, userId });
-		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		log.info('RECORD_DECISION completed', { requestId, action: result.action, userId });
+		return { entityId: result.entityId, previousStatus: result.previousStatus, newStatus: result.newStatus };
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -349,35 +356,37 @@ async function requestInfo(
 	organizationId: string,
 	userId: string,
 	requestId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<{ entityId: string; previousStatus: string; newStatus: string }> {
-	const request = await prisma.aRCRequest.findFirst({
-		where: { id: requestId },
-		include: { association: true }
-	});
-
-	if (!request || request.association.organizationId !== organizationId) {
-		throw new Error('ARC Request not found');
-	}
-
-	if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
-		throw new Error('Cannot request info for a finalized ARC request');
-	}
-
-	const previousStatus = request.status;
-
 	try {
-		const updated = await orgTransaction(organizationId, async (tx) => {
-			return tx.aRCRequest.update({
+		const result = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findFirst({
+				where: { id: requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== organizationId) {
+				throw new Error('ARC Request not found');
+			}
+
+			if (terminalStatuses.includes(request.status as ARCRequestStatus)) {
+				throw new Error('Cannot request info for a finalized ARC request');
+			}
+
+			const previousStatus = request.status;
+
+			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
 					status: 'CHANGES_REQUESTED'
 				}
 			});
+
+			return { entityId: updated.id, previousStatus, newStatus: updated.status };
 		}, { userId, reason: 'Requesting info on ARC request via workflow' });
 
 		log.info('REQUEST_INFO completed', { requestId, userId });
-		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		return result;
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -387,35 +396,37 @@ async function submitInfo(
 	organizationId: string,
 	userId: string,
 	requestId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<{ entityId: string; previousStatus: string; newStatus: string }> {
-	const request = await prisma.aRCRequest.findFirst({
-		where: { id: requestId },
-		include: { association: true }
-	});
-
-	if (!request || request.association.organizationId !== organizationId) {
-		throw new Error('ARC Request not found');
-	}
-
-	if (request.status !== 'CHANGES_REQUESTED') {
-		throw new Error('No information request pending for this ARC request');
-	}
-
-	const previousStatus = request.status;
-
 	try {
-		const updated = await orgTransaction(organizationId, async (tx) => {
-			return tx.aRCRequest.update({
+		const result = await orgTransaction(organizationId, async (tx) => {
+			const request = await tx.aRCRequest.findFirst({
+				where: { id: requestId },
+				include: { association: true }
+			});
+
+			if (!request || request.association.organizationId !== organizationId) {
+				throw new Error('ARC Request not found');
+			}
+
+			if (request.status !== 'CHANGES_REQUESTED') {
+				throw new Error('No information request pending for this ARC request');
+			}
+
+			const previousStatus = request.status;
+
+			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
 					status: 'SUBMITTED'
 				}
 			});
+
+			return { entityId: updated.id, previousStatus, newStatus: updated.status };
 		}, { userId, reason: 'Submitting info on ARC request via workflow' });
 
 		log.info('SUBMIT_INFO completed', { requestId, userId });
-		return { entityId: updated.id, previousStatus, newStatus: updated.status };
+		return result;
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -496,7 +507,7 @@ async function arcRequestWorkflow(input: ARCRequestWorkflowInput): Promise<ARCRe
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ARCRequestWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage, action: input.action });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

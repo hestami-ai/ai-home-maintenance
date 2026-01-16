@@ -696,6 +696,7 @@ export const activityEventRouter = {
 			const limit = input.limit ?? 50;
 			const events = await prisma.activityEvent.findMany({
 				where: {
+					organizationId: context.organization!.id,
 					entityType: input.entityType as ActivityEntityType,
 					entityId: input.entityId
 				},

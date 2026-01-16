@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -70,19 +70,25 @@ export interface ExternalVendorWorkflowResult extends EntityWorkflowResult {
 async function createContext(
 	input: ExternalVendorWorkflowInput
 ): Promise<{ id: string; vendorName: string; createdAt: string }> {
-	const vendorContext = await prisma.externalVendorContext.create({
-		data: {
-			organizationId: input.organizationId,
-			propertyId: input.propertyId,
-			vendorName: input.vendorName!,
-			vendorContactName: input.vendorContactName,
-			vendorContactEmail: input.vendorContactEmail,
-			vendorContactPhone: input.vendorContactPhone,
-			vendorAddress: input.vendorAddress,
-			tradeCategories: input.tradeCategories ?? [],
-			notes: input.notes
-		}
-	});
+	const vendorContext = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalVendorContext.create({
+				data: {
+					organizationId: input.organizationId,
+					propertyId: input.propertyId,
+					vendorName: input.vendorName!,
+					vendorContactName: input.vendorContactName,
+					vendorContactEmail: input.vendorContactEmail,
+					vendorContactPhone: input.vendorContactPhone,
+					vendorAddress: input.vendorAddress,
+					tradeCategories: input.tradeCategories ?? [],
+					notes: input.notes
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create external vendor context' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -118,10 +124,16 @@ async function updateContext(
 	if (input.tradeCategories !== undefined) updateData.tradeCategories = input.tradeCategories;
 	if (input.notes !== undefined) updateData.notes = input.notes;
 
-	const updated = await prisma.externalVendorContext.update({
-		where: { id: input.contextId },
-		data: updateData
-	});
+	const updated = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalVendorContext.update({
+				where: { id: input.contextId },
+				data: updateData
+			});
+		},
+		{ userId: input.userId, reason: 'Update external vendor context' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -146,13 +158,18 @@ async function updateContext(
 }
 
 async function linkToServiceProvider(
-	input: ExternalVendorWorkflowInput,
-	propertyId: string | null
+	input: ExternalVendorWorkflowInput
 ): Promise<{ id: string; linkedServiceProviderOrgId: string }> {
-	const updated = await prisma.externalVendorContext.update({
-		where: { id: input.contextId },
-		data: { linkedServiceProviderOrgId: input.serviceProviderOrgId }
-	});
+	const updated = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalVendorContext.update({
+				where: { id: input.contextId },
+				data: { linkedServiceProviderOrgId: input.serviceProviderOrgId }
+			});
+		},
+		{ userId: input.userId, reason: 'Link external vendor to service provider' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -176,21 +193,26 @@ async function linkToServiceProvider(
 }
 
 async function logInteraction(
-	input: ExternalVendorWorkflowInput,
-	propertyId: string | null
+	input: ExternalVendorWorkflowInput
 ): Promise<{ id: string; interactionType: string; interactionDate: string; createdAt: string }> {
-	const interaction = await prisma.externalVendorInteraction.create({
-		data: {
-			externalVendorContextId: input.externalVendorContextId!,
-			caseId: input.caseId,
-			interactionType: input.interactionType as 'QUOTE_REQUEST' | 'QUOTE_RECEIVED' | 'WORK_SCHEDULED' | 'WORK_COMPLETED' | 'PAYMENT_MADE' | 'FOLLOW_UP' | 'COMPLAINT' | 'OTHER',
-			interactionDate: input.interactionDate!,
-			description: input.description!,
-			amount: input.amount,
-			notes: input.notes,
-			relatedDocumentIds: input.relatedDocumentIds ?? []
-		}
-	});
+	const interaction = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalVendorInteraction.create({
+				data: {
+					externalVendorContextId: input.externalVendorContextId!,
+					caseId: input.caseId,
+					interactionType: input.interactionType as any,
+					interactionDate: input.interactionDate!,
+					description: input.description!,
+					amount: input.amount,
+					notes: input.notes,
+					relatedDocumentIds: input.relatedDocumentIds ?? []
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Log external vendor interaction' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -285,7 +307,7 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 				}
 				log.debug('Step: linkToServiceProvider starting', { contextId: input.contextId });
 				const result = await DBOS.runStep(
-					() => linkToServiceProvider(input, input.propertyId ?? null),
+					() => linkToServiceProvider(input),
 					{ name: 'linkToServiceProvider' }
 				);
 				log.info('Step: linkToServiceProvider completed', { id: result.id });
@@ -308,7 +330,7 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 				}
 				log.debug('Step: logInteraction starting', { contextId: input.externalVendorContextId });
 				const result = await DBOS.runStep(
-					() => logInteraction(input, input.propertyId ?? null),
+					() => logInteraction(input),
 					{ name: 'logInteraction' }
 				);
 				log.info('Step: logInteraction completed', { id: result.id });

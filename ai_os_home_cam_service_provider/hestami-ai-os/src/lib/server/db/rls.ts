@@ -96,8 +96,60 @@ export async function withOrgContext<T>(
 }
 
 /**
+ * Type alias for Prisma transaction client
+ * This matches the type passed to prisma.$transaction callbacks
+ */
+export type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/**
+ * Sets organization context within an existing transaction
+ * Use this within DBOS.runStep or prisma.$transaction for connection pool safety
+ *
+ * @param tx - The Prisma transaction client
+ * @param organizationId - The organization ID to set as context
+ * @param fn - The async function to execute after setting context
+ * @param context - Optional context for audit logging
+ * @returns The result of the callback function
+ *
+ * @example
+ * // Within a DBOS workflow step:
+ * await DBOS.runStep(async () => {
+ *   return prisma.$transaction(async (tx) => {
+ *     return withTxOrgContext(tx, orgId, async () => {
+ *       return tx.document.findMany({ where: { ... } });
+ *     });
+ *   });
+ * });
+ */
+export async function withTxOrgContext<T>(
+	tx: PrismaTransaction,
+	organizationId: string,
+	fn: () => Promise<T>,
+	context?: RLSContext
+): Promise<T> {
+	if (context?.userId) {
+		// Use audited version with logging (supports Phase 30 tiered RLS: Org + Assoc + Staff)
+		await tx.$executeRawUnsafe(
+			`SELECT set_org_context_audited($1, $2, $3, $4, $5, $6, $7)`,
+			context.userId,
+			organizationId,
+			context.associationId ?? null,
+			context.isStaff ?? false,
+			context.reason ?? null,
+			context.itemType ?? null,
+			context.itemId ?? null
+		);
+	} else {
+		// Simple version - just set org context
+		await tx.$executeRawUnsafe(`SELECT set_current_org_id($1)`, organizationId);
+		await tx.$executeRawUnsafe(`SELECT set_config('app.current_assoc_id', '', false)`);
+	}
+	return fn();
+}
+
+/**
  * Creates a Prisma transaction with organization context set
- * 
+ *
  * @param organizationId - The organization ID to set as context
  * @param callback - The async function to execute within the transaction
  * @param context - Optional context for audit logging

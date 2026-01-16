@@ -143,8 +143,8 @@ export const transferRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create transfer' });
 			}
 
-			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const transfer = await prisma.inventoryTransfer.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: true }
 			});
 
@@ -304,8 +304,8 @@ export const transferRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to ship transfer' });
 			}
 
-			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const transfer = await prisma.inventoryTransfer.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: true }
 			});
 
@@ -379,8 +379,8 @@ export const transferRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to receive transfer' });
 			}
 
-			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const transfer = await prisma.inventoryTransfer.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: true }
 			});
 
@@ -448,8 +448,8 @@ export const transferRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel transfer' });
 			}
 
-			const transfer = await prisma.inventoryTransfer.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const transfer = await prisma.inventoryTransfer.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: true }
 			});
 

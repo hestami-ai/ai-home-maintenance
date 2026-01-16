@@ -233,8 +233,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create contract' });
 			}
 
-			const contract = await prisma.serviceContract.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const contract = await prisma.serviceContract.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { serviceItems: true }
 			});
 
@@ -402,8 +402,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update contract' });
 			}
 
-			const contract = await prisma.serviceContract.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const contract = await prisma.serviceContract.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { serviceItems: true }
 			});
 
@@ -454,8 +454,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate contract' });
 			}
 
-			const contract = await prisma.serviceContract.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const contract = await prisma.serviceContract.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { serviceItems: true }
 			});
 
@@ -506,8 +506,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to suspend contract' });
 			}
 
-			const contract = await prisma.serviceContract.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const contract = await prisma.serviceContract.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { serviceItems: true }
 			});
 
@@ -558,8 +558,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel contract' });
 			}
 
-			const contract = await prisma.serviceContract.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const contract = await prisma.serviceContract.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { serviceItems: true }
 			});
 
@@ -622,8 +622,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to renew contract' });
 			}
 
-			const contract = await prisma.serviceContract.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const contract = await prisma.serviceContract.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { serviceItems: true }
 			});
 
@@ -745,8 +745,8 @@ export const serviceContractRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add service item' });
 			}
 
-			const serviceItem = await prisma.contractServiceItem.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const serviceItem = await prisma.contractServiceItem.findFirstOrThrow({
+				where: { id: result.entityId, contract: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ serviceItem: formatServiceItem(serviceItem) }, context);

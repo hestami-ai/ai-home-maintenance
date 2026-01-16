@@ -6,10 +6,10 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('ContractorBranchWorkflow');
 
@@ -40,33 +40,66 @@ async function createOrUpdateBranch(
 	branchId: string | undefined,
 	data: Record<string, unknown>
 ): Promise<string> {
-	if (branchId) {
-		const existing = await prisma.contractorBranch.findFirst({
-			where: { id: branchId, organizationId }
-		});
-		if (!existing) throw new Error('ContractorBranch not found');
+	return orgTransaction(organizationId, async (tx) => {
+		if (branchId) {
+			const existing = await tx.contractorBranch.findFirst({
+				where: { id: branchId, organizationId }
+			});
+			if (!existing) throw new Error('ContractorBranch not found');
+
+			if (data.isPrimary) {
+				await tx.contractorBranch.updateMany({
+					where: { organizationId, isPrimary: true, NOT: { id: branchId } },
+					data: { isPrimary: false }
+				});
+			}
+
+			const branch = await tx.contractorBranch.update({
+				where: { id: branchId },
+				data: {
+					name: data.name as string | undefined,
+					code: data.code as string | undefined,
+					contactName: data.contactName as string | undefined,
+					contactEmail: data.contactEmail as string | undefined,
+					contactPhone: data.contactPhone as string | undefined,
+					addressLine1: data.addressLine1 as string | undefined,
+					addressLine2: data.addressLine2 as string | undefined,
+					city: data.city as string | undefined,
+					state: data.state as string | undefined,
+					postalCode: data.postalCode as string | undefined,
+					country: data.country as string | undefined,
+					operatingHoursJson: data.operatingHoursJson as string | undefined,
+					timezone: data.timezone as string | undefined,
+					serviceRadiusMiles: data.serviceRadiusMiles as number | undefined,
+					isPrimary: data.isPrimary as boolean | undefined
+				}
+			});
+
+			log.info(`UPDATE_BRANCH branch:${branch.id} by user ${userId}`);
+			return branch.id;
+		}
 
 		if (data.isPrimary) {
-			await prisma.contractorBranch.updateMany({
-				where: { organizationId, isPrimary: true, NOT: { id: branchId } },
+			await tx.contractorBranch.updateMany({
+				where: { organizationId, isPrimary: true },
 				data: { isPrimary: false }
 			});
 		}
 
-		const branch = await prisma.contractorBranch.update({
-			where: { id: branchId },
+		const branch = await tx.contractorBranch.create({
 			data: {
-				name: data.name as string | undefined,
+				organizationId,
+				name: data.name as string,
 				code: data.code as string | undefined,
 				contactName: data.contactName as string | undefined,
 				contactEmail: data.contactEmail as string | undefined,
 				contactPhone: data.contactPhone as string | undefined,
-				addressLine1: data.addressLine1 as string | undefined,
+				addressLine1: data.addressLine1 as string,
 				addressLine2: data.addressLine2 as string | undefined,
-				city: data.city as string | undefined,
-				state: data.state as string | undefined,
-				postalCode: data.postalCode as string | undefined,
-				country: data.country as string | undefined,
+				city: data.city as string,
+				state: data.state as string,
+				postalCode: data.postalCode as string,
+				country: (data.country as string) || 'US',
 				operatingHoursJson: data.operatingHoursJson as string | undefined,
 				timezone: data.timezone as string | undefined,
 				serviceRadiusMiles: data.serviceRadiusMiles as number | undefined,
@@ -74,40 +107,9 @@ async function createOrUpdateBranch(
 			}
 		});
 
-		console.log(`[ContractorBranchWorkflow] UPDATE_BRANCH branch:${branch.id} by user ${userId}`);
+		log.info(`CREATE_BRANCH branch:${branch.id} by user ${userId}`);
 		return branch.id;
-	}
-
-	if (data.isPrimary) {
-		await prisma.contractorBranch.updateMany({
-			where: { organizationId, isPrimary: true },
-			data: { isPrimary: false }
-		});
-	}
-
-	const branch = await prisma.contractorBranch.create({
-		data: {
-			organizationId,
-			name: data.name as string,
-			code: data.code as string | undefined,
-			contactName: data.contactName as string | undefined,
-			contactEmail: data.contactEmail as string | undefined,
-			contactPhone: data.contactPhone as string | undefined,
-			addressLine1: data.addressLine1 as string,
-			addressLine2: data.addressLine2 as string | undefined,
-			city: data.city as string,
-			state: data.state as string,
-			postalCode: data.postalCode as string,
-			country: (data.country as string) || 'US',
-			operatingHoursJson: data.operatingHoursJson as string | undefined,
-			timezone: data.timezone as string | undefined,
-			serviceRadiusMiles: data.serviceRadiusMiles as number | undefined,
-			isPrimary: data.isPrimary as boolean | undefined
-		}
-	});
-
-	console.log(`[ContractorBranchWorkflow] CREATE_BRANCH branch:${branch.id} by user ${userId}`);
-	return branch.id;
+	}, { userId, reason: 'createOrUpdateBranch' });
 }
 
 async function archiveBranch(
@@ -115,21 +117,23 @@ async function archiveBranch(
 	userId: string,
 	branchId: string
 ): Promise<string> {
-	const existing = await prisma.contractorBranch.findFirst({
-		where: { id: branchId, organizationId }
-	});
-	if (!existing) throw new Error('ContractorBranch not found');
+	return orgTransaction(organizationId, async (tx) => {
+		const existing = await tx.contractorBranch.findFirst({
+			where: { id: branchId, organizationId }
+		});
+		if (!existing) throw new Error('ContractorBranch not found');
 
-	await prisma.contractorBranch.update({
-		where: { id: branchId },
-		data: {
-			isActive: false,
-			code: existing.code ? `${existing.code}-archived` : existing.code
-		}
-	});
+		await tx.contractorBranch.update({
+			where: { id: branchId },
+			data: {
+				isActive: false,
+				code: existing.code ? `${existing.code}-archived` : existing.code
+			}
+		});
 
-	console.log(`[ContractorBranchWorkflow] ARCHIVE_BRANCH branch:${branchId} by user ${userId}`);
-	return branchId;
+		log.info(`ARCHIVE_BRANCH branch:${branchId} by user ${userId}`);
+		return branchId;
+	}, { userId, reason: 'archiveBranch' });
 }
 
 // Main workflow function
@@ -160,7 +164,7 @@ async function contractorBranchWorkflow(input: ContractorBranchWorkflowInput): P
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ContractorBranchWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

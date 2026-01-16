@@ -12,6 +12,7 @@ A governance CLI tool designed to programmatically enforce the **Hestami AI Deve
 - **Cerbos Policies (R10)**: Validates that all Cerbos `.yaml` policy files are syntax-valid.
 - **Security Check (R7/R8)**: Scans for raw SQL usage and sensitive variable exposure.
 - **Deep Semantic Trace (R11)**: Traces oRPC handlers to ensure Cerbos authorization is checking `context.cerbos` in the call chain.
+- **RLS Defense in Depth (R12)**: Ensures tenant isolation via explicit org/association filters, proper transaction-scoped RLS context, and connection pooling safety (withRLSContext pattern).
 - **Pipeline Integrity (R4)**: Detects drift between Prisma schemas, Zod models, OpenAPI specs, and generated frontend types.
 
 ## Installation
@@ -46,6 +47,7 @@ bun run src/cli.ts verify policies
 bun run src/cli.ts verify timestamps
 bun run src/cli.ts verify security
 bun run src/cli.ts verify trace
+bun run src/cli.ts verify rls
 ```
 
 ### JSON Output
@@ -74,4 +76,5 @@ Rules and folder boundaries are defined in `haos-guard.config.json`.
 - **R8**: Avoid `z.enum(['A', 'B'])` literals; use imported schemas from `api/schemas.ts`.
 - **R9**: Use `TIMESTAMPTZ(3)` for consistent high-precision time storage.
 - **R10**: Authorization (Cerbos) must be enforced and policies must be valid.
+- **R12**: RLS Defense in Depth - All tenant-scoped queries must include explicit `organizationId` filters. Workflows must use `orgTransaction` helper. CAM pillar tables must also include `associationId` filters when in association context. Connection pooling safety: `orgProcedure` must use `withRLSContext`, and Prisma extensions must use `tx[modelName][operation](args)` instead of `query(args)` inside transactions.
 

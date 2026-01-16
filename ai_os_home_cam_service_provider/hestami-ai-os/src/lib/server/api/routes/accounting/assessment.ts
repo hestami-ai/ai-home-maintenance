@@ -263,11 +263,11 @@ export const assessmentRouter = {
 
 			// Validate unit belongs to this association
 			const unit = await prisma.unit.findFirst({
-				where: { id: input.unitId },
+				where: { id: input.unitId, organizationId: context.organization.id },
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
 
@@ -446,6 +446,7 @@ export const assessmentRouter = {
 			// Get all payments for the unit
 			const payments = await prisma.payment.findMany({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					unitId: input.unitId,
 					status: { notIn: ['BOUNCED', 'VOIDED'] }

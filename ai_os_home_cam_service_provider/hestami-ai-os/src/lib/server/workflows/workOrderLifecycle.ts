@@ -227,7 +227,7 @@ async function queueNotifications(
 	// 3. Trigger the notification delivery service
 
 	// For now, we log the notification intent
-	console.log(`[Workflow] Notification queued: Work order ${workOrderId} transitioned from ${fromStatus} to ${toStatus} by user ${userId}`);
+	log.info('Notification queued', { workOrderId, fromStatus, toStatus, userId });
 
 	// Example notification rules:
 	// - SUBMITTED: Notify managers
@@ -299,7 +299,7 @@ async function workOrderTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Log SLA warning if applicable
 		if (slaStatus.isOverdue) {
-			console.warn(`[Workflow ${workflowId}] Work order ${input.workOrderId} is OVERDUE by ${Math.abs(slaStatus.hoursRemaining!)} hours`);
+			log.warn('Work order is OVERDUE', { workflowId, workOrderId: input.workOrderId, hoursOverdue: Math.abs(slaStatus.hoursRemaining!) });
 		}
 
 		return {
@@ -358,7 +358,7 @@ export async function startWorkOrderTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `wo-transition-${input.workOrderId}-${Date.now()}`;
-	await DBOS.startWorkflow(workOrderLifecycle_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(workOrderLifecycle_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

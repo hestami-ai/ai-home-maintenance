@@ -6,8 +6,8 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
-import { EstimateStatus, type EntityWorkflowResult } from './schemas.js';
+import { orgTransaction } from '../db/rls.js';
+import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
@@ -52,12 +52,14 @@ async function updateEstimate(
 ): Promise<string> {
 	const { id, idempotencyKey, ...updateData } = data;
 
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: updateData
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: updateData
+		});
+	}, { userId, reason: 'UPDATE_ESTIMATE' });
 
-	console.log(`[EstimateWorkflow] UPDATE_ESTIMATE on estimate:${estimateId} by user ${userId}`);
+	log.info('UPDATE_ESTIMATE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -67,25 +69,44 @@ async function addLine(
 	estimateId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const line = await prisma.estimateLine.create({
-		data: {
-			estimateId,
-			lineNumber: data.lineNumber as number,
-			description: data.description as string,
-			quantity: data.quantity as number,
-			unitPrice: data.unitPrice as number,
-			lineTotal: data.lineTotal as number,
-			pricebookItemId: data.pricebookItemId as string | undefined,
-			isTaxable: data.isTaxable as boolean | undefined ?? true,
-			taxRate: data.taxRate as number | undefined ?? 0,
-			optionId: data.optionId as string | undefined
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimateLine.create({
+			data: {
+				estimateId,
+				lineNumber: data.lineNumber as number,
+				description: data.description as string,
+				quantity: data.quantity as number,
+				unitPrice: data.unitPrice as number,
+				lineTotal: data.lineTotal as number,
+				pricebookItemId: data.pricebookItemId as string | undefined,
+				isTaxable: data.isTaxable as boolean | undefined ?? true,
+				taxRate: data.taxRate as number | undefined ?? 0,
+				optionId: data.optionId as string | undefined
+			}
+		});
+
+		// Recalculate estimate totals within same transaction
+		const lines = await tx.estimateLine.findMany({ where: { estimateId } });
+
+		let subtotal = 0;
+		let taxAmount = 0;
+
+		for (const line of lines) {
+			subtotal += Number(line.lineTotal);
+			if (line.isTaxable) {
+				taxAmount += Number(line.lineTotal) * (Number(line.taxRate) / 100);
+			}
 		}
-	});
 
-	// Recalculate estimate totals
-	await recalculateEstimateTotals(estimateId);
+		const totalAmount = subtotal + taxAmount;
 
-	console.log(`[EstimateWorkflow] ADD_LINE on estimate:${estimateId} by user ${userId}`);
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: { subtotal, taxAmount, totalAmount }
+		});
+	}, { userId, reason: 'ADD_LINE' });
+
+	log.info('ADD_LINE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -95,12 +116,31 @@ async function removeLine(
 	estimateId: string,
 	lineId: string
 ): Promise<string> {
-	await prisma.estimateLine.delete({ where: { id: lineId } });
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimateLine.delete({ where: { id: lineId } });
 
-	// Recalculate estimate totals
-	await recalculateEstimateTotals(estimateId);
+		// Recalculate estimate totals within same transaction
+		const lines = await tx.estimateLine.findMany({ where: { estimateId } });
 
-	console.log(`[EstimateWorkflow] REMOVE_LINE on estimate:${estimateId} by user ${userId}`);
+		let subtotal = 0;
+		let taxAmount = 0;
+
+		for (const line of lines) {
+			subtotal += Number(line.lineTotal);
+			if (line.isTaxable) {
+				taxAmount += Number(line.lineTotal) * (Number(line.taxRate) / 100);
+			}
+		}
+
+		const totalAmount = subtotal + taxAmount;
+
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: { subtotal, taxAmount, totalAmount }
+		});
+	}, { userId, reason: 'REMOVE_LINE' });
+
+	log.info('REMOVE_LINE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -109,15 +149,17 @@ async function sendEstimate(
 	userId: string,
 	estimateId: string
 ): Promise<string> {
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: {
-			status: 'SENT',
-			sentAt: new Date()
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: {
+				status: 'SENT',
+				sentAt: new Date()
+			}
+		});
+	}, { userId, reason: 'SEND_ESTIMATE' });
 
-	console.log(`[EstimateWorkflow] SEND_ESTIMATE on estimate:${estimateId} by user ${userId}`);
+	log.info('SEND_ESTIMATE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -126,13 +168,15 @@ async function markViewed(
 	userId: string,
 	estimateId: string
 ): Promise<string> {
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: {
-			status: 'VIEWED',
-			viewedAt: new Date()
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: {
+				status: 'VIEWED',
+				viewedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'MARK_VIEWED' });
 
 	log.info('MARK_VIEWED completed', { estimateId, userId });
 	return estimateId;
@@ -144,15 +188,17 @@ async function acceptEstimate(
 	estimateId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: {
-			status: 'ACCEPTED',
-			acceptedAt: new Date()
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: {
+				status: 'ACCEPTED',
+				acceptedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'ACCEPT_ESTIMATE' });
 
-	console.log(`[EstimateWorkflow] ACCEPT_ESTIMATE on estimate:${estimateId} by user ${userId}`);
+	log.info('ACCEPT_ESTIMATE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -161,15 +207,17 @@ async function declineEstimate(
 	userId: string,
 	estimateId: string
 ): Promise<string> {
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: {
-			status: 'DECLINED',
-			declinedAt: new Date()
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: {
+				status: 'DECLINED',
+				declinedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'DECLINE_ESTIMATE' });
 
-	console.log(`[EstimateWorkflow] DECLINE_ESTIMATE on estimate:${estimateId} by user ${userId}`);
+	log.info('DECLINE_ESTIMATE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -178,59 +226,63 @@ async function reviseEstimate(
 	userId: string,
 	estimateId: string
 ): Promise<string> {
-	const existing = await prisma.estimate.findUniqueOrThrow({
-		where: { id: estimateId },
-		include: { lines: true, options: { include: { lines: true } } }
-	});
+	const revisedId = await orgTransaction(organizationId, async (tx) => {
+		const existing = await tx.estimate.findUniqueOrThrow({
+			where: { id: estimateId },
+			include: { lines: true, options: { include: { lines: true } } }
+		});
 
-	// Create new revision
-	const newVersion = (existing.version ?? 1) + 1;
-	const newEstimateNumber = `${existing.estimateNumber}-R${newVersion}`;
+		// Create new revision
+		const newVersion = (existing.version ?? 1) + 1;
+		const newEstimateNumber = `${existing.estimateNumber}-R${newVersion}`;
 
-	const revised = await prisma.estimate.create({
-		data: {
-			organizationId: existing.organizationId,
-			customerId: existing.customerId,
-			jobId: existing.jobId,
-			estimateNumber: newEstimateNumber,
-			version: newVersion,
-			previousVersionId: existing.id,
-			title: existing.title,
-			description: existing.description,
-			validUntil: existing.validUntil,
-			subtotal: existing.subtotal,
-			taxAmount: existing.taxAmount,
-			totalAmount: existing.totalAmount,
-			status: 'DRAFT',
-			createdBy: userId
-		}
-	});
-
-	// Copy lines
-	for (const line of existing.lines) {
-		await prisma.estimateLine.create({
+		const revised = await tx.estimate.create({
 			data: {
-				estimateId: revised.id,
-				lineNumber: line.lineNumber,
-				description: line.description,
-				quantity: line.quantity,
-				unitPrice: line.unitPrice,
-				lineTotal: line.lineTotal,
-				pricebookItemId: line.pricebookItemId,
-				isTaxable: line.isTaxable,
-				taxRate: line.taxRate
+				organizationId: existing.organizationId,
+				customerId: existing.customerId,
+				jobId: existing.jobId,
+				estimateNumber: newEstimateNumber,
+				version: newVersion,
+				previousVersionId: existing.id,
+				title: existing.title,
+				description: existing.description,
+				validUntil: existing.validUntil,
+				subtotal: existing.subtotal,
+				taxAmount: existing.taxAmount,
+				totalAmount: existing.totalAmount,
+				status: 'DRAFT',
+				createdBy: userId
 			}
 		});
-	}
 
-	// Mark original as revised
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: { status: 'REVISED' }
-	});
+		// Copy lines
+		for (const line of existing.lines) {
+			await tx.estimateLine.create({
+				data: {
+					estimateId: revised.id,
+					lineNumber: line.lineNumber,
+					description: line.description,
+					quantity: line.quantity,
+					unitPrice: line.unitPrice,
+					lineTotal: line.lineTotal,
+					pricebookItemId: line.pricebookItemId,
+					isTaxable: line.isTaxable,
+					taxRate: line.taxRate
+				}
+			});
+		}
 
-	console.log(`[EstimateWorkflow] REVISE_ESTIMATE on estimate:${estimateId} -> ${revised.id} by user ${userId}`);
-	return revised.id;
+		// Mark original as revised
+		await tx.estimate.update({
+			where: { id: estimateId },
+			data: { status: 'REVISED' }
+		});
+
+		return revised.id;
+	}, { userId, reason: 'REVISE_ESTIMATE' });
+
+	log.info('REVISE_ESTIMATE completed', { estimateId, revisedId, userId });
+	return revisedId;
 }
 
 async function deleteEstimate(
@@ -238,9 +290,11 @@ async function deleteEstimate(
 	userId: string,
 	estimateId: string
 ): Promise<string> {
-	await prisma.estimate.delete({ where: { id: estimateId } });
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.estimate.delete({ where: { id: estimateId } });
+	}, { userId, reason: 'DELETE_ESTIMATE' });
 
-	console.log(`[EstimateWorkflow] DELETE_ESTIMATE on estimate:${estimateId} by user ${userId}`);
+	log.info('DELETE_ESTIMATE completed', { estimateId, userId });
 	return estimateId;
 }
 
@@ -257,42 +311,42 @@ async function generateFromPricebook(
 	const validUntil = data.validUntil as string | undefined;
 	const defaultTaxRate = (data.defaultTaxRate as number) ?? 0;
 
-	// Get pricebook items
-	const pricebookItems = await prisma.pricebookItem.findMany({
-		where: { id: { in: pricebookItemIds } }
-	});
+	const estimateId = await orgTransaction(organizationId, async (tx) => {
+		// Get pricebook items
+		const pricebookItems = await tx.pricebookItem.findMany({
+			where: { id: { in: pricebookItemIds } }
+		});
 
-	// Generate estimate number
-	const year = new Date().getFullYear();
-	const lastEstimate = await prisma.estimate.findFirst({
-		where: { organizationId, estimateNumber: { startsWith: `EST-${year}-` } },
-		orderBy: { createdAt: 'desc' }
-	});
-	const seq = lastEstimate ? parseInt((lastEstimate.estimateNumber.split('-')[2] ?? '0'), 10) + 1 : 1;
-	const estimateNumber = `EST-${year}-${String(seq).padStart(6, '0')}`;
+		// Generate estimate number
+		const year = new Date().getFullYear();
+		const lastEstimate = await tx.estimate.findFirst({
+			where: { organizationId, estimateNumber: { startsWith: `EST-${year}-` } },
+			orderBy: { createdAt: 'desc' }
+		});
+		const seq = lastEstimate ? parseInt((lastEstimate.estimateNumber.split('-')[2] ?? '0'), 10) + 1 : 1;
+		const estimateNumber = `EST-${year}-${String(seq).padStart(6, '0')}`;
 
-	const linesWithTotals = pricebookItems.map((item, idx) => ({
-		lineNumber: idx + 1,
-		description: `${item.name}${item.description ? ` - ${item.description}` : ''}`,
-		quantity: 1,
-		unitPrice: Number(item.basePrice),
-		lineTotal: Number(item.basePrice),
-		pricebookItemId: item.id,
-		isTaxable: item.isTaxable,
-		taxRate: defaultTaxRate
-	}));
+		const linesWithTotals = pricebookItems.map((item, idx) => ({
+			lineNumber: idx + 1,
+			description: `${item.name}${item.description ? ` - ${item.description}` : ''}`,
+			quantity: 1,
+			unitPrice: Number(item.basePrice),
+			lineTotal: Number(item.basePrice),
+			pricebookItemId: item.id,
+			isTaxable: item.isTaxable,
+			taxRate: defaultTaxRate
+		}));
 
-	let subtotal = 0;
-	let taxAmount = 0;
-	for (const line of linesWithTotals) {
-		subtotal += line.lineTotal;
-		if (line.isTaxable) {
-			taxAmount += line.lineTotal * (line.taxRate / 100);
+		let subtotal = 0;
+		let taxAmount = 0;
+		for (const line of linesWithTotals) {
+			subtotal += line.lineTotal;
+			if (line.isTaxable) {
+				taxAmount += line.lineTotal * (line.taxRate / 100);
+			}
 		}
-	}
-	const totalAmount = subtotal + taxAmount;
+		const totalAmount = subtotal + taxAmount;
 
-	const estimate = await prisma.$transaction(async (tx) => {
 		const est = await tx.estimate.create({
 			data: {
 				organizationId,
@@ -318,32 +372,11 @@ async function generateFromPricebook(
 			});
 		}
 
-		return est;
-	});
+		return est.id;
+	}, { userId, reason: 'GENERATE_FROM_PRICEBOOK' });
 
-	console.log(`[EstimateWorkflow] GENERATE_FROM_PRICEBOOK estimate:${estimate.id} by user ${userId}`);
-	return estimate.id;
-}
-
-async function recalculateEstimateTotals(estimateId: string): Promise<void> {
-	const lines = await prisma.estimateLine.findMany({ where: { estimateId } });
-
-	let subtotal = 0;
-	let taxAmount = 0;
-
-	for (const line of lines) {
-		subtotal += Number(line.lineTotal);
-		if (line.isTaxable) {
-			taxAmount += Number(line.lineTotal) * (Number(line.taxRate) / 100);
-		}
-	}
-
-	const totalAmount = subtotal + taxAmount;
-
-	await prisma.estimate.update({
-		where: { id: estimateId },
-		data: { subtotal, taxAmount, totalAmount }
-	});
+	log.info('GENERATE_FROM_PRICEBOOK completed', { estimateId, userId });
+	return estimateId;
 }
 
 // Main workflow function
@@ -430,7 +463,7 @@ async function estimateWorkflow(input: EstimateWorkflowInput): Promise<EstimateW
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[EstimateWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { action: input.action, error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

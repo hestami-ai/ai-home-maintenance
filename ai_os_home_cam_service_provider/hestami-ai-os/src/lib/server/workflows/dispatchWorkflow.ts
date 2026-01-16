@@ -6,12 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { DispatchStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('DispatchWorkflow');
 
@@ -48,7 +48,7 @@ async function createAssignment(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const result = await prisma.$transaction(async (tx) => {
+	const result = await orgTransaction(organizationId, async (tx) => {
 		const assignment = await tx.dispatchAssignment.create({
 			data: {
 				organizationId,
@@ -88,7 +88,7 @@ async function createAssignment(
 		});
 
 		return assignment;
-	});
+	}, { userId, reason: 'Create dispatch assignment' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -114,7 +114,7 @@ async function reassignDispatch(
 	assignmentId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const result = await prisma.$transaction(async (tx) => {
+	const result = await orgTransaction(organizationId, async (tx) => {
 		const existing = await tx.dispatchAssignment.findUniqueOrThrow({
 			where: { id: assignmentId }
 		});
@@ -153,7 +153,7 @@ async function reassignDispatch(
 		});
 
 		return updated;
-	});
+	}, { userId, reason: 'Reassign dispatch to new technician' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -179,15 +179,17 @@ async function updateDispatchStatus(
 	assignmentId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const assignment = await prisma.dispatchAssignment.update({
-		where: { id: assignmentId },
-		data: {
-			status: data.status as DispatchStatus,
-			actualStart: data.actualStart ? new Date(data.actualStart as string) : undefined,
-			actualEnd: data.actualEnd ? new Date(data.actualEnd as string) : undefined,
-			techNotes: data.completionNotes as string | undefined
-		}
-	});
+	const assignment = await orgTransaction(organizationId, async (tx) => {
+		return tx.dispatchAssignment.update({
+			where: { id: assignmentId },
+			data: {
+				status: data.status as DispatchStatus,
+				actualStart: data.actualStart ? new Date(data.actualStart as string) : undefined,
+				actualEnd: data.actualEnd ? new Date(data.actualEnd as string) : undefined,
+				techNotes: data.completionNotes as string | undefined
+			}
+		});
+	}, { userId, reason: 'Update dispatch status' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -213,7 +215,7 @@ async function rescheduleDispatch(
 	assignmentId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const result = await prisma.$transaction(async (tx) => {
+	const result = await orgTransaction(organizationId, async (tx) => {
 		const existing = await tx.dispatchAssignment.findUniqueOrThrow({
 			where: { id: assignmentId }
 		});
@@ -237,7 +239,7 @@ async function rescheduleDispatch(
 		});
 
 		return updated;
-	});
+	}, { userId, reason: 'Reschedule dispatch' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -262,15 +264,17 @@ async function optimizeRoute(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const routePlan = await prisma.routePlan.create({
-		data: {
-			organizationId,
-			technicianId: data.technicianId as string,
-			routeDate: new Date(data.planDate as string),
-			isOptimized: true,
-			optimizedAt: new Date()
-		}
-	});
+	const routePlan = await orgTransaction(organizationId, async (tx) => {
+		return tx.routePlan.create({
+			data: {
+				organizationId,
+				technicianId: data.technicianId as string,
+				routeDate: new Date(data.planDate as string),
+				isOptimized: true,
+				optimizedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'Optimize route plan' });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -294,13 +298,15 @@ async function createRoutePlan(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const routePlan = await prisma.routePlan.create({
-		data: {
-			organizationId,
-			technicianId: data.technicianId as string,
-			routeDate: new Date(data.routeDate as string)
-		}
-	});
+	const routePlan = await orgTransaction(organizationId, async (tx) => {
+		return tx.routePlan.create({
+			data: {
+				organizationId,
+				technicianId: data.technicianId as string,
+				routeDate: new Date(data.routeDate as string)
+			}
+		});
+	}, { userId, reason: 'Create route plan' });
 
 	log.info('CREATE_ROUTE_PLAN completed', { routePlanId: routePlan.id, technicianId: data.technicianId });
 	return { id: routePlan.id };
@@ -400,7 +406,7 @@ export const dispatchWorkflow_v1 = DBOS.registerWorkflow(dispatchWorkflow);
 
 export async function startDispatchWorkflow(
 	input: DispatchWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<DispatchWorkflowResult> {
 	const handle = await DBOS.startWorkflow(dispatchWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

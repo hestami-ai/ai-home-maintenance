@@ -63,15 +63,15 @@ export const reportExecutionRouter = {
 						format: input.format
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to generate report' });
 			}
 
-			const execution = await prisma.reportExecution.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const execution = await prisma.reportExecution.findFirstOrThrow({
+				where: { id: result.entityId, schedule: { association: { organizationId: context.organization.id } } }
 			});
 
 			return successResponse({
@@ -255,15 +255,15 @@ export const reportExecutionRouter = {
 					executionId: input.id,
 					data: {}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel execution' });
 			}
 
-			const execution = await prisma.reportExecution.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const execution = await prisma.reportExecution.findFirstOrThrow({
+				where: { id: result.entityId, schedule: { association: { organizationId: context.organization.id } } }
 			});
 
 			return successResponse({

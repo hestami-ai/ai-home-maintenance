@@ -172,8 +172,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create purchase order' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -334,8 +334,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update purchase order' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -407,8 +407,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add line' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -464,8 +464,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove line' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -521,8 +521,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to submit purchase order' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -573,8 +573,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to confirm purchase order' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -660,8 +660,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to receive purchase order' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -712,8 +712,8 @@ export const purchaseOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel purchase order' });
 			}
 
-			const po = await prisma.purchaseOrder.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const po = await prisma.purchaseOrder.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 

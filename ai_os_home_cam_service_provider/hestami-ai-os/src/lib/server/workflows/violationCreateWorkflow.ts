@@ -178,7 +178,7 @@ export const violationCreateWorkflow_v1 = DBOS.registerWorkflow(violationCreateW
 
 export async function startViolationCreateWorkflow(
 	input: ViolationCreateInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<ViolationCreateResult> {
 	const handle = await DBOS.startWorkflow(violationCreateWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

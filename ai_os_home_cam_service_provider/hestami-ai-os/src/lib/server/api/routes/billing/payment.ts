@@ -127,8 +127,8 @@ export const paymentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create payment intent' });
 			}
 
-			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const paymentIntent = await prisma.paymentIntent.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
@@ -272,8 +272,8 @@ export const paymentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to process payment' });
 			}
 
-			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const paymentIntent = await prisma.paymentIntent.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
@@ -334,8 +334,8 @@ export const paymentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark payment as failed' });
 			}
 
-			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const paymentIntent = await prisma.paymentIntent.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
@@ -401,8 +401,8 @@ export const paymentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to refund payment' });
 			}
 
-			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const paymentIntent = await prisma.paymentIntent.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);
@@ -455,8 +455,8 @@ export const paymentRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to cancel payment' });
 			}
 
-			const paymentIntent = await prisma.paymentIntent.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const paymentIntent = await prisma.paymentIntent.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ paymentIntent: formatPaymentIntent(paymentIntent) }, context);

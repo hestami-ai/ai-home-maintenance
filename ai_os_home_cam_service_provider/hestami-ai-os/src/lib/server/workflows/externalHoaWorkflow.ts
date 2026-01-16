@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -82,19 +82,25 @@ export interface ExternalHoaWorkflowResult extends EntityWorkflowResult {
 async function createContext(
 	input: ExternalHoaWorkflowInput
 ): Promise<{ id: string; propertyId: string; hoaName: string; createdAt: string }> {
-	const hoaContext = await prisma.externalHOAContext.create({
-		data: {
-			organizationId: input.organizationId,
-			propertyId: input.propertyId!,
-			hoaName: input.hoaName!,
-			hoaContactName: input.hoaContactName,
-			hoaContactEmail: input.hoaContactEmail,
-			hoaContactPhone: input.hoaContactPhone,
-			hoaAddress: input.hoaAddress,
-			notes: input.notes,
-			documentsJson: input.documentsJson ?? []
-		}
-	});
+	const hoaContext = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalHOAContext.create({
+				data: {
+					organizationId: input.organizationId,
+					propertyId: input.propertyId!,
+					hoaName: input.hoaName!,
+					hoaContactName: input.hoaContactName,
+					hoaContactEmail: input.hoaContactEmail,
+					hoaContactPhone: input.hoaContactPhone,
+					hoaAddress: input.hoaAddress,
+					notes: input.notes,
+					documentsJson: input.documentsJson ?? []
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create external HOA context' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -131,10 +137,16 @@ async function updateContext(
 	if (input.notes !== undefined) updateData.notes = input.notes;
 	if (input.documentsJson !== undefined) updateData.documentsJson = input.documentsJson;
 
-	const updated = await prisma.externalHOAContext.update({
-		where: { id: input.contextId },
-		data: updateData
-	});
+	const updated = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalHOAContext.update({
+				where: { id: input.contextId },
+				data: updateData
+			});
+		},
+		{ userId: input.userId, reason: 'Update external HOA context' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -160,18 +172,24 @@ async function updateContext(
 
 async function createApproval(
 	input: ExternalHoaWorkflowInput,
-	propertyId: string
+	_propertyId: string
 ): Promise<{ id: string; approvalType: string; status: string; createdAt: string }> {
-	const approval = await prisma.externalHOAApproval.create({
-		data: {
-			externalHoaContextId: input.externalHoaContextId!,
-			caseId: input.caseId,
-			approvalType: input.approvalType!,
-			status: 'PENDING',
-			notes: input.notes,
-			relatedDocumentIds: input.relatedDocumentIds ?? []
-		}
-	});
+	const approval = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalHOAApproval.create({
+				data: {
+					externalHoaContextId: input.externalHoaContextId!,
+					caseId: input.caseId,
+					approvalType: input.approvalType!,
+					status: 'PENDING',
+					notes: input.notes,
+					relatedDocumentIds: input.relatedDocumentIds ?? []
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create external HOA approval' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -199,7 +217,7 @@ async function createApproval(
 async function updateApprovalStatus(
 	input: ExternalHoaWorkflowInput,
 	previousStatus: string,
-	propertyId: string
+	_propertyId: string
 ): Promise<{ id: string; status: string; updatedAt: string }> {
 	const updateData: Record<string, unknown> = { status: input.status };
 	if (input.submittedAt) updateData.submittedAt = input.submittedAt;
@@ -208,10 +226,16 @@ async function updateApprovalStatus(
 	if (input.approvalReference) updateData.approvalReference = input.approvalReference;
 	if (input.notes) updateData.notes = input.notes;
 
-	const updated = await prisma.externalHOAApproval.update({
-		where: { id: input.approvalId },
-		data: updateData
-	});
+	const updated = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalHOAApproval.update({
+				where: { id: input.approvalId },
+				data: updateData
+			});
+		},
+		{ userId: input.userId, reason: 'Update external HOA approval status' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -239,15 +263,21 @@ async function updateApprovalStatus(
 async function addRule(
 	input: ExternalHoaWorkflowInput
 ): Promise<{ id: string; ruleCategory: string; ruleDescription: string; createdAt: string }> {
-	const rule = await prisma.externalHOARule.create({
-		data: {
-			externalHoaContextId: input.externalHoaContextId!,
-			ruleCategory: input.ruleCategory!,
-			ruleDescription: input.ruleDescription!,
-			sourceDocumentId: input.sourceDocumentId,
-			notes: input.notes
-		}
-	});
+	const rule = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.externalHOARule.create({
+				data: {
+					externalHoaContextId: input.externalHoaContextId!,
+					ruleCategory: input.ruleCategory!,
+					ruleDescription: input.ruleDescription!,
+					sourceDocumentId: input.sourceDocumentId,
+					notes: input.notes
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Add external HOA rule' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -277,10 +307,16 @@ async function deleteRule(
 	organizationId: string,
 	userId: string
 ): Promise<{ deleted: boolean }> {
-	await prisma.externalHOARule.update({
-		where: { id: ruleId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.externalHOARule.update({
+				where: { id: ruleId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Delete external HOA rule' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,

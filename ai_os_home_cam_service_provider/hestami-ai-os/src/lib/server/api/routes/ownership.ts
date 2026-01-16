@@ -55,11 +55,15 @@ export const ownershipRouter = {
 
 			// Verify unit belongs to this organization
 			const unit = await prisma.unit.findFirst({
-				where: { id: input.unitId, deletedAt: null },
+				where: {
+					id: input.unitId,
+					deletedAt: null,
+					property: { association: { organizationId: context.organization.id } }
+				},
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
@@ -148,14 +152,18 @@ export const ownershipRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const ownership = await prisma.ownership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					unit: { property: { association: { organizationId: context.organization.id } } }
+				},
 				include: {
 					unit: { include: { property: { include: { association: true } } } },
 					party: true
 				}
 			});
 
-			if (!ownership || ownership.unit.property.association.organizationId !== context.organization.id) {
+			if (!ownership) {
 				throw errors.NOT_FOUND({ message: 'Ownership' });
 			}
 
@@ -235,11 +243,15 @@ export const ownershipRouter = {
 		.handler(async ({ input, context, errors }) => {
 			// Verify unit belongs to this organization
 			const unit = await prisma.unit.findFirst({
-				where: { id: input.unitId, deletedAt: null },
+				where: {
+					id: input.unitId,
+					deletedAt: null,
+					property: { association: { organizationId: context.organization.id } }
+				},
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit' });
 			}
 
@@ -249,6 +261,7 @@ export const ownershipRouter = {
 			const ownerships = await prisma.ownership.findMany({
 				where: {
 					unitId: input.unitId,
+					unit: { property: { association: { organizationId: context.organization.id } } },
 					...(!input.includeEnded && { endDate: null })
 				},
 				take: input.limit + 1,
@@ -313,11 +326,15 @@ export const ownershipRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					unit: { property: { association: { organizationId: context.organization.id } } }
+				},
 				include: { unit: { include: { property: { include: { association: true } } } } }
 			});
 
-			if (!existing || existing.unit.property.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Ownership' });
 			}
 
@@ -378,11 +395,15 @@ export const ownershipRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const existing = await prisma.ownership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					unit: { property: { association: { organizationId: context.organization.id } } }
+				},
 				include: { unit: { include: { property: { include: { association: true } } } } }
 			});
 
-			if (!existing || existing.unit.property.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Ownership' });
 			}
 

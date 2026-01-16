@@ -10,7 +10,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -137,50 +137,54 @@ export interface WorkOrderMutationResult extends EntityWorkflowResult {
 async function createWorkOrder(
 	input: WorkOrderMutationInput
 ): Promise<{ id: string; workOrderNumber: string; title: string; status: string; priority: string }> {
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.create({
-			data: {
-				organizationId: input.organizationId,
-				associationId: input.associationId,
-				workOrderNumber: input.workOrderNumber!,
-				title: input.title!,
-				description: input.description!,
-				category: input.category! as Prisma.WorkOrderCreateInput['category'],
-				priority: input.priority! as Prisma.WorkOrderCreateInput['priority'],
-				status: 'DRAFT',
-				unitId: input.unitId,
-				commonAreaName: input.commonAreaName,
-				assetId: input.assetId,
-				locationDetails: input.locationDetails,
-				requestedBy: input.userId,
-				scheduledStart: input.scheduledStart,
-				scheduledEnd: input.scheduledEnd,
-				estimatedCost: input.estimatedCost,
-				estimatedHours: input.estimatedHours,
-				slaDeadline: input.slaDeadline,
-				originType: input.originType as Prisma.WorkOrderCreateInput['originType'],
-				violationId: input.violationId,
-				arcRequestId: input.arcRequestId,
-				resolutionId: input.resolutionId,
-				originNotes: input.originNotes,
-				budgetSource: input.budgetSource,
-				approvedAmount: input.approvedAmount,
-				constraints: input.constraints
-			}
-		});
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.create({
+				data: {
+					organizationId: input.organizationId,
+					associationId: input.associationId,
+					workOrderNumber: input.workOrderNumber!,
+					title: input.title!,
+					description: input.description!,
+					category: input.category! as Prisma.WorkOrderCreateInput['category'],
+					priority: input.priority! as Prisma.WorkOrderCreateInput['priority'],
+					status: 'DRAFT',
+					unitId: input.unitId,
+					commonAreaName: input.commonAreaName,
+					assetId: input.assetId,
+					locationDetails: input.locationDetails,
+					requestedBy: input.userId,
+					scheduledStart: input.scheduledStart,
+					scheduledEnd: input.scheduledEnd,
+					estimatedCost: input.estimatedCost,
+					estimatedHours: input.estimatedHours,
+					slaDeadline: input.slaDeadline,
+					originType: input.originType as Prisma.WorkOrderCreateInput['originType'],
+					violationId: input.violationId,
+					arcRequestId: input.arcRequestId,
+					resolutionId: input.resolutionId,
+					originNotes: input.originNotes,
+					budgetSource: input.budgetSource,
+					approvedAmount: input.approvedAmount,
+					constraints: input.constraints
+				}
+			});
 
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: wo.id,
-				fromStatus: null,
-				toStatus: 'DRAFT',
-				changedBy: input.userId,
-				notes: 'Work order created'
-			}
-		});
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: wo.id,
+					fromStatus: null,
+					toStatus: 'DRAFT',
+					changedBy: input.userId,
+					notes: 'Work order created'
+				}
+			});
 
-		return wo;
-	});
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Create work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -233,24 +237,28 @@ async function updateWorkOrderStatus(
 		updateData.closedBy = input.userId;
 	}
 
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: updateData
-		});
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
+				data: updateData
+			});
 
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: input.workOrderId!,
-				fromStatus: input.previousStatus!,
-				toStatus: input.newStatus!,
-				changedBy: input.userId,
-				notes: input.notes
-			}
-		});
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: input.workOrderId!,
+					fromStatus: input.previousStatus!,
+					toStatus: input.newStatus!,
+					changedBy: input.userId,
+					notes: input.notes
+				}
+			});
 
-		return wo;
-	});
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Update work order status' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -278,31 +286,35 @@ async function updateWorkOrderStatus(
 async function assignVendorToWorkOrder(
 	input: WorkOrderMutationInput
 ): Promise<{ id: string; status: string; assignedVendorId: string }> {
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				assignedVendorId: input.vendorId,
-				assignedAt: new Date(),
-				assignedBy: input.userId,
-				status: 'ASSIGNED'
-			}
-		});
-
-		if (input.previousStatus !== 'ASSIGNED') {
-			await tx.workOrderStatusHistory.create({
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
 				data: {
-					workOrderId: input.workOrderId!,
-					fromStatus: input.previousStatus!,
-					toStatus: 'ASSIGNED',
-					changedBy: input.userId,
-					notes: input.notes || `Assigned to vendor: ${input.vendorName}`
+					assignedVendorId: input.vendorId,
+					assignedAt: new Date(),
+					assignedBy: input.userId,
+					status: 'ASSIGNED'
 				}
 			});
-		}
 
-		return wo;
-	});
+			if (input.previousStatus !== 'ASSIGNED') {
+				await tx.workOrderStatusHistory.create({
+					data: {
+						workOrderId: input.workOrderId!,
+						fromStatus: input.previousStatus!,
+						toStatus: 'ASSIGNED',
+						changedBy: input.userId,
+						notes: input.notes || `Assigned to vendor: ${input.vendorName}`
+					}
+				});
+			}
+
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Assign vendor to work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -329,31 +341,35 @@ async function assignVendorToWorkOrder(
 async function assignTechnicianToWorkOrder(
 	input: WorkOrderMutationInput
 ): Promise<{ id: string; status: string; assignedTechnicianId: string }> {
-	const result = await prisma.$transaction(async (tx) => {
-		const newStatus = input.previousStatus === 'TRIAGED' ? 'ASSIGNED' : input.previousStatus!;
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				assignedTechnicianId: input.technicianId,
-				assignedTechnicianBranchId: input.technicianBranchId,
-				status: newStatus
-			}
-		});
-
-		if (input.previousStatus === 'TRIAGED') {
-			await tx.workOrderStatusHistory.create({
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const newStatus = input.previousStatus === 'TRIAGED' ? 'ASSIGNED' : input.previousStatus!;
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
 				data: {
-					workOrderId: input.workOrderId!,
-					fromStatus: input.previousStatus!,
-					toStatus: 'ASSIGNED',
-					changedBy: input.userId,
-					notes: input.notes || `Assigned to technician: ${input.technicianName}`
+					assignedTechnicianId: input.technicianId,
+					assignedTechnicianBranchId: input.technicianBranchId,
+					status: newStatus
 				}
 			});
-		}
 
-		return wo;
-	});
+			if (input.previousStatus === 'TRIAGED') {
+				await tx.workOrderStatusHistory.create({
+					data: {
+						workOrderId: input.workOrderId!,
+						fromStatus: input.previousStatus!,
+						toStatus: 'ASSIGNED',
+						changedBy: input.userId,
+						notes: input.notes || `Assigned to technician: ${input.technicianName}`
+					}
+				});
+			}
+
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Assign technician to work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -380,32 +396,36 @@ async function assignTechnicianToWorkOrder(
 async function scheduleWorkOrder(
 	input: WorkOrderMutationInput
 ): Promise<{ id: string; status: string; scheduledStart: string }> {
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				scheduledStart: input.scheduledStart,
-				scheduledEnd: input.scheduledEnd,
-				assignedTechnicianId: input.technicianId,
-				assignedTechnicianBranchId: input.technicianBranchId,
-				status: 'SCHEDULED'
-			}
-		});
-
-		if (input.previousStatus !== 'SCHEDULED') {
-			await tx.workOrderStatusHistory.create({
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
 				data: {
-					workOrderId: input.workOrderId!,
-					fromStatus: input.previousStatus!,
-					toStatus: 'SCHEDULED',
-					changedBy: input.userId,
-					notes: input.notes || `Scheduled for ${input.scheduledStart?.toISOString()}`
+					scheduledStart: input.scheduledStart,
+					scheduledEnd: input.scheduledEnd,
+					assignedTechnicianId: input.technicianId,
+					assignedTechnicianBranchId: input.technicianBranchId,
+					status: 'SCHEDULED'
 				}
 			});
-		}
 
-		return wo;
-	});
+			if (input.previousStatus !== 'SCHEDULED') {
+				await tx.workOrderStatusHistory.create({
+					data: {
+						workOrderId: input.workOrderId!,
+						fromStatus: input.previousStatus!,
+						toStatus: 'SCHEDULED',
+						changedBy: input.userId,
+						notes: input.notes || `Scheduled for ${input.scheduledStart?.toISOString()}`
+					}
+				});
+			}
+
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Schedule work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -434,62 +454,66 @@ async function completeWorkOrder(
 ): Promise<{ id: string; status: string; completedAt: string; slaMet: boolean | null }> {
 	const now = new Date();
 
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				status: 'COMPLETED',
-				completedAt: now,
-				actualCost: input.actualCost,
-				actualHours: input.actualHours,
-				resolutionNotes: input.resolutionNotes,
-				slaMet: input.slaMet
-			}
-		});
-
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: input.workOrderId!,
-				fromStatus: 'IN_PROGRESS',
-				toStatus: 'COMPLETED',
-				changedBy: input.userId,
-				notes: input.resolutionNotes || 'Work completed'
-			}
-		});
-
-		// If there's an asset, log maintenance
-		if (input.assetId) {
-			await tx.assetMaintenanceLog.create({
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
 				data: {
-					assetId: input.assetId,
-					maintenanceDate: now,
-					maintenanceType: input.category || 'GENERAL',
-					description: input.title || 'Work order completion',
-					performedBy: input.vendorId ? 'Vendor' : 'Internal',
-					cost: input.actualCost,
-					workOrderId: input.workOrderId!,
-					notes: input.resolutionNotes,
-					createdBy: input.userId
+					status: 'COMPLETED',
+					completedAt: now,
+					actualCost: input.actualCost,
+					actualHours: input.actualHours,
+					resolutionNotes: input.resolutionNotes,
+					slaMet: input.slaMet
 				}
 			});
 
-			// Update asset maintenance dates
-			const asset = await tx.asset.findUnique({ where: { id: input.assetId } });
-			if (asset) {
-				await tx.asset.update({
-					where: { id: input.assetId },
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: input.workOrderId!,
+					fromStatus: 'IN_PROGRESS',
+					toStatus: 'COMPLETED',
+					changedBy: input.userId,
+					notes: input.resolutionNotes || 'Work completed'
+				}
+			});
+
+			// If there's an asset, log maintenance
+			if (input.assetId) {
+				await tx.assetMaintenanceLog.create({
 					data: {
-						lastMaintenanceDate: now,
-						nextMaintenanceDate: asset.maintenanceFrequencyDays
-							? new Date(now.getTime() + asset.maintenanceFrequencyDays * 24 * 60 * 60 * 1000)
-							: null
+						assetId: input.assetId,
+						maintenanceDate: now,
+						maintenanceType: input.category || 'GENERAL',
+						description: input.title || 'Work order completion',
+						performedBy: input.vendorId ? 'Vendor' : 'Internal',
+						cost: input.actualCost,
+						workOrderId: input.workOrderId!,
+						notes: input.resolutionNotes,
+						createdBy: input.userId
 					}
 				});
-			}
-		}
 
-		return wo;
-	});
+				// Update asset maintenance dates
+				const asset = await tx.asset.findUnique({ where: { id: input.assetId } });
+				if (asset) {
+					await tx.asset.update({
+						where: { id: input.assetId },
+						data: {
+							lastMaintenanceDate: now,
+							nextMaintenanceDate: asset.maintenanceFrequencyDays
+								? new Date(now.getTime() + asset.maintenanceFrequencyDays * 24 * 60 * 60 * 1000)
+								: null
+						}
+					});
+				}
+			}
+
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Complete work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -525,37 +549,41 @@ async function authorizeWorkOrder(
 	const now = new Date();
 	const requiresBoardApproval = input.requiresBoardApproval ?? false;
 
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				status: requiresBoardApproval ? 'TRIAGED' : 'AUTHORIZED',
-				authorizedBy: requiresBoardApproval ? null : input.userId,
-				authorizedAt: requiresBoardApproval ? null : now,
-				authorizationRationale: input.rationale,
-				authorizingRole: requiresBoardApproval ? null : (input.authorizingRole || 'MANAGER'),
-				budgetSource: input.budgetSource,
-				approvedAmount: input.approvedAmount,
-				constraints: input.constraints,
-				requiresBoardApproval,
-				boardApprovalStatus: requiresBoardApproval ? 'PENDING' : null
-			}
-		});
-
-		if (!requiresBoardApproval) {
-			await tx.workOrderStatusHistory.create({
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
 				data: {
-					workOrderId: input.workOrderId!,
-					fromStatus: 'TRIAGED',
-					toStatus: 'AUTHORIZED',
-					changedBy: input.userId,
-					notes: `Authorized by manager: ${input.rationale}`
+					status: requiresBoardApproval ? 'TRIAGED' : 'AUTHORIZED',
+					authorizedBy: requiresBoardApproval ? null : input.userId,
+					authorizedAt: requiresBoardApproval ? null : now,
+					authorizationRationale: input.rationale,
+					authorizingRole: requiresBoardApproval ? null : (input.authorizingRole || 'MANAGER'),
+					budgetSource: input.budgetSource,
+					approvedAmount: input.approvedAmount,
+					constraints: input.constraints,
+					requiresBoardApproval,
+					boardApprovalStatus: requiresBoardApproval ? 'PENDING' : null
 				}
 			});
-		}
 
-		return wo;
-	});
+			if (!requiresBoardApproval) {
+				await tx.workOrderStatusHistory.create({
+					data: {
+						workOrderId: input.workOrderId!,
+						fromStatus: 'TRIAGED',
+						toStatus: 'AUTHORIZED',
+						changedBy: input.userId,
+						notes: `Authorized by manager: ${input.rationale}`
+					}
+				});
+			}
+
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Authorize work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -593,31 +621,35 @@ async function acceptWorkOrderCompletion(
 ): Promise<{ id: string; status: string; closedAt: string }> {
 	const now = new Date();
 
-	const result = await prisma.$transaction(async (tx) => {
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				status: 'CLOSED',
-				closedAt: now,
-				closedBy: input.userId,
-				resolutionNotes: input.resolutionNotes,
-				actualCost: input.actualCost,
-				spendToDate: input.actualCost
-			}
-		});
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
+				data: {
+					status: 'CLOSED',
+					closedAt: now,
+					closedBy: input.userId,
+					resolutionNotes: input.resolutionNotes,
+					actualCost: input.actualCost,
+					spendToDate: input.actualCost
+				}
+			});
 
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: input.workOrderId!,
-				fromStatus: input.previousStatus!,
-				toStatus: 'CLOSED',
-				changedBy: input.userId,
-				notes: `Completion accepted: ${input.resolutionNotes}`
-			}
-		});
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: input.workOrderId!,
+					fromStatus: input.previousStatus!,
+					toStatus: 'CLOSED',
+					changedBy: input.userId,
+					notes: `Completion accepted: ${input.resolutionNotes}`
+				}
+			});
 
-		return wo;
-	});
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Accept work order completion' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -648,28 +680,32 @@ async function acceptWorkOrderCompletion(
 async function requestBoardApprovalForWorkOrder(
 	input: WorkOrderMutationInput
 ): Promise<{ workOrderId: string; voteId: string; boardApprovalStatus: string }> {
-	const result = await prisma.$transaction(async (tx) => {
-		// Create vote for board approval
-		const vote = await tx.vote.create({
-			data: {
-				meetingId: input.meetingId!,
-				question: input.voteQuestion!,
-				method: 'IN_PERSON',
-				createdBy: input.userId
-			}
-		});
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			// Create vote for board approval
+			const vote = await tx.vote.create({
+				data: {
+					meetingId: input.meetingId!,
+					question: input.voteQuestion!,
+					method: 'IN_PERSON',
+					createdBy: input.userId
+				}
+			});
 
-		// Link vote to work order
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				boardApprovalVoteId: vote.id,
-				boardApprovalStatus: 'PENDING'
-			}
-		});
+			// Link vote to work order
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
+				data: {
+					boardApprovalVoteId: vote.id,
+					boardApprovalStatus: 'PENDING'
+				}
+			});
 
-		return { vote, workOrder: wo };
-	});
+			return { vote, workOrder: wo };
+		},
+		{ userId: input.userId, reason: 'Request board approval for work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -703,41 +739,45 @@ async function recordBoardDecisionForWorkOrder(
 	const newStatus = input.approved ? 'AUTHORIZED' : 'CANCELLED';
 	const boardApprovalStatus = input.approved ? 'APPROVED' : 'DENIED';
 
-	const result = await prisma.$transaction(async (tx) => {
-		// Close the vote if it exists
-		if (input.boardApprovalVoteId) {
-			await tx.vote.update({
-				where: { id: input.boardApprovalVoteId },
-				data: { closedAt: now }
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			// Close the vote if it exists
+			if (input.boardApprovalVoteId) {
+				await tx.vote.update({
+					where: { id: input.boardApprovalVoteId },
+					data: { closedAt: now }
+				});
+			}
+
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
+				data: {
+					status: newStatus,
+					boardApprovalStatus,
+					authorizedBy: input.approved ? input.userId : null,
+					authorizedAt: input.approved ? now : null,
+					authorizingRole: input.approved ? 'BOARD' : null,
+					authorizationRationale: input.rationale
+				}
 			});
-		}
 
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				status: newStatus,
-				boardApprovalStatus,
-				authorizedBy: input.approved ? input.userId : null,
-				authorizedAt: input.approved ? now : null,
-				authorizingRole: input.approved ? 'BOARD' : null,
-				authorizationRationale: input.rationale
-			}
-		});
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: input.workOrderId!,
+					fromStatus: input.previousStatus!,
+					toStatus: newStatus,
+					changedBy: input.userId,
+					notes: input.approved
+						? `Board approved: ${input.rationale}`
+						: `Board denied: ${input.rationale}`
+				}
+			});
 
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: input.workOrderId!,
-				fromStatus: input.previousStatus!,
-				toStatus: newStatus,
-				changedBy: input.userId,
-				notes: input.approved
-					? `Board approved: ${input.rationale}`
-					: `Board denied: ${input.rationale}`
-			}
-		});
-
-		return wo;
-	});
+			return wo;
+		},
+		{ userId: input.userId, reason: 'Record board decision for work order' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -771,14 +811,20 @@ async function recordBoardDecisionForWorkOrder(
 async function addWorkOrderComment(
 	input: WorkOrderMutationInput
 ): Promise<{ id: string; comment: string; createdAt: string }> {
-	const commentRecord = await prisma.workOrderComment.create({
-		data: {
-			workOrderId: input.workOrderId!,
-			comment: input.comment!,
-			isInternal: input.isInternal ?? false,
-			authorId: input.userId
-		}
-	});
+	const commentRecord = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.workOrderComment.create({
+				data: {
+					workOrderId: input.workOrderId!,
+					comment: input.comment!,
+					isInternal: input.isInternal ?? false,
+					authorId: input.userId
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Add work order comment' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
@@ -808,75 +854,79 @@ async function createWorkOrderInvoice(
 	const subtotal = (input.laborAmount ?? 0) + (input.materialsAmount ?? 0);
 	const totalAmount = subtotal + (input.taxAmount ?? 0);
 
-	const result = await prisma.$transaction(async (tx) => {
-		// Create AP Invoice with line items
-		const lineItems: Prisma.APInvoiceLineCreateWithoutInvoiceInput[] = [];
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			// Create AP Invoice with line items
+			const lineItems: Prisma.APInvoiceLineCreateWithoutInvoiceInput[] = [];
 
-		if ((input.laborAmount ?? 0) > 0) {
-			lineItems.push({
-				description: 'Labor',
-				quantity: 1,
-				unitPrice: input.laborAmount!,
-				amount: input.laborAmount!,
-				glAccountId: input.glAccountId!,
-				lineNumber: 1
-			});
-		}
+			if ((input.laborAmount ?? 0) > 0) {
+				lineItems.push({
+					description: 'Labor',
+					quantity: 1,
+					unitPrice: input.laborAmount!,
+					amount: input.laborAmount!,
+					glAccountId: input.glAccountId!,
+					lineNumber: 1
+				});
+			}
 
-		if ((input.materialsAmount ?? 0) > 0) {
-			lineItems.push({
-				description: 'Materials',
-				quantity: 1,
-				unitPrice: input.materialsAmount!,
-				amount: input.materialsAmount!,
-				glAccountId: input.glAccountId!,
-				lineNumber: 2
-			});
-		}
+			if ((input.materialsAmount ?? 0) > 0) {
+				lineItems.push({
+					description: 'Materials',
+					quantity: 1,
+					unitPrice: input.materialsAmount!,
+					amount: input.materialsAmount!,
+					glAccountId: input.glAccountId!,
+					lineNumber: 2
+				});
+			}
 
-		const invoice = await tx.aPInvoice.create({
-			data: {
-				associationId: input.associationId,
-				vendorId: input.vendorId!,
-				invoiceNumber: input.invoiceNumber!,
-				invoiceDate: input.invoiceDate!,
-				dueDate: input.dueDate!,
-				subtotal,
-				taxAmount: input.taxAmount ?? 0,
-				totalAmount,
-				balanceDue: totalAmount,
-				status: 'PENDING_APPROVAL',
-				description: input.invoiceDescription || `Work Order ${input.workOrderNumber}: ${input.title}`,
-				workOrderId: input.workOrderId,
-				lineItems: {
-					create: lineItems
+			const invoice = await tx.aPInvoice.create({
+				data: {
+					associationId: input.associationId,
+					vendorId: input.vendorId!,
+					invoiceNumber: input.invoiceNumber!,
+					invoiceDate: input.invoiceDate!,
+					dueDate: input.dueDate!,
+					subtotal,
+					taxAmount: input.taxAmount ?? 0,
+					totalAmount,
+					balanceDue: totalAmount,
+					status: 'PENDING_APPROVAL',
+					description: input.invoiceDescription || `Work Order ${input.workOrderNumber}: ${input.title}`,
+					workOrderId: input.workOrderId,
+					lineItems: {
+						create: lineItems
+					}
 				}
-			}
-		});
+			});
 
-		// Update work order with invoice reference and status
-		const wo = await tx.workOrder.update({
-			where: { id: input.workOrderId },
-			data: {
-				invoiceId: invoice.id,
-				status: 'INVOICED',
-				actualCost: totalAmount
-			}
-		});
+			// Update work order with invoice reference and status
+			const wo = await tx.workOrder.update({
+				where: { id: input.workOrderId },
+				data: {
+					invoiceId: invoice.id,
+					status: 'INVOICED',
+					actualCost: totalAmount
+				}
+			});
 
-		// Record status change
-		await tx.workOrderStatusHistory.create({
-			data: {
-				workOrderId: input.workOrderId!,
-				fromStatus: 'COMPLETED',
-				toStatus: 'INVOICED',
-				changedBy: input.userId,
-				notes: `Invoice ${input.invoiceNumber} created`
-			}
-		});
+			// Record status change
+			await tx.workOrderStatusHistory.create({
+				data: {
+					workOrderId: input.workOrderId!,
+					fromStatus: 'COMPLETED',
+					toStatus: 'INVOICED',
+					changedBy: input.userId,
+					notes: `Invoice ${input.invoiceNumber} created`
+				}
+			});
 
-		return { invoice, workOrder: wo };
-	});
+			return { invoice, workOrder: wo };
+		},
+		{ userId: input.userId, reason: 'Create work order invoice' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,

@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { VendorApprovalStatus } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -49,22 +50,24 @@ async function getLinkAndProfile(vendorId: string, organizationId: string) {
 	return { link, profile };
 }
 
-async function ensureComplianceRecord(vendorId: string, organizationId: string) {
+async function ensureComplianceRecord(vendorId: string, organizationId: string, userId: string) {
 	const existing = await prisma.contractorComplianceStatus.findUnique({
 		where: { vendorId }
 	});
 	if (existing) return existing;
 
 	const { link } = await getLinkAndProfile(vendorId, organizationId);
-	return prisma.contractorComplianceStatus.create({
-		data: {
-			vendorId: link.vendorId,
-			lastCheckedAt: new Date()
-		}
-	});
+	return orgTransaction(organizationId, async (tx) => {
+		return tx.contractorComplianceStatus.create({
+			data: {
+				vendorId: link.vendorId,
+				lastCheckedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'ensureComplianceRecord' });
 }
 
-async function computeCompliance(vendorId: string, organizationId: string, persist = false) {
+async function computeCompliance(vendorId: string, organizationId: string, userId: string, persist = false) {
 	const { link, profile } = await getLinkAndProfile(vendorId, organizationId);
 
 	// Find latest valid license and insurance
@@ -121,16 +124,18 @@ async function computeCompliance(vendorId: string, organizationId: string, persi
 	};
 
 	if (persist) {
-		const existing = await prisma.contractorComplianceStatus.findUnique({ where: { vendorId } });
-		if (existing) {
-			return prisma.contractorComplianceStatus.update({
-				where: { vendorId },
+		return orgTransaction(organizationId, async (tx) => {
+			const existing = await tx.contractorComplianceStatus.findUnique({ where: { vendorId } });
+			if (existing) {
+				return tx.contractorComplianceStatus.update({
+					where: { vendorId },
+					data: status
+				});
+			}
+			return tx.contractorComplianceStatus.create({
 				data: status
 			});
-		}
-		return prisma.contractorComplianceStatus.create({
-			data: status
-		});
+		}, { userId, reason: 'computeCompliance persist' });
 	}
 
 	return status;
@@ -142,8 +147,8 @@ async function refreshCompliance(
 	userId: string,
 	vendorId: string
 ): Promise<Record<string, unknown>> {
-	const result = await computeCompliance(vendorId, organizationId, true);
-	console.log(`[ContractorComplianceWorkflow] REFRESH vendor:${vendorId} by user ${userId}`);
+	const result = await computeCompliance(vendorId, organizationId, userId, true);
+	log.info(`REFRESH vendor:${vendorId} by user ${userId}`);
 	return result as unknown as Record<string, unknown>;
 }
 
@@ -153,22 +158,24 @@ async function setBlock(
 	vendorId: string,
 	data: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-	const existing = await ensureComplianceRecord(vendorId, organizationId);
+	const existing = await ensureComplianceRecord(vendorId, organizationId, userId);
 	const isBlocked = data.isBlocked as boolean;
 	const blockReason = data.blockReason as string | undefined;
 
-	const result = await prisma.contractorComplianceStatus.update({
-		where: { id: existing.id },
-		data: {
-			isBlocked,
-			blockReason: isBlocked ? blockReason ?? 'Blocked by admin' : null,
-			blockedAt: isBlocked ? new Date() : null,
-			blockedBy: isBlocked ? userId : null,
-			lastCheckedAt: new Date()
-		}
-	});
+	const result = await orgTransaction(organizationId, async (tx) => {
+		return tx.contractorComplianceStatus.update({
+			where: { id: existing.id },
+			data: {
+				isBlocked,
+				blockReason: isBlocked ? blockReason ?? 'Blocked by admin' : null,
+				blockedAt: isBlocked ? new Date() : null,
+				blockedBy: isBlocked ? userId : null,
+				lastCheckedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'setBlock' });
 
-	console.log(`[ContractorComplianceWorkflow] SET_BLOCK vendor:${vendorId} blocked:${isBlocked} by user ${userId}`);
+	log.info(`SET_BLOCK vendor:${vendorId} blocked:${isBlocked} by user ${userId}`);
 	return result as unknown as Record<string, unknown>;
 }
 
@@ -180,29 +187,31 @@ async function linkHoaApproval(
 ): Promise<Record<string, unknown>> {
 	const { link } = await getLinkAndProfile(vendorId, organizationId);
 
-	await prisma.vendor.update({
-		where: { id: vendorId },
-		data: {
-			approvalStatus: data.approvalStatus as VendorApprovalStatus,
-			insuranceVerified: data.insuranceVerified as boolean | undefined,
-			licenseVerified: data.licenseVerified as boolean | undefined,
-			complianceNotes: data.complianceNotes as string | undefined,
-			approvedBy: userId,
-			approvedAt: new Date()
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.vendor.update({
+			where: { id: vendorId },
+			data: {
+				approvalStatus: data.approvalStatus as VendorApprovalStatus,
+				insuranceVerified: data.insuranceVerified as boolean | undefined,
+				licenseVerified: data.licenseVerified as boolean | undefined,
+				complianceNotes: data.complianceNotes as string | undefined,
+				approvedBy: userId,
+				approvedAt: new Date()
+			}
+		});
 
-	await prisma.serviceProviderLink.update({
-		where: { id: link.id },
-		data: {
-			status: data.approvalStatus === 'REJECTED' ? 'REVOKED' : 'VERIFIED',
-			linkedAt: new Date(),
-			linkedBy: userId
-		}
-	});
+		await tx.serviceProviderLink.update({
+			where: { id: link.id },
+			data: {
+				status: data.approvalStatus === 'REJECTED' ? 'REVOKED' : 'VERIFIED',
+				linkedAt: new Date(),
+				linkedBy: userId
+			}
+		});
+	}, { userId, reason: 'linkHoaApproval' });
 
-	const result = await computeCompliance(vendorId, organizationId, true);
-	console.log(`[ContractorComplianceWorkflow] LINK_HOA_APPROVAL vendor:${vendorId} status:${data.approvalStatus} by user ${userId}`);
+	const result = await computeCompliance(vendorId, organizationId, userId, true);
+	log.info(`LINK_HOA_APPROVAL vendor:${vendorId} status:${data.approvalStatus} by user ${userId}`);
 	return result as unknown as Record<string, unknown>;
 }
 
@@ -241,7 +250,7 @@ async function contractorComplianceWorkflow(input: ContractorComplianceWorkflowI
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ContractorComplianceWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

@@ -3,7 +3,7 @@ import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } 
 import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema } from '../router.js';
 import { prisma } from '../../db.js';
 import type { Prisma, OrganizationType, OrganizationStatus } from '../../../../../generated/prisma/client.js';
-import { recordActivityEvent, recordActivityFromContext } from '../middleware/activityEvent.js';
+import { recordActivityEvent, recordActivityFromContext, recordWorkflowEvent } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
 import { setOrgContext } from '../../db/rls.js';
 import { startOrganizationWorkflow } from '../../workflows/index.js';
@@ -102,14 +102,10 @@ export const organizationRouter = {
 				status: createResult.organizationStatus as OrganizationStatus
 			};
 
-			// Set org context to the newly created org so subsequent RLS-protected queries work
-			await setOrgContext(organization.id, {
-				userId: context.user!.id,
-				reason: 'Organization creation - setting initial context'
-			});
-
 			// Record activity event for organization creation
-			await recordActivityEvent({
+			// Use recordWorkflowEvent which bypasses RLS via SECURITY DEFINER function
+			// This is necessary because the user doesn't have RLS access to the new org yet
+			await recordWorkflowEvent({
 				organizationId: organization.id,
 				entityType: 'ORGANIZATION',
 				entityId: organization.id,
@@ -118,12 +114,20 @@ export const organizationRouter = {
 				summary: `Organization "${organization.name}" created (${organization.type})`,
 				performedById: context.user!.id,
 				performedByType: 'HUMAN',
+				workflowId: input.idempotencyKey,
+				workflowStep: 'organization_created',
 				newState: {
 					name: organization.name,
 					slug: organization.slug,
 					type: organization.type,
 					status: organization.status
 				}
+			});
+
+			// Set org context to the newly created org so subsequent RLS-protected queries work
+			await setOrgContext(organization.id, {
+				userId: context.user!.id,
+				reason: 'Organization creation - setting initial context'
 			});
 
 			// For self-managed HOAs (COMMUNITY_ASSOCIATION), auto-create the association
@@ -153,7 +157,8 @@ export const organizationRouter = {
 					});
 
 					// Record activity event for association creation
-					await recordActivityEvent({
+					// Use recordWorkflowEvent which bypasses RLS via SECURITY DEFINER function
+					await recordWorkflowEvent({
 						organizationId: organization.id,
 						entityType: 'ASSOCIATION',
 						entityId: assocResult.associationId,
@@ -162,6 +167,8 @@ export const organizationRouter = {
 						summary: `Association "${organization.name}" auto-created during onboarding`,
 						performedById: context.user!.id,
 						performedByType: 'HUMAN',
+						workflowId: `${input.idempotencyKey}-assoc`,
+						workflowStep: 'association_created',
 						associationId: assocResult.associationId,
 						newState: {
 							name: organization.name,
@@ -301,24 +308,30 @@ export const organizationRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			// Verify user has access to this organization
-			const membership = await prisma.userOrganization.findUnique({
-				where: {
-					userId_organizationId: {
-						userId: context.user!.id,
-						organizationId: input.organizationId
-					}
-				}
-			});
+			// Use raw query to bypass RLS since user_organizations table has RLS
+			// and we need to look up memberships across all orgs the user belongs to
+			const memberships = await prisma.$queryRaw<{ id: string; organization_id: string }[]>`
+				SELECT id, organization_id 
+				FROM user_organizations 
+				WHERE user_id = ${context.user!.id} 
+				AND organization_id = ${input.organizationId}
+				LIMIT 1
+			`;
+			const membership = memberships[0] ?? null;
 
 			if (!membership) {
 				throw errors.FORBIDDEN({ message: 'You do not have access to this organization' });
 			}
 
-			// Get current default org for activity event
-			const currentDefault = await prisma.userOrganization.findFirst({
-				where: { userId: context.user!.id, isDefault: true },
-				include: { organization: true }
-			});
+			// Get current default org for activity event (bypass RLS)
+			const currentDefaults = await prisma.$queryRaw<{ organization_id: string; org_name: string }[]>`
+				SELECT uo.organization_id, o.name as org_name
+				FROM user_organizations uo
+				JOIN organizations o ON o.id = uo.organization_id
+				WHERE uo.user_id = ${context.user!.id} AND uo.is_default = true
+				LIMIT 1
+			`;
+			const currentDefault = currentDefaults[0] ?? null;
 
 			// Clear existing default and set new one via workflow
 			const setDefaultResult = await startOrganizationWorkflow(
@@ -336,14 +349,14 @@ export const organizationRouter = {
 				throw errors.FORBIDDEN({ message: setDefaultResult.error || 'Failed to set default organization' });
 			}
 
-			// Get new org details for activity event
+			// Get new org details for activity event (organizations table has no RLS)
 			const newOrg = await prisma.organization.findUnique({
 				where: { id: input.organizationId }
 			});
 
-			// Record activity event for context switch
+			// Record activity event for context switch using recordWorkflowEvent to bypass RLS
 			if (newOrg) {
-				await recordActivityEvent({
+				await recordWorkflowEvent({
 					organizationId: newOrg.id,
 					entityType: 'USER',
 					entityId: context.user!.id,
@@ -352,9 +365,11 @@ export const organizationRouter = {
 					summary: `User switched organization context to "${newOrg.name}"`,
 					performedById: context.user!.id,
 					performedByType: 'HUMAN',
+					workflowId: input.idempotencyKey,
+					workflowStep: 'set_default_organization',
 					previousState: currentDefault ? {
-						defaultOrganizationId: currentDefault.organizationId,
-						defaultOrganizationName: currentDefault.organization.name
+						defaultOrganizationId: currentDefault.organization_id,
+						defaultOrganizationName: currentDefault.org_name
 					} : undefined,
 					newState: {
 						defaultOrganizationId: newOrg.id,

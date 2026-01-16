@@ -78,6 +78,7 @@
 
 		try {
 			const response = await associationApi.update({
+				idempotencyKey: crypto.randomUUID(),
 				id: association.id,
 				name: formData.name,
 				legalName: formData.legalName || undefined,

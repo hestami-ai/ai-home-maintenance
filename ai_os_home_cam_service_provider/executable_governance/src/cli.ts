@@ -9,6 +9,7 @@ import { verifyPolicies } from './checks/policies.ts';
 import { verifyTimestamps } from './checks/timestamps.ts';
 import { verifySecurity } from './checks/security.ts';
 import { verifyDeepTrace } from './checks/trace.ts';
+import { verifyRls } from './checks/rls.ts';
 import { printReport, type Report, type Violation } from './reporting/index.ts';
 import path from 'path';
 
@@ -87,19 +88,29 @@ program
             }
 
             if (check === 'trace' || check === 'rules') {
-                process.stdout.write('Checking deep semantic trace (R10)... ');
+                process.stdout.write('Checking deep semantic trace (R11)... ');
                 const traceViolations = await verifyDeepTrace(config);
                 violations.push(...traceViolations);
                 console.log(traceViolations.length === 0 ? '✔' : '✖');
             }
 
+            if (check === 'rls' || check === 'rules') {
+                process.stdout.write('Checking RLS defense in depth (R12)... ');
+                const rlsViolations = await verifyRls(config);
+                violations.push(...rlsViolations);
+                console.log(rlsViolations.length === 0 ? '✔' : '✖');
+            }
+
             // Add more checks here as they are implemented
-            if (check !== 'boundaries' && check !== 'mutations' && check !== 'types' && check !== 'pipelines' && check !== 'errors' && check !== 'policies' && check !== 'timestamps' && check !== 'security' && check !== 'trace' && check !== 'rules') {
+            if (check !== 'boundaries' && check !== 'mutations' && check !== 'types' && check !== 'pipelines' && check !== 'errors' && check !== 'policies' && check !== 'timestamps' && check !== 'security' && check !== 'trace' && check !== 'rls' && check !== 'rules') {
                 console.warn(`Check '${check}' is not yet implemented.`);
             }
 
+            // Only count errors (not warnings/info) for pass/fail status
+            const errorCount = violations.filter(v => !v.severity || v.severity === 'error').length;
+            
             const report: Report = {
-                status: violations.length === 0 ? 'pass' : 'fail',
+                status: errorCount === 0 ? 'pass' : 'fail',
                 violations
             };
 

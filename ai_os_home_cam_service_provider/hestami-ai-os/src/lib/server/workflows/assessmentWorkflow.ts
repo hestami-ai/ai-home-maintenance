@@ -6,14 +6,16 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { postAssessmentChargeToGL } from '../accounting/index.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import { createModuleLogger } from '../logger.js';
 import type { AssessmentFrequency } from '../../../../generated/prisma/client.js';
 
+const log = createModuleLogger('assessmentWorkflow');
 const WORKFLOW_STATUS_EVENT = 'assessment_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'assessment_workflow_error';
 
@@ -69,28 +71,30 @@ export interface AssessmentWorkflowResult extends EntityWorkflowResult {
 async function createAssessmentType(
 	input: AssessmentWorkflowInput
 ): Promise<{ id: string; name: string; code: string; frequency: string; defaultAmount: string }> {
-	const assessmentType = await prisma.assessmentType.create({
-		data: {
-			organizationId: input.organizationId,
-			associationId: input.associationId!,
-			name: input.name!,
-			description: input.description,
-			code: input.code!,
-			frequency: input.frequency!,
-			defaultAmount: input.defaultAmount!,
-			revenueAccountId: input.revenueAccountId!,
-			lateFeeAccountId: input.lateFeeAccountId,
-			lateFeeAmount: input.lateFeeAmount,
-			lateFeePercent: input.lateFeePercent,
-			gracePeriodDays: input.gracePeriodDays ?? 15,
-			prorateOnTransfer: input.prorateOnTransfer ?? true
-		}
-	});
+	const assessmentType = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.assessmentType.create({
+			data: {
+				organizationId: input.organizationId,
+				associationId: input.associationId!,
+				name: input.name!,
+				description: input.description,
+				code: input.code!,
+				frequency: input.frequency!,
+				defaultAmount: input.defaultAmount!,
+				revenueAccountId: input.revenueAccountId!,
+				lateFeeAccountId: input.lateFeeAccountId,
+				lateFeeAmount: input.lateFeeAmount,
+				lateFeePercent: input.lateFeePercent,
+				gracePeriodDays: input.gracePeriodDays ?? 15,
+				prorateOnTransfer: input.prorateOnTransfer ?? true
+			}
+		});
+	}, { userId: input.userId, reason: 'Create assessment type' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ASSESSMENT_TYPE',
+		entityType: 'ASSESSMENT',
 		entityId: assessmentType.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -115,22 +119,24 @@ async function createAssessmentType(
 async function createAssessmentCharge(
 	input: AssessmentWorkflowInput
 ): Promise<{ id: string; amount: string; dueDate: string; status: string }> {
-	const charge = await prisma.assessmentCharge.create({
-		data: {
-			associationId: input.associationId!,
-			unitId: input.unitId!,
-			assessmentTypeId: input.assessmentTypeId!,
-			chargeDate: new Date(input.chargeDate!),
-			dueDate: new Date(input.dueDate!),
-			periodStart: input.periodStart ? new Date(input.periodStart) : null,
-			periodEnd: input.periodEnd ? new Date(input.periodEnd) : null,
-			amount: input.amount!,
-			totalAmount: input.amount!,
-			balanceDue: input.amount!,
-			description: input.description,
-			status: 'BILLED'
-		}
-	});
+	const charge = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.assessmentCharge.create({
+			data: {
+				associationId: input.associationId!,
+				unitId: input.unitId!,
+				assessmentTypeId: input.assessmentTypeId!,
+				chargeDate: new Date(input.chargeDate!),
+				dueDate: new Date(input.dueDate!),
+				periodStart: input.periodStart ? new Date(input.periodStart) : null,
+				periodEnd: input.periodEnd ? new Date(input.periodEnd) : null,
+				amount: input.amount!,
+				totalAmount: input.amount!,
+				balanceDue: input.amount!,
+				description: input.description,
+				status: 'BILLED'
+			}
+		});
+	}, { userId: input.userId, reason: 'Create assessment charge' });
 
 	// Post to GL if requested
 	if (input.postToGL) {
@@ -150,7 +156,7 @@ async function createAssessmentCharge(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ASSESSMENT_CHARGE',
+		entityType: 'ASSESSMENT',
 		entityId: charge.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -276,5 +282,6 @@ export async function startAssessmentWorkflow(
 	input: AssessmentWorkflowInput,
 	idempotencyKey: string
 ): Promise<AssessmentWorkflowResult> {
-	return DBOS.startWorkflow(assessmentWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(assessmentWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

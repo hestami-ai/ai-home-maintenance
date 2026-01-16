@@ -28,7 +28,7 @@ export const appealRouter = {
 			hearingId: z.string(),
 			reason: z.string().min(10).max(5000),
 			documentsJson: z.string().optional(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),
@@ -211,7 +211,7 @@ export const appealRouter = {
 			id: z.string(),
 			appealHearingDate: z.string().datetime(),
 			appealHearingLocation: z.string().max(500).optional(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),
@@ -274,7 +274,7 @@ export const appealRouter = {
 			status: AppealDecisionSchema,
 			decisionNotes: z.string().max(5000).optional(),
 			revisedFineAmount: z.number().min(0).optional(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),
@@ -337,7 +337,7 @@ export const appealRouter = {
 	withdraw: orgProcedure
 		.input(z.object({
 			id: z.string(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),

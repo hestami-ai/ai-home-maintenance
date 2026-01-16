@@ -1,4 +1,5 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
+import { orgTransaction } from '../db/rls.js';
 import { prisma } from '../db.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import {
@@ -103,21 +104,27 @@ async function createTemplate(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const template = await prisma.communicationTemplate.create({
-		data: {
-			associationId: data.associationId as string,
-			name: data.name as string,
-			type: data.type as any,
-			channel: data.channel as any,
-			subject: data.subject as string | undefined,
-			body: data.body as string,
-			variables: data.variables as Prisma.InputJsonValue | undefined,
-			createdBy: userId
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const template = await tx.communicationTemplate.create({
+				data: {
+					associationId: data.associationId as string,
+					name: data.name as string,
+					type: data.type as any,
+					channel: data.channel as any,
+					subject: data.subject as string | undefined,
+					body: data.body as string,
+					variables: data.variables as Prisma.InputJsonValue | undefined,
+					createdBy: userId
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_TEMPLATE template:${template.id} by user ${userId}`);
-	return template.id;
+			log.info(`CREATE_TEMPLATE template:${template.id} by user ${userId}`);
+			return template.id;
+		},
+		{ userId, reason: 'Creating communication template' }
+	);
 }
 
 async function createTemplateVersion(
@@ -128,26 +135,32 @@ async function createTemplateVersion(
 	const templateId = data.templateId as string;
 	const versionStr = data.version as string;
 
-	// Check for existing version (idempotency)
+	// Check for existing version (idempotency) - read operation outside transaction is OK
 	const existing = await prisma.communicationTemplateVersion.findFirst({
 		where: { templateId, version: versionStr }
 	});
 	if (existing) return existing.id;
 
-	const version = await prisma.communicationTemplateVersion.create({
-		data: {
-			templateId,
-			version: versionStr,
-			subject: data.subject as string | undefined,
-			body: data.body as string,
-			variables: data.variables as Prisma.InputJsonValue | undefined,
-			status: (data.status as any) || 'DRAFT',
-			createdBy: userId
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const version = await tx.communicationTemplateVersion.create({
+				data: {
+					templateId,
+					version: versionStr,
+					subject: data.subject as string | undefined,
+					body: data.body as string,
+					variables: data.variables as Prisma.InputJsonValue | undefined,
+					status: (data.status as any) || 'DRAFT',
+					createdBy: userId
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_TEMPLATE_VERSION version:${version.id} template:${templateId} by user ${userId}`);
-	return version.id;
+			log.info(`CREATE_TEMPLATE_VERSION version:${version.id} template:${templateId} by user ${userId}`);
+			return version.id;
+		},
+		{ userId, reason: 'Creating template version' }
+	);
 }
 
 async function activateTemplateVersion(
@@ -163,24 +176,28 @@ async function activateTemplateVersion(
 	});
 	if (!targetVersion) throw new Error('Template version not found');
 
-	// Retire all active versions and activate the target
-	await prisma.$transaction([
-		prisma.communicationTemplateVersion.updateMany({
-			where: { templateId, status: 'ACTIVE' },
-			data: { status: 'RETIRED' }
-		}),
-		prisma.communicationTemplateVersion.update({
-			where: { id: targetVersion.id },
-			data: { status: 'ACTIVE' }
-		}),
-		prisma.communicationTemplate.update({
-			where: { id: templateId },
-			data: { currentVersion: versionStr }
-		})
-	]);
+	// Retire all active versions and activate the target within RLS context
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			await tx.communicationTemplateVersion.updateMany({
+				where: { templateId, status: 'ACTIVE' },
+				data: { status: 'RETIRED' }
+			});
+			await tx.communicationTemplateVersion.update({
+				where: { id: targetVersion.id },
+				data: { status: 'ACTIVE' }
+			});
+			await tx.communicationTemplate.update({
+				where: { id: templateId },
+				data: { currentVersion: versionStr }
+			});
 
-	console.log(`[CommunicationWorkflow] ACTIVATE_TEMPLATE_VERSION template:${templateId} version:${versionStr} by user ${userId}`);
-	return templateId;
+			log.info(`ACTIVATE_TEMPLATE_VERSION template:${templateId} version:${versionStr} by user ${userId}`);
+			return templateId;
+		},
+		{ userId, reason: 'Activating template version' }
+	);
 }
 
 async function createMassCommunication(
@@ -188,22 +205,28 @@ async function createMassCommunication(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const comm = await prisma.massCommunication.create({
-		data: {
-			associationId: data.associationId as string,
-			templateId: data.templateId as string | undefined,
-			subject: data.subject as string | undefined,
-			body: data.body as string,
-			channel: data.channel as any,
-			status: (data.status as any) || 'DRAFT',
-			scheduledFor: data.scheduledFor ? new Date(data.scheduledFor as string) : undefined,
-			targetFilter: data.targetFilter as Prisma.InputJsonValue | undefined,
-			createdBy: userId
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const comm = await tx.massCommunication.create({
+				data: {
+					associationId: data.associationId as string,
+					templateId: data.templateId as string | undefined,
+					subject: data.subject as string | undefined,
+					body: data.body as string,
+					channel: data.channel as any,
+					status: (data.status as any) || 'DRAFT',
+					scheduledFor: data.scheduledFor ? new Date(data.scheduledFor as string) : undefined,
+					targetFilter: data.targetFilter as Prisma.InputJsonValue | undefined,
+					createdBy: userId
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_MASS_COMMUNICATION comm:${comm.id} by user ${userId}`);
-	return comm.id;
+			log.info(`CREATE_MASS_COMMUNICATION comm:${comm.id} by user ${userId}`);
+			return comm.id;
+		},
+		{ userId, reason: 'Creating mass communication' }
+	);
 }
 
 async function createDeliveryLog(
@@ -211,19 +234,25 @@ async function createDeliveryLog(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const delivery = await prisma.massCommunicationDelivery.create({
-		data: {
-			massCommunicationId: data.massCommunicationId as string,
-			recipient: data.recipient as string,
-			channel: data.channel as any,
-			status: (data.status as any) || 'PENDING',
-			sentAt: data.sentAt ? new Date(data.sentAt as string) : undefined,
-			errorMessage: data.errorMessage as string | undefined
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const delivery = await tx.massCommunicationDelivery.create({
+				data: {
+					massCommunicationId: data.massCommunicationId as string,
+					recipient: data.recipient as string,
+					channel: data.channel as any,
+					status: (data.status as any) || 'PENDING',
+					sentAt: data.sentAt ? new Date(data.sentAt as string) : undefined,
+					errorMessage: data.errorMessage as string | undefined
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_DELIVERY_LOG delivery:${delivery.id} by user ${userId}`);
-	return delivery.id;
+			log.info(`CREATE_DELIVERY_LOG delivery:${delivery.id} by user ${userId}`);
+			return delivery.id;
+		},
+		{ userId, reason: 'Creating delivery log' }
+	);
 }
 
 async function updateDeliveryStatus(
@@ -236,17 +265,23 @@ async function updateDeliveryStatus(
 		where: { id: deliveryId }
 	});
 
-	const updated = await prisma.massCommunicationDelivery.update({
-		where: { id: deliveryId },
-		data: {
-			status: data.status as any,
-			sentAt: data.sentAt ? new Date(data.sentAt as string) : existing.sentAt,
-			errorMessage: (data.errorMessage as string | undefined) ?? existing.errorMessage
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const updated = await tx.massCommunicationDelivery.update({
+				where: { id: deliveryId },
+				data: {
+					status: data.status as any,
+					sentAt: data.sentAt ? new Date(data.sentAt as string) : existing.sentAt,
+					errorMessage: (data.errorMessage as string | undefined) ?? existing.errorMessage
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] UPDATE_DELIVERY_STATUS delivery:${deliveryId} status:${data.status} by user ${userId}`);
-	return updated.id;
+			log.info(`UPDATE_DELIVERY_STATUS delivery:${deliveryId} status:${data.status} by user ${userId}`);
+			return updated.id;
+		},
+		{ userId, reason: 'Updating delivery status' }
+	);
 }
 
 async function createAnnouncement(
@@ -254,21 +289,27 @@ async function createAnnouncement(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const ann = await prisma.announcement.create({
-		data: {
-			associationId: data.associationId as string,
-			title: data.title as string,
-			content: data.content as string,
-			status: (data.status as any) || 'DRAFT',
-			publishedAt: data.publishedAt ? new Date(data.publishedAt as string) : undefined,
-			expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
-			audience: data.audience as Prisma.InputJsonValue | undefined,
-			createdBy: userId
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const ann = await tx.announcement.create({
+				data: {
+					associationId: data.associationId as string,
+					title: data.title as string,
+					content: data.content as string,
+					status: (data.status as any) || 'DRAFT',
+					publishedAt: data.publishedAt ? new Date(data.publishedAt as string) : undefined,
+					expiresAt: data.expiresAt ? new Date(data.expiresAt as string) : undefined,
+					audience: data.audience as Prisma.InputJsonValue | undefined,
+					createdBy: userId
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_ANNOUNCEMENT announcement:${ann.id} by user ${userId}`);
-	return ann.id;
+			log.info(`CREATE_ANNOUNCEMENT announcement:${ann.id} by user ${userId}`);
+			return ann.id;
+		},
+		{ userId, reason: 'Creating announcement' }
+	);
 }
 
 async function markAnnouncementRead(
@@ -285,15 +326,21 @@ async function markAnnouncementRead(
 	});
 	if (existing) return existing.id;
 
-	const read = await prisma.announcementRead.create({
-		data: {
-			announcementId,
-			partyId
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const read = await tx.announcementRead.create({
+				data: {
+					announcementId,
+					partyId
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] MARK_ANNOUNCEMENT_READ announcement:${announcementId} party:${partyId} by user ${userId}`);
-	return read.id;
+			log.info(`MARK_ANNOUNCEMENT_READ announcement:${announcementId} party:${partyId} by user ${userId}`);
+			return read.id;
+		},
+		{ userId, reason: 'Marking announcement as read' }
+	);
 }
 
 async function createEvent(
@@ -301,24 +348,30 @@ async function createEvent(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const ev = await prisma.calendarEvent.create({
-		data: {
-			associationId: data.associationId as string,
-			type: data.type as any,
-			title: data.title as string,
-			description: data.description as string | undefined,
-			startsAt: new Date(data.startsAt as string),
-			endsAt: data.endsAt ? new Date(data.endsAt as string) : undefined,
-			location: data.location as string | undefined,
-			recurrenceRule: data.recurrenceRule as string | undefined,
-			notifyAt: data.notifyAt ? new Date(data.notifyAt as string) : undefined,
-			metadata: data.metadata as Prisma.InputJsonValue | undefined,
-			createdBy: userId
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const ev = await tx.calendarEvent.create({
+				data: {
+					associationId: data.associationId as string,
+					type: data.type as any,
+					title: data.title as string,
+					description: data.description as string | undefined,
+					startsAt: new Date(data.startsAt as string),
+					endsAt: data.endsAt ? new Date(data.endsAt as string) : undefined,
+					location: data.location as string | undefined,
+					recurrenceRule: data.recurrenceRule as string | undefined,
+					notifyAt: data.notifyAt ? new Date(data.notifyAt as string) : undefined,
+					metadata: data.metadata as Prisma.InputJsonValue | undefined,
+					createdBy: userId
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_EVENT event:${ev.id} by user ${userId}`);
-	return ev.id;
+			log.info(`CREATE_EVENT event:${ev.id} by user ${userId}`);
+			return ev.id;
+		},
+		{ userId, reason: 'Creating calendar event' }
+	);
 }
 
 async function createEventNotification(
@@ -326,19 +379,25 @@ async function createEventNotification(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const notification = await prisma.calendarEventNotification.create({
-		data: {
-			associationId: data.associationId as string,
-			eventId: data.eventId as string,
-			notifyAt: new Date(data.notifyAt as string),
-			status: 'PENDING',
-			channel: data.channel as any | undefined,
-			payload: data.payload as Prisma.InputJsonValue | undefined
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const notification = await tx.calendarEventNotification.create({
+				data: {
+					associationId: data.associationId as string,
+					eventId: data.eventId as string,
+					notifyAt: new Date(data.notifyAt as string),
+					status: 'PENDING',
+					channel: data.channel as any | undefined,
+					payload: data.payload as Prisma.InputJsonValue | undefined
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] CREATE_EVENT_NOTIFICATION notification:${notification.id} event:${data.eventId} by user ${userId}`);
-	return notification.id;
+			log.info(`CREATE_EVENT_NOTIFICATION notification:${notification.id} event:${data.eventId} by user ${userId}`);
+			return notification.id;
+		},
+		{ userId, reason: 'Creating event notification' }
+	);
 }
 
 async function updateEventNotificationStatus(
@@ -351,17 +410,23 @@ async function updateEventNotificationStatus(
 		where: { id: notificationId }
 	});
 
-	const updated = await prisma.calendarEventNotification.update({
-		where: { id: notificationId },
-		data: {
-			status: data.status as any,
-			sentAt: data.sentAt ? new Date(data.sentAt as string) : existing.sentAt,
-			errorMessage: (data.errorMessage as string | undefined) ?? existing.errorMessage
-		}
-	});
+	return orgTransaction(
+		organizationId,
+		async (tx) => {
+			const updated = await tx.calendarEventNotification.update({
+				where: { id: notificationId },
+				data: {
+					status: data.status as any,
+					sentAt: data.sentAt ? new Date(data.sentAt as string) : existing.sentAt,
+					errorMessage: (data.errorMessage as string | undefined) ?? existing.errorMessage
+				}
+			});
 
-	console.log(`[CommunicationWorkflow] UPDATE_EVENT_NOTIFICATION_STATUS notification:${notificationId} status:${data.status} by user ${userId}`);
-	return updated.id;
+			log.info(`UPDATE_EVENT_NOTIFICATION_STATUS notification:${notificationId} status:${data.status} by user ${userId}`);
+			return updated.id;
+		},
+		{ userId, reason: 'Updating event notification status' }
+	);
 }
 
 // Main workflow function
@@ -455,7 +520,7 @@ async function communicationWorkflow(input: CommunicationWorkflowInput): Promise
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[CommunicationWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

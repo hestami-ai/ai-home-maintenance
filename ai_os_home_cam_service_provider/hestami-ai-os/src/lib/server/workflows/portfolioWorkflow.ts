@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -71,18 +71,24 @@ async function createPortfolio(
 	isActive: boolean;
 	createdAt: string;
 }> {
-	const portfolio = await prisma.propertyPortfolio.create({
-		data: {
-			organizationId: input.organizationId,
-			name: input.name!,
-			description: input.description ?? null,
-			settings: (input.settings ?? {}) as Prisma.InputJsonValue
-		}
-	});
+	const portfolio = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.propertyPortfolio.create({
+				data: {
+					organizationId: input.organizationId,
+					name: input.name!,
+					description: input.description ?? null,
+					settings: (input.settings ?? {}) as Prisma.InputJsonValue
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PROPERTY_PORTFOLIO',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolio.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -113,19 +119,25 @@ async function updatePortfolio(
 	isActive: boolean;
 	updatedAt: string;
 }> {
-	const portfolio = await prisma.propertyPortfolio.update({
-		where: { id: input.portfolioId },
-		data: {
-			...(input.name !== undefined && { name: input.name }),
-			...(input.description !== undefined && { description: input.description }),
-			...(input.settings !== undefined && { settings: input.settings as Prisma.InputJsonValue }),
-			...(input.isActive !== undefined && { isActive: input.isActive })
-		}
-	});
+	const portfolio = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.propertyPortfolio.update({
+				where: { id: input.portfolioId },
+				data: {
+					...(input.name !== undefined && { name: input.name }),
+					...(input.description !== undefined && { description: input.description }),
+					...(input.settings !== undefined && { settings: input.settings as Prisma.InputJsonValue }),
+					...(input.isActive !== undefined && { isActive: input.isActive })
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Update portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PROPERTY_PORTFOLIO',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolio.id,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -153,14 +165,20 @@ async function deletePortfolio(
 	userId: string
 ): Promise<{ deletedAt: string }> {
 	const now = new Date();
-	await prisma.propertyPortfolio.update({
-		where: { id: portfolioId },
-		data: { deletedAt: now }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.propertyPortfolio.update({
+				where: { id: portfolioId },
+				data: { deletedAt: now }
+			});
+		},
+		{ userId, reason: 'Delete portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'PROPERTY_PORTFOLIO',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolioId,
 		action: 'DELETE',
 		eventCategory: 'EXECUTION',
@@ -185,19 +203,25 @@ async function addPropertyToPortfolio(
 	displayOrder: number | null;
 	addedAt: string;
 }> {
-	const portfolioProperty = await prisma.portfolioProperty.create({
-		data: {
-			portfolioId: input.portfolioId!,
-			propertyId: input.propertyId!,
-			displayOrder: input.displayOrder,
-			notes: input.notes,
-			addedBy: input.userId
-		}
-	});
+	const portfolioProperty = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.portfolioProperty.create({
+				data: {
+					portfolioId: input.portfolioId!,
+					propertyId: input.propertyId!,
+					displayOrder: input.displayOrder,
+					notes: input.notes,
+					addedBy: input.userId
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Add property to portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PORTFOLIO_PROPERTY',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolioProperty.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -225,14 +249,20 @@ async function removePropertyFromPortfolio(
 	userId: string
 ): Promise<{ removedAt: string }> {
 	const now = new Date();
-	await prisma.portfolioProperty.update({
-		where: { id: portfolioPropertyId },
-		data: { removedAt: now }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.portfolioProperty.update({
+				where: { id: portfolioPropertyId },
+				data: { removedAt: now }
+			});
+		},
+		{ userId, reason: 'Remove property from portfolio' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'PORTFOLIO_PROPERTY',
+		entityType: 'INDIVIDUAL_PROPERTY',
 		entityId: portfolioPropertyId,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',

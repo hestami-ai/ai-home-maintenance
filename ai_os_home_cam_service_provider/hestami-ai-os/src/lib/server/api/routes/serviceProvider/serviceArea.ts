@@ -66,14 +66,14 @@ export const serviceAreaRouter = {
 						centerLng: input.centerLng
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create service area' });
 			}
 
-			const serviceArea = await prisma.serviceArea.findUniqueOrThrow({ where: { id: result.entityId } });
+			const serviceArea = await prisma.serviceArea.findFirstOrThrow({ where: { id: result.entityId, serviceProviderOrgId: context.organization.id } });
 
 			return successResponse({
 				serviceArea: {
@@ -184,14 +184,14 @@ export const serviceAreaRouter = {
 						isActive: input.isActive
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update service area' });
 			}
 
-			const serviceArea = await prisma.serviceArea.findUniqueOrThrow({ where: { id: result.entityId } });
+			const serviceArea = await prisma.serviceArea.findFirstOrThrow({ where: { id: result.entityId, serviceProviderOrgId: context.organization.id } });
 
 			return successResponse({
 				serviceArea: {
@@ -232,7 +232,7 @@ export const serviceAreaRouter = {
 					serviceAreaId: input.id,
 					data: {}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {

@@ -91,7 +91,7 @@ export const insuranceRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update insurance' });
 			}
 
-			const insurance = await prisma.contractorInsurance.findUniqueOrThrow({ where: { id: result.entityId } });
+			const insurance = await prisma.contractorInsurance.findFirstOrThrow({ where: { id: result.entityId, contractorProfile: { organizationId: context.organization.id } } });
 
 			return successResponse({ insurance: serializeInsurance(insurance) }, context);
 		}),

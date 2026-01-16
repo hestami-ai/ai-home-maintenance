@@ -179,23 +179,55 @@ export interface OrganizationContext {
 
 All API responses use typed Zod schemas. Use `ResponseMetaSchema` for metadata—never `z.any()`.
 
-### **9\. RLS & SECURITY DEFINER**
+### **9\. RLS & Prisma Connection Pooling (Critical)**
+
+**The Problem**: Prisma uses connection pooling. Setting PostgreSQL session variables (like `app.current_org_id` for RLS) on one connection doesn't guarantee subsequent queries use that same connection. This causes intermittent data visibility issues where queries return 0 results despite data existing.
+
+**The Solution**: `withRLSContext()` + `withRLSInjection()` in `src/lib/server/db.ts`
+
+typescript
+// In API handlers (router.ts orgProcedure middleware)
+return withRLSContext(
+  { organizationId, userId, associationId, isStaff },
+  () => next({ context })
+);
+
+// All Prisma queries within the callback automatically:
+// 1. Run in an interactive transaction (same connection)
+// 2. Set RLS context before the query
+// 3. Clear RLS context after the query (prevents pool contamination)
+
+**How it works**:
+- `withRLSContext()` uses `AsyncLocalStorage` to propagate RLS context across async boundaries
+- `withRLSInjection()` is a Prisma extension that intercepts all model operations
+- Each query is wrapped in `prisma.$transaction()` ensuring context SET and query run on same connection
+- Uses `tx[modelName][operation](args)` instead of `query(args)` to ensure query runs on transaction client
+
+**Defense in depth**:
+1. **With RLS context**: Set context → run query → clear context (prevents stale context on pooled connections)
+2. **Without RLS context**: Clear any stale context before query (prevents cross-org data leakage)
+
+**Critical**: Never call `query(args)` inside the transaction—it runs on the original client's connection pool, NOT the transaction client. Always use `tx[modelName][operation](args)`.
+
+**Debugging**: Debug logging in `withRLSInjection` shows context setting/verification. Look for `expectedOrgId` vs `actualOrgId` mismatch if data visibility issues occur.
+
+### **10\. RLS & SECURITY DEFINER**
 
 RLS enforces multitenancy, but some ops need bypass:
 
 **When to use SECURITY DEFINER**:
 
-* Context bootstrapping (user memberships before org context set)  
-* Cross-org staff access (work queues)  
+* Context bootstrapping (user memberships before org context set)
+* Cross-org staff access (work queues)
 * System-level operations (background jobs)
 
 **Pattern**:
 
-sql  
-*\-- In Prisma migration*  
-CREATE OR REPLACE FUNCTION get\_user\_memberships(p\_user\_id TEXT)  
-RETURNS TABLE (..., created\_at TIMESTAMPTZ(3), ...)  *\-- Match Prisma @db.Timestamptz(3)*  
-SECURITY DEFINER SET search\_path \= public  
+sql
+*\-- In Prisma migration*
+CREATE OR REPLACE FUNCTION get\_user\_memberships(p\_user\_id TEXT)
+RETURNS TABLE (..., created\_at TIMESTAMPTZ(3), ...)  *\-- Match Prisma @db.Timestamptz(3)*
+SECURITY DEFINER SET search\_path \= public
 AS $$ ... $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION get\_user\_memberships(TEXT) TO hestami\_app;
@@ -204,7 +236,7 @@ GRANT EXECUTE ON FUNCTION get\_user\_memberships(TEXT) TO hestami\_app;
 
 **Never use `prismaAdmin` for RLS bypass**—use SECURITY DEFINER functions.
 
-### **10\. Cerbos Authorization**
+### **11\. Cerbos Authorization**
 
 Policies in `cerbos/policies/resource/`. Derived roles in `cerbos/policies/derived_roles/common.yaml`. Each `resource` \+ `version` must be unique.
 
@@ -262,10 +294,17 @@ import type { Organization, Staff } from '$lib/api/cam';
 
 **SSR issues**:
 
-* Using client-side `onMount` for critical values (race conditions)  
-* Using default `orpc` client in SSR (relative URLs fail server-side)  
-* Direct Prisma queries for user context in page server loads (RLS blocks before context established)  
+* Using client-side `onMount` for critical values (race conditions)
+* Using default `orpc` client in SSR (relative URLs fail server-side)
+* Direct Prisma queries for user context in page server loads (RLS blocks before context established)
 * Direct Prisma queries in oRPC handler bootstrap (`get_user_memberships`, `get_staff_profile` bypass RLS)
+
+**RLS connection pooling**:
+
+* Using `setOrgContext()` outside a transaction (context may be set on different connection than query)
+* Calling `query(args)` in Prisma extensions instead of `tx[modelName][operation](args)` (runs on wrong connection)
+* Intermittent 0 results despite data existing = connection pooling race condition
+* Fix: Always use `withRLSContext()` which wraps queries in transactions with proper context management
 
 **oRPC Client Usage (SSR Critical)**:
 

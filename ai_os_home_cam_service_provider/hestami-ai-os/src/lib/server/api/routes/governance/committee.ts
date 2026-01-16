@@ -106,8 +106,8 @@ export const governanceCommitteeRouter = {
                 throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create committee' });
             }
 
-            const committee = await prisma.committee.findUniqueOrThrow({
-                where: { id: result.entityId },
+            const committee = await prisma.committee.findFirstOrThrow({
+                where: { id: result.entityId, association: { organizationId: context.organization.id } },
                 include: { _count: { select: { members: true } } }
             });
 
@@ -150,9 +150,8 @@ export const governanceCommitteeRouter = {
         })
         .handler(async ({ input, context, errors }) => {
             const committee = await prisma.committee.findFirst({
-                where: { id: input.id },
+                where: { id: input.id, association: { organizationId: context.organization.id } },
                 include: {
-                    association: true,
                     members: {
                         include: {
                             party: {
@@ -171,7 +170,7 @@ export const governanceCommitteeRouter = {
                     _count: { select: { members: true } }
                 }
             });
-            if (!committee || committee.association.organizationId !== context.organization.id) {
+            if (!committee) {
                 throw errors.NOT_FOUND({ message: 'Committee' });
             }
             await context.cerbos.authorize('view', 'governance_committee', committee.id);
@@ -302,10 +301,9 @@ export const governanceCommitteeRouter = {
             const { idempotencyKey, id, ...updateData } = input;
 
             const committee = await prisma.committee.findFirst({
-                where: { id },
-                include: { association: true }
+                where: { id, association: { organizationId: context.organization.id } }
             });
-            if (!committee || committee.association.organizationId !== context.organization.id) {
+            if (!committee) {
                 throw errors.NOT_FOUND({ message: 'Committee' });
             }
 
@@ -325,8 +323,8 @@ export const governanceCommitteeRouter = {
                 throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update committee' });
             }
 
-            const updated = await prisma.committee.findUniqueOrThrow({
-                where: { id },
+            const updated = await prisma.committee.findFirstOrThrow({
+                where: { id, association: { organizationId: context.organization.id } },
                 include: { _count: { select: { members: true } } }
             });
 
@@ -380,10 +378,9 @@ export const governanceCommitteeRouter = {
             const { idempotencyKey, ...rest } = input;
 
             const committee = await prisma.committee.findFirst({
-                where: { id: rest.committeeId },
-                include: { association: true }
+                where: { id: rest.committeeId, association: { organizationId: context.organization.id } }
             });
-            if (!committee || committee.association.organizationId !== context.organization.id) {
+            if (!committee) {
                 throw errors.NOT_FOUND({ message: 'Committee' });
             }
             await ensurePartyBelongs(rest.partyId, context.organization.id, errors);
@@ -409,8 +406,8 @@ export const governanceCommitteeRouter = {
                 throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to add committee member' });
             }
 
-            const member = await prisma.committeeMember.findUniqueOrThrow({
-                where: { id: workflowResult.entityId },
+            const member = await prisma.committeeMember.findFirstOrThrow({
+                where: { id: workflowResult.entityId, committee: { association: { organizationId: context.organization.id } } },
                 include: {
                     party: {
                         select: {
@@ -471,10 +468,9 @@ export const governanceCommitteeRouter = {
             const { idempotencyKey, ...rest } = input;
 
             const committee = await prisma.committee.findFirst({
-                where: { id: rest.committeeId },
-                include: { association: true }
+                where: { id: rest.committeeId, association: { organizationId: context.organization.id } }
             });
-            if (!committee || committee.association.organizationId !== context.organization.id) {
+            if (!committee) {
                 throw errors.NOT_FOUND({ message: 'Committee' });
             }
 
@@ -496,7 +492,7 @@ export const governanceCommitteeRouter = {
                 throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to remove committee member' });
             }
 
-            const member = await prisma.committeeMember.findUniqueOrThrow({ where: { id: rest.memberId } });
+            const member = await prisma.committeeMember.findFirstOrThrow({ where: { id: rest.memberId, committee: { association: { organizationId: context.organization.id } } } });
 
             return successResponse(
                 { member: { id: member.id, committeeId: member.committeeId, isActive: member.isActive } },
@@ -532,14 +528,13 @@ export const governanceCommitteeRouter = {
 
             const take = input.limit ?? 20;
             const committee = await prisma.committee.findFirst({
-                where: { id: input.committeeId },
-                include: { association: true }
+                where: { id: input.committeeId, association: { organizationId: context.organization.id } }
             });
-            if (!committee || committee.association.organizationId !== context.organization.id) {
+            if (!committee) {
                 throw errors.NOT_FOUND({ message: 'Committee' });
             }
 
-            const where: any = { committeeId: input.committeeId };
+            const where: any = { committeeId: input.committeeId, committee: { association: { organizationId: context.organization.id } } };
             if (input.isActive !== undefined) where.isActive = input.isActive;
 
             const items = await prisma.committeeMember.findMany({

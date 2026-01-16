@@ -28,17 +28,15 @@
 		EVENT_CATEGORY_LABELS,
 		EVENT_CATEGORY_COLORS,
 		getActionColor,
-		type ActivityEvent,
 		type ActivityEntityType,
 		type ActivityActionType,
 		type ActivityEventCategory,
 		type ActivityActorType
 	} from '$lib/api/activityEvent';
+	import type { operations } from '$lib/api/types.generated';
 
-	// Extended event type with organization name for staff view
-	interface StaffActivityEvent extends ActivityEvent {
-		organizationName?: string | null;
-	}
+	// Use the actual type from staffList response which includes organizationName
+	type StaffActivityEvent = operations['activityEvent.staffList']['responses']['200']['content']['application/json']['data']['events'][number];
 
 	// URL params for filtering
 	const urlEntityType = $derived($page.url.searchParams.get('entityType') as ActivityEntityType | null);
@@ -123,7 +121,7 @@
 				cursor: nextCursor || undefined
 			});
 			if (response.ok) {
-				events = [...events, ...response.data.events];
+				events = [...events, ...response.data.events] as StaffActivityEvent[];
 			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load more activity events';

@@ -148,8 +148,8 @@ export const customerRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create customer' });
 			}
 
-			const customer = await prisma.customer.findUniqueOrThrow({
-				where: { id: result.customerId }
+			const customer = await prisma.customer.findFirstOrThrow({
+				where: { id: result.customerId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ customer: formatCustomer(customer) }, context);
@@ -350,8 +350,8 @@ export const customerRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update customer' });
 			}
 
-			const customer = await prisma.customer.findUniqueOrThrow({
-				where: { id: result.customerId }
+			const customer = await prisma.customer.findFirstOrThrow({
+				where: { id: result.customerId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ customer: formatCustomer(customer) }, context);

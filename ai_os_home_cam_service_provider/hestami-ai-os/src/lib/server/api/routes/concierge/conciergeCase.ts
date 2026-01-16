@@ -172,9 +172,12 @@ export const conciergeCaseRouter = {
 					throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create case' });
 				}
 
+				// Re-set RLS context since workflow clears it when done
+				await setOrgContextForWorkItem(context.user.id, 'CONCIERGE_CASE', result.caseId!);
+
 				// Fetch the created case for the response
-				const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-					where: { id: result.caseId }
+				const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+					where: { id: result.caseId, organizationId: context.organization.id }
 				});
 
 				reqLog.info('Concierge case created', {
@@ -218,7 +221,8 @@ export const conciergeCaseRouter = {
 		.input(z.object({ id: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -419,20 +423,35 @@ export const conciergeCaseRouter = {
 				);
 			}
 
-			// Regular users: RLS filters to their org automatically
+			// Regular users: Filter by organizationId explicitly (defense in depth, not relying solely on RLS)
+			const whereClause = {
+				organizationId: context.organization.id, // Explicit org filter for connection pool safety
+				deletedAt: null,
+				...(input.propertyId && { propertyId: input.propertyId }),
+				...(input.status && { status: input.status }),
+				...(input.priority && { priority: input.priority }),
+				...(input.assignedConciergeUserId && {
+					assignedConciergeUserId: input.assignedConciergeUserId
+				}),
+				...(!input.includeClosedCancelled && {
+					status: { notIn: ['CLOSED', 'CANCELLED'] as ConciergeCaseStatus[] }
+				})
+			};
+
+			// Debug: Check total cases for this org (regardless of filters)
+			const totalCasesForOrg = await prisma.conciergeCase.count({
+				where: { organizationId: context.organization.id }
+			});
+
+			log.debug('conciergeCase.list query', {
+				orgId: context.organization.id,
+				includeClosedCancelled: input.includeClosedCancelled,
+				totalCasesForOrg,
+				whereClause: JSON.stringify(whereClause)
+			});
+
 			const cases = await prisma.conciergeCase.findMany({
-				where: {
-					deletedAt: null,
-					...(input.propertyId && { propertyId: input.propertyId }),
-					...(input.status && { status: input.status }),
-					...(input.priority && { priority: input.priority }),
-					...(input.assignedConciergeUserId && {
-						assignedConciergeUserId: input.assignedConciergeUserId
-					}),
-					...(!input.includeClosedCancelled && {
-						status: { notIn: ['CLOSED', 'CANCELLED'] as ConciergeCaseStatus[] }
-					})
-				},
+				where: whereClause,
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
@@ -440,6 +459,11 @@ export const conciergeCaseRouter = {
 					property: true,
 					assignedConcierge: true
 				}
+			});
+
+			log.debug('conciergeCase.list results', {
+				casesFound: cases.length,
+				caseStatuses: cases.map(c => c.status)
 			});
 
 			const hasMore = cases.length > input.limit;
@@ -481,7 +505,8 @@ export const conciergeCaseRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid request' }
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -539,8 +564,8 @@ export const conciergeCaseRouter = {
 			}
 
 			// Fetch updated case for response
-			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: input.id }
+			const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -567,7 +592,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -627,8 +653,8 @@ export const conciergeCaseRouter = {
 			}
 
 			// Fetch updated case for response
-			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: input.id }
+			const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -656,7 +682,8 @@ export const conciergeCaseRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid request' }
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -712,8 +739,8 @@ export const conciergeCaseRouter = {
 			}
 
 			// Fetch updated case for response
-			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: input.id }
+			const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -741,7 +768,8 @@ export const conciergeCaseRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid request' }
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -793,8 +821,8 @@ export const conciergeCaseRouter = {
 			}
 
 			// Fetch updated case for response
-			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: input.id }
+			const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -822,7 +850,8 @@ export const conciergeCaseRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid request' }
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -876,8 +905,8 @@ export const conciergeCaseRouter = {
 			}
 
 			// Fetch updated case for response
-			const conciergeCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: input.id }
+			const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -899,7 +928,8 @@ export const conciergeCaseRouter = {
 		.input(z.object({ caseId: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -969,7 +999,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1023,9 +1054,9 @@ export const conciergeCaseRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add note' });
 			}
 
-			// Fetch created note for response
-			const note = await prisma.caseNote.findUniqueOrThrow({
-				where: { id: result.noteId }
+			// Fetch created note for response - use findFirstOrThrow with caseId to ensure RLS safety
+			const note = await prisma.caseNote.findFirstOrThrow({
+				where: { id: result.noteId, caseId: input.caseId, case: { organizationId: context.organization.id } }
 			});
 
 			return successResponse(
@@ -1057,7 +1088,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1096,6 +1128,7 @@ export const conciergeCaseRouter = {
 			const notes = await prisma.caseNote.findMany({
 				where: {
 					caseId: input.caseId,
+					case: { organizationId: context.organization.id },
 					...(input.noteType && { noteType: input.noteType }),
 					...(input.includeInternal ? {} : { isInternal: false })
 				},
@@ -1135,7 +1168,8 @@ export const conciergeCaseRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid request' }
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1208,9 +1242,9 @@ export const conciergeCaseRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add participant' });
 			}
 
-			// Fetch created participant for response
-			const participant = await prisma.caseParticipant.findUniqueOrThrow({
-				where: { id: result.participantId }
+			// Fetch created participant for response - use findFirstOrThrow with caseId to ensure RLS safety
+			const participant = await prisma.caseParticipant.findFirstOrThrow({
+				where: { id: result.participantId, caseId: input.caseId, case: { organizationId: context.organization.id } }
 			});
 
 			return successResponse(
@@ -1235,7 +1269,8 @@ export const conciergeCaseRouter = {
 		.input(z.object({ caseId: z.string() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1277,6 +1312,7 @@ export const conciergeCaseRouter = {
 			const participants = await prisma.caseParticipant.findMany({
 				where: {
 					caseId: input.caseId,
+					case: { organizationId: context.organization.id },
 					removedAt: null
 				},
 				include: { party: true },
@@ -1316,7 +1352,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1330,11 +1367,11 @@ export const conciergeCaseRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			const participant = await prisma.caseParticipant.findFirst({
-				where: { id: input.participantId, removedAt: null },
+				where: { id: input.participantId, case: { organizationId: context.organization.id }, removedAt: null },
 				include: { case: true }
 			});
 
-			if (!participant || participant.case.organizationId !== context.organization.id) {
+			if (!participant) {
 				throw errors.NOT_FOUND({ message: 'CaseParticipant not found' });
 			}
 
@@ -1378,7 +1415,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1401,8 +1439,10 @@ export const conciergeCaseRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
 
-			// Verify unit exists (Phase 1 unit)
-			const unit = await prisma.unit.findUnique({ where: { id: input.unitId } });
+			// Verify unit exists (Phase 1 unit) - use findFirstOrThrow with organizationId for RLS safety
+			const unit = await prisma.unit.findFirst({
+				where: { id: input.unitId, organizationId: context.organization.id }
+			});
 			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
@@ -1445,7 +1485,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1468,8 +1509,10 @@ export const conciergeCaseRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
 
-			// Verify job exists (Phase 2 job)
-			const job = await prisma.job.findUnique({ where: { id: input.jobId } });
+			// Verify job exists (Phase 2 job) - use findFirst with organizationId for RLS safety
+			const job = await prisma.job.findFirst({
+				where: { id: input.jobId, organizationId: context.organization.id }
+			});
 			if (!job) {
 				throw errors.NOT_FOUND({ message: 'Job not found' });
 			}
@@ -1512,7 +1555,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1573,7 +1617,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1627,12 +1672,12 @@ export const conciergeCaseRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to request clarification' });
 			}
 
-			// Fetch note and case for response
-			const note = await prisma.caseNote.findUniqueOrThrow({
-				where: { id: result.noteId }
+			// Fetch note and case for response - use findFirstOrThrow with organizationId for RLS safety
+			const note = await prisma.caseNote.findFirstOrThrow({
+				where: { id: result.noteId, caseId: input.caseId, case: { organizationId: context.organization.id } }
 			});
-			const updatedCase = await prisma.conciergeCase.findUniqueOrThrow({
-				where: { id: input.caseId }
+			const updatedCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.caseId, organizationId: context.organization.id }
 			});
 
 			return successResponse(
@@ -1665,7 +1710,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1715,9 +1761,9 @@ export const conciergeCaseRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to respond to clarification' });
 			}
 
-			// Fetch note for response
-			const note = await prisma.caseNote.findUniqueOrThrow({
-				where: { id: result.noteId }
+			// Fetch note for response - use findFirstOrThrow with caseId for RLS safety
+			const note = await prisma.caseNote.findFirstOrThrow({
+				where: { id: result.noteId, caseId: input.caseId, case: { organizationId: context.organization.id } }
 			});
 
 			return successResponse(
@@ -1911,11 +1957,11 @@ export const conciergeCaseRouter = {
 					organizationId: conciergeCase.organizationId
 				});
 
-				// Fetch origin intent if exists
+				// Fetch origin intent if exists - use findFirst with organizationId for RLS safety
 				let originIntent = null;
 				if (conciergeCase.originIntentId) {
-					const intent = await prisma.ownerIntent.findUnique({
-						where: { id: conciergeCase.originIntentId }
+					const intent = await prisma.ownerIntent.findFirst({
+						where: { id: conciergeCase.originIntentId, organizationId: conciergeCase.organizationId }
 					});
 					if (intent) {
 						originIntent = {
@@ -1927,6 +1973,31 @@ export const conciergeCaseRouter = {
 						};
 					}
 				}
+
+				// Fetch documents bound to this case via DocumentContextBinding
+				const documentBindings = await prisma.documentContextBinding.findMany({
+					where: {
+						contextType: 'CASE',
+						contextId: input.id
+					},
+					include: {
+						document: true
+					},
+					orderBy: { createdAt: 'desc' }
+				});
+
+				// Filter to only show ACTIVE documents
+				const boundDocuments = documentBindings
+					.filter((b) => b.document.status === 'ACTIVE')
+					.map((b) => ({
+						id: b.document.id,
+						fileName: b.document.fileName,
+						fileSize: b.document.fileSize,
+						mimeType: b.document.mimeType,
+						fileUrl: b.document.fileUrl ?? '',
+						uploadedBy: b.document.uploadedBy,
+						createdAt: b.document.createdAt.toISOString()
+					}));
 
 				return successResponse(
 					{
@@ -2008,15 +2079,19 @@ export const conciergeCaseRouter = {
 							decidedAt: d.decidedAt.toISOString(),
 							hasOutcome: d.actualOutcome !== null
 						})),
-						attachments: conciergeCase.attachments.map((a) => ({
-							id: a.id,
-							fileName: a.fileName,
-							fileSize: a.fileSize,
-							mimeType: a.mimeType,
-							fileUrl: a.fileUrl,
-							uploadedBy: a.uploadedBy,
-							createdAt: a.createdAt.toISOString()
-						}))
+						// Combine legacy CaseAttachment and new Document bindings
+						attachments: [
+							...boundDocuments,
+							...conciergeCase.attachments.map((a) => ({
+								id: a.id,
+								fileName: a.fileName,
+								fileSize: a.fileSize,
+								mimeType: a.mimeType,
+								fileUrl: a.fileUrl,
+								uploadedBy: a.uploadedBy,
+								createdAt: a.createdAt.toISOString()
+							}))
+						]
 					},
 					context
 				);
@@ -2044,7 +2119,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -2067,8 +2143,10 @@ export const conciergeCaseRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
 
-			// Verify ARC request exists
-			const arcRequest = await prisma.aRCRequest.findUnique({ where: { id: input.arcRequestId } });
+			// Verify ARC request exists - use findFirst with organizationId for RLS safety
+			const arcRequest = await prisma.aRCRequest.findFirst({
+				where: { id: input.arcRequestId, organizationId: context.organization.id }
+			});
 			if (!arcRequest) {
 				throw errors.NOT_FOUND({ message: 'ARCRequest not found' });
 			}
@@ -2111,7 +2189,8 @@ export const conciergeCaseRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -2134,8 +2213,10 @@ export const conciergeCaseRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_case', conciergeCase.id);
 
-			// Verify work order exists
-			const workOrder = await prisma.workOrder.findUnique({ where: { id: input.workOrderId } });
+			// Verify work order exists - use findFirst with organizationId for RLS safety
+			const workOrder = await prisma.workOrder.findFirst({
+				where: { id: input.workOrderId, organizationId: context.organization.id }
+			});
 			if (!workOrder) {
 				throw errors.NOT_FOUND({ message: 'WorkOrder not found' });
 			}

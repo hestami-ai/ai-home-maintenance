@@ -6,11 +6,11 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const WORKFLOW_STATUS_EVENT = 'vendor_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'vendor_workflow_error';
@@ -63,32 +63,38 @@ export interface VendorWorkflowResult extends EntityWorkflowResult {
 async function createVendor(
 	input: VendorWorkflowInput
 ): Promise<{ id: string; name: string; email: string | null; isActive: boolean }> {
-	const vendor = await prisma.vendor.create({
-		data: {
-			organizationId: input.organizationId,
-			associationId: input.associationId,
-			name: input.name!,
-			dba: input.dba,
-			contactName: input.contactName,
-			email: input.email,
-			phone: input.phone,
-			addressLine1: input.addressLine1,
-			addressLine2: input.addressLine2,
-			city: input.city,
-			state: input.state,
-			postalCode: input.postalCode,
-			taxId: input.taxId,
-			w9OnFile: input.w9OnFile ?? false,
-			is1099Eligible: input.is1099Eligible ?? false,
-			paymentTerms: input.paymentTerms ?? 30,
-			defaultGLAccountId: input.defaultGLAccountId
-		}
-	});
+	const vendor = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.vendor.create({
+				data: {
+					organizationId: input.organizationId,
+					associationId: input.associationId,
+					name: input.name!,
+					dba: input.dba,
+					contactName: input.contactName,
+					email: input.email,
+					phone: input.phone,
+					addressLine1: input.addressLine1,
+					addressLine2: input.addressLine2,
+					city: input.city,
+					state: input.state,
+					postalCode: input.postalCode,
+					taxId: input.taxId,
+					w9OnFile: input.w9OnFile ?? false,
+					is1099Eligible: input.is1099Eligible ?? false,
+					paymentTerms: input.paymentTerms ?? 30,
+					defaultGLAccountId: input.defaultGLAccountId
+				}
+			});
+		},
+		{ userId: input.userId, reason: 'Create vendor record' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'VENDOR',
+		entityType: 'EXTERNAL_VENDOR',
 		entityId: vendor.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -128,15 +134,21 @@ async function updateVendor(
 	if (input.paymentTerms !== undefined) updateData.paymentTerms = input.paymentTerms;
 	if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
-	const vendor = await prisma.vendor.update({
-		where: { id: input.vendorId },
-		data: updateData
-	});
+	const vendor = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			return tx.vendor.update({
+				where: { id: input.vendorId },
+				data: updateData
+			});
+		},
+		{ userId: input.userId, reason: 'Update vendor record' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'VENDOR',
+		entityType: 'EXTERNAL_VENDOR',
 		entityId: vendor.id,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -161,15 +173,21 @@ async function deleteVendor(
 	organizationId: string,
 	userId: string
 ): Promise<{ success: boolean }> {
-	await prisma.vendor.update({
-		where: { id: vendorId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.vendor.update({
+				where: { id: vendorId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Soft delete vendor record' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'VENDOR',
+		entityType: 'EXTERNAL_VENDOR',
 		entityId: vendorId,
 		action: 'DELETE',
 		eventCategory: 'EXECUTION',
@@ -314,5 +332,6 @@ export async function startVendorWorkflow(
 	input: VendorWorkflowInput,
 	idempotencyKey: string
 ): Promise<VendorWorkflowResult> {
-	return DBOS.startWorkflow(vendorWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(vendorWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

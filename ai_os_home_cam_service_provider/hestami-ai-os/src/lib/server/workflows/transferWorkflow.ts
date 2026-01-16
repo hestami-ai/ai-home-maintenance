@@ -6,9 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('TransferWorkflow');
 
 // Action types for the unified workflow
 export const TransferAction = {
@@ -32,12 +35,6 @@ export interface TransferWorkflowResult extends EntityWorkflowResult {
 	// Inherits success, error, entityId from EntityWorkflowResult
 }
 
-// Helper to generate transfer number
-async function generateTransferNumber(organizationId: string): Promise<string> {
-	const count = await prisma.inventoryTransfer.count({ where: { organizationId } });
-	return `TRF-${String(count + 1).padStart(6, '0')}`;
-}
-
 // Step functions for each operation
 async function createTransfer(
 	organizationId: string,
@@ -54,31 +51,35 @@ async function createTransfer(
 		serialNumber?: string;
 	}>;
 
-	const transferNumber = await generateTransferNumber(organizationId);
+	return orgTransaction(organizationId, async (tx) => {
+		// Generate transfer number within transaction
+		const count = await tx.inventoryTransfer.count({ where: { organizationId } });
+		const transferNumber = `TRF-${String(count + 1).padStart(6, '0')}`;
 
-	const transfer = await prisma.inventoryTransfer.create({
-		data: {
-			organizationId,
-			transferNumber,
-			fromLocationId,
-			toLocationId,
-			notes,
-			requestedBy: userId
-		}
-	});
+		const transfer = await tx.inventoryTransfer.create({
+			data: {
+				organizationId,
+				transferNumber,
+				fromLocationId,
+				toLocationId,
+				notes,
+				requestedBy: userId
+			}
+		});
 
-	await prisma.inventoryTransferLine.createMany({
-		data: lines.map((line) => ({
-			transferId: transfer.id,
-			itemId: line.itemId,
-			quantityRequested: line.quantity,
-			lotNumber: line.lotNumber,
-			serialNumber: line.serialNumber
-		}))
-	});
+		await tx.inventoryTransferLine.createMany({
+			data: lines.map((line) => ({
+				transferId: transfer.id,
+				itemId: line.itemId,
+				quantityRequested: line.quantity,
+				lotNumber: line.lotNumber,
+				serialNumber: line.serialNumber
+			}))
+		});
 
-	console.log(`[TransferWorkflow] CREATE_TRANSFER transfer:${transfer.id} by user ${userId}`);
-	return transfer.id;
+		log.info('CREATE_TRANSFER completed', { transferId: transfer.id, userId });
+		return transfer.id;
+	}, { userId, reason: 'Create inventory transfer' });
 }
 
 async function shipTransfer(
@@ -97,50 +98,52 @@ async function shipTransfer(
 	const fromLocationId = data.fromLocationId as string;
 	const inputLines = data.lines as Array<{ lineId: string; quantityShipped: number }> | undefined;
 
-	// Update line quantities and deduct from source location
-	for (const line of existingLines) {
-		const shipLine = inputLines?.find((l) => l.lineId === line.id);
-		const qtyToShip = shipLine?.quantityShipped ?? line.quantityRequested;
+	return orgTransaction(organizationId, async (tx) => {
+		// Update line quantities and deduct from source location
+		for (const line of existingLines) {
+			const shipLine = inputLines?.find((l) => l.lineId === line.id);
+			const qtyToShip = shipLine?.quantityShipped ?? line.quantityRequested;
 
-		// Deduct from source location
-		const level = await prisma.inventoryLevel.findFirst({
-			where: {
-				itemId: line.itemId,
-				locationId: fromLocationId,
-				lotNumber: line.lotNumber ?? null,
-				serialNumber: line.serialNumber ?? null
+			// Deduct from source location
+			const level = await tx.inventoryLevel.findFirst({
+				where: {
+					itemId: line.itemId,
+					locationId: fromLocationId,
+					lotNumber: line.lotNumber ?? null,
+					serialNumber: line.serialNumber ?? null
+				}
+			});
+
+			if (!level || level.quantityAvailable < qtyToShip) {
+				throw new Error(`Insufficient stock for item ${line.itemId}`);
 			}
-		});
 
-		if (!level || level.quantityAvailable < qtyToShip) {
-			throw new Error(`Insufficient stock for item ${line.itemId}`);
+			await tx.inventoryLevel.update({
+				where: { id: level.id },
+				data: {
+					quantityOnHand: level.quantityOnHand - qtyToShip,
+					quantityAvailable: level.quantityAvailable - qtyToShip
+				}
+			});
+
+			await tx.inventoryTransferLine.update({
+				where: { id: line.id },
+				data: { quantityShipped: qtyToShip }
+			});
 		}
 
-		await prisma.inventoryLevel.update({
-			where: { id: level.id },
+		// Update transfer status
+		await tx.inventoryTransfer.update({
+			where: { id: transferId },
 			data: {
-				quantityOnHand: level.quantityOnHand - qtyToShip,
-				quantityAvailable: level.quantityAvailable - qtyToShip
+				status: 'IN_TRANSIT',
+				shippedAt: new Date()
 			}
 		});
 
-		await prisma.inventoryTransferLine.update({
-			where: { id: line.id },
-			data: { quantityShipped: qtyToShip }
-		});
-	}
-
-	// Update transfer status
-	await prisma.inventoryTransfer.update({
-		where: { id: transferId },
-		data: {
-			status: 'IN_TRANSIT',
-			shippedAt: new Date()
-		}
-	});
-
-	console.log(`[TransferWorkflow] SHIP_TRANSFER on transfer:${transferId} by user ${userId}`);
-	return transferId;
+		log.info('SHIP_TRANSFER completed', { transferId, userId });
+		return transferId;
+	}, { userId, reason: 'Ship inventory transfer' });
 }
 
 async function receiveTransfer(
@@ -159,59 +162,61 @@ async function receiveTransfer(
 	const toLocationId = data.toLocationId as string;
 	const inputLines = data.lines as Array<{ lineId: string; quantityReceived: number }> | undefined;
 
-	// Update line quantities and add to destination location
-	for (const line of existingLines) {
-		const recvLine = inputLines?.find((l) => l.lineId === line.id);
-		const qtyToReceive = recvLine?.quantityReceived ?? line.quantityShipped;
+	return orgTransaction(organizationId, async (tx) => {
+		// Update line quantities and add to destination location
+		for (const line of existingLines) {
+			const recvLine = inputLines?.find((l) => l.lineId === line.id);
+			const qtyToReceive = recvLine?.quantityReceived ?? line.quantityShipped;
 
-		// Add to destination location
-		let level = await prisma.inventoryLevel.findFirst({
-			where: {
-				itemId: line.itemId,
-				locationId: toLocationId,
-				lotNumber: line.lotNumber ?? null,
-				serialNumber: line.serialNumber ?? null
+			// Add to destination location
+			const level = await tx.inventoryLevel.findFirst({
+				where: {
+					itemId: line.itemId,
+					locationId: toLocationId,
+					lotNumber: line.lotNumber ?? null,
+					serialNumber: line.serialNumber ?? null
+				}
+			});
+
+			if (level) {
+				await tx.inventoryLevel.update({
+					where: { id: level.id },
+					data: {
+						quantityOnHand: level.quantityOnHand + qtyToReceive,
+						quantityAvailable: level.quantityAvailable + qtyToReceive
+					}
+				});
+			} else {
+				await tx.inventoryLevel.create({
+					data: {
+						itemId: line.itemId,
+						locationId: toLocationId,
+						quantityOnHand: qtyToReceive,
+						quantityAvailable: qtyToReceive,
+						lotNumber: line.lotNumber,
+						serialNumber: line.serialNumber
+					}
+				});
+			}
+
+			await tx.inventoryTransferLine.update({
+				where: { id: line.id },
+				data: { quantityReceived: qtyToReceive }
+			});
+		}
+
+		// Update transfer status
+		await tx.inventoryTransfer.update({
+			where: { id: transferId },
+			data: {
+				status: 'RECEIVED',
+				receivedAt: new Date()
 			}
 		});
 
-		if (level) {
-			await prisma.inventoryLevel.update({
-				where: { id: level.id },
-				data: {
-					quantityOnHand: level.quantityOnHand + qtyToReceive,
-					quantityAvailable: level.quantityAvailable + qtyToReceive
-				}
-			});
-		} else {
-			await prisma.inventoryLevel.create({
-				data: {
-					itemId: line.itemId,
-					locationId: toLocationId,
-					quantityOnHand: qtyToReceive,
-					quantityAvailable: qtyToReceive,
-					lotNumber: line.lotNumber,
-					serialNumber: line.serialNumber
-				}
-			});
-		}
-
-		await prisma.inventoryTransferLine.update({
-			where: { id: line.id },
-			data: { quantityReceived: qtyToReceive }
-		});
-	}
-
-	// Update transfer status
-	await prisma.inventoryTransfer.update({
-		where: { id: transferId },
-		data: {
-			status: 'RECEIVED',
-			receivedAt: new Date()
-		}
-	});
-
-	console.log(`[TransferWorkflow] RECEIVE_TRANSFER on transfer:${transferId} by user ${userId}`);
-	return transferId;
+		log.info('RECEIVE_TRANSFER completed', { transferId, userId });
+		return transferId;
+	}, { userId, reason: 'Receive inventory transfer' });
 }
 
 async function cancelTransfer(
@@ -232,53 +237,55 @@ async function cancelTransfer(
 	const reason = data.reason as string | undefined;
 	const existingNotes = data.existingNotes as string | undefined;
 
-	// If in transit, return stock to source
-	if (existingStatus === 'IN_TRANSIT') {
-		for (const line of existingLines) {
-			if (line.quantityShipped > 0) {
-				let level = await prisma.inventoryLevel.findFirst({
-					where: {
-						itemId: line.itemId,
-						locationId: fromLocationId,
-						lotNumber: line.lotNumber ?? null,
-						serialNumber: line.serialNumber ?? null
-					}
-				});
-
-				if (level) {
-					await prisma.inventoryLevel.update({
-						where: { id: level.id },
-						data: {
-							quantityOnHand: level.quantityOnHand + line.quantityShipped,
-							quantityAvailable: level.quantityAvailable + line.quantityShipped
-						}
-					});
-				} else {
-					await prisma.inventoryLevel.create({
-						data: {
+	return orgTransaction(organizationId, async (tx) => {
+		// If in transit, return stock to source
+		if (existingStatus === 'IN_TRANSIT') {
+			for (const line of existingLines) {
+				if (line.quantityShipped > 0) {
+					const level = await tx.inventoryLevel.findFirst({
+						where: {
 							itemId: line.itemId,
 							locationId: fromLocationId,
-							quantityOnHand: line.quantityShipped,
-							quantityAvailable: line.quantityShipped,
-							lotNumber: line.lotNumber,
-							serialNumber: line.serialNumber
+							lotNumber: line.lotNumber ?? null,
+							serialNumber: line.serialNumber ?? null
 						}
 					});
+
+					if (level) {
+						await tx.inventoryLevel.update({
+							where: { id: level.id },
+							data: {
+								quantityOnHand: level.quantityOnHand + line.quantityShipped,
+								quantityAvailable: level.quantityAvailable + line.quantityShipped
+							}
+						});
+					} else {
+						await tx.inventoryLevel.create({
+							data: {
+								itemId: line.itemId,
+								locationId: fromLocationId,
+								quantityOnHand: line.quantityShipped,
+								quantityAvailable: line.quantityShipped,
+								lotNumber: line.lotNumber,
+								serialNumber: line.serialNumber
+							}
+						});
+					}
 				}
 			}
 		}
-	}
 
-	await prisma.inventoryTransfer.update({
-		where: { id: transferId },
-		data: {
-			status: 'CANCELLED',
-			notes: reason ? `${existingNotes ?? ''}\nCancelled: ${reason}`.trim() : existingNotes
-		}
-	});
+		await tx.inventoryTransfer.update({
+			where: { id: transferId },
+			data: {
+				status: 'CANCELLED',
+				notes: reason ? `${existingNotes ?? ''}\nCancelled: ${reason}`.trim() : existingNotes
+			}
+		});
 
-	console.log(`[TransferWorkflow] CANCEL_TRANSFER on transfer:${transferId} by user ${userId}`);
-	return transferId;
+		log.info('CANCEL_TRANSFER completed', { transferId, userId });
+		return transferId;
+	}, { userId, reason: 'Cancel inventory transfer' });
 }
 
 // Main workflow function
@@ -323,7 +330,7 @@ async function transferWorkflow(input: TransferWorkflowInput): Promise<TransferW
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[TransferWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error('Workflow error', { action: input.action, error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

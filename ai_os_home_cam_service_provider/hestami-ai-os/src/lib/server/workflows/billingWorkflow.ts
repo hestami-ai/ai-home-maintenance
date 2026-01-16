@@ -6,9 +6,8 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
-import { EstimateStatus, InvoiceStatus, type EntityWorkflowResult } from './schemas.js';
+import { EstimateStatus } from './schemas.js';
 import type { ProposalStatus, JobPaymentStatus, JobInvoiceStatus } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -357,29 +356,29 @@ async function createInvoiceFromEstimate(
 ): Promise<{ id: string }> {
 	const estimateId = data.estimateId as string;
 
-	const estimate = await prisma.estimate.findFirst({
-		where: { id: estimateId, organizationId },
-		include: { lines: { orderBy: { lineNumber: 'asc' } } }
-	});
-	if (!estimate) throw new Error('Estimate not found');
-
-	const sourceLines = estimate.lines;
-	const subtotal = sourceLines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
-	const taxAmount = sourceLines.reduce((sum, l) => l.isTaxable ? sum + (Number(l.lineTotal) * Number(l.taxRate) / 100) : sum, 0);
-	const discount = data.discount !== undefined ? Number(data.discount) : Number(estimate.discount);
-	const totalAmount = subtotal + taxAmount - discount;
-
-	// Generate invoice number
-	const year = new Date().getFullYear();
-	const lastInvoice = await prisma.jobInvoice.findFirst({
-		where: { organizationId, invoiceNumber: { startsWith: `INV-${year}-` } },
-		orderBy: { createdAt: 'desc' }
-	});
-	const seq = lastInvoice ? parseInt((lastInvoice.invoiceNumber.split('-')[2] ?? '0'), 10) + 1 : 1;
-	const invoiceNumber = `INV-${year}-${String(seq).padStart(6, '0')}`;
-
 	try {
 		const invoice = await orgTransaction(organizationId, async (tx) => {
+			const estimate = await tx.estimate.findFirst({
+				where: { id: estimateId, organizationId },
+				include: { lines: { orderBy: { lineNumber: 'asc' } } }
+			});
+			if (!estimate) throw new Error('Estimate not found');
+
+			const sourceLines = estimate.lines;
+			const subtotal = sourceLines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
+			const taxAmount = sourceLines.reduce((sum, l) => l.isTaxable ? sum + (Number(l.lineTotal) * Number(l.taxRate) / 100) : sum, 0);
+			const discount = data.discount !== undefined ? Number(data.discount) : Number(estimate.discount);
+			const totalAmount = subtotal + taxAmount - discount;
+
+			// Generate invoice number
+			const year = new Date().getFullYear();
+			const lastInvoice = await tx.jobInvoice.findFirst({
+				where: { organizationId, invoiceNumber: { startsWith: `INV-${year}-` } },
+				orderBy: { createdAt: 'desc' }
+			});
+			const seq = lastInvoice ? parseInt((lastInvoice.invoiceNumber.split('-')[2] ?? '0'), 10) + 1 : 1;
+			const invoiceNumber = `INV-${year}-${String(seq).padStart(6, '0')}`;
+
 			const inv = await tx.jobInvoice.create({
 				data: {
 					organizationId,
@@ -452,23 +451,23 @@ async function updateInvoice(
 	invoiceId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const existing = await prisma.jobInvoice.findFirst({
-		where: { id: invoiceId, organizationId },
-		include: { lines: true }
-	});
-	if (!existing) throw new Error('Invoice not found');
-
-	if (existing.status !== 'DRAFT') {
-		throw new Error('Can only edit DRAFT invoices');
-	}
-
-	const discount = data.discount !== undefined ? Number(data.discount) : Number(existing.discount);
-	const subtotal = existing.lines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
-	const taxAmount = existing.lines.reduce((sum, l) => l.isTaxable ? sum + (Number(l.lineTotal) * Number(l.taxRate) / 100) : sum, 0);
-	const totalAmount = subtotal + taxAmount - discount;
-
 	try {
 		await orgTransaction(organizationId, async (tx) => {
+			const existing = await tx.jobInvoice.findFirst({
+				where: { id: invoiceId, organizationId },
+				include: { lines: true }
+			});
+			if (!existing) throw new Error('Invoice not found');
+
+			if (existing.status !== 'DRAFT') {
+				throw new Error('Can only edit DRAFT invoices');
+			}
+
+			const discount = data.discount !== undefined ? Number(data.discount) : Number(existing.discount);
+			const subtotal = existing.lines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
+			const taxAmount = existing.lines.reduce((sum, l) => l.isTaxable ? sum + (Number(l.lineTotal) * Number(l.taxRate) / 100) : sum, 0);
+			const totalAmount = subtotal + taxAmount - discount;
+
 			return tx.jobInvoice.update({
 				where: { id: invoiceId },
 				data: {
@@ -728,7 +727,7 @@ export const billingWorkflow_v1 = DBOS.registerWorkflow(billingWorkflow);
 
 export async function startBillingWorkflow(
 	input: BillingWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<BillingWorkflowResult> {
 	const handle = await DBOS.startWorkflow(billingWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

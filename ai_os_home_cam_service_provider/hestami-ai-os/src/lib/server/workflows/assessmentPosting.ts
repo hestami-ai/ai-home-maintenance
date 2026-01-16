@@ -224,7 +224,7 @@ async function queueDelinquencyNotifications(
 	chargesCreated: number,
 	lateFeesApplied: number
 ): Promise<void> {
-	console.log(`[Workflow] Assessment posting complete for association ${associationId}: ${chargesCreated} charges created, ${lateFeesApplied} late fees applied`);
+	log.info(`Assessment posting complete for association ${associationId}: ${chargesCreated} charges created, ${lateFeesApplied} late fees applied`);
 }
 
 // ============================================================================
@@ -335,7 +335,7 @@ export async function startAssessmentPosting(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `assessment-posting-${input.associationId}-${Date.now()}`;
-	await DBOS.startWorkflow(assessmentPosting_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(assessmentPosting_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

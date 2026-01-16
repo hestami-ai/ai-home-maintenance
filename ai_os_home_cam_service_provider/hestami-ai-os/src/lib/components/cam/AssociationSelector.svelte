@@ -50,7 +50,7 @@
 
 		try {
 			// Call oRPC to set the default association in the database
-			const result = await orpc.association.setDefault({ associationId });
+			const result = await orpc.association.setDefault({ idempotencyKey: crypto.randomUUID(), associationId });
 			
 			if (result.ok) {
 				// Update the store immediately for optimistic UI

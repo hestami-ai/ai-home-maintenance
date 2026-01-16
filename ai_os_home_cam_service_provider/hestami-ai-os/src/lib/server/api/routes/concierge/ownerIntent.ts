@@ -280,17 +280,15 @@ export const ownerIntentRouter = {
 			// Cerbos authorization for listing
 			await context.cerbos.authorize('view', 'owner_intent', 'list');
 
-			const whereClause = {
-				organizationId: context.organization.id,
-				deletedAt: null,
-				...(input.propertyId && { propertyId: input.propertyId }),
-				...(input.status && { status: input.status }),
-				...(input.category && { category: input.category }),
-				...(input.priority && { priority: input.priority })
-			};
-
 			const intents = await prisma.ownerIntent.findMany({
-				where: whereClause,
+				where: {
+					organizationId: context.organization.id,
+					deletedAt: null,
+					...(input.propertyId && { propertyId: input.propertyId }),
+					...(input.status && { status: input.status }),
+					...(input.category && { category: input.category }),
+					...(input.priority && { priority: input.priority })
+				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
@@ -930,6 +928,7 @@ export const ownerIntentRouter = {
 			const notes = await prisma.intentNote.findMany({
 				where: {
 					intentId: input.intentId,
+					intent: { organizationId: context.organization.id },
 					...(input.includeInternal ? {} : { isInternal: false })
 				},
 				orderBy: { createdAt: 'desc' }

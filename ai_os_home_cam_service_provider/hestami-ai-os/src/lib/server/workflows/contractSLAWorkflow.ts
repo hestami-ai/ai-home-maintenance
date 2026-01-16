@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -57,28 +58,30 @@ async function createSLA(
 		? (completedVisits / scheduledVisits) * 100
 		: null;
 
-	const record = await prisma.contractSLARecord.create({
-		data: {
-			contractId: data.contractId as string,
-			periodStart: new Date(data.periodStart as string),
-			periodEnd: new Date(data.periodEnd as string),
-			totalRequests,
-			onTimeResponses,
-			onTimeResolutions,
-			missedSLAs: (data.missedSLAs as number) || 0,
-			responseCompliancePercent,
-			resolutionCompliancePercent,
-			avgResponseTimeMinutes: data.avgResponseTimeMinutes as number | undefined,
-			avgResolutionTimeMinutes: data.avgResolutionTimeMinutes as number | undefined,
-			scheduledVisits,
-			completedVisits,
-			missedVisits: (data.missedVisits as number) || 0,
-			visitCompliancePercent,
-			notes: data.notes as string | undefined
-		}
-	});
+	const record = await orgTransaction(organizationId, async (tx) => {
+		return tx.contractSLARecord.create({
+			data: {
+				contractId: data.contractId as string,
+				periodStart: new Date(data.periodStart as string),
+				periodEnd: new Date(data.periodEnd as string),
+				totalRequests,
+				onTimeResponses,
+				onTimeResolutions,
+				missedSLAs: (data.missedSLAs as number) || 0,
+				responseCompliancePercent,
+				resolutionCompliancePercent,
+				avgResponseTimeMinutes: data.avgResponseTimeMinutes as number | undefined,
+				avgResolutionTimeMinutes: data.avgResolutionTimeMinutes as number | undefined,
+				scheduledVisits,
+				completedVisits,
+				missedVisits: (data.missedVisits as number) || 0,
+				visitCompliancePercent,
+				notes: data.notes as string | undefined
+			}
+		});
+	}, { userId, reason: 'Create contract SLA record' });
 
-	console.log(`[ContractSLAWorkflow] CREATE_SLA record:${record.id} by user ${userId}`);
+	log.info(`CREATE_SLA record:${record.id} by user ${userId}`);
 	return record.id;
 }
 
@@ -112,26 +115,28 @@ async function updateSLA(
 		? (completedVisits / scheduledVisits) * 100
 		: null;
 
-	await prisma.contractSLARecord.update({
-		where: { id: slaRecordId },
-		data: {
-			totalRequests: data.totalRequests as number | undefined,
-			onTimeResponses: data.onTimeResponses as number | undefined,
-			onTimeResolutions: data.onTimeResolutions as number | undefined,
-			missedSLAs: data.missedSLAs as number | undefined,
-			avgResponseTimeMinutes: data.avgResponseTimeMinutes as number | null | undefined,
-			avgResolutionTimeMinutes: data.avgResolutionTimeMinutes as number | null | undefined,
-			scheduledVisits: data.scheduledVisits as number | undefined,
-			completedVisits: data.completedVisits as number | undefined,
-			missedVisits: data.missedVisits as number | undefined,
-			notes: data.notes as string | null | undefined,
-			responseCompliancePercent,
-			resolutionCompliancePercent,
-			visitCompliancePercent
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.contractSLARecord.update({
+			where: { id: slaRecordId },
+			data: {
+				totalRequests: data.totalRequests as number | undefined,
+				onTimeResponses: data.onTimeResponses as number | undefined,
+				onTimeResolutions: data.onTimeResolutions as number | undefined,
+				missedSLAs: data.missedSLAs as number | undefined,
+				avgResponseTimeMinutes: data.avgResponseTimeMinutes as number | null | undefined,
+				avgResolutionTimeMinutes: data.avgResolutionTimeMinutes as number | null | undefined,
+				scheduledVisits: data.scheduledVisits as number | undefined,
+				completedVisits: data.completedVisits as number | undefined,
+				missedVisits: data.missedVisits as number | undefined,
+				notes: data.notes as string | null | undefined,
+				responseCompliancePercent,
+				resolutionCompliancePercent,
+				visitCompliancePercent
+			}
+		});
+	}, { userId, reason: 'Update contract SLA record' });
 
-	console.log(`[ContractSLAWorkflow] UPDATE_SLA record:${slaRecordId} by user ${userId}`);
+	log.info(`UPDATE_SLA record:${slaRecordId} by user ${userId}`);
 	return slaRecordId;
 }
 
@@ -161,32 +166,34 @@ async function calculateSLA(
 		: null;
 
 	// Upsert the record
-	const record = await prisma.contractSLARecord.upsert({
-		where: {
-			contractId_periodStart_periodEnd: {
+	const record = await orgTransaction(organizationId, async (tx) => {
+		return tx.contractSLARecord.upsert({
+			where: {
+				contractId_periodStart_periodEnd: {
+					contractId,
+					periodStart,
+					periodEnd
+				}
+			},
+			create: {
 				contractId,
 				periodStart,
-				periodEnd
+				periodEnd,
+				scheduledVisits,
+				completedVisits,
+				missedVisits,
+				visitCompliancePercent
+			},
+			update: {
+				scheduledVisits,
+				completedVisits,
+				missedVisits,
+				visitCompliancePercent
 			}
-		},
-		create: {
-			contractId,
-			periodStart,
-			periodEnd,
-			scheduledVisits,
-			completedVisits,
-			missedVisits,
-			visitCompliancePercent
-		},
-		update: {
-			scheduledVisits,
-			completedVisits,
-			missedVisits,
-			visitCompliancePercent
-		}
-	});
+		});
+	}, { userId, reason: 'Calculate contract SLA for period' });
 
-	console.log(`[ContractSLAWorkflow] CALCULATE_SLA record:${record.id} by user ${userId}`);
+	log.info(`CALCULATE_SLA record:${record.id} by user ${userId}`);
 	return record.id;
 }
 
@@ -225,7 +232,7 @@ async function contractSLAWorkflow(input: ContractSLAWorkflowInput): Promise<Con
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ContractSLAWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

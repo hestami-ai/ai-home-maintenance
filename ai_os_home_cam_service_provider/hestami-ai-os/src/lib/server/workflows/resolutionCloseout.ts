@@ -7,8 +7,10 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ResolutionStatus, WorkOrderStatus, WorkOrderPriority } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'resolution_status';
@@ -24,6 +26,7 @@ const validTransitions: Record<ResolutionStatus, ResolutionStatus[]> = {
 
 interface CloseoutInput {
 	resolutionId: string;
+	organizationId: string;
 	toStatus: ResolutionStatus;
 	userId: string;
 	motionId?: string;
@@ -104,7 +107,9 @@ async function validateTransition(input: CloseoutInput): Promise<{
  */
 async function linkToMotion(
 	resolutionId: string,
-	motionId: string
+	motionId: string,
+	organizationId: string,
+	userId: string
 ): Promise<void> {
 	// Verify motion exists
 	const motion = await prisma.boardMotion.findUnique({
@@ -115,10 +120,12 @@ async function linkToMotion(
 		throw new Error(`Motion ${motionId} not found`);
 	}
 
-	await prisma.resolution.update({
-		where: { id: resolutionId },
-		data: { motionId }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.resolution.update({
+			where: { id: resolutionId },
+			data: { motionId }
+		});
+	}, { userId, reason: 'linkToMotion' });
 }
 
 /**
@@ -138,10 +145,12 @@ async function updateResolutionStatus(
 		updateData.adoptedBy = input.userId;
 	}
 
-	await prisma.resolution.update({
-		where: { id: input.resolutionId },
-		data: updateData
-	});
+	await orgTransaction(input.organizationId, async (tx) => {
+		await tx.resolution.update({
+			where: { id: input.resolutionId },
+			data: updateData
+		});
+	}, { userId: input.userId, reason: 'updateResolutionStatus' });
 }
 
 /**
@@ -162,24 +171,26 @@ async function createDownstreamWorkOrder(
 	});
 	const workOrderNumber = `WO-${year}-${String(count + 1).padStart(5, '0')}`;
 
-	const workOrder = await prisma.workOrder.create({
-		data: {
-			organizationId: resolution.organizationId,
-			associationId: resolution.associationId,
-			workOrderNumber,
-			title: workOrderData.title,
-			description: workOrderData.description || '',
-			category: 'OTHER',
-			priority: (workOrderData.priority as WorkOrderPriority) ?? ('MEDIUM' as WorkOrderPriority),
-			status: 'DRAFT' as WorkOrderStatus,
-			originType: 'BOARD_DIRECTIVE',
-			resolutionId: resolution.id,
-			requestedBy: userId,
-			requestedAt: new Date()
-		}
-	});
+	return orgTransaction(resolution.organizationId, async (tx) => {
+		const workOrder = await tx.workOrder.create({
+			data: {
+				organizationId: resolution.organizationId,
+				associationId: resolution.associationId,
+				workOrderNumber,
+				title: workOrderData.title,
+				description: workOrderData.description || '',
+				category: 'OTHER',
+				priority: (workOrderData.priority as WorkOrderPriority) ?? ('MEDIUM' as WorkOrderPriority),
+				status: 'DRAFT' as WorkOrderStatus,
+				originType: 'BOARD_DIRECTIVE',
+				resolutionId: resolution.id,
+				requestedBy: userId,
+				requestedAt: new Date()
+			}
+		});
 
-	return workOrder.id;
+		return workOrder.id;
+	}, { userId, reason: 'createDownstreamWorkOrder' });
 }
 
 /**
@@ -187,12 +198,16 @@ async function createDownstreamWorkOrder(
  */
 async function updatePolicyDocument(
 	policyId: string,
-	resolutionId: string
+	resolutionId: string,
+	organizationId: string,
+	userId: string
 ): Promise<void> {
-	await prisma.policyDocument.update({
-		where: { id: policyId },
-		data: { resolutionId }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.policyDocument.update({
+			where: { id: policyId },
+			data: { resolutionId }
+		});
+	}, { userId, reason: 'updatePolicyDocument' });
 }
 
 /**
@@ -202,9 +217,10 @@ async function queueNotifications(
 	resolutionId: string,
 	fromStatus: ResolutionStatus,
 	toStatus: ResolutionStatus,
-	resolution: { title: string; associationId: string }
+	resolution: { title: string; associationId: string },
+	log: ReturnType<typeof createWorkflowLogger>
 ): Promise<void> {
-	console.log(`[Workflow] Resolution notification queued: "${resolution.title}" transitioned from ${fromStatus} to ${toStatus}`);
+	log.info(`Resolution notification queued: "${resolution.title}" transitioned from ${fromStatus} to ${toStatus}`);
 
 	// In a full implementation:
 	// - ADOPTED: Notify stakeholders of new resolution
@@ -217,6 +233,9 @@ async function queueNotifications(
 // ============================================================================
 
 async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<CloseoutResult> {
+	const log = createWorkflowLogger('resolutionCloseout', DBOS.workflowID, `TRANSITION_TO_${input.toStatus}`);
+	const startTime = logWorkflowStart(log, `TRANSITION_TO_${input.toStatus}`, input as unknown as Record<string, unknown>);
+
 	try {
 		// Step 1: Validate transition
 		const validation = await DBOS.runStep(
@@ -226,7 +245,7 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'validated' });
 
 		if (!validation.valid || !validation.resolution) {
-			return {
+			const errorResult = {
 				success: false,
 				resolutionId: input.resolutionId,
 				fromStatus: validation.currentStatus,
@@ -234,12 +253,14 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 				timestamp: new Date().toISOString(),
 				error: validation.error
 			};
+			logWorkflowEnd(log, `TRANSITION_TO_${input.toStatus}`, false, startTime, errorResult as unknown as Record<string, unknown>);
+			return errorResult;
 		}
 
 		// Step 2: Link to motion if provided
 		if (input.motionId) {
 			await DBOS.runStep(
-				() => linkToMotion(input.resolutionId, input.motionId!),
+				() => linkToMotion(input.resolutionId, input.motionId!, input.organizationId, input.userId),
 				{ name: 'linkToMotion' }
 			);
 			await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'motion_linked' });
@@ -270,7 +291,7 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 		let updatedPolicyId: string | undefined;
 		if (input.updatePolicyId && input.toStatus === 'ADOPTED') {
 			await DBOS.runStep(
-				() => updatePolicyDocument(input.updatePolicyId!, input.resolutionId),
+				() => updatePolicyDocument(input.updatePolicyId!, input.resolutionId, input.organizationId, input.userId),
 				{ name: 'updatePolicy' }
 			);
 			updatedPolicyId = input.updatePolicyId;
@@ -283,13 +304,14 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 				input.resolutionId,
 				validation.currentStatus,
 				input.toStatus,
-				validation.resolution!
+				validation.resolution!,
+				log
 			),
 			{ name: 'queueNotifications' }
 		);
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'notifications_queued' });
 
-		return {
+		const result = {
 			success: true,
 			resolutionId: input.resolutionId,
 			fromStatus: validation.currentStatus,
@@ -298,6 +320,8 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 			createdWorkOrderId,
 			updatedPolicyId
 		};
+		logWorkflowEnd(log, `TRANSITION_TO_${input.toStatus}`, true, startTime, result as unknown as Record<string, unknown>);
+		return result;
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
@@ -310,14 +334,16 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 			errorType: 'RESOLUTION_CLOSEOUT_ERROR'
 		});
 
-		return {
+		const errorResult = {
 			success: false,
 			resolutionId: input.resolutionId,
-			fromStatus: 'PROPOSED',
+			fromStatus: 'PROPOSED' as ResolutionStatus,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
+		logWorkflowEnd(log, `TRANSITION_TO_${input.toStatus}`, false, startTime, errorResult as unknown as Record<string, unknown>);
+		return errorResult;
 	}
 }
 

@@ -6,7 +6,6 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import {
@@ -144,32 +143,32 @@ async function updateStatus(
 ): Promise<string> {
 	const newStatus = data.status as ViolationStatus;
 	const notes = data.notes as string | undefined;
-
-	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
-	if (!violation) throw new Error('Violation not found');
-
-	const oldStatus = violation.status;
 	const now = new Date();
-
-	// Build status-specific update data
-	const updateData: Prisma.ViolationUncheckedUpdateInput = { status: newStatus };
-
-	// Set status-specific fields
-	if (newStatus === 'CURED') {
-		updateData.curedDate = now;
-		updateData.resolutionNotes = notes ?? violation.resolutionNotes;
-	} else if (newStatus === 'CLOSED') {
-		updateData.closedDate = now;
-		updateData.closedBy = userId;
-		updateData.resolutionNotes = notes ?? violation.resolutionNotes;
-	} else if (newStatus === 'DISMISSED') {
-		updateData.closedDate = now;
-		updateData.closedBy = userId;
-		updateData.resolutionNotes = notes ?? violation.resolutionNotes;
-	}
 
 	try {
 		await orgTransaction(organizationId, async (tx) => {
+			const violation = await tx.violation.findUnique({ where: { id: violationId } });
+			if (!violation) throw new Error('Violation not found');
+
+			const oldStatus = violation.status;
+
+			// Build status-specific update data
+			const updateData: Prisma.ViolationUncheckedUpdateInput = { status: newStatus };
+
+			// Set status-specific fields
+			if (newStatus === 'CURED') {
+				updateData.curedDate = now;
+				updateData.resolutionNotes = notes ?? violation.resolutionNotes;
+			} else if (newStatus === 'CLOSED') {
+				updateData.closedDate = now;
+				updateData.closedBy = userId;
+				updateData.resolutionNotes = notes ?? violation.resolutionNotes;
+			} else if (newStatus === 'DISMISSED') {
+				updateData.closedDate = now;
+				updateData.closedBy = userId;
+				updateData.resolutionNotes = notes ?? violation.resolutionNotes;
+			}
+
 			await tx.violation.update({
 				where: { id: violationId },
 				data: updateData
@@ -184,9 +183,9 @@ async function updateStatus(
 					notes
 				}
 			});
-		}, { userId, reason: `Updating violation status from ${oldStatus} to ${newStatus}` });
+		}, { userId, reason: `Updating violation status to ${newStatus}` });
 
-		log.info('UPDATE_STATUS completed', { violationId, oldStatus, newStatus, userId });
+		log.info('UPDATE_STATUS completed', { violationId, newStatus, userId });
 		return violationId;
 	} finally {
 		await clearOrgContext(userId);
@@ -200,14 +199,13 @@ async function deleteViolation(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const reason = data.reason as string | undefined;
-
-	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
-	if (!violation) throw new Error('Violation not found');
-
 	const deletedAt = new Date();
 
 	try {
 		await orgTransaction(organizationId, async (tx) => {
+			const violation = await tx.violation.findUnique({ where: { id: violationId } });
+			if (!violation) throw new Error('Violation not found');
+
 			await tx.violation.update({
 				where: { id: violationId },
 				data: {
@@ -254,9 +252,6 @@ async function sendNotice(
 	const noticeCount = data.noticeCount as number;
 	const defaultCurePeriodDays = data.defaultCurePeriodDays as number;
 
-	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
-	if (!violation) throw new Error('Violation not found');
-
 	const now = new Date();
 	const effectiveCurePeriodDays = curePeriodDays ?? defaultCurePeriodDays ?? 0;
 	const curePeriodEnds = effectiveCurePeriodDays > 0
@@ -266,6 +261,9 @@ async function sendNotice(
 
 	try {
 		const noticeId = await orgTransaction(organizationId, async (tx) => {
+			const violation = await tx.violation.findUnique({ where: { id: violationId } });
+			if (!violation) throw new Error('Violation not found');
+
 			const notice = await tx.violationNotice.create({
 				data: {
 					violationId,
@@ -326,19 +324,15 @@ async function escalateViolation(
 	const escalationReason = data.escalationReason as string | undefined;
 	const assignedTo = data.assignedTo as string | undefined;
 
-	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
-	if (!violation) throw new Error('Violation not found');
-
 	try {
 		await orgTransaction(organizationId, async (tx) => {
+			const violation = await tx.violation.findUnique({ where: { id: violationId } });
+			if (!violation) throw new Error('Violation not found');
+
 			await tx.violation.update({
 				where: { id: violationId },
 				data: {
-					status: 'ESCALATED',
-					escalatedAt: new Date(),
-					escalatedBy: userId,
-					escalationReason,
-					...(assignedTo && { assignedTo })
+					status: 'ESCALATED'
 				}
 			});
 
@@ -367,14 +361,13 @@ async function dismissViolation(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const reason = data.reason as string | undefined;
-
-	const violation = await prisma.violation.findUnique({ where: { id: violationId } });
-	if (!violation) throw new Error('Violation not found');
-
 	const now = new Date();
 
 	try {
 		await orgTransaction(organizationId, async (tx) => {
+			const violation = await tx.violation.findUnique({ where: { id: violationId } });
+			if (!violation) throw new Error('Violation not found');
+
 			await tx.violation.update({
 				where: { id: violationId },
 				data: {
@@ -627,24 +620,30 @@ async function createViolationType(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const violationType = await prisma.violationType.create({
-		data: {
-			organizationId,
-			associationId: data.associationId as string,
-			code: data.code as string,
-			name: data.name as string,
-			description: data.description as string | undefined,
-			category: data.category as string,
-			ccnrSection: data.ccnrSection as string | undefined,
-			ruleReference: data.ruleReference as string | undefined,
-			defaultSeverity: data.defaultSeverity as any,
-			defaultCurePeriodDays: data.defaultCurePeriodDays as number | undefined,
-			firstFineAmount: data.firstFineAmount as number | undefined,
-			secondFineAmount: data.secondFineAmount as number | undefined,
-			subsequentFineAmount: data.subsequentFineAmount as number | undefined,
-			maxFineAmount: data.maxFineAmount as number | undefined
-		}
-	});
+	const violationType = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.violationType.create({
+				data: {
+					organizationId,
+					associationId: data.associationId as string,
+					code: data.code as string,
+					name: data.name as string,
+					description: data.description as string | undefined,
+					category: data.category as string,
+					ccnrSection: data.ccnrSection as string | undefined,
+					ruleReference: data.ruleReference as string | undefined,
+					defaultSeverity: data.defaultSeverity as any,
+					defaultCurePeriodDays: data.defaultCurePeriodDays as number | undefined,
+					firstFineAmount: data.firstFineAmount as number | undefined,
+					secondFineAmount: data.secondFineAmount as number | undefined,
+					subsequentFineAmount: data.subsequentFineAmount as number | undefined,
+					maxFineAmount: data.maxFineAmount as number | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Create violation type' }
+	);
 
 	log.info('CREATE_TYPE completed', { typeId: violationType.id, code: violationType.code, userId });
 	return violationType.id;
@@ -658,10 +657,16 @@ async function updateViolationType(
 ): Promise<string> {
 	const { id, associationId, code, ...updateData } = data;
 
-	await prisma.violationType.update({
-		where: { id: typeId },
-		data: updateData
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.violationType.update({
+				where: { id: typeId },
+				data: updateData
+			});
+		},
+		{ userId, reason: 'Update violation type' }
+	);
 
 	log.info('UPDATE_TYPE completed', { typeId, userId });
 	return typeId;

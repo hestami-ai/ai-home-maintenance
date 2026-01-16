@@ -84,12 +84,14 @@ export const propertyOwnershipRouter = {
 			}
 
 			// Check if ownership already exists for this property/party/role combination
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.propertyOwnership.findFirst({
 				where: {
 					propertyId: input.propertyId,
 					partyId: input.partyId,
 					role: input.role,
-					deletedAt: null
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
 				}
 			});
 
@@ -99,12 +101,14 @@ export const propertyOwnershipRouter = {
 
 			// Validate: at least one OWNER must exist (or this is creating the first OWNER)
 			if (input.role !== 'OWNER') {
+				// Defense in depth: explicit org filter via property relationship for connection pool safety
 				const ownerExists = await prisma.propertyOwnership.findFirst({
 					where: {
 						propertyId: input.propertyId,
 						role: 'OWNER',
 						status: 'ACTIVE',
-						deletedAt: null
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
 					}
 				});
 
@@ -200,15 +204,20 @@ export const propertyOwnershipRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const propertyOwnership = await prisma.propertyOwnership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: {
 					property: true,
 					party: true
 				}
 			});
 
-			if (!propertyOwnership || propertyOwnership.property.ownerOrgId !== context.organization.id) {
+			if (!propertyOwnership) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
@@ -311,16 +320,16 @@ export const propertyOwnershipRouter = {
 			// Cerbos authorization for viewing property's ownerships
 			await context.cerbos.authorize('view', 'individual_property', property.id);
 
-			const whereClause = {
-				propertyId: input.propertyId,
-				deletedAt: null,
-				...(input.status && { status: input.status }),
-				...(input.role && { role: input.role }),
-				...(!input.includeTerminated && { status: { not: 'TERMINATED' as const } })
-			};
-
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const propertyOwnerships = await prisma.propertyOwnership.findMany({
-				where: whereClause,
+				where: {
+					propertyId: input.propertyId,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id },
+					...(input.status && { status: input.status }),
+					...(input.role && { role: input.role }),
+					...(!input.includeTerminated && { status: { not: 'TERMINATED' as const } })
+				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: [{ isPrimaryContact: 'desc' }, { role: 'asc' }, { createdAt: 'desc' }],
@@ -409,15 +418,15 @@ export const propertyOwnershipRouter = {
 				partyUserId: party.userId ?? undefined
 			});
 
-			const whereClause = {
-				partyId: input.partyId,
-				deletedAt: null,
-				...(input.status && { status: input.status }),
-				...(!input.includeTerminated && { status: { not: 'TERMINATED' as const } })
-			};
-
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const propertyOwnerships = await prisma.propertyOwnership.findMany({
-				where: whereClause,
+				where: {
+					partyId: input.partyId,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id },
+					...(input.status && { status: input.status }),
+					...(!input.includeTerminated && { status: { not: 'TERMINATED' as const } })
+				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
 				orderBy: [{ isPrimaryContact: 'desc' }, { createdAt: 'desc' }],
@@ -483,12 +492,17 @@ export const propertyOwnershipRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.propertyOwnership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: { property: true }
 			});
 
-			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
@@ -557,12 +571,17 @@ export const propertyOwnershipRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.propertyOwnership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: { property: true }
 			});
 
-			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
@@ -626,12 +645,17 @@ export const propertyOwnershipRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.propertyOwnership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: { property: true }
 			});
 
-			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
@@ -640,13 +664,15 @@ export const propertyOwnershipRouter = {
 
 			// Check if this is the last OWNER - cannot terminate
 			if (existing.role === 'OWNER') {
+				// Defense in depth: explicit org filter via property relationship for connection pool safety
 				const otherOwners = await prisma.propertyOwnership.count({
 					where: {
 						propertyId: existing.propertyId,
 						role: 'OWNER',
 						status: 'ACTIVE',
 						id: { not: input.id },
-						deletedAt: null
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
 					}
 				});
 
@@ -708,12 +734,17 @@ export const propertyOwnershipRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
+			// Defense in depth: explicit org filter via property relationship for connection pool safety
 			const existing = await prisma.propertyOwnership.findFirst({
-				where: { id: input.id, deletedAt: null },
+				where: {
+					id: input.id,
+					deletedAt: null,
+					property: { ownerOrgId: context.organization.id }
+				},
 				include: { property: true }
 			});
 
-			if (!existing || existing.property.ownerOrgId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'PropertyOwnership not found' });
 			}
 
@@ -722,13 +753,15 @@ export const propertyOwnershipRouter = {
 
 			// Check if this is the last OWNER - cannot delete
 			if (existing.role === 'OWNER') {
+				// Defense in depth: explicit org filter via property relationship for connection pool safety
 				const otherOwners = await prisma.propertyOwnership.count({
 					where: {
 						propertyId: existing.propertyId,
 						role: 'OWNER',
 						status: 'ACTIVE',
 						id: { not: input.id },
-						deletedAt: null
+						deletedAt: null,
+						property: { ownerOrgId: context.organization.id }
 					}
 				});
 

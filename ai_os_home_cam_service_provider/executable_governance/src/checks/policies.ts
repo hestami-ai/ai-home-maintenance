@@ -17,12 +17,16 @@ export async function verifyPolicies(config: Config): Promise<Violation[]> {
     const policyDir = path.join(projectRoot, 'cerbos/policies/resource');
     const policies = loadCerbosPolicies(policyDir);
 
-    // 2. Focus on oRPC route files
-    const globPath = path.join(projectRoot, 'src/lib/server/api/routes/**/*.ts').replace(/\\/g, '/');
+    // 2. Scan all TypeScript files - don't rely on directory conventions
+    // Code patterns (getCerbosCheck) determine what gets checked
+    const globPath = path.join(projectRoot, 'src/**/*.ts').replace(/\\/g, '/');
     const files = project.addSourceFilesAtPaths(globPath);
 
     for (const file of files) {
         const relativePath = path.relative(projectRoot, file.getFilePath()).replace(/\\/g, '/');
+
+        // Skip generated files
+        if (relativePath.includes('/generated/') || relativePath.includes('.generated.')) continue;
 
         const calls = file.getDescendantsOfKind(SyntaxKind.CallExpression);
         for (const call of calls) {

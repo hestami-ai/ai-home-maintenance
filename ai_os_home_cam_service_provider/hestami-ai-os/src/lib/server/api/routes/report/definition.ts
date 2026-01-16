@@ -75,15 +75,15 @@ export const reportDefinitionRouter = {
 						allowedFormats: input.allowedFormats
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create report' });
 			}
 
-			const report = await prisma.reportDefinition.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const report = await prisma.reportDefinition.findFirstOrThrow({
+				where: { id: result.entityId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({
@@ -288,15 +288,15 @@ export const reportDefinitionRouter = {
 						isActive: input.isActive
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update report' });
 			}
 
-			const report = await prisma.reportDefinition.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const report = await prisma.reportDefinition.findFirstOrThrow({
+				where: { id: result.entityId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({
@@ -339,7 +339,7 @@ export const reportDefinitionRouter = {
 					reportId: input.id,
 					data: {}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {

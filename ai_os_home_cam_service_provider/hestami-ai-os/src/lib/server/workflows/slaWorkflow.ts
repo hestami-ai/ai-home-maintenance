@@ -6,13 +6,16 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type SLAPriority } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { createWorkflowLogger } from './workflowLogger.js';
 
 const WORKFLOW_STATUS_EVENT = 'sla_status';
 const WORKFLOW_ERROR_EVENT = 'sla_error';
+const workflowName = 'SLAWorkflow';
+const log = createWorkflowLogger(workflowName);
 
 type SLAAction =
 	| 'CREATE_WINDOW'
@@ -44,17 +47,21 @@ async function createWindow(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const window = await prisma.sLAWindow.create({
-		data: {
-			organizationId,
-			name: data.name as string,
-			priority: data.priority as SLAPriority,
-			responseTimeMinutes: data.responseMinutes as number,
-			resolutionTimeMinutes: data.resolutionMinutes as number,
-			businessHoursOnly: data.businessHoursOnly as boolean ?? true,
-			isDefault: data.isDefault as boolean ?? false
-		}
-	});
+	const window = await orgTransaction(organizationId, async (tx) => {
+		return tx.sLAWindow.create({
+			data: {
+				organizationId,
+				name: data.name as string,
+				priority: data.priority as SLAPriority,
+				responseTimeMinutes: data.responseMinutes as number,
+				resolutionTimeMinutes: data.resolutionMinutes as number,
+				businessHoursOnly: data.businessHoursOnly as boolean ?? true,
+				isDefault: data.isDefault as boolean ?? false
+			}
+		});
+	}, { userId, reason: 'SLA workflow: create window' });
+
+	log.info('SLA window created', { windowId: window.id, windowName: window.name });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -79,17 +86,21 @@ async function updateWindow(
 	windowId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const window = await prisma.sLAWindow.update({
-		where: { id: windowId },
-		data: {
-			name: data.name as string | undefined,
-			priority: data.priority as SLAPriority | undefined,
-			responseTimeMinutes: data.responseTimeMinutes as number | undefined,
-			resolutionTimeMinutes: data.resolutionTimeMinutes as number | undefined,
-			businessHoursOnly: data.businessHoursOnly as boolean | undefined,
-			isDefault: data.isDefault as boolean | undefined
-		}
-	});
+	const window = await orgTransaction(organizationId, async (tx) => {
+		return tx.sLAWindow.update({
+			where: { id: windowId },
+			data: {
+				name: data.name as string | undefined,
+				priority: data.priority as SLAPriority | undefined,
+				responseTimeMinutes: data.responseTimeMinutes as number | undefined,
+				resolutionTimeMinutes: data.resolutionTimeMinutes as number | undefined,
+				businessHoursOnly: data.businessHoursOnly as boolean | undefined,
+				isDefault: data.isDefault as boolean | undefined
+			}
+		});
+	}, { userId, reason: 'SLA workflow: update window' });
+
+	log.info('SLA window updated', { windowId: window.id, windowName: window.name });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -113,7 +124,11 @@ async function deleteWindow(
 	userId: string,
 	windowId: string
 ): Promise<{ id: string }> {
-	await prisma.sLAWindow.delete({ where: { id: windowId } });
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.sLAWindow.delete({ where: { id: windowId } });
+	}, { userId, reason: 'SLA workflow: delete window' });
+
+	log.info('SLA window deleted', { windowId });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -137,16 +152,20 @@ async function createRecord(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string }> {
-	const record = await prisma.sLARecord.create({
-		data: {
-			organizationId,
-			jobId: data.jobId as string,
-			slaWindowId: data.slaWindowId as string,
-			responseDue: new Date(data.responseDue as string),
-			resolutionDue: new Date(data.resolutionDue as string),
-			notes: data.notes as string | undefined
-		}
-	});
+	const record = await orgTransaction(organizationId, async (tx) => {
+		return tx.sLARecord.create({
+			data: {
+				organizationId,
+				jobId: data.jobId as string,
+				slaWindowId: data.slaWindowId as string,
+				responseDue: new Date(data.responseDue as string),
+				resolutionDue: new Date(data.resolutionDue as string),
+				notes: data.notes as string | undefined
+			}
+		});
+	}, { userId, reason: 'SLA workflow: create record' });
+
+	log.info('SLA record created', { recordId: record.id, jobId: data.jobId });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -171,10 +190,14 @@ async function markResponse(
 	userId: string,
 	recordId: string
 ): Promise<{ id: string }> {
-	const record = await prisma.sLARecord.update({
-		where: { id: recordId },
-		data: { respondedAt: new Date() }
-	});
+	const record = await orgTransaction(organizationId, async (tx) => {
+		return tx.sLARecord.update({
+			where: { id: recordId },
+			data: { respondedAt: new Date() }
+		});
+	}, { userId, reason: 'SLA workflow: mark response' });
+
+	log.info('SLA response marked', { recordId: record.id });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -198,10 +221,14 @@ async function markResolution(
 	userId: string,
 	recordId: string
 ): Promise<{ id: string }> {
-	const record = await prisma.sLARecord.update({
-		where: { id: recordId },
-		data: { resolvedAt: new Date() }
-	});
+	const record = await orgTransaction(organizationId, async (tx) => {
+		return tx.sLARecord.update({
+			where: { id: recordId },
+			data: { resolvedAt: new Date() }
+		});
+	}, { userId, reason: 'SLA workflow: mark resolution' });
+
+	log.info('SLA resolution marked', { recordId: record.id });
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -315,7 +342,7 @@ export const slaWorkflow_v1 = DBOS.registerWorkflow(slaWorkflow);
 
 export async function startSLAWorkflow(
 	input: SLAWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<SLAWorkflowResult> {
 	const handle = await DBOS.startWorkflow(slaWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

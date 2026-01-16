@@ -82,7 +82,7 @@ export const licenseRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create/update license' });
 			}
 
-			const license = await prisma.contractorLicense.findUniqueOrThrow({ where: { id: result.entityId } });
+			const license = await prisma.contractorLicense.findFirstOrThrow({ where: { id: result.entityId, contractorProfile: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{

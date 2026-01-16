@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
@@ -16,6 +17,7 @@ const WORKFLOW_STATUS_EVENT = 'dispatch_status';
 const WORKFLOW_ERROR_EVENT = 'dispatch_error';
 
 interface DispatchAssignmentInput {
+	organizationId: string;
 	jobId: string;
 	technicianId: string;
 	userId: string;
@@ -163,9 +165,10 @@ async function calculateRouting(
 }
 
 async function assignTechnicianToJob(
-	input: DispatchAssignmentInput
+	input: DispatchAssignmentInput,
+	organizationId: string
 ): Promise<void> {
-	await prisma.$transaction(async (tx) => {
+	await orgTransaction(organizationId, async (tx) => {
 		await tx.job.update({
 			where: { id: input.jobId },
 			data: {
@@ -186,7 +189,7 @@ async function assignTechnicianToJob(
 				notes: input.notes ?? `Assigned to technician ${input.technicianId}`
 			}
 		});
-	});
+	}, { userId: input.userId, reason: 'Assigning technician to job' });
 }
 
 async function queueDispatchNotifications(
@@ -261,7 +264,7 @@ async function dispatchAssignmentWorkflow(input: DispatchAssignmentInput): Promi
 
 		// Step 4: Assign technician
 		await DBOS.runStep(
-			() => assignTechnicianToJob(input),
+			() => assignTechnicianToJob(input, input.organizationId),
 			{ name: 'assignTechnicianToJob' }
 		);
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'assigned' });
@@ -309,7 +312,7 @@ export async function startDispatchAssignment(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `dispatch-${input.jobId}-${Date.now()}`;
-	await DBOS.startWorkflow(dispatchAssignment_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(dispatchAssignment_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

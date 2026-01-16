@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ContractorTradeType, PricebookItemType } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -56,57 +56,67 @@ async function addLineItem(input: AddLineItemInput): Promise<{
 	unitPrice: number;
 	total: number;
 }> {
-	let unitPrice = input.unitPrice ?? 0;
-	let itemCode = input.itemCode ?? null;
-	let itemName = input.itemName ?? null;
-	let itemType = input.itemType ?? null;
-	let unitOfMeasure = input.unitOfMeasure ?? null;
-	let trade = input.trade ?? null;
-	const isCustom = !input.pricebookItemId;
+	const result = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			let unitPrice = input.unitPrice ?? 0;
+			let itemCode = input.itemCode ?? null;
+			let itemName = input.itemName ?? null;
+			let itemType = input.itemType ?? null;
+			let unitOfMeasure = input.unitOfMeasure ?? null;
+			let trade = input.trade ?? null;
+			const isCustom = !input.pricebookItemId;
 
-	// If pricebook item provided, snapshot its data
-	if (input.pricebookItemId) {
-		const pbItem = await prisma.pricebookItem.findUnique({
-			where: { id: input.pricebookItemId }
-		});
-		if (!pbItem) {
-			throw new Error('PricebookItem not found');
-		}
+			// If pricebook item provided, snapshot its data
+			if (input.pricebookItemId) {
+				const pbItem = await tx.pricebookItem.findUnique({
+					where: { id: input.pricebookItemId }
+				});
+				if (!pbItem) {
+					throw new Error('PricebookItem not found');
+				}
 
-		unitPrice = input.unitPrice ?? pbItem.basePrice.toNumber();
-		itemCode = pbItem.code;
-		itemName = pbItem.name;
-		itemType = pbItem.type;
-		unitOfMeasure = pbItem.unitOfMeasure;
-		trade = pbItem.trade;
-	}
+				unitPrice = input.unitPrice ?? pbItem.basePrice.toNumber();
+				itemCode = pbItem.code;
+				itemName = pbItem.name;
+				itemType = pbItem.type;
+				unitOfMeasure = pbItem.unitOfMeasure;
+				trade = pbItem.trade;
+			}
 
-	const total = unitPrice * input.quantity;
+			const total = unitPrice * input.quantity;
 
-	// Get next line number
-	const maxLine = await prisma.workOrderLineItem.aggregate({
-		where: { workOrderId: input.workOrderId },
-		_max: { lineNumber: true }
-	});
-	const lineNumber = (maxLine._max?.lineNumber ?? 0) + 1;
+			// Get next line number
+			const maxLine = await tx.workOrderLineItem.aggregate({
+				where: { workOrderId: input.workOrderId },
+				_max: { lineNumber: true }
+			});
+			const lineNumber = (maxLine._max?.lineNumber ?? 0) + 1;
 
-	const lineItem = await prisma.workOrderLineItem.create({
-		data: {
-			workOrderId: input.workOrderId,
-			pricebookItemId: input.pricebookItemId ?? null,
-			quantity: input.quantity,
-			unitPrice,
-			total,
-			lineNumber,
-			itemCode,
-			itemName,
-			itemType,
-			unitOfMeasure,
-			trade,
-			isCustom,
-			notes: input.notes
-		}
-	});
+			const lineItem = await tx.workOrderLineItem.create({
+				data: {
+					workOrderId: input.workOrderId,
+					pricebookItemId: input.pricebookItemId ?? null,
+					quantity: input.quantity,
+					unitPrice,
+					total,
+					lineNumber,
+					itemCode,
+					itemName,
+					itemType,
+					unitOfMeasure,
+					trade,
+					isCustom,
+					notes: input.notes
+				}
+			});
+
+			return { lineItem, lineNumber, itemName, unitPrice, total };
+		},
+		{ userId: input.userId, reason: 'Add work order line item' }
+	);
+
+	const { lineItem, lineNumber, itemName, unitPrice, total } = result;
 
 	// Record activity event
 	await recordWorkflowEvent({
@@ -143,15 +153,23 @@ async function addLineItem(input: AddLineItemInput): Promise<{
 }
 
 async function removeLineItem(input: RemoveLineItemInput): Promise<void> {
-	const lineItem = await prisma.workOrderLineItem.findFirst({
-		where: { id: input.lineItemId, workOrderId: input.workOrderId }
-	});
+	const lineItemInfo = await orgTransaction(
+		input.organizationId,
+		async (tx) => {
+			const lineItem = await tx.workOrderLineItem.findFirst({
+				where: { id: input.lineItemId, workOrderId: input.workOrderId }
+			});
 
-	if (!lineItem) {
-		throw new Error('LineItem not found');
-	}
+			if (!lineItem) {
+				throw new Error('LineItem not found');
+			}
 
-	await prisma.workOrderLineItem.delete({ where: { id: input.lineItemId } });
+			await tx.workOrderLineItem.delete({ where: { id: input.lineItemId } });
+
+			return { id: lineItem.id, lineNumber: lineItem.lineNumber, itemName: lineItem.itemName };
+		},
+		{ userId: input.userId, reason: 'Remove work order line item' }
+	);
 
 	// Record activity event
 	await recordWorkflowEvent({
@@ -160,7 +178,7 @@ async function removeLineItem(input: RemoveLineItemInput): Promise<void> {
 		entityId: input.workOrderId,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
-		summary: `Line item removed: ${lineItem.itemName || 'Custom item'}`,
+		summary: `Line item removed: ${lineItemInfo.itemName || 'Custom item'}`,
 		performedById: input.userId,
 		performedByType: 'HUMAN',
 		workflowId: 'workOrderLineItemWorkflow_v1',
@@ -168,9 +186,9 @@ async function removeLineItem(input: RemoveLineItemInput): Promise<void> {
 		workflowVersion: 'v1',
 		workOrderId: input.workOrderId,
 		previousState: {
-			lineItemId: lineItem.id,
-			lineNumber: lineItem.lineNumber,
-			itemName: lineItem.itemName
+			lineItemId: lineItemInfo.id,
+			lineNumber: lineItemInfo.lineNumber,
+			itemName: lineItemInfo.itemName
 		}
 	});
 }
@@ -252,7 +270,7 @@ export const removeLineItemWorkflow_v1 = DBOS.registerWorkflow(removeLineItemWor
 
 export async function startAddLineItemWorkflow(
 	input: AddLineItemInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<LineItemResult> {
 	const handle = await DBOS.startWorkflow(addLineItemWorkflow_v1, {
 		workflowID: idempotencyKey})(input);
@@ -262,7 +280,7 @@ export async function startAddLineItemWorkflow(
 
 export async function startRemoveLineItemWorkflow(
 	input: RemoveLineItemInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<LineItemResult> {
 	const handle = await DBOS.startWorkflow(removeLineItemWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

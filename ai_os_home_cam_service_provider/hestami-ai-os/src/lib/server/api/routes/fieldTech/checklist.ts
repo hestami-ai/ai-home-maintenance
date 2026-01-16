@@ -137,8 +137,8 @@ export const checklistRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create checklist' });
 			}
 
-			const checklist = await prisma.jobChecklist.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const checklist = await prisma.jobChecklist.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { steps: { orderBy: { stepNumber: 'asc' } } }
 			});
 
@@ -269,8 +269,8 @@ export const checklistRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to apply checklist' });
 			}
 
-			const checklist = await prisma.jobChecklist.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const checklist = await prisma.jobChecklist.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { steps: { orderBy: { stepNumber: 'asc' } } }
 			});
 
@@ -390,8 +390,8 @@ export const checklistRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update step' });
 			}
 
-			const updatedStep = await prisma.jobStep.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const updatedStep = await prisma.jobStep.findFirstOrThrow({
+				where: { id: result.entityId, checklist: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({ step: formatJobStep(updatedStep) }, context);

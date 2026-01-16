@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -75,29 +75,31 @@ async function createAsset(
 	userId: string,
 	data: AssetWorkflowInput['data']
 ): Promise<{ id: string; assetNumber: string; name: string; category: string; status: string }> {
-	const asset = await prisma.asset.create({
-		data: {
-			organizationId,
-			associationId,
-			assetNumber: data.assetNumber!,
-			name: data.name!,
-			description: data.description,
-			category: data.category as any,
-			unitId: data.unitId,
-			commonAreaName: data.commonAreaName,
-			locationDetails: data.locationDetails,
-			manufacturer: data.manufacturer,
-			model: data.model,
-			serialNumber: data.serialNumber,
-			purchaseDate: data.purchaseDate,
-			installDate: data.installDate,
-			warrantyExpires: data.warrantyExpires,
-			warrantyDetails: data.warrantyDetails,
-			purchaseCost: data.purchaseCost,
-			currentValue: data.currentValue,
-			maintenanceFrequencyDays: data.maintenanceFrequencyDays
-		}
-	});
+	const asset = await orgTransaction(organizationId, async (tx) => {
+		return tx.asset.create({
+			data: {
+				organizationId,
+				associationId,
+				assetNumber: data.assetNumber!,
+				name: data.name!,
+				description: data.description,
+				category: data.category as any,
+				unitId: data.unitId,
+				commonAreaName: data.commonAreaName,
+				locationDetails: data.locationDetails,
+				manufacturer: data.manufacturer,
+				model: data.model,
+				serialNumber: data.serialNumber,
+				purchaseDate: data.purchaseDate,
+				installDate: data.installDate,
+				warrantyExpires: data.warrantyExpires,
+				warrantyDetails: data.warrantyDetails,
+				purchaseCost: data.purchaseCost,
+				currentValue: data.currentValue,
+				maintenanceFrequencyDays: data.maintenanceFrequencyDays
+			}
+		});
+	}, { userId, reason: 'Create asset' });
 
 	log.info('CREATE completed', { assetId: asset.id, assetNumber: asset.assetNumber, userId });
 	return {
@@ -110,28 +112,31 @@ async function createAsset(
 }
 
 async function updateAsset(
+	organizationId: string,
 	assetId: string,
 	userId: string,
 	data: AssetWorkflowInput['data']
 ): Promise<{ id: string; name: string; status: string }> {
-	const asset = await prisma.asset.update({
-		where: { id: assetId },
-		data: {
-			...(data.name !== undefined && { name: data.name }),
-			...(data.description !== undefined && { description: data.description }),
-			...(data.status !== undefined && { status: data.status as any }),
-			...(data.unitId !== undefined && { unitId: data.unitId }),
-			...(data.commonAreaName !== undefined && { commonAreaName: data.commonAreaName }),
-			...(data.locationDetails !== undefined && { locationDetails: data.locationDetails }),
-			...(data.manufacturer !== undefined && { manufacturer: data.manufacturer }),
-			...(data.model !== undefined && { model: data.model }),
-			...(data.serialNumber !== undefined && { serialNumber: data.serialNumber }),
-			...(data.warrantyExpires !== undefined && { warrantyExpires: data.warrantyExpires }),
-			...(data.warrantyDetails !== undefined && { warrantyDetails: data.warrantyDetails }),
-			...(data.currentValue !== undefined && { currentValue: data.currentValue }),
-			...(data.maintenanceFrequencyDays !== undefined && { maintenanceFrequencyDays: data.maintenanceFrequencyDays })
-		}
-	});
+	const asset = await orgTransaction(organizationId, async (tx) => {
+		return tx.asset.update({
+			where: { id: assetId },
+			data: {
+				...(data.name !== undefined && { name: data.name }),
+				...(data.description !== undefined && { description: data.description }),
+				...(data.status !== undefined && { status: data.status as any }),
+				...(data.unitId !== undefined && { unitId: data.unitId }),
+				...(data.commonAreaName !== undefined && { commonAreaName: data.commonAreaName }),
+				...(data.locationDetails !== undefined && { locationDetails: data.locationDetails }),
+				...(data.manufacturer !== undefined && { manufacturer: data.manufacturer }),
+				...(data.model !== undefined && { model: data.model }),
+				...(data.serialNumber !== undefined && { serialNumber: data.serialNumber }),
+				...(data.warrantyExpires !== undefined && { warrantyExpires: data.warrantyExpires }),
+				...(data.warrantyDetails !== undefined && { warrantyDetails: data.warrantyDetails }),
+				...(data.currentValue !== undefined && { currentValue: data.currentValue }),
+				...(data.maintenanceFrequencyDays !== undefined && { maintenanceFrequencyDays: data.maintenanceFrequencyDays })
+			}
+		});
+	}, { userId, reason: 'Update asset' });
 
 	log.info('UPDATE completed', { assetId, userId });
 	return {
@@ -142,27 +147,31 @@ async function updateAsset(
 }
 
 async function deleteAsset(
+	organizationId: string,
 	assetId: string,
 	userId: string
 ): Promise<{ success: boolean }> {
-	await prisma.asset.update({
-		where: { id: assetId },
-		data: { deletedAt: new Date(), status: 'DISPOSED' }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.asset.update({
+			where: { id: assetId },
+			data: { deletedAt: new Date(), status: 'DISPOSED' }
+		});
+	}, { userId, reason: 'Delete asset (soft delete)' });
 
 	log.info('DELETE completed', { assetId, userId });
 	return { success: true };
 }
 
 async function logMaintenance(
+	organizationId: string,
 	assetId: string,
 	userId: string,
 	data: AssetWorkflowInput['data']
 ): Promise<{ maintenanceLogId: string; maintenanceDate: string; maintenanceType: string }> {
 	const maintenanceDate = data.maintenanceDate!;
 
-	const [maintenanceLog] = await prisma.$transaction([
-		prisma.assetMaintenanceLog.create({
+	const maintenanceLog = await orgTransaction(organizationId, async (tx) => {
+		const log = await tx.assetMaintenanceLog.create({
 			data: {
 				assetId,
 				maintenanceDate,
@@ -174,15 +183,16 @@ async function logMaintenance(
 				notes: data.notes,
 				createdBy: userId
 			}
-		}),
-		prisma.asset.update({
+		});
+		await tx.asset.update({
 			where: { id: assetId },
 			data: {
 				lastMaintenanceDate: maintenanceDate,
 				nextMaintenanceDate: data.nextMaintenanceDate
 			}
-		})
-	]);
+		});
+		return log;
+	}, { userId, reason: 'Log asset maintenance' });
 
 	log.info('LOG_MAINTENANCE completed', { assetId, maintenanceLogId: maintenanceLog.id, userId });
 	return {
@@ -210,7 +220,7 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 
 			case 'UPDATE': {
 				const result = await DBOS.runStep(
-					() => updateAsset(input.assetId!, input.userId, input.data),
+					() => updateAsset(input.organizationId, input.assetId!, input.userId, input.data),
 					{ name: 'updateAsset' }
 				);
 				return { success: true, entityId: result.id };
@@ -218,7 +228,7 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 
 			case 'DELETE': {
 				await DBOS.runStep(
-					() => deleteAsset(input.assetId!, input.userId),
+					() => deleteAsset(input.organizationId, input.assetId!, input.userId),
 					{ name: 'deleteAsset' }
 				);
 				return { success: true, entityId: input.assetId };
@@ -226,7 +236,7 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 
 			case 'LOG_MAINTENANCE': {
 				const result = await DBOS.runStep(
-					() => logMaintenance(input.assetId!, input.userId, input.data),
+					() => logMaintenance(input.organizationId, input.assetId!, input.userId, input.data),
 					{ name: 'logMaintenance' }
 				);
 				return {

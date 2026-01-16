@@ -284,8 +284,8 @@ export const technicianRouter = {
 			}
 
 			// Fetch the technician for the response
-			const technician = await prisma.technician.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const technician = await prisma.technician.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ technician: serializeTechnician(technician) }, context);
@@ -399,8 +399,8 @@ export const technicianRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert skill' });
 			}
 
-			const skill = await prisma.technicianSkill.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const skill = await prisma.technicianSkill.findFirstOrThrow({
+				where: { id: result.entityId, technician: { organizationId: context.organization.id } }
 			});
 			return successResponse({ skill: serializeSkill(skill) }, context);
 		}),
@@ -472,8 +472,8 @@ export const technicianRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to upsert certification' });
 			}
 
-			const certification = await prisma.technicianCertification.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const certification = await prisma.technicianCertification.findFirstOrThrow({
+				where: { id: result.entityId, technician: { organizationId: context.organization.id } }
 			});
 			return successResponse({ certification: serializeCertification(certification) }, context);
 		}),
@@ -591,8 +591,8 @@ export const technicianRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to set availability' });
 			}
 
-			const availability = await prisma.technicianAvailability.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const availability = await prisma.technicianAvailability.findFirstOrThrow({
+				where: { id: result.entityId, technician: { organizationId: context.organization.id } }
 			});
 			return successResponse({ availability: serializeAvailability(availability) }, context);
 		}),
@@ -678,8 +678,8 @@ export const technicianRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add time off' });
 			}
 
-			const timeOff = await prisma.technicianTimeOff.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const timeOff = await prisma.technicianTimeOff.findFirstOrThrow({
+				where: { id: result.entityId, technician: { organizationId: context.organization.id } }
 			});
 			return successResponse({ timeOff: serializeTimeOff(timeOff) }, context);
 		}),
@@ -755,8 +755,8 @@ export const technicianRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign territory' });
 			}
 
-			const territory = await prisma.technicianTerritory.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const territory = await prisma.technicianTerritory.findFirstOrThrow({
+				where: { id: result.entityId, technician: { organizationId: context.organization.id } }
 			});
 			return successResponse({ territory: serializeTerritory(territory) }, context);
 		}),

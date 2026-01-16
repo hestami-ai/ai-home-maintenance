@@ -7,8 +7,12 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('UsageWorkflow');
 
 // Action types for the unified workflow
 export const UsageAction = {
@@ -46,7 +50,7 @@ async function recordUsage(
 	const unitCost = data.unitCost as number;
 	const notes = data.notes as string | undefined;
 
-	// Check and deduct stock
+	// Check stock first (read operation, no RLS context needed for check)
 	const level = await prisma.inventoryLevel.findFirst({
 		where: {
 			itemId,
@@ -60,36 +64,43 @@ async function recordUsage(
 		throw new Error('Insufficient stock at location');
 	}
 
-	// Deduct from inventory
-	await prisma.inventoryLevel.update({
-		where: { id: level.id },
-		data: {
-			quantityOnHand: level.quantityOnHand - quantity,
-			quantityAvailable: level.quantityAvailable - quantity
-		}
-	});
+	// Perform all mutations in org transaction
+	const usage = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// Deduct from inventory
+			await tx.inventoryLevel.update({
+				where: { id: level.id },
+				data: {
+					quantityOnHand: level.quantityOnHand - quantity,
+					quantityAvailable: level.quantityAvailable - quantity
+				}
+			});
 
-	// Record usage
-	const totalCost = unitCost * quantity;
+			// Record usage
+			const totalCost = unitCost * quantity;
 
-	const usage = await prisma.materialUsage.create({
-		data: {
-			organizationId,
-			jobId,
-			jobVisitId,
-			itemId,
-			locationId,
-			quantity,
-			unitCost,
-			totalCost,
-			lotNumber,
-			serialNumber,
-			usedBy: userId,
-			notes
-		}
-	});
+			return tx.materialUsage.create({
+				data: {
+					organizationId,
+					jobId,
+					jobVisitId,
+					itemId,
+					locationId,
+					quantity,
+					unitCost,
+					totalCost,
+					lotNumber,
+					serialNumber,
+					usedBy: userId,
+					notes
+				}
+			});
+		},
+		{ userId, reason: 'Record material usage' }
+	);
 
-	console.log(`[UsageWorkflow] RECORD_USAGE usage:${usage.id} by user ${userId}`);
+	log.info('RECORD_USAGE completed', { usageId: usage.id, userId });
 	return usage.id;
 }
 
@@ -97,14 +108,15 @@ async function reverseUsage(
 	organizationId: string,
 	userId: string,
 	usageId: string,
-	data: Record<string, unknown>
+	_data: Record<string, unknown>
 ): Promise<string> {
+	// Get usage record first (read operation)
 	const usage = await prisma.materialUsage.findUnique({ where: { id: usageId } });
 	if (!usage) {
 		throw new Error('Usage record not found');
 	}
 
-	// Return stock to inventory
+	// Check for existing inventory level (read operation)
 	const level = await prisma.inventoryLevel.findFirst({
 		where: {
 			itemId: usage.itemId,
@@ -114,31 +126,39 @@ async function reverseUsage(
 		}
 	});
 
-	if (level) {
-		await prisma.inventoryLevel.update({
-			where: { id: level.id },
-			data: {
-				quantityOnHand: level.quantityOnHand + usage.quantity,
-				quantityAvailable: level.quantityAvailable + usage.quantity
+	// Perform all mutations in org transaction
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			// Return stock to inventory
+			if (level) {
+				await tx.inventoryLevel.update({
+					where: { id: level.id },
+					data: {
+						quantityOnHand: level.quantityOnHand + usage.quantity,
+						quantityAvailable: level.quantityAvailable + usage.quantity
+					}
+				});
+			} else {
+				await tx.inventoryLevel.create({
+					data: {
+						itemId: usage.itemId,
+						locationId: usage.locationId,
+						quantityOnHand: usage.quantity,
+						quantityAvailable: usage.quantity,
+						lotNumber: usage.lotNumber,
+						serialNumber: usage.serialNumber
+					}
+				});
 			}
-		});
-	} else {
-		await prisma.inventoryLevel.create({
-			data: {
-				itemId: usage.itemId,
-				locationId: usage.locationId,
-				quantityOnHand: usage.quantity,
-				quantityAvailable: usage.quantity,
-				lotNumber: usage.lotNumber,
-				serialNumber: usage.serialNumber
-			}
-		});
-	}
 
-	// Delete usage record
-	await prisma.materialUsage.delete({ where: { id: usageId } });
+			// Delete usage record
+			await tx.materialUsage.delete({ where: { id: usageId } });
+		},
+		{ userId, reason: 'Reverse material usage' }
+	);
 
-	console.log(`[UsageWorkflow] REVERSE_USAGE usage:${usageId} by user ${userId}`);
+	log.info('REVERSE_USAGE completed', { usageId, userId });
 	return usageId;
 }
 
@@ -170,7 +190,7 @@ async function usageWorkflow(input: UsageWorkflowInput): Promise<UsageWorkflowRe
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[UsageWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error('Workflow error', { action: input.action, error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

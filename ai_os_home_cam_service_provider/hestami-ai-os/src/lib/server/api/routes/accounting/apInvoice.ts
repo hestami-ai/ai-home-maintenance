@@ -70,7 +70,7 @@ export const apInvoiceRouter = {
 
 			// Validate vendor
 			const vendor = await prisma.vendor.findFirst({
-				where: { id: input.vendorId, associationId: association.id, deletedAt: null }
+				where: { id: input.vendorId, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!vendor) {

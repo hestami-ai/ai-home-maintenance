@@ -425,6 +425,8 @@ export const bankAccountRouter = {
 			// Check for pending payments linked to this account
 			const pendingPayments = await prisma.payment.findFirst({
 				where: {
+					association: { organizationId: context.organization.id },
+					associationId: association.id,
 					bankAccountId: input.id,
 					status: 'PENDING'
 				}

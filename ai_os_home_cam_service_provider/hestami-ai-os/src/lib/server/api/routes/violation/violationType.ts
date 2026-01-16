@@ -92,7 +92,7 @@ export const violationTypeRouter = {
 						secondFineAmount: input.secondFineAmount,
 						subsequentFineAmount: input.subsequentFineAmount,
 						maxFineAmount: input.maxFineAmount
-					}
+					} as any
 				},
 				input.idempotencyKey
 			);

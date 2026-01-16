@@ -194,15 +194,17 @@ export const propertyPortfolioRouter = {
 		.handler(async ({ input, context }) => {
 			await context.cerbos.authorize('view', 'property_portfolio', 'list');
 
-			const where = {
-				organizationId: context.organization.id,
+			const baseWhere = {
 				deletedAt: null,
 				...(input.includeInactive ? {} : { isActive: true })
 			};
 
 			const [portfolios, total] = await Promise.all([
 				prisma.propertyPortfolio.findMany({
-					where,
+					where: {
+						organizationId: context.organization.id,
+						...baseWhere
+					},
 					include: {
 						_count: {
 							select: { properties: true }
@@ -213,7 +215,12 @@ export const propertyPortfolioRouter = {
 					skip: input.cursor ? 1 : 0,
 					cursor: input.cursor ? { id: input.cursor } : undefined
 				}),
-				prisma.propertyPortfolio.count({ where })
+				prisma.propertyPortfolio.count({
+					where: {
+						organizationId: context.organization.id,
+						...baseWhere
+					}
+				})
 			]);
 
 			return successResponse(

@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -50,47 +50,62 @@ export interface CaseCommunicationWorkflowResult extends EntityWorkflowResult {
 
 // Step functions
 async function createCaseCommunication(
+	organizationId: string,
 	userId: string,
 	data: CaseCommunicationWorkflowInput['data']
 ): Promise<{ communicationId: string }> {
-	const communication = await prisma.caseCommunication.create({
-		data: {
-			caseId: data.caseId!,
-			channel: data.channel!,
-			direction: data.direction!,
-			subject: data.subject,
-			content: data.content,
-			fromUserId: userId,
-			toRecipient: data.toRecipient,
-			ccRecipients: data.ccRecipients,
-			threadId: data.threadId,
-			sentAt: data.sentAt ? new Date(data.sentAt) : new Date()
-		}
-	});
+	const communication = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.caseCommunication.create({
+				data: {
+					caseId: data.caseId!,
+					channel: data.channel!,
+					direction: data.direction!,
+					subject: data.subject ?? '',
+					content: data.content ?? '',
+					fromUserId: userId,
+					toRecipient: data.toRecipient ?? null,
+					ccRecipients: (data.ccRecipients ?? null) as any,
+					threadId: data.threadId,
+					sentAt: data.sentAt ? new Date(data.sentAt) : new Date()
+				}
+			});
+		},
+		{ userId, reason: 'Create case communication' }
+	);
 
 	log.info('CREATE completed', { communicationId: communication.id, caseId: data.caseId });
 	return { communicationId: communication.id };
 }
 
 async function updateCommunicationStatus(
+	organizationId: string,
+	userId: string,
 	communicationId: string,
 	data: CaseCommunicationWorkflowInput['data']
 ): Promise<{ communicationId: string }> {
-	await prisma.caseCommunication.update({
-		where: { id: communicationId },
-		data: {
-			...(data.deliveredAt !== undefined && {
-				deliveredAt: data.deliveredAt ? new Date(data.deliveredAt) : null
-			}),
-			...(data.readAt !== undefined && {
-				readAt: data.readAt ? new Date(data.readAt) : null
-			}),
-			...(data.failedAt !== undefined && {
-				failedAt: data.failedAt ? new Date(data.failedAt) : null
-			}),
-			...(data.failureReason !== undefined && { failureReason: data.failureReason })
-		}
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.caseCommunication.update({
+				where: { id: communicationId },
+				data: {
+					...(data.deliveredAt !== undefined && {
+						deliveredAt: data.deliveredAt ? new Date(data.deliveredAt) : null
+					}),
+					...(data.readAt !== undefined && {
+						readAt: data.readAt ? new Date(data.readAt) : null
+					}),
+					...(data.failedAt !== undefined && {
+						failedAt: data.failedAt ? new Date(data.failedAt) : null
+					}),
+					...(data.failureReason !== undefined && { failureReason: data.failureReason })
+				}
+			});
+		},
+		{ userId, reason: 'Update case communication status' }
+	);
 
 	log.info('UPDATE_STATUS completed', { communicationId });
 	return { communicationId };
@@ -102,7 +117,7 @@ async function caseCommunicationWorkflow(input: CaseCommunicationWorkflowInput):
 		switch (input.action) {
 			case 'CREATE': {
 				const result = await DBOS.runStep(
-					() => createCaseCommunication(input.userId, input.data),
+					() => createCaseCommunication(input.organizationId, input.userId, input.data),
 					{ name: 'createCaseCommunication' }
 				);
 				return {
@@ -114,7 +129,7 @@ async function caseCommunicationWorkflow(input: CaseCommunicationWorkflowInput):
 
 			case 'UPDATE_STATUS': {
 				const result = await DBOS.runStep(
-					() => updateCommunicationStatus(input.communicationId!, input.data),
+					() => updateCommunicationStatus(input.organizationId, input.userId, input.communicationId!, input.data),
 					{ name: 'updateCommunicationStatus' }
 				);
 				return { success: true, entityId: result.communicationId, communicationId: result.communicationId };
@@ -126,7 +141,7 @@ async function caseCommunicationWorkflow(input: CaseCommunicationWorkflowInput):
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[CaseCommunicationWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
 			errorCode: 'WORKFLOW_FAILED',

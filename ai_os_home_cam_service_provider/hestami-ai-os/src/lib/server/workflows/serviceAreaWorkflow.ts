@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -40,19 +40,25 @@ async function createArea(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const serviceArea = await prisma.serviceArea.create({
-		data: {
-			serviceProviderOrgId: organizationId,
-			name: data.name as string,
-			zipCodes: data.zipCodes as string[],
-			serviceCategories: data.serviceCategories as string[],
-			radius: data.radius as number | undefined,
-			centerLat: data.centerLat as number | undefined,
-			centerLng: data.centerLng as number | undefined
-		}
-	});
+	const serviceArea = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.serviceArea.create({
+				data: {
+					serviceProviderOrgId: organizationId,
+					name: data.name as string,
+					zipCodes: data.zipCodes as string[],
+					serviceCategories: data.serviceCategories as string[],
+					radius: data.radius as number | undefined,
+					centerLat: data.centerLat as number | undefined,
+					centerLng: data.centerLng as number | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Create service area' }
+	);
 
-	console.log(`[ServiceAreaWorkflow] CREATE_AREA area:${serviceArea.id} by user ${userId}`);
+	log.info('CREATE_AREA completed', { serviceAreaId: serviceArea.id, userId });
 	return serviceArea.id;
 }
 
@@ -62,25 +68,31 @@ async function updateArea(
 	serviceAreaId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const existing = await prisma.serviceArea.findFirst({
-		where: { id: serviceAreaId, serviceProviderOrgId: organizationId }
-	});
-	if (!existing) throw new Error('Service area not found');
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			const existing = await tx.serviceArea.findFirst({
+				where: { id: serviceAreaId, serviceProviderOrgId: organizationId }
+			});
+			if (!existing) throw new Error('Service area not found');
 
-	await prisma.serviceArea.update({
-		where: { id: serviceAreaId },
-		data: {
-			name: data.name as string | undefined,
-			zipCodes: data.zipCodes as string[] | undefined,
-			serviceCategories: data.serviceCategories as string[] | undefined,
-			radius: data.radius as number | null | undefined,
-			centerLat: data.centerLat as number | null | undefined,
-			centerLng: data.centerLng as number | null | undefined,
-			isActive: data.isActive as boolean | undefined
-		}
-	});
+			return tx.serviceArea.update({
+				where: { id: serviceAreaId },
+				data: {
+					name: data.name as string | undefined,
+					zipCodes: data.zipCodes as string[] | undefined,
+					serviceCategories: data.serviceCategories as string[] | undefined,
+					radius: data.radius as number | null | undefined,
+					centerLat: data.centerLat as number | null | undefined,
+					centerLng: data.centerLng as number | null | undefined,
+					isActive: data.isActive as boolean | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Update service area' }
+	);
 
-	console.log(`[ServiceAreaWorkflow] UPDATE_AREA area:${serviceAreaId} by user ${userId}`);
+	log.info('UPDATE_AREA completed', { serviceAreaId, userId });
 	return serviceAreaId;
 }
 
@@ -89,14 +101,20 @@ async function deleteArea(
 	userId: string,
 	serviceAreaId: string
 ): Promise<string> {
-	const existing = await prisma.serviceArea.findFirst({
-		where: { id: serviceAreaId, serviceProviderOrgId: organizationId }
-	});
-	if (!existing) throw new Error('Service area not found');
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			const existing = await tx.serviceArea.findFirst({
+				where: { id: serviceAreaId, serviceProviderOrgId: organizationId }
+			});
+			if (!existing) throw new Error('Service area not found');
 
-	await prisma.serviceArea.delete({ where: { id: serviceAreaId } });
+			return tx.serviceArea.delete({ where: { id: serviceAreaId } });
+		},
+		{ userId, reason: 'Delete service area' }
+	);
 
-	console.log(`[ServiceAreaWorkflow] DELETE_AREA area:${serviceAreaId} by user ${userId}`);
+	log.info('DELETE_AREA completed', { serviceAreaId, userId });
 	return serviceAreaId;
 }
 
@@ -135,7 +153,7 @@ async function serviceAreaWorkflow(input: ServiceAreaWorkflowInput): Promise<Ser
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ServiceAreaWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

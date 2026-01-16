@@ -7,10 +7,11 @@
 		title?: string;
 		dismissible?: boolean;
 		onDismiss?: () => void;
+		class?: string;
 		children: Snippet;
 	}
 
-	let { variant = 'info', title, dismissible = false, onDismiss, children }: Props = $props();
+	let { variant = 'info', title, dismissible = false, onDismiss, class: className = '', children }: Props = $props();
 
 	const variantConfig = {
 		info: {
@@ -47,7 +48,7 @@
 	const Icon = $derived(config.icon);
 </script>
 
-<div class="rounded-lg border {config.bgClass} {config.borderClass} p-4" role="alert">
+<div class="rounded-lg border {config.bgClass} {config.borderClass} p-4 {className}" role="alert">
 	<div class="flex items-start gap-3">
 		<Icon class="h-5 w-5 flex-shrink-0 {config.iconClass}" />
 		<div class="flex-1 {config.textClass}">

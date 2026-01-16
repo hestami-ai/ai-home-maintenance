@@ -539,6 +539,7 @@ export const permissionsAdminRouter = {
 
 			const events = await prisma.activityEvent.findMany({
 				where: {
+					organizationId: context.organization!.id,
 					entityType: { in: permissionEntityTypes },
 					action: { in: permissionActions }
 				},

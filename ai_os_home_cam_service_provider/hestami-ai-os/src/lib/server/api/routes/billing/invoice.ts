@@ -182,8 +182,8 @@ export const invoiceRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create invoice from estimate' });
 			}
 
-			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const invoice = await prisma.jobInvoice.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -265,8 +265,8 @@ export const invoiceRouter = {
 			}
 
 			// Fetch the created invoice with relations for the response
-			const invoice = await prisma.jobInvoice.findUnique({
-				where: { id: result.invoiceId },
+			const invoice = await prisma.jobInvoice.findFirst({
+				where: { id: result.invoiceId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -434,8 +434,8 @@ export const invoiceRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update invoice' });
 			}
 
-			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const invoice = await prisma.jobInvoice.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -489,8 +489,8 @@ export const invoiceRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send invoice' });
 			}
 
-			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const invoice = await prisma.jobInvoice.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -536,7 +536,6 @@ export const invoiceRouter = {
 					entityId: input.id,
 					data: {}
 				},
-				input.idempotencyKey,
 				input.idempotencyKey
 			);
 
@@ -545,8 +544,8 @@ export const invoiceRouter = {
 			}
 
 			// Fetch updated invoice
-			const invoice = await prisma.jobInvoice.findUnique({
-				where: { id: input.id },
+			const invoice = await prisma.jobInvoice.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -609,8 +608,8 @@ export const invoiceRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record payment' });
 			}
 
-			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const invoice = await prisma.jobInvoice.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 
@@ -664,8 +663,8 @@ export const invoiceRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to void invoice' });
 			}
 
-			const invoice = await prisma.jobInvoice.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const invoice = await prisma.jobInvoice.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: { lines: { orderBy: { lineNumber: 'asc' } } }
 			});
 

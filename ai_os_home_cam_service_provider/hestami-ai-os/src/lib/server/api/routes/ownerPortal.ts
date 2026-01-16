@@ -592,7 +592,7 @@ export const ownerPortalRouter = {
 
 			if (input.unitId) {
 				const unit = await prisma.unit.findFirst({
-					where: { id: input.unitId, deletedAt: null },
+					where: { id: input.unitId, property: { association: { organizationId: context.organization.id } }, deletedAt: null },
 					include: { property: true }
 				});
 				if (!unit || unit.property.associationId !== input.associationId) {
@@ -855,7 +855,12 @@ export const ownerPortalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to submit owner request' });
 			}
 
-			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.ownerRequest.findFirstOrThrow({
+				where: {
+					id: input.id,
+					association: { organizationId: context.organization.id }
+				}
+			});
 
 			return successResponse(
 				{
@@ -931,7 +936,12 @@ export const ownerPortalRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update request status' });
 			}
 
-			const updated = await prisma.ownerRequest.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.ownerRequest.findFirstOrThrow({
+				where: {
+					id: input.id,
+					association: { organizationId: context.organization.id }
+				}
+			});
 
 			return successResponse(
 				{
@@ -984,11 +994,11 @@ export const ownerPortalRouter = {
 			await context.cerbos.authorize('update', 'ownerRequest', request.id);
 
 			const workOrder = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId },
+				where: { id: input.workOrderId, organizationId: context.organization.id },
 				include: { association: true }
 			});
 
-			if (!workOrder || workOrder.association.organizationId !== context.organization.id) {
+			if (!workOrder) {
 				throw errors.NOT_FOUND({ message: 'WorkOrder' });
 			}
 

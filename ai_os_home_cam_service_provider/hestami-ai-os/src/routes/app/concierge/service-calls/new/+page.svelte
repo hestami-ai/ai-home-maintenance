@@ -32,6 +32,7 @@
 		type ServiceCallCategory,
 		type ServiceCallUrgency
 	} from '$lib/utils/serviceCallTerminology';
+	import ServiceCallMediaUpload from '$lib/components/concierge/ServiceCallMediaUpload.svelte';
 
 	type AvailabilityType = 'FLEXIBLE' | 'SPECIFIC';
 
@@ -52,18 +53,31 @@
 		postalCode: string;
 	}
 
+	interface Organization {
+		id: string;
+		name: string;
+		slug: string;
+		type: string;
+		status: string;
+	}
+
 	interface Props {
 		data: {
 			properties: Property[];
+			organization: Organization | null;
 		};
 	}
 
 	let { data }: Props = $props();
 
 	let isSubmitting = $state(false);
+	let isUploadingMedia = $state(false);
 	let isLoadingProperties = $state(false);
 	let error = $state<string | null>(null);
 	let properties = $derived(data.properties);
+
+	// Reference to media upload component
+	let mediaUploadComponent: ServiceCallMediaUpload | undefined = $state();
 
 	// Form state
 	let selectedPropertyId = $state('');
@@ -192,12 +206,27 @@
 				availabilitySlots: slotsForApi
 			});
 
+			const caseId = result.data.case.id;
+
+			// Upload media files if any are selected
+			if (mediaUploadComponent?.hasPendingFiles()) {
+				isUploadingMedia = true;
+				const uploadResult = await mediaUploadComponent.uploadFilesForCase(caseId);
+
+				if (!uploadResult.success) {
+					// Some uploads failed, but case was created - continue to detail page
+					console.warn('Some media uploads failed:', uploadResult);
+				}
+				isUploadingMedia = false;
+			}
+
 			// Redirect to the service call detail page
-			goto(`/app/concierge/service-calls/${result.data.case.id}`);
+			goto(`/app/concierge/service-calls/${caseId}`);
 		} catch (err) {
 			console.error('Failed to create service call:', err);
 			error = err instanceof Error ? err.message : 'Failed to create service call';
 			isSubmitting = false;
+			isUploadingMedia = false;
 		}
 	}
 
@@ -509,6 +538,17 @@
 					</div>
 				</Card>
 
+				<!-- Supporting Media -->
+				{#if data.organization}
+					<Card variant="outlined" padding="md">
+						<ServiceCallMediaUpload
+							bind:this={mediaUploadComponent}
+							organizationId={data.organization.id}
+							disabled={isSubmitting}
+						/>
+					</Card>
+				{/if}
+
 				<!-- Actions -->
 				<div class="flex justify-end gap-3">
 					<a href="/app/concierge/service-calls" class="btn preset-tonal-surface">Cancel</a>
@@ -519,7 +559,11 @@
 					>
 						{#if isSubmitting}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Submitting...
+							{#if isUploadingMedia}
+								Uploading media...
+							{:else}
+								Creating service call...
+							{/if}
 						{:else}
 							<Check class="mr-2 h-4 w-4" />
 							Submit Service Call

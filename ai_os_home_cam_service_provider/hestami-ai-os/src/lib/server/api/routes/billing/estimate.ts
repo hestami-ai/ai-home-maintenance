@@ -240,8 +240,8 @@ export const estimateRouter = {
 			}
 
 			// Fetch the created estimate with relations for the response
-			const estimate = await prisma.estimate.findUnique({
-				where: { id: result.estimateId },
+			const estimate = await prisma.estimate.findFirst({
+				where: { id: result.estimateId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -332,8 +332,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to generate estimate from pricebook' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -505,8 +505,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update estimate' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -590,8 +590,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add line' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -656,8 +656,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to remove line' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -714,8 +714,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to send estimate' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -767,8 +767,8 @@ export const estimateRouter = {
 			);
 
 			// Fetch updated estimate with relations
-			const estimate = await prisma.estimate.findUnique({
-				where: { id: input.id },
+			const estimate = await prisma.estimate.findFirst({
+				where: { id: input.id, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -826,8 +826,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to accept estimate' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -884,8 +884,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to decline estimate' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }
@@ -938,8 +938,8 @@ export const estimateRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to revise estimate' });
 			}
 
-			const estimate = await prisma.estimate.findUniqueOrThrow({
-				where: { id: result.entityId },
+			const estimate = await prisma.estimate.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id },
 				include: {
 					lines: { orderBy: { lineNumber: 'asc' } },
 					options: { orderBy: { sortOrder: 'asc' }, include: { lines: true } }

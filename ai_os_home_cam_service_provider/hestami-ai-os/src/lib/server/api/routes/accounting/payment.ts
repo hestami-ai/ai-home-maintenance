@@ -66,18 +66,18 @@ export const paymentRouter = {
 
 			// Validate unit
 			const unit = await prisma.unit.findFirst({
-				where: { id: input.unitId },
+				where: { id: input.unitId, organizationId: context.organization.id },
 				include: { property: { include: { association: true } } }
 			});
 
-			if (!unit || unit.property.association.organizationId !== context.organization.id) {
+			if (!unit) {
 				throw errors.NOT_FOUND({ message: 'Unit not found' });
 			}
 
 			// Validate bank account if provided
 			if (input.bankAccountId) {
 				const bankAccount = await prisma.bankAccount.findFirst({
-					where: { id: input.bankAccountId, associationId: association.id }
+					where: { id: input.bankAccountId, associationId: association.id, organizationId: context.organization.id }
 				});
 				if (!bankAccount) {
 					throw errors.NOT_FOUND({ message: 'Bank Account not found' });
@@ -173,7 +173,8 @@ export const paymentRouter = {
 			}
 
 			const where: Prisma.PaymentWhereInput = {
-				associationId: association.id
+				associationId: association.id,
+				association: { organizationId: context.organization.id }
 			};
 
 			if (input?.unitId) where.unitId = input.unitId;
@@ -256,7 +257,7 @@ export const paymentRouter = {
 			}
 
 			const payment = await prisma.payment.findFirst({
-				where: { id: input.id, associationId: association.id },
+				where: { id: input.id, associationId: association.id, association: { organizationId: context.organization.id } },
 				include: { applications: true }
 			});
 
@@ -318,7 +319,7 @@ export const paymentRouter = {
 			}
 
 			const payment = await prisma.payment.findFirst({
-				where: { id: input.id, associationId: association.id },
+				where: { id: input.id, associationId: association.id, association: { organizationId: context.organization.id } },
 				include: { applications: true }
 			});
 

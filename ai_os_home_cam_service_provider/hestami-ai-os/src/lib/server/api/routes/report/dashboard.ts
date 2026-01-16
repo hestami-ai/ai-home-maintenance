@@ -179,15 +179,15 @@ export const dashboardRouter = {
 						userId: input.userId
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create widget' });
 			}
 
-			const widget = await prisma.dashboardWidget.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const widget = await prisma.dashboardWidget.findFirstOrThrow({
+				where: { id: result.entityId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({
@@ -305,15 +305,15 @@ export const dashboardRouter = {
 						isActive: input.isActive
 					}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update widget' });
 			}
 
-			const widget = await prisma.dashboardWidget.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const widget = await prisma.dashboardWidget.findFirstOrThrow({
+				where: { id: result.entityId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse({
@@ -357,7 +357,7 @@ export const dashboardRouter = {
 					widgetId: input.id,
 					data: {}
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
@@ -397,7 +397,7 @@ export const dashboardRouter = {
 					associationId: association.id,
 					data: { widgetIds: input.widgetIds }
 				},
-				input.idempotencyKey
+				input.idempotencyKey ?? crypto.randomUUID()
 			);
 
 			if (!result.success) {
@@ -466,6 +466,7 @@ export const dashboardRouter = {
 			// Aggregate operational data
 			const openWorkOrders = await prisma.workOrder.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['DRAFT', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS'] }
 				}
@@ -473,6 +474,7 @@ export const dashboardRouter = {
 
 			const pendingViolations = await prisma.violation.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['DRAFT', 'OPEN', 'NOTICE_SENT', 'CURE_PERIOD'] },
 					deletedAt: null
@@ -481,6 +483,7 @@ export const dashboardRouter = {
 
 			const pendingArcRequests = await prisma.aRCRequest.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }
 				}
@@ -492,6 +495,7 @@ export const dashboardRouter = {
 
 			const upcomingDeadlines = await prisma.complianceDeadline.count({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					dueDate: { gte: now, lte: thirtyDaysFromNow },
 					status: { in: ['NOT_STARTED', 'IN_PROGRESS'] }
@@ -500,6 +504,7 @@ export const dashboardRouter = {
 
 			const overdueItems = await prisma.complianceDeadline.count({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					dueDate: { lt: now },
 					status: { in: ['NOT_STARTED', 'IN_PROGRESS'] }
@@ -555,6 +560,7 @@ export const dashboardRouter = {
 			// Pending ARC decisions
 			const pendingArcRequests = await prisma.aRCRequest.findMany({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['SUBMITTED', 'UNDER_REVIEW'] }
 				},
@@ -569,6 +575,7 @@ export const dashboardRouter = {
 			// Escalated violations by severity
 			const escalatedViolations = await prisma.violation.findMany({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: 'ESCALATED',
 					deletedAt: null
@@ -585,6 +592,7 @@ export const dashboardRouter = {
 			// Work orders awaiting authorization
 			const workOrdersAwaitingAuth = await prisma.workOrder.findMany({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: 'SUBMITTED', // Awaiting authorization
 					requiresBoardApproval: true,
@@ -603,6 +611,7 @@ export const dashboardRouter = {
 			// Governance pending: meetings needing minutes approval
 			const meetingsNeedingMinutes = await prisma.meeting.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: 'MINUTES_DRAFT'
 				}
@@ -611,6 +620,7 @@ export const dashboardRouter = {
 			// Governance pending: motions awaiting vote
 			const motionsAwaitingVote = await prisma.boardMotion.count({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					status: { in: ['SECONDED', 'UNDER_DISCUSSION', 'UNDER_VOTE'] }
 				}
@@ -623,6 +633,7 @@ export const dashboardRouter = {
 			// Open violations by severity
 			const openViolations = await prisma.violation.findMany({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED'] },
 					deletedAt: null
@@ -641,6 +652,7 @@ export const dashboardRouter = {
 			const violationsByUnit = await prisma.violation.groupBy({
 				by: ['unitId'],
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED'] },
 					deletedAt: null,
@@ -656,8 +668,8 @@ export const dashboardRouter = {
 			const repeatViolationsByUnit = await Promise.all(
 				violationsByUnit.map(async (v) => {
 					if (!v.unitId) return null;
-					const unit = await prisma.unit.findUnique({
-						where: { id: v.unitId },
+					const unit = await prisma.unit.findFirst({
+						where: { id: v.unitId, organizationId: context.organization.id },
 						include: {
 							ownerships: {
 								where: { endDate: null },
@@ -683,6 +695,7 @@ export const dashboardRouter = {
 			// Overdue ARC requests (past SLA - assume 30 days)
 			const overdueArcRequests = await prisma.aRCRequest.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
 					submittedAt: { lt: thirtyDaysAgo }
@@ -692,6 +705,7 @@ export const dashboardRouter = {
 			// Long-running work orders (open > 30 days)
 			const longRunningWorkOrders = await prisma.workOrder.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['SUBMITTED', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS'] },
 					createdAt: { lt: thirtyDaysAgo }
@@ -705,6 +719,7 @@ export const dashboardRouter = {
 			// Overdue assessments
 			const overdueAssessments = await prisma.assessmentCharge.aggregate({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					dueDate: { lt: now },
 					balanceDue: { gt: 0 }
@@ -716,6 +731,7 @@ export const dashboardRouter = {
 			// Work orders exceeding budget
 			const workOrdersExceedingBudget = await prisma.workOrder.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { notIn: ['CLOSED', 'CANCELLED'] },
 					AND: [
@@ -730,6 +746,7 @@ export const dashboardRouter = {
 			// Reserve-funded work pending approval
 			const reserveFundedWorkPending = await prisma.workOrder.count({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					budgetSource: 'RESERVE',
 					status: { in: ['SUBMITTED', 'TRIAGED'] },
@@ -757,6 +774,7 @@ export const dashboardRouter = {
 			// Recently approved ARC requests
 			const recentApprovedArc = await prisma.aRCRequest.findMany({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: 'APPROVED',
 					updatedAt: { gte: thirtyDaysAgo }
@@ -779,6 +797,7 @@ export const dashboardRouter = {
 			// Recently closed violations
 			const recentClosedViolations = await prisma.violation.findMany({
 				where: {
+					organizationId: context.organization.id,
 					associationId: association.id,
 					status: { in: ['CLOSED', 'CURED', 'DISMISSED'] },
 					closedDate: { gte: thirtyDaysAgo },
@@ -802,6 +821,7 @@ export const dashboardRouter = {
 			// Recently approved motions
 			const recentApprovedMotions = await prisma.boardMotion.findMany({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					status: 'APPROVED',
 					decidedAt: { gte: thirtyDaysAgo }
@@ -824,6 +844,7 @@ export const dashboardRouter = {
 			// Recently adopted resolutions
 			const recentResolutions = await prisma.resolution.findMany({
 				where: {
+					association: { organizationId: context.organization.id },
 					associationId: association.id,
 					status: 'ADOPTED',
 					adoptedAt: { gte: thirtyDaysAgo }

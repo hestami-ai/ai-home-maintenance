@@ -17,7 +17,7 @@ import {
 } from '../cerbos/index.js';
 import type { User, Organization, UserRole } from '../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../logger.js';
-import { setOrgContext, clearOrgContext } from '../db/rls.js';
+import { withRLSContext } from '../db.js';
 
 const log = createModuleLogger('api:router');
 
@@ -114,6 +114,10 @@ export const orgProcedure = authedProcedure
 	})
 	.use(async ({ context, next, errors }) => {
 		if (!context.organization) {
+			log.warn('orgProcedure: No organization in context', {
+				userId: context.user?.id,
+				hasUser: !!context.user
+			});
 			throw errors.FORBIDDEN({
 				message: 'Organization context required. Set X-Org-Id header.'
 			});
@@ -122,6 +126,12 @@ export const orgProcedure = authedProcedure
 		const user = context.user!;
 		const organization = context.organization;
 		const role = context.role!;
+
+		log.debug('orgProcedure: Setting RLS context', {
+			userId: user.id,
+			orgId: organization.id,
+			role
+		});
 
 		// Build Cerbos principal from context, including current org role and staff roles
 		const principal = buildPrincipal(
@@ -228,27 +238,27 @@ export const orgProcedure = authedProcedure
 			}
 		};
 
-		// Set RLS context before executing the procedure
-		await setOrgContext(organization.id, {
-			userId: user.id,
-			associationId: context.associationId,
-			isStaff: context.isStaff,
-			reason: 'orgProcedure'
-		});
-
-		try {
-			return await next({
-				context: {
-					...context,
-					organization,
-					role,
-					cerbos: cerbosHelpers
-				} as OrgContext
-			});
-		} finally {
-			// Always clear RLS context, even on error
-			await clearOrgContext(user.id);
-		}
+		// Run the handler within RLS context
+		// The withRLSContext function uses AsyncLocalStorage to propagate context
+		// The Prisma client extension will automatically wrap each query in a transaction
+		// that sets the org context, ensuring connection pool safety
+		return withRLSContext(
+			{
+				organizationId: organization.id,
+				userId: user.id,
+				associationId: context.associationId,
+				isStaff: context.isStaff
+			},
+			() =>
+				next({
+					context: {
+						...context,
+						organization,
+						role,
+						cerbos: cerbosHelpers
+					} as OrgContext
+				})
+		)
 	});
 
 /**

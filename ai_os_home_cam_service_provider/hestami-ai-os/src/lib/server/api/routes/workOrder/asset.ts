@@ -79,17 +79,17 @@ export const assetRouter = {
 			// Validate unit if provided
 			if (input.unitId) {
 				const unit = await prisma.unit.findFirst({
-					where: { id: input.unitId },
+					where: { id: input.unitId, organizationId: context.organization.id },
 					include: { property: { include: { association: true } } }
 				});
-				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+				if (!unit) {
 					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
 
 			// Generate asset number
 			const lastAsset = await prisma.asset.findFirst({
-				where: { associationId: association.id },
+				where: { organizationId: context.organization.id, associationId: association.id },
 				orderBy: { createdAt: 'desc' }
 			});
 
@@ -195,6 +195,7 @@ export const assetRouter = {
 			}
 
 			const where: Prisma.AssetWhereInput = {
+				organizationId: context.organization.id,
 				associationId: association.id,
 				deletedAt: null
 			};
@@ -286,7 +287,7 @@ export const assetRouter = {
 			}
 
 			const asset = await prisma.asset.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!asset) {
@@ -374,7 +375,7 @@ export const assetRouter = {
 			}
 
 			const existing = await prisma.asset.findFirst({
-				where: { id: input.id, associationId: association.id, deletedAt: null }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!existing) {
@@ -458,6 +459,7 @@ export const assetRouter = {
 			// Check for open work orders
 			const openWorkOrders = await prisma.workOrder.findFirst({
 				where: {
+					organizationId: context.organization.id,
 					assetId: input.id,
 					status: { notIn: ['CLOSED', 'CANCELLED'] }
 				}

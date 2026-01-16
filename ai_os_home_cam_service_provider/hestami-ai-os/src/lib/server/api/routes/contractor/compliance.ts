@@ -198,7 +198,7 @@ async function computeComplianceReadOnly(vendorId: string, organizationId: strin
 	const earliestLicenseExpiry = license?.expirationDate ?? null;
 	const earliestInsuranceExpiry = insurance?.expirationDate ?? null;
 	const meetsMinCoverage = !!insurance;
-	const hasW9OnFile = !!(await prisma.vendor.findUnique({ where: { id: vendorId }, select: { w9OnFile: true } }))
+	const hasW9OnFile = !!(await prisma.vendor.findFirst({ where: { id: vendorId, organizationId }, select: { w9OnFile: true } }))
 		?.w9OnFile;
 
 	let complianceScore = 0;

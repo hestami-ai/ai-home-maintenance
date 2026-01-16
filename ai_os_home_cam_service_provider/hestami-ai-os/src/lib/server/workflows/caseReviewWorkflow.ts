@@ -6,10 +6,10 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('CaseReviewWorkflow');
 
@@ -47,53 +47,60 @@ export interface CaseReviewWorkflowResult extends EntityWorkflowResult {
 
 // Step functions
 async function createCaseReview(
+	organizationId: string,
 	userId: string,
 	caseId: string,
 	data: CaseReviewWorkflowInput['data']
 ): Promise<{ reviewId: string }> {
-	const review = await prisma.caseReview.create({
-		data: {
-			caseId,
-			outcomeSummary: data.outcomeSummary!,
-			vendorPerformanceNotes: data.vendorPerformanceNotes,
-			issuesEncountered: data.issuesEncountered,
-			lessonsLearned: data.lessonsLearned,
-			vendorRating: data.vendorRating,
-			communicationRating: data.communicationRating,
-			timelinessRating: data.timelinessRating,
-			overallSatisfaction: data.overallSatisfaction,
-			reusableVendor: data.reusableVendor ?? false,
-			reusableScope: data.reusableScope ?? false,
-			reusableProcess: data.reusableProcess ?? false,
-			reviewedByUserId: userId,
-			reviewedAt: new Date()
-		}
-	});
+	const review = await orgTransaction(organizationId, async (tx) => {
+		return tx.caseReview.create({
+			data: {
+				caseId,
+				outcomeSummary: data.outcomeSummary!,
+				vendorPerformanceNotes: data.vendorPerformanceNotes,
+				issuesEncountered: data.issuesEncountered,
+				lessonsLearned: data.lessonsLearned,
+				vendorRating: data.vendorRating,
+				communicationRating: data.communicationRating,
+				timelinessRating: data.timelinessRating,
+				overallSatisfaction: data.overallSatisfaction,
+				reusableVendor: data.reusableVendor ?? false,
+				reusableScope: data.reusableScope ?? false,
+				reusableProcess: data.reusableProcess ?? false,
+				reviewedByUserId: userId,
+				reviewedAt: new Date()
+			}
+		});
+	}, { userId, reason: 'Create case review' });
 
 	log.info('CREATE completed', { reviewId: review.id, caseId });
 	return { reviewId: review.id };
 }
 
 async function updateCaseReview(
+	organizationId: string,
+	userId: string,
 	caseId: string,
 	data: CaseReviewWorkflowInput['data']
 ): Promise<{ reviewId: string }> {
-	const review = await prisma.caseReview.update({
-		where: { caseId },
-		data: {
-			...(data.outcomeSummary !== undefined && { outcomeSummary: data.outcomeSummary }),
-			...(data.vendorPerformanceNotes !== undefined && { vendorPerformanceNotes: data.vendorPerformanceNotes }),
-			...(data.issuesEncountered !== undefined && { issuesEncountered: data.issuesEncountered }),
-			...(data.lessonsLearned !== undefined && { lessonsLearned: data.lessonsLearned }),
-			...(data.vendorRating !== undefined && { vendorRating: data.vendorRating }),
-			...(data.communicationRating !== undefined && { communicationRating: data.communicationRating }),
-			...(data.timelinessRating !== undefined && { timelinessRating: data.timelinessRating }),
-			...(data.overallSatisfaction !== undefined && { overallSatisfaction: data.overallSatisfaction }),
-			...(data.reusableVendor !== undefined && { reusableVendor: data.reusableVendor }),
-			...(data.reusableScope !== undefined && { reusableScope: data.reusableScope }),
-			...(data.reusableProcess !== undefined && { reusableProcess: data.reusableProcess })
-		}
-	});
+	const review = await orgTransaction(organizationId, async (tx) => {
+		return tx.caseReview.update({
+			where: { caseId },
+			data: {
+				...(data.outcomeSummary !== undefined && { outcomeSummary: data.outcomeSummary }),
+				...(data.vendorPerformanceNotes !== undefined && { vendorPerformanceNotes: data.vendorPerformanceNotes }),
+				...(data.issuesEncountered !== undefined && { issuesEncountered: data.issuesEncountered }),
+				...(data.lessonsLearned !== undefined && { lessonsLearned: data.lessonsLearned }),
+				...(data.vendorRating !== undefined && { vendorRating: data.vendorRating }),
+				...(data.communicationRating !== undefined && { communicationRating: data.communicationRating }),
+				...(data.timelinessRating !== undefined && { timelinessRating: data.timelinessRating }),
+				...(data.overallSatisfaction !== undefined && { overallSatisfaction: data.overallSatisfaction }),
+				...(data.reusableVendor !== undefined && { reusableVendor: data.reusableVendor }),
+				...(data.reusableScope !== undefined && { reusableScope: data.reusableScope }),
+				...(data.reusableProcess !== undefined && { reusableProcess: data.reusableProcess })
+			}
+		});
+	}, { userId, reason: 'Update case review' });
 
 	log.info('UPDATE completed', { reviewId: review.id, caseId });
 	return { reviewId: review.id };
@@ -105,7 +112,7 @@ async function caseReviewWorkflow(input: CaseReviewWorkflowInput): Promise<CaseR
 		switch (input.action) {
 			case 'CREATE': {
 				const result = await DBOS.runStep(
-					() => createCaseReview(input.userId, input.caseId, input.data),
+					() => createCaseReview(input.organizationId, input.userId, input.caseId, input.data),
 					{ name: 'createCaseReview' }
 				);
 				return {
@@ -117,7 +124,7 @@ async function caseReviewWorkflow(input: CaseReviewWorkflowInput): Promise<CaseR
 
 			case 'UPDATE': {
 				const result = await DBOS.runStep(
-					() => updateCaseReview(input.caseId, input.data),
+					() => updateCaseReview(input.organizationId, input.userId, input.caseId, input.data),
 					{ name: 'updateCaseReview' }
 				);
 				return { success: true, entityId: result.reviewId, reviewId: result.reviewId };
@@ -129,7 +136,7 @@ async function caseReviewWorkflow(input: CaseReviewWorkflowInput): Promise<CaseR
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[CaseReviewWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}:`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
 			errorCode: 'WORKFLOW_FAILED',

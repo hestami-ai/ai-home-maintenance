@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { WidgetType } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -52,20 +53,22 @@ async function createWidget(
 		_max: { position: true }
 	});
 
-	const widget = await prisma.dashboardWidget.create({
-		data: {
-			associationId,
-			userId: widgetUserId,
-			widgetType: data.widgetType as WidgetType,
-			title: data.title as string,
-			configJson: data.configJson as string | undefined,
-			position: (data.position as number | undefined) ?? (maxPos._max.position ?? 0) + 1,
-			width: (data.width as number | undefined) ?? 1,
-			height: (data.height as number | undefined) ?? 1
-		}
-	});
+	const widget = await orgTransaction(organizationId, async (tx) => {
+		return tx.dashboardWidget.create({
+			data: {
+				associationId,
+				userId: widgetUserId,
+				widgetType: data.widgetType as WidgetType,
+				title: data.title as string,
+				configJson: data.configJson as string | undefined,
+				position: (data.position as number | undefined) ?? (maxPos._max.position ?? 0) + 1,
+				width: (data.width as number | undefined) ?? 1,
+				height: (data.height as number | undefined) ?? 1
+			}
+		});
+	}, { userId, reason: 'Create dashboard widget' });
 
-	console.log(`[DashboardWorkflow] CREATE_WIDGET widget:${widget.id} by user ${userId}`);
+	log.info(`CREATE_WIDGET widget:${widget.id} by user ${userId}`);
 	return widget.id;
 }
 
@@ -81,19 +84,21 @@ async function updateWidget(
 	});
 	if (!existing) throw new Error('Dashboard widget not found');
 
-	await prisma.dashboardWidget.update({
-		where: { id: widgetId },
-		data: {
-			title: data.title as string | undefined,
-			configJson: data.configJson as string | null | undefined,
-			position: data.position as number | undefined,
-			width: data.width as number | undefined,
-			height: data.height as number | undefined,
-			isActive: data.isActive as boolean | undefined
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.dashboardWidget.update({
+			where: { id: widgetId },
+			data: {
+				title: data.title as string | undefined,
+				configJson: data.configJson as string | null | undefined,
+				position: data.position as number | undefined,
+				width: data.width as number | undefined,
+				height: data.height as number | undefined,
+				isActive: data.isActive as boolean | undefined
+			}
+		});
+	}, { userId, reason: 'Update dashboard widget' });
 
-	console.log(`[DashboardWorkflow] UPDATE_WIDGET widget:${widgetId} by user ${userId}`);
+	log.info(`UPDATE_WIDGET widget:${widgetId} by user ${userId}`);
 	return widgetId;
 }
 
@@ -108,9 +113,11 @@ async function deleteWidget(
 	});
 	if (!existing) throw new Error('Dashboard widget not found');
 
-	await prisma.dashboardWidget.delete({ where: { id: widgetId } });
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.dashboardWidget.delete({ where: { id: widgetId } });
+	}, { userId, reason: 'Delete dashboard widget' });
 
-	console.log(`[DashboardWorkflow] DELETE_WIDGET widget:${widgetId} by user ${userId}`);
+	log.info(`DELETE_WIDGET widget:${widgetId} by user ${userId}`);
 	return widgetId;
 }
 
@@ -131,17 +138,17 @@ async function reorderWidgets(
 		throw new Error('Some widgets not found or not accessible');
 	}
 
-	// Update positions in order
-	await prisma.$transaction(
-		widgetIds.map((id, index) =>
-			prisma.dashboardWidget.update({
-				where: { id },
+	// Update positions in order using orgTransaction
+	await orgTransaction(organizationId, async (tx) => {
+		for (let index = 0; index < widgetIds.length; index++) {
+			await tx.dashboardWidget.update({
+				where: { id: widgetIds[index] },
 				data: { position: index }
-			})
-		)
-	);
+			});
+		}
+	}, { userId, reason: 'Reorder dashboard widgets' });
 
-	console.log(`[DashboardWorkflow] REORDER_WIDGETS ${widgetIds.length} widgets by user ${userId}`);
+	log.info(`REORDER_WIDGETS ${widgetIds.length} widgets by user ${userId}`);
 	return 'reordered';
 }
 
@@ -187,7 +194,7 @@ async function dashboardWorkflow(input: DashboardWorkflowInput): Promise<Dashboa
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[DashboardWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

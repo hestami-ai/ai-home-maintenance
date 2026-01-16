@@ -6,9 +6,12 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
+import { createWorkflowLogger } from './workflowLogger.js';
+
+const log = createWorkflowLogger('StockWorkflow');
 
 // Action types for the unified workflow
 export const StockAction = {
@@ -47,49 +50,53 @@ async function adjustStock(
 	const serialNumber = (data.serialNumber as string | undefined) ?? null;
 	const expirationDate = data.expirationDate as string | undefined;
 
-	let level = await prisma.inventoryLevel.findFirst({
-		where: {
-			itemId,
-			locationId,
-			lotNumber,
-			serialNumber
-		}
-	});
-
-	if (level) {
-		const newOnHand = level.quantityOnHand + adjustment;
-		if (newOnHand < 0) {
-			throw new Error('Adjustment would result in negative stock');
-		}
-
-		level = await prisma.inventoryLevel.update({
-			where: { id: level.id },
-			data: {
-				quantityOnHand: newOnHand,
-				quantityAvailable: newOnHand - level.quantityReserved,
-				expirationDate: expirationDate ? new Date(expirationDate) : level.expirationDate
-			}
-		});
-	} else {
-		if (adjustment < 0) {
-			throw new Error('Cannot remove stock that does not exist');
-		}
-
-		level = await prisma.inventoryLevel.create({
-			data: {
+	const levelId = await orgTransaction(organizationId, async (tx) => {
+		let level = await tx.inventoryLevel.findFirst({
+			where: {
 				itemId,
 				locationId,
-				quantityOnHand: adjustment,
-				quantityAvailable: adjustment,
 				lotNumber,
-				serialNumber,
-				expirationDate: expirationDate ? new Date(expirationDate) : null
+				serialNumber
 			}
 		});
-	}
 
-	console.log(`[StockWorkflow] ADJUST_STOCK on item:${itemId} location:${locationId} by user ${userId}`);
-	return level.id;
+		if (level) {
+			const newOnHand = level.quantityOnHand + adjustment;
+			if (newOnHand < 0) {
+				throw new Error('Adjustment would result in negative stock');
+			}
+
+			level = await tx.inventoryLevel.update({
+				where: { id: level.id },
+				data: {
+					quantityOnHand: newOnHand,
+					quantityAvailable: newOnHand - level.quantityReserved,
+					expirationDate: expirationDate ? new Date(expirationDate) : level.expirationDate
+				}
+			});
+		} else {
+			if (adjustment < 0) {
+				throw new Error('Cannot remove stock that does not exist');
+			}
+
+			level = await tx.inventoryLevel.create({
+				data: {
+					itemId,
+					locationId,
+					quantityOnHand: adjustment,
+					quantityAvailable: adjustment,
+					lotNumber,
+					serialNumber,
+					expirationDate: expirationDate ? new Date(expirationDate) : null
+				}
+			});
+		}
+
+		return level.id;
+	}, { userId, reason: 'Adjusting stock via workflow' });
+
+	log.info(`ADJUST_STOCK on item:${itemId} location:${locationId} by user ${userId}`);
+	return levelId;
 }
 
 async function reserveStock(
@@ -103,33 +110,37 @@ async function reserveStock(
 	const lotNumber = (data.lotNumber as string | undefined) ?? null;
 	const serialNumber = (data.serialNumber as string | undefined) ?? null;
 
-	const level = await prisma.inventoryLevel.findFirst({
-		where: {
-			itemId,
-			locationId,
-			lotNumber,
-			serialNumber
+	const updatedId = await orgTransaction(organizationId, async (tx) => {
+		const level = await tx.inventoryLevel.findFirst({
+			where: {
+				itemId,
+				locationId,
+				lotNumber,
+				serialNumber
+			}
+		});
+
+		if (!level) {
+			throw new Error('Inventory level not found');
 		}
-	});
 
-	if (!level) {
-		throw new Error('Inventory level not found');
-	}
-
-	if (level.quantityAvailable < quantity) {
-		throw new Error('Insufficient available stock');
-	}
-
-	const updated = await prisma.inventoryLevel.update({
-		where: { id: level.id },
-		data: {
-			quantityReserved: level.quantityReserved + quantity,
-			quantityAvailable: level.quantityAvailable - quantity
+		if (level.quantityAvailable < quantity) {
+			throw new Error('Insufficient available stock');
 		}
-	});
 
-	console.log(`[StockWorkflow] RESERVE_STOCK on item:${itemId} location:${locationId} qty:${quantity} by user ${userId}`);
-	return updated.id;
+		const updated = await tx.inventoryLevel.update({
+			where: { id: level.id },
+			data: {
+				quantityReserved: level.quantityReserved + quantity,
+				quantityAvailable: level.quantityAvailable - quantity
+			}
+		});
+
+		return updated.id;
+	}, { userId, reason: 'Reserving stock via workflow' });
+
+	log.info(`RESERVE_STOCK on item:${itemId} location:${locationId} qty:${quantity} by user ${userId}`);
+	return updatedId;
 }
 
 async function releaseStock(
@@ -143,33 +154,37 @@ async function releaseStock(
 	const lotNumber = (data.lotNumber as string | undefined) ?? null;
 	const serialNumber = (data.serialNumber as string | undefined) ?? null;
 
-	const level = await prisma.inventoryLevel.findFirst({
-		where: {
-			itemId,
-			locationId,
-			lotNumber,
-			serialNumber
+	const updatedId = await orgTransaction(organizationId, async (tx) => {
+		const level = await tx.inventoryLevel.findFirst({
+			where: {
+				itemId,
+				locationId,
+				lotNumber,
+				serialNumber
+			}
+		});
+
+		if (!level) {
+			throw new Error('Inventory level not found');
 		}
-	});
 
-	if (!level) {
-		throw new Error('Inventory level not found');
-	}
-
-	if (level.quantityReserved < quantity) {
-		throw new Error('Cannot release more than reserved');
-	}
-
-	const updated = await prisma.inventoryLevel.update({
-		where: { id: level.id },
-		data: {
-			quantityReserved: level.quantityReserved - quantity,
-			quantityAvailable: level.quantityAvailable + quantity
+		if (level.quantityReserved < quantity) {
+			throw new Error('Cannot release more than reserved');
 		}
-	});
 
-	console.log(`[StockWorkflow] RELEASE_STOCK on item:${itemId} location:${locationId} qty:${quantity} by user ${userId}`);
-	return updated.id;
+		const updated = await tx.inventoryLevel.update({
+			where: { id: level.id },
+			data: {
+				quantityReserved: level.quantityReserved - quantity,
+				quantityAvailable: level.quantityAvailable + quantity
+			}
+		});
+
+		return updated.id;
+	}, { userId, reason: 'Releasing stock via workflow' });
+
+	log.info(`RELEASE_STOCK on item:${itemId} location:${locationId} qty:${quantity} by user ${userId}`);
+	return updatedId;
 }
 
 async function recordCount(
@@ -184,40 +199,44 @@ async function recordCount(
 	const lotNumber = (data.lotNumber as string | undefined) ?? null;
 	const serialNumber = (data.serialNumber as string | undefined) ?? null;
 
-	let updated;
+	const updatedId = await orgTransaction(organizationId, async (tx) => {
+		let updated;
 
-	if (levelId) {
-		const level = await prisma.inventoryLevel.findUnique({ where: { id: levelId } });
-		if (!level) {
-			throw new Error('Inventory level not found');
+		if (levelId) {
+			const level = await tx.inventoryLevel.findUnique({ where: { id: levelId } });
+			if (!level) {
+				throw new Error('Inventory level not found');
+			}
+
+			// Update existing level
+			updated = await tx.inventoryLevel.update({
+				where: { id: levelId },
+				data: {
+					quantityOnHand: countedQuantity,
+					quantityAvailable: countedQuantity - level.quantityReserved,
+					lastCountedAt: new Date()
+				}
+			});
+		} else {
+			// Create new level if it doesn't exist
+			updated = await tx.inventoryLevel.create({
+				data: {
+					itemId,
+					locationId,
+					quantityOnHand: countedQuantity,
+					quantityAvailable: countedQuantity,
+					lotNumber,
+					serialNumber,
+					lastCountedAt: new Date()
+				}
+			});
 		}
 
-		// Update existing level
-		updated = await prisma.inventoryLevel.update({
-			where: { id: levelId },
-			data: {
-				quantityOnHand: countedQuantity,
-				quantityAvailable: countedQuantity - level.quantityReserved,
-				lastCountedAt: new Date()
-			}
-		});
-	} else {
-		// Create new level if it doesn't exist
-		updated = await prisma.inventoryLevel.create({
-			data: {
-				itemId,
-				locationId,
-				quantityOnHand: countedQuantity,
-				quantityAvailable: countedQuantity,
-				lotNumber,
-				serialNumber,
-				lastCountedAt: new Date()
-			}
-		});
-	}
+		return updated.id;
+	}, { userId, reason: 'Recording inventory count via workflow' });
 
-	console.log(`[StockWorkflow] RECORD_COUNT on level:${updated.id} by user ${userId}`);
-	return updated.id;
+	log.info(`RECORD_COUNT on level:${updatedId} by user ${userId}`);
+	return updatedId;
 }
 
 // Main workflow function
@@ -262,7 +281,7 @@ async function stockWorkflow(input: StockWorkflowInput): Promise<StockWorkflowRe
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[StockWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

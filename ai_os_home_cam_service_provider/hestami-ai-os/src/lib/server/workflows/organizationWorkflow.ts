@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -99,21 +100,24 @@ async function createOrganizationWithAdmin(
 async function createAssociation(
 	organizationId: string,
 	organizationName: string,
+	userId: string,
 	data: OrganizationWorkflowInput['data']
 ): Promise<{ associationId: string; name: string; status: string }> {
-	const association = await prisma.association.create({
-		data: {
-			organizationId,
-			name: data.associationName ?? organizationName,
-			legalName: data.legalName ?? null,
-			fiscalYearEnd: data.fiscalYearEndMonth ?? 12,
-			status: 'ONBOARDING',
-			settings: {
-				boardSeats: data.boardSeats ?? 5,
-				totalUnits: data.totalUnits ?? 0
+	const association = await orgTransaction(organizationId, async (tx) => {
+		return tx.association.create({
+			data: {
+				organizationId,
+				name: data.associationName ?? organizationName,
+				legalName: data.legalName ?? null,
+				fiscalYearEnd: data.fiscalYearEndMonth ?? 12,
+				status: 'ONBOARDING',
+				settings: {
+					boardSeats: data.boardSeats ?? 5,
+					totalUnits: data.totalUnits ?? 0
+				}
 			}
-		}
-	});
+		});
+	}, { userId, reason: 'Creating association for organization' });
 
 	log.info('CREATE_ASSOCIATION completed', { associationId: association.id, organizationId });
 	return {
@@ -128,13 +132,15 @@ async function updateOrganization(
 	userId: string,
 	data: OrganizationWorkflowInput['data']
 ): Promise<{ id: string; name: string; slug: string; type: string; status: string }> {
-	const organization = await prisma.organization.update({
-		where: { id: organizationId },
-		data: {
-			...(data.name && { name: data.name }),
-			...(data.settings && { settings: data.settings as Prisma.InputJsonValue })
-		}
-	});
+	const organization = await orgTransaction(organizationId, async (tx) => {
+		return tx.organization.update({
+			where: { id: organizationId },
+			data: {
+				...(data.name && { name: data.name }),
+				...(data.settings && { settings: data.settings as Prisma.InputJsonValue })
+			}
+		});
+	}, { userId, reason: 'Updating organization settings' });
 
 	log.info('UPDATE completed', { organizationId, userId });
 	return {
@@ -151,10 +157,12 @@ async function deleteOrganization(
 	userId: string
 ): Promise<{ deletedAt: string }> {
 	const now = new Date();
-	await prisma.organization.update({
-		where: { id: organizationId },
-		data: { deletedAt: now }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.organization.update({
+			where: { id: organizationId },
+			data: { deletedAt: now }
+		});
+	}, { userId, reason: 'Soft-deleting organization' });
 
 	log.info('DELETE completed', { organizationId, userId });
 	return { deletedAt: now.toISOString() };
@@ -207,6 +215,7 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 					() => createAssociation(
 						input.organizationId!,
 						input.data.name!,
+						input.userId,
 						input.data
 					),
 					{ name: 'createAssociation' }

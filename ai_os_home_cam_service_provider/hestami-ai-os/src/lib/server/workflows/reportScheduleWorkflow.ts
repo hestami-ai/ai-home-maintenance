@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ScheduleFrequency, ReportFormat, ReportDeliveryMethod } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -73,7 +74,7 @@ async function createSchedule(
 ): Promise<string> {
 	const reportId = data.reportId as string;
 
-	// Verify report exists
+	// Verify report exists (read operation - no RLS transaction needed)
 	const report = await prisma.reportDefinition.findFirst({
 		where: {
 			id: reportId,
@@ -92,23 +93,25 @@ async function createSchedule(
 	const format = (data.format as string) || report.defaultFormat;
 	const nextRunAt = calculateNextRun(frequency, cronExpression);
 
-	const schedule = await prisma.reportSchedule.create({
-		data: {
-			reportId,
-			associationId,
-			name: data.name as string,
-			frequency: frequency as ScheduleFrequency,
-			cronExpression,
-			parametersJson: data.parametersJson as string | undefined,
-			format: format as ReportFormat,
-			deliveryMethod: (data.deliveryMethod as ReportDeliveryMethod) || 'EMAIL',
-			recipientsJson: data.recipientsJson as string | undefined,
-			nextRunAt,
-			createdBy: userId
-		}
-	});
+	const schedule = await orgTransaction(organizationId, async (tx) => {
+		return tx.reportSchedule.create({
+			data: {
+				reportId,
+				associationId,
+				name: data.name as string,
+				frequency: frequency as ScheduleFrequency,
+				cronExpression,
+				parametersJson: data.parametersJson as string | undefined,
+				format: format as ReportFormat,
+				deliveryMethod: (data.deliveryMethod as ReportDeliveryMethod) || 'EMAIL',
+				recipientsJson: data.recipientsJson as string | undefined,
+				nextRunAt,
+				createdBy: userId
+			}
+		});
+	}, { userId, reason: 'Create report schedule' });
 
-	console.log(`[ReportScheduleWorkflow] CREATE_SCHEDULE schedule:${schedule.id} by user ${userId}`);
+	log.info(`CREATE_SCHEDULE schedule:${schedule.id} by user ${userId}`);
 	return schedule.id;
 }
 
@@ -131,22 +134,24 @@ async function updateSchedule(
 		nextRunAt = calculateNextRun(frequency, data.cronExpression as string | undefined);
 	}
 
-	await prisma.reportSchedule.update({
-		where: { id: scheduleId },
-		data: {
-			name: data.name as string | undefined,
-			frequency: frequency as ScheduleFrequency | undefined,
-			cronExpression: data.cronExpression as string | undefined,
-			parametersJson: data.parametersJson as string | undefined,
-			format: data.format as ReportFormat | undefined,
-			deliveryMethod: data.deliveryMethod as ReportDeliveryMethod | undefined,
-			recipientsJson: data.recipientsJson as string | null | undefined,
-			isActive: data.isActive as boolean | undefined,
-			nextRunAt
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.reportSchedule.update({
+			where: { id: scheduleId },
+			data: {
+				name: data.name as string | undefined,
+				frequency: frequency as ScheduleFrequency | undefined,
+				cronExpression: data.cronExpression as string | undefined,
+				parametersJson: data.parametersJson as string | undefined,
+				format: data.format as ReportFormat | undefined,
+				deliveryMethod: data.deliveryMethod as ReportDeliveryMethod | undefined,
+				recipientsJson: data.recipientsJson as string | null | undefined,
+				isActive: data.isActive as boolean | undefined,
+				nextRunAt
+			}
+		});
+	}, { userId, reason: 'Update report schedule' });
 
-	console.log(`[ReportScheduleWorkflow] UPDATE_SCHEDULE schedule:${scheduleId} by user ${userId}`);
+	log.info(`UPDATE_SCHEDULE schedule:${scheduleId} by user ${userId}`);
 	return scheduleId;
 }
 
@@ -161,9 +166,11 @@ async function deleteSchedule(
 	});
 	if (!existing) throw new Error('Report schedule not found');
 
-	await prisma.reportSchedule.delete({ where: { id: scheduleId } });
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.reportSchedule.delete({ where: { id: scheduleId } });
+	}, { userId, reason: 'Delete report schedule' });
 
-	console.log(`[ReportScheduleWorkflow] DELETE_SCHEDULE schedule:${scheduleId} by user ${userId}`);
+	log.info(`DELETE_SCHEDULE schedule:${scheduleId} by user ${userId}`);
 	return scheduleId;
 }
 
@@ -178,29 +185,33 @@ async function runNow(
 	});
 	if (!schedule) throw new Error('Report schedule not found');
 
-	// Create execution from schedule
-	const execution = await prisma.reportExecution.create({
-		data: {
-			reportId: schedule.reportId,
-			scheduleId: schedule.id,
-			associationId,
-			status: 'PENDING',
-			parametersJson: schedule.parametersJson,
-			format: schedule.format,
-			executedBy: userId
-		}
-	});
+	// Create execution from schedule and update schedule last run in a single transaction
+	const execution = await orgTransaction(organizationId, async (tx) => {
+		const exec = await tx.reportExecution.create({
+			data: {
+				reportId: schedule.reportId,
+				scheduleId: schedule.id,
+				associationId,
+				status: 'PENDING',
+				parametersJson: schedule.parametersJson,
+				format: schedule.format,
+				executedBy: userId
+			}
+		});
 
-	// Update schedule last run
-	await prisma.reportSchedule.update({
-		where: { id: scheduleId },
-		data: {
-			lastRunAt: new Date(),
-			nextRunAt: calculateNextRun(schedule.frequency, schedule.cronExpression)
-		}
-	});
+		// Update schedule last run
+		await tx.reportSchedule.update({
+			where: { id: scheduleId },
+			data: {
+				lastRunAt: new Date(),
+				nextRunAt: calculateNextRun(schedule.frequency, schedule.cronExpression)
+			}
+		});
 
-	console.log(`[ReportScheduleWorkflow] RUN_NOW schedule:${scheduleId} execution:${execution.id} by user ${userId}`);
+		return exec;
+	}, { userId, reason: 'Run report schedule now' });
+
+	log.info(`RUN_NOW schedule:${scheduleId} execution:${execution.id} by user ${userId}`);
 	return execution.id;
 }
 
@@ -246,7 +257,7 @@ async function reportScheduleWorkflow(input: ReportScheduleWorkflowInput): Promi
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[ReportScheduleWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}: ${errorMessage}`);
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

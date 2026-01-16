@@ -6,13 +6,15 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { postPaymentToGL, reversePaymentGL } from '../accounting/index.js';
 import type { PaymentMethod } from '../../../../generated/prisma/client.js';
+import { orgTransaction } from '../db/rls.js';
+
+const log = createWorkflowLogger('paymentWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'payment_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'payment_workflow_error';
@@ -62,8 +64,8 @@ export interface PaymentWorkflowResult extends EntityWorkflowResult {
 async function createPaymentWithApplications(
 	input: PaymentWorkflowInput
 ): Promise<{ id: string; amount: number; appliedAmount: number; unappliedAmount: number; status: string }> {
-	// Create payment in transaction
-	const result = await prisma.$transaction(async (tx) => {
+	// Create payment in transaction with RLS context
+	const result = await orgTransaction(input.organizationId, async (tx) => {
 		const payment = await tx.payment.create({
 			data: {
 				associationId: input.associationId,
@@ -146,12 +148,12 @@ async function createPaymentWithApplications(
 			unappliedAmount: input.amount! - appliedAmount,
 			status: payment.status
 		};
-	});
+	}, { userId: input.userId, reason: 'Creating payment with applications' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PAYMENT',
+		entityType: 'INVOICE',
 		entityId: result.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -177,7 +179,7 @@ async function postPaymentToGLStep(
 		return { success: true };
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
-		console.warn(`Failed to post payment ${paymentId} to GL:`, error);
+		log.warn(`Failed to post payment ${paymentId} to GL`, { error: errorObj.message, paymentId });
 		await recordSpanError(errorObj, {
 			errorCode: 'GL_POSTING_FAILED',
 			errorType: 'Payment_GL_Error'
@@ -189,8 +191,8 @@ async function postPaymentToGLStep(
 async function voidPaymentWithReversal(
 	input: PaymentWorkflowInput
 ): Promise<{ success: boolean }> {
-	// Reverse all applications
-	await prisma.$transaction(async (tx) => {
+	// Reverse all applications with RLS context
+	await orgTransaction(input.organizationId, async (tx) => {
 		for (const app of input.applications || []) {
 			const charge = await tx.assessmentCharge.findUnique({
 				where: { id: app.chargeId }
@@ -225,12 +227,12 @@ async function voidPaymentWithReversal(
 				unappliedAmount: input.paymentAmount
 			}
 		});
-	});
+	}, { userId: input.userId, reason: 'Voiding payment with reversal' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'PAYMENT',
+		entityType: 'INVOICE',
 		entityId: input.paymentId!,
 		action: 'DELETE',
 		eventCategory: 'EXECUTION',
@@ -391,5 +393,6 @@ export async function startPaymentWorkflow(
 	input: PaymentWorkflowInput,
 	idempotencyKey: string
 ): Promise<PaymentWorkflowResult> {
-	return DBOS.startWorkflow(paymentWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(paymentWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

@@ -31,6 +31,7 @@
 
 			// Type-safe oRPC call
 			const result = await orpc.organization.create({
+				idempotencyKey: crypto.randomUUID(),
 				name: $communityOnboarding.organizationDetails.name,
 				slug: $communityOnboarding.organizationDetails.slug,
 				type: $communityOnboarding.organizationType!,
@@ -38,7 +39,7 @@
 			});
 
 			const org = result.data.organization;
-			await orpc.organization.setDefault({ organizationId: org.id });
+			await orpc.organization.setDefault({ idempotencyKey: crypto.randomUUID(), organizationId: org.id });
 
 			// Client-side store removed - server data will refresh on redirect
 			

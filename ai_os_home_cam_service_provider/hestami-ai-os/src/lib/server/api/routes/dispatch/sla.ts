@@ -134,8 +134,8 @@ export const slaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create SLA window' });
 			}
 
-			const slaWindow = await prisma.sLAWindow.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const slaWindow = await prisma.sLAWindow.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ slaWindow: formatSLAWindow(slaWindow) }, context);
@@ -288,8 +288,8 @@ export const slaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update SLA window' });
 			}
 
-			const slaWindow = await prisma.sLAWindow.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const slaWindow = await prisma.sLAWindow.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ slaWindow: formatSLAWindow(slaWindow) }, context);
@@ -437,8 +437,8 @@ export const slaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create SLA record' });
 			}
 
-			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const slaRecord = await prisma.sLARecord.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
@@ -523,8 +523,8 @@ export const slaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark SLA response' });
 			}
 
-			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const slaRecord = await prisma.sLARecord.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);
@@ -584,8 +584,8 @@ export const slaRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to mark SLA resolution' });
 			}
 
-			const slaRecord = await prisma.sLARecord.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const slaRecord = await prisma.sLARecord.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ slaRecord: formatSLARecord(slaRecord) }, context);

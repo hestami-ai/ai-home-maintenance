@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
@@ -166,43 +167,50 @@ async function checkUpcomingExpirations(
 
 async function updateComplianceScore(
 	organizationId: string,
+	userId: string,
 	score: number
 ): Promise<void> {
-	await prisma.contractorProfile.update({
-		where: { organizationId },
-		data: {
-			complianceScore: score,
-			lastComplianceCheck: new Date()
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.contractorProfile.update({
+			where: { organizationId },
+			data: {
+				complianceScore: score,
+				lastComplianceCheck: new Date()
+			}
+		});
+	}, { userId, reason: 'Update compliance score' });
 }
 
 async function createRequirement(
 	organizationId: string,
+	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const requirement = await prisma.complianceRequirement.create({
-		data: {
-			organizationId,
-			name: data.name as string,
-			description: data.description as string | undefined,
-			type: data.type as any,
-			jurisdiction: data.jurisdiction as string | undefined,
-			recurrence: (data.recurrence as any) ?? 'ANNUAL',
-			defaultDueDayOfYear: data.defaultDueDayOfYear as number | undefined,
-			defaultLeadDays: (data.defaultLeadDays as number) ?? 30,
-			requiresEvidence: (data.requiresEvidence as boolean) ?? false,
-			evidenceTypes: (data.evidenceTypes as string[]) ?? [],
-			statutoryReference: data.statutoryReference as string | undefined,
-			penaltyDescription: data.penaltyDescription as string | undefined,
-			checklistTemplate: data.checklistTemplate as any
-		}
-	});
-	return requirement.id;
+	return orgTransaction(organizationId, async (tx) => {
+		const requirement = await tx.complianceRequirement.create({
+			data: {
+				organizationId,
+				name: data.name as string,
+				description: data.description as string | undefined,
+				type: data.type as any,
+				jurisdiction: data.jurisdiction as string | undefined,
+				recurrence: (data.recurrence as any) ?? 'ANNUAL',
+				defaultDueDayOfYear: data.defaultDueDayOfYear as number | undefined,
+				defaultLeadDays: (data.defaultLeadDays as number) ?? 30,
+				requiresEvidence: (data.requiresEvidence as boolean) ?? false,
+				evidenceTypes: (data.evidenceTypes as string[]) ?? [],
+				statutoryReference: data.statutoryReference as string | undefined,
+				penaltyDescription: data.penaltyDescription as string | undefined,
+				checklistTemplate: data.checklistTemplate as any
+			}
+		});
+		return requirement.id;
+	}, { userId, reason: 'Create compliance requirement' });
 }
 
 async function updateRequirement(
 	organizationId: string,
+	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
 	const id = data.id as string;
@@ -221,15 +229,18 @@ async function updateRequirement(
 	if (data.penaltyDescription !== undefined) updateData.penaltyDescription = data.penaltyDescription as string;
 	if (data.isActive !== undefined) updateData.isActive = data.isActive as boolean;
 
-	await prisma.complianceRequirement.update({
-		where: { id },
-		data: updateData as any
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.complianceRequirement.update({
+			where: { id },
+			data: updateData as any
+		});
+	}, { userId, reason: 'Update compliance requirement' });
 	return id;
 }
 
 async function createDeadline(
 	organizationId: string,
+	userId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
 	const requirementId = data.requirementId as string;
@@ -239,36 +250,39 @@ async function createDeadline(
 		where: { id: requirementId, organizationId }
 	});
 
-	const deadline = await prisma.complianceDeadline.create({
-		data: {
-			associationId: data.associationId as string,
-			requirementId,
-			title: data.title as string,
-			description: data.description as string | undefined,
-			dueDate: new Date(data.dueDate as string),
-			reminderDate: data.reminderDate ? new Date(data.reminderDate as string) : undefined,
-			fiscalYear: data.fiscalYear as number | undefined,
-			notes: data.notes as string | undefined
-		}
-	});
-
-	// Create checklist items from template if available
-	if (requirement?.checklistTemplate && Array.isArray(requirement.checklistTemplate)) {
-		const template = requirement.checklistTemplate as Array<{ title: string; description?: string }>;
-		await prisma.complianceChecklistItem.createMany({
-			data: template.map((item, index) => ({
-				deadlineId: deadline.id,
-				title: item.title,
-				description: item.description,
-				sortOrder: index
-			}))
+	return orgTransaction(organizationId, async (tx) => {
+		const deadline = await tx.complianceDeadline.create({
+			data: {
+				associationId: data.associationId as string,
+				requirementId,
+				title: data.title as string,
+				description: data.description as string | undefined,
+				dueDate: new Date(data.dueDate as string),
+				reminderDate: data.reminderDate ? new Date(data.reminderDate as string) : undefined,
+				fiscalYear: data.fiscalYear as number | undefined,
+				notes: data.notes as string | undefined
+			}
 		});
-	}
 
-	return deadline.id;
+		// Create checklist items from template if available
+		if (requirement?.checklistTemplate && Array.isArray(requirement.checklistTemplate)) {
+			const template = requirement.checklistTemplate as Array<{ title: string; description?: string }>;
+			await tx.complianceChecklistItem.createMany({
+				data: template.map((item, index) => ({
+					deadlineId: deadline.id,
+					title: item.title,
+					description: item.description,
+					sortOrder: index
+				}))
+			});
+		}
+
+		return deadline.id;
+	}, { userId, reason: 'Create compliance deadline' });
 }
 
 async function updateDeadlineStatusStep(
+	organizationId: string,
 	deadlineId: string,
 	userId: string,
 	status: string,
@@ -284,19 +298,23 @@ async function updateDeadlineStatusStep(
 
 	const isCompleting = status === 'COMPLETED' && deadline.status !== 'COMPLETED';
 
-	await prisma.complianceDeadline.update({
-		where: { id: deadlineId },
-		data: {
-			status,
-			...(isCompleting && { completedAt: new Date(), completedBy: userId }),
-			...(notes !== undefined && { notes })
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.complianceDeadline.update({
+			where: { id: deadlineId },
+			data: {
+				status: status as any,
+				...(isCompleting && { completedAt: new Date(), completedBy: userId }),
+				...(notes !== undefined && { notes })
+			}
+		});
+	}, { userId, reason: 'Update compliance deadline status' });
 
 	return deadlineId;
 }
 
 async function addEvidenceDocumentStep(
+	organizationId: string,
+	userId: string,
 	deadlineId: string,
 	documentId: string
 ): Promise<string> {
@@ -309,18 +327,21 @@ async function addEvidenceDocumentStep(
 	}
 
 	if (!deadline.evidenceDocumentIds.includes(documentId)) {
-		await prisma.complianceDeadline.update({
-			where: { id: deadlineId },
-			data: {
-				evidenceDocumentIds: [...deadline.evidenceDocumentIds, documentId]
-			}
-		});
+		await orgTransaction(organizationId, async (tx) => {
+			await tx.complianceDeadline.update({
+				where: { id: deadlineId },
+				data: {
+					evidenceDocumentIds: [...deadline.evidenceDocumentIds, documentId]
+				}
+			});
+		}, { userId, reason: 'Add evidence document to compliance deadline' });
 	}
 
 	return deadlineId;
 }
 
 async function updateChecklistItemStep(
+	organizationId: string,
 	itemId: string,
 	userId: string,
 	isCompleted?: boolean,
@@ -338,16 +359,18 @@ async function updateChecklistItemStep(
 	const isCompletingItem = isCompleted === true && !item.isCompleted;
 	const isUncompletingItem = isCompleted === false && item.isCompleted;
 
-	await prisma.complianceChecklistItem.update({
-		where: { id: itemId },
-		data: {
-			...(isCompleted !== undefined && { isCompleted }),
-			...(isCompletingItem && { completedAt: new Date(), completedBy: userId }),
-			...(isUncompletingItem && { completedAt: null, completedBy: null }),
-			...(notes !== undefined && { notes }),
-			...(evidenceDocumentId !== undefined && { evidenceDocumentId })
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.complianceChecklistItem.update({
+			where: { id: itemId },
+			data: {
+				...(isCompleted !== undefined && { isCompleted }),
+				...(isCompletingItem && { completedAt: new Date(), completedBy: userId }),
+				...(isUncompletingItem && { completedAt: null, completedBy: null }),
+				...(notes !== undefined && { notes }),
+				...(evidenceDocumentId !== undefined && { evidenceDocumentId })
+			}
+		});
+	}, { userId, reason: 'Update compliance checklist item' });
 
 	return itemId;
 }
@@ -368,7 +391,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 
 				// Update the score in the profile
 				await DBOS.runStep(
-					() => updateComplianceScore(input.organizationId, compliance.score),
+					() => updateComplianceScore(input.organizationId, input.userId, compliance.score),
 					{ name: 'updateComplianceScore' }
 				);
 
@@ -404,7 +427,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				);
 
 				await DBOS.runStep(
-					() => updateComplianceScore(input.organizationId, compliance.score),
+					() => updateComplianceScore(input.organizationId, input.userId, compliance.score),
 					{ name: 'updateComplianceScore' }
 				);
 				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'score_updated', score: compliance.score });
@@ -419,7 +442,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 
 			case 'CREATE_REQUIREMENT': {
 				const entityId = await DBOS.runStep(
-					() => createRequirement(input.organizationId, input.data!),
+					() => createRequirement(input.organizationId, input.userId, input.data!),
 					{ name: 'createRequirement' }
 				);
 
@@ -433,7 +456,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 
 			case 'UPDATE_REQUIREMENT': {
 				const entityId = await DBOS.runStep(
-					() => updateRequirement(input.organizationId, input.data!),
+					() => updateRequirement(input.organizationId, input.userId, input.data!),
 					{ name: 'updateRequirement' }
 				);
 
@@ -447,7 +470,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 
 			case 'CREATE_DEADLINE': {
 				const entityId = await DBOS.runStep(
-					() => createDeadline(input.organizationId, input.data!),
+					() => createDeadline(input.organizationId, input.userId, input.data!),
 					{ name: 'createDeadline' }
 				);
 
@@ -463,6 +486,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				const data = input.data || {};
 				const entityId = await DBOS.runStep(
 					() => updateDeadlineStatusStep(
+						input.organizationId,
 						data.deadlineId as string,
 						input.userId,
 						data.status as string,
@@ -483,6 +507,8 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				const data = input.data || {};
 				const entityId = await DBOS.runStep(
 					() => addEvidenceDocumentStep(
+						input.organizationId,
+						input.userId,
 						data.deadlineId as string,
 						data.documentId as string
 					),
@@ -501,6 +527,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				const data = input.data || {};
 				const entityId = await DBOS.runStep(
 					() => updateChecklistItemStep(
+						input.organizationId,
 						data.itemId as string,
 						input.userId,
 						data.isCompleted as boolean | undefined,

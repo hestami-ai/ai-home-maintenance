@@ -28,7 +28,7 @@ export const noticeTemplateRouter = {
 			subject: z.string().min(1).max(255),
 			bodyTemplate: z.string().min(1),
 			defaultCurePeriodDays: z.number().int().min(1).max(365).optional(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),
@@ -195,7 +195,7 @@ export const noticeTemplateRouter = {
 			bodyTemplate: z.string().min(1).optional(),
 			defaultCurePeriodDays: z.number().int().min(1).max(365).nullable().optional(),
 			isActive: z.boolean().optional(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),
@@ -256,7 +256,7 @@ export const noticeTemplateRouter = {
 	delete: orgProcedure
 		.input(z.object({
 			id: z.string(),
-			idempotencyKey: z.string().optional()
+			idempotencyKey: z.string().min(1)
 		}))
 		.output(z.object({
 			ok: z.literal(true),

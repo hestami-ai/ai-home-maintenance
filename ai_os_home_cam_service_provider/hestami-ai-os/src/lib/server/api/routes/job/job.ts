@@ -12,6 +12,7 @@ import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { JobStatus, JobSourceType, CheckpointType } from '../../../../../../generated/prisma/client.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
+import { recordSpanError } from '../../middleware/tracing.js';
 import { startJobCreateWorkflow } from '../../../workflows/jobCreateWorkflow.js';
 import { startJobWorkflow } from '../../../workflows/jobWorkflow.js';
 
@@ -344,8 +345,8 @@ export const jobRouter = {
 			}
 
 			// Fetch the created job for the response
-			const job = await prisma.job.findUniqueOrThrow({
-				where: { id: result.jobId }
+			const job = await prisma.job.findFirstOrThrow({
+				where: { id: result.jobId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ job: formatJob(job) }, context);
@@ -529,7 +530,7 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update job' });
 			}
 
-			const job = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
+			const job = await prisma.job.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			return successResponse({ job: formatJob(job) }, context);
 		}),
@@ -576,7 +577,7 @@ export const jobRouter = {
 			if (input.toStatus === 'ESTIMATE_SENT') {
 				// Validate at least one estimate exists for this job
 				const estimateCount = await prisma.estimate.count({
-					where: { jobId: input.id, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } }
+					where: { jobId: input.id, organizationId: context.organization.id, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } }
 				});
 				if (estimateCount === 0) {
 					throw errors.BAD_REQUEST({ message: 'Cannot send estimate: no estimate exists for this job' });
@@ -630,7 +631,7 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to transition job status' });
 			}
 
-			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updatedJob = await prisma.job.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordStatusChange(context, 'JOB', updatedJob.id, job.status, input.toStatus,
@@ -702,7 +703,7 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign technician' });
 			}
 
-			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updatedJob = await prisma.job.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			// Record activity event
 			if (input.technicianId) {
@@ -776,7 +777,7 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to schedule job' });
 			}
 
-			const updatedJob = await prisma.job.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updatedJob = await prisma.job.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			return successResponse({ job: formatJob(updatedJob) }, context);
 		}),
@@ -881,7 +882,9 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add note' });
 			}
 
-			const note = await prisma.jobNote.findUniqueOrThrow({ where: { id: result.entityId } });
+			const note = await prisma.jobNote.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
+			});
 
 			return successResponse({ note: formatNote(note) }, context);
 		}),
@@ -975,7 +978,9 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add attachment' });
 			}
 
-			const attachment = await prisma.jobAttachment.findUniqueOrThrow({ where: { id: result.entityId } });
+			const attachment = await prisma.jobAttachment.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
+			});
 
 			return successResponse({ attachment: formatAttachment(attachment) }, context);
 		}),
@@ -1106,7 +1111,9 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add checkpoint' });
 			}
 
-			const checkpoint = await prisma.jobCheckpoint.findUniqueOrThrow({ where: { id: result.entityId } });
+			const checkpoint = await prisma.jobCheckpoint.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
+			});
 
 			return successResponse({ checkpoint: formatCheckpoint(checkpoint) }, context);
 		}),
@@ -1164,7 +1171,9 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to complete checkpoint' });
 			}
 
-			const updated = await prisma.jobCheckpoint.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updated = await prisma.jobCheckpoint.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
+			});
 
 			return successResponse({ checkpoint: formatCheckpoint(updated) }, context);
 		}),
@@ -1273,7 +1282,9 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add visit' });
 			}
 
-			const visit = await prisma.jobVisit.findUniqueOrThrow({ where: { id: result.entityId } });
+			const visit = await prisma.jobVisit.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
+			});
 
 			return successResponse({ visit: formatVisit(visit) }, context);
 		}),
@@ -1338,7 +1349,9 @@ export const jobRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update visit' });
 			}
 
-			const updated = await prisma.jobVisit.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updated = await prisma.jobVisit.findFirstOrThrow({
+				where: { id: result.entityId, job: { organizationId: context.organization.id } }
+			});
 
 			return successResponse({ visit: formatVisit(updated) }, context);
 		}),

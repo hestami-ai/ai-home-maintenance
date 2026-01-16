@@ -508,6 +508,7 @@ export const individualPropertyRouter = {
 			const activeCases = await prisma.conciergeCase.count({
 				where: {
 					propertyId: input.propertyId,
+					organizationId: context.organization.id,
 					status: {
 						notIn: ['CLOSED', 'CANCELLED', 'RESOLVED']
 					}
@@ -594,7 +595,10 @@ export const individualPropertyRouter = {
 				where: {
 					propertyId: input.propertyId,
 					portfolioId: input.portfolioId,
-					removedAt: null
+					removedAt: null,
+					portfolio: {
+						organizationId: context.organization.id
+					}
 				}
 			});
 
@@ -643,7 +647,7 @@ export const individualPropertyRouter = {
 				meta: ResponseMetaSchema
 			})
 		)
-		.handler(async ({ input, context }) => {
+		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('edit', 'individual_property', input.propertyId);
 
 			const membership = await prisma.portfolioProperty.findFirst({
@@ -727,7 +731,7 @@ export const individualPropertyRouter = {
 
 			// Check for existing HOA context
 			const existing = await prisma.externalHOAContext.findFirst({
-				where: { propertyId: input.propertyId }
+				where: { propertyId: input.propertyId, organizationId: context.organization.id }
 			});
 
 			// Use DBOS workflow for durable execution

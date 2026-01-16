@@ -7,6 +7,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { DocumentStatus } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -96,10 +97,13 @@ async function cleanupInfectedFiles(scheduledTime: Date, actualTime: Date): Prom
                 // 3. Mark as Deleted (or Hard Delete)
                 // Requirement says "Delete Permanently: Hard delete from S3 and database"
                 // WE WILL USE HARD DELETE for the document record as per requirement implications on "Cleanup"
+                // Note: For scheduled cleanup workflows without user context, we use 'system' as userId
                 await DBOS.runStep(
-                    () => prisma.document.delete({
-                        where: { id: doc.id }
-                    }),
+                    () => orgTransaction(doc.organizationId, async (tx) => {
+                        await tx.document.delete({
+                            where: { id: doc.id }
+                        });
+                    }, { userId: 'system', reason: 'Cleanup infected document past retention period' }),
                     { name: `deleteDb-${doc.id}` }
                 );
 

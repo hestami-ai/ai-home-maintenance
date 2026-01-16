@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -67,38 +67,40 @@ async function createAPInvoice(
 	const subtotal = input.lines!.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0);
 	const totalAmount = subtotal;
 
-	const invoice = await prisma.aPInvoice.create({
-		data: {
-			associationId: input.associationId!,
-			vendorId: input.vendorId!,
-			invoiceNumber: input.invoiceNumber!,
-			invoiceDate: new Date(input.invoiceDate!),
-			dueDate: new Date(input.dueDate!),
-			description: input.description,
-			memo: input.memo,
-			subtotal,
-			totalAmount,
-			balanceDue: totalAmount,
-			workOrderId: input.workOrderId,
-			status: 'DRAFT',
-			lineItems: {
-				create: input.lines!.map((line, index) => ({
-					description: line.description,
-					quantity: line.quantity,
-					unitPrice: line.unitPrice,
-					amount: line.quantity * line.unitPrice,
-					glAccountId: line.glAccountId,
-					lineNumber: index + 1
-				}))
-			}
-		},
-		include: { vendor: true }
-	});
+	const invoice = await orgTransaction(input.organizationId, async (tx) => {
+		return tx.aPInvoice.create({
+			data: {
+				associationId: input.associationId!,
+				vendorId: input.vendorId!,
+				invoiceNumber: input.invoiceNumber!,
+				invoiceDate: new Date(input.invoiceDate!),
+				dueDate: new Date(input.dueDate!),
+				description: input.description,
+				memo: input.memo,
+				subtotal,
+				totalAmount,
+				balanceDue: totalAmount,
+				workOrderId: input.workOrderId,
+				status: 'DRAFT',
+				lineItems: {
+					create: input.lines!.map((line, index) => ({
+						description: line.description,
+						quantity: line.quantity,
+						unitPrice: line.unitPrice,
+						amount: line.quantity * line.unitPrice,
+						glAccountId: line.glAccountId,
+						lineNumber: index + 1
+					}))
+				}
+			},
+			include: { vendor: true }
+		});
+	}, { userId: input.userId, reason: 'Create AP invoice with line items' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'AP_INVOICE',
+		entityType: 'INVOICE',
 		entityId: invoice.id,
 		action: 'CREATE',
 		eventCategory: 'EXECUTION',
@@ -127,19 +129,21 @@ async function approveAPInvoice(
 ): Promise<{ id: string; status: string; approvedAt: string }> {
 	const now = new Date();
 
-	await prisma.aPInvoice.update({
-		where: { id: invoiceId },
-		data: {
-			status: 'APPROVED',
-			approvedBy: userId,
-			approvedAt: now
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.aPInvoice.update({
+			where: { id: invoiceId },
+			data: {
+				status: 'APPROVED',
+				approvedBy: userId,
+				approvedAt: now
+			}
+		});
+	}, { userId, reason: 'Approve AP invoice' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'AP_INVOICE',
+		entityType: 'INVOICE',
 		entityId: invoiceId,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -164,15 +168,17 @@ async function voidAPInvoice(
 	userId: string,
 	organizationId: string
 ): Promise<{ success: boolean }> {
-	await prisma.aPInvoice.update({
-		where: { id: invoiceId },
-		data: { status: 'VOIDED' }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		return tx.aPInvoice.update({
+			where: { id: invoiceId },
+			data: { status: 'VOIDED' }
+		});
+	}, { userId, reason: 'Void AP invoice' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'AP_INVOICE',
+		entityType: 'INVOICE',
 		entityId: invoiceId,
 		action: 'UPDATE',
 		eventCategory: 'EXECUTION',
@@ -319,5 +325,6 @@ export async function startAPInvoiceWorkflow(
 	input: APInvoiceWorkflowInput,
 	idempotencyKey: string
 ): Promise<APInvoiceWorkflowResult> {
-	return DBOS.startWorkflow(apInvoiceWorkflow_v1, { workflowID: idempotencyKey })(input);
+	const handle = await DBOS.startWorkflow(apInvoiceWorkflow_v1, { workflowID: idempotencyKey })(input);
+	return handle.getResult();
 }

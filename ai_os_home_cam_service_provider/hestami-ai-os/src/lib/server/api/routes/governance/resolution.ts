@@ -86,7 +86,7 @@ export const governanceResolutionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create resolution' });
 			}
 
-			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: result.entityId } });
+			const resolution = await prisma.resolution.findFirstOrThrow({ where: { id: result.entityId, association: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{
@@ -115,10 +115,10 @@ export const governanceResolutionRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const resolution = await prisma.resolution.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: { association: true, board: true, policyDocuments: true, supersedes: true, supersededBy: true }
 			});
-			if (!resolution || resolution.association.organizationId !== context.organization.id) {
+			if (!resolution) {
 				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 			await context.cerbos.authorize('view', 'governance_resolution', resolution.id);
@@ -200,16 +200,16 @@ export const governanceResolutionRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const existing = await prisma.resolution.findFirst({
-				where: { id: rest.id },
+				where: { id: rest.id, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 
 			if (rest.supersededById) {
 				const sup = await prisma.resolution.findFirst({
-					where: { id: rest.supersededById, associationId: existing.associationId }
+					where: { id: rest.supersededById, associationId: existing.associationId, association: { organizationId: context.organization.id } }
 				});
 				if (!sup) throw errors.NOT_FOUND({ message: 'Superseding resolution' });
 			}
@@ -230,7 +230,7 @@ export const governanceResolutionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update resolution status' });
 			}
 
-			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: rest.id } });
+			const resolution = await prisma.resolution.findFirstOrThrow({ where: { id: rest.id, association: { organizationId: context.organization.id } } });
 
 			return successResponse({ resolution: { id: resolution.id, status: resolution.status } }, context);
 		}),
@@ -272,7 +272,7 @@ export const governanceResolutionRouter = {
 			await ensureAssociation(rest.associationId, context.organization.id, errors);
 			if (rest.resolutionId) {
 				const res = await prisma.resolution.findFirst({
-					where: { id: rest.resolutionId, associationId: rest.associationId }
+					where: { id: rest.resolutionId, associationId: rest.associationId, association: { organizationId: context.organization.id } }
 				});
 				if (!res) throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
@@ -297,7 +297,7 @@ export const governanceResolutionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create policy document' });
 			}
 
-			const policy = await prisma.policyDocument.findUniqueOrThrow({ where: { id: result.entityId } });
+			const policy = await prisma.policyDocument.findFirstOrThrow({ where: { id: result.entityId, association: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{
@@ -326,10 +326,10 @@ export const governanceResolutionRouter = {
 		})
 		.handler(async ({ input, context, errors }) => {
 			const policy = await prisma.policyDocument.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: { association: true, resolution: true, versions: true }
 			});
-			if (!policy || policy.association.organizationId !== context.organization.id) {
+			if (!policy) {
 				throw errors.NOT_FOUND({ message: 'Policy' });
 			}
 			await context.cerbos.authorize('view', 'governance_policy', policy.id);
@@ -413,16 +413,16 @@ export const governanceResolutionRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const policy = await prisma.policyDocument.findFirst({
-				where: { id: rest.policyDocumentId },
+				where: { id: rest.policyDocumentId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!policy || policy.association.organizationId !== context.organization.id) {
+			if (!policy) {
 				throw errors.NOT_FOUND({ message: 'Policy' });
 			}
 
 			// Check if version already exists
 			const existing = await prisma.policyVersion.findFirst({
-				where: { policyDocumentId: rest.policyDocumentId, version: rest.version }
+				where: { policyDocumentId: rest.policyDocumentId, version: rest.version, policyDocument: { association: { organizationId: context.organization.id } } }
 			});
 			if (existing) {
 				return successResponse(
@@ -456,7 +456,7 @@ export const governanceResolutionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create policy version' });
 			}
 
-			const version = await prisma.policyVersion.findUniqueOrThrow({ where: { id: result.entityId } });
+			const version = await prisma.policyVersion.findFirstOrThrow({ where: { id: result.entityId, policyDocument: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse(
 				{
@@ -528,7 +528,7 @@ export const governanceResolutionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to activate policy version' });
 			}
 
-			const updatedPolicy = await prisma.policyDocument.findUniqueOrThrow({ where: { id: rest.policyDocumentId } });
+			const updatedPolicy = await prisma.policyDocument.findFirstOrThrow({ where: { id: rest.policyDocumentId, association: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{
@@ -575,18 +575,18 @@ export const governanceResolutionRouter = {
 			const { idempotencyKey, resolutionId, motionId } = input;
 
 			const existing = await prisma.resolution.findFirst({
-				where: { id: resolutionId },
+				where: { id: resolutionId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!existing || existing.association.organizationId !== context.organization.id) {
+			if (!existing) {
 				throw errors.NOT_FOUND({ message: 'Resolution' });
 			}
 
 			const motion = await prisma.boardMotion.findFirst({
-				where: { id: motionId },
+				where: { id: motionId, association: { organizationId: context.organization.id } },
 				include: { association: true }
 			});
-			if (!motion || motion.association.organizationId !== context.organization.id) {
+			if (!motion) {
 				throw errors.NOT_FOUND({ message: 'Motion' });
 			}
 
@@ -606,7 +606,7 @@ export const governanceResolutionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to link resolution to motion' });
 			}
 
-			const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: resolutionId } });
+			const resolution = await prisma.resolution.findFirstOrThrow({ where: { id: resolutionId, association: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{
@@ -641,7 +641,7 @@ export const governanceResolutionRouter = {
 			await context.cerbos.authorize('view', 'governance_resolution', input.resolutionId);
 
 			const resolution = await prisma.resolution.findFirst({
-				where: { id: input.resolutionId },
+				where: { id: input.resolutionId, association: { organizationId: context.organization.id } },
 				include: {
 					association: true,
 					motion: { select: { id: true, title: true, status: true } },

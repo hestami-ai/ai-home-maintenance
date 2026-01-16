@@ -70,9 +70,9 @@ const getAssociationOrThrow = async (organizationId: string, contextAssocId: str
 	return association;
 };
 
-const getViolationOrThrow = async (id: string, associationId: string, errors: any) => {
+const getViolationOrThrow = async (id: string, organizationId: string, associationId: string, errors: any) => {
 	const violation = await prisma.violation.findFirst({
-		where: { id, associationId, deletedAt: null },
+		where: { id, organizationId, associationId, deletedAt: null },
 		include: { violationType: true }
 	});
 
@@ -149,10 +149,9 @@ export const violationRouter = {
 			// Validate unit if provided
 			if (input.unitId) {
 				const unit = await prisma.unit.findFirst({
-					where: { id: input.unitId },
-					include: { property: { include: { association: true } } }
+					where: { id: input.unitId, property: { association: { organizationId: context.organization!.id } } }
 				});
-				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+				if (!unit) {
 					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
@@ -220,7 +219,8 @@ export const violationRouter = {
             id: z.string(), reason: z.string().max(1000).optional() }))
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
 		})
 		.output(
 			successResponseSchema(
@@ -233,7 +233,7 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('delete', 'violation', input.id);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.id, association.id, errors);
+			await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
 			const result = await startViolationWorkflow(
 				{
@@ -298,6 +298,7 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			const where: Prisma.ViolationWhereInput = {
+				organizationId: context.organization.id,
 				associationId: association.id,
 				deletedAt: null
 			};
@@ -384,7 +385,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('view', 'violation', input.id);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const v = await getViolationOrThrow(input.id, association.id, errors);
+			const v = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
 			return successResponse(
 				{
@@ -462,15 +463,14 @@ export const violationRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(rest.id, association.id, errors);
+			const violation = await getViolationOrThrow(rest.id, context.organization.id, association.id, errors);
 
 			// Validate unit if provided
 			if (rest.unitId) {
 				const unit = await prisma.unit.findFirst({
-					where: { id: rest.unitId },
-					include: { property: { include: { association: true } } }
+					where: { id: rest.unitId, property: { association: { organizationId: context.organization!.id } } }
 				});
-				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+				if (!unit) {
 					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
@@ -501,7 +501,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update violation' });
 			}
 
-			const result = await prisma.violation.findUniqueOrThrow({ where: { id: rest.id } });
+			const result = await prisma.violation.findFirstOrThrow({ where: { id: rest.id, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -553,7 +553,7 @@ export const violationRouter = {
 			const { idempotencyKey, ...rest } = input;
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const v = await getViolationOrThrow(rest.id, association.id, errors);
+			const v = await getViolationOrThrow(rest.id, context.organization.id, association.id, errors);
 
 			assertStatusChangeAllowed(v.status, rest.status, errors);
 			const previousStatus = v.status;
@@ -574,7 +574,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to update violation status' });
 			}
 
-			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: rest.id } });
+			const updated = await prisma.violation.findFirstOrThrow({ where: { id: rest.id, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -602,7 +602,8 @@ export const violationRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid status change' }
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			successResponseSchema(
@@ -619,7 +620,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const v = await getViolationOrThrow(input.id, association.id, errors);
+			const v = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
 			assertStatusChangeAllowed(v.status, 'CURED', errors);
 
@@ -642,14 +643,14 @@ export const violationRouter = {
 			}
 
 			// Fetch updated record for response
-			const updated = await prisma.violation.findUnique({ where: { id: input.id } });
+			const updated = await prisma.violation.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
 					violation: {
 						id: input.id,
 						status: 'CURED' as const,
-						curedDate: updated?.curedDate?.toISOString() ?? null
+						curedDate: updated.curedDate?.toISOString() ?? null
 					}
 				},
 				context
@@ -670,7 +671,8 @@ export const violationRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid status change' }
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			successResponseSchema(
@@ -687,7 +689,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const v = await getViolationOrThrow(input.id, association.id, errors);
+			const v = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
 			assertStatusChangeAllowed(v.status, 'CLOSED', errors);
 
@@ -710,14 +712,14 @@ export const violationRouter = {
 			}
 
 			// Fetch updated record for response
-			const updated = await prisma.violation.findUnique({ where: { id: input.id } });
+			const updated = await prisma.violation.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
 					violation: {
 						id: input.id,
 						status: 'CLOSED' as const,
-						closedDate: updated?.closedDate?.toISOString() ?? null
+						closedDate: updated.closedDate?.toISOString() ?? null
 					}
 				},
 				context
@@ -745,7 +747,8 @@ export const violationRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			successResponseSchema(
@@ -770,7 +773,7 @@ export const violationRouter = {
 			}
 
 			const violation = await prisma.violation.findFirst({
-				where: { id: input.violationId, associationId: association.id, deletedAt: null }
+				where: { id: input.violationId, organizationId: context.organization!.id, associationId: association.id, deletedAt: null }
 			});
 
 			if (!violation) {
@@ -850,10 +853,11 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			const evidence = await prisma.document.findMany({
 				where: {
+					organizationId: context.organization.id,
 					contextBindings: {
 						some: {
 							contextType: 'VIOLATION',
@@ -899,7 +903,8 @@ export const violationRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid status change' }
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			successResponseSchema(
@@ -919,7 +924,7 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			const violation = await prisma.violation.findFirst({
-				where: { id: input.violationId, associationId: association.id, deletedAt: null },
+				where: { id: input.violationId, organizationId: context.organization!.id, associationId: association.id, deletedAt: null },
 				include: { violationType: true }
 			});
 
@@ -961,7 +966,7 @@ export const violationRouter = {
 
 			// Fetch the created notice for response
 			const notice = await prisma.violationNotice.findFirst({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: { createdAt: 'desc' }
 			});
 
@@ -1005,10 +1010,10 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			const notices = await prisma.violationNotice.findMany({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: [{ noticeNumber: 'asc' }]
 			});
 
@@ -1043,7 +1048,8 @@ export const violationRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid status change' }
+			BAD_REQUEST: { message: 'Invalid status change' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			successResponseSchema(
@@ -1060,7 +1066,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(input.violationId, association.id, errors);
+			const violation = await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			assertStatusChangeAllowed(violation.status, 'HEARING_SCHEDULED', errors);
 
@@ -1123,10 +1129,10 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			const hearings = await prisma.violationHearing.findMany({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: { hearingDate: 'asc' }
 			});
 
@@ -1160,7 +1166,8 @@ export const violationRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1177,11 +1184,10 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			const hearing = await prisma.violationHearing.findFirst({
-				where: { id: input.hearingId },
-				include: { violation: { include: { association: true } } }
+				where: { id: input.hearingId, violation: { organizationId: context.organization!.id } }
 			});
 
-			if (!hearing || hearing.violation.association.organizationId !== context.organization!.id) {
+			if (!hearing) {
 				throw errors.NOT_FOUND({ message: 'Hearing' });
 			}
 
@@ -1236,7 +1242,8 @@ export const violationRouter = {
 		)
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
-			FORBIDDEN: { message: 'Access denied' }
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1264,7 +1271,7 @@ export const violationRouter = {
 			}
 
 			const violation = await prisma.violation.findFirst({
-				where: { id: input.violationId, associationId: association.id, deletedAt: null },
+				where: { id: input.violationId, organizationId: context.organization!.id, associationId: association.id, deletedAt: null },
 				include: { fines: true }
 			});
 
@@ -1296,7 +1303,7 @@ export const violationRouter = {
 
 			// Fetch the created fine for response
 			const fine = await prisma.violationFine.findFirst({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: { createdAt: 'desc' }
 			});
 
@@ -1328,7 +1335,8 @@ export const violationRouter = {
 		.errors({
 			NOT_FOUND: { message: 'Resource not found' },
 			FORBIDDEN: { message: 'Access denied' },
-			BAD_REQUEST: { message: 'Invalid waived amount' }
+			BAD_REQUEST: { message: 'Invalid waived amount' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
 		})
 		.output(
 			z.object({
@@ -1345,11 +1353,11 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			const fine = await prisma.violationFine.findFirst({
-				where: { id: input.fineId },
+				where: { id: input.fineId, violation: { organizationId: context.organization!.id } },
 				include: { violation: { include: { association: true } } }
 			});
 
-			if (!fine || fine.violation.association.organizationId !== context.organization!.id) {
+			if (!fine) {
 				throw errors.NOT_FOUND({ message: 'Fine' });
 			}
 
@@ -1379,14 +1387,14 @@ export const violationRouter = {
 			}
 
 			// Fetch updated fine for response
-			const updatedFine = await prisma.violationFine.findUnique({ where: { id: input.fineId } });
+			const updatedFine = await prisma.violationFine.findFirstOrThrow({ where: { id: input.fineId, violation: { organizationId: context.organization.id } } });
 
 			return successResponse(
 				{
 					fine: {
 						id: input.fineId,
-						waivedAmount: updatedFine?.waivedAmount.toString() || '0',
-						balanceDue: updatedFine?.balanceDue.toString() || '0'
+						waivedAmount: updatedFine.waivedAmount.toString(),
+						balanceDue: updatedFine.balanceDue.toString()
 					}
 				},
 				context
@@ -1423,10 +1431,10 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			const fines = await prisma.violationFine.findMany({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: { fineNumber: 'asc' }
 			});
 
@@ -1484,7 +1492,7 @@ export const violationRouter = {
 			}
 
 			const violation = await prisma.violation.findFirst({
-				where: { id: input.violationId, associationId: association.id }
+				where: { id: input.violationId, organizationId: context.organization!.id, associationId: association.id }
 			});
 
 			if (!violation) {
@@ -1492,7 +1500,7 @@ export const violationRouter = {
 			}
 
 			const history = await prisma.violationStatusHistory.findMany({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: { changedAt: 'asc' }
 			});
 
@@ -1562,6 +1570,7 @@ export const violationRouter = {
 			const unitViolations = input.unitId
 				? await prisma.violation.findMany({
 					where: {
+						organizationId: context.organization.id,
 						associationId: association.id,
 						unitId: input.unitId,
 						id: { not: input.violationId },
@@ -1575,6 +1584,7 @@ export const violationRouter = {
 			const typeViolations = input.violationTypeId
 				? await prisma.violation.findMany({
 					where: {
+						organizationId: context.organization.id,
 						associationId: association.id,
 						violationTypeId: input.violationTypeId,
 						id: { not: input.violationId },
@@ -1642,7 +1652,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(input.id, association.id, errors);
+			const violation = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
 			assertStatusChangeAllowed(violation.status, 'ESCALATED', errors);
 			const previousStatus = violation.status;
@@ -1663,7 +1673,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to escalate violation' });
 			}
 
-			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.violation.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordStatusChange(
@@ -1720,7 +1730,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(input.id, association.id, errors);
+			const violation = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 			const previousStatus = violation.status;
 
 			// Use DBOS workflow for durable execution
@@ -1739,7 +1749,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to mark violation as invalid' });
 			}
 
-			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.violation.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordStatusChange(
@@ -1798,7 +1808,7 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.id);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			const violation = await getViolationOrThrow(input.id, association.id, errors);
+			const violation = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
 			assertStatusChangeAllowed(violation.status, 'CLOSED', errors);
 			const previousStatus = violation.status;
@@ -1819,7 +1829,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to resolve violation' });
 			}
 
-			const updated = await prisma.violation.findUniqueOrThrow({ where: { id: input.id } });
+			const updated = await prisma.violation.findFirstOrThrow({ where: { id: input.id, organizationId: context.organization.id } });
 
 			// Record activity event
 			await recordStatusChange(
@@ -1880,12 +1890,12 @@ export const violationRouter = {
 			await context.cerbos.authorize('edit', 'violation', input.violationId);
 
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			// Check if there's already a pending appeal
 			const existingAppeal = await prisma.violationAppeal.findFirst({
 				where: {
-					hearing: { violationId: input.violationId },
+					hearing: { violation: { id: input.violationId, organizationId: context.organization.id } },
 					status: 'PENDING'
 				}
 			});
@@ -1896,7 +1906,7 @@ export const violationRouter = {
 
 			// Check if there's an existing hearing
 			const existingHearing = await prisma.violationHearing.findFirst({
-				where: { violationId: input.violationId },
+				where: { violationId: input.violationId, violation: { organizationId: context.organization.id } },
 				orderBy: { hearingDate: 'desc' }
 			});
 
@@ -1922,7 +1932,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to file appeal' });
 			}
 
-			const result = await prisma.violationAppeal.findUniqueOrThrow({ where: { id: workflowResult.entityId } });
+			const result = await prisma.violationAppeal.findFirstOrThrow({ where: { id: workflowResult.entityId, hearing: { violation: { organizationId: context.organization.id } } }, include: { hearing: true } });
 
 			// Record activity event
 			await recordExecution(context, {
@@ -1980,11 +1990,11 @@ export const violationRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await context.cerbos.authorize('view', 'violation', input.violationId);
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
-			await getViolationOrThrow(input.violationId, association.id, errors);
+			await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
 			const appeal = await prisma.violationAppeal.findFirst({
 				where: {
-					hearing: { violationId: input.violationId }
+					hearing: { violation: { id: input.violationId, organizationId: context.organization.id } }
 				},
 				orderBy: { filedDate: 'desc' }
 			});
@@ -2057,11 +2067,11 @@ export const violationRouter = {
 		)
 		.handler(async ({ input, context, errors }) => {
 			const appeal = await prisma.violationAppeal.findFirst({
-				where: { id: input.appealId },
-				include: { hearing: { include: { violation: { include: { association: true } } } } }
+				where: { id: input.appealId, hearing: { violation: { organizationId: context.organization!.id } } },
+				include: { hearing: true }
 			});
 
-			if (!appeal || appeal.hearing.violation.association.organizationId !== context.organization!.id) {
+			if (!appeal) {
 				throw errors.NOT_FOUND({ message: 'Appeal' });
 			}
 
@@ -2088,7 +2098,7 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: workflowResult.error || 'Failed to record appeal decision' });
 			}
 
-			const result = await prisma.violationAppeal.findUniqueOrThrow({ where: { id: input.appealId } });
+			const result = await prisma.violationAppeal.findFirstOrThrow({ where: { id: input.appealId, hearing: { violation: { organizationId: context.organization.id } } } });
 
 			// Record activity event
 			await recordExecution(context, {
@@ -2119,7 +2129,7 @@ export const violationRouter = {
 		.input(
 			z.object({
 				fineId: z.string(),
-				idempotencyKey: z.string().optional()
+				idempotencyKey: z.string().min(1)
 			})
 		)
 		.errors({
@@ -2145,8 +2155,6 @@ export const violationRouter = {
 			})
 		)
 		.handler(async ({ input, context, errors }) => {
-			await context.cerbos.authorize('edit', 'violation_fine', input.fineId);
-
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 
 			// Use DBOS workflow for durable execution
@@ -2166,8 +2174,8 @@ export const violationRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to convert fine to charge' });
 			}
 
-			const charge = await prisma.assessmentCharge.findUniqueOrThrow({
-				where: { id: result.chargeId }
+			const charge = await prisma.assessmentCharge.findFirstOrThrow({
+				where: { id: result.chargeId, association: { organizationId: context.organization.id } }
 			});
 
 			return successResponse(

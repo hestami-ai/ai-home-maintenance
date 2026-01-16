@@ -19,6 +19,7 @@
 		try {
 			// 1. Create Organization (type-safe oRPC call)
 			const orgResult = await orpc.organization.create({
+				idempotencyKey: crypto.randomUUID(),
 				name: $propertyOwnerOnboarding.organizationDetails.name,
 				slug: $propertyOwnerOnboarding.organizationDetails.slug,
 				type: $propertyOwnerOnboarding.organizationType!
@@ -27,7 +28,7 @@
 			const org = orgResult.data.organization;
 
 			// 2. Set as default organization
-			await orpc.organization.setDefault({ organizationId: org.id });
+			await orpc.organization.setDefault({ idempotencyKey: crypto.randomUUID(), organizationId: org.id });
 
 			// 3. Update local store (REMOVED - we rely on server data after redirect)
 

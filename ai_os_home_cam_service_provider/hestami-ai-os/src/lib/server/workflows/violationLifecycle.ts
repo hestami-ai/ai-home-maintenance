@@ -16,6 +16,7 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import type { ViolationStatus } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
@@ -51,6 +52,7 @@ const CURE_PERIOD_DAYS: Record<string, number> = {
 
 interface TransitionInput {
 	violationId: string;
+	organizationId: string;
 	toStatus: ViolationStatus;
 	userId: string;
 	notes?: string;
@@ -398,7 +400,7 @@ export async function startViolationTransition(
 	workflowId?: string
 ): Promise<{ workflowId: string }> {
 	const id = workflowId || `viol-transition-${input.violationId}-${Date.now()}`;
-	await DBOS.startWorkflow(violationLifecycle_v1, { workflowID: idempotencyKey})(input);
+	await DBOS.startWorkflow(violationLifecycle_v1, { workflowID: id })(input);
 	return { workflowId: id };
 }
 

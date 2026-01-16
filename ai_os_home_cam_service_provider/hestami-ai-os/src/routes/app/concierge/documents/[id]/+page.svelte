@@ -16,6 +16,7 @@
 	import { page } from '$app/state';
 	import { createOrgClient } from '$lib/api/orpc';
 	import DocumentStatusBadge from '$lib/components/cam/documents/DocumentStatusBadge.svelte';
+	import { onDestroy } from 'svelte';
 
 	interface Document {
 		id: string;
@@ -68,13 +69,73 @@
 	// Create org client for API calls
 	const orgClient = $derived(createOrgClient(data.organization.id));
 
-	let document = $derived(data.document);
+	// Local document state that can be updated by polling
+	// Use a separate override state to avoid the state_referenced_locally warning
+	let documentOverride = $state<Document | null>(null);
+	const documentData = $derived(documentOverride ?? data.document);
 	let contextBindings = $derived(data.contextBindings);
 	let isLoading = $state(false);
 	let isDeleting = $state(false);
 	let error = $state<string | null>(null);
 	let showDeleteConfirm = $state(false);
-	
+
+	// Reset override when navigating to a different document
+	$effect(() => {
+		// Access data.document.id to track navigation changes
+		data.document.id;
+		documentOverride = null;
+	});
+
+	// Polling state
+	let pollIntervalId: ReturnType<typeof setInterval> | null = null;
+	const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
+	const PROCESSING_STATUSES = ['PENDING_UPLOAD', 'PROCESSING'];
+
+	// Check if document is in a processing state that requires polling
+	const isProcessing = $derived(PROCESSING_STATUSES.includes(documentData.status));
+
+	// Start/stop polling based on processing status
+	$effect(() => {
+		if (isProcessing) {
+			startPolling();
+		} else {
+			stopPolling();
+		}
+	});
+
+	function startPolling() {
+		if (pollIntervalId) return; // Already polling
+
+		pollIntervalId = setInterval(async () => {
+			try {
+				const result = await orgClient.document.getDocument({ id: documentData.id });
+				if (result.ok) {
+					const newDoc = result.data.document as Document;
+					documentOverride = newDoc;
+
+					// Stop polling if no longer processing
+					if (!PROCESSING_STATUSES.includes(newDoc.status)) {
+						stopPolling();
+					}
+				}
+			} catch (err) {
+				console.error('Polling error:', err);
+			}
+		}, POLL_INTERVAL_MS);
+	}
+
+	function stopPolling() {
+		if (pollIntervalId) {
+			clearInterval(pollIntervalId);
+			pollIntervalId = null;
+		}
+	}
+
+	// Cleanup on component destroy
+	onDestroy(() => {
+		stopPolling();
+	});
+
 	// Check for feedback messages in URL
 	const showSuccessAlert = $derived(page.url.searchParams.get('success') === 'true');
 	const showErrorAlert = $derived(page.url.searchParams.get('error') === 'true');
@@ -94,7 +155,7 @@
 
 
 	async function handleDelete() {
-		if (isDeleting || !document) return;
+		if (isDeleting || !documentData) return;
 
 		isDeleting = true;
 		error = null;
@@ -102,7 +163,7 @@
 		try {
 			const result = await orgClient.document.archiveDocument({
 				idempotencyKey: crypto.randomUUID(),
-				id: document.id,
+				id: documentData.id,
 				reason: 'User requested deletion'
 			});
 
@@ -143,7 +204,7 @@
 </script>
 
 <svelte:head>
-	<title>{document?.title || 'Document'} | Hestami AI</title>
+	<title>{documentData?.title || 'Document'} | Hestami AI</title>
 </svelte:head>
 
 <PageContainer>
@@ -165,7 +226,7 @@
 					</div>
 				</div>
 			</Card>
-		{:else if document}
+		{:else if documentData}
 			<!-- Header -->
 			<div class="mb-6">
 				<a
@@ -181,9 +242,9 @@
 						<div
 							class="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-500/10"
 						>
-							{#if document.mimeType.startsWith('image/')}
+							{#if documentData.mimeType.startsWith('image/')}
 								<Image class="h-7 w-7 text-primary-500" />
-							{:else if document.mimeType.includes('pdf')}
+							{:else if documentData.mimeType.includes('pdf')}
 								<FileText class="h-7 w-7 text-primary-500" />
 							{:else}
 								<File class="h-7 w-7 text-primary-500" />
@@ -191,30 +252,42 @@
 						</div>
 						<div>
 							<div class="flex items-center gap-3">
-								<h1 class="text-2xl font-bold">{document.title}</h1>
-								<DocumentStatusBadge 
-									status={document.status} 
-									processingAttemptCount={document.processingAttemptCount}
-									processingErrorType={document.processingErrorType}
+								<h1 class="text-2xl font-bold">{documentData.title}</h1>
+								<DocumentStatusBadge
+									status={documentData.status}
+									processingAttemptCount={documentData.processingAttemptCount}
+									processingErrorType={documentData.processingErrorType}
 									size="md"
 								/>
 							</div>
 							<p class="mt-1 text-surface-500">
-								{document.fileName} • {formatFileSize(document.fileSize)}
+								{documentData.fileName} • {formatFileSize(documentData.fileSize)}
 							</p>
 						</div>
 					</div>
 
 					<div class="flex gap-2">
-						<a
-							href={(document as any).presignedFileUrl || ''}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="btn preset-filled-primary-500"
-						>
-							<Download class="mr-2 h-4 w-4" />
-							Download
-						</a>
+						{#if documentData.status === 'ACTIVE'}
+							<a
+								href={(documentData as any).presignedFileUrl || ''}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="btn preset-filled-primary-500"
+							>
+								<Download class="mr-2 h-4 w-4" />
+								Download
+							</a>
+						{:else}
+							<button
+								type="button"
+								class="btn preset-filled-primary-500"
+								disabled
+								title="Document is still processing"
+							>
+								<Download class="mr-2 h-4 w-4" />
+								Download
+							</button>
+						{/if}
 						<button
 							type="button"
 							onclick={() => (showDeleteConfirm = true)}
@@ -264,59 +337,79 @@
 			<div class="grid gap-6 lg:grid-cols-3">
 				<!-- Main Content -->
 				<div class="space-y-6 lg:col-span-2">
+					<!-- Processing Alert -->
+					{#if isProcessing}
+						<Alert variant="info" title="Processing Document">
+							<div class="flex items-center gap-2">
+								<Loader2 class="h-4 w-4 animate-spin" />
+								<span>Your document is being scanned and processed. This page will update automatically.</span>
+							</div>
+						</Alert>
+					{/if}
+
 					<!-- Feedback Alerts -->
-					{#if showSuccessAlert}
+					{#if showSuccessAlert && documentData.status === 'ACTIVE'}
 						<Alert variant="success" title="Upload Successful">
 							Your document has been processed and is now ready for use.
 						</Alert>
 					{/if}
 
-					{#if showInfectedAlert || (document.status === 'INFECTED')}
+					{#if showInfectedAlert || (documentData.status === 'INFECTED')}
 						<Alert variant="error" title="Security Risk Detected">
 							This file has been flagged as a security risk and cannot be used.
 						</Alert>
 					{/if}
 
 					<!-- Processing Error Info -->
-					{#if document.status === 'PROCESSING_FAILED' && document.processingErrorMessage}
+					{#if documentData.status === 'PROCESSING_FAILED' && documentData.processingErrorMessage}
 						<Alert variant="error" title="Processing Issue">
-							<p>{document.processingErrorMessage}</p>
-							{#if document.processingNextRetryAt}
+							<p>{documentData.processingErrorMessage}</p>
+							{#if documentData.processingNextRetryAt}
 								<p class="mt-2 text-sm">
-									Next retry scheduled for: {new Date(document.processingNextRetryAt).toLocaleString()}
+									Next retry scheduled for: {new Date(documentData.processingNextRetryAt).toLocaleString()}
 								</p>
 							{/if}
 						</Alert>
 					{/if}
 
 					<!-- Preview -->
-					{#if document.mimeType.startsWith('image/')}
+					{#if documentData.status === 'ACTIVE'}
+						{#if documentData.mimeType.startsWith('image/')}
+							<Card variant="outlined" padding="md">
+								<h2 class="mb-4 font-semibold">Preview</h2>
+								<img
+									src={(documentData as any).presignedThumbnailUrl || (documentData as any).presignedFileUrl || ''}
+									alt={documentData.title}
+									class="max-h-96 w-full rounded-lg object-contain"
+								/>
+							</Card>
+						{:else if documentData.mimeType.includes('pdf')}
+							<Card variant="outlined" padding="md">
+								<h2 class="mb-4 font-semibold">Preview</h2>
+								<div class="aspect-[8.5/11] w-full">
+									<iframe
+										src={(documentData as any).presignedFileUrl || ''}
+										title={documentData.title}
+										class="h-full w-full rounded-lg border border-surface-300-700"
+									></iframe>
+								</div>
+							</Card>
+						{/if}
+					{:else if isProcessing}
 						<Card variant="outlined" padding="md">
 							<h2 class="mb-4 font-semibold">Preview</h2>
-							<img
-								src={(document as any).presignedThumbnailUrl || (document as any).presignedFileUrl || ''}
-								alt={document.title}
-								class="max-h-96 w-full rounded-lg object-contain"
-							/>
-						</Card>
-					{:else if document.mimeType.includes('pdf')}
-						<Card variant="outlined" padding="md">
-							<h2 class="mb-4 font-semibold">Preview</h2>
-							<div class="aspect-[8.5/11] w-full">
-								<iframe
-									src={(document as any).presignedFileUrl || ''}
-									title={document.title}
-									class="h-full w-full rounded-lg border border-surface-300-700"
-								></iframe>
+							<div class="flex flex-col items-center justify-center py-12 text-surface-500">
+								<Loader2 class="h-8 w-8 animate-spin mb-3" />
+								<p>Preview will be available after processing completes</p>
 							</div>
 						</Card>
 					{/if}
 
 					<!-- Description -->
-					{#if document.description}
+					{#if documentData.description}
 						<Card variant="outlined" padding="md">
 							<h2 class="mb-3 font-semibold">Description</h2>
-							<p class="text-surface-600 dark:text-surface-400">{document.description}</p>
+							<p class="text-surface-600 dark:text-surface-400">{documentData.description}</p>
 						</Card>
 					{/if}
 				</div>
@@ -330,35 +423,35 @@
 							<div class="flex justify-between">
 								<dt class="text-surface-500">Category</dt>
 								<dd class="font-medium">
-									{categoryLabels[document.category] || document.category}
+									{categoryLabels[documentData.category] || documentData.category}
 								</dd>
 							</div>
 							<div class="flex justify-between">
 								<dt class="text-surface-500">File Type</dt>
-								<dd class="font-medium">{document.mimeType}</dd>
+								<dd class="font-medium">{documentData.mimeType}</dd>
 							</div>
 							<div class="flex justify-between">
 								<dt class="text-surface-500">Size</dt>
-								<dd class="font-medium">{formatFileSize(document.fileSize)}</dd>
+								<dd class="font-medium">{formatFileSize(documentData.fileSize)}</dd>
 							</div>
 							<div class="flex justify-between">
 								<dt class="text-surface-500">Version</dt>
-								<dd class="font-medium">{document.version}</dd>
+								<dd class="font-medium">{documentData.version}</dd>
 							</div>
 							<div class="flex justify-between">
 								<dt class="text-surface-500">Uploaded</dt>
-								<dd class="font-medium">{formatDate(document.createdAt)}</dd>
+								<dd class="font-medium">{formatDate(documentData.createdAt)}</dd>
 							</div>
-							{#if document.effectiveDate}
+							{#if documentData.effectiveDate}
 								<div class="flex justify-between">
 									<dt class="text-surface-500">Effective Date</dt>
-									<dd class="font-medium">{formatDate(document.effectiveDate)}</dd>
+									<dd class="font-medium">{formatDate(documentData.effectiveDate)}</dd>
 								</div>
 							{/if}
-							{#if document.expirationDate}
+							{#if documentData.expirationDate}
 								<div class="flex justify-between">
 									<dt class="text-surface-500">Expires</dt>
-									<dd class="font-medium">{formatDate(document.expirationDate)}</dd>
+									<dd class="font-medium">{formatDate(documentData.expirationDate)}</dd>
 								</div>
 							{/if}
 						</dl>
@@ -383,11 +476,11 @@
 					{/if}
 
 					<!-- Tags -->
-					{#if document.tags.length > 0}
+					{#if documentData.tags.length > 0}
 						<Card variant="outlined" padding="md">
 							<h2 class="mb-3 font-semibold">Tags</h2>
 							<div class="flex flex-wrap gap-2">
-								{#each document.tags as tag}
+								{#each documentData.tags as tag}
 									<span
 										class="inline-flex items-center gap-1 rounded-full bg-surface-500/10 px-2 py-1 text-xs"
 									>

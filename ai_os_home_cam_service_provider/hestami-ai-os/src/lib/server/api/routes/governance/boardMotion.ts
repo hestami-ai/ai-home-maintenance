@@ -25,11 +25,12 @@ const getAssociationOrThrow = async (associationId: string, organizationId: stri
 	return association;
 };
 
-const generateMotionNumber = async (associationId: string): Promise<string> => {
+const generateMotionNumber = async (associationId: string, organizationId: string): Promise<string> => {
 	const year = new Date().getFullYear();
 	const count = await prisma.boardMotion.count({
 		where: {
 			associationId,
+			association: { organizationId },
 			motionNumber: { startsWith: `MOT-${year}-` }
 		}
 	});
@@ -77,6 +78,7 @@ export const boardMotionRouter = {
 
 			const where = {
 				associationId,
+				association: { organizationId: context.organization.id },
 				...(meetingId && { meetingId }),
 				...(status && { status }),
 				...(category && { category }),
@@ -131,7 +133,7 @@ export const boardMotionRouter = {
 			await context.cerbos.authorize('view', 'governance_motion', input.id);
 
 			const motion = await prisma.boardMotion.findFirst({
-				where: { id: input.id },
+				where: { id: input.id, association: { organizationId: context.organization.id } },
 				include: {
 					association: { select: { id: true, name: true, organizationId: true } },
 					meeting: { select: { id: true, title: true, scheduledFor: true, status: true } }
@@ -139,9 +141,6 @@ export const boardMotionRouter = {
 			});
 
 			if (!motion) throw errors.NOT_FOUND({ message: 'Board motion' });
-			if (motion.association.organizationId !== context.organization.id) {
-				throw errors.FORBIDDEN({ message: 'Access denied' });
-			}
 
 			return successResponse({ motion }, context);
 		}),
@@ -204,7 +203,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create motion' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id: result.entityId } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id: result.entityId, association: { organizationId: context.organization.id } } });
 
 			return successResponse({
 				motion: {
@@ -247,14 +246,11 @@ export const boardMotionRouter = {
 			const { id, idempotencyKey, ...data } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
-				where: { id },
+				where: { id, association: { organizationId: context.organization.id } },
 				include: { association: { select: { organizationId: true } } }
 			});
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
-			if (existing.association.organizationId !== context.organization.id) {
-				throw errors.FORBIDDEN({ message: 'Access denied' });
-			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
 				throw errors.BAD_REQUEST({ message: 'Cannot update a decided motion' });
@@ -282,7 +278,7 @@ export const boardMotionRouter = {
 				throw errors.NOT_FOUND({ message: result.error || 'Failed to update motion' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id: result.entityId } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id: result.entityId, association: { organizationId: context.organization.id } } });
 
 			return successResponse({ motion }, context);
 		}),
@@ -319,14 +315,11 @@ export const boardMotionRouter = {
 			const { id, secondedById, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
-				where: { id },
+				where: { id, association: { organizationId: context.organization.id } },
 				include: { association: { select: { organizationId: true } } }
 			});
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
-			if (existing.association.organizationId !== context.organization.id) {
-				throw errors.FORBIDDEN({ message: 'Access denied' });
-			}
 
 			if (existing.status !== 'PROPOSED') {
 				throw errors.BAD_REQUEST({ message: 'Motion must be in PROPOSED status to be seconded' });
@@ -348,7 +341,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to second motion' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, association: { organizationId: context.organization.id } } });
 
 			return successResponse({
 				motion: {
@@ -392,14 +385,11 @@ export const boardMotionRouter = {
 			const { id, status, notes, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
-				where: { id },
+				where: { id, association: { organizationId: context.organization.id } },
 				include: { association: { select: { organizationId: true } } }
 			});
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
-			if (existing.association.organizationId !== context.organization.id) {
-				throw errors.FORBIDDEN({ message: 'Access denied' });
-			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
 				throw errors.BAD_REQUEST({ message: 'Cannot change status of a decided motion' });
@@ -421,7 +411,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update motion status' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, association: { organizationId: context.organization.id } } });
 
 			return successResponse({
 				motion: {
@@ -465,14 +455,11 @@ export const boardMotionRouter = {
 			const { id, outcome, outcomeNotes, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
-				where: { id },
+				where: { id, association: { organizationId: context.organization.id } },
 				include: { association: { select: { organizationId: true } } }
 			});
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
-			if (existing.association.organizationId !== context.organization.id) {
-				throw errors.FORBIDDEN({ message: 'Access denied' });
-			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
 				throw errors.BAD_REQUEST({ message: 'Motion outcome already recorded' });
@@ -494,7 +481,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to record motion outcome' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, association: { organizationId: context.organization.id } } });
 
 			return successResponse({
 				motion: {
@@ -538,14 +525,11 @@ export const boardMotionRouter = {
 			const { id, reason, idempotencyKey } = input;
 
 			const existing = await prisma.boardMotion.findFirst({
-				where: { id },
+				where: { id, association: { organizationId: context.organization.id } },
 				include: { association: { select: { organizationId: true } } }
 			});
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
-			if (existing.association.organizationId !== context.organization.id) {
-				throw errors.FORBIDDEN({ message: 'Access denied' });
-			}
 
 			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
 				throw errors.BAD_REQUEST({ message: 'Cannot withdraw a decided motion' });
@@ -567,7 +551,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to withdraw motion' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, association: { organizationId: context.organization.id } } });
 
 			return successResponse({
 				motion: {
@@ -646,8 +630,8 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to open voting' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
-			const vote = await prisma.vote.findUniqueOrThrow({ where: { id: result.entityId } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, meeting: { association: { organizationId: context.organization.id } } } });
+			const vote = await prisma.vote.findFirstOrThrow({ where: { id: result.entityId, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse({
 				motion: {
@@ -739,7 +723,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to close voting' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse({
 				motion: {
@@ -814,7 +798,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to table motion' });
 			}
 
-			const motion = await prisma.boardMotion.findUniqueOrThrow({ where: { id } });
+			const motion = await prisma.boardMotion.findFirstOrThrow({ where: { id, meeting: { association: { organizationId: context.organization.id } } } });
 
 			return successResponse({
 				motion: {
@@ -908,7 +892,7 @@ export const boardMotionRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to apply motion to ARC request' });
 			}
 
-			const updatedArc = await prisma.aRCRequest.findUniqueOrThrow({ where: { id: arcRequestId } });
+			const updatedArc = await prisma.aRCRequest.findFirstOrThrow({ where: { id: arcRequestId, organizationId: context.organization.id } });
 
 			return successResponse({
 				arcRequest: {

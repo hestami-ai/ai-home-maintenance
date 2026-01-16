@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { readFile, stat } from 'fs/promises';
-import { join } from 'path';
+import { readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createModuleLogger } from '$lib/server/logger';
 
 const log = createModuleLogger('UploadsRoute');

@@ -1,6 +1,7 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import type { StaffRole, PillarAccess } from '$lib/schemas';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
     // Get staff and memberships from parent layout (fetched via SECURITY DEFINER)
@@ -11,20 +12,22 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
         throw redirect(303, '/app');
     }
 
-    const hasAccess = (staff.roles as any[]).includes('ADMIN') || (staff.roles as any[]).includes('SUPPORT') || (staff.roles as any[]).includes('OWNER');
+    // PLATFORM_ADMIN has full access to document processing
+    const staffRoles = staff.roles as StaffRole[];
+    const hasAccess = staffRoles.includes('PLATFORM_ADMIN');
     if (!hasAccess) {
         throw redirect(303, '/app');
     }
 
-    // Double check pillar access (as defined in requirements)
-    const hasPlatformOps = (staff.pillarAccess as any[]).includes('PLATFORM_OPERATIONS') || (staff.pillarAccess as any[]).includes('ALL');
+    // Check pillar access - ADMIN pillar grants access to document processing
+    const staffPillarAccess = staff.pillarAccess as PillarAccess[];
+    const hasPlatformOps = staffPillarAccess.includes('ADMIN');
     if (!hasPlatformOps) {
         throw redirect(303, '/app');
     }
 
-    // Build context using data from parent layout
-    const staffRoles = staff?.roles ?? [];
-    const pillarAccess = staff?.pillarAccess ?? [];
+    // Build context using data from parent layout (reuse typed variables from above)
+    const pillarAccess = staffPillarAccess;
     const orgRoles: Record<string, any> = {};
     for (const m of memberships ?? []) {
         orgRoles[m.organization.id] = m.role;

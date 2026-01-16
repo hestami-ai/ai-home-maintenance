@@ -150,7 +150,8 @@ export const staffApi = {
 	 */
 	async activateWithCode(input: { code: string }) {
 		return orpc.staff.activateWithCode({
-			code: input.code
+			code: input.code,
+			idempotencyKey: uuidv4()
 		});
 	},
 

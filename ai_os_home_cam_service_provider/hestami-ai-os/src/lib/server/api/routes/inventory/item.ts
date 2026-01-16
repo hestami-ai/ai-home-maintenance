@@ -123,8 +123,8 @@ export const inventoryItemRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to create item' });
 			}
 
-			const item = await prisma.inventoryItem.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const item = await prisma.inventoryItem.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ item: formatInventoryItem(item) }, context);
@@ -284,8 +284,8 @@ export const inventoryItemRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update item' });
 			}
 
-			const item = await prisma.inventoryItem.findUniqueOrThrow({
-				where: { id: result.entityId }
+			const item = await prisma.inventoryItem.findFirstOrThrow({
+				where: { id: result.entityId, organizationId: context.organization.id }
 			});
 
 			return successResponse({ item: formatInventoryItem(item) }, context);

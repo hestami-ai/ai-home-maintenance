@@ -13,10 +13,9 @@ const config = {
 			// Enable precompression for static assets
 			precompress: false,
 			// Development mode detection
-			development: process.env.NODE_ENV !== 'production',
-			// Mark Node.js built-ins as external - Bun resolves these at runtime
-			// Used by: src/routes/uploads/[...path]/+server.ts, src/lib/server/api/routes/document.ts
-			external: ['fs/promises', 'path', 'crypto']
+			development: process.env.NODE_ENV !== 'production'
+			// Note: Node.js built-ins use 'node:' prefix (e.g., 'node:fs/promises')
+			// which the adapter automatically externalizes
 		}),
 		alias: {
 			$server: 'src/lib/server',

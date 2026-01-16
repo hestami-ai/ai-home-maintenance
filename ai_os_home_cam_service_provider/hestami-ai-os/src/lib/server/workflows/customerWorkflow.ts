@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -42,24 +42,30 @@ async function createCustomer(
 	userId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string; displayName: string }> {
-	const customer = await prisma.customer.create({
-		data: {
-			organizationId,
-			name: data.displayName as string,
-			companyName: data.companyName as string | undefined,
-			email: data.email as string | undefined,
-			phone: data.phone as string | undefined,
-			altPhone: data.alternatePhone as string | undefined,
-			addressLine1: data.addressLine1 as string | undefined,
-			addressLine2: data.addressLine2 as string | undefined,
-			city: data.city as string | undefined,
-			state: data.state as string | undefined,
-			postalCode: data.postalCode as string | undefined,
-			country: data.country as string | undefined,
-			notes: data.notes as string | undefined,
-			tags: data.tags as string[] | undefined
-		}
-	});
+	const customer = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.customer.create({
+				data: {
+					organizationId,
+					name: data.displayName as string,
+					companyName: data.companyName as string | undefined,
+					email: data.email as string | undefined,
+					phone: data.phone as string | undefined,
+					altPhone: data.alternatePhone as string | undefined,
+					addressLine1: data.addressLine1 as string | undefined,
+					addressLine2: data.addressLine2 as string | undefined,
+					city: data.city as string | undefined,
+					state: data.state as string | undefined,
+					postalCode: data.postalCode as string | undefined,
+					country: data.country as string | undefined,
+					notes: data.notes as string | undefined,
+					tags: data.tags as string[] | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Create customer' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -84,24 +90,30 @@ async function updateCustomer(
 	customerId: string,
 	data: Record<string, unknown>
 ): Promise<{ id: string; displayName: string }> {
-	const customer = await prisma.customer.update({
-		where: { id: customerId },
-		data: {
-			name: data.displayName as string | undefined,
-			companyName: data.companyName as string | undefined,
-			email: data.email as string | undefined,
-			phone: data.phone as string | undefined,
-			altPhone: data.alternatePhone as string | undefined,
-			addressLine1: data.addressLine1 as string | undefined,
-			addressLine2: data.addressLine2 as string | undefined,
-			city: data.city as string | undefined,
-			state: data.state as string | undefined,
-			postalCode: data.postalCode as string | undefined,
-			country: data.country as string | undefined,
-			notes: data.notes as string | undefined,
-			tags: data.tags as string[] | undefined
-		}
-	});
+	const customer = await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.customer.update({
+				where: { id: customerId },
+				data: {
+					name: data.displayName as string | undefined,
+					companyName: data.companyName as string | undefined,
+					email: data.email as string | undefined,
+					phone: data.phone as string | undefined,
+					altPhone: data.alternatePhone as string | undefined,
+					addressLine1: data.addressLine1 as string | undefined,
+					addressLine2: data.addressLine2 as string | undefined,
+					city: data.city as string | undefined,
+					state: data.state as string | undefined,
+					postalCode: data.postalCode as string | undefined,
+					country: data.country as string | undefined,
+					notes: data.notes as string | undefined,
+					tags: data.tags as string[] | undefined
+				}
+			});
+		},
+		{ userId, reason: 'Update customer' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -125,10 +137,16 @@ async function deleteCustomer(
 	userId: string,
 	customerId: string
 ): Promise<{ id: string }> {
-	await prisma.customer.update({
-		where: { id: customerId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(
+		organizationId,
+		async (tx) => {
+			return tx.customer.update({
+				where: { id: customerId },
+				data: { deletedAt: new Date() }
+			});
+		},
+		{ userId, reason: 'Soft delete customer' }
+	);
 
 	await recordWorkflowEvent({
 		organizationId,
@@ -216,7 +234,7 @@ export const customerWorkflow_v1 = DBOS.registerWorkflow(customerWorkflow);
 
 export async function startCustomerWorkflow(
 	input: CustomerWorkflowInput,
-	workflowId: string, idempotencyKey: string
+	idempotencyKey: string
 ): Promise<CustomerWorkflowResult> {
 	const handle = await DBOS.startWorkflow(customerWorkflow_v1, {
 		workflowID: idempotencyKey})(input);

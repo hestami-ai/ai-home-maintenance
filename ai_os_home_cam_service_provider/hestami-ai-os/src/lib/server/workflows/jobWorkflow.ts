@@ -6,7 +6,7 @@
  */
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { prisma } from '../db.js';
+import { orgTransaction } from '../db/rls.js';
 import { JobStatus, type EntityWorkflowResult } from './schemas.js';
 import type { CheckpointType } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
@@ -55,7 +55,7 @@ async function recordWorkflowEvent(
 	metadata?: Record<string, unknown>
 ): Promise<void> {
 	// Log the event for now - activity events will be recorded by the route handlers
-	console.log(`[JobWorkflow] ${action} on ${entityType}:${entityId} by user ${userId}`);
+	log.info(`${action} on ${entityType}:${entityId} by user ${userId}`, { organizationId, entityType, entityId, action, metadata });
 }
 
 // Step functions for each operation
@@ -67,10 +67,12 @@ async function updateJob(
 ): Promise<string> {
 	const { idempotencyKey, id, ...updateData } = data;
 
-	const job = await prisma.job.update({
-		where: { id: jobId },
-		data: updateData
-	});
+	const job = await orgTransaction(organizationId, async (tx) => {
+		return tx.job.update({
+			where: { id: jobId },
+			data: updateData
+		});
+	}, { userId, reason: 'Update job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job', job.id, 'UPDATE_JOB', { fields: Object.keys(updateData) });
 	return job.id;
@@ -83,37 +85,37 @@ async function transitionJobStatus(
 	toStatus: JobStatus,
 	notes?: string
 ): Promise<string> {
-	const job = await prisma.job.findUniqueOrThrow({ where: { id: jobId } });
-	const fromStatus = job.status;
+	await orgTransaction(organizationId, async (tx) => {
+		const job = await tx.job.findUniqueOrThrow({ where: { id: jobId } });
+		const fromStatus = job.status;
 
-	const updateData: Record<string, unknown> = { status: toStatus };
+		const updateData: Record<string, unknown> = { status: toStatus };
 
-	switch (toStatus) {
-		case 'DISPATCHED':
-			updateData.dispatchedAt = new Date();
-			break;
-		case 'IN_PROGRESS':
-			if (!job.startedAt) updateData.startedAt = new Date();
-			break;
-		case 'COMPLETED':
-			updateData.completedAt = new Date();
-			break;
-		case 'INVOICED':
-			updateData.invoicedAt = new Date();
-			break;
-		case 'PAID':
-			updateData.paidAt = new Date();
-			break;
-		case 'CLOSED':
-			updateData.closedAt = new Date();
-			updateData.closedBy = userId;
-			break;
-		case 'CANCELLED':
-			updateData.cancelledAt = new Date();
-			break;
-	}
+		switch (toStatus) {
+			case 'DISPATCHED':
+				updateData.dispatchedAt = new Date();
+				break;
+			case 'IN_PROGRESS':
+				if (!job.startedAt) updateData.startedAt = new Date();
+				break;
+			case 'COMPLETED':
+				updateData.completedAt = new Date();
+				break;
+			case 'INVOICED':
+				updateData.invoicedAt = new Date();
+				break;
+			case 'PAID':
+				updateData.paidAt = new Date();
+				break;
+			case 'CLOSED':
+				updateData.closedAt = new Date();
+				updateData.closedBy = userId;
+				break;
+			case 'CANCELLED':
+				updateData.cancelledAt = new Date();
+				break;
+		}
 
-	await prisma.$transaction(async (tx) => {
 		await tx.job.update({ where: { id: jobId }, data: updateData });
 		await tx.jobStatusHistory.create({
 			data: {
@@ -148,7 +150,7 @@ async function transitionJobStatus(
 					...(toStatus === 'CLOSED' ? { closedAt: new Date(), closedBy: userId } : {})
 				}
 			}).catch((err) => {
-				console.error(`Failed to update linked work order ${job.workOrderId}:`, err);
+				log.error(`Failed to update linked work order ${job.workOrderId}:`, { error: err });
 			});
 		}
 
@@ -177,14 +179,14 @@ async function transitionJobStatus(
 							...(toStatus === 'CLOSED' ? { closedAt: new Date() } : {})
 						}
 					}).catch((err) => {
-						console.error(`Failed to update linked case ${linkedCase.id}:`, err);
+						log.error(`Failed to update linked case ${linkedCase.id}:`, { error: err });
 					});
 				}
 			}
 		}
-	});
+	}, { userId, reason: 'Transition job status' });
 
-	await recordWorkflowEvent(organizationId, userId, 'job', jobId, 'TRANSITION_STATUS', { fromStatus, toStatus });
+	await recordWorkflowEvent(organizationId, userId, 'job', jobId, 'TRANSITION_STATUS', { toStatus });
 	return jobId;
 }
 
@@ -194,14 +196,16 @@ async function assignTechnician(
 	jobId: string,
 	technicianId: string
 ): Promise<string> {
-	await prisma.job.update({
-		where: { id: jobId },
-		data: {
-			assignedTechnicianId: technicianId,
-			assignedAt: new Date(),
-			assignedBy: userId
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.job.update({
+			where: { id: jobId },
+			data: {
+				assignedTechnicianId: technicianId,
+				assignedAt: new Date(),
+				assignedBy: userId
+			}
+		});
+	}, { userId, reason: 'Assign technician to job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job', jobId, 'ASSIGN_TECHNICIAN', { technicianId });
 	return jobId;
@@ -227,7 +231,9 @@ async function scheduleJob(
 		updateData.assignedBy = userId;
 	}
 
-	await prisma.job.update({ where: { id: jobId }, data: updateData });
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.job.update({ where: { id: jobId }, data: updateData });
+	}, { userId, reason: 'Schedule job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job', jobId, 'SCHEDULE_JOB', { scheduledStart, scheduledEnd, technicianId });
 	return jobId;
@@ -240,14 +246,16 @@ async function addNote(
 	content: string,
 	isInternal: boolean
 ): Promise<string> {
-	const note = await prisma.jobNote.create({
-		data: {
-			jobId,
-			content,
-			isInternal,
-			authorId: userId
-		}
-	});
+	const note = await orgTransaction(organizationId, async (tx) => {
+		return tx.jobNote.create({
+			data: {
+				jobId,
+				content,
+				isInternal,
+				authorId: userId
+			}
+		});
+	}, { userId, reason: 'Add note to job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_note', note.id, 'ADD_NOTE', { jobId, isInternal });
 	return note.id;
@@ -259,17 +267,19 @@ async function addAttachment(
 	jobId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const attachment = await prisma.jobAttachment.create({
-		data: {
-			jobId,
-			fileName: data.fileName as string,
-			fileUrl: data.storageUrl as string,
-			fileSize: data.fileSize as number | undefined,
-			mimeType: data.fileType as string | undefined,
-			description: data.description as string | undefined,
-			uploadedBy: userId
-		}
-	});
+	const attachment = await orgTransaction(organizationId, async (tx) => {
+		return tx.jobAttachment.create({
+			data: {
+				jobId,
+				fileName: data.fileName as string,
+				fileUrl: data.storageUrl as string,
+				fileSize: data.fileSize as number | undefined,
+				mimeType: data.fileType as string | undefined,
+				description: data.description as string | undefined,
+				uploadedBy: userId
+			}
+		});
+	}, { userId, reason: 'Add attachment to job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_attachment', attachment.id, 'ADD_ATTACHMENT', { jobId });
 	return attachment.id;
@@ -280,7 +290,9 @@ async function deleteAttachment(
 	userId: string,
 	attachmentId: string
 ): Promise<string> {
-	await prisma.jobAttachment.delete({ where: { id: attachmentId } });
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.jobAttachment.delete({ where: { id: attachmentId } });
+	}, { userId, reason: 'Delete job attachment' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_attachment', attachmentId, 'DELETE_ATTACHMENT');
 	return attachmentId;
@@ -292,15 +304,17 @@ async function addCheckpoint(
 	jobId: string,
 	data: Record<string, unknown>
 ): Promise<string> {
-	const checkpoint = await prisma.jobCheckpoint.create({
-		data: {
-			jobId,
-			type: data.type as CheckpointType,
-			name: (data.name as string) || `Checkpoint ${data.type}`,
-			description: data.description as string | undefined,
-			isRequired: data.isRequired as boolean | undefined ?? true
-		}
-	});
+	const checkpoint = await orgTransaction(organizationId, async (tx) => {
+		return tx.jobCheckpoint.create({
+			data: {
+				jobId,
+				type: data.type as CheckpointType,
+				name: (data.name as string) || `Checkpoint ${data.type}`,
+				description: data.description as string | undefined,
+				isRequired: data.isRequired as boolean | undefined ?? true
+			}
+		});
+	}, { userId, reason: 'Add checkpoint to job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_checkpoint', checkpoint.id, 'ADD_CHECKPOINT', { jobId, type: data.type });
 	return checkpoint.id;
@@ -312,14 +326,16 @@ async function completeCheckpoint(
 	checkpointId: string,
 	notes?: string
 ): Promise<string> {
-	await prisma.jobCheckpoint.update({
-		where: { id: checkpointId },
-		data: {
-			completedAt: new Date(),
-			completedBy: userId,
-			notes
-		}
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.jobCheckpoint.update({
+			where: { id: checkpointId },
+			data: {
+				completedAt: new Date(),
+				completedBy: userId,
+				notes
+			}
+		});
+	}, { userId, reason: 'Complete job checkpoint' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_checkpoint', checkpointId, 'COMPLETE_CHECKPOINT');
 	return checkpointId;
@@ -332,16 +348,18 @@ async function addVisit(
 	data: Record<string, unknown>
 ): Promise<string> {
 	const scheduledEndValue = data.scheduledEnd ? new Date(data.scheduledEnd as string) : new Date(data.scheduledStart as string);
-	const visit = await prisma.jobVisit.create({
-		data: {
-			jobId,
-			visitNumber: data.visitNumber as number,
-			scheduledStart: new Date(data.scheduledStart as string),
-			scheduledEnd: scheduledEndValue,
-			technicianId: data.technicianId as string | undefined,
-			notes: data.notes as string | undefined
-		}
-	});
+	const visit = await orgTransaction(organizationId, async (tx) => {
+		return tx.jobVisit.create({
+			data: {
+				jobId,
+				visitNumber: data.visitNumber as number,
+				scheduledStart: new Date(data.scheduledStart as string),
+				scheduledEnd: scheduledEndValue,
+				technicianId: data.technicianId as string | undefined,
+				notes: data.notes as string | undefined
+			}
+		});
+	}, { userId, reason: 'Add visit to job' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_visit', visit.id, 'ADD_VISIT', { jobId });
 	return visit.id;
@@ -361,7 +379,9 @@ async function updateVisit(
 	if (data.status) updateData.status = data.status;
 	if (data.notes !== undefined) updateData.notes = data.notes;
 
-	await prisma.jobVisit.update({ where: { id: visitId }, data: updateData });
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.jobVisit.update({ where: { id: visitId }, data: updateData });
+	}, { userId, reason: 'Update job visit' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job_visit', visitId, 'UPDATE_VISIT');
 	return visitId;
@@ -372,10 +392,12 @@ async function deleteJob(
 	userId: string,
 	jobId: string
 ): Promise<string> {
-	await prisma.job.update({
-		where: { id: jobId },
-		data: { deletedAt: new Date() }
-	});
+	await orgTransaction(organizationId, async (tx) => {
+		await tx.job.update({
+			where: { id: jobId },
+			data: { deletedAt: new Date() }
+		});
+	}, { userId, reason: 'Delete job (soft delete)' });
 
 	await recordWorkflowEvent(organizationId, userId, 'job', jobId, 'DELETE_JOB');
 	return jobId;
@@ -508,7 +530,7 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
-		console.error(`[JobWorkflow] Error in ${input.action}:`, errorMessage);
+		log.error(`Error in ${input.action}:`, { error: errorMessage, action: input.action });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {

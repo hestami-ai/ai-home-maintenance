@@ -57,7 +57,7 @@ export const bidRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const workOrder = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!workOrder) throw errors.NOT_FOUND({ message: 'Work Order' });
@@ -71,6 +71,7 @@ export const bidRouter = {
 			const vendors = await prisma.vendor.findMany({
 				where: {
 					id: { in: input.vendorIds },
+					organizationId: context.organization.id,
 					associationId: association.id,
 					isActive: true
 				}
@@ -174,14 +175,15 @@ export const bidRouter = {
 				throw errors.NOT_FOUND({ message: 'Association' });
 			}
 
-			const bid = await prisma.workOrderBid.findFirst({
-				where: { id: input.bidId },
+			const bid = await prisma.workOrderBid.findFirstOrThrow({
+				where: {
+					id: input.bidId,
+					workOrder: { association: { organizationId: context.organization!.id } }
+				},
 				include: { workOrder: true, vendor: true }
-			});
-
-			if (!bid || bid.workOrder.associationId !== association.id) {
+			}).catch(() => {
 				throw errors.NOT_FOUND({ message: 'Bid' });
-			}
+			});
 
 			// Check authorization - must be the vendor or an admin/manager
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
@@ -287,7 +289,7 @@ export const bidRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const workOrder = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!workOrder) throw errors.NOT_FOUND({ message: 'Work Order' });
@@ -359,14 +361,15 @@ export const bidRouter = {
 
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
-			const bid = await prisma.workOrderBid.findFirst({
-				where: { id: input.bidId },
+			const bid = await prisma.workOrderBid.findFirstOrThrow({
+				where: {
+					id: input.bidId,
+					workOrder: { association: { organizationId: context.organization!.id } }
+				},
 				include: { workOrder: true, vendor: true }
-			});
-
-			if (!bid || bid.workOrder.associationId !== association.id) {
+			}).catch(() => {
 				throw errors.NOT_FOUND({ message: 'Bid' });
-			}
+			});
 
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
@@ -388,7 +391,7 @@ export const bidRouter = {
 						vendorName: bid.vendor.name,
 						workOrderStatus: bid.workOrder.status,
 						totalAmount: bid.totalAmount ? parseFloat(bid.totalAmount.toString()) : undefined,
-						estimatedHours: bid.estimatedHours ?? undefined,
+						estimatedHours: bid.estimatedHours ? parseFloat(bid.estimatedHours.toString()) : undefined,
 						notes: input.notes
 					}
 				},
@@ -449,14 +452,15 @@ export const bidRouter = {
 
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
-			const bid = await prisma.workOrderBid.findFirst({
-				where: { id: input.bidId },
+			const bid = await prisma.workOrderBid.findFirstOrThrow({
+				where: {
+					id: input.bidId,
+					workOrder: { association: { organizationId: context.organization!.id } }
+				},
 				include: { workOrder: true }
-			});
-
-			if (!bid || bid.workOrder.associationId !== association.id) {
+			}).catch(() => {
 				throw errors.NOT_FOUND({ message: 'Bid' });
-			}
+			});
 
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
@@ -530,14 +534,15 @@ export const bidRouter = {
 
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
-			const bid = await prisma.workOrderBid.findFirst({
-				where: { id: input.bidId },
+			const bid = await prisma.workOrderBid.findFirstOrThrow({
+				where: {
+					id: input.bidId,
+					workOrder: { association: { organizationId: context.organization!.id } }
+				},
 				include: { workOrder: true }
-			});
-
-			if (!bid || bid.workOrder.associationId !== association.id) {
+			}).catch(() => {
 				throw errors.NOT_FOUND({ message: 'Bid' });
-			}
+			});
 
 			// Can only withdraw pending or submitted bids
 			if (!['REQUESTED', 'PENDING', 'SUBMITTED'].includes(bid.status)) {

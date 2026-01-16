@@ -260,7 +260,7 @@ export const workOrderRouter = {
 			// Validate unit if provided
 			if (input.unitId) {
 				const unit = await prisma.unit.findFirst({
-					where: { id: input.unitId },
+					where: { id: input.unitId, organizationId: context.organization.id },
 					include: { property: { include: { association: true } } }
 				});
 				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
@@ -271,7 +271,7 @@ export const workOrderRouter = {
 			// Validate asset if provided
 			if (input.assetId) {
 				const asset = await prisma.asset.findFirst({
-					where: { id: input.assetId, associationId: association.id, deletedAt: null }
+					where: { id: input.assetId, organizationId: context.organization.id, associationId: association.id, deletedAt: null }
 				});
 				if (!asset) {
 					throw errors.NOT_FOUND({ message: 'Asset' });
@@ -280,7 +280,7 @@ export const workOrderRouter = {
 
 			// Generate work order number
 			const lastWO = await prisma.workOrder.findFirst({
-				where: { associationId: association.id },
+				where: { organizationId: context.organization.id, associationId: association.id },
 				orderBy: { createdAt: 'desc' }
 			});
 
@@ -301,7 +301,7 @@ export const workOrderRouter = {
 			// Phase 9: Validate origin references if provided
 			if (input.violationId) {
 				const violation = await prisma.violation.findFirst({
-					where: { id: input.violationId, associationId: association.id }
+					where: { id: input.violationId, organizationId: context.organization.id, associationId: association.id }
 				});
 				if (!violation) {
 					throw errors.NOT_FOUND({ message: 'Violation' });
@@ -309,7 +309,7 @@ export const workOrderRouter = {
 			}
 			if (input.arcRequestId) {
 				const arcRequest = await prisma.aRCRequest.findFirst({
-					where: { id: input.arcRequestId, associationId: association.id }
+					where: { id: input.arcRequestId, organizationId: context.organization.id, associationId: association.id }
 				});
 				if (!arcRequest) {
 					throw errors.NOT_FOUND({ message: 'ARC Request' });
@@ -317,7 +317,7 @@ export const workOrderRouter = {
 			}
 			if (input.resolutionId) {
 				const resolution = await prisma.resolution.findFirst({
-					where: { id: input.resolutionId, associationId: association.id }
+					where: { id: input.resolutionId, associationId: association.id, association: { organizationId: context.organization.id } }
 				});
 				if (!resolution) {
 					throw errors.NOT_FOUND({ message: 'Resolution' });
@@ -428,6 +428,7 @@ export const workOrderRouter = {
 			}
 
 			const where: Prisma.WorkOrderWhereInput = {
+				organizationId: context.organization.id,
 				associationId: association.id
 			};
 
@@ -527,7 +528,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.id, associationId: association.id }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -611,7 +612,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.id, associationId: association.id }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -707,7 +708,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.id, associationId: association.id }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -716,7 +717,7 @@ export const workOrderRouter = {
 
 			// Validate vendor
 			const vendor = await prisma.vendor.findFirst({
-				where: { id: input.vendorId, associationId: association.id, isActive: true }
+				where: { id: input.vendorId, organizationId: context.organization.id, associationId: association.id, isActive: true }
 			});
 
 			if (!vendor) {
@@ -803,7 +804,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.id, associationId: association.id }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -898,7 +899,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.id, associationId: association.id }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1004,7 +1005,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.id, associationId: association.id }
+				where: { id: input.id, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1100,7 +1101,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1208,7 +1209,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1299,7 +1300,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1316,7 +1317,7 @@ export const workOrderRouter = {
 
 			// Validate meeting exists and belongs to association
 			const meeting = await prisma.meeting.findFirst({
-				where: { id: input.meetingId },
+				where: { id: input.meetingId, association: { organizationId: context.organization.id } },
 				include: { board: true }
 			});
 
@@ -1405,7 +1406,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1493,7 +1494,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1568,7 +1569,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1648,7 +1649,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id },
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id },
 				include: { assignedVendor: true }
 			});
 
@@ -1777,7 +1778,7 @@ export const workOrderRouter = {
 			}
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 
 			if (!wo) {
@@ -1883,14 +1884,14 @@ export const workOrderRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			// Validate pricebook version if provided
 			if (input.pricebookVersionId) {
 				const version = await prisma.pricebookVersion.findFirst({
-					where: { id: input.pricebookVersionId, status: { in: ['ACTIVE', 'PUBLISHED'] } },
+					where: { id: input.pricebookVersionId, pricebook: { organizationId: context.organization.id }, status: { in: ['ACTIVE', 'PUBLISHED'] } },
 					include: { pricebook: true }
 				});
 				if (!version) throw errors.NOT_FOUND({ message: 'PricebookVersion' });
@@ -1899,7 +1900,7 @@ export const workOrderRouter = {
 			// Validate job template if provided
 			if (input.jobTemplateId) {
 				const template = await prisma.jobTemplate.findFirst({
-					where: { id: input.jobTemplateId, isActive: true }
+					where: { id: input.jobTemplateId, organizationId: context.organization.id, isActive: true }
 				});
 				if (!template) throw errors.NOT_FOUND({ message: 'JobTemplate' });
 			}
@@ -1923,7 +1924,7 @@ export const workOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to set pricebook/template' });
 			}
 
-			const updatedWO = await prisma.workOrder.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updatedWO = await prisma.workOrder.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
@@ -1987,7 +1988,7 @@ export const workOrderRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
@@ -2015,8 +2016,8 @@ export const workOrderRouter = {
 			}
 
 			// Fetch the created line item for the response
-			const lineItem = await prisma.workOrderLineItem.findUniqueOrThrow({
-				where: { id: result.lineItemId }
+			const lineItem = await prisma.workOrderLineItem.findFirstOrThrow({
+				where: { id: result.lineItemId, workOrder: { organizationId: context.organization.id } }
 			});
 
 			return successResponse(
@@ -2078,7 +2079,7 @@ export const workOrderRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
@@ -2145,7 +2146,7 @@ export const workOrderRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
@@ -2211,12 +2212,12 @@ export const workOrderRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			const wo = await prisma.workOrder.findFirst({
-				where: { id: input.workOrderId, associationId: association.id }
+				where: { id: input.workOrderId, organizationId: context.organization.id, associationId: association.id }
 			});
 			if (!wo) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			const template = await prisma.jobTemplate.findFirst({
-				where: { id: input.jobTemplateId, isActive: true },
+				where: { id: input.jobTemplateId, organizationId: context.organization.id, isActive: true },
 				include: { items: { include: { pricebookItem: true } } }
 			});
 			if (!template) throw errors.NOT_FOUND({ message: 'JobTemplate' });
@@ -2240,7 +2241,7 @@ export const workOrderRouter = {
 				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to apply job template' });
 			}
 
-			const updatedWO = await prisma.workOrder.findUniqueOrThrow({ where: { id: result.entityId } });
+			const updatedWO = await prisma.workOrder.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			return successResponse(
 				{
