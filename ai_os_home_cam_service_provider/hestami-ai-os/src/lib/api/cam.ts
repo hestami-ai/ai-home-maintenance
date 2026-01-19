@@ -1,7 +1,7 @@
 /**
  * CAM (Community Association Management) API client
  * Provides typed functions for calling oRPC backend endpoints
- * 
+ *
  * Types are extracted from types.generated.ts following the pipeline:
  * Prisma Schema → Zod Schemas → oRPC → OpenAPI → Generated Types → API Clients
  */
@@ -9,6 +9,1148 @@
 import { orpc } from './orpc.js';
 import type { operations } from './types.generated';
 import { waitForOrganization } from '$lib/stores/organization.js';
+
+// ============================================================================
+// Enum Value Constants - Client-safe copies for use in Svelte components
+// (Cannot import directly from generated/prisma due to svelte-check memory issues)
+// These MUST be kept in sync with generated/prisma/enums.ts
+// ============================================================================
+
+// Job & Work Order Status Enums (most commonly used)
+export const JobStatusValues = {
+	LEAD: 'LEAD',
+	TICKET: 'TICKET',
+	ESTIMATE_REQUIRED: 'ESTIMATE_REQUIRED',
+	ESTIMATE_SENT: 'ESTIMATE_SENT',
+	ESTIMATE_APPROVED: 'ESTIMATE_APPROVED',
+	JOB_CREATED: 'JOB_CREATED',
+	SCHEDULED: 'SCHEDULED',
+	DISPATCHED: 'DISPATCHED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	ON_HOLD: 'ON_HOLD',
+	COMPLETED: 'COMPLETED',
+	INVOICED: 'INVOICED',
+	PAID: 'PAID',
+	WARRANTY: 'WARRANTY',
+	CLOSED: 'CLOSED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const WorkOrderStatusValues = {
+	DRAFT: 'DRAFT',
+	SUBMITTED: 'SUBMITTED',
+	TRIAGED: 'TRIAGED',
+	AUTHORIZED: 'AUTHORIZED',
+	ASSIGNED: 'ASSIGNED',
+	SCHEDULED: 'SCHEDULED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	ON_HOLD: 'ON_HOLD',
+	COMPLETED: 'COMPLETED',
+	REVIEW_REQUIRED: 'REVIEW_REQUIRED',
+	INVOICED: 'INVOICED',
+	CLOSED: 'CLOSED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const WorkOrderPriorityValues = {
+	EMERGENCY: 'EMERGENCY',
+	HIGH: 'HIGH',
+	MEDIUM: 'MEDIUM',
+	LOW: 'LOW',
+	SCHEDULED: 'SCHEDULED'
+} as const;
+
+export const WorkOrderCategoryValues = {
+	MAINTENANCE: 'MAINTENANCE',
+	REPAIR: 'REPAIR',
+	INSPECTION: 'INSPECTION',
+	INSTALLATION: 'INSTALLATION',
+	REPLACEMENT: 'REPLACEMENT',
+	EMERGENCY: 'EMERGENCY',
+	PREVENTIVE: 'PREVENTIVE',
+	LANDSCAPING: 'LANDSCAPING',
+	CLEANING: 'CLEANING',
+	SECURITY: 'SECURITY',
+	OTHER: 'OTHER'
+} as const;
+
+export const WorkOrderOriginTypeValues = {
+	VIOLATION_REMEDIATION: 'VIOLATION_REMEDIATION',
+	ARC_APPROVAL: 'ARC_APPROVAL',
+	PREVENTIVE_MAINTENANCE: 'PREVENTIVE_MAINTENANCE',
+	BOARD_DIRECTIVE: 'BOARD_DIRECTIVE',
+	EMERGENCY_ACTION: 'EMERGENCY_ACTION',
+	MANUAL: 'MANUAL'
+} as const;
+
+// Concierge & Case Enums
+export const ConciergeCaseStatusValues = {
+	INTAKE: 'INTAKE',
+	ASSESSMENT: 'ASSESSMENT',
+	IN_PROGRESS: 'IN_PROGRESS',
+	PENDING_EXTERNAL: 'PENDING_EXTERNAL',
+	PENDING_OWNER: 'PENDING_OWNER',
+	ON_HOLD: 'ON_HOLD',
+	RESOLVED: 'RESOLVED',
+	CLOSED: 'CLOSED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const ConciergeCasePriorityValues = {
+	LOW: 'LOW',
+	NORMAL: 'NORMAL',
+	HIGH: 'HIGH',
+	URGENT: 'URGENT',
+	EMERGENCY: 'EMERGENCY'
+} as const;
+
+export const ConciergeActionStatusValues = {
+	PLANNED: 'PLANNED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	COMPLETED: 'COMPLETED',
+	CANCELLED: 'CANCELLED',
+	BLOCKED: 'BLOCKED'
+} as const;
+
+export const ConciergeActionTypeValues = {
+	PHONE_CALL: 'PHONE_CALL',
+	EMAIL: 'EMAIL',
+	DOCUMENT_REVIEW: 'DOCUMENT_REVIEW',
+	RESEARCH: 'RESEARCH',
+	VENDOR_CONTACT: 'VENDOR_CONTACT',
+	HOA_CONTACT: 'HOA_CONTACT',
+	SCHEDULING: 'SCHEDULING',
+	APPROVAL_REQUEST: 'APPROVAL_REQUEST',
+	FOLLOW_UP: 'FOLLOW_UP',
+	ESCALATION: 'ESCALATION',
+	OTHER: 'OTHER'
+} as const;
+
+// Owner & Property Request Enums
+export const OwnerRequestStatusValues = {
+	DRAFT: 'DRAFT',
+	SUBMITTED: 'SUBMITTED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	RESOLVED: 'RESOLVED',
+	CLOSED: 'CLOSED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const OwnerRequestCategoryValues = {
+	GENERAL_INQUIRY: 'GENERAL_INQUIRY',
+	MAINTENANCE: 'MAINTENANCE',
+	BILLING: 'BILLING',
+	ARCHITECTURAL: 'ARCHITECTURAL',
+	VIOLATION: 'VIOLATION',
+	GOVERNANCE: 'GOVERNANCE',
+	AMENITY: 'AMENITY',
+	OTHER: 'OTHER'
+} as const;
+
+export const IndividualRequestStatusValues = {
+	SUBMITTED: 'SUBMITTED',
+	REVIEWING: 'REVIEWING',
+	APPROVED: 'APPROVED',
+	SCHEDULED: 'SCHEDULED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	COMPLETED: 'COMPLETED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const OwnerIntentStatusValues = {
+	DRAFT: 'DRAFT',
+	SUBMITTED: 'SUBMITTED',
+	ACKNOWLEDGED: 'ACKNOWLEDGED',
+	CONVERTED_TO_CASE: 'CONVERTED_TO_CASE',
+	DECLINED: 'DECLINED',
+	WITHDRAWN: 'WITHDRAWN'
+} as const;
+
+export const OwnerIntentCategoryValues = {
+	MAINTENANCE: 'MAINTENANCE',
+	IMPROVEMENT: 'IMPROVEMENT',
+	COMPLIANCE: 'COMPLIANCE',
+	DISPUTE: 'DISPUTE',
+	INQUIRY: 'INQUIRY',
+	EMERGENCY: 'EMERGENCY',
+	OTHER: 'OTHER'
+} as const;
+
+export const OwnerIntentPriorityValues = {
+	LOW: 'LOW',
+	NORMAL: 'NORMAL',
+	HIGH: 'HIGH',
+	URGENT: 'URGENT'
+} as const;
+
+// ARC Request Enums
+export const ARCRequestStatusValues = {
+	DRAFT: 'DRAFT',
+	SUBMITTED: 'SUBMITTED',
+	UNDER_REVIEW: 'UNDER_REVIEW',
+	APPROVED: 'APPROVED',
+	DENIED: 'DENIED',
+	CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+	TABLED: 'TABLED',
+	WITHDRAWN: 'WITHDRAWN',
+	CANCELLED: 'CANCELLED',
+	EXPIRED: 'EXPIRED'
+} as const;
+
+export const ARCCategoryValues = {
+	FENCE: 'FENCE',
+	ROOF: 'ROOF',
+	PAINT: 'PAINT',
+	ADDITION: 'ADDITION',
+	LANDSCAPING: 'LANDSCAPING',
+	WINDOWS: 'WINDOWS',
+	DOORS: 'DOORS',
+	DRIVEWAY: 'DRIVEWAY',
+	GARAGE: 'GARAGE',
+	SOLAR: 'SOLAR',
+	HVAC: 'HVAC',
+	OTHER: 'OTHER'
+} as const;
+
+export const ARCReviewActionValues = {
+	APPROVE: 'APPROVE',
+	DENY: 'DENY',
+	REQUEST_CHANGES: 'REQUEST_CHANGES',
+	TABLE: 'TABLE'
+} as const;
+
+// Service Contract Enums
+export const ServiceContractStatusValues = {
+	DRAFT: 'DRAFT',
+	PENDING_APPROVAL: 'PENDING_APPROVAL',
+	ACTIVE: 'ACTIVE',
+	SUSPENDED: 'SUSPENDED',
+	EXPIRED: 'EXPIRED',
+	CANCELLED: 'CANCELLED',
+	RENEWED: 'RENEWED'
+} as const;
+
+export const ServiceContractTypeValues = {
+	PREVENTIVE_MAINTENANCE: 'PREVENTIVE_MAINTENANCE',
+	FULL_SERVICE: 'FULL_SERVICE',
+	INSPECTION_ONLY: 'INSPECTION_ONLY',
+	ON_CALL: 'ON_CALL',
+	SEASONAL: 'SEASONAL'
+} as const;
+
+// Staff Enums
+export const StaffStatusValues = {
+	PENDING: 'PENDING',
+	ACTIVE: 'ACTIVE',
+	SUSPENDED: 'SUSPENDED',
+	DEACTIVATED: 'DEACTIVATED'
+} as const;
+
+export const StaffRoleValues = {
+	CONCIERGE_OPERATOR: 'CONCIERGE_OPERATOR',
+	OPERATIONS_COORDINATOR: 'OPERATIONS_COORDINATOR',
+	CAM_SPECIALIST: 'CAM_SPECIALIST',
+	VENDOR_LIAISON: 'VENDOR_LIAISON',
+	PLATFORM_ADMIN: 'PLATFORM_ADMIN'
+} as const;
+
+export const PillarAccessValues = {
+	CONCIERGE: 'CONCIERGE',
+	CAM: 'CAM',
+	CONTRACTOR: 'CONTRACTOR',
+	VENDOR: 'VENDOR',
+	ADMIN: 'ADMIN'
+} as const;
+
+export const ServiceProviderTeamMemberStatusValues = {
+	PENDING: 'PENDING',
+	ACTIVE: 'ACTIVE',
+	SUSPENDED: 'SUSPENDED',
+	DEACTIVATED: 'DEACTIVATED'
+} as const;
+
+export const ServiceProviderRoleValues = {
+	OWNER: 'OWNER',
+	ADMIN: 'ADMIN',
+	OFFICE_MANAGER: 'OFFICE_MANAGER',
+	DISPATCHER: 'DISPATCHER',
+	ESTIMATOR: 'ESTIMATOR',
+	BOOKKEEPER: 'BOOKKEEPER',
+	TECHNICIAN: 'TECHNICIAN'
+} as const;
+
+// Invitation Enums
+export const InvitationStatusValues = {
+	PENDING: 'PENDING',
+	ACCEPTED: 'ACCEPTED',
+	EXPIRED: 'EXPIRED',
+	REVOKED: 'REVOKED'
+} as const;
+
+// Violation Enums
+export const ViolationStatusValues = {
+	DRAFT: 'DRAFT',
+	DETECTED: 'DETECTED',
+	OPEN: 'OPEN',
+	UNDER_REVIEW: 'UNDER_REVIEW',
+	NOTICE_SENT: 'NOTICE_SENT',
+	OWNER_RESPONSE_PENDING: 'OWNER_RESPONSE_PENDING',
+	CURE_PERIOD: 'CURE_PERIOD',
+	CURED: 'CURED',
+	ESCALATED: 'ESCALATED',
+	HEARING_SCHEDULED: 'HEARING_SCHEDULED',
+	HEARING_HELD: 'HEARING_HELD',
+	REMEDIATION_IN_PROGRESS: 'REMEDIATION_IN_PROGRESS',
+	FINE_ASSESSED: 'FINE_ASSESSED',
+	APPEALED: 'APPEALED',
+	RESOLVED: 'RESOLVED',
+	CLOSED: 'CLOSED',
+	DISMISSED: 'DISMISSED'
+} as const;
+
+export const ViolationSeverityValues = {
+	MINOR: 'MINOR',
+	MODERATE: 'MODERATE',
+	MAJOR: 'MAJOR',
+	CRITICAL: 'CRITICAL'
+} as const;
+
+// Activity Event Enums
+export const ActivityEntityTypeValues = {
+	ASSOCIATION: 'ASSOCIATION',
+	UNIT: 'UNIT',
+	OWNER: 'OWNER',
+	PARTY: 'PARTY',
+	OWNERSHIP: 'OWNERSHIP',
+	VIOLATION: 'VIOLATION',
+	ARC_REQUEST: 'ARC_REQUEST',
+	ASSESSMENT: 'ASSESSMENT',
+	GOVERNING_DOCUMENT: 'GOVERNING_DOCUMENT',
+	BOARD_ACTION: 'BOARD_ACTION',
+	JOB: 'JOB',
+	WORK_ORDER: 'WORK_ORDER',
+	ESTIMATE: 'ESTIMATE',
+	INVOICE: 'INVOICE',
+	TECHNICIAN: 'TECHNICIAN',
+	CONTRACTOR: 'CONTRACTOR',
+	INVENTORY: 'INVENTORY',
+	PURCHASE_ORDER: 'PURCHASE_ORDER',
+	CONCIERGE_CASE: 'CONCIERGE_CASE',
+	OWNER_INTENT: 'OWNER_INTENT',
+	INDIVIDUAL_PROPERTY: 'INDIVIDUAL_PROPERTY',
+	PROPERTY_DOCUMENT: 'PROPERTY_DOCUMENT',
+	MATERIAL_DECISION: 'MATERIAL_DECISION',
+	EXTERNAL_HOA: 'EXTERNAL_HOA',
+	EXTERNAL_VENDOR: 'EXTERNAL_VENDOR',
+	CONCIERGE_ACTION: 'CONCIERGE_ACTION',
+	MEETING: 'MEETING',
+	MOTION: 'MOTION',
+	VOTE: 'VOTE',
+	RESOLUTION: 'RESOLUTION',
+	USER: 'USER',
+	USER_ROLE: 'USER_ROLE',
+	ORGANIZATION: 'ORGANIZATION',
+	DOCUMENT: 'DOCUMENT',
+	STAFF: 'STAFF',
+	STAFF_ASSIGNMENT: 'STAFF_ASSIGNMENT',
+	VENDOR_CANDIDATE: 'VENDOR_CANDIDATE',
+	VENDOR_BID: 'VENDOR_BID',
+	OTHER: 'OTHER'
+} as const;
+
+export const ActivityActionTypeValues = {
+	CREATE: 'CREATE',
+	UPDATE: 'UPDATE',
+	DELETE: 'DELETE',
+	STATUS_CHANGE: 'STATUS_CHANGE',
+	APPROVE: 'APPROVE',
+	DENY: 'DENY',
+	ASSIGN: 'ASSIGN',
+	UNASSIGN: 'UNASSIGN',
+	SUBMIT: 'SUBMIT',
+	CANCEL: 'CANCEL',
+	COMPLETE: 'COMPLETE',
+	SCHEDULE: 'SCHEDULE',
+	DISPATCH: 'DISPATCH',
+	CLOSE: 'CLOSE',
+	REOPEN: 'REOPEN',
+	ESCALATE: 'ESCALATE',
+	ROLE_CHANGE: 'ROLE_CHANGE',
+	LOGIN: 'LOGIN',
+	LOGOUT: 'LOGOUT',
+	WORKFLOW_INITIATED: 'WORKFLOW_INITIATED',
+	WORKFLOW_COMPLETED: 'WORKFLOW_COMPLETED',
+	WORKFLOW_FAILED: 'WORKFLOW_FAILED',
+	CUSTOM: 'CUSTOM',
+	CLASSIFY: 'CLASSIFY',
+	VERSION: 'VERSION',
+	SUPERSEDE: 'SUPERSEDE',
+	REFERENCED: 'REFERENCED',
+	START_SESSION: 'START_SESSION',
+	ADJOURN: 'ADJOURN',
+	APPROVE_MINUTES: 'APPROVE_MINUTES',
+	ARCHIVE: 'ARCHIVE',
+	PROPOSE: 'PROPOSE',
+	SECOND: 'SECOND',
+	OPEN_VOTING: 'OPEN_VOTING',
+	CLOSE_VOTING: 'CLOSE_VOTING',
+	TABLE: 'TABLE',
+	WITHDRAW: 'WITHDRAW',
+	CAST_BALLOT: 'CAST_BALLOT',
+	ADOPT: 'ADOPT',
+	REQUEST_INFO: 'REQUEST_INFO',
+	RESPOND: 'RESPOND',
+	LINK: 'LINK'
+} as const;
+
+export const ActivityActorTypeValues = {
+	HUMAN: 'HUMAN',
+	AI: 'AI',
+	SYSTEM: 'SYSTEM'
+} as const;
+
+export const ActivityEventCategoryValues = {
+	INTENT: 'INTENT',
+	DECISION: 'DECISION',
+	EXECUTION: 'EXECUTION',
+	SYSTEM: 'SYSTEM'
+} as const;
+
+// Meeting & Governance Enums
+export const MeetingStatusValues = {
+	SCHEDULED: 'SCHEDULED',
+	IN_SESSION: 'IN_SESSION',
+	ADJOURNED: 'ADJOURNED',
+	MINUTES_DRAFT: 'MINUTES_DRAFT',
+	MINUTES_APPROVED: 'MINUTES_APPROVED',
+	ARCHIVED: 'ARCHIVED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const MeetingTypeValues = {
+	BOARD: 'BOARD',
+	ANNUAL: 'ANNUAL',
+	SPECIAL: 'SPECIAL'
+} as const;
+
+export const MeetingAttendanceStatusValues = {
+	PRESENT: 'PRESENT',
+	ABSENT: 'ABSENT',
+	EXCUSED: 'EXCUSED'
+} as const;
+
+export const BoardMotionStatusValues = {
+	PROPOSED: 'PROPOSED',
+	SECONDED: 'SECONDED',
+	UNDER_DISCUSSION: 'UNDER_DISCUSSION',
+	UNDER_VOTE: 'UNDER_VOTE',
+	TABLED: 'TABLED',
+	APPROVED: 'APPROVED',
+	DENIED: 'DENIED',
+	WITHDRAWN: 'WITHDRAWN'
+} as const;
+
+export const BoardMotionCategoryValues = {
+	POLICY: 'POLICY',
+	BUDGET: 'BUDGET',
+	ASSESSMENT: 'ASSESSMENT',
+	ENFORCEMENT: 'ENFORCEMENT',
+	CONTRACT: 'CONTRACT',
+	CAPITAL_PROJECT: 'CAPITAL_PROJECT',
+	RULE_CHANGE: 'RULE_CHANGE',
+	ELECTION: 'ELECTION',
+	OTHER: 'OTHER'
+} as const;
+
+export const ResolutionStatusValues = {
+	PROPOSED: 'PROPOSED',
+	ADOPTED: 'ADOPTED',
+	SUPERSEDED: 'SUPERSEDED',
+	ARCHIVED: 'ARCHIVED'
+} as const;
+
+export const VoteMethodValues = {
+	IN_PERSON: 'IN_PERSON',
+	PROXY: 'PROXY',
+	ELECTRONIC: 'ELECTRONIC'
+} as const;
+
+export const VoteChoiceValues = {
+	YES: 'YES',
+	NO: 'NO',
+	ABSTAIN: 'ABSTAIN'
+} as const;
+
+export const CommitteeTypeValues = {
+	ARC: 'ARC',
+	SOCIAL: 'SOCIAL',
+	LANDSCAPE: 'LANDSCAPE',
+	BUDGET: 'BUDGET',
+	SAFETY: 'SAFETY',
+	NOMINATING: 'NOMINATING',
+	CUSTOM: 'CUSTOM'
+} as const;
+
+export const CommitteeRoleValues = {
+	CHAIR: 'CHAIR',
+	VICE_CHAIR: 'VICE_CHAIR',
+	SECRETARY: 'SECRETARY',
+	MEMBER: 'MEMBER'
+} as const;
+
+export const BoardRoleValues = {
+	PRESIDENT: 'PRESIDENT',
+	VICE_PRESIDENT: 'VICE_PRESIDENT',
+	SECRETARY: 'SECRETARY',
+	TREASURER: 'TREASURER',
+	DIRECTOR: 'DIRECTOR',
+	MEMBER_AT_LARGE: 'MEMBER_AT_LARGE'
+} as const;
+
+// Document Enums
+export const DocumentStatusValues = {
+	DRAFT: 'DRAFT',
+	PENDING_UPLOAD: 'PENDING_UPLOAD',
+	PROCESSING: 'PROCESSING',
+	PROCESSING_FAILED: 'PROCESSING_FAILED',
+	INFECTED: 'INFECTED',
+	ACTIVE: 'ACTIVE',
+	SUPERSEDED: 'SUPERSEDED',
+	ARCHIVED: 'ARCHIVED'
+} as const;
+
+export const DocumentCategoryValues = {
+	GOVERNING_DOCS: 'GOVERNING_DOCS',
+	FINANCIAL: 'FINANCIAL',
+	MEETING: 'MEETING',
+	LEGAL: 'LEGAL',
+	INSURANCE: 'INSURANCE',
+	MAINTENANCE: 'MAINTENANCE',
+	ARCHITECTURAL: 'ARCHITECTURAL',
+	RESERVE_STUDY: 'RESERVE_STUDY',
+	INSPECTION: 'INSPECTION',
+	CONTRACT: 'CONTRACT',
+	CC_AND_RS: 'CC_AND_RS',
+	PERMIT: 'PERMIT',
+	APPROVAL: 'APPROVAL',
+	CORRESPONDENCE: 'CORRESPONDENCE',
+	TITLE_DEED: 'TITLE_DEED',
+	SURVEY: 'SURVEY',
+	WARRANTY: 'WARRANTY',
+	LICENSE: 'LICENSE',
+	CERTIFICATION: 'CERTIFICATION',
+	BOND: 'BOND',
+	PROPOSAL: 'PROPOSAL',
+	ESTIMATE: 'ESTIMATE',
+	INVOICE: 'INVOICE',
+	WORK_ORDER: 'WORK_ORDER',
+	VOICE_NOTE: 'VOICE_NOTE',
+	SIGNATURE: 'SIGNATURE',
+	CHECKLIST: 'CHECKLIST',
+	ARC_ATTACHMENT: 'ARC_ATTACHMENT',
+	VIOLATION_EVIDENCE: 'VIOLATION_EVIDENCE',
+	PHOTO: 'PHOTO',
+	VIDEO: 'VIDEO',
+	AUDIO: 'AUDIO',
+	GENERAL: 'GENERAL'
+} as const;
+
+export const DocumentContextTypeValues = {
+	ASSOCIATION: 'ASSOCIATION',
+	PROPERTY: 'PROPERTY',
+	UNIT: 'UNIT',
+	JOB: 'JOB',
+	CASE: 'CASE',
+	WORK_ORDER: 'WORK_ORDER',
+	TECHNICIAN: 'TECHNICIAN',
+	CONTRACTOR: 'CONTRACTOR',
+	VENDOR: 'VENDOR',
+	PARTY: 'PARTY',
+	OWNER_INTENT: 'OWNER_INTENT',
+	VIOLATION: 'VIOLATION',
+	ARC_REQUEST: 'ARC_REQUEST',
+	BOARD_MOTION: 'BOARD_MOTION',
+	RESOLUTION: 'RESOLUTION',
+	MEETING: 'MEETING'
+} as const;
+
+export const DocumentVisibilityValues = {
+	PUBLIC: 'PUBLIC',
+	OWNERS_ONLY: 'OWNERS_ONLY',
+	BOARD_ONLY: 'BOARD_ONLY',
+	STAFF_ONLY: 'STAFF_ONLY',
+	PRIVATE: 'PRIVATE'
+} as const;
+
+// Vendor & Approval Enums
+export const VendorApprovalStatusValues = {
+	PENDING: 'PENDING',
+	APPROVED: 'APPROVED',
+	CONDITIONAL: 'CONDITIONAL',
+	SUSPENDED: 'SUSPENDED',
+	REJECTED: 'REJECTED'
+} as const;
+
+export const VendorCandidateStatusValues = {
+	IDENTIFIED: 'IDENTIFIED',
+	CONTACTED: 'CONTACTED',
+	RESPONDED: 'RESPONDED',
+	QUOTED: 'QUOTED',
+	SELECTED: 'SELECTED',
+	REJECTED: 'REJECTED',
+	ARCHIVED: 'ARCHIVED'
+} as const;
+
+export const ExternalApprovalStatusValues = {
+	NOT_REQUIRED: 'NOT_REQUIRED',
+	PENDING: 'PENDING',
+	SUBMITTED: 'SUBMITTED',
+	APPROVED: 'APPROVED',
+	DENIED: 'DENIED',
+	EXPIRED: 'EXPIRED'
+} as const;
+
+export const BoardApprovalStatusValues = {
+	PENDING: 'PENDING',
+	APPROVED: 'APPROVED',
+	DENIED: 'DENIED'
+} as const;
+
+// Dispatch & Schedule Enums
+export const DispatchStatusValues = {
+	PENDING: 'PENDING',
+	ASSIGNED: 'ASSIGNED',
+	ACCEPTED: 'ACCEPTED',
+	DECLINED: 'DECLINED',
+	EN_ROUTE: 'EN_ROUTE',
+	ON_SITE: 'ON_SITE',
+	COMPLETED: 'COMPLETED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const ScheduledVisitStatusValues = {
+	SCHEDULED: 'SCHEDULED',
+	CONFIRMED: 'CONFIRMED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	COMPLETED: 'COMPLETED',
+	CANCELLED: 'CANCELLED',
+	RESCHEDULED: 'RESCHEDULED',
+	MISSED: 'MISSED'
+} as const;
+
+export const JobVisitStatusValues = {
+	SCHEDULED: 'SCHEDULED',
+	EN_ROUTE: 'EN_ROUTE',
+	ARRIVED: 'ARRIVED',
+	IN_PROGRESS: 'IN_PROGRESS',
+	COMPLETED: 'COMPLETED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+// Report Enums
+export const ReportExecutionStatusValues = {
+	PENDING: 'PENDING',
+	RUNNING: 'RUNNING',
+	COMPLETED: 'COMPLETED',
+	FAILED: 'FAILED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const ReportCategoryValues = {
+	FINANCIAL: 'FINANCIAL',
+	RECEIVABLES: 'RECEIVABLES',
+	PAYABLES: 'PAYABLES',
+	OPERATIONAL: 'OPERATIONAL',
+	COMPLIANCE: 'COMPLIANCE',
+	GOVERNANCE: 'GOVERNANCE',
+	CUSTOM: 'CUSTOM'
+} as const;
+
+export const ReportFormatValues = {
+	PDF: 'PDF',
+	EXCEL: 'EXCEL',
+	CSV: 'CSV',
+	JSON: 'JSON',
+	HTML: 'HTML'
+} as const;
+
+export const ScheduleFrequencyValues = {
+	DAILY: 'DAILY',
+	WEEKLY: 'WEEKLY',
+	BIWEEKLY: 'BIWEEKLY',
+	MONTHLY: 'MONTHLY',
+	QUARTERLY: 'QUARTERLY',
+	ANNUALLY: 'ANNUALLY',
+	CUSTOM: 'CUSTOM'
+} as const;
+
+// Organization Enums
+export const OrganizationStatusValues = {
+	ACTIVE: 'ACTIVE',
+	SUSPENDED: 'SUSPENDED',
+	INACTIVE: 'INACTIVE'
+} as const;
+
+export const OrganizationTypeValues = {
+	COMMUNITY_ASSOCIATION: 'COMMUNITY_ASSOCIATION',
+	MANAGEMENT_COMPANY: 'MANAGEMENT_COMPANY',
+	SERVICE_PROVIDER: 'SERVICE_PROVIDER',
+	EXTERNAL_SERVICE_PROVIDER: 'EXTERNAL_SERVICE_PROVIDER',
+	COMMERCIAL_CLIENT: 'COMMERCIAL_CLIENT',
+	INDIVIDUAL_PROPERTY_OWNER: 'INDIVIDUAL_PROPERTY_OWNER',
+	TRUST_OR_LLC: 'TRUST_OR_LLC',
+	PLATFORM_OPERATOR: 'PLATFORM_OPERATOR'
+} as const;
+
+export const AssociationStatusValues = {
+	ACTIVE: 'ACTIVE',
+	ONBOARDING: 'ONBOARDING',
+	SUSPENDED: 'SUSPENDED',
+	TERMINATED: 'TERMINATED'
+} as const;
+
+// Insurance & License Enums
+export const InsuranceStatusValues = {
+	ACTIVE: 'ACTIVE',
+	EXPIRED: 'EXPIRED',
+	PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const InsuranceTypeValues = {
+	GENERAL_LIABILITY: 'GENERAL_LIABILITY',
+	WORKERS_COMPENSATION: 'WORKERS_COMPENSATION',
+	PROFESSIONAL_LIABILITY: 'PROFESSIONAL_LIABILITY',
+	AUTO_LIABILITY: 'AUTO_LIABILITY',
+	UMBRELLA: 'UMBRELLA',
+	BONDING: 'BONDING'
+} as const;
+
+export const LicenseStatusValues = {
+	ACTIVE: 'ACTIVE',
+	EXPIRED: 'EXPIRED',
+	SUSPENDED: 'SUSPENDED',
+	REVOKED: 'REVOKED',
+	PENDING_RENEWAL: 'PENDING_RENEWAL'
+} as const;
+
+// Contractor Enums
+export const ContractorTradeTypeValues = {
+	PLUMBING: 'PLUMBING',
+	ELECTRICAL: 'ELECTRICAL',
+	HVAC: 'HVAC',
+	ROOFING: 'ROOFING',
+	LANDSCAPING: 'LANDSCAPING',
+	PAINTING: 'PAINTING',
+	FLOORING: 'FLOORING',
+	CARPENTRY: 'CARPENTRY',
+	MASONRY: 'MASONRY',
+	GENERAL_CONTRACTOR: 'GENERAL_CONTRACTOR',
+	POOL_SPA: 'POOL_SPA',
+	PEST_CONTROL: 'PEST_CONTROL',
+	CLEANING: 'CLEANING',
+	SECURITY: 'SECURITY',
+	FIRE_SAFETY: 'FIRE_SAFETY',
+	ELEVATOR: 'ELEVATOR',
+	APPLIANCE_REPAIR: 'APPLIANCE_REPAIR',
+	LOCKSMITH: 'LOCKSMITH',
+	GLASS_WINDOW: 'GLASS_WINDOW',
+	FENCING: 'FENCING',
+	CONCRETE: 'CONCRETE',
+	DEMOLITION: 'DEMOLITION',
+	EXCAVATION: 'EXCAVATION',
+	WATERPROOFING: 'WATERPROOFING',
+	INSULATION: 'INSULATION',
+	DRYWALL: 'DRYWALL',
+	SIDING: 'SIDING',
+	GUTTERS: 'GUTTERS',
+	GARAGE_DOOR: 'GARAGE_DOOR',
+	OTHER: 'OTHER'
+} as const;
+
+// Pricebook & Version Enums
+export const PricebookVersionStatusValues = {
+	DRAFT: 'DRAFT',
+	PUBLISHED: 'PUBLISHED',
+	ACTIVE: 'ACTIVE',
+	ARCHIVED: 'ARCHIVED'
+} as const;
+
+export const PricebookItemTypeValues = {
+	SERVICE: 'SERVICE',
+	LABOR: 'LABOR',
+	MATERIAL: 'MATERIAL',
+	BUNDLE: 'BUNDLE'
+} as const;
+
+// Communication & Notification Enums
+export const CommunicationStatusValues = {
+	DRAFT: 'DRAFT',
+	SCHEDULED: 'SCHEDULED',
+	SENT: 'SENT',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const NotificationStatusValues = {
+	PENDING: 'PENDING',
+	SENT: 'SENT',
+	FAILED: 'FAILED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export const NotificationTypeValues = {
+	INFO: 'INFO',
+	SUCCESS: 'SUCCESS',
+	WARNING: 'WARNING',
+	ERROR: 'ERROR'
+} as const;
+
+export const NotificationCategoryValues = {
+	GENERAL: 'GENERAL',
+	BILLING: 'BILLING',
+	MAINTENANCE: 'MAINTENANCE',
+	GOVERNANCE: 'GOVERNANCE',
+	ARC: 'ARC',
+	VIOLATION: 'VIOLATION',
+	COMMUNICATION: 'COMMUNICATION',
+	DOCUMENT_PROCESSING: 'DOCUMENT_PROCESSING'
+} as const;
+
+// Billing & Payment Enums
+export const BidStatusValues = {
+	REQUESTED: 'REQUESTED',
+	PENDING: 'PENDING',
+	SUBMITTED: 'SUBMITTED',
+	UNDER_REVIEW: 'UNDER_REVIEW',
+	ACCEPTED: 'ACCEPTED',
+	REJECTED: 'REJECTED',
+	WITHDRAWN: 'WITHDRAWN',
+	EXPIRED: 'EXPIRED'
+} as const;
+
+export const EstimateStatusValues = {
+	DRAFT: 'DRAFT',
+	SENT: 'SENT',
+	VIEWED: 'VIEWED',
+	ACCEPTED: 'ACCEPTED',
+	DECLINED: 'DECLINED',
+	EXPIRED: 'EXPIRED',
+	REVISED: 'REVISED'
+} as const;
+
+export const InvoiceStatusValues = {
+	DRAFT: 'DRAFT',
+	PENDING_APPROVAL: 'PENDING_APPROVAL',
+	APPROVED: 'APPROVED',
+	PARTIALLY_PAID: 'PARTIALLY_PAID',
+	PAID: 'PAID',
+	VOIDED: 'VOIDED'
+} as const;
+
+export const JobInvoiceStatusValues = {
+	DRAFT: 'DRAFT',
+	SENT: 'SENT',
+	VIEWED: 'VIEWED',
+	PARTIAL: 'PARTIAL',
+	PAID: 'PAID',
+	OVERDUE: 'OVERDUE',
+	VOID: 'VOID',
+	REFUNDED: 'REFUNDED'
+} as const;
+
+export const JobPaymentStatusValues = {
+	PENDING: 'PENDING',
+	PROCESSING: 'PROCESSING',
+	SUCCEEDED: 'SUCCEEDED',
+	FAILED: 'FAILED',
+	CANCELLED: 'CANCELLED',
+	REFUNDED: 'REFUNDED'
+} as const;
+
+export const PaymentStatusValues = {
+	PENDING: 'PENDING',
+	CLEARED: 'CLEARED',
+	BOUNCED: 'BOUNCED',
+	REFUNDED: 'REFUNDED',
+	VOIDED: 'VOIDED'
+} as const;
+
+export const PaymentMethodValues = {
+	CHECK: 'CHECK',
+	ACH: 'ACH',
+	CREDIT_CARD: 'CREDIT_CARD',
+	CASH: 'CASH',
+	WIRE: 'WIRE',
+	OTHER: 'OTHER'
+} as const;
+
+export const ChargeStatusValues = {
+	PENDING: 'PENDING',
+	BILLED: 'BILLED',
+	PARTIALLY_PAID: 'PARTIALLY_PAID',
+	PAID: 'PAID',
+	WRITTEN_OFF: 'WRITTEN_OFF',
+	CREDITED: 'CREDITED'
+} as const;
+
+export const PurchaseOrderStatusValues = {
+	DRAFT: 'DRAFT',
+	SUBMITTED: 'SUBMITTED',
+	CONFIRMED: 'CONFIRMED',
+	PARTIALLY_RECEIVED: 'PARTIALLY_RECEIVED',
+	RECEIVED: 'RECEIVED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+// Checklist & Milestone Enums
+export const ChecklistItemStatusValues = {
+	PENDING: 'PENDING',
+	IN_PROGRESS: 'IN_PROGRESS',
+	COMPLETED: 'COMPLETED',
+	SKIPPED: 'SKIPPED',
+	FAILED: 'FAILED'
+} as const;
+
+export const MilestoneStatusValues = {
+	PENDING: 'PENDING',
+	IN_PROGRESS: 'IN_PROGRESS',
+	COMPLETED: 'COMPLETED',
+	SKIPPED: 'SKIPPED',
+	BLOCKED: 'BLOCKED'
+} as const;
+
+export const MilestoneTypeValues = {
+	INTAKE_COMPLETE: 'INTAKE_COMPLETE',
+	ASSESSMENT_COMPLETE: 'ASSESSMENT_COMPLETE',
+	SCOPE_DEFINED: 'SCOPE_DEFINED',
+	VENDOR_SELECTED: 'VENDOR_SELECTED',
+	WORK_STARTED: 'WORK_STARTED',
+	WORK_COMPLETE: 'WORK_COMPLETE',
+	INSPECTION_PASSED: 'INSPECTION_PASSED',
+	PAYMENT_PROCESSED: 'PAYMENT_PROCESSED',
+	CASE_CLOSED: 'CASE_CLOSED',
+	CUSTOM: 'CUSTOM'
+} as const;
+
+// Template & Policy Enums
+export const TemplateVersionStatusValues = {
+	DRAFT: 'DRAFT',
+	ACTIVE: 'ACTIVE',
+	RETIRED: 'RETIRED'
+} as const;
+
+export const PolicyStatusValues = {
+	DRAFT: 'DRAFT',
+	ACTIVE: 'ACTIVE',
+	RETIRED: 'RETIRED'
+} as const;
+
+// Asset & Reserve Enums
+export const AssetStatusValues = {
+	ACTIVE: 'ACTIVE',
+	INACTIVE: 'INACTIVE',
+	UNDER_REPAIR: 'UNDER_REPAIR',
+	DISPOSED: 'DISPOSED'
+} as const;
+
+export const AssetCategoryValues = {
+	HVAC: 'HVAC',
+	PLUMBING: 'PLUMBING',
+	ELECTRICAL: 'ELECTRICAL',
+	STRUCTURAL: 'STRUCTURAL',
+	LANDSCAPING: 'LANDSCAPING',
+	POOL_SPA: 'POOL_SPA',
+	ELEVATOR: 'ELEVATOR',
+	SECURITY: 'SECURITY',
+	FIRE_SAFETY: 'FIRE_SAFETY',
+	COMMON_AREA: 'COMMON_AREA',
+	EQUIPMENT: 'EQUIPMENT',
+	VEHICLE: 'VEHICLE',
+	OTHER: 'OTHER'
+} as const;
+
+export const ReserveComponentCategoryValues = {
+	ROOFING: 'ROOFING',
+	PAVING: 'PAVING',
+	PAINTING: 'PAINTING',
+	PLUMBING: 'PLUMBING',
+	ELECTRICAL: 'ELECTRICAL',
+	HVAC: 'HVAC',
+	POOL_SPA: 'POOL_SPA',
+	LANDSCAPING: 'LANDSCAPING',
+	FENCING: 'FENCING',
+	STRUCTURAL: 'STRUCTURAL',
+	ELEVATOR: 'ELEVATOR',
+	COMMON_AREA: 'COMMON_AREA',
+	EQUIPMENT: 'EQUIPMENT',
+	OTHER: 'OTHER'
+} as const;
+
+// Appeal Enums
+export const AppealStatusValues = {
+	PENDING: 'PENDING',
+	SCHEDULED: 'SCHEDULED',
+	UPHELD: 'UPHELD',
+	MODIFIED: 'MODIFIED',
+	REVERSED: 'REVERSED',
+	WITHDRAWN: 'WITHDRAWN'
+} as const;
+
+export const AppealDecisionValues = {
+	UPHELD: 'UPHELD',
+	MODIFIED: 'MODIFIED',
+	OVERTURNED: 'OVERTURNED',
+	REVERSED: 'REVERSED'
+} as const;
+
+// Job Source Enums
+export const JobSourceTypeValues = {
+	WORK_ORDER: 'WORK_ORDER',
+	VIOLATION: 'VIOLATION',
+	ARC_REQUEST: 'ARC_REQUEST',
+	DIRECT_CUSTOMER: 'DIRECT_CUSTOMER',
+	LEAD: 'LEAD',
+	RECURRING: 'RECURRING'
+} as const;
+
+export const JobPriorityValues = {
+	EMERGENCY: 'EMERGENCY',
+	HIGH: 'HIGH',
+	MEDIUM: 'MEDIUM',
+	LOW: 'LOW'
+} as const;
+
+// Property & Unit Enums
+export const PropertyTypeValues = {
+	SINGLE_FAMILY: 'SINGLE_FAMILY',
+	CONDOMINIUM: 'CONDOMINIUM',
+	TOWNHOUSE: 'TOWNHOUSE',
+	COOPERATIVE: 'COOPERATIVE',
+	MIXED_USE: 'MIXED_USE',
+	COMMERCIAL: 'COMMERCIAL'
+} as const;
+
+export const UnitTypeValues = {
+	SINGLE_FAMILY_HOME: 'SINGLE_FAMILY_HOME',
+	CONDO_UNIT: 'CONDO_UNIT',
+	TOWNHOUSE: 'TOWNHOUSE',
+	LOT: 'LOT',
+	COMMERCIAL_UNIT: 'COMMERCIAL_UNIT'
+} as const;
+
+export const PropertyOwnershipStatusValues = {
+	ACTIVE: 'ACTIVE',
+	PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+	SUSPENDED: 'SUSPENDED',
+	TERMINATED: 'TERMINATED'
+} as const;
+
+export const PropertyOwnershipRoleValues = {
+	OWNER: 'OWNER',
+	CO_OWNER: 'CO_OWNER',
+	TRUSTEE_MANAGER: 'TRUSTEE_MANAGER',
+	DELEGATED_AGENT: 'DELEGATED_AGENT'
+} as const;
+
+// Party & Ownership Enums
+export const PartyTypeValues = {
+	INDIVIDUAL: 'INDIVIDUAL',
+	TRUST: 'TRUST',
+	CORPORATION: 'CORPORATION',
+	LLC: 'LLC',
+	PARTNERSHIP: 'PARTNERSHIP',
+	ESTATE: 'ESTATE'
+} as const;
+
+export const OwnershipTypeValues = {
+	FEE_SIMPLE: 'FEE_SIMPLE',
+	JOINT_TENANCY: 'JOINT_TENANCY',
+	TENANCY_IN_COMMON: 'TENANCY_IN_COMMON',
+	COMMUNITY_PROPERTY: 'COMMUNITY_PROPERTY',
+	TRUST: 'TRUST'
+} as const;
+
+// User Role Enum
+export const UserRoleValues = {
+	OWNER: 'OWNER',
+	TENANT: 'TENANT',
+	MANAGER: 'MANAGER',
+	VENDOR: 'VENDOR',
+	BOARD_MEMBER: 'BOARD_MEMBER',
+	ADMIN: 'ADMIN'
+} as const;
+
+// Notice Enums
+export const NoticeTypeValues = {
+	WARNING: 'WARNING',
+	FIRST_NOTICE: 'FIRST_NOTICE',
+	SECOND_NOTICE: 'SECOND_NOTICE',
+	FINAL_NOTICE: 'FINAL_NOTICE',
+	FINE_NOTICE: 'FINE_NOTICE',
+	HEARING_NOTICE: 'HEARING_NOTICE',
+	CURE_CONFIRMATION: 'CURE_CONFIRMATION'
+} as const;
+
+export const NoticeDeliveryMethodValues = {
+	EMAIL: 'EMAIL',
+	MAIL: 'MAIL',
+	CERTIFIED_MAIL: 'CERTIFIED_MAIL',
+	POSTED: 'POSTED',
+	HAND_DELIVERED: 'HAND_DELIVERED',
+	PORTAL: 'PORTAL'
+} as const;
+
+// Case Note Enum
+export const CaseNoteTypeValues = {
+	GENERAL: 'GENERAL',
+	CLARIFICATION_REQUEST: 'CLARIFICATION_REQUEST',
+	CLARIFICATION_RESPONSE: 'CLARIFICATION_RESPONSE',
+	DECISION_RATIONALE: 'DECISION_RATIONALE'
+} as const;
+
+// Accounting Enums
+export const AccountTypeValues = {
+	ASSET: 'ASSET',
+	LIABILITY: 'LIABILITY',
+	EQUITY: 'EQUITY',
+	REVENUE: 'REVENUE',
+	EXPENSE: 'EXPENSE'
+} as const;
+
+export const FundTypeValues = {
+	OPERATING: 'OPERATING',
+	RESERVE: 'RESERVE',
+	SPECIAL: 'SPECIAL'
+} as const;
+
+export const JournalEntryStatusValues = {
+	DRAFT: 'DRAFT',
+	PENDING_APPROVAL: 'PENDING_APPROVAL',
+	POSTED: 'POSTED',
+	REVERSED: 'REVERSED'
+} as const;
+
+export const AssessmentFrequencyValues = {
+	MONTHLY: 'MONTHLY',
+	QUARTERLY: 'QUARTERLY',
+	SEMI_ANNUAL: 'SEMI_ANNUAL',
+	ANNUAL: 'ANNUAL',
+	ONE_TIME: 'ONE_TIME'
+} as const;
+
+// Media & Evidence Enums
+export const MediaTypeValues = {
+	PHOTO: 'PHOTO',
+	VIDEO: 'VIDEO',
+	AUDIO: 'AUDIO',
+	DOCUMENT: 'DOCUMENT'
+} as const;
+
+export const ReporterTypeValues = {
+	STAFF: 'STAFF',
+	RESIDENT: 'RESIDENT',
+	ANONYMOUS: 'ANONYMOUS'
+} as const;
 
 /**
  * Helper to ensure organization context is loaded before making API calls.
@@ -1466,14 +2608,20 @@ export async function fetchBadgeCounts(associationId: string): Promise<BadgeCoun
 		// The association is derived from the organization on the server side
 		const [violationsRes, arcRes, workOrdersRes, vendorsRes] = await Promise.all([
 			orpc.violation.list({}).catch(() => null),
-			orpc.arcRequest.list({ status: 'SUBMITTED' }).catch(() => null),
+			orpc.arcRequest.list({ status: ARCRequestStatusValues.SUBMITTED }).catch(() => null),
 			orpc.workOrder.list({}).catch(() => null),
 			orpc.vendor.list({ isActive: true }).catch(() => null)
 		]);
 
 		if (violationsRes?.ok && violationsRes.data?.violations) {
+			const openStatuses = [
+				ViolationStatusValues.OPEN,
+				ViolationStatusValues.NOTICE_SENT,
+				ViolationStatusValues.CURE_PERIOD,
+				ViolationStatusValues.ESCALATED
+			];
 			counts.openViolations = violationsRes.data.violations.filter((v: { status: string }) =>
-				['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED'].includes(v.status)
+				(openStatuses as string[]).includes(v.status)
 			).length;
 		}
 
@@ -1484,12 +2632,23 @@ export async function fetchBadgeCounts(associationId: string): Promise<BadgeCoun
 		if (workOrdersRes?.ok && workOrdersRes.data?.workOrders) {
 			const now = new Date();
 			const workOrders = workOrdersRes.data.workOrders;
+			const activeStatuses = [
+				WorkOrderStatusValues.SUBMITTED,
+				WorkOrderStatusValues.ASSIGNED,
+				WorkOrderStatusValues.SCHEDULED,
+				WorkOrderStatusValues.IN_PROGRESS
+			];
 			counts.activeWorkOrders = workOrders.filter((wo: { status: string }) =>
-				['SUBMITTED', 'ASSIGNED', 'SCHEDULED', 'IN_PROGRESS'].includes(wo.status)
+				(activeStatuses as string[]).includes(wo.status)
 			).length;
+			const terminalStatuses = [
+				WorkOrderStatusValues.COMPLETED,
+				WorkOrderStatusValues.CLOSED,
+				WorkOrderStatusValues.CANCELLED
+			];
 			counts.overdueWorkOrders = workOrders.filter((wo: { slaDeadline?: string | null; status: string }) => {
 				if (!wo.slaDeadline) return false;
-				return new Date(wo.slaDeadline) < now && !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(wo.status);
+				return new Date(wo.slaDeadline) < now && !(terminalStatuses as string[]).includes(wo.status);
 			}).length;
 		}
 

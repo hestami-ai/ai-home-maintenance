@@ -11,6 +11,18 @@ import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import {
+	PurchaseOrderStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PURCHASE_ORDER_WORKFLOW_ERROR: 'PURCHASE_ORDER_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const PurchaseOrderAction = {
@@ -183,7 +195,7 @@ async function submitPO(
 		await tx.purchaseOrder.update({
 			where: { id: poId },
 			data: {
-				status: 'SUBMITTED',
+				status: PurchaseOrderStatus.SUBMITTED,
 				submittedAt: new Date()
 			}
 		});
@@ -201,7 +213,7 @@ async function confirmPO(
 		await tx.purchaseOrder.update({
 			where: { id: poId },
 			data: {
-				status: 'CONFIRMED',
+				status: PurchaseOrderStatus.CONFIRMED,
 				confirmedAt: new Date()
 			}
 		});
@@ -317,11 +329,11 @@ async function receivePO(
 		const fullyReceived = updatedLines.every((l) => l.quantityReceived >= l.quantity);
 		const partiallyReceived = updatedLines.some((l) => l.quantityReceived > 0);
 
-		let newStatus: 'CONFIRMED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' = 'CONFIRMED';
+		let newStatus: PurchaseOrderStatus = PurchaseOrderStatus.CONFIRMED;
 		if (fullyReceived) {
-			newStatus = 'RECEIVED';
+			newStatus = PurchaseOrderStatus.RECEIVED;
 		} else if (partiallyReceived) {
-			newStatus = 'PARTIALLY_RECEIVED';
+			newStatus = PurchaseOrderStatus.PARTIALLY_RECEIVED;
 		}
 
 		await tx.purchaseOrder.update({
@@ -345,7 +357,7 @@ async function cancelPO(
 		await tx.purchaseOrder.update({
 			where: { id: poId },
 			data: {
-				status: 'CANCELLED'
+				status: PurchaseOrderStatus.CANCELLED
 			}
 		});
 
@@ -389,182 +401,182 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_PO':
+			case PurchaseOrderAction.CREATE_PO:
 				entityId = await DBOS.runStep(
 					() => createPO(input.organizationId, input.userId, input.data),
 					{ name: 'createPO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'CREATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order created',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'CREATE_PO',
+					workflowStep: PurchaseOrderAction.CREATE_PO,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'UPDATE_PO':
+			case PurchaseOrderAction.UPDATE_PO:
 				entityId = await DBOS.runStep(
 					() => updatePO(input.organizationId, input.userId, input.purchaseOrderId!, input.data),
 					{ name: 'updatePO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order updated',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'UPDATE_PO',
+					workflowStep: PurchaseOrderAction.UPDATE_PO,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'ADD_LINE':
+			case PurchaseOrderAction.ADD_LINE:
 				entityId = await DBOS.runStep(
 					() => addLine(input.organizationId, input.userId, input.purchaseOrderId!, input.data),
 					{ name: 'addLine' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order line item added',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'ADD_LINE',
+					workflowStep: PurchaseOrderAction.ADD_LINE,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'REMOVE_LINE':
+			case PurchaseOrderAction.REMOVE_LINE:
 				entityId = await DBOS.runStep(
 					() => removeLine(input.organizationId, input.userId, input.purchaseOrderId!, input.lineId!),
 					{ name: 'removeLine' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order line item removed',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'REMOVE_LINE',
+					workflowStep: PurchaseOrderAction.REMOVE_LINE,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'SUBMIT_PO':
+			case PurchaseOrderAction.SUBMIT_PO:
 				entityId = await DBOS.runStep(
 					() => submitPO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'submitPO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order submitted',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'SUBMIT_PO',
+					workflowStep: PurchaseOrderAction.SUBMIT_PO,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'CONFIRM_PO':
+			case PurchaseOrderAction.CONFIRM_PO:
 				entityId = await DBOS.runStep(
 					() => confirmPO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'confirmPO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION', // Confirmation by vendor/human
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION, // Confirmation by vendor/human
 					summary: 'Purchase Order confirmed',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'CONFIRM_PO',
+					workflowStep: PurchaseOrderAction.CONFIRM_PO,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'RECEIVE_PO':
+			case PurchaseOrderAction.RECEIVE_PO:
 				entityId = await DBOS.runStep(
 					() => receivePO(input.organizationId, input.userId, input.purchaseOrderId!, input.data),
 					{ name: 'receivePO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order items received',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'RECEIVE_PO',
+					workflowStep: PurchaseOrderAction.RECEIVE_PO,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'CANCEL_PO':
+			case PurchaseOrderAction.CANCEL_PO:
 				entityId = await DBOS.runStep(
 					() => cancelPO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'cancelPO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order cancelled',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'CANCEL_PO',
+					workflowStep: PurchaseOrderAction.CANCEL_PO,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'DELETE_PO':
+			case PurchaseOrderAction.DELETE_PO:
 				entityId = await DBOS.runStep(
 					() => deletePO(input.organizationId, input.userId, input.purchaseOrderId!),
 					{ name: 'deletePO' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'PURCHASE_ORDER',
+					entityType: ActivityEntityType.PURCHASE_ORDER,
 					entityId: input.purchaseOrderId!,
-					action: 'DELETE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.DELETE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Purchase Order deleted',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'purchaseOrderWorkflow_v1',
-					workflowStep: 'DELETE_PO',
+					workflowStep: PurchaseOrderAction.DELETE_PO,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -588,8 +600,8 @@ async function purchaseOrderWorkflow(input: PurchaseOrderWorkflowInput): Promise
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PURCHASE_ORDER_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PURCHASE_ORDER_WORKFLOW_ERROR
 		});
 
 		const errorResult = { success: false, error: errorMessage };

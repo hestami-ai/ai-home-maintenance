@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startStockWorkflow } from '../../../workflows/stockWorkflow.js';
+import { startStockWorkflow, StockAction } from '../../../workflows/stockWorkflow.js';
 
 const inventoryLevelOutput = z.object({
 	id: z.string(),
@@ -204,7 +204,7 @@ export const stockRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startStockWorkflow(
 				{
-					action: 'ADJUST_STOCK',
+					action: StockAction.ADJUST_STOCK,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					itemId: input.itemId,
@@ -265,7 +265,7 @@ export const stockRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startStockWorkflow(
 				{
-					action: 'RESERVE_STOCK',
+					action: StockAction.RESERVE_STOCK,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					itemId: input.itemId,
@@ -324,7 +324,7 @@ export const stockRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startStockWorkflow(
 				{
-					action: 'RELEASE_STOCK',
+					action: StockAction.RELEASE_STOCK,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					itemId: input.itemId,
@@ -398,7 +398,7 @@ export const stockRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startStockWorkflow(
 				{
-					action: 'RECORD_COUNT',
+					action: StockAction.RECORD_COUNT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					itemId: input.itemId,

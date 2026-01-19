@@ -5,7 +5,8 @@ import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 import { InvoiceStatusSchema } from '../../schemas.js';
-import { startAPInvoiceWorkflow } from '../../../workflows/index.js';
+import { InvoiceStatus } from '../../../../../../generated/prisma/enums.js';
+import { startAPInvoiceWorkflow, APInvoiceAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('APInvoiceRoute');
 
@@ -105,7 +106,7 @@ export const apInvoiceRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startAPInvoiceWorkflow(
 				{
-					action: 'CREATE',
+					action: APInvoiceAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -366,14 +367,14 @@ export const apInvoiceRouter = {
 				throw errors.NOT_FOUND({ message: 'Invoice not found' });
 			}
 
-			if (invoice.status !== 'DRAFT' && invoice.status !== 'PENDING_APPROVAL') {
+			if (invoice.status !== InvoiceStatus.DRAFT && invoice.status !== InvoiceStatus.PENDING_APPROVAL) {
 				throw errors.CONFLICT({ message: `Cannot approve invoice with status: ${invoice.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startAPInvoiceWorkflow(
 				{
-					action: 'APPROVE',
+					action: APInvoiceAction.APPROVE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					invoiceId: input.id
@@ -433,18 +434,18 @@ export const apInvoiceRouter = {
 				throw errors.NOT_FOUND({ message: 'Invoice not found' });
 			}
 
-			if (invoice.status === 'PAID') {
+			if (invoice.status === InvoiceStatus.PAID) {
 				throw errors.CONFLICT({ message: 'Cannot void a paid invoice' });
 			}
 
-			if (invoice.status === 'VOIDED') {
+			if (invoice.status === InvoiceStatus.VOIDED) {
 				throw errors.CONFLICT({ message: 'Invoice already voided' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startAPInvoiceWorkflow(
 				{
-					action: 'VOID',
+					action: APInvoiceAction.VOID,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					invoiceId: input.id

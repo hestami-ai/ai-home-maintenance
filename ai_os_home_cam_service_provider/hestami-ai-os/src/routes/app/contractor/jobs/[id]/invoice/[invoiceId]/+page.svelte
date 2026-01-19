@@ -13,7 +13,7 @@
 		Plus
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { invoiceApi, jobApi, type JobInvoice, type Job } from '$lib/api/cam';
+	import { ARCCategoryValues, JobInvoiceStatusValues, PaymentMethodValues, invoiceApi, jobApi, type Job, type JobInvoice } from '$lib/api/cam';
 
 	const jobId = $derived($page.params.id ?? '');
 	const invoiceId = $derived($page.params.invoiceId ?? '');
@@ -44,6 +44,7 @@
 
 	// Synchronize server data
 	$effect(() => {
+		if (!data) return;
 		if (data.invoice) {
 			invoice = data.invoice;
 			paymentAmount = Number(invoice.balanceDue);
@@ -136,12 +137,12 @@
 	}
 
 	const paymentMethods = [
-		{ value: 'CASH', label: 'Cash' },
-		{ value: 'CHECK', label: 'Check' },
-		{ value: 'CREDIT_CARD', label: 'Credit Card' },
+		{ value: PaymentMethodValues.CASH, label: 'Cash' },
+		{ value: PaymentMethodValues.CHECK, label: 'Check' },
+		{ value: PaymentMethodValues.CREDIT_CARD, label: 'Credit Card' },
 		{ value: 'DEBIT_CARD', label: 'Debit Card' },
 		{ value: 'BANK_TRANSFER', label: 'Bank Transfer' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: ARCCategoryValues.OTHER, label: 'Other' }
 	];
 </script>
 
@@ -186,7 +187,7 @@
 
 				<!-- Actions -->
 				<div class="flex gap-2">
-					{#if invoice.status === 'DRAFT'}
+					{#if invoice.status === JobInvoiceStatusValues.DRAFT}
 						<button
 							onclick={sendInvoice}
 							disabled={isSending}
@@ -200,7 +201,7 @@
 							Send to Customer
 						</button>
 					{/if}
-					{#if ['SENT', 'VIEWED', 'PARTIAL', 'OVERDUE'].includes(invoice.status) && Number(invoice.balanceDue) > 0}
+					{#if ([JobInvoiceStatusValues.SENT, JobInvoiceStatusValues.VIEWED, JobInvoiceStatusValues.PARTIAL, JobInvoiceStatusValues.OVERDUE] as string[]).includes(invoice.status) && Number(invoice.balanceDue) > 0}
 						<button
 							onclick={() => showPaymentForm = !showPaymentForm}
 							class="btn preset-filled-success-500"

@@ -9,9 +9,10 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { EstimateStatus } from '../../../../../../generated/prisma/client.js';
+import { EstimateStatus as EstimateStatusType } from '../../../../../../generated/prisma/client.js';
+import { EstimateStatus } from '../../../../../../generated/prisma/enums.js';
 import { startEstimateCreateWorkflow } from '../../../workflows/estimateCreateWorkflow.js';
-import { startEstimateWorkflow } from '../../../workflows/estimateWorkflow.js';
+import { startEstimateWorkflow, EstimateAction } from '../../../workflows/estimateWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('EstimateRoute');
@@ -312,7 +313,7 @@ export const estimateRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'GENERATE_FROM_PRICEBOOK',
+					action: EstimateAction.GENERATE_FROM_PRICEBOOK,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -478,14 +479,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== EstimateStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'UPDATE_ESTIMATE',
+					action: EstimateAction.UPDATE_ESTIMATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,
@@ -557,7 +558,7 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== EstimateStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT estimates' });
 			}
 
@@ -567,7 +568,7 @@ export const estimateRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'ADD_LINE',
+					action: EstimateAction.ADD_LINE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.estimateId,
@@ -635,14 +636,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== EstimateStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'REMOVE_LINE',
+					action: EstimateAction.REMOVE_LINE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.estimateId,
@@ -694,14 +695,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (!['DRAFT', 'REVISED'].includes(existing.status)) {
+			if (!([EstimateStatus.DRAFT, EstimateStatus.REVISED] as EstimateStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only send DRAFT or REVISED estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'SEND_ESTIMATE',
+					action: EstimateAction.SEND_ESTIMATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,
@@ -750,14 +751,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (existing.status !== 'SENT') {
+			if (existing.status !== EstimateStatus.SENT) {
 				return successResponse({ estimate: formatEstimate(existing) }, context);
 			}
 
 			// Mark as viewed via workflow
 			await startEstimateWorkflow(
 				{
-					action: 'MARK_VIEWED',
+					action: EstimateAction.MARK_VIEWED,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,
@@ -806,14 +807,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (!['SENT', 'VIEWED'].includes(existing.status)) {
+			if (!([EstimateStatus.SENT, EstimateStatus.VIEWED] as EstimateStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only accept SENT or VIEWED estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'ACCEPT_ESTIMATE',
+					action: EstimateAction.ACCEPT_ESTIMATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,
@@ -864,14 +865,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (!['SENT', 'VIEWED'].includes(existing.status)) {
+			if (!([EstimateStatus.SENT, EstimateStatus.VIEWED] as EstimateStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only decline SENT or VIEWED estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'DECLINE_ESTIMATE',
+					action: EstimateAction.DECLINE_ESTIMATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,
@@ -925,7 +926,7 @@ export const estimateRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'REVISE_ESTIMATE',
+					action: EstimateAction.REVISE_ESTIMATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,
@@ -976,14 +977,14 @@ export const estimateRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Estimate' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== EstimateStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT estimates' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startEstimateWorkflow(
 				{
-					action: 'DELETE_ESTIMATE',
+					action: EstimateAction.DELETE_ESTIMATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					estimateId: input.id,

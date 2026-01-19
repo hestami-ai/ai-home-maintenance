@@ -10,7 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { PurchaseOrderStatus } from '../../../../../../generated/prisma/client.js';
-import { startPurchaseOrderWorkflow } from '../../../workflows/purchaseOrderWorkflow.js';
+import { startPurchaseOrderWorkflow, PurchaseOrderAction } from '../../../workflows/purchaseOrderWorkflow.js';
 
 const poLineOutput = z.object({
 	id: z.string(),
@@ -152,7 +152,7 @@ export const purchaseOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'CREATE_PO',
+					action: PurchaseOrderAction.CREATE_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -301,7 +301,7 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (!['DRAFT', 'SUBMITTED'].includes(existing.status)) {
+			if (existing.status !== PurchaseOrderStatus.DRAFT && existing.status !== PurchaseOrderStatus.SUBMITTED) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT or SUBMITTED purchase orders' });
 			}
 
@@ -312,7 +312,7 @@ export const purchaseOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'UPDATE_PO',
+					action: PurchaseOrderAction.UPDATE_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.id,
@@ -377,7 +377,7 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== PurchaseOrderStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only add lines to DRAFT purchase orders' });
 			}
 
@@ -387,7 +387,7 @@ export const purchaseOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'ADD_LINE',
+					action: PurchaseOrderAction.ADD_LINE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.purchaseOrderId,
@@ -443,14 +443,14 @@ export const purchaseOrderRouter = {
 
 			await context.cerbos.authorize('edit', 'purchase_order', line.purchaseOrderId);
 
-			if (line.purchaseOrder.status !== 'DRAFT') {
+			if (line.purchaseOrder.status !== PurchaseOrderStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only remove lines from DRAFT purchase orders' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'REMOVE_LINE',
+					action: PurchaseOrderAction.REMOVE_LINE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: line.purchaseOrderId,
@@ -497,7 +497,7 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== PurchaseOrderStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only submit DRAFT purchase orders' });
 			}
 
@@ -508,7 +508,7 @@ export const purchaseOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'SUBMIT_PO',
+					action: PurchaseOrderAction.SUBMIT_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.id,
@@ -553,14 +553,14 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (existing.status !== 'SUBMITTED') {
+			if (existing.status !== PurchaseOrderStatus.SUBMITTED) {
 				throw errors.BAD_REQUEST({ message: 'Can only confirm SUBMITTED purchase orders' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'CONFIRM_PO',
+					action: PurchaseOrderAction.CONFIRM_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.id,
@@ -623,7 +623,7 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (!['CONFIRMED', 'PARTIALLY_RECEIVED'].includes(existing.status)) {
+			if (existing.status !== PurchaseOrderStatus.CONFIRMED && existing.status !== PurchaseOrderStatus.PARTIALLY_RECEIVED) {
 				throw errors.BAD_REQUEST({ message: 'Can only receive CONFIRMED or PARTIALLY_RECEIVED purchase orders' });
 			}
 
@@ -636,7 +636,7 @@ export const purchaseOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'RECEIVE_PO',
+					action: PurchaseOrderAction.RECEIVE_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.id,
@@ -692,14 +692,14 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (['RECEIVED', 'CANCELLED'].includes(existing.status)) {
+			if (existing.status === PurchaseOrderStatus.RECEIVED || existing.status === PurchaseOrderStatus.CANCELLED) {
 				throw errors.BAD_REQUEST({ message: 'Cannot cancel received or already cancelled purchase order' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'CANCEL_PO',
+					action: PurchaseOrderAction.CANCEL_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.id,
@@ -744,14 +744,14 @@ export const purchaseOrderRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Purchase order' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== PurchaseOrderStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT purchase orders' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startPurchaseOrderWorkflow(
 				{
-					action: 'DELETE_PO',
+					action: PurchaseOrderAction.DELETE_PO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					purchaseOrderId: input.id,

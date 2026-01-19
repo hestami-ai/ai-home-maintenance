@@ -1,7 +1,20 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { prisma } from '$lib/server/db';
-import { setOrgContextForWorkItem, clearOrgContext } from '$lib/server/db/rls';
+import { lookupWorkItemOrgId, orgTransaction } from '$lib/server/db/rls';
+import { StaffStatus, UserRole, DocumentContextType, DocumentStatus, ActivityEntityType, StorageProvider } from '../../../../../../generated/prisma/enums.js';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+// S3 Client for SeaweedFS (presigned URLs for media viewing)
+const s3Client = new S3Client({
+    endpoint: process.env.S3_ENDPOINT,
+    region: process.env.S3_REGION || 'us-east-1',
+    credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY || '',
+        secretAccessKey: process.env.S3_SECRET_KEY || ''
+    },
+    forcePathStyle: true // Required for SeaweedFS
+});
 
 /**
  * Server-side load function for admin case detail view.
@@ -18,7 +31,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
     const { staff, user } = await parent();
 
     // Verify the user is active staff (layout already checks but double-check)
-    if (!staff || staff.status !== 'ACTIVE' || !user) {
+    if (!staff || staff.status !== StaffStatus.ACTIVE || !user) {
         throw error(403, 'Staff access required');
     }
 
@@ -27,19 +40,18 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         throw error(400, 'Case ID required');
     }
 
-    let orgContextSet = false;
-
     try {
-        // Step 1: Look up the case's organization and set RLS context
-        const orgId = await setOrgContextForWorkItem(user.id, 'CONCIERGE_CASE', caseId);
+        // Step 1: Look up the case's organization ID using SECURITY DEFINER function
+        const orgId = await lookupWorkItemOrgId(ActivityEntityType.CONCIERGE_CASE, caseId);
 
         if (!orgId) {
             throw error(404, 'Case not found');
         }
-        orgContextSet = true;
 
-        // Step 2: Fetch the case with all related data (RLS now allows access)
-        const conciergeCase = await prisma.conciergeCase.findFirst({
+        // Step 2: Use orgTransaction to ensure RLS context is set on the same connection
+        const result = await orgTransaction(orgId, async (tx) => {
+            // Fetch the case with all related data (RLS now allows access)
+            const conciergeCase = await tx.conciergeCase.findFirst({
             where: {
                 id: caseId,
                 deletedAt: null
@@ -57,7 +69,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                         ownerOrg: {
                             include: {
                                 memberships: {
-                                    where: { role: 'ADMIN' },
+                                    where: { role: UserRole.ADMIN },
                                     take: 1,
                                     include: {
                                         user: {
@@ -92,36 +104,92 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                     }
                 }
             }
-        });
+            });
 
-        if (!conciergeCase) {
-            throw error(404, 'Case not found');
-        }
+            if (!conciergeCase) {
+                return null; // Will throw 404 outside transaction
+            }
 
-        // Fetch document bindings for attachments
-        const documentBindings = await prisma.documentContextBinding.findMany({
+            // Fetch document bindings for attachments
+            const documentBindings = await tx.documentContextBinding.findMany({
             where: {
-                contextType: 'CASE',
+                contextType: DocumentContextType.CASE,
                 contextId: caseId
             },
             include: {
                 document: true
             },
             orderBy: { createdAt: 'desc' }
-        });
+            });
 
-        // Transform document bindings to attachment format
-        const attachments = documentBindings
-            .filter((b) => b.document.status === 'ACTIVE')
-            .map((b) => ({
-                id: b.document.id,
-                fileName: b.document.fileName,
-                fileSize: b.document.fileSize,
-                mimeType: b.document.mimeType,
-                fileUrl: b.document.fileUrl ?? '',
-                uploadedBy: b.document.uploadedBy,
-                createdAt: b.document.createdAt.toISOString()
-            }));
+            return { conciergeCase, documentBindings };
+        }, { userId: user.id, reason: 'Staff viewing case detail', itemType: ActivityEntityType.CONCIERGE_CASE, itemId: caseId });
+
+        if (!result || !result.conciergeCase) {
+            throw error(404, 'Case not found');
+        }
+
+        const { conciergeCase, documentBindings } = result;
+
+        // Transform document bindings to attachment format with presigned URLs
+        const s3Bucket = process.env.S3_BUCKET || 'uploads';
+        const expiresIn = 3600; // 1 hour
+
+        const attachments = await Promise.all(
+            documentBindings
+                .filter((b) => b.document.status === DocumentStatus.ACTIVE)
+                .map(async (b) => {
+                    let presignedFileUrl: string | null = null;
+                    let presignedThumbnailUrl: string | null = null;
+
+                    // Generate presigned URL for the main file
+                    if (b.document.storageProvider === StorageProvider.SEAWEEDFS || b.document.storageProvider === StorageProvider.S3) {
+                        try {
+                            const command = new GetObjectCommand({
+                                Bucket: s3Bucket,
+                                Key: b.document.storagePath
+                            });
+                            presignedFileUrl = await getSignedUrl(s3Client, command, { expiresIn });
+                        } catch {
+                            // Silently fail for URL generation - fallback to fileUrl
+                            presignedFileUrl = b.document.fileUrl ?? null;
+                        }
+
+                        // Generate presigned URL for thumbnail if exists
+                        if (b.document.thumbnailUrl) {
+                            try {
+                                const thumbnailKey = b.document.thumbnailUrl.includes('/uploads/')
+                                    ? b.document.thumbnailUrl.split('/uploads/')[1]
+                                    : b.document.thumbnailUrl;
+
+                                const thumbCommand = new GetObjectCommand({
+                                    Bucket: s3Bucket,
+                                    Key: thumbnailKey
+                                });
+                                presignedThumbnailUrl = await getSignedUrl(s3Client, thumbCommand, { expiresIn });
+                            } catch {
+                                // Silently fail for thumbnail URL generation
+                            }
+                        }
+                    } else {
+                        // Local storage - use fileUrl directly
+                        presignedFileUrl = b.document.fileUrl ?? null;
+                    }
+
+                    return {
+                        id: b.document.id,
+                        fileName: b.document.fileName,
+                        fileSize: b.document.fileSize,
+                        mimeType: b.document.mimeType,
+                        fileUrl: b.document.fileUrl ?? '',
+                        presignedFileUrl,
+                        presignedThumbnailUrl,
+                        thumbnailUrl: b.document.thumbnailUrl,
+                        uploadedBy: b.document.uploadedBy,
+                        createdAt: b.document.createdAt.toISOString()
+                    };
+                })
+        );
 
         // Get owner contact info from the property's owner organization
         const ownerMember = conciergeCase.property.ownerOrg?.memberships?.[0];
@@ -201,10 +269,5 @@ export const load: PageServerLoad = async ({ params, parent }) => {
         }
         console.error('Error loading case:', err);
         throw error(500, 'Failed to load case details');
-    } finally {
-        // Always clear the RLS context
-        if (orgContextSet) {
-            await clearOrgContext(user.id);
-        }
     }
 };

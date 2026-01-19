@@ -4,12 +4,7 @@
 	import { Plus, Search, Filter, Briefcase, User, AlertCircle } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import {
-		conciergeCaseApi,
-		type ConciergeCase,
-		type ConciergeCaseStatus,
-		type ConciergeCaseDetail
-	} from '$lib/api/cam';
+	import { ActivityEntityTypeValues, ConciergeCaseStatusValues, JobStatusValues, ViolationStatusValues, conciergeCaseApi, type ConciergeCase, type ConciergeCaseDetail, type ConciergeCaseStatus } from '$lib/api/cam';
 
 	let cases = $state<ConciergeCase[]>([]);
 	let selectedCase = $state<ConciergeCase | null>(null);
@@ -24,15 +19,15 @@
 
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'INTAKE', label: 'Intake' },
-		{ value: 'ASSESSMENT', label: 'Assessment' },
-		{ value: 'IN_PROGRESS', label: 'In Progress' },
-		{ value: 'PENDING_EXTERNAL', label: 'Pending External' },
-		{ value: 'PENDING_OWNER', label: 'Pending Owner' },
-		{ value: 'ON_HOLD', label: 'On Hold' },
-		{ value: 'RESOLVED', label: 'Resolved' },
-		{ value: 'CLOSED', label: 'Closed' },
-		{ value: 'CANCELLED', label: 'Cancelled' }
+		{ value: ConciergeCaseStatusValues.INTAKE, label: 'Intake' },
+		{ value: ActivityEntityTypeValues.ASSESSMENT, label: 'Assessment' },
+		{ value: JobStatusValues.IN_PROGRESS, label: 'In Progress' },
+		{ value: ConciergeCaseStatusValues.PENDING_EXTERNAL, label: 'Pending External' },
+		{ value: ConciergeCaseStatusValues.PENDING_OWNER, label: 'Pending Owner' },
+		{ value: JobStatusValues.ON_HOLD, label: 'On Hold' },
+		{ value: ViolationStatusValues.RESOLVED, label: 'Resolved' },
+		{ value: JobStatusValues.CLOSED, label: 'Closed' },
+		{ value: JobStatusValues.CANCELLED, label: 'Cancelled' }
 	];
 
 	async function loadCases() {
@@ -129,7 +124,7 @@
 	}
 
 	function needsAttention(caseItem: ConciergeCase): boolean {
-		return caseItem.status === 'INTAKE' || caseItem.status === 'PENDING_OWNER';
+		return caseItem.status === ConciergeCaseStatusValues.INTAKE || caseItem.status === ConciergeCaseStatusValues.PENDING_OWNER;
 	}
 </script>
 
@@ -294,7 +289,7 @@
 						</div>
 
 						<!-- Pending Owner Response Alert -->
-						{#if selectedCaseDetail.case.status === 'PENDING_OWNER'}
+						{#if selectedCaseDetail.case.status === ConciergeCaseStatusValues.PENDING_OWNER}
 							<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
 								<div class="flex items-center gap-3">
 									<AlertCircle class="h-5 w-5 text-amber-500" />

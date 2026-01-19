@@ -9,14 +9,17 @@ import {
 	VoteChoiceSchema
 } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
+import { startGovernanceWorkflow, GovernanceAction } from '../../../workflows/governanceWorkflow.js';
 import type {
 	MeetingType,
 	MeetingStatus,
-	MeetingAttendanceStatus,
-	VoteMethod,
-	VoteChoice
+	VoteMethod
 } from '../../../../../../generated/prisma/client.js';
+import {
+	MeetingStatus as MeetingStatusEnum,
+	MeetingAttendanceStatus,
+	VoteChoice
+} from '../../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('MeetingRoute');
@@ -61,13 +64,13 @@ const getVoteResults = async (voteId: string, organizationId: string) => {
 	if (!vote) return null;
 
 	const attendance = vote.meeting.attendance as { status: MeetingAttendanceStatus }[];
-	const presentCount = attendance.filter((a) => a.status !== 'ABSENT').length;
+	const presentCount = attendance.filter((a) => a.status !== MeetingAttendanceStatus.ABSENT).length;
 	const quorumRequired = vote.quorumRequired ?? null;
 	const counts = vote.ballots.reduce<{ yes: number; no: number; abstain: number }>(
 		(acc, b) => {
-			if (b.choice === 'YES') acc.yes += 1;
-			if (b.choice === 'NO') acc.no += 1;
-			if (b.choice === 'ABSTAIN') acc.abstain += 1;
+			if (b.choice === VoteChoice.YES) acc.yes += 1;
+			if (b.choice === VoteChoice.NO) acc.no += 1;
+			if (b.choice === VoteChoice.ABSTAIN) acc.abstain += 1;
 			return acc;
 		},
 		{ yes: 0, no: 0, abstain: 0 }
@@ -124,7 +127,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_MEETING',
+					action: GovernanceAction.CREATE_MEETING,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -273,7 +276,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'ADD_AGENDA_ITEM',
+					action: GovernanceAction.ADD_AGENDA_ITEM,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -336,7 +339,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'ADD_MEETING_MINUTES',
+					action: GovernanceAction.ADD_MEETING_MINUTES,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -398,7 +401,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'RECORD_ATTENDANCE',
+					action: GovernanceAction.RECORD_ATTENDANCE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -473,7 +476,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_VOTE',
+					action: GovernanceAction.CREATE_VOTE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -566,7 +569,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CAST_BALLOT',
+					action: GovernanceAction.CAST_BALLOT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -771,7 +774,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGovernanceWorkflow(
 				{
-					action: 'CLOSE_VOTE',
+					action: GovernanceAction.CLOSE_VOTE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: voteId,
@@ -834,7 +837,7 @@ export const governanceMeetingRouter = {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			if (meeting.status !== 'SCHEDULED') {
+			if (meeting.status !== MeetingStatusEnum.SCHEDULED) {
 				throw errors.BAD_REQUEST({ message: `Cannot start session from status ${meeting.status}` });
 			}
 
@@ -853,7 +856,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'START_MEETING',
+					action: GovernanceAction.START_MEETING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: meetingId,
@@ -904,14 +907,14 @@ export const governanceMeetingRouter = {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			if (existing.status !== 'IN_SESSION') {
+			if (existing.status !== MeetingStatusEnum.IN_SESSION) {
 				throw errors.BAD_REQUEST({ message: `Cannot adjourn from status ${existing.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'ADJOURN_MEETING',
+					action: GovernanceAction.ADJOURN_MEETING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: meetingId,
@@ -964,14 +967,14 @@ export const governanceMeetingRouter = {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			if (existing.status !== 'ADJOURNED') {
+			if (existing.status !== MeetingStatusEnum.ADJOURNED) {
 				throw errors.BAD_REQUEST({ message: `Cannot submit minutes draft from status ${existing.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'UPDATE_MINUTES',
+					action: GovernanceAction.UPDATE_MINUTES,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: meetingId,
@@ -1016,7 +1019,7 @@ export const governanceMeetingRouter = {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			if (existing.status !== 'MINUTES_DRAFT') {
+			if (existing.status !== MeetingStatusEnum.MINUTES_DRAFT) {
 				throw errors.BAD_REQUEST({ message: `Cannot approve minutes from status ${existing.status}` });
 			}
 
@@ -1027,7 +1030,7 @@ export const governanceMeetingRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'APPROVE_MINUTES',
+					action: GovernanceAction.APPROVE_MINUTES,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: meetingId,
@@ -1072,14 +1075,14 @@ export const governanceMeetingRouter = {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			if (existing.status !== 'MINUTES_APPROVED') {
+			if (existing.status !== MeetingStatusEnum.MINUTES_APPROVED) {
 				throw errors.BAD_REQUEST({ message: `Cannot archive from status ${existing.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'ARCHIVE_MEETING',
+					action: GovernanceAction.ARCHIVE_MEETING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: meetingId,
@@ -1129,7 +1132,7 @@ export const governanceMeetingRouter = {
 				throw errors.NOT_FOUND({ message: 'Meeting' });
 			}
 
-			const presentCount = meeting.attendance.filter(a => a.status !== 'ABSENT').length;
+			const presentCount = meeting.attendance.filter(a => a.status !== MeetingAttendanceStatus.ABSENT).length;
 			const quorumRequired = meeting.quorumRequired;
 			const quorumMet = quorumRequired === null || presentCount >= quorumRequired;
 

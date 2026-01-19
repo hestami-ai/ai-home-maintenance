@@ -4,7 +4,7 @@
 	import { ArrowLeft, FileText, Clock, Download, Eye, Edit, Loader2 } from 'lucide-svelte';
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState, Alert } from '$lib/components/ui';
-	import { documentApi, activityEventApi, type Document } from '$lib/api/cam';
+	import { ActivityEntityTypeValues, DocumentStatusValues, DocumentVisibilityValues, activityEventApi, documentApi, type Document } from '$lib/api/cam';
 	import DocumentStatusBadge from '$lib/components/cam/documents/DocumentStatusBadge.svelte';
 	import { onDestroy } from 'svelte';
 
@@ -26,10 +26,10 @@
 	// Polling state
 	let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 	const POLL_INTERVAL_MS = 2000;
-	const PROCESSING_STATUSES = ['PENDING_UPLOAD', 'PROCESSING'];
+	const PROCESSING_STATUSES = [DocumentStatusValues.PENDING_UPLOAD, DocumentStatusValues.PROCESSING];
 
 	// Check if document is in a processing state
-	const isProcessing = $derived(documentData ? PROCESSING_STATUSES.includes(documentData.status) : false);
+	const isProcessing = $derived(documentData ? (PROCESSING_STATUSES as string[]).includes(documentData.status) : false);
 
 	// Start/stop polling based on processing status
 	$effect(() => {
@@ -49,7 +49,7 @@
 				const response = await documentApi.get(documentId);
 				if (response.ok) {
 					documentData = response.data.document;
-					if (!PROCESSING_STATUSES.includes(response.data.document.status)) {
+					if (!(PROCESSING_STATUSES as string[]).includes(response.data.document.status)) {
 						stopPolling();
 					}
 				}
@@ -94,7 +94,7 @@
 	async function loadHistory() {
 		if (!documentId) return;
 		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'DOCUMENT', entityId: documentId });
+			const response = await activityEventApi.getByEntity({ entityType: ActivityEntityTypeValues.DOCUMENT, entityId: documentId });
 			if (response.ok) {
 				history = response.data.events.map((e: any) => ({
 					id: e.id,
@@ -138,10 +138,11 @@
 	function getVisibilityLabel(visibility: string | undefined): string {
 		if (!visibility) return '—';
 		switch (visibility) {
-			case 'OWNER_ONLY': return 'Owner Only';
-			case 'BOARD_ONLY': return 'Board Only';
-			case 'MEMBERS': return 'All Members';
-			case 'PUBLIC': return 'Public';
+			case DocumentVisibilityValues.OWNERS_ONLY: return 'Owner Only';
+			case DocumentVisibilityValues.BOARD_ONLY: return 'Board Only';
+			case DocumentVisibilityValues.STAFF_ONLY: return 'Staff Only';
+			case DocumentVisibilityValues.PUBLIC: return 'Public';
+			case DocumentVisibilityValues.PRIVATE: return 'Private';
 			default: return visibility;
 		}
 	}
@@ -191,7 +192,7 @@
 				</div>
 
 				<div class="flex gap-2">
-					{#if documentData.status === 'ACTIVE'}
+					{#if documentData.status === DocumentStatusValues.ACTIVE}
 						<a href="/api/document/{documentData.id}/download" class="btn btn-sm preset-filled-primary-500">
 							<Download class="mr-1 h-4 w-4" />
 							Download
@@ -237,14 +238,14 @@
 			{/if}
 
 			<!-- Security Alert -->
-			{#if documentData.status === 'INFECTED'}
+			{#if documentData.status === DocumentStatusValues.INFECTED}
 				<Alert variant="error" title="Security Risk Detected" class="mb-6">
 					This file has been flagged as a security risk and cannot be used.
 				</Alert>
 			{/if}
 
 			<!-- Processing Error Alert -->
-			{#if documentData.status === 'PROCESSING_FAILED' && (documentData as any).processingErrorMessage}
+			{#if documentData.status === DocumentStatusValues.PROCESSING_FAILED && (documentData as any).processingErrorMessage}
 				<Alert variant="error" title="Processing Issue" class="mb-6">
 					<p>{(documentData as any).processingErrorMessage}</p>
 					{#if (documentData as any).processingNextRetryAt}
@@ -336,7 +337,7 @@
 	<Card variant="outlined" padding="lg">
 		<h3 class="mb-4 font-semibold">Document Preview</h3>
 
-		{#if documentData && documentData.status === 'ACTIVE' && documentData.mimeType && isPreviewable(documentData.mimeType)}
+		{#if documentData && documentData.status === DocumentStatusValues.ACTIVE && documentData.mimeType && isPreviewable(documentData.mimeType)}
 			{#if documentData.mimeType.startsWith('image/')}
 				<div class="flex justify-center">
 					<img
@@ -359,7 +360,7 @@
 				<Loader2 class="h-12 w-12 animate-spin mb-4" />
 				<p>Preview will be available after processing completes</p>
 			</div>
-		{:else if documentData?.status === 'INFECTED'}
+		{:else if documentData?.status === DocumentStatusValues.INFECTED}
 			<div class="flex flex-col items-center justify-center py-12">
 				<Eye class="h-12 w-12 text-error-300" />
 				<p class="mt-4 text-error-500">Preview not available - file flagged as security risk</p>
@@ -368,7 +369,7 @@
 			<div class="flex flex-col items-center justify-center py-12">
 				<Eye class="h-12 w-12 text-surface-300" />
 				<p class="mt-4 text-surface-500">Preview not available for this file type</p>
-				{#if documentData?.status === 'ACTIVE'}
+				{#if documentData?.status === DocumentStatusValues.ACTIVE}
 					<a href="/api/document/{documentId}/download" class="btn preset-filled-primary-500 mt-4">
 						<Download class="mr-1 h-4 w-4" />
 						Download to View

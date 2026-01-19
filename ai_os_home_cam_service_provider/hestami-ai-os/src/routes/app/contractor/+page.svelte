@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Wrench, Users, Calendar, DollarSign, ClipboardList, TrendingUp, AlertCircle } from 'lucide-svelte';
+	import { Wrench, Users, Calendar, DollarSign, ClipboardList, TrendingUp, AlertCircle, Settings } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import type { operations } from '$lib/api/types.generated';
 
@@ -11,7 +11,8 @@
 		{ label: 'Create Job', icon: ClipboardList, href: '/app/contractor/jobs/new' },
 		{ label: 'Dispatch Board', icon: Calendar, href: '/app/contractor/dispatch' },
 		{ label: 'Manage Technicians', icon: Users, href: '/app/contractor/technicians' },
-		{ label: 'Invoices', icon: DollarSign, href: '/app/contractor/invoices' }
+		{ label: 'Invoices', icon: DollarSign, href: '/app/contractor/invoices' },
+		{ label: 'Team Management', icon: Settings, href: '/app/contractor/admin/team' }
 	];
 
 	// Check if compliance is complete (placeholder)
@@ -55,10 +56,10 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<h1 class="text-2xl font-bold">
-					Welcome back, {data.user?.name?.split(' ')[0] || 'there'}!
+					Welcome back, {data?.user?.name?.split(' ')[0] || 'there'}!
 				</h1>
 				<p class="mt-1 text-surface-500">
-					{data.organization?.name || 'Contractor Dashboard'}
+					{data?.organization?.name || 'Contractor Dashboard'}
 				</p>
 			</div>
 			<a href="/app/contractor/jobs/new" class="btn preset-filled-primary-500">

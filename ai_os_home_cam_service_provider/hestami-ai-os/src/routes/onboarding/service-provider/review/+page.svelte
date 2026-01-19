@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, Check, Loader2, Wrench, Shield, MapPin, Clock } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { serviceProviderOnboarding } from '$lib/stores';
@@ -22,7 +23,7 @@
 				idempotencyKey: crypto.randomUUID(),
 				name: $serviceProviderOnboarding.businessDetails.name,
 				slug: $serviceProviderOnboarding.businessDetails.slug,
-				type: 'SERVICE_PROVIDER'
+				type: OrganizationTypeValues.SERVICE_PROVIDER
 			});
 
 			const org = result.data.organization;

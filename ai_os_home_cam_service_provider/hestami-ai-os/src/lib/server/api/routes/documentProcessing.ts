@@ -4,7 +4,8 @@ import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
 import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
 import { DocumentStatusSchema } from '$lib/schemas/index.js';
-import { startSystemSettingsWorkflow } from '../../workflows/systemSettingsWorkflow.js';
+import { DocumentStatus } from '../../../../../generated/prisma/enums.js';
+import { startSystemSettingsWorkflow, SystemSettingsAction } from '../../workflows/systemSettingsWorkflow.js';
 
 const log = createModuleLogger('DocumentProcessingRoute');
 
@@ -41,7 +42,7 @@ export const documentProcessingRouter = {
                 ok: z.literal(true),
                 data: z.array(z.object({
                     metric_name: z.string(),
-                    metric_value: z.string().transform((v) => parseInt(v, 10))
+                    metric_value: z.union([z.number(), z.bigint()]).transform((v) => Number(v))
                 })),
                 meta: z.any()
             })
@@ -51,11 +52,14 @@ export const documentProcessingRouter = {
             INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
         })
         .handler(async ({ context, errors }) => {
+            log.debug('getQueueStats: Starting');
             await requireStaffPermission(context, 'view_stats', errors);
 
+            log.debug('getQueueStats: Executing SQL query');
             const stats = await prisma.$queryRaw<any[]>`
 				SELECT * FROM get_processing_queue_stats()
 			`;
+            log.debug('getQueueStats: Query complete', { count: stats.length });
 
             return successResponse(stats, context);
         }),
@@ -76,6 +80,7 @@ export const documentProcessingRouter = {
             INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
         })
         .handler(async ({ input, context, errors }) => {
+            log.debug('listQueue: Starting', { view: input.view });
             await requireStaffPermission(context, 'view_queue', errors);
 
             const limit = input.limit ?? 50;
@@ -85,14 +90,15 @@ export const documentProcessingRouter = {
             let status = input.status || null;
             let errorTypeFilter: string | null = null;
 
-            if (input.view === 'processing') status = 'PROCESSING';
-            if (input.view === 'infected') status = 'INFECTED';
-            if (input.view === 'history') status = 'ACTIVE';
+            if (input.view === 'processing') status = DocumentStatus.PROCESSING;
+            if (input.view === 'infected') status = DocumentStatus.INFECTED;
+            if (input.view === 'history') status = DocumentStatus.ACTIVE;
 
             // For needs-attention and auto-retry, we use the same status but different logic in SQL
-            // However, the current list_documents_admin is simple. 
+            // However, the current list_documents_admin is simple.
             // We'll pass the view to a new SQL function or handle it with more complex where clause.
 
+            log.debug('listQueue: Executing SQL query', { status, view: input.view, limit });
             const documents = await prisma.$queryRaw<any[]>`
 				SELECT * FROM list_documents_admin_v2(
 					${status},
@@ -102,6 +108,7 @@ export const documentProcessingRouter = {
 					${offset}
 				)
 			`;
+            log.debug('listQueue: Query complete', { count: documents.length });
 
             return successResponse({
                 documents,
@@ -121,11 +128,14 @@ export const documentProcessingRouter = {
             INTERNAL_SERVER_ERROR: { message: 'Internal server error' }
         })
         .handler(async ({ context, errors }) => {
+            log.debug('getSettings: Starting');
             await requireStaffPermission(context, 'view_settings', errors);
 
+            log.debug('getSettings: Executing Prisma query');
             const setting = await prisma.systemSetting.findUnique({
                 where: { key: 'dpq_settings' }
             });
+            log.debug('getSettings: Query complete', { found: !!setting });
 
             return successResponse(setting?.value || {}, context);
         }),
@@ -152,7 +162,7 @@ export const documentProcessingRouter = {
             const { idempotencyKey, ...settingsData } = input;
             const result = await startSystemSettingsWorkflow(
                 {
-                    action: 'UPSERT_SETTING',
+                    action: SystemSettingsAction.UPSERT_SETTING,
                     organizationId: context.organization!.id,
                     userId: context.user!.id,
                     data: {

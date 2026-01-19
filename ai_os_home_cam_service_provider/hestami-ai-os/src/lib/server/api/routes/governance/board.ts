@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema, JsonSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
+import { startGovernanceWorkflow, GovernanceAction } from '../../../workflows/governanceWorkflow.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 import { BoardRoleSchema } from '../../schemas.js';
@@ -53,7 +53,7 @@ export const governanceBoardRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_BOARD',
+					action: GovernanceAction.CREATE_BOARD,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: rest
@@ -178,7 +178,7 @@ export const governanceBoardRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGovernanceWorkflow(
 				{
-					action: 'ADD_BOARD_MEMBER',
+					action: GovernanceAction.ADD_BOARD_MEMBER,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -239,7 +239,7 @@ export const governanceBoardRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGovernanceWorkflow(
 				{
-					action: 'REMOVE_BOARD_MEMBER',
+					action: GovernanceAction.REMOVE_BOARD_MEMBER,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {

@@ -15,6 +15,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createOrgClient } from '$lib/api/orpc';
+	import { DocumentContextTypeValues, DocumentStatusValues } from '$lib/api/cam';
 	import DocumentStatusBadge from '$lib/components/cam/documents/DocumentStatusBadge.svelte';
 	import { onDestroy } from 'svelte';
 
@@ -66,33 +67,41 @@
 
 	let { data }: Props = $props();
 
-	// Create org client for API calls
-	const orgClient = $derived(createOrgClient(data.organization.id));
-
-	// Local document state that can be updated by polling
-	// Use a separate override state to avoid the state_referenced_locally warning
-	let documentOverride = $state<Document | null>(null);
-	const documentData = $derived(documentOverride ?? data.document);
-	let contextBindings = $derived(data.contextBindings);
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let orgId = $state<string | null>(null);
+	let documentFromData = $state<Document | null>(null);
+	let contextBindings = $state<ContextBinding[]>([]);
 	let isLoading = $state(false);
 	let isDeleting = $state(false);
 	let error = $state<string | null>(null);
 	let showDeleteConfirm = $state(false);
 
-	// Reset override when navigating to a different document
+	// Local document state that can be updated by polling
+	// Use a separate override state to avoid the state_referenced_locally warning
+	let documentOverride = $state<Document | null>(null);
+	const documentData = $derived(documentOverride ?? documentFromData);
+
+	// Create org client for API calls
+	const orgClient = $derived(orgId ? createOrgClient(orgId) : null);
+
+	// Sync state from data and reset override when navigating to a different document
 	$effect(() => {
-		// Access data.document.id to track navigation changes
-		data.document.id;
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data == null || typeof data !== 'object') return;
+		orgId = data.organization?.id ?? null;
+		documentFromData = data.document ?? null;
+		contextBindings = data.contextBindings ?? [];
+		// Reset override when document changes (navigation)
 		documentOverride = null;
 	});
 
 	// Polling state
 	let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 	const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
-	const PROCESSING_STATUSES = ['PENDING_UPLOAD', 'PROCESSING'];
+	const PROCESSING_STATUSES = [DocumentStatusValues.PENDING_UPLOAD, DocumentStatusValues.PROCESSING];
 
 	// Check if document is in a processing state that requires polling
-	const isProcessing = $derived(PROCESSING_STATUSES.includes(documentData.status));
+	const isProcessing = $derived((PROCESSING_STATUSES as string[]).includes(documentData.status));
 
 	// Start/stop polling based on processing status
 	$effect(() => {
@@ -108,13 +117,14 @@
 
 		pollIntervalId = setInterval(async () => {
 			try {
+				if (!orgClient) return;
 				const result = await orgClient.document.getDocument({ id: documentData.id });
 				if (result.ok) {
 					const newDoc = result.data.document as Document;
 					documentOverride = newDoc;
 
 					// Stop polling if no longer processing
-					if (!PROCESSING_STATUSES.includes(newDoc.status)) {
+					if (!(PROCESSING_STATUSES as string[]).includes(newDoc.status)) {
 						stopPolling();
 					}
 				}
@@ -161,6 +171,11 @@
 		error = null;
 
 		try {
+			if (!orgClient) {
+				error = 'Client not available';
+				isDeleting = false;
+				return;
+			}
 			const result = await orgClient.document.archiveDocument({
 				idempotencyKey: crypto.randomUUID(),
 				id: documentData.id,
@@ -200,7 +215,7 @@
 		return File;
 	}
 
-	const propertyBinding = $derived(contextBindings.find((b) => b.contextType === 'PROPERTY'));
+	const propertyBinding = $derived(contextBindings.find((b) => b.contextType === DocumentContextTypeValues.PROPERTY));
 </script>
 
 <svelte:head>
@@ -267,7 +282,7 @@
 					</div>
 
 					<div class="flex gap-2">
-						{#if documentData.status === 'ACTIVE'}
+						{#if documentData.status === DocumentStatusValues.ACTIVE}
 							<a
 								href={(documentData as any).presignedFileUrl || ''}
 								target="_blank"
@@ -348,20 +363,20 @@
 					{/if}
 
 					<!-- Feedback Alerts -->
-					{#if showSuccessAlert && documentData.status === 'ACTIVE'}
+					{#if showSuccessAlert && documentData.status === DocumentStatusValues.ACTIVE}
 						<Alert variant="success" title="Upload Successful">
 							Your document has been processed and is now ready for use.
 						</Alert>
 					{/if}
 
-					{#if showInfectedAlert || (documentData.status === 'INFECTED')}
+					{#if showInfectedAlert || (documentData.status === DocumentStatusValues.INFECTED)}
 						<Alert variant="error" title="Security Risk Detected">
 							This file has been flagged as a security risk and cannot be used.
 						</Alert>
 					{/if}
 
 					<!-- Processing Error Info -->
-					{#if documentData.status === 'PROCESSING_FAILED' && documentData.processingErrorMessage}
+					{#if documentData.status === DocumentStatusValues.PROCESSING_FAILED && documentData.processingErrorMessage}
 						<Alert variant="error" title="Processing Issue">
 							<p>{documentData.processingErrorMessage}</p>
 							{#if documentData.processingNextRetryAt}
@@ -373,7 +388,7 @@
 					{/if}
 
 					<!-- Preview -->
-					{#if documentData.status === 'ACTIVE'}
+					{#if documentData.status === DocumentStatusValues.ACTIVE}
 						{#if documentData.mimeType.startsWith('image/')}
 							<Card variant="outlined" padding="md">
 								<h2 class="mb-4 font-semibold">Preview</h2>

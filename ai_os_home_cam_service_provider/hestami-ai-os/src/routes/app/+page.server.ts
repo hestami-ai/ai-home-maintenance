@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { createModuleLogger } from '$lib/server/logger';
+import { OrganizationType } from '../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('AppRootPage');
 
@@ -44,11 +45,11 @@ export const load: PageServerLoad = async ({ parent }) => {
 		orgType
 	});
 
-	if (orgType === 'INDIVIDUAL_PROPERTY_OWNER' || orgType === 'TRUST_OR_LLC') {
+	if (orgType === OrganizationType.INDIVIDUAL_PROPERTY_OWNER || orgType === OrganizationType.TRUST_OR_LLC) {
 		throw redirect(302, '/app/concierge');
-	} else if (orgType === 'COMMUNITY_ASSOCIATION' || orgType === 'MANAGEMENT_COMPANY') {
+	} else if (orgType === OrganizationType.COMMUNITY_ASSOCIATION || orgType === OrganizationType.MANAGEMENT_COMPANY) {
 		throw redirect(302, '/app/cam');
-	} else if (orgType === 'SERVICE_PROVIDER') {
+	} else if (orgType === OrganizationType.SERVICE_PROVIDER) {
 		throw redirect(302, '/app/contractor');
 	} else {
 		// Default to concierge dashboard for other owner types

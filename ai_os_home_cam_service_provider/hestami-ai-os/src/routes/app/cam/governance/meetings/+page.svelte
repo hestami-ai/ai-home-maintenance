@@ -14,7 +14,7 @@
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
 	import { meetingLive } from '$lib/stores/governanceLive';
-	import { governanceApi } from '$lib/api/cam';
+	import { governanceApi, MeetingStatusValues, MeetingTypeValues, MeetingAttendanceStatusValues, BoardMotionStatusValues } from '$lib/api/cam';
 
 	interface Meeting {
 		id: string;
@@ -89,20 +89,20 @@
 
 	const typeOptions = [
 		{ value: 'all', label: 'All Types' },
-		{ value: 'BOARD', label: 'Board' },
-		{ value: 'ANNUAL', label: 'Annual' },
-		{ value: 'SPECIAL', label: 'Special' },
+		{ value: MeetingTypeValues.BOARD, label: 'Board' },
+		{ value: MeetingTypeValues.ANNUAL, label: 'Annual' },
+		{ value: MeetingTypeValues.SPECIAL, label: 'Special' },
 		{ value: 'COMMITTEE', label: 'Committee' }
 	];
 
 	const statusOptions = [
 		{ value: 'all', label: 'All Status' },
-		{ value: 'SCHEDULED', label: 'Scheduled' },
-		{ value: 'IN_SESSION', label: 'In Session' },
-		{ value: 'ADJOURNED', label: 'Adjourned' },
-		{ value: 'MINUTES_DRAFT', label: 'Minutes Draft' },
-		{ value: 'MINUTES_APPROVED', label: 'Approved' },
-		{ value: 'ARCHIVED', label: 'Archived' }
+		{ value: MeetingStatusValues.SCHEDULED, label: 'Scheduled' },
+		{ value: MeetingStatusValues.IN_SESSION, label: 'In Session' },
+		{ value: MeetingStatusValues.ADJOURNED, label: 'Adjourned' },
+		{ value: MeetingStatusValues.MINUTES_DRAFT, label: 'Minutes Draft' },
+		{ value: MeetingStatusValues.MINUTES_APPROVED, label: 'Approved' },
+		{ value: MeetingStatusValues.ARCHIVED, label: 'Archived' }
 	];
 
 	const detailTabs = [
@@ -207,43 +207,43 @@
 		activeTab = 0;
 		await loadMeetingDetail(meeting.id);
 		// Connect to live updates if meeting is in session
-		if (meeting.status === 'IN_SESSION') {
+		if (meeting.status === MeetingStatusValues.IN_SESSION) {
 			meetingLive.connect(meeting.id);
 		}
 	}
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'SCHEDULED': return 'text-blue-500 bg-blue-500/10';
-			case 'IN_SESSION': return 'text-green-500 bg-green-500/10';
-			case 'ADJOURNED': return 'text-orange-500 bg-orange-500/10';
-			case 'MINUTES_DRAFT': return 'text-yellow-500 bg-yellow-500/10';
-			case 'MINUTES_APPROVED': return 'text-emerald-500 bg-emerald-500/10';
-			case 'ARCHIVED': return 'text-gray-500 bg-gray-500/10';
-			case 'CANCELLED': return 'text-red-500 bg-red-500/10';
+			case MeetingStatusValues.SCHEDULED: return 'text-blue-500 bg-blue-500/10';
+			case MeetingStatusValues.IN_SESSION: return 'text-green-500 bg-green-500/10';
+			case MeetingStatusValues.ADJOURNED: return 'text-orange-500 bg-orange-500/10';
+			case MeetingStatusValues.MINUTES_DRAFT: return 'text-yellow-500 bg-yellow-500/10';
+			case MeetingStatusValues.MINUTES_APPROVED: return 'text-emerald-500 bg-emerald-500/10';
+			case MeetingStatusValues.ARCHIVED: return 'text-gray-500 bg-gray-500/10';
+			case MeetingStatusValues.CANCELLED: return 'text-red-500 bg-red-500/10';
 			default: return 'text-gray-500 bg-gray-500/10';
 		}
 	}
 
 	function getStatusLabel(status: string): string {
 		switch (status) {
-			case 'SCHEDULED': return 'Scheduled';
-			case 'IN_SESSION': return 'In Session';
-			case 'ADJOURNED': return 'Adjourned';
-			case 'MINUTES_DRAFT': return 'Minutes Draft';
-			case 'MINUTES_APPROVED': return 'Approved';
-			case 'ARCHIVED': return 'Archived';
-			case 'CANCELLED': return 'Cancelled';
+			case MeetingStatusValues.SCHEDULED: return 'Scheduled';
+			case MeetingStatusValues.IN_SESSION: return 'In Session';
+			case MeetingStatusValues.ADJOURNED: return 'Adjourned';
+			case MeetingStatusValues.MINUTES_DRAFT: return 'Minutes Draft';
+			case MeetingStatusValues.MINUTES_APPROVED: return 'Approved';
+			case MeetingStatusValues.ARCHIVED: return 'Archived';
+			case MeetingStatusValues.CANCELLED: return 'Cancelled';
 			default: return status;
 		}
 	}
 
 	function getTypeLabel(type: string): string {
 		switch (type) {
-			case 'BOARD': return 'Board Meeting';
-			case 'ANNUAL': return 'Annual Meeting';
-			case 'SPECIAL': return 'Special Meeting';
-			case 'COMMITTEE': return 'Committee Meeting';
+			case MeetingTypeValues.BOARD: return 'Board Meeting';
+			case MeetingTypeValues.ANNUAL: return 'Annual Meeting';
+			case MeetingTypeValues.SPECIAL: return 'Special Meeting';
+			case 'COMMITTEE': return 'Committee Meeting'; // Not in Prisma enum - UI-only value
 			default: return type;
 		}
 	}
@@ -297,7 +297,7 @@
 				idempotencyKey: crypto.randomUUID()
 			});
 			if (response.ok) {
-				selectedMeeting = { ...selectedMeeting, status: 'IN_SESSION' };
+				selectedMeeting = { ...selectedMeeting, status: MeetingStatusValues.IN_SESSION };
 				meetingLive.connect(selectedMeeting.id);
 				await loadMeetings();
 			}
@@ -314,7 +314,7 @@
 				idempotencyKey: crypto.randomUUID()
 			});
 			if (response.ok) {
-				selectedMeeting = { ...selectedMeeting, status: 'ADJOURNED' };
+				selectedMeeting = { ...selectedMeeting, status: MeetingStatusValues.ADJOURNED };
 				meetingLive.disconnect();
 				await loadMeetings();
 			}
@@ -458,7 +458,7 @@
 						{/snippet}
 
 						{#snippet actions()}
-							{#if m.status === 'SCHEDULED'}
+							{#if m.status === MeetingStatusValues.SCHEDULED}
 								<button class="btn btn-sm preset-tonal-surface">
 									Edit
 								</button>
@@ -466,12 +466,12 @@
 									Start Meeting
 								</button>
 							{/if}
-							{#if m.status === 'IN_SESSION'}
+							{#if m.status === MeetingStatusValues.IN_SESSION}
 								<button class="btn btn-sm preset-filled-warning-500" onclick={handleAdjournMeeting}>
 									Adjourn Meeting
 								</button>
 							{/if}
-							{#if m.status === 'ADJOURNED'}
+							{#if m.status === MeetingStatusValues.ADJOURNED}
 								<button class="btn btn-sm preset-filled-primary-500" onclick={() => activeTab = 4}>
 									Draft Minutes
 								</button>
@@ -544,11 +544,11 @@
 													<h3 class="font-semibold">Quorum & Attendance</h3>
 													<QuorumIndicator 
 														required={m.quorumRequired ?? null} 
-														present={attendees.filter(a => a.status !== 'ABSENT').length}
-														met={$meetingLive.quorum.met || (m.quorumRequired ? attendees.filter(a => a.status !== 'ABSENT').length >= m.quorumRequired : true)}
+														present={attendees.filter(a => a.status !== MeetingAttendanceStatusValues.ABSENT).length}
+														met={$meetingLive.quorum.met || (m.quorumRequired ? attendees.filter(a => a.status !== MeetingAttendanceStatusValues.ABSENT).length >= m.quorumRequired : true)}
 													/>
 												</div>
-												<AttendanceList {attendees} editable={m.status === 'IN_SESSION'} />
+												<AttendanceList {attendees} editable={m.status === MeetingStatusValues.IN_SESSION} />
 											</Card>
 										</div>
 
@@ -557,7 +557,7 @@
 										<div class="space-y-3">
 											<div class="flex items-center justify-between mb-4">
 												<h3 class="font-semibold">Agenda Items</h3>
-												{#if m.status === 'SCHEDULED'}
+												{#if m.status === MeetingStatusValues.SCHEDULED}
 													<button class="btn btn-sm preset-tonal-primary">
 														<Plus class="h-4 w-4 mr-1" />
 														Add Item
@@ -585,7 +585,7 @@
 										<div class="space-y-4">
 											<div class="flex items-center justify-between mb-4">
 												<h3 class="font-semibold">Motions</h3>
-												{#if m.status === 'IN_SESSION'}
+												{#if m.status === MeetingStatusValues.IN_SESSION}
 													<button class="btn btn-sm preset-tonal-primary">
 														<Gavel class="h-4 w-4 mr-1" />
 														Propose Motion
@@ -615,10 +615,10 @@
 										<!-- Resolutions Tab -->
 										<div class="space-y-4">
 											<h3 class="font-semibold mb-4">Resolutions & Outcomes</h3>
-											{#if motions.filter(m => m.status === 'APPROVED').length === 0}
+											{#if motions.filter(m => m.status === BoardMotionStatusValues.APPROVED).length === 0}
 												<EmptyState title="No resolutions" description="Approved motions will generate resolutions here." />
 											{:else}
-												{#each motions.filter(m => m.status === 'APPROVED') as motion (motion.id)}
+												{#each motions.filter(m => m.status === BoardMotionStatusValues.APPROVED) as motion (motion.id)}
 													<Card variant="outlined" padding="md">
 														<div class="flex items-center justify-between">
 															<div>
@@ -640,8 +640,8 @@
 										<MinutesEditor 
 											meetingId={m.id}
 											initialContent={minutesContent}
-											status={m.status === 'MINUTES_APPROVED' ? 'approved' : m.status === 'MINUTES_DRAFT' ? 'submitted' : 'draft'}
-											readonly={m.status === 'MINUTES_APPROVED' || m.status === 'ARCHIVED'}
+											status={m.status === MeetingStatusValues.MINUTES_APPROVED ? 'approved' : m.status === MeetingStatusValues.MINUTES_DRAFT ? 'submitted' : 'draft'}
+											readonly={m.status === MeetingStatusValues.MINUTES_APPROVED || m.status === MeetingStatusValues.ARCHIVED}
 										/>
 
 									{:else if activeTab === 5}

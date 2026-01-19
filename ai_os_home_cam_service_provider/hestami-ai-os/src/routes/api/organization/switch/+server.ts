@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db';
 import { createModuleLogger } from '$lib/server/logger';
+import { OrganizationType } from '../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('ApiOrgSwitch');
 
@@ -69,15 +70,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     let redirectUrl = '/app/concierge';
 
     switch (orgType) {
-        case 'COMMUNITY_ASSOCIATION':
-        case 'MANAGEMENT_COMPANY':
+        case OrganizationType.COMMUNITY_ASSOCIATION:
+        case OrganizationType.MANAGEMENT_COMPANY:
             redirectUrl = '/app/cam';
             break;
-        case 'SERVICE_PROVIDER':
+        case OrganizationType.SERVICE_PROVIDER:
             redirectUrl = '/app/contractor';
             break;
-        case 'INDIVIDUAL_PROPERTY_OWNER':
-        case 'TRUST_OR_LLC':
+        case OrganizationType.INDIVIDUAL_PROPERTY_OWNER:
+        case OrganizationType.TRUST_OR_LLC:
             redirectUrl = '/app/concierge';
             break;
         default:

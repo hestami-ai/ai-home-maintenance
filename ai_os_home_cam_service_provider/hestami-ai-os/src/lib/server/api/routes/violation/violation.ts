@@ -14,30 +14,32 @@ import {
 	AppealDecisionSchema
 } from '$lib/schemas/index.js';
 import { Prisma, type ViolationStatus } from '../../../../../../generated/prisma/client.js';
+import { ViolationStatus as ViolationStatusEnum, ActivityEntityType, ActivityActionType, DocumentCategory, DocumentVisibility, DocumentContextType, MediaType } from '../../../../../../generated/prisma/enums.js';
 import { recordExecution, recordStatusChange } from '../../middleware/activityEvent.js';
 import { startViolationCreateWorkflow } from '../../../workflows/violationCreateWorkflow.js';
-import { startViolationFineWorkflow } from '../../../workflows/violationFineWorkflow.js';
-import { startViolationWorkflow } from '../../../workflows/violationWorkflow.js';
-import { startDocumentWorkflow } from '../../../workflows/documentWorkflow.js';
+import { startViolationFineWorkflow, ViolationFineAction } from '../../../workflows/violationFineWorkflow.js';
+import { startViolationWorkflow, ViolationAction } from '../../../workflows/violationWorkflow.js';
+import { startDocumentWorkflow, DocumentAction } from '../../../workflows/documentWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
+import { SortOrder } from '../../../workflows/schemas.js';
 
 const log = createModuleLogger('ViolationRoute');
 
-const FINAL_STATUSES: ViolationStatus[] = ['CLOSED', 'DISMISSED'];
+const FINAL_STATUSES: ViolationStatus[] = [ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED];
 
 const allowedTransitions: Record<ViolationStatus, ViolationStatus[]> = {
-	DRAFT: ['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
-	OPEN: ['NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
-	NOTICE_SENT: ['CURE_PERIOD', 'ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
-	CURE_PERIOD: ['CURED', 'ESCALATED', 'HEARING_SCHEDULED', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
-	CURED: ['CLOSED', 'DISMISSED'],
-	ESCALATED: ['HEARING_SCHEDULED', 'FINE_ASSESSED', 'CLOSED', 'DISMISSED'],
-	HEARING_SCHEDULED: ['HEARING_HELD', 'DISMISSED', 'ESCALATED', 'CLOSED'],
-	HEARING_HELD: ['FINE_ASSESSED', 'APPEALED', 'CLOSED', 'DISMISSED'],
-	FINE_ASSESSED: ['CLOSED', 'DISMISSED', 'APPEALED'],
-	APPEALED: ['CLOSED', 'DISMISSED'],
-	CLOSED: [],
-	DISMISSED: []
+	[ViolationStatusEnum.DRAFT]: [ViolationStatusEnum.OPEN, ViolationStatusEnum.NOTICE_SENT, ViolationStatusEnum.CURE_PERIOD, ViolationStatusEnum.ESCALATED, ViolationStatusEnum.HEARING_SCHEDULED, ViolationStatusEnum.HEARING_HELD, ViolationStatusEnum.FINE_ASSESSED, ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.OPEN]: [ViolationStatusEnum.NOTICE_SENT, ViolationStatusEnum.CURE_PERIOD, ViolationStatusEnum.ESCALATED, ViolationStatusEnum.HEARING_SCHEDULED, ViolationStatusEnum.HEARING_HELD, ViolationStatusEnum.FINE_ASSESSED, ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.NOTICE_SENT]: [ViolationStatusEnum.CURE_PERIOD, ViolationStatusEnum.ESCALATED, ViolationStatusEnum.HEARING_SCHEDULED, ViolationStatusEnum.HEARING_HELD, ViolationStatusEnum.FINE_ASSESSED, ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.CURE_PERIOD]: [ViolationStatusEnum.CURED, ViolationStatusEnum.ESCALATED, ViolationStatusEnum.HEARING_SCHEDULED, ViolationStatusEnum.FINE_ASSESSED, ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.CURED]: [ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.ESCALATED]: [ViolationStatusEnum.HEARING_SCHEDULED, ViolationStatusEnum.FINE_ASSESSED, ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.HEARING_SCHEDULED]: [ViolationStatusEnum.HEARING_HELD, ViolationStatusEnum.DISMISSED, ViolationStatusEnum.ESCALATED, ViolationStatusEnum.CLOSED],
+	[ViolationStatusEnum.HEARING_HELD]: [ViolationStatusEnum.FINE_ASSESSED, ViolationStatusEnum.APPEALED, ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.FINE_ASSESSED]: [ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED, ViolationStatusEnum.APPEALED],
+	[ViolationStatusEnum.APPEALED]: [ViolationStatusEnum.CLOSED, ViolationStatusEnum.DISMISSED],
+	[ViolationStatusEnum.CLOSED]: [],
+	[ViolationStatusEnum.DISMISSED]: []
 };
 
 const assertStatusChangeAllowed = (current: ViolationStatus, next: ViolationStatus, errors: any) => {
@@ -237,7 +239,7 @@ export const violationRouter = {
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'DELETE_VIOLATION',
+					action: ViolationAction.DELETE_VIOLATION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.id,
@@ -318,7 +320,7 @@ export const violationRouter = {
 
 			const violations = await prisma.violation.findMany({
 				where,
-				orderBy: [{ status: 'asc' }, { observedDate: 'desc' }]
+				orderBy: [{ status: SortOrder.ASC }, { observedDate: SortOrder.DESC }]
 			});
 
 			return successResponse(
@@ -488,7 +490,7 @@ export const violationRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'UPDATE_VIOLATION',
+					action: ViolationAction.UPDATE_VIOLATION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: rest.id,
@@ -561,7 +563,7 @@ export const violationRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: ViolationAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: rest.id,
@@ -622,16 +624,16 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const v = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
-			assertStatusChangeAllowed(v.status, 'CURED', errors);
+			assertStatusChangeAllowed(v.status, ViolationStatusEnum.CURED, errors);
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: ViolationAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.id,
 					data: {
-						status: 'CURED',
+						status: ViolationStatusEnum.CURED,
 						notes: input.notes ?? 'Violation cured'
 					}
 				},
@@ -649,7 +651,7 @@ export const violationRouter = {
 				{
 					violation: {
 						id: input.id,
-						status: 'CURED' as const,
+						status: ViolationStatusEnum.CURED,
 						curedDate: updated.curedDate?.toISOString() ?? null
 					}
 				},
@@ -691,16 +693,16 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const v = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
-			assertStatusChangeAllowed(v.status, 'CLOSED', errors);
+			assertStatusChangeAllowed(v.status, ViolationStatusEnum.CLOSED, errors);
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: ViolationAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.id,
 					data: {
-						status: 'CLOSED',
+						status: ViolationStatusEnum.CLOSED,
 						notes: input.notes ?? 'Violation closed'
 					}
 				},
@@ -718,7 +720,7 @@ export const violationRouter = {
 				{
 					violation: {
 						id: input.id,
-						status: 'CLOSED' as const,
+						status: ViolationStatusEnum.CLOSED,
 						closedDate: updated.closedDate?.toISOString() ?? null
 					}
 				},
@@ -782,7 +784,7 @@ export const violationRouter = {
 
 			const result = await startDocumentWorkflow(
 				{
-					action: 'CREATE_DOCUMENT',
+					action: DocumentAction.CREATE_DOCUMENT,
 					organizationId: context.organization!.id,
 					associationId: association.id,
 					userId: context.user!.id,
@@ -794,9 +796,9 @@ export const violationRouter = {
 						fileSize: input.fileSize || 0,
 						mimeType: input.mimeType || 'application/octet-stream',
 						description: input.description,
-						category: 'VIOLATION_EVIDENCE',
-						visibility: 'PRIVATE',
-						contextType: 'VIOLATION',
+						category: DocumentCategory.VIOLATION_EVIDENCE,
+						visibility: DocumentVisibility.PRIVATE,
+						contextType: DocumentContextType.VIOLATION,
 						contextId: input.violationId,
 						isPrimary: true,
 						metadata: {
@@ -860,7 +862,7 @@ export const violationRouter = {
 					organizationId: context.organization.id,
 					contextBindings: {
 						some: {
-							contextType: 'VIOLATION',
+							contextType: DocumentContextType.VIOLATION,
 							contextId: input.violationId
 						}
 					}
@@ -872,7 +874,7 @@ export const violationRouter = {
 				{
 					evidence: evidence.map((e) => ({
 						id: e.id,
-						evidenceType: (e.metadata as any)?.evidenceType || 'DOCUMENT',
+						evidenceType: (e.metadata as any)?.evidenceType || MediaType.DOCUMENT,
 						fileName: e.fileName,
 						fileUrl: e.fileUrl,
 						capturedAt: e.capturedAt?.toISOString() || e.createdAt.toISOString()
@@ -934,13 +936,13 @@ export const violationRouter = {
 
 			const targetStatus: ViolationStatus =
 				(input.curePeriodDays ?? violation.violationType.defaultCurePeriodDays) > 0
-					? 'CURE_PERIOD'
-					: 'NOTICE_SENT';
+					? ViolationStatusEnum.CURE_PERIOD
+					: ViolationStatusEnum.NOTICE_SENT;
 			assertStatusChangeAllowed(violation.status, targetStatus, errors);
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'SEND_NOTICE',
+					action: ViolationAction.SEND_NOTICE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.violationId,
@@ -1068,11 +1070,11 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.violationId, context.organization.id, association.id, errors);
 
-			assertStatusChangeAllowed(violation.status, 'HEARING_SCHEDULED', errors);
+			assertStatusChangeAllowed(violation.status, ViolationStatusEnum.HEARING_SCHEDULED, errors);
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'SCHEDULE_HEARING',
+					action: ViolationAction.SCHEDULE_HEARING,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.violationId,
@@ -1195,7 +1197,7 @@ export const violationRouter = {
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'RECORD_HEARING_OUTCOME',
+					action: ViolationAction.RECORD_HEARING_OUTCOME,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: hearing.violationId,
@@ -1281,7 +1283,7 @@ export const violationRouter = {
 
 			const result = await startViolationFineWorkflow(
 				{
-					action: 'ASSESS_FINE',
+					action: ViolationFineAction.ASSESS_FINE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -1369,7 +1371,7 @@ export const violationRouter = {
 
 			const result = await startViolationFineWorkflow(
 				{
-					action: 'WAIVE_FINE',
+					action: ViolationFineAction.WAIVE_FINE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: fine.violation.association.id,
@@ -1654,17 +1656,17 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
-			assertStatusChangeAllowed(violation.status, 'ESCALATED', errors);
+			assertStatusChangeAllowed(violation.status, ViolationStatusEnum.ESCALATED, errors);
 			const previousStatus = violation.status;
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: ViolationAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.id,
-					data: { status: 'ESCALATED', notes: input.reason }
+					data: { status: ViolationStatusEnum.ESCALATED, notes: input.reason }
 				},
 				input.idempotencyKey
 			);
@@ -1678,7 +1680,7 @@ export const violationRouter = {
 			// Record activity event
 			await recordStatusChange(
 				context,
-				'VIOLATION',
+				ActivityEntityType.VIOLATION,
 				input.id,
 				previousStatus,
 				updated.status,
@@ -1736,11 +1738,11 @@ export const violationRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: ViolationAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.id,
-					data: { status: 'DISMISSED', notes: `Marked as invalid: ${input.reason}` }
+					data: { status: ViolationStatusEnum.DISMISSED, notes: `Marked as invalid: ${input.reason}` }
 				},
 				input.idempotencyKey
 			);
@@ -1754,7 +1756,7 @@ export const violationRouter = {
 			// Record activity event
 			await recordStatusChange(
 				context,
-				'VIOLATION',
+				ActivityEntityType.VIOLATION,
 				input.id,
 				previousStatus,
 				updated.status,
@@ -1810,17 +1812,17 @@ export const violationRouter = {
 			const association = await getAssociationOrThrow(context.organization!.id, context.associationId, errors);
 			const violation = await getViolationOrThrow(input.id, context.organization.id, association.id, errors);
 
-			assertStatusChangeAllowed(violation.status, 'CLOSED', errors);
+			assertStatusChangeAllowed(violation.status, ViolationStatusEnum.CLOSED, errors);
 			const previousStatus = violation.status;
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: ViolationAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.id,
-					data: { status: 'CLOSED', notes: input.notes }
+					data: { status: ViolationStatusEnum.CLOSED, notes: input.notes }
 				},
 				input.idempotencyKey
 			);
@@ -1834,7 +1836,7 @@ export const violationRouter = {
 			// Record activity event
 			await recordStatusChange(
 				context,
-				'VIOLATION',
+				ActivityEntityType.VIOLATION,
 				input.id,
 				previousStatus,
 				updated.status,
@@ -1913,7 +1915,7 @@ export const violationRouter = {
 			// Use DBOS workflow for durable execution (workflow will create placeholder hearing if needed)
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'RECORD_APPEAL',
+					action: ViolationAction.RECORD_APPEAL,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: input.violationId,
@@ -1936,12 +1938,12 @@ export const violationRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'VIOLATION',
+				entityType: ActivityEntityType.VIOLATION,
 				entityId: input.violationId,
-				action: 'SUBMIT',
+				action: ActivityActionType.SUBMIT,
 				summary: `Appeal filed for violation`,
 				violationId: input.violationId,
-				newState: { appealId: result.id, status: 'APPEALED' }
+				newState: { appealId: result.id, status: ViolationStatusEnum.APPEALED }
 			});
 
 			return successResponse(
@@ -2080,7 +2082,7 @@ export const violationRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startViolationWorkflow(
 				{
-					action: 'RECORD_APPEAL_DECISION',
+					action: ViolationAction.RECORD_APPEAL_DECISION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					violationId: appeal.hearing.violationId,
@@ -2102,9 +2104,9 @@ export const violationRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'VIOLATION',
+				entityType: ActivityEntityType.VIOLATION,
 				entityId: appeal.hearing.violationId,
-				action: 'CLOSE',
+				action: ActivityActionType.CLOSE,
 				summary: `Appeal decision: ${input.decision}`,
 				violationId: appeal.hearing.violationId,
 				newState: { appealId: result.id, decision: input.decision }
@@ -2160,7 +2162,7 @@ export const violationRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startViolationFineWorkflow(
 				{
-					action: 'FINE_TO_CHARGE',
+					action: ViolationFineAction.FINE_TO_CHARGE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

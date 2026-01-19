@@ -8,7 +8,9 @@
 import { GRPC } from '@cerbos/grpc';
 import type { Value } from '@cerbos/core';
 import type { User, UserRole } from '../../../../generated/prisma/client.js';
+import { ActivityActionType, StaffRole } from '../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../logger.js';
+import { WorkflowErrorType, CerbosEffectKind } from '../workflows/schemas.js';
 
 const log = createModuleLogger('Cerbos');
 import { recordSpanError, enrichSpanWithCerbos } from '../api/middleware/tracing.js';
@@ -151,7 +153,7 @@ export function buildPrincipal(
 	// Add staff role if user is Hestami staff
 	if (staffRoles && staffRoles.length > 0) {
 		roles.push('hestami_staff');
-		if (staffRoles.includes('PLATFORM_ADMIN')) {
+		if (staffRoles.includes(StaffRole.PLATFORM_ADMIN)) {
 			roles.push('hestami_platform_admin');
 		}
 	}
@@ -226,7 +228,7 @@ export async function isAllowed(
 			action,
 			resource.kind,
 			resource.id,
-			allowed ? 'ALLOW' : 'DENY'
+			allowed ? 'ALLOW' : ActivityActionType.DENY
 		);
 		
 		log.debug('Authorization check', {
@@ -247,7 +249,7 @@ export async function isAllowed(
 
 		await recordSpanError(errorObj, {
 			errorCode: 'AUTHORIZATION_FAILED',
-			errorType: 'AUTHORIZATION_ERROR'
+			errorType: WorkflowErrorType.AUTHORIZATION_ERROR
 		});
 
 		log.error('Authorization check failed', {
@@ -384,11 +386,11 @@ export function queryPlanToPrismaWhere(
 ): QueryPlanResult {
 	// Check if unconditionally allowed or denied
 	if (plan.kind === 'KIND_ALWAYS_ALLOWED') {
-		return { kind: 'always_allowed' };
+		return { kind: CerbosEffectKind.ALWAYS_ALLOWED };
 	}
 
 	if (plan.kind === 'KIND_ALWAYS_DENIED') {
-		return { kind: 'always_denied' };
+		return { kind: CerbosEffectKind.ALWAYS_DENIED };
 	}
 
 	// For conditional plans, we need to convert the filter
@@ -398,12 +400,12 @@ export function queryPlanToPrismaWhere(
 		const conditionalPlan = plan as unknown as { condition?: QueryPlanCondition };
 		if (conditionalPlan.condition) {
 			const filter = convertConditionToPrisma(conditionalPlan.condition, fieldMapper, principalId);
-			return { kind: 'conditional', filter };
+			return { kind: CerbosEffectKind.CONDITIONAL, filter };
 		}
 	}
 
 	// Default to always denied for safety
-	return { kind: 'always_denied' };
+	return { kind: CerbosEffectKind.ALWAYS_DENIED };
 }
 
 /**

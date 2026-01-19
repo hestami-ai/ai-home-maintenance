@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { createModuleLogger } from '$lib/server/logger';
+import { StaffRole } from '../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('OrganizationsPage');
 
@@ -55,7 +56,7 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
 					status: status || '',
 					search: search || ''
 				},
-				isPlatformAdmin: staffRoles.includes('PLATFORM_ADMIN')
+				isPlatformAdmin: staffRoles.includes(StaffRole.PLATFORM_ADMIN)
 			};
 		}
 
@@ -67,7 +68,7 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
 				status: status || '',
 				search: search || ''
 			},
-			isPlatformAdmin: staffRoles.includes('PLATFORM_ADMIN')
+			isPlatformAdmin: staffRoles.includes(StaffRole.PLATFORM_ADMIN)
 		};
 	} catch (err) {
 		log.error('Failed to load organizations', {
@@ -94,7 +95,7 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
 				status: status || '',
 				search: search || ''
 			},
-			isPlatformAdmin: staffRoles.includes('PLATFORM_ADMIN')
+			isPlatformAdmin: staffRoles.includes(StaffRole.PLATFORM_ADMIN)
 		};
 	}
 };

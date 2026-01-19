@@ -5,6 +5,7 @@ import '$server/telemetry-init';
 import type { Handle } from '@sveltejs/kit';
 import { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
 import type { Organization, UserRole } from '../generated/prisma/client';
+import { OrganizationType } from '../generated/prisma/enums.js';
 import { auth } from '$server/auth';
 import { prisma } from '$server/db';
 import { initDBOS } from '$server/dbos';
@@ -201,8 +202,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 						// Determine if user is platform staff
 						// This could be enhanced to check role types or staff model
-						event.locals.isStaff = membership.org_type === 'PLATFORM_OPERATOR' ||
-							membership.org_type === 'MANAGEMENT_COMPANY';
+						event.locals.isStaff = membership.org_type === OrganizationType.PLATFORM_OPERATOR ||
+							membership.org_type === OrganizationType.MANAGEMENT_COMPANY;
 
 						// Set SQL session context for RLS
 						await prisma.$executeRaw`

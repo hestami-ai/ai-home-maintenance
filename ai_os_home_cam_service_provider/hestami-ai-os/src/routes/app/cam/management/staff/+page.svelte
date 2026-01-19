@@ -23,33 +23,33 @@
 	} from '$lib/components/cam';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { orgStaffApi, type OrgStaffListItem, type OrgStaffDetail } from '$lib/api/cam';
+	import { ActivityEntityTypeValues, StaffStatusValues, orgStaffApi, type OrgStaffDetail, type OrgStaffListItem } from '$lib/api/cam';
 	import { activityEventApi } from '$lib/api/cam';
 	import { nanoid } from 'nanoid';
 
 	let { data } = $props();
 
-	let staffMembers = $derived(data.staffMembers as OrgStaffListItem[]);
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let staffMembers = $state<OrgStaffListItem[]>([]);
 	let selectedStaffSummary = $state<OrgStaffListItem | null>(null);
 	let selectedStaffDetail = $state<OrgStaffDetail | null>(null);
 	let isLoadingDetail = $state(false);
 	let isInviteModalOpen = $state(false);
 
-	// Filters - initialized from URL params, user can modify
-	// Using derived for initial values to avoid state_referenced_locally warning
-	const initialSearch = $derived(data.filters?.search || '');
-	const initialStatus = $derived(data.filters?.status || '');
-	const initialRole = $derived(data.filters?.role || '');
-	
+	// Filters - use $state instead of $derived for safe navigation
 	let searchQuery = $state('');
 	let statusFilter = $state('');
 	let roleFilter = $state('');
-	
-	// Sync filter state when URL params change (e.g., browser back/forward)
+
+	// Sync state when data changes (e.g., URL params, navigation)
 	$effect(() => {
-		searchQuery = initialSearch;
-		statusFilter = initialStatus;
-		roleFilter = initialRole;
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			staffMembers = (data.staffMembers ?? []) as OrgStaffListItem[];
+			searchQuery = data.filters?.search ?? '';
+			statusFilter = data.filters?.status ?? '';
+			roleFilter = data.filters?.role ?? '';
+		}
 	});
 
 	// Activity Data
@@ -69,7 +69,7 @@
 			const [detailRes, activityRes] = await Promise.all([
 				orgStaffApi.get(staff.id),
 				activityEventApi.getByEntity({
-					entityType: 'STAFF',
+					entityType: ActivityEntityTypeValues.STAFF,
 					entityId: staff.id,
 					limit: 10
 				})
@@ -106,7 +106,7 @@
 		if (!selectedStaffDetail) return;
 
 		const staffId = selectedStaffDetail.id;
-		const isDeactivating = selectedStaffDetail.status !== 'DEACTIVATED';
+		const isDeactivating = selectedStaffDetail.status !== StaffStatusValues.DEACTIVATED;
 
 		if (isDeactivating && !confirm('Are you sure you want to deactivate this staff member?')) return;
 
@@ -144,13 +144,13 @@
 
 	function getStatusColor(status: string) {
 		switch (status) {
-			case 'ACTIVE':
+			case StaffStatusValues.ACTIVE:
 				return 'text-success-500 bg-success-500/10';
-			case 'PENDING':
+			case StaffStatusValues.PENDING:
 				return 'text-warning-500 bg-warning-500/10';
-			case 'SUSPENDED':
+			case StaffStatusValues.SUSPENDED:
 				return 'text-error-500 bg-error-500/10';
-			case 'DEACTIVATED':
+			case StaffStatusValues.DEACTIVATED:
 				return 'text-surface-500 bg-surface-500/10';
 			default:
 				return 'text-surface-500 bg-surface-500/10';
@@ -214,9 +214,9 @@
 				class="flex-1 rounded-lg border border-surface-300-700 bg-surface-100-900 py-1.5 px-3 text-xs focus:ring-primary-500"
 			>
 				<option value="">All Statuses</option>
-				<option value="ACTIVE">Active</option>
-				<option value="PENDING">Pending</option>
-				<option value="DEACTIVATED">Deactivated</option>
+				<option value=StaffStatusValues.ACTIVE>Active</option>
+				<option value=StaffStatusValues.PENDING>Pending</option>
+				<option value=StaffStatusValues.DEACTIVATED>Deactivated</option>
 			</select>
 			<select
 				bind:value={roleFilter}
@@ -318,11 +318,11 @@
 						<button 
 							onclick={toggleStatus}
 							disabled={isLoadingDetail}
-							class="btn btn-sm {selectedStaffSummary.status === 'DEACTIVATED' ? 'variant-soft-success' : 'variant-soft-error'} flex items-center gap-2"
+							class="btn btn-sm {selectedStaffSummary.status === StaffStatusValues.DEACTIVATED ? 'variant-soft-success' : 'variant-soft-error'} flex items-center gap-2"
 						>
 							{#if isLoadingDetail}
 								<Loader2 class="h-3 w-3 animate-spin" />
-							{:else if selectedStaffSummary.status === 'DEACTIVATED'}
+							{:else if selectedStaffSummary.status === StaffStatusValues.DEACTIVATED}
 								<UserCheck class="h-4 w-4" />
 								<span>Reactivate Account</span>
 							{:else}
@@ -499,9 +499,9 @@
 	{/if}
 {/snippet}
 
-<InviteStaffModal 
-	bind:open={isInviteModalOpen} 
-	orgType={data.organization?.type || ''}
+<InviteStaffModal
+	bind:open={isInviteModalOpen}
+	orgType={data?.organization?.type || ''}
 	onClose={() => {}}
 	onSuccess={async () => {
 		await goto($page.url.pathname, { invalidateAll: true });

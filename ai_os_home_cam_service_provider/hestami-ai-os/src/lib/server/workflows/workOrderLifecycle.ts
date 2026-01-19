@@ -13,11 +13,16 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
-import type { WorkOrderStatus } from '../../../../generated/prisma/client.js';
+import { WorkOrderStatus, ActivityActionType } from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('WorkOrderLifecycleWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	WORK_ORDER_LIFECYCLE_ERROR: 'WORK_ORDER_LIFECYCLE_ERROR'
+} as const;
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'work_order_status';
@@ -25,19 +30,19 @@ const WORKFLOW_ERROR_EVENT = 'work_order_error';
 
 // Valid status transitions (Phase 9: Added AUTHORIZED and REVIEW_REQUIRED)
 const validTransitions: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-	DRAFT: ['SUBMITTED', 'CANCELLED'],
-	SUBMITTED: ['TRIAGED', 'CANCELLED'],
-	TRIAGED: ['AUTHORIZED', 'CANCELLED'], // Phase 9: Must go through AUTHORIZED
-	AUTHORIZED: ['ASSIGNED', 'CANCELLED'], // Phase 9: New state
-	ASSIGNED: ['SCHEDULED', 'IN_PROGRESS', 'CANCELLED'],
-	SCHEDULED: ['IN_PROGRESS', 'ON_HOLD', 'CANCELLED'],
-	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-	ON_HOLD: ['IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: ['REVIEW_REQUIRED', 'INVOICED', 'CLOSED'], // Phase 9: Added REVIEW_REQUIRED
-	REVIEW_REQUIRED: ['COMPLETED', 'CLOSED', 'CANCELLED'], // Phase 9: New state
-	INVOICED: ['CLOSED'],
-	CLOSED: [],
-	CANCELLED: []
+	[WorkOrderStatus.DRAFT]: [WorkOrderStatus.SUBMITTED, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.SUBMITTED]: [WorkOrderStatus.TRIAGED, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.TRIAGED]: [WorkOrderStatus.AUTHORIZED, WorkOrderStatus.CANCELLED], // Phase 9: Must go through AUTHORIZED
+	[WorkOrderStatus.AUTHORIZED]: [WorkOrderStatus.ASSIGNED, WorkOrderStatus.CANCELLED], // Phase 9: New state
+	[WorkOrderStatus.ASSIGNED]: [WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.SCHEDULED]: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.ON_HOLD, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.IN_PROGRESS]: [WorkOrderStatus.ON_HOLD, WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.ON_HOLD]: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.COMPLETED]: [WorkOrderStatus.REVIEW_REQUIRED, WorkOrderStatus.INVOICED, WorkOrderStatus.CLOSED], // Phase 9: Added REVIEW_REQUIRED
+	[WorkOrderStatus.REVIEW_REQUIRED]: [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED], // Phase 9: New state
+	[WorkOrderStatus.INVOICED]: [WorkOrderStatus.CLOSED],
+	[WorkOrderStatus.CLOSED]: [],
+	[WorkOrderStatus.CANCELLED]: []
 };
 
 // SLA hours by priority
@@ -89,7 +94,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 	});
 
 	if (!workOrder) {
-		return { valid: false, currentStatus: 'DRAFT', error: 'Work order not found' };
+		return { valid: false, currentStatus: WorkOrderStatus.DRAFT, error: 'Work order not found' };
 	}
 
 	const currentStatus = workOrder.status as WorkOrderStatus;
@@ -104,7 +109,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 	}
 
 	// Additional validation for specific transitions
-	if (input.toStatus === 'ASSIGNED' && !input.vendorId) {
+	if (input.toStatus === WorkOrderStatus.ASSIGNED && !input.vendorId) {
 		// Check if vendor is already assigned
 		if (!workOrder.assignedVendorId) {
 			return {
@@ -134,29 +139,29 @@ async function updateWorkOrderStatus(
 
 			// Handle specific transitions
 			switch (input.toStatus) {
-				case 'ASSIGNED':
+				case WorkOrderStatus.ASSIGNED:
 					if (input.vendorId) {
 						updateData.assignedVendorId = input.vendorId;
 						updateData.assignedAt = new Date();
 					}
 					break;
 
-				case 'SCHEDULED':
+				case WorkOrderStatus.SCHEDULED:
 					if (input.scheduledStart) updateData.scheduledStart = input.scheduledStart;
 					if (input.scheduledEnd) updateData.scheduledEnd = input.scheduledEnd;
 					break;
 
-				case 'IN_PROGRESS':
+				case WorkOrderStatus.IN_PROGRESS:
 					updateData.actualStart = new Date();
 					break;
 
-				case 'COMPLETED':
+				case WorkOrderStatus.COMPLETED:
 					updateData.actualEnd = new Date();
 					if (input.actualCost !== undefined) updateData.actualCost = input.actualCost;
 					if (input.actualHours !== undefined) updateData.actualHours = input.actualHours;
 					break;
 
-				case 'CANCELLED':
+				case WorkOrderStatus.CANCELLED:
 					updateData.cancelledAt = new Date();
 					updateData.cancelledBy = input.userId;
 					break;
@@ -317,26 +322,26 @@ async function workOrderTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'WORK_ORDER_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.WORK_ORDER_LIFECYCLE_ERROR
 		});
 
 		return {
 			success: false,
 			workOrderId: input.workOrderId,
-			fromStatus: 'DRAFT', // Unknown at this point
+			fromStatus: WorkOrderStatus.DRAFT, // Unknown at this point
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage
 		};
 	}
 
-	// This path should be unreachable due to return in try/catch, 
+	// This path should be unreachable due to return in try/catch,
 	// but kept for TypeScript safety if logic changes
 	return {
 		success: false,
 		workOrderId: input.workOrderId,
-		fromStatus: 'DRAFT',
+		fromStatus: WorkOrderStatus.DRAFT,
 		toStatus: input.toStatus,
 		timestamp: new Date().toISOString(),
 		error: 'Unknown error occurred'

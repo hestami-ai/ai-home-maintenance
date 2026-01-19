@@ -1,6 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { error } from '@sveltejs/kit';
+import { ConciergeCaseStatus } from '../../../../../../generated/prisma/enums.js';
 
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
     // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
@@ -39,7 +40,15 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
         // Fetch quotes if status indicates they might exist
         let quotes: any[] = [];
 
-        if (['QUOTE_REQUESTED', 'QUOTE_RECEIVED', 'QUOTE_APPROVED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED'].includes(data.case.status)) {
+        // These statuses indicate the case has progressed far enough that quotes might exist
+        const quoteEligibleStatuses = [
+            ConciergeCaseStatus.IN_PROGRESS,
+            ConciergeCaseStatus.PENDING_EXTERNAL,
+            ConciergeCaseStatus.PENDING_OWNER,
+            ConciergeCaseStatus.RESOLVED,
+            ConciergeCaseStatus.CLOSED
+        ];
+        if ((quoteEligibleStatuses as ConciergeCaseStatus[]).includes(data.case.status as ConciergeCaseStatus)) {
             try {
                 const quotesResult = await client.vendorBid.listByCase({ caseId, limit: 20 });
                 if (quotesResult.ok) {
@@ -58,6 +67,9 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
                 description: data.case.description,
                 status: data.case.status,
                 priority: data.case.priority,
+                availabilityType: data.case.availabilityType,
+                availabilityNotes: data.case.availabilityNotes ?? null,
+                availabilitySlots: data.case.availabilitySlots ?? [],
                 createdAt: data.case.createdAt,
                 updatedAt: data.case.updatedAt,
                 resolvedAt: data.case.resolvedAt ?? null,
@@ -67,7 +79,8 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
             notes: data.notes.filter((n: any) => !n.isInternal),
             statusHistory: data.statusHistory,
             attachments: data.attachments ?? [],
-            quotes
+            quotes,
+            organization
         };
     } catch (err) {
         console.error(`Failed to load service call ${caseId}:`, err);

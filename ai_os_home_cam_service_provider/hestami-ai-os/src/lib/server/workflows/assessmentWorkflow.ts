@@ -14,6 +14,22 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { createModuleLogger } from '../logger.js';
 import type { AssessmentFrequency } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	ChargeStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Alias for backward compatibility
+const AssessmentChargeStatus = ChargeStatus;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ASSESSMENT_WORKFLOW_ERROR: 'ASSESSMENT_WORKFLOW_ERROR',
+	ASSESSMENT_CHARGE_GL_ERROR: 'AssessmentCharge_GL_Error'
+} as const;
 
 const log = createModuleLogger('assessmentWorkflow');
 const WORKFLOW_STATUS_EVENT = 'assessment_workflow_status';
@@ -94,15 +110,15 @@ async function createAssessmentType(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ASSESSMENT',
+		entityType: ActivityEntityType.ASSESSMENT,
 		entityId: assessmentType.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Assessment type created: ${assessmentType.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'assessmentWorkflow_v1',
-		workflowStep: 'CREATE_TYPE',
+		workflowStep: AssessmentWorkflowAction.CREATE_TYPE,
 		workflowVersion: 'v1',
 		newState: { name: assessmentType.name, code: assessmentType.code, frequency: assessmentType.frequency }
 	});
@@ -133,7 +149,7 @@ async function createAssessmentCharge(
 				totalAmount: input.amount!,
 				balanceDue: input.amount!,
 				description: input.description,
-				status: 'BILLED'
+				status: AssessmentChargeStatus.BILLED
 			}
 		});
 	}, { userId: input.userId, reason: 'Create assessment charge' });
@@ -148,7 +164,7 @@ async function createAssessmentCharge(
 			console.warn(`Failed to post charge ${charge.id} to GL:`, error);
 			await recordSpanError(errorObj, {
 				errorCode: 'GL_POSTING_FAILED',
-				errorType: 'AssessmentCharge_GL_Error'
+				errorType: WorkflowErrorType.ASSESSMENT_CHARGE_GL_ERROR
 			});
 		}
 	}
@@ -156,15 +172,15 @@ async function createAssessmentCharge(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ASSESSMENT',
+		entityType: ActivityEntityType.ASSESSMENT,
 		entityId: charge.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Assessment charge created: ${charge.amount}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'assessmentWorkflow_v1',
-		workflowStep: 'CREATE_CHARGE',
+		workflowStep: AssessmentWorkflowAction.CREATE_CHARGE,
 		workflowVersion: 'v1',
 		newState: { amount: charge.amount.toString(), dueDate: charge.dueDate.toISOString(), status: charge.status }
 	});
@@ -191,7 +207,7 @@ async function assessmentWorkflow(input: AssessmentWorkflowInput): Promise<Asses
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE_TYPE': {
+			case AssessmentWorkflowAction.CREATE_TYPE: {
 				if (!input.associationId || !input.name || !input.code || !input.frequency || !input.defaultAmount || !input.revenueAccountId) {
 					const error = new Error('Missing required fields for CREATE_TYPE');
 					logStepError(log, 'validation', error, { input });
@@ -215,7 +231,7 @@ async function assessmentWorkflow(input: AssessmentWorkflowInput): Promise<Asses
 				return successResult;
 			}
 
-			case 'CREATE_CHARGE': {
+			case AssessmentWorkflowAction.CREATE_CHARGE: {
 				if (!input.associationId || !input.unitId || !input.assessmentTypeId || !input.chargeDate || !input.dueDate || !input.amount) {
 					const error = new Error('Missing required fields for CREATE_CHARGE');
 					logStepError(log, 'validation', error, { input });
@@ -264,8 +280,8 @@ async function assessmentWorkflow(input: AssessmentWorkflowInput): Promise<Asses
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ASSESSMENT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ASSESSMENT_WORKFLOW_ERROR
 		});
 		const errorResult: AssessmentWorkflowResult = {
 			success: false,

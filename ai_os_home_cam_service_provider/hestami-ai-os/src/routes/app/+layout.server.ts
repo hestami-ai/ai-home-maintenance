@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
+import { StaffStatus } from '../../../generated/prisma/enums.js';
 
 export const load: LayoutServerLoad = async ({ parent, url }) => {
 	const { user, staff } = await parent();
@@ -20,12 +21,12 @@ export const load: LayoutServerLoad = async ({ parent, url }) => {
 
 	// 2. Staff profile exists but not active -> Activation
 	if (staff) {
-		if (staff.status === 'PENDING') {
+		if (staff.status === StaffStatus.PENDING) {
 			throw redirect(302, '/staff/activate');
 		}
 
 		// Block access for suspended/deactivated staff
-		if (staff.status === 'SUSPENDED' || staff.status === 'DEACTIVATED') {
+		if (staff.status === StaffStatus.SUSPENDED || staff.status === StaffStatus.DEACTIVATED) {
 			throw redirect(302, '/staff/pending');
 		}
 	}

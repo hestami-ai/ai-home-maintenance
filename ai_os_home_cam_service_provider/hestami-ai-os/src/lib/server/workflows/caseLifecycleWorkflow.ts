@@ -12,11 +12,24 @@ import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import {
 	ConciergeCaseStatus,
 	ConciergeCasePriority,
+	OwnerIntentStatus,
 	type LifecycleWorkflowResult
 } from './schemas.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	CaseNoteType
+} from '../../../../generated/prisma/enums.js';
 import { recordWorkflowEvent, recordWorkflowLifecycleEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CASE_LIFECYCLE_ERROR: 'CASE_LIFECYCLE_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'case_lifecycle_status';
 const WORKFLOW_ERROR_EVENT = 'case_lifecycle_error';
@@ -24,6 +37,7 @@ const WORKFLOW_ERROR_EVENT = 'case_lifecycle_error';
 // Action types for case lifecycle operations
 export const CaseLifecycleAction = {
 	CREATE_CASE: 'CREATE_CASE',
+	UPDATE_CASE: 'UPDATE_CASE',
 	CONVERT_INTENT: 'CONVERT_INTENT',
 	TRANSITION_STATUS: 'TRANSITION_STATUS',
 	ASSIGN_CONCIERGE: 'ASSIGN_CONCIERGE',
@@ -110,16 +124,16 @@ export interface CaseLifecycleWorkflowResult extends LifecycleWorkflowResult {
 	unlinked?: string[];
 }
 
-const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
-	INTAKE: ['ASSESSMENT', 'CANCELLED'],
-	ASSESSMENT: ['IN_PROGRESS', 'PENDING_EXTERNAL', 'PENDING_OWNER', 'ON_HOLD', 'CANCELLED'],
-	IN_PROGRESS: ['PENDING_EXTERNAL', 'PENDING_OWNER', 'ON_HOLD', 'RESOLVED', 'CANCELLED'],
-	PENDING_EXTERNAL: ['IN_PROGRESS', 'ON_HOLD', 'RESOLVED', 'CANCELLED'],
-	PENDING_OWNER: ['IN_PROGRESS', 'ON_HOLD', 'RESOLVED', 'CANCELLED'],
-	ON_HOLD: ['ASSESSMENT', 'IN_PROGRESS', 'PENDING_EXTERNAL', 'PENDING_OWNER', 'CANCELLED'],
-	RESOLVED: ['CLOSED', 'IN_PROGRESS'],
-	CLOSED: [],
-	CANCELLED: []
+const VALID_STATUS_TRANSITIONS: Record<ConciergeCaseStatus, ConciergeCaseStatus[]> = {
+	[ConciergeCaseStatus.INTAKE]: [ConciergeCaseStatus.ASSESSMENT, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.ASSESSMENT]: [ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.IN_PROGRESS]: [ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.PENDING_EXTERNAL]: [ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.PENDING_OWNER]: [ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.ON_HOLD]: [ConciergeCaseStatus.ASSESSMENT, ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.RESOLVED]: [ConciergeCaseStatus.CLOSED, ConciergeCaseStatus.IN_PROGRESS],
+	[ConciergeCaseStatus.CLOSED]: [],
+	[ConciergeCaseStatus.CANCELLED]: []
 };
 
 async function generateCaseNumber(organizationId: string): Promise<string> {
@@ -157,7 +171,7 @@ async function createCase(
 					title,
 					description,
 					priority,
-					status: 'INTAKE',
+					status: ConciergeCaseStatus.INTAKE,
 					...(originIntentId && { originIntentId }),
 					...(assignedConciergeUserId && { assignedConciergeUserId }),
 					availabilityType: availabilityType ?? 'FLEXIBLE',
@@ -181,7 +195,7 @@ async function createCase(
 			await tx.caseStatusHistory.create({
 				data: {
 					caseId: createdCase.id,
-					toStatus: 'INTAKE',
+					toStatus: ConciergeCaseStatus.INTAKE,
 					reason: 'Case created',
 					changedBy: userId
 				}
@@ -192,7 +206,7 @@ async function createCase(
 				await tx.ownerIntent.update({
 					where: { id: originIntentId },
 					data: {
-						status: 'CONVERTED_TO_CASE',
+						status: OwnerIntentStatus.CONVERTED_TO_CASE,
 						convertedCaseId: createdCase.id,
 						convertedAt: new Date()
 					}
@@ -205,15 +219,15 @@ async function createCase(
 		// Record activity event for case creation
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: newCase.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case created: ${title}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'CREATE_CASE',
+			workflowStep: CaseLifecycleAction.CREATE_CASE,
 			workflowVersion: 'v1',
 			caseId: newCase.id,
 			propertyId,
@@ -224,6 +238,158 @@ async function createCase(
 		return { id: newCase.id, caseNumber: newCase.caseNumber, status: newCase.status };
 	} finally {
 		// CRITICAL: Always clear context to prevent leakage to next request
+		await clearOrgContext(userId);
+	}
+}
+
+async function updateCase(
+	caseId: string,
+	organizationId: string,
+	userId: string,
+	data: {
+		title?: string;
+		description?: string;
+		priority?: ConciergeCasePriority;
+		availabilityType?: 'FLEXIBLE' | 'SPECIFIC';
+		availabilityNotes?: string;
+		availabilitySlots?: AvailabilitySlot[];
+	}
+): Promise<{ id: string; title: string; description: string; priority: string; availabilityType: string; availabilityNotes: string | null }> {
+	const caseRecord = await prisma.conciergeCase.findUnique({
+		where: { id: caseId }
+	});
+
+	if (!caseRecord) {
+		throw new Error('Case not found');
+	}
+
+	// Cannot update closed or cancelled cases
+	if (caseRecord.status === ConciergeCaseStatus.CLOSED || caseRecord.status === ConciergeCaseStatus.CANCELLED) {
+		throw new Error(`Cannot update case in ${caseRecord.status} status`);
+	}
+
+	const updateData: { title?: string; description?: string; priority?: ConciergeCasePriority; availabilityType?: 'FLEXIBLE' | 'SPECIFIC'; availabilityNotes?: string } = {};
+	const changes: string[] = [];
+
+	if (data.title !== undefined && data.title !== caseRecord.title) {
+		updateData.title = data.title;
+		changes.push('title');
+	}
+	if (data.description !== undefined && data.description !== caseRecord.description) {
+		updateData.description = data.description;
+		changes.push('description');
+	}
+	if (data.priority !== undefined && data.priority !== caseRecord.priority) {
+		updateData.priority = data.priority;
+		changes.push('priority');
+	}
+	if (data.availabilityType !== undefined && data.availabilityType !== caseRecord.availabilityType) {
+		updateData.availabilityType = data.availabilityType;
+		changes.push('availabilityType');
+	}
+	if (data.availabilityNotes !== undefined && data.availabilityNotes !== caseRecord.availabilityNotes) {
+		updateData.availabilityNotes = data.availabilityNotes;
+		changes.push('availabilityNotes');
+	}
+
+	// Check if availability slots need updating
+	const needsSlotsUpdate = data.availabilitySlots !== undefined;
+
+	if (Object.keys(updateData).length === 0 && !needsSlotsUpdate) {
+		// No changes to make
+		return {
+			id: caseRecord.id,
+			title: caseRecord.title,
+			description: caseRecord.description,
+			priority: caseRecord.priority,
+			availabilityType: caseRecord.availabilityType,
+			availabilityNotes: caseRecord.availabilityNotes
+		};
+	}
+
+	try {
+		const updatedCase = await orgTransaction(organizationId, async (tx) => {
+			// Update case fields if any changed
+			const updated = Object.keys(updateData).length > 0
+				? await tx.conciergeCase.update({
+						where: { id: caseId },
+						data: updateData
+					})
+				: caseRecord;
+
+			// Update availability slots if provided
+			if (needsSlotsUpdate) {
+				// Delete existing slots
+				await tx.caseAvailabilitySlot.deleteMany({
+					where: { caseId }
+				});
+
+				// Create new slots
+				if (data.availabilitySlots && data.availabilitySlots.length > 0) {
+					await tx.caseAvailabilitySlot.createMany({
+						data: data.availabilitySlots.map((slot) => ({
+							caseId,
+							startTime: new Date(slot.startTime),
+							endTime: new Date(slot.endTime),
+							notes: slot.notes
+						}))
+					});
+				}
+				changes.push('availabilitySlots');
+			}
+
+			// Add internal note about the update
+			if (changes.length > 0) {
+				await tx.caseNote.create({
+					data: {
+						caseId,
+						content: `Case updated: ${changes.join(', ')} modified`,
+						noteType: CaseNoteType.GENERAL,
+						isInternal: true,
+						createdBy: userId
+					}
+				});
+			}
+
+			return updated;
+		}, { userId, reason: 'Updating case via workflow' });
+
+		// Record activity event for update
+		await recordWorkflowEvent({
+			organizationId,
+			entityType: ActivityEntityType.CONCIERGE_CASE,
+			entityId: caseId,
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
+			summary: `Case updated: ${changes.join(', ')}`,
+			performedById: userId,
+			performedByType: ActivityActorType.HUMAN,
+			workflowId: 'caseLifecycleWorkflow_v1',
+			workflowStep: CaseLifecycleAction.UPDATE_CASE,
+			workflowVersion: 'v1',
+			caseId,
+			propertyId: caseRecord.propertyId,
+			previousState: {
+				title: caseRecord.title,
+				description: caseRecord.description,
+				priority: caseRecord.priority
+			},
+			newState: {
+				title: updatedCase.title,
+				description: updatedCase.description,
+				priority: updatedCase.priority
+			}
+		});
+
+		return {
+			id: updatedCase.id,
+			title: updatedCase.title,
+			description: updatedCase.description,
+			priority: updatedCase.priority,
+			availabilityType: updatedCase.availabilityType,
+			availabilityNotes: updatedCase.availabilityNotes
+		};
+	} finally {
 		await clearOrgContext(userId);
 	}
 }
@@ -240,7 +406,7 @@ async function convertIntentToCase(
 		throw new Error('Intent not found');
 	}
 
-	if (intent.status !== 'SUBMITTED' && intent.status !== 'ACKNOWLEDGED') {
+	if (intent.status !== OwnerIntentStatus.SUBMITTED && intent.status !== OwnerIntentStatus.ACKNOWLEDGED) {
 		throw new Error(`Cannot convert intent in status ${intent.status}`);
 	}
 
@@ -255,8 +421,8 @@ async function convertIntentToCase(
 					caseNumber,
 					title: intent.title,
 					description: intent.description,
-					priority: intent.priority === 'URGENT' ? 'URGENT' : intent.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
-					status: 'INTAKE',
+					priority: intent.priority === ConciergeCasePriority.URGENT ? ConciergeCasePriority.URGENT : intent.priority === ConciergeCasePriority.HIGH ? ConciergeCasePriority.HIGH : ConciergeCasePriority.NORMAL,
+					status: ConciergeCaseStatus.INTAKE,
 					originIntentId: intentId
 				}
 			});
@@ -265,7 +431,7 @@ async function convertIntentToCase(
 			await tx.ownerIntent.update({
 				where: { id: intentId },
 				data: {
-					status: 'CONVERTED_TO_CASE',
+					status: OwnerIntentStatus.CONVERTED_TO_CASE,
 					convertedCaseId: createdCase.id,
 					convertedAt: new Date()
 				}
@@ -275,7 +441,7 @@ async function convertIntentToCase(
 			await tx.caseStatusHistory.create({
 				data: {
 					caseId: createdCase.id,
-					toStatus: 'INTAKE',
+					toStatus: ConciergeCaseStatus.INTAKE,
 					reason: `Converted from intent ${intentId}`,
 					changedBy: userId
 				}
@@ -287,15 +453,15 @@ async function convertIntentToCase(
 		// Record activity event for intent conversion
 		await recordWorkflowEvent({
 			organizationId: intent.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: newCase.id,
-			action: 'CREATE',
-			eventCategory: 'DECISION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.DECISION,
 			summary: `Intent converted to case: ${intent.title}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'CONVERT_INTENT',
+			workflowStep: CaseLifecycleAction.CONVERT_INTENT,
 			workflowVersion: 'v1',
 			caseId: newCase.id,
 			intentId,
@@ -349,15 +515,15 @@ async function transitionStatus(
 		// Record activity event for status transition
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'STATUS_CHANGE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.STATUS_CHANGE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case status changed from ${caseRecord.status} to ${targetStatus}${reason ? `: ${reason}` : ''}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'TRANSITION_STATUS',
+			workflowStep: CaseLifecycleAction.TRANSITION_STATUS,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
@@ -402,15 +568,15 @@ async function assignConcierge(
 		// Record activity event for assignment
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'ASSIGN',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.ASSIGN,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case assigned to concierge`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'ASSIGN_CONCIERGE',
+			workflowStep: CaseLifecycleAction.ASSIGN_CONCIERGE,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
@@ -437,7 +603,7 @@ async function resolveCase(
 	}
 
 	const validTransitions = VALID_STATUS_TRANSITIONS[caseRecord.status] || [];
-	if (!validTransitions.includes('RESOLVED')) {
+	if (!validTransitions.includes(ConciergeCaseStatus.RESOLVED)) {
 		throw new Error(`Cannot resolve case in status ${caseRecord.status}`);
 	}
 
@@ -446,7 +612,7 @@ async function resolveCase(
 			await tx.conciergeCase.update({
 				where: { id: caseId },
 				data: {
-					status: 'RESOLVED',
+					status: ConciergeCaseStatus.RESOLVED,
 					resolutionSummary,
 					resolvedBy: userId,
 					resolvedAt: new Date()
@@ -457,7 +623,7 @@ async function resolveCase(
 				data: {
 					caseId,
 					fromStatus: caseRecord.status,
-					toStatus: 'RESOLVED',
+					toStatus: ConciergeCaseStatus.RESOLVED,
 					reason: resolutionSummary,
 					changedBy: userId
 				}
@@ -467,23 +633,23 @@ async function resolveCase(
 		// Record activity event for resolution
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'COMPLETE',
-			eventCategory: 'DECISION',
+			action: ActivityActionType.COMPLETE,
+			eventCategory: ActivityEventCategory.DECISION,
 			summary: `Case resolved: ${resolutionSummary.substring(0, 100)}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'RESOLVE_CASE',
+			workflowStep: CaseLifecycleAction.RESOLVE_CASE,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
 			previousState: { status: caseRecord.status },
-			newState: { status: 'RESOLVED', resolutionSummary }
+			newState: { status: ConciergeCaseStatus.RESOLVED, resolutionSummary }
 		});
 
-		return { status: 'RESOLVED' };
+		return { status: ConciergeCaseStatus.RESOLVED };
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -498,7 +664,7 @@ async function closeCase(caseId: string, userId: string): Promise<{ status: stri
 		throw new Error('Case not found');
 	}
 
-	if (caseRecord.status !== 'RESOLVED') {
+	if (caseRecord.status !== ConciergeCaseStatus.RESOLVED) {
 		throw new Error('Can only close resolved cases');
 	}
 
@@ -507,7 +673,7 @@ async function closeCase(caseId: string, userId: string): Promise<{ status: stri
 			await tx.conciergeCase.update({
 				where: { id: caseId },
 				data: {
-					status: 'CLOSED',
+					status: ConciergeCaseStatus.CLOSED,
 					closedAt: new Date()
 				}
 			});
@@ -515,8 +681,8 @@ async function closeCase(caseId: string, userId: string): Promise<{ status: stri
 			await tx.caseStatusHistory.create({
 				data: {
 					caseId,
-					fromStatus: 'RESOLVED',
-					toStatus: 'CLOSED',
+					fromStatus: ConciergeCaseStatus.RESOLVED,
+					toStatus: ConciergeCaseStatus.CLOSED,
 					reason: 'Case closed',
 					changedBy: userId
 				}
@@ -526,23 +692,23 @@ async function closeCase(caseId: string, userId: string): Promise<{ status: stri
 		// Record activity event for close
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'CLOSE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CLOSE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case closed`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'CLOSE_CASE',
+			workflowStep: CaseLifecycleAction.CLOSE_CASE,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
-			previousState: { status: 'RESOLVED' },
-			newState: { status: 'CLOSED' }
+			previousState: { status: ConciergeCaseStatus.RESOLVED },
+			newState: { status: ConciergeCaseStatus.CLOSED }
 		});
 
-		return { status: 'CLOSED' };
+		return { status: ConciergeCaseStatus.CLOSED };
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -562,7 +728,7 @@ async function cancelCase(
 	}
 
 	const validTransitions = VALID_STATUS_TRANSITIONS[caseRecord.status] || [];
-	if (!validTransitions.includes('CANCELLED')) {
+	if (!validTransitions.includes(ConciergeCaseStatus.CANCELLED)) {
 		throw new Error(`Cannot cancel case in status ${caseRecord.status}`);
 	}
 
@@ -571,7 +737,7 @@ async function cancelCase(
 			await tx.conciergeCase.update({
 				where: { id: caseId },
 				data: {
-					status: 'CANCELLED',
+					status: ConciergeCaseStatus.CANCELLED,
 					cancelReason,
 					cancelledBy: userId,
 					cancelledAt: new Date()
@@ -582,7 +748,7 @@ async function cancelCase(
 				data: {
 					caseId,
 					fromStatus: caseRecord.status,
-					toStatus: 'CANCELLED',
+					toStatus: ConciergeCaseStatus.CANCELLED,
 					reason: cancelReason,
 					changedBy: userId
 				}
@@ -592,23 +758,23 @@ async function cancelCase(
 		// Record activity event for cancellation
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'CANCEL',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CANCEL,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case cancelled: ${cancelReason}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'CANCEL_CASE',
+			workflowStep: CaseLifecycleAction.CANCEL_CASE,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
 			previousState: { status: caseRecord.status },
-			newState: { status: 'CANCELLED', cancelReason }
+			newState: { status: ConciergeCaseStatus.CANCELLED, cancelReason }
 		});
 
-		return { status: 'CANCELLED' };
+		return { status: ConciergeCaseStatus.CANCELLED };
 	} finally {
 		await clearOrgContext(userId);
 	}
@@ -633,15 +799,15 @@ async function unassignConcierge(
 
 		await recordWorkflowEvent({
 			organizationId: caseRecord.organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'UNASSIGN',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UNASSIGN,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case unassigned`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'UNASSIGN_CONCIERGE',
+			workflowStep: CaseLifecycleAction.UNASSIGN_CONCIERGE,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
@@ -678,15 +844,15 @@ async function addNote(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Note added to case`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'ADD_NOTE',
+			workflowStep: CaseLifecycleAction.ADD_NOTE,
 			workflowVersion: 'v1',
 			caseId,
 			newState: { noteId: note.id, noteType }
@@ -729,15 +895,15 @@ async function addParticipant(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'ASSIGN',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.ASSIGN,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Participant added to case`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'ADD_PARTICIPANT',
+			workflowStep: CaseLifecycleAction.ADD_PARTICIPANT,
 			workflowVersion: 'v1',
 			caseId,
 			newState: { participantId: participant.id, role: data.role }
@@ -765,15 +931,15 @@ async function removeParticipant(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: participant.caseId,
-			action: 'UNASSIGN',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UNASSIGN,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Participant removed from case`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'REMOVE_PARTICIPANT',
+			workflowStep: CaseLifecycleAction.REMOVE_PARTICIPANT,
 			workflowVersion: 'v1',
 			caseId: participant.caseId,
 			newState: { participantId, removedAt: now.toISOString() }
@@ -801,15 +967,15 @@ async function linkUnit(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'LINK',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.LINK,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case linked to unit`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'LINK_UNIT',
+			workflowStep: CaseLifecycleAction.LINK_UNIT,
 			workflowVersion: 'v1',
 			caseId,
 			unitId,
@@ -838,15 +1004,15 @@ async function linkJob(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'LINK',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.LINK,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case linked to job`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'LINK_JOB',
+			workflowStep: CaseLifecycleAction.LINK_JOB,
 			workflowVersion: 'v1',
 			caseId,
 			newState: { linkedJobId: jobId }
@@ -874,15 +1040,15 @@ async function linkArc(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'LINK',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.LINK,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case linked to ARC request`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'LINK_ARC',
+			workflowStep: CaseLifecycleAction.LINK_ARC,
 			workflowVersion: 'v1',
 			caseId,
 			newState: { linkedArcRequestId: arcRequestId }
@@ -910,15 +1076,15 @@ async function linkWorkOrder(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'LINK',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.LINK,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case linked to work order`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'LINK_WORK_ORDER',
+			workflowStep: CaseLifecycleAction.LINK_WORK_ORDER,
 			workflowVersion: 'v1',
 			caseId,
 			newState: { linkedWorkOrderId: workOrderId }
@@ -972,15 +1138,15 @@ async function unlinkCrossDomain(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Case unlinked from ${unlinked.join(', ')}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'UNLINK_CROSS_DOMAIN',
+			workflowStep: CaseLifecycleAction.UNLINK_CROSS_DOMAIN,
 			workflowVersion: 'v1',
 			caseId,
 			newState: { unlinked }
@@ -1009,26 +1175,26 @@ async function requestClarification(
 				data: {
 					caseId,
 					content: question,
-					noteType: 'CLARIFICATION_REQUEST',
+					noteType: CaseNoteType.CLARIFICATION_REQUEST,
 					isInternal: false,
 					createdBy: userId
 				}
 			});
 
 			let updatedCase = caseRecord;
-			if (caseRecord.status !== 'PENDING_OWNER') {
+			if (caseRecord.status !== ConciergeCaseStatus.PENDING_OWNER) {
 				const validTransitions = VALID_STATUS_TRANSITIONS[caseRecord.status] || [];
-				if (validTransitions.includes('PENDING_OWNER')) {
+				if (validTransitions.includes(ConciergeCaseStatus.PENDING_OWNER)) {
 					updatedCase = await tx.conciergeCase.update({
 						where: { id: caseId },
-						data: { status: 'PENDING_OWNER' }
+						data: { status: ConciergeCaseStatus.PENDING_OWNER }
 					});
 
 					await tx.caseStatusHistory.create({
 						data: {
 							caseId,
 							fromStatus: caseRecord.status,
-							toStatus: 'PENDING_OWNER',
+							toStatus: ConciergeCaseStatus.PENDING_OWNER,
 							reason: 'Clarification requested from owner',
 							changedBy: userId
 						}
@@ -1041,15 +1207,15 @@ async function requestClarification(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'REQUEST_INFO',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.REQUEST_INFO,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Clarification requested: ${question.substring(0, 100)}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'REQUEST_CLARIFICATION',
+			workflowStep: CaseLifecycleAction.REQUEST_CLARIFICATION,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord.propertyId,
@@ -1074,7 +1240,7 @@ async function respondClarification(
 				data: {
 					caseId,
 					content: response,
-					noteType: 'CLARIFICATION_RESPONSE',
+					noteType: CaseNoteType.CLARIFICATION_RESPONSE,
 					isInternal: false,
 					createdBy: userId
 				}
@@ -1085,15 +1251,15 @@ async function respondClarification(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'CONCIERGE_CASE',
+			entityType: ActivityEntityType.CONCIERGE_CASE,
 			entityId: caseId,
-			action: 'RESPOND',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.RESPOND,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Owner responded to clarification: ${response.substring(0, 100)}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'caseLifecycleWorkflow_v1',
-			workflowStep: 'RESPOND_CLARIFICATION',
+			workflowStep: CaseLifecycleAction.RESPOND_CLARIFICATION,
 			workflowVersion: 'v1',
 			caseId,
 			propertyId: caseRecord?.propertyId
@@ -1119,7 +1285,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE_CASE': {
+			case CaseLifecycleAction.CREATE_CASE: {
 				if (!input.propertyId || !input.title || !input.description) {
 					const error = new Error('Missing required fields for CREATE_CASE');
 					logStepError(log, 'validation', error, { propertyId: input.propertyId, title: input.title });
@@ -1133,7 +1299,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 							input.propertyId!,
 							input.title!,
 							input.description!,
-							input.priority || 'NORMAL',
+							input.priority || ConciergeCasePriority.NORMAL,
 							input.userId,
 							input.intentId,
 							input.assigneeUserId,
@@ -1157,7 +1323,42 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'CONVERT_INTENT': {
+			case CaseLifecycleAction.UPDATE_CASE: {
+				if (!input.caseId) {
+					const error = new Error('Missing caseId for UPDATE_CASE');
+					logStepError(log, 'validation', error, { caseId: input.caseId });
+					throw error;
+				}
+				log.debug('Step: updateCase starting', { caseId: input.caseId });
+				const result = await DBOS.runStep(
+					() => updateCase(
+						input.caseId!,
+						input.organizationId,
+						input.userId,
+						{
+							title: input.title,
+							description: input.description,
+							priority: input.priority,
+							availabilityType: input.availabilityType,
+							availabilityNotes: input.availabilityNotes,
+							availabilitySlots: input.availabilitySlots
+						}
+					),
+					{ name: 'updateCase' }
+				);
+				log.info('Step: updateCase completed', { caseId: result.id });
+				await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'case_updated', ...result });
+				const successResult = {
+					success: true,
+					action: input.action,
+					timestamp: new Date().toISOString(),
+					caseId: result.id
+				};
+				logWorkflowEnd(log, input.action, true, startTime, successResult);
+				return successResult;
+			}
+
+			case CaseLifecycleAction.CONVERT_INTENT: {
 				if (!input.intentId) {
 					const error = new Error('Missing intentId for CONVERT_INTENT');
 					logStepError(log, 'validation', error, { intentId: input.intentId });
@@ -1182,7 +1383,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'TRANSITION_STATUS': {
+			case CaseLifecycleAction.TRANSITION_STATUS: {
 				if (!input.caseId || !input.targetStatus) {
 					const error = new Error('Missing caseId or targetStatus for TRANSITION_STATUS');
 					logStepError(log, 'validation', error, { caseId: input.caseId, targetStatus: input.targetStatus });
@@ -1207,7 +1408,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'ASSIGN_CONCIERGE': {
+			case CaseLifecycleAction.ASSIGN_CONCIERGE: {
 				if (!input.caseId || !input.assigneeUserId) {
 					const error = new Error('Missing caseId or assigneeUserId for ASSIGN_CONCIERGE');
 					logStepError(log, 'validation', error, { caseId: input.caseId, assigneeUserId: input.assigneeUserId });
@@ -1230,7 +1431,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'RESOLVE_CASE': {
+			case CaseLifecycleAction.RESOLVE_CASE: {
 				if (!input.caseId || !input.resolutionSummary) {
 					const error = new Error('Missing caseId or resolutionSummary for RESOLVE_CASE');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1254,7 +1455,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'CLOSE_CASE': {
+			case CaseLifecycleAction.CLOSE_CASE: {
 				if (!input.caseId) {
 					const error = new Error('Missing caseId for CLOSE_CASE');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1277,7 +1478,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'CANCEL_CASE': {
+			case CaseLifecycleAction.CANCEL_CASE: {
 				if (!input.caseId || !input.cancelReason) {
 					const error = new Error('Missing caseId or cancelReason for CANCEL_CASE');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1301,7 +1502,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'UNASSIGN_CONCIERGE': {
+			case CaseLifecycleAction.UNASSIGN_CONCIERGE: {
 				if (!input.caseId) {
 					const error = new Error('Missing caseId for UNASSIGN_CONCIERGE');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1324,7 +1525,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'ADD_NOTE': {
+			case CaseLifecycleAction.ADD_NOTE: {
 				if (!input.caseId || !input.noteContent) {
 					const error = new Error('Missing caseId or noteContent for ADD_NOTE');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1337,7 +1538,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 						input.organizationId,
 						input.userId,
 						input.noteContent!,
-						input.noteType ?? 'GENERAL',
+						input.noteType ?? CaseNoteType.GENERAL,
 						input.isInternal ?? true
 					),
 					{ name: 'addNote' }
@@ -1355,7 +1556,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'ADD_PARTICIPANT': {
+			case CaseLifecycleAction.ADD_PARTICIPANT: {
 				if (!input.caseId || !input.participantRole) {
 					const error = new Error('Missing caseId or participantRole for ADD_PARTICIPANT');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1396,7 +1597,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'REMOVE_PARTICIPANT': {
+			case CaseLifecycleAction.REMOVE_PARTICIPANT: {
 				if (!input.participantId) {
 					const error = new Error('Missing participantId for REMOVE_PARTICIPANT');
 					logStepError(log, 'validation', error, { participantId: input.participantId });
@@ -1420,7 +1621,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'LINK_UNIT': {
+			case CaseLifecycleAction.LINK_UNIT: {
 				if (!input.caseId || !input.unitId) {
 					const error = new Error('Missing caseId or unitId for LINK_UNIT');
 					logStepError(log, 'validation', error, { caseId: input.caseId, unitId: input.unitId });
@@ -1444,7 +1645,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'LINK_JOB': {
+			case CaseLifecycleAction.LINK_JOB: {
 				if (!input.caseId || !input.jobId) {
 					const error = new Error('Missing caseId or jobId for LINK_JOB');
 					logStepError(log, 'validation', error, { caseId: input.caseId, jobId: input.jobId });
@@ -1468,7 +1669,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'LINK_ARC': {
+			case CaseLifecycleAction.LINK_ARC: {
 				if (!input.caseId || !input.arcRequestId) {
 					const error = new Error('Missing caseId or arcRequestId for LINK_ARC');
 					logStepError(log, 'validation', error, { caseId: input.caseId, arcRequestId: input.arcRequestId });
@@ -1492,7 +1693,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'LINK_WORK_ORDER': {
+			case CaseLifecycleAction.LINK_WORK_ORDER: {
 				if (!input.caseId || !input.workOrderId) {
 					const error = new Error('Missing caseId or workOrderId for LINK_WORK_ORDER');
 					logStepError(log, 'validation', error, { caseId: input.caseId, workOrderId: input.workOrderId });
@@ -1516,7 +1717,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'UNLINK_CROSS_DOMAIN': {
+			case CaseLifecycleAction.UNLINK_CROSS_DOMAIN: {
 				if (!input.caseId || !input.unlinkType) {
 					const error = new Error('Missing caseId or unlinkType for UNLINK_CROSS_DOMAIN');
 					logStepError(log, 'validation', error, { caseId: input.caseId, unlinkType: input.unlinkType });
@@ -1540,7 +1741,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'REQUEST_CLARIFICATION': {
+			case CaseLifecycleAction.REQUEST_CLARIFICATION: {
 				if (!input.caseId || !input.clarificationQuestion) {
 					const error = new Error('Missing caseId or clarificationQuestion for REQUEST_CLARIFICATION');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1565,7 +1766,7 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 				return successResult;
 			}
 
-			case 'RESPOND_CLARIFICATION': {
+			case CaseLifecycleAction.RESPOND_CLARIFICATION: {
 				if (!input.caseId || !input.clarificationResponse) {
 					const error = new Error('Missing caseId or clarificationResponse for RESPOND_CLARIFICATION');
 					logStepError(log, 'validation', error, { caseId: input.caseId });
@@ -1617,8 +1818,8 @@ async function caseLifecycleWorkflow(input: CaseLifecycleWorkflowInput): Promise
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CASE_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CASE_LIFECYCLE_ERROR
 		});
 		const errorResult = {
 			success: false,

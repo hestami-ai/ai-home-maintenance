@@ -9,8 +9,9 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { ProposalStatus } from '../../../../../../generated/prisma/client.js';
-import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
+import { ProposalStatus as ProposalStatusType } from '../../../../../../generated/prisma/client.js';
+import { ProposalStatus } from '../../../../../../generated/prisma/enums.js';
+import { startBillingWorkflow, BillingAction } from '../../../workflows/billingWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ProposalRoute');
@@ -21,7 +22,7 @@ const proposalOutput = z.object({
 	customerId: z.string(),
 	estimateId: z.string().nullable(),
 	proposalNumber: z.string(),
-	status: z.nativeEnum(ProposalStatus),
+	status: z.nativeEnum(ProposalStatusType),
 	issueDate: z.string(),
 	validUntil: z.string().nullable(),
 	sentAt: z.string().nullable(),
@@ -130,7 +131,7 @@ export const proposalRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'CREATE_PROPOSAL',
+					action: BillingAction.CREATE_PROPOSAL,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -195,7 +196,7 @@ export const proposalRouter = {
 				.object({
 					customerId: z.string().optional(),
 					estimateId: z.string().optional(),
-					status: z.nativeEnum(ProposalStatus).optional()
+					status: z.nativeEnum(ProposalStatusType).optional()
 				})
 				.merge(PaginationInputSchema)
 				.optional()
@@ -285,14 +286,14 @@ export const proposalRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== ProposalStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'UPDATE_PROPOSAL',
+					action: BillingAction.UPDATE_PROPOSAL,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -339,14 +340,14 @@ export const proposalRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== ProposalStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only send DRAFT proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'SEND_PROPOSAL',
+					action: BillingAction.SEND_PROPOSAL,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -436,14 +437,14 @@ export const proposalRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
-			if (!['SENT', 'VIEWED'].includes(existing.status)) {
+			if (!([ProposalStatus.SENT, ProposalStatus.VIEWED] as ProposalStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only accept SENT or VIEWED proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'ACCEPT_PROPOSAL',
+					action: BillingAction.ACCEPT_PROPOSAL,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -490,14 +491,14 @@ export const proposalRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
-			if (!['SENT', 'VIEWED'].includes(existing.status)) {
+			if (!([ProposalStatus.SENT, ProposalStatus.VIEWED] as ProposalStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only decline SENT or VIEWED proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'DECLINE_PROPOSAL',
+					action: BillingAction.DECLINE_PROPOSAL,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -544,14 +545,14 @@ export const proposalRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Proposal not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== ProposalStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT proposals' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'DELETE_PROPOSAL',
+					action: BillingAction.DELETE_PROPOSAL,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,

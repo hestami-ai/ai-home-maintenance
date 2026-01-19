@@ -13,6 +13,22 @@ import { EstimateStatus, type BaseWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ESTIMATE_CREATE_WORKFLOW_ERROR: 'ESTIMATE_CREATE_WORKFLOW_ERROR'
+} as const;
+
+// Workflow step constants
+const EstimateCreateStep = {
+	CREATE_ESTIMATE: 'CREATE_ESTIMATE'
+} as const;
 
 const log = createWorkflowLogger('EstimateCreateWorkflow');
 
@@ -144,15 +160,15 @@ async function createEstimate(input: EstimateCreateInput): Promise<{
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ESTIMATE',
+		entityType: ActivityEntityType.ESTIMATE,
 		entityId: estimate.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Estimate created: ${estimate.estimateNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'estimateCreateWorkflow_v1',
-		workflowStep: 'CREATE_ESTIMATE',
+		workflowStep: EstimateCreateStep.CREATE_ESTIMATE,
 		workflowVersion: 'v1',
 		jobId: input.jobId,
 		newState: {
@@ -194,8 +210,8 @@ async function estimateCreateWorkflow(input: EstimateCreateInput): Promise<Estim
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ESTIMATE_CREATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ESTIMATE_CREATE_WORKFLOW_ERROR
 		});
 
 		return {

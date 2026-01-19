@@ -10,7 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { TimeEntryType } from '../../../../../../generated/prisma/client.js';
-import { startTimeEntryWorkflow } from '../../../workflows/timeEntryWorkflow.js';
+import { startTimeEntryWorkflow, TimeEntryAction } from '../../../workflows/timeEntryWorkflow.js';
 
 const timeEntryOutput = z.object({
 	id: z.string(),
@@ -117,7 +117,7 @@ export const timeEntryRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startTimeEntryWorkflow(
 				{
-					action: 'CREATE_ENTRY',
+					action: TimeEntryAction.CREATE_ENTRY,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -193,7 +193,7 @@ export const timeEntryRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startTimeEntryWorkflow(
 				{
-					action: 'STOP_ENTRY',
+					action: TimeEntryAction.STOP_ENTRY,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					entryId: input.timeEntryId,
@@ -420,7 +420,7 @@ export const timeEntryRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startTimeEntryWorkflow(
 				{
-					action: 'UPDATE_ENTRY',
+					action: TimeEntryAction.UPDATE_ENTRY,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					entryId: input.id,
@@ -476,7 +476,7 @@ export const timeEntryRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startTimeEntryWorkflow(
 				{
-					action: 'DELETE_ENTRY',
+					action: TimeEntryAction.DELETE_ENTRY,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					entryId: input.id,

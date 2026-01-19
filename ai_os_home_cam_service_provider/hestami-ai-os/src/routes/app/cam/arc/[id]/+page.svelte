@@ -4,7 +4,7 @@
 	import { ArrowLeft, ClipboardCheck, FileText, Clock, CheckCircle, XCircle, Pause, MessageSquare, Pencil, User, Bot, Image, FileImage, History, Scale, Users, Vote, AlertCircle } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, ARCDecisionModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { arcRequestApi, arcReviewApi, documentApi, activityEventApi, type ARCRequest, type Document } from '$lib/api/cam';
+	import { ARCRequestStatusValues, ARCReviewActionValues, ActivityEntityTypeValues, activityEventApi, arcRequestApi, arcReviewApi, documentApi, type ARCRequest, type Document } from '$lib/api/cam';
 	import { nanoid } from 'nanoid';
 	import { refreshBadgeCounts } from '$lib/stores';
 
@@ -102,7 +102,7 @@
 	async function loadDocuments() {
 		if (!requestId) return;
 		try {
-			const response = await documentApi.list({ contextType: 'ARC_REQUEST', contextId: requestId });
+			const response = await documentApi.list({ contextType: ActivityEntityTypeValues.ARC_REQUEST, contextId: requestId });
 			if (response.ok) {
 				documents = response.data.documents;
 			}
@@ -114,7 +114,7 @@
 	async function loadHistory() {
 		if (!requestId) return;
 		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'ARC_REQUEST', entityId: requestId });
+			const response = await activityEventApi.getByEntity({ entityType: ActivityEntityTypeValues.ARC_REQUEST, entityId: requestId });
 			if (response.ok) {
 				history = response.data.events.map((e: any) => ({
 					id: e.id,
@@ -165,13 +165,13 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'SUBMITTED': return 'text-primary-500 bg-primary-500/10';
-			case 'UNDER_REVIEW': return 'text-warning-500 bg-warning-500/10';
-			case 'APPROVED': return 'text-success-500 bg-success-500/10';
+			case ARCRequestStatusValues.SUBMITTED: return 'text-primary-500 bg-primary-500/10';
+			case ARCRequestStatusValues.UNDER_REVIEW: return 'text-warning-500 bg-warning-500/10';
+			case ARCRequestStatusValues.APPROVED: return 'text-success-500 bg-success-500/10';
 			case 'APPROVED_WITH_CONDITIONS': return 'text-success-600 bg-success-500/20';
-			case 'DENIED': return 'text-error-500 bg-error-500/10';
-			case 'TABLED': return 'text-surface-500 bg-surface-500/10';
-			case 'WITHDRAWN': return 'text-surface-400 bg-surface-400/10';
+			case ARCRequestStatusValues.DENIED: return 'text-error-500 bg-error-500/10';
+			case ARCRequestStatusValues.TABLED: return 'text-surface-500 bg-surface-500/10';
+			case ARCRequestStatusValues.WITHDRAWN: return 'text-surface-400 bg-surface-400/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -210,13 +210,13 @@
 		try {
 			// Map decision to action type
 			const actionMap: Record<string, 'APPROVE' | 'DENY' | 'REQUEST_CHANGES' | 'TABLE'> = {
-				'APPROVE': 'APPROVE',
-				'APPROVE_WITH_CONDITIONS': 'APPROVE',
-				'DENY': 'DENY',
-				'REQUEST_CHANGES': 'REQUEST_CHANGES',
-				'TABLE': 'TABLE'
+				[ARCReviewActionValues.APPROVE]: ARCReviewActionValues.APPROVE,
+				'APPROVE_WITH_CONDITIONS': ARCReviewActionValues.APPROVE,
+				[ARCReviewActionValues.DENY]: ARCReviewActionValues.DENY,
+				[ARCReviewActionValues.REQUEST_CHANGES]: ARCReviewActionValues.REQUEST_CHANGES,
+				[ARCReviewActionValues.TABLE]: ARCReviewActionValues.TABLE
 			};
-			const action = actionMap[data.decision] || 'APPROVE';
+			const action = actionMap[data.decision] || ARCReviewActionValues.APPROVE;
 
 			const response = await arcReviewApi.recordDecision({
 				requestId: request.id,
@@ -249,7 +249,7 @@
 			for (const doc of selectedDocs) {
 				const response = await documentApi.linkToContext({
 					documentId: doc.documentId,
-					contextType: 'ARC_REQUEST',
+					contextType: ActivityEntityTypeValues.ARC_REQUEST,
 					contextId: requestId,
 					bindingNotes: `Linked as referenced guideline/submission document`,
 					idempotencyKey: crypto.randomUUID()
@@ -316,11 +316,11 @@
 				</div>
 
 				<div class="flex gap-2">
-					{#if ['SUBMITTED', 'UNDER_REVIEW'].includes(request.status)}
+					{#if ([ARCRequestStatusValues.SUBMITTED, ARCRequestStatusValues.UNDER_REVIEW] as string[]).includes(request.status)}
 						<DecisionButton
 							variant="approve"
 							requiresRationale
-							onclick={() => openDecisionModal('APPROVE')}
+							onclick={() => openDecisionModal(ARCReviewActionValues.APPROVE)}
 						>
 							<CheckCircle class="mr-1 h-4 w-4" />
 							Approve
@@ -336,7 +336,7 @@
 						<DecisionButton
 							variant="deny"
 							requiresRationale
-							onclick={() => openDecisionModal('DENY')}
+							onclick={() => openDecisionModal(ARCReviewActionValues.DENY)}
 						>
 							<XCircle class="mr-1 h-4 w-4" />
 							Deny
@@ -344,7 +344,7 @@
 						<DecisionButton
 							variant="default"
 							requiresRationale
-							onclick={() => openDecisionModal('TABLE')}
+							onclick={() => openDecisionModal(ARCReviewActionValues.TABLE)}
 						>
 							<Pause class="mr-1 h-4 w-4" />
 							Table
@@ -352,7 +352,7 @@
 						<DecisionButton
 							variant="default"
 							requiresRationale
-							onclick={() => openDecisionModal('REQUEST_CHANGES')}
+							onclick={() => openDecisionModal(ARCReviewActionValues.REQUEST_CHANGES)}
 						>
 							<MessageSquare class="mr-1 h-4 w-4" />
 							Request Changes
@@ -626,9 +626,9 @@
 					{#each unitPrecedents as precedent}
 						<a href="/app/cam/arc/{precedent.id}" class="flex items-center gap-3 py-3 hover:bg-surface-100-900 -mx-2 px-2 rounded transition-colors">
 							<div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full {getStatusColor(precedent.status)}">
-								{#if precedent.status === 'APPROVED'}
+								{#if precedent.status === ARCRequestStatusValues.APPROVED}
 									<CheckCircle class="h-4 w-4" />
-								{:else if precedent.status === 'DENIED'}
+								{:else if precedent.status === ARCRequestStatusValues.DENIED}
 									<XCircle class="h-4 w-4" />
 								{:else}
 									<Clock class="h-4 w-4" />
@@ -662,9 +662,9 @@
 					{#each categoryPrecedents as precedent}
 						<a href="/app/cam/arc/{precedent.id}" class="flex items-center gap-3 py-3 hover:bg-surface-100-900 -mx-2 px-2 rounded transition-colors">
 							<div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full {getStatusColor(precedent.status)}">
-								{#if precedent.status === 'APPROVED'}
+								{#if precedent.status === ARCRequestStatusValues.APPROVED}
 									<CheckCircle class="h-4 w-4" />
-								{:else if precedent.status === 'DENIED'}
+								{:else if precedent.status === ARCRequestStatusValues.DENIED}
 									<XCircle class="h-4 w-4" />
 								{:else}
 									<Clock class="h-4 w-4" />
@@ -807,10 +807,10 @@
 						<div class="py-3">
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-3">
-									<div class="flex h-8 w-8 items-center justify-center rounded-full {vote.action === 'APPROVE' ? 'bg-success-500/20' : vote.action === 'DENY' ? 'bg-error-500/20' : 'bg-warning-500/20'}">
-										{#if vote.action === 'APPROVE'}
+									<div class="flex h-8 w-8 items-center justify-center rounded-full {vote.action === ARCReviewActionValues.APPROVE ? 'bg-success-500/20' : vote.action === ARCReviewActionValues.DENY ? 'bg-error-500/20' : 'bg-warning-500/20'}">
+										{#if vote.action === ARCReviewActionValues.APPROVE}
 											<CheckCircle class="h-4 w-4 text-success-500" />
-										{:else if vote.action === 'DENY'}
+										{:else if vote.action === ARCReviewActionValues.DENY}
 											<XCircle class="h-4 w-4 text-error-500" />
 										{:else}
 											<AlertCircle class="h-4 w-4 text-warning-500" />
@@ -821,7 +821,7 @@
 										<p class="text-xs text-surface-500">{formatDateTime(vote.createdAt)}</p>
 									</div>
 								</div>
-								<span class="rounded-full px-2 py-0.5 text-xs font-medium {vote.action === 'APPROVE' ? 'bg-success-500/10 text-success-500' : vote.action === 'DENY' ? 'bg-error-500/10 text-error-500' : 'bg-warning-500/10 text-warning-500'}">
+								<span class="rounded-full px-2 py-0.5 text-xs font-medium {vote.action === ARCReviewActionValues.APPROVE ? 'bg-success-500/10 text-success-500' : vote.action === ARCReviewActionValues.DENY ? 'bg-error-500/10 text-error-500' : 'bg-warning-500/10 text-warning-500'}">
 									{vote.action.replace(/_/g, ' ')}
 								</span>
 							</div>
@@ -841,7 +841,7 @@
 		</Card>
 
 		<!-- Decision Actions (if request is still open) -->
-		{#if request && ['SUBMITTED', 'UNDER_REVIEW'].includes(request.status)}
+		{#if request && ([ARCRequestStatusValues.SUBMITTED, ARCRequestStatusValues.UNDER_REVIEW] as string[]).includes(request.status)}
 			<Card variant="outlined" padding="lg">
 				<h3 class="mb-4 font-semibold">Record Decision</h3>
 				<p class="mb-4 text-sm text-surface-500">
@@ -851,7 +851,7 @@
 					<DecisionButton
 						variant="approve"
 						requiresRationale
-						onclick={() => openDecisionModal('APPROVE')}
+						onclick={() => openDecisionModal(ARCReviewActionValues.APPROVE)}
 					>
 						<CheckCircle class="mr-1 h-4 w-4" />
 						Approve
@@ -867,7 +867,7 @@
 					<DecisionButton
 						variant="deny"
 						requiresRationale
-						onclick={() => openDecisionModal('DENY')}
+						onclick={() => openDecisionModal(ARCReviewActionValues.DENY)}
 					>
 						<XCircle class="mr-1 h-4 w-4" />
 						Deny
@@ -875,7 +875,7 @@
 					<DecisionButton
 						variant="default"
 						requiresRationale
-						onclick={() => openDecisionModal('REQUEST_CHANGES')}
+						onclick={() => openDecisionModal(ARCReviewActionValues.REQUEST_CHANGES)}
 					>
 						<MessageSquare class="mr-1 h-4 w-4" />
 						Request Changes
@@ -883,7 +883,7 @@
 					<DecisionButton
 						variant="default"
 						requiresRationale
-						onclick={() => openDecisionModal('TABLE')}
+						onclick={() => openDecisionModal(ARCReviewActionValues.TABLE)}
 					>
 						<Pause class="mr-1 h-4 w-4" />
 						Table

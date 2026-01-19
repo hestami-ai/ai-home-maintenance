@@ -10,6 +10,12 @@ import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ASSESSMENT_POSTING_WORKFLOW_ERROR: 'ASSESSMENT_POSTING_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('AssessmentPostingWorkflow');
 
@@ -307,8 +313,8 @@ async function assessmentPostingWorkflow(input: PostingInput): Promise<PostingRe
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ASSESSMENT_POSTING_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ASSESSMENT_POSTING_WORKFLOW_ERROR
 		});
 
 		return {

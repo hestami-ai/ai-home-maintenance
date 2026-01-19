@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { publicProcedure, successResponse } from '../router.js';
 import { createModuleLogger } from '../../logger.js';
+import { HealthStatus } from '../../workflows/schemas.js';
 
 const log = createModuleLogger('SystemRoute');
 
@@ -35,7 +36,7 @@ export const systemRouter = {
 		.handler(async ({ context }) => {
 			return successResponse(
 				{
-					status: 'healthy',
+					status: HealthStatus.HEALTHY,
 					version: process.env.npm_package_version || '0.0.1',
 					timestamp: new Date().toISOString()
 				},

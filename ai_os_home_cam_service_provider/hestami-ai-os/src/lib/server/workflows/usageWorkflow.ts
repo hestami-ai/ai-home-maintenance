@@ -11,8 +11,14 @@ import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('UsageWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	USAGE_WORKFLOW_ERROR: 'USAGE_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const UsageAction = {
@@ -168,14 +174,14 @@ async function usageWorkflow(input: UsageWorkflowInput): Promise<UsageWorkflowRe
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'RECORD_USAGE':
+			case UsageAction.RECORD_USAGE:
 				entityId = await DBOS.runStep(
 					() => recordUsage(input.organizationId, input.userId, input.data),
 					{ name: 'recordUsage' }
 				);
 				break;
 
-			case 'REVERSE_USAGE':
+			case UsageAction.REVERSE_USAGE:
 				entityId = await DBOS.runStep(
 					() => reverseUsage(input.organizationId, input.userId, input.usageId!, input.data),
 					{ name: 'reverseUsage' }
@@ -194,8 +200,8 @@ async function usageWorkflow(input: UsageWorkflowInput): Promise<UsageWorkflowRe
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'USAGE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.USAGE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

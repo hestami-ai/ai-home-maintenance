@@ -42,6 +42,7 @@
 
 	// Synchronize server data to local state for reactive mark-as-read
 	$effect(() => {
+		if (!data) return;
 		if (data.notifications) {
 			notifications = [...data.notifications];
 		}

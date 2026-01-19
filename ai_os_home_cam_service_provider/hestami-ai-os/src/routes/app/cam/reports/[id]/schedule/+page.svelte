@@ -4,7 +4,7 @@
 	import { ArrowLeft, Calendar, Clock, Mail, Loader2 } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { reportApi } from '$lib/api/cam';
+	import { ReportFormatValues, ScheduleFrequencyValues, reportApi } from '$lib/api/cam';
 
 	interface ReportDefinition {
 		id: string;
@@ -20,21 +20,21 @@
 	let successMessage = $state<string | null>(null);
 
 	// Schedule form state
-	let frequency = $state('WEEKLY');
+	let frequency = $state<string>(ScheduleFrequencyValues.WEEKLY);
 	let dayOfWeek = $state('1'); // Monday
 	let dayOfMonth = $state('1');
 	let time = $state('08:00');
-	let outputFormat = $state('PDF');
+	let outputFormat = $state(ReportFormatValues.PDF);
 	let recipients = $state('');
 	let isActive = $state(true);
 
 	const reportId = $derived(($page.params as Record<string, string>).id);
 
 	const frequencyOptions = [
-		{ value: 'DAILY', label: 'Daily' },
-		{ value: 'WEEKLY', label: 'Weekly' },
-		{ value: 'MONTHLY', label: 'Monthly' },
-		{ value: 'QUARTERLY', label: 'Quarterly' }
+		{ value: ScheduleFrequencyValues.DAILY, label: 'Daily' },
+		{ value: ScheduleFrequencyValues.WEEKLY, label: 'Weekly' },
+		{ value: ScheduleFrequencyValues.MONTHLY, label: 'Monthly' },
+		{ value: ScheduleFrequencyValues.QUARTERLY, label: 'Quarterly' }
 	];
 
 	const dayOfWeekOptions = [
@@ -48,9 +48,9 @@
 	];
 
 	const formatOptions = [
-		{ value: 'PDF', label: 'PDF' },
-		{ value: 'EXCEL', label: 'Excel' },
-		{ value: 'CSV', label: 'CSV' }
+		{ value: ReportFormatValues.PDF, label: ReportFormatValues.PDF },
+		{ value: ReportFormatValues.EXCEL, label: 'Excel' },
+		{ value: ReportFormatValues.CSV, label: ReportFormatValues.CSV }
 	];
 
 	async function loadReport() {
@@ -182,7 +182,7 @@
 							</select>
 						</div>
 
-						{#if frequency === 'WEEKLY'}
+						{#if frequency === ScheduleFrequencyValues.WEEKLY}
 							<div>
 								<label for="dayOfWeek" class="block text-sm font-medium">
 									Day of Week <span class="text-error-500">*</span>
@@ -199,7 +199,7 @@
 							</div>
 						{/if}
 
-						{#if frequency === 'MONTHLY' || frequency === 'QUARTERLY'}
+						{#if frequency === ScheduleFrequencyValues.MONTHLY || frequency === ScheduleFrequencyValues.QUARTERLY}
 							<div>
 								<label for="dayOfMonth" class="block text-sm font-medium">
 									Day of Month <span class="text-error-500">*</span>

@@ -6,12 +6,13 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
+import { startGovernanceWorkflow, GovernanceAction } from '../../../workflows/governanceWorkflow.js';
 import {
 	BoardMotionCategorySchema,
 	BoardMotionStatusSchema,
 	BoardMotionOutcomeSchema
 } from '../../schemas.js';
+import { BoardMotionStatus, BoardMotionOutcome, ARCRequestStatus, VoteChoice } from '../../../../../../generated/prisma/enums.js';
 
 const boardMotionCategoryEnum = BoardMotionCategorySchema;
 const boardMotionStatusEnum = BoardMotionStatusSchema;
@@ -188,7 +189,7 @@ export const boardMotionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_MOTION',
+					action: GovernanceAction.CREATE_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -252,13 +253,13 @@ export const boardMotionRouter = {
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 
-			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
+			if (existing.status === BoardMotionStatus.APPROVED || existing.status === BoardMotionStatus.DENIED) {
 				throw errors.BAD_REQUEST({ message: 'Cannot update a decided motion' });
 			}
 
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'UPDATE_MOTION',
+					action: GovernanceAction.UPDATE_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: id,
@@ -321,14 +322,14 @@ export const boardMotionRouter = {
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 
-			if (existing.status !== 'PROPOSED') {
+			if (existing.status !== BoardMotionStatus.PROPOSED) {
 				throw errors.BAD_REQUEST({ message: 'Motion must be in PROPOSED status to be seconded' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'SECOND_MOTION',
+					action: GovernanceAction.SECOND_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -391,14 +392,14 @@ export const boardMotionRouter = {
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 
-			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
+			if (existing.status === BoardMotionStatus.APPROVED || existing.status === BoardMotionStatus.DENIED) {
 				throw errors.BAD_REQUEST({ message: 'Cannot change status of a decided motion' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'UPDATE_MOTION_STATUS',
+					action: GovernanceAction.UPDATE_MOTION_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -461,14 +462,14 @@ export const boardMotionRouter = {
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 
-			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
+			if (existing.status === BoardMotionStatus.APPROVED || existing.status === BoardMotionStatus.DENIED) {
 				throw errors.BAD_REQUEST({ message: 'Motion outcome already recorded' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'RECORD_MOTION_OUTCOME',
+					action: GovernanceAction.RECORD_MOTION_OUTCOME,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -531,14 +532,14 @@ export const boardMotionRouter = {
 
 			if (!existing) throw errors.NOT_FOUND({ message: 'Board motion' });
 
-			if (existing.status === 'APPROVED' || existing.status === 'DENIED') {
+			if (existing.status === BoardMotionStatus.APPROVED || existing.status === BoardMotionStatus.DENIED) {
 				throw errors.BAD_REQUEST({ message: 'Cannot withdraw a decided motion' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'WITHDRAW_MOTION',
+					action: GovernanceAction.WITHDRAW_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -610,14 +611,14 @@ export const boardMotionRouter = {
 				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
-			if (existing.status !== 'SECONDED' && existing.status !== 'UNDER_DISCUSSION') {
+			if (existing.status !== BoardMotionStatus.SECONDED && existing.status !== BoardMotionStatus.UNDER_DISCUSSION) {
 				throw errors.BAD_REQUEST({ message: 'Motion must be SECONDED or UNDER_DISCUSSION to open voting' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'OPEN_VOTING',
+					action: GovernanceAction.OPEN_VOTING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -695,22 +696,22 @@ export const boardMotionRouter = {
 				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
-			if (existing.status !== 'UNDER_VOTE') {
+			if (existing.status !== BoardMotionStatus.UNDER_VOTE) {
 				throw errors.BAD_REQUEST({ message: 'Motion must be UNDER_VOTE to close voting' });
 			}
 
 			// Tally votes from all votes linked to this motion
 			const allBallots = existing.votes.flatMap(v => v.ballots);
-			const yes = allBallots.filter(b => b.choice === 'YES').length;
-			const no = allBallots.filter(b => b.choice === 'NO').length;
-			const abstain = allBallots.filter(b => b.choice === 'ABSTAIN').length;
+			const yes = allBallots.filter(b => b.choice === VoteChoice.YES).length;
+			const no = allBallots.filter(b => b.choice === VoteChoice.NO).length;
+			const abstain = allBallots.filter(b => b.choice === VoteChoice.ABSTAIN).length;
 			const passed = yes > no;
-			const outcome = passed ? 'PASSED' : 'FAILED';
+			const outcome = passed ? BoardMotionOutcome.PASSED : BoardMotionOutcome.FAILED;
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CLOSE_VOTING',
+					action: GovernanceAction.CLOSE_VOTING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -778,14 +779,14 @@ export const boardMotionRouter = {
 			}
 
 			// Can table from any pre-decided state
-			if (existing.status === 'APPROVED' || existing.status === 'DENIED' || existing.status === 'WITHDRAWN') {
+			if (existing.status === BoardMotionStatus.APPROVED || existing.status === BoardMotionStatus.DENIED || existing.status === BoardMotionStatus.WITHDRAWN) {
 				throw errors.BAD_REQUEST({ message: 'Cannot table a motion that has already been decided' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'TABLE_MOTION',
+					action: GovernanceAction.TABLE_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,
@@ -856,7 +857,7 @@ export const boardMotionRouter = {
 				throw errors.FORBIDDEN({ message: 'Access denied' });
 			}
 
-			if (motion.status !== 'APPROVED' && motion.status !== 'DENIED') {
+			if (motion.status !== BoardMotionStatus.APPROVED && motion.status !== BoardMotionStatus.DENIED) {
 				throw errors.BAD_REQUEST({ message: 'Motion must be approved or denied to apply to ARC request' });
 			}
 
@@ -874,12 +875,12 @@ export const boardMotionRouter = {
 			const previousStatus = arcRequest.status;
 
 			// Map motion outcome to ARC status
-			const newArcStatus = motion.status === 'APPROVED' ? 'APPROVED' : 'DENIED';
+			const newArcStatus = motion.status === BoardMotionStatus.APPROVED ? ARCRequestStatus.APPROVED : ARCRequestStatus.DENIED;
 
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'LINK_ARC_TO_MOTION',
+					action: GovernanceAction.LINK_ARC_TO_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: motionId,

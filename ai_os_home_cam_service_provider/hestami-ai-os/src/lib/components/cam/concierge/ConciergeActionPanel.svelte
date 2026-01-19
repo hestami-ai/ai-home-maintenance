@@ -11,7 +11,7 @@
 		FileText,
 		Wrench
 	} from 'lucide-svelte';
-	import { conciergeCaseApi, type ConciergeCaseDetail, type ConciergeCaseStatus } from '$lib/api/cam';
+	import { conciergeCaseApi, ConciergeCaseStatusValues, type ConciergeCaseDetail, type ConciergeCaseStatus } from '$lib/api/cam';
 
 	interface Props {
 		caseDetail: ConciergeCaseDetail;
@@ -162,21 +162,21 @@
 	}
 
 	const statusOptions: ConciergeCaseStatus[] = [
-		'INTAKE',
-		'ASSESSMENT',
-		'IN_PROGRESS',
-		'PENDING_EXTERNAL',
-		'PENDING_OWNER',
-		'ON_HOLD',
-		'RESOLVED',
-		'CLOSED',
-		'CANCELLED'
+		ConciergeCaseStatusValues.INTAKE,
+		ConciergeCaseStatusValues.ASSESSMENT,
+		ConciergeCaseStatusValues.IN_PROGRESS,
+		ConciergeCaseStatusValues.PENDING_EXTERNAL,
+		ConciergeCaseStatusValues.PENDING_OWNER,
+		ConciergeCaseStatusValues.ON_HOLD,
+		ConciergeCaseStatusValues.RESOLVED,
+		ConciergeCaseStatusValues.CLOSED,
+		ConciergeCaseStatusValues.CANCELLED
 	];
 
 	function getActions() {
 		const status = caseDetail.case.status;
-		const canRequestClarification = status !== 'CLOSED' && status !== 'CANCELLED' && status !== 'PENDING_OWNER';
-		const canClose = status === 'RESOLVED' || status === 'IN_PROGRESS';
+		const canRequestClarification = status !== ConciergeCaseStatusValues.CLOSED && status !== ConciergeCaseStatusValues.CANCELLED && status !== ConciergeCaseStatusValues.PENDING_OWNER;
+		const canClose = status === ConciergeCaseStatusValues.RESOLVED || status === ConciergeCaseStatusValues.IN_PROGRESS;
 
 		return [
 			{
@@ -226,7 +226,7 @@
 				label: 'Assign Concierge',
 				icon: UserPlus,
 				color: 'text-blue-500',
-				enabled: status !== 'CLOSED' && status !== 'CANCELLED'
+				enabled: status !== ConciergeCaseStatusValues.CLOSED && status !== ConciergeCaseStatusValues.CANCELLED
 			}
 		];
 	}

@@ -3,7 +3,7 @@
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { propertyApi } from '$lib/api/cam';
+	import { AssetStatusValues, PropertyTypeValues, StaffStatusValues, propertyApi } from '$lib/api/cam';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
@@ -12,7 +12,7 @@
 		name: '',
 		address: '',
 		propertyType: 'CONDO',
-		status: 'ACTIVE',
+		status: StaffStatusValues.ACTIVE,
 		yearBuilt: '',
 		totalSquareFootage: '',
 		parkingSpaces: '',
@@ -23,17 +23,17 @@
 	let newAmenity = $state('');
 
 	const propertyTypeOptions = [
-		{ value: 'SINGLE_FAMILY', label: 'Single Family' },
+		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family' },
 		{ value: 'TOWNHOME', label: 'Townhome' },
 		{ value: 'CONDO', label: 'Condominium' },
 		{ value: 'APARTMENT', label: 'Apartment' },
-		{ value: 'COMMERCIAL', label: 'Commercial' },
-		{ value: 'MIXED_USE', label: 'Mixed Use' }
+		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
+		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' }
 	];
 
 	const statusOptions = [
-		{ value: 'ACTIVE', label: 'Active' },
-		{ value: 'INACTIVE', label: 'Inactive' },
+		{ value: StaffStatusValues.ACTIVE, label: 'Active' },
+		{ value: AssetStatusValues.INACTIVE, label: 'Inactive' },
 		{ value: 'UNDER_CONSTRUCTION', label: 'Under Construction' }
 	];
 

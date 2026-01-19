@@ -12,6 +12,17 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import type { OwnershipType, Prisma } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	OWNERSHIP_WORKFLOW_ERROR: 'OWNERSHIP_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'ownership_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'ownership_workflow_error';
@@ -89,15 +100,15 @@ async function createOwnership(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'OWNERSHIP',
+			entityType: ActivityEntityType.OWNERSHIP,
 			entityId: ownership.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Ownership created for unit`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'ownershipWorkflow_v1',
-			workflowStep: 'CREATE',
+			workflowStep: OwnershipWorkflowAction.CREATE,
 			workflowVersion: 'v1',
 			unitId,
 			newState: { ownershipType, percentage: ownership.percentage, isPrimary: data.isPrimary }
@@ -125,15 +136,15 @@ async function endOwnership(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'OWNERSHIP',
+			entityType: ActivityEntityType.OWNERSHIP,
 			entityId: ownershipId,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Ownership ended`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'ownershipWorkflow_v1',
-			workflowStep: 'END',
+			workflowStep: OwnershipWorkflowAction.END,
 			workflowVersion: 'v1',
 			unitId: ownership.unitId,
 			newState: { endDate: endDate.toISOString(), isPrimary: false }
@@ -161,15 +172,15 @@ async function deleteOwnership(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'OWNERSHIP',
+			entityType: ActivityEntityType.OWNERSHIP,
 			entityId: ownershipId,
-			action: 'DELETE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.DELETE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Ownership deleted`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'ownershipWorkflow_v1',
-			workflowStep: 'DELETE',
+			workflowStep: OwnershipWorkflowAction.DELETE,
 			workflowVersion: 'v1',
 			unitId: ownership.unitId,
 			newState: { deletedAt: now.toISOString() }
@@ -194,7 +205,7 @@ async function ownershipWorkflow(input: OwnershipWorkflowInput): Promise<Ownersh
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case OwnershipWorkflowAction.CREATE: {
 				if (!input.unitId || !input.partyId || !input.ownershipType || !input.startDate) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { unitId: input.unitId, partyId: input.partyId });
@@ -226,7 +237,7 @@ async function ownershipWorkflow(input: OwnershipWorkflowInput): Promise<Ownersh
 				return successResult;
 			}
 
-			case 'END': {
+			case OwnershipWorkflowAction.END: {
 				if (!input.ownershipId || !input.endDate) {
 					const error = new Error('Missing required fields: ownershipId, endDate for END');
 					logStepError(log, 'validation', error, { ownershipId: input.ownershipId });
@@ -249,7 +260,7 @@ async function ownershipWorkflow(input: OwnershipWorkflowInput): Promise<Ownersh
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case OwnershipWorkflowAction.DELETE: {
 				if (!input.ownershipId) {
 					const error = new Error('Missing required field: ownershipId for DELETE');
 					logStepError(log, 'validation', error, { ownershipId: input.ownershipId });
@@ -296,8 +307,8 @@ async function ownershipWorkflow(input: OwnershipWorkflowInput): Promise<Ownersh
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'OWNERSHIP_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.OWNERSHIP_WORKFLOW_ERROR
 		});
 		const errorResult: OwnershipWorkflowResult = {
 			success: false,

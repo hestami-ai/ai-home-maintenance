@@ -15,12 +15,13 @@
 import { z } from 'zod';
 import { prisma } from '../../db.js';
 import type { RequestContext } from '../context.js';
-import type {
+import {
 	ActivityEntityType,
 	ActivityActionType,
 	ActivityActorType,
-	ActivityEventCategory
-} from '../../../../../generated/prisma/client.js';
+	ActivityEventCategory,
+	DocumentStatus
+} from '../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../logger.js';
 
 const log = createModuleLogger('ActivityEventMiddleware');
@@ -218,7 +219,7 @@ export async function recordActivityFromContext(
 	input: ActivityEventFromContextInput
 ): Promise<string> {
 	const performedById = context.user?.id;
-	const performedByType: ActivityActorType = 'HUMAN';
+	const performedByType: ActivityActorType = ActivityActorType.HUMAN;
 	const organizationId = context.organization?.id;
 
 	if (!organizationId) {
@@ -268,7 +269,7 @@ export async function recordActivityFromWorkflow(input: ActivityEventFromWorkflo
 	return recordActivityEvent({
 		...input,
 		performedById: input.workflowId,
-		performedByType: 'SYSTEM',
+		performedByType: ActivityActorType.SYSTEM,
 		metadata
 	});
 }
@@ -286,7 +287,7 @@ export async function recordActivityFromAI(input: ActivityEventFromAIInput): Pro
 	return recordActivityEvent({
 		...input,
 		performedById: `ai:${input.agentId}`,
-		performedByType: 'AI',
+		performedByType: ActivityActorType.AI,
 		metadata
 	});
 }
@@ -304,7 +305,7 @@ export async function recordIntent(
 ): Promise<string> {
 	return recordActivityFromContext(context, {
 		...input,
-		eventCategory: 'INTENT'
+		eventCategory: ActivityEventCategory.INTENT
 	});
 }
 
@@ -317,7 +318,7 @@ export async function recordDecision(
 ): Promise<string> {
 	return recordActivityFromContext(context, {
 		...input,
-		eventCategory: 'DECISION'
+		eventCategory: ActivityEventCategory.DECISION
 	});
 }
 
@@ -330,7 +331,7 @@ export async function recordExecution(
 ): Promise<string> {
 	return recordActivityFromContext(context, {
 		...input,
-		eventCategory: 'EXECUTION'
+		eventCategory: ActivityEventCategory.EXECUTION
 	});
 }
 
@@ -344,8 +345,8 @@ export async function recordSystemEvent(
 	return recordActivityEvent({
 		...input,
 		organizationId,
-		performedByType: 'SYSTEM',
-		eventCategory: 'SYSTEM'
+		performedByType: ActivityActorType.SYSTEM,
+		eventCategory: ActivityEventCategory.SYSTEM
 	});
 }
 
@@ -378,8 +379,8 @@ export async function recordCreate(
 	return recordActivityFromContext(context, {
 		entityType,
 		entityId,
-		action: 'CREATE',
-		eventCategory: options?.eventCategory ?? 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: options?.eventCategory ?? ActivityEventCategory.EXECUTION,
 		summary,
 		newState: options?.newState,
 		metadata: options?.metadata,
@@ -419,8 +420,8 @@ export async function recordUpdate(
 	return recordActivityFromContext(context, {
 		entityType,
 		entityId,
-		action: 'UPDATE',
-		eventCategory: options?.eventCategory ?? 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: options?.eventCategory ?? ActivityEventCategory.EXECUTION,
 		summary,
 		previousState: options?.previousState,
 		newState: options?.newState,
@@ -461,8 +462,8 @@ export async function recordStatusChange(
 	return recordActivityFromContext(context, {
 		entityType,
 		entityId,
-		action: 'STATUS_CHANGE',
-		eventCategory: options?.eventCategory ?? 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: options?.eventCategory ?? ActivityEventCategory.EXECUTION,
 		summary,
 		previousState: { status: fromStatus },
 		newState: { status: toStatus },
@@ -501,8 +502,8 @@ export async function recordAssignment(
 	return recordActivityFromContext(context, {
 		entityType,
 		entityId,
-		action: 'ASSIGN',
-		eventCategory: options?.eventCategory ?? 'EXECUTION',
+		action: ActivityActionType.ASSIGN,
+		eventCategory: options?.eventCategory ?? ActivityEventCategory.EXECUTION,
 		summary,
 		newState: { assigneeId, assigneeName },
 		metadata: options?.metadata,
@@ -576,7 +577,7 @@ export async function recordWorkflowEvent(input: WorkflowActivityEventInput): Pr
 			${input.eventCategory}::TEXT,
 			${input.summary}::TEXT,
 			${input.performedById ?? null}::TEXT,
-			${input.performedByType ?? 'SYSTEM'}::TEXT,
+			${input.performedByType ?? ActivityActorType.SYSTEM}::TEXT,
 			${JSON.stringify(input.previousState ?? {})}::JSONB,
 			${JSON.stringify(input.newState ?? {})}::JSONB,
 			${JSON.stringify(metadata)}::JSONB,
@@ -617,12 +618,12 @@ export async function recordWorkflowLifecycleEvent(
 	}
 ): Promise<string> {
 	const actionMap: Record<string, ActivityActionType> = {
-		STARTED: 'CREATE',
-		COMPLETED: 'COMPLETE',
-		FAILED: 'STATUS_CHANGE'
+		STARTED: ActivityActionType.CREATE,
+		COMPLETED: ActivityActionType.COMPLETE,
+		FAILED: ActivityActionType.STATUS_CHANGE
 	};
 
-	const entityType = options?.entityType ?? 'OTHER';
+	const entityType = options?.entityType ?? ActivityEntityType.OTHER;
 	const entityId = options?.entityId ?? workflowId;
 	const action = actionMap[lifecycle];
 	const metadata = {
@@ -868,10 +869,10 @@ export async function recordDocumentClassify(
 	reason: string
 ): Promise<string> {
 	return recordActivityFromContext(context, {
-		entityType: 'DOCUMENT',
+		entityType: ActivityEntityType.DOCUMENT,
 		entityId: documentId,
-		action: 'CLASSIFY',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CLASSIFY,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Document reclassified from ${fromCategory} to ${toCategory}: ${reason}`,
 		previousState: { category: fromCategory },
 		newState: { category: toCategory },
@@ -889,10 +890,10 @@ export async function recordDocumentVersion(
 	parentDocumentId?: string
 ): Promise<string> {
 	return recordActivityFromContext(context, {
-		entityType: 'DOCUMENT',
+		entityType: ActivityEntityType.DOCUMENT,
 		entityId: documentId,
-		action: 'VERSION',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.VERSION,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `New document version ${newVersion} created`,
 		newState: { version: newVersion, parentDocumentId },
 		metadata: {
@@ -910,12 +911,12 @@ export async function recordDocumentSupersede(
 	supersededById: string
 ): Promise<string> {
 	return recordActivityFromContext(context, {
-		entityType: 'DOCUMENT',
+		entityType: ActivityEntityType.DOCUMENT,
 		entityId: documentId,
-		action: 'SUPERSEDE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.SUPERSEDE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Document superseded by ${supersededById}`,
-		newState: { status: 'SUPERSEDED', supersededById }
+		newState: { status: DocumentStatus.SUPERSEDED, supersededById }
 	});
 }
 
@@ -930,10 +931,10 @@ export async function recordDocumentReferenced(
 	referencingEntityId: string
 ): Promise<string> {
 	return recordActivityFromContext(context, {
-		entityType: 'DOCUMENT',
+		entityType: ActivityEntityType.DOCUMENT,
 		entityId: documentId,
-		action: 'REFERENCED',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.REFERENCED,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Document referenced in ${referencingEntityType} ${referencingEntityId}`,
 		newState: { referencingEntityType, referencingEntityId },
 		metadata: {

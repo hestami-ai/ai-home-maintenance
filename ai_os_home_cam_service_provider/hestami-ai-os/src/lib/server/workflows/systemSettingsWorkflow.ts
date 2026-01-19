@@ -10,6 +10,12 @@ import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	SYSTEM_SETTINGS_WORKFLOW_ERROR: 'SYSTEM_SETTINGS_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('SystemSettingsWorkflow');
 
@@ -64,7 +70,7 @@ async function upsertSetting(
 async function systemSettingsWorkflow(input: SystemSettingsWorkflowInput): Promise<SystemSettingsWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'UPSERT_SETTING': {
+			case SystemSettingsAction.UPSERT_SETTING: {
 				if (!input.data.key || !input.data.value) {
 					throw new Error('key and value are required for UPSERT_SETTING');
 				}
@@ -88,8 +94,8 @@ async function systemSettingsWorkflow(input: SystemSettingsWorkflowInput): Promi
 		console.error(`[SystemSettingsWorkflow] Error in ${input.action}:`, errorMessage);
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'SYSTEM_SETTINGS_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.SYSTEM_SETTINGS_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

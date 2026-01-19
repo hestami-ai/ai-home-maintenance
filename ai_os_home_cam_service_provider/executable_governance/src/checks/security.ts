@@ -149,7 +149,7 @@ function findSecurityDefinerViolations(
     // Find all lines containing SECURITY DEFINER (skip comments)
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.includes('SECURITY DEFINER')) continue;
+        if (line === undefined || !line.includes('SECURITY DEFINER')) continue;
 
         // Skip SQL comment lines and string literals (documentation)
         const trimmedLine = line.trim();
@@ -165,7 +165,8 @@ function findSecurityDefinerViolations(
 
         let hasSearchPath = false;
         for (let j = startIdx; j <= endIdx; j++) {
-            if (lines[j].toLowerCase().includes('set search_path')) {
+            const checkLine = lines[j];
+            if (checkLine && checkLine.toLowerCase().includes('set search_path')) {
                 hasSearchPath = true;
                 break;
             }
@@ -209,7 +210,7 @@ function findProperlyDefinedFunctions(content: string): string[] {
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (!line.includes('SECURITY DEFINER')) continue;
+        if (line === undefined || !line.includes('SECURITY DEFINER')) continue;
 
         // Skip SQL comment lines and string literals (documentation)
         const trimmedLine = line.trim();
@@ -224,7 +225,8 @@ function findProperlyDefinedFunctions(content: string): string[] {
 
         let hasSearchPath = false;
         for (let j = startIdx; j <= endIdx; j++) {
-            if (lines[j].toLowerCase().includes('set search_path')) {
+            const checkLine = lines[j];
+            if (checkLine && checkLine.toLowerCase().includes('set search_path')) {
                 hasSearchPath = true;
                 break;
             }
@@ -250,8 +252,9 @@ function extractFunctionName(lines: string[], securityDefinerLineIdx: number): s
     const startIdx = Math.max(0, securityDefinerLineIdx - 30);
     for (let i = securityDefinerLineIdx; i >= startIdx; i--) {
         const line = lines[i];
+        if (line === undefined) continue;
         const match = line.match(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([^\s(]+)/i);
-        if (match) {
+        if (match && match[1]) {
             return match[1];
         }
     }

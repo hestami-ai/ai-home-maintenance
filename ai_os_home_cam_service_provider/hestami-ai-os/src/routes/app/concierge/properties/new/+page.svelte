@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PropertyTypeValues, UnitTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, Home, Loader2, Check } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
@@ -9,7 +10,7 @@
 
 	// Form state
 	let name = $state('');
-	let propertyType = $state('SINGLE_FAMILY');
+	let propertyType = $state(PropertyTypeValues.SINGLE_FAMILY);
 	let addressLine1 = $state('');
 	let addressLine2 = $state('');
 	let city = $state('');
@@ -28,12 +29,12 @@
 	let hoaContactPhone = $state('');
 
 	const propertyTypes = [
-		{ value: 'SINGLE_FAMILY', label: 'Single Family Home' },
-		{ value: 'CONDOMINIUM', label: 'Condominium' },
-		{ value: 'TOWNHOUSE', label: 'Townhouse' },
-		{ value: 'COOPERATIVE', label: 'Cooperative' },
-		{ value: 'MIXED_USE', label: 'Mixed Use' },
-		{ value: 'COMMERCIAL', label: 'Commercial' }
+		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family Home' },
+		{ value: PropertyTypeValues.CONDOMINIUM, label: 'Condominium' },
+		{ value: UnitTypeValues.TOWNHOUSE, label: 'Townhouse' },
+		{ value: PropertyTypeValues.COOPERATIVE, label: 'Cooperative' },
+		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' },
+		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' }
 	];
 
 	const usStates = [

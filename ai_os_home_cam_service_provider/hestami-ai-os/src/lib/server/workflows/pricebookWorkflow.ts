@@ -12,11 +12,23 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { orgTransaction } from '../db/rls.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	PricebookVersionStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('PricebookWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'pricebook_status';
 const WORKFLOW_ERROR_EVENT = 'pricebook_error';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PRICEBOOK_WORKFLOW_ERROR: 'PRICEBOOK_WORKFLOW_ERROR'
+} as const;
 
 export const PricebookAction = {
 	UPSERT_PRICEBOOK: 'UPSERT_PRICEBOOK',
@@ -82,15 +94,15 @@ async function upsertPricebook(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: pricebook.id,
-		action: pricebookId ? 'UPDATE' : 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: pricebookId ? ActivityActionType.UPDATE : ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Pricebook ${pricebookId ? 'updated' : 'created'}: ${pricebook.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'UPSERT_PRICEBOOK',
+		workflowStep: PricebookAction.UPSERT_PRICEBOOK,
 		workflowVersion: 'v1'
 	});
 
@@ -112,7 +124,7 @@ async function createVersion(
 					pricebookId,
 					versionNumber,
 					notes: data.notes as string | undefined,
-					status: 'DRAFT'
+					status: PricebookVersionStatus.DRAFT
 				}
 			});
 		},
@@ -123,15 +135,15 @@ async function createVersion(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: version.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Pricebook version created: v${versionNumber}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'CREATE_VERSION',
+		workflowStep: PricebookAction.CREATE_VERSION,
 		workflowVersion: 'v1'
 	});
 
@@ -149,7 +161,7 @@ async function publishVersion(
 			return tx.pricebookVersion.update({
 				where: { id: versionId },
 				data: {
-					status: 'PUBLISHED',
+					status: PricebookVersionStatus.PUBLISHED,
 					publishedAt: new Date(),
 					publishedBy: userId
 				}
@@ -162,15 +174,15 @@ async function publishVersion(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: version.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Pricebook version published',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'PUBLISH_VERSION',
+		workflowStep: PricebookAction.PUBLISH_VERSION,
 		workflowVersion: 'v1'
 	});
 
@@ -188,13 +200,13 @@ async function activateVersion(
 		async (tx) => {
 			// Deactivate other active versions
 			await tx.pricebookVersion.updateMany({
-				where: { pricebookId, status: 'ACTIVE', NOT: { id: versionId } },
-				data: { status: 'ARCHIVED' }
+				where: { pricebookId, status: PricebookVersionStatus.ACTIVE, NOT: { id: versionId } },
+				data: { status: PricebookVersionStatus.ARCHIVED }
 			});
 
 			return tx.pricebookVersion.update({
 				where: { id: versionId },
-				data: { status: 'ACTIVE', activatedAt: new Date() }
+				data: { status: PricebookVersionStatus.ACTIVE, activatedAt: new Date() }
 			});
 		},
 		{ userId, reason: 'Activating pricebook version' }
@@ -204,15 +216,15 @@ async function activateVersion(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: version.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Pricebook version activated',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'ACTIVATE_VERSION',
+		workflowStep: PricebookAction.ACTIVATE_VERSION,
 		workflowVersion: 'v1'
 	});
 
@@ -264,15 +276,15 @@ async function upsertItem(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: item.id,
-		action: itemId ? 'UPDATE' : 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: itemId ? ActivityActionType.UPDATE : ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Pricebook item ${itemId ? 'updated' : 'created'}: ${item.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'UPSERT_ITEM',
+		workflowStep: PricebookAction.UPSERT_ITEM,
 		workflowVersion: 'v1'
 	});
 
@@ -322,15 +334,15 @@ async function upsertRule(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: rule.id,
-		action: ruleId ? 'UPDATE' : 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ruleId ? ActivityActionType.UPDATE : ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Price rule ${ruleId ? 'updated' : 'created'}: ${rule.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'UPSERT_RULE',
+		workflowStep: PricebookAction.UPSERT_RULE,
 		workflowVersion: 'v1'
 	});
 
@@ -377,15 +389,15 @@ async function upsertTemplate(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: template.id,
-		action: templateId ? 'UPDATE' : 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: templateId ? ActivityActionType.UPDATE : ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Job template ${templateId ? 'updated' : 'created'}: ${template.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'pricebookWorkflow_v1',
-		workflowStep: 'UPSERT_TEMPLATE',
+		workflowStep: PricebookAction.UPSERT_TEMPLATE,
 		workflowVersion: 'v1'
 	});
 
@@ -399,7 +411,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'UPSERT_PRICEBOOK': {
+			case PricebookAction.UPSERT_PRICEBOOK: {
 				const result = await DBOS.runStep(
 					() => upsertPricebook(input.organizationId, input.userId, input.pricebookId, input.data),
 					{ name: 'upsertPricebook' }
@@ -407,7 +419,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 				entityId = result.id;
 				break;
 			}
-			case 'CREATE_VERSION': {
+			case PricebookAction.CREATE_VERSION: {
 				if (!input.pricebookId) throw new Error('pricebookId required for CREATE_VERSION');
 				const versionNumber = input.data.versionNumber as number;
 				const result = await DBOS.runStep(
@@ -417,7 +429,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 				entityId = result.id;
 				break;
 			}
-			case 'PUBLISH_VERSION': {
+			case PricebookAction.PUBLISH_VERSION: {
 				if (!input.versionId) throw new Error('versionId required for PUBLISH_VERSION');
 				const result = await DBOS.runStep(
 					() => publishVersion(input.organizationId, input.userId, input.versionId!),
@@ -426,7 +438,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 				entityId = result.id;
 				break;
 			}
-			case 'ACTIVATE_VERSION': {
+			case PricebookAction.ACTIVATE_VERSION: {
 				if (!input.versionId || !input.pricebookId) throw new Error('versionId and pricebookId required for ACTIVATE_VERSION');
 				const result = await DBOS.runStep(
 					() => activateVersion(input.organizationId, input.userId, input.versionId!, input.pricebookId!),
@@ -435,7 +447,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 				entityId = result.id;
 				break;
 			}
-			case 'UPSERT_ITEM': {
+			case PricebookAction.UPSERT_ITEM: {
 				if (!input.versionId) throw new Error('versionId required for UPSERT_ITEM');
 				const result = await DBOS.runStep(
 					() => upsertItem(input.organizationId, input.userId, input.versionId!, input.itemId, input.data),
@@ -444,7 +456,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 				entityId = result.id;
 				break;
 			}
-			case 'UPSERT_RULE': {
+			case PricebookAction.UPSERT_RULE: {
 				if (!input.versionId) throw new Error('versionId required for UPSERT_RULE');
 				const result = await DBOS.runStep(
 					() => upsertRule(input.organizationId, input.userId, input.versionId!, input.ruleId, input.data),
@@ -453,7 +465,7 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 				entityId = result.id;
 				break;
 			}
-			case 'UPSERT_TEMPLATE': {
+			case PricebookAction.UPSERT_TEMPLATE: {
 				if (!input.versionId) throw new Error('versionId required for UPSERT_TEMPLATE');
 				const result = await DBOS.runStep(
 					() => upsertTemplate(input.organizationId, input.userId, input.versionId!, input.templateId, input.data),
@@ -481,8 +493,8 @@ async function pricebookWorkflow(input: PricebookWorkflowInput): Promise<Pricebo
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PRICEBOOK_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PRICEBOOK_WORKFLOW_ERROR
 		});
 
 		return {

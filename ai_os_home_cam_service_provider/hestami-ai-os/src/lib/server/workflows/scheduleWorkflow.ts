@@ -12,15 +12,31 @@ import type { RecurrenceFrequency } from '../../../../generated/prisma/client.js
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	ScheduledVisitStatus,
+	RecurrenceFrequency as RecurrenceFrequencyEnum
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	SCHEDULE_WORKFLOW_ERROR: 'SCHEDULE_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'schedule_status';
 const WORKFLOW_ERROR_EVENT = 'schedule_error';
 
-type ScheduleAction =
-	| 'CREATE_SCHEDULE'
-	| 'UPDATE_SCHEDULE'
-	| 'DELETE_SCHEDULE'
-	| 'GENERATE_VISITS';
+export const ScheduleAction = {
+	CREATE_SCHEDULE: 'CREATE_SCHEDULE',
+	UPDATE_SCHEDULE: 'UPDATE_SCHEDULE',
+	DELETE_SCHEDULE: 'DELETE_SCHEDULE',
+	GENERATE_VISITS: 'GENERATE_VISITS'
+} as const;
+
+export type ScheduleAction = (typeof ScheduleAction)[keyof typeof ScheduleAction];
 
 interface ScheduleWorkflowInput {
 	action: ScheduleAction;
@@ -65,15 +81,15 @@ async function createSchedule(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: schedule.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Contract schedule created: ${schedule.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'scheduleWorkflow_v1',
-		workflowStep: 'CREATE_SCHEDULE',
+		workflowStep: ScheduleAction.CREATE_SCHEDULE,
 		workflowVersion: 'v1'
 	});
 
@@ -106,15 +122,15 @@ async function updateSchedule(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: schedule.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Contract schedule updated: ${schedule.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'scheduleWorkflow_v1',
-		workflowStep: 'UPDATE_SCHEDULE',
+		workflowStep: ScheduleAction.UPDATE_SCHEDULE,
 		workflowVersion: 'v1'
 	});
 
@@ -134,15 +150,15 @@ async function deleteSchedule(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: scheduleId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Contract schedule deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'scheduleWorkflow_v1',
-		workflowStep: 'DELETE_SCHEDULE',
+		workflowStep: ScheduleAction.DELETE_SCHEDULE,
 		workflowVersion: 'v1'
 	});
 
@@ -171,25 +187,25 @@ async function generateVisits(
 		visits.push({ scheduledDate: new Date(currentDate) });
 
 		switch (schedule.frequency) {
-			case 'DAILY':
+			case RecurrenceFrequencyEnum.DAILY:
 				currentDate.setDate(currentDate.getDate() + 1);
 				break;
-			case 'WEEKLY':
+			case RecurrenceFrequencyEnum.WEEKLY:
 				currentDate.setDate(currentDate.getDate() + 7);
 				break;
-			case 'BIWEEKLY':
+			case RecurrenceFrequencyEnum.BIWEEKLY:
 				currentDate.setDate(currentDate.getDate() + 14);
 				break;
-			case 'MONTHLY':
+			case RecurrenceFrequencyEnum.MONTHLY:
 				currentDate.setMonth(currentDate.getMonth() + 1);
 				break;
-			case 'QUARTERLY':
+			case RecurrenceFrequencyEnum.QUARTERLY:
 				currentDate.setMonth(currentDate.getMonth() + 3);
 				break;
-			case 'ANNUAL':
+			case RecurrenceFrequencyEnum.ANNUAL:
 				currentDate.setFullYear(currentDate.getFullYear() + 1);
 				break;
-			case 'SEMI_ANNUAL':
+			case RecurrenceFrequencyEnum.SEMI_ANNUAL:
 				currentDate.setMonth(currentDate.getMonth() + 6);
 				break;
 			default:
@@ -206,7 +222,7 @@ async function generateVisits(
 					scheduleId: schedule.id,
 					visitNumber: visitNumber + idx,
 					scheduledDate: v.scheduledDate,
-					status: 'SCHEDULED'
+					status: ScheduledVisitStatus.SCHEDULED
 				}
 			})
 		)
@@ -214,15 +230,15 @@ async function generateVisits(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: schedule.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Generated ${createdVisits.length} visits for schedule`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'scheduleWorkflow_v1',
-		workflowStep: 'GENERATE_VISITS',
+		workflowStep: ScheduleAction.GENERATE_VISITS,
 		workflowVersion: 'v1'
 	});
 
@@ -240,7 +256,7 @@ async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleW
 		let generatedCount: number | undefined;
 
 		switch (input.action) {
-			case 'CREATE_SCHEDULE': {
+			case ScheduleAction.CREATE_SCHEDULE: {
 				const result = await DBOS.runStep(
 					() => createSchedule(input.organizationId, input.userId, input.data),
 					{ name: 'createSchedule' }
@@ -248,7 +264,7 @@ async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleW
 				entityId = result.id;
 				break;
 			}
-			case 'UPDATE_SCHEDULE': {
+			case ScheduleAction.UPDATE_SCHEDULE: {
 				if (!input.scheduleId) throw new Error('scheduleId required for UPDATE_SCHEDULE');
 				const result = await DBOS.runStep(
 					() => updateSchedule(input.organizationId, input.userId, input.scheduleId!, input.data),
@@ -257,7 +273,7 @@ async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleW
 				entityId = result.id;
 				break;
 			}
-			case 'DELETE_SCHEDULE': {
+			case ScheduleAction.DELETE_SCHEDULE: {
 				if (!input.scheduleId) throw new Error('scheduleId required for DELETE_SCHEDULE');
 				const result = await DBOS.runStep(
 					() => deleteSchedule(input.organizationId, input.userId, input.scheduleId!),
@@ -266,7 +282,7 @@ async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleW
 				entityId = result.id;
 				break;
 			}
-			case 'GENERATE_VISITS': {
+			case ScheduleAction.GENERATE_VISITS: {
 				if (!input.scheduleId) throw new Error('scheduleId required for GENERATE_VISITS');
 				const result = await DBOS.runStep(
 					() => generateVisits(input.organizationId, input.userId, input.scheduleId!, input.data),
@@ -307,8 +323,8 @@ async function scheduleWorkflow(input: ScheduleWorkflowInput): Promise<ScheduleW
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'SCHEDULE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.SCHEDULE_WORKFLOW_ERROR
 		});
 
 		const errorResult = {
@@ -334,4 +350,4 @@ export async function startScheduleWorkflow(
 	return handle.getResult();
 }
 
-export type { ScheduleWorkflowInput, ScheduleWorkflowResult, ScheduleAction };
+export type { ScheduleWorkflowInput, ScheduleWorkflowResult };

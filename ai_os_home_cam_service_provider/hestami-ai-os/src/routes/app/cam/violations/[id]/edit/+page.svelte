@@ -4,7 +4,7 @@
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { violationApi, violationTypeApi, unitApi, type ViolationDetail, type ViolationType, type Unit } from '$lib/api/cam';
+	import { ViolationSeverityValues, type Unit, type ViolationDetail, type ViolationType, unitApi, violationApi, violationTypeApi } from '$lib/api/cam';
 
 	let violation = $state<ViolationDetail | null>(null);
 	let violationTypes = $state<ViolationType[]>([]);
@@ -13,21 +13,29 @@
 	let isSaving = $state(false);
 	let error = $state<string | null>(null);
 
-	let formData = $state({
+	let formData = $state<{
+		unitId: string;
+		violationTypeId: string;
+		title: string;
+		description: string;
+		severity: string;
+		reportedDate: string;
+		dueDate: string;
+	}>({
 		unitId: '',
 		violationTypeId: '',
 		title: '',
 		description: '',
-		severity: 'MODERATE',
+		severity: ViolationSeverityValues.MODERATE,
 		reportedDate: '',
 		dueDate: ''
 	});
 
 	const severityOptions = [
-		{ value: 'CRITICAL', label: 'Critical' },
-		{ value: 'MAJOR', label: 'Major' },
-		{ value: 'MODERATE', label: 'Moderate' },
-		{ value: 'MINOR', label: 'Minor' }
+		{ value: ViolationSeverityValues.CRITICAL, label: 'Critical' },
+		{ value: ViolationSeverityValues.MAJOR, label: 'Major' },
+		{ value: ViolationSeverityValues.MODERATE, label: 'Moderate' },
+		{ value: ViolationSeverityValues.MINOR, label: 'Minor' }
 	];
 
 	const violationId = $derived(($page.params as Record<string, string>).id);
@@ -53,7 +61,7 @@
 					violationTypeId: v.violationTypeId || '',
 					title: v.title || '',
 					description: v.description || '',
-					severity: v.severity || 'MODERATE',
+					severity: v.severity as string || ViolationSeverityValues.MODERATE,
 					reportedDate: v.reportedDate?.split('T')[0] || '',
 					dueDate: v.curePeriodEnds?.split('T')[0] || ''
 				};

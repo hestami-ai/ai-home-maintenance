@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import type { PageServerLoad } from './$types';
+import { DocumentContextType } from '../../../../../../generated/prisma/enums.js';
 
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
     // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
@@ -38,7 +39,7 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
         // Load documents and service history in parallel (SSR to avoid client-side race conditions)
         const [documentsResult, serviceCallsResult] = await Promise.all([
             client.document.listDocuments({
-                contextType: 'PROPERTY',
+                contextType: DocumentContextType.PROPERTY,
                 contextId: params.id,
                 limit: 100
             }).catch((err) => {

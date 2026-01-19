@@ -57,7 +57,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 			// Heartbeat every 30 seconds to keep connection alive
 			const heartbeatInterval = setInterval(() => {
 				sendEvent({
-					type: 'heartbeat',
+					type: 'heartbeat' as const,
 					data: { meetingId },
 					timestamp: new Date().toISOString()
 				});

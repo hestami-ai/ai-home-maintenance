@@ -1,19 +1,20 @@
 /**
  * Vote Event Emitter
- * 
+ *
  * Handles real-time event broadcasting for live votes.
  * Used by SSE endpoint and vote action handlers.
  */
 
-// Event types for vote updates
-export type VoteEventType = 
-	| 'ballot_cast'
-	| 'tally_update'
-	| 'vote_closed'
+import { VoteChoice } from '../../../generated/prisma/enums.js';
+import { VoteEventType } from './workflows/schemas.js';
+
+// Event types for vote updates - extends schema VoteEventType with heartbeat
+export type VoteEventTypeExtended =
+	| VoteEventType
 	| 'heartbeat';
 
 export interface VoteEvent {
-	type: VoteEventType;
+	type: VoteEventTypeExtended;
 	data: unknown;
 	timestamp: string;
 }
@@ -32,11 +33,11 @@ export function emitVoteEvent(voteId: string, event: VoteEvent): void {
 // Helper functions to emit specific event types
 export function emitBallotCast(voteId: string, data: {
 	voterPartyId: string;
-	choice: string;
+	choice: VoteChoice;
 	hasConflictOfInterest: boolean;
 }): void {
 	emitVoteEvent(voteId, {
-		type: 'ballot_cast',
+		type: VoteEventType.BALLOT_CAST,
 		data,
 		timestamp: new Date().toISOString()
 	});
@@ -50,7 +51,7 @@ export function emitTallyUpdate(voteId: string, data: {
 	quorumMet: boolean;
 }): void {
 	emitVoteEvent(voteId, {
-		type: 'tally_update',
+		type: VoteEventType.TALLY_UPDATE,
 		data,
 		timestamp: new Date().toISOString()
 	});
@@ -64,7 +65,7 @@ export function emitVoteClosed(voteId: string, data: {
 	closedAt: string;
 }): void {
 	emitVoteEvent(voteId, {
-		type: 'vote_closed',
+		type: VoteEventType.VOTE_CLOSED,
 		data,
 		timestamp: new Date().toISOString()
 	});

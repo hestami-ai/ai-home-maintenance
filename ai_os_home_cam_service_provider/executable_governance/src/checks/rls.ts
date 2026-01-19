@@ -11,7 +11,8 @@ import path from 'path';
  * B) Workflows should use orgTransaction helper instead of raw prisma calls
  * C) setOrgContext calls should be inside prisma.$transaction blocks OR wrapped in withRLSContext
  * D) Connection pooling safety: orgProcedure must use withRLSContext pattern
- * E) Prisma extensions must not call query(args) inside transactions (must use tx[model][operation])
+ * E) Prisma extensions must not call query(args) inside transactions (must use tx[modelName][operation])
+ * F) SvelteKit page.server.ts files must use orgTransaction for cross-org access, not setOrgContext + prisma
  */
 
 const QUERY_METHODS = ['findMany', 'findFirst', 'findUnique', 'findUniqueOrThrow', 'findFirstOrThrow', 'count', 'aggregate', 'groupBy'];
@@ -92,6 +93,12 @@ export async function verifyRls(config: Config): Promise<Violation[]> {
         if (relativePath.endsWith('db.ts')) {
             const extensionViolations = checkPrismaExtensionQueryUsage(file, relativePath);
             violations.push(...extensionViolations);
+        }
+
+        // Check F: SvelteKit page.server.ts files must use orgTransaction, not setOrgContext + prisma
+        if (relativePath.endsWith('+page.server.ts')) {
+            const pageServerViolations = checkPageServerRlsUsage(file, relativePath);
+            violations.push(...pageServerViolations);
         }
     }
 
@@ -710,6 +717,7 @@ function checkPrismaExtensionQueryUsage(file: SourceFile, relativePath: string):
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (line === undefined) continue;
 
             // Track if we're in the rlsContext block (where SET happens)
             if (line.includes('if (rlsContext)') && !line.includes('_inTransaction')) {
@@ -767,6 +775,121 @@ function checkPrismaExtensionQueryUsage(file: SourceFile, relativePath: string):
                 reason: 'withRLSInjection does not use tx[modelName][operation](args) pattern.',
                 suggestion: 'After setting RLS context, execute the query using tx[modelName][operation](args) to ensure it runs on the transaction connection.',
                 line: 1
+            });
+        }
+    }
+
+    return violations;
+}
+
+/**
+ * Check F: SvelteKit page.server.ts files must use orgTransaction for cross-org access
+ *
+ * The issue: page.server.ts files that use setOrgContext or setOrgContextForWorkItem
+ * followed by Prisma queries will fail due to connection pooling. The setOrgContext
+ * call sets RLS context on one connection, but subsequent Prisma queries may run
+ * on different connections from the pool.
+ *
+ * The fix: Use orgTransaction() or lookupWorkItemOrgId() + orgTransaction() to ensure
+ * all queries run on the same connection where RLS context was set.
+ *
+ * Correct patterns:
+ * 1. lookupWorkItemOrgId() + orgTransaction(orgId, async (tx) => { ... })
+ * 2. orgTransaction(orgId, async (tx) => { ... })
+ *
+ * Incorrect patterns:
+ * 1. setOrgContext() + prisma.model.findFirst() (connection pooling issue)
+ * 2. setOrgContextForWorkItem() + prisma.model.findFirst() (connection pooling issue)
+ */
+function checkPageServerRlsUsage(file: SourceFile, relativePath: string): Violation[] {
+    const violations: Violation[] = [];
+    const fileText = file.getText();
+
+    // Check if file uses RLS context setting functions
+    const usesSetOrgContext = fileText.includes('setOrgContext') || 
+                              fileText.includes('setOrgContextForWorkItem');
+    
+    if (!usesSetOrgContext) {
+        // No RLS context setting, nothing to check
+        return violations;
+    }
+
+    // Check if file uses orgTransaction (the correct pattern)
+    const usesOrgTransaction = fileText.includes('orgTransaction');
+
+    // Check if file has direct prisma calls (not inside orgTransaction)
+    const calls = file.getDescendantsOfKind(SyntaxKind.CallExpression);
+    const hasPrismaCallsOutsideTransaction: { tableName: string; methodName: string; line: number }[] = [];
+
+    for (const call of calls) {
+        const queryInfo = getPrismaQueryInfo(call);
+        if (!queryInfo) continue;
+
+        // Check if this Prisma call is inside orgTransaction
+        if (!isInsideOrgTransaction(call) && !isInsidePrismaTransaction(call)) {
+            hasPrismaCallsOutsideTransaction.push({
+                tableName: queryInfo.tableName,
+                methodName: queryInfo.methodName,
+                line: call.getStartLineNumber()
+            });
+        }
+    }
+
+    // If file uses setOrgContext but has Prisma calls outside transactions, flag it
+    if (hasPrismaCallsOutsideTransaction.length > 0) {
+        // Check if the file imports setOrgContext/setOrgContextForWorkItem but NOT orgTransaction
+        const importsSetOrgContext = fileText.includes("import") && 
+            (fileText.includes('setOrgContext') || fileText.includes('setOrgContextForWorkItem'));
+        const importsOrgTransaction = fileText.includes("import") && fileText.includes('orgTransaction');
+
+        // If they import setOrgContext but not orgTransaction, this is likely the bug pattern
+        if (importsSetOrgContext && !importsOrgTransaction) {
+            // Find the line where setOrgContext is called
+            const setOrgContextMatch = fileText.match(/setOrgContext(ForWorkItem)?\s*\(/);
+            let setOrgContextLine = 1;
+            if (setOrgContextMatch && setOrgContextMatch.index !== undefined) {
+                setOrgContextLine = fileText.substring(0, setOrgContextMatch.index).split('\n').length;
+            }
+
+            violations.push({
+                rule: 'R12',
+                file: relativePath,
+                reason: 'page.server.ts uses setOrgContext/setOrgContextForWorkItem with Prisma queries outside orgTransaction.',
+                suggestion: 'Due to connection pooling, setOrgContext may set RLS context on a different connection than subsequent queries. Use orgTransaction() to wrap all Prisma queries, ensuring they run on the same connection where RLS context was set. Pattern: const orgId = await lookupWorkItemOrgId(...); await orgTransaction(orgId, async (tx) => { /* queries using tx */ });',
+                line: setOrgContextLine,
+                severity: 'error'
+            });
+
+            // Also flag each Prisma call outside transaction
+            for (const prismaCall of hasPrismaCallsOutsideTransaction) {
+                violations.push({
+                    rule: 'R12',
+                    file: relativePath,
+                    reason: `Prisma query '${prismaCall.tableName}.${prismaCall.methodName}' outside orgTransaction in page.server.ts with RLS context setting.`,
+                    suggestion: 'Move this query inside the orgTransaction callback to ensure it uses the same connection where RLS context was set.',
+                    line: prismaCall.line,
+                    severity: 'warning'
+                });
+            }
+        }
+    }
+
+    // Additional check: If file uses clearOrgContext in finally block, it's the old pattern
+    if (fileText.includes('clearOrgContext') && fileText.includes('finally')) {
+        const clearOrgContextMatch = fileText.match(/finally\s*\{[\s\S]*?clearOrgContext/);
+        if (clearOrgContextMatch) {
+            let line = 1;
+            if (clearOrgContextMatch.index !== undefined) {
+                line = fileText.substring(0, clearOrgContextMatch.index).split('\n').length;
+            }
+
+            violations.push({
+                rule: 'R12',
+                file: relativePath,
+                reason: 'page.server.ts uses clearOrgContext in finally block - this is the old pattern that has connection pooling issues.',
+                suggestion: 'Replace setOrgContext/clearOrgContext pattern with orgTransaction(). The transaction automatically handles context cleanup.',
+                line,
+                severity: 'error'
             });
         }
     }

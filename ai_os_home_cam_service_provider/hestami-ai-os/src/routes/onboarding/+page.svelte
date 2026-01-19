@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Home, Building2, Wrench, ArrowRight } from 'lucide-svelte';
+	import { Home, Building2, Wrench, ArrowRight, UserPlus } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 
 	interface Props {
@@ -51,6 +51,16 @@
 			href: '/onboarding/service-provider',
 			color: 'text-success-500',
 			bgColor: 'bg-success-500/10'
+		},
+		{
+			id: 'join-existing',
+			title: 'I have an invitation code',
+			subtitle: 'Join Existing Organization',
+			description: 'Join an existing organization using an invitation code you received from an administrator.',
+			icon: UserPlus,
+			href: '/onboarding/join',
+			color: 'text-tertiary-500',
+			bgColor: 'bg-tertiary-500/10'
 		}
 	];
 </script>
@@ -69,25 +79,27 @@
 		</div>
 
 		<!-- Existing Organizations -->
-		{#if data.memberships.length > 0}
+		{#if data?.memberships?.length > 0}
 			<div class="mt-8">
 				<h2 class="text-lg font-semibold">Your Organizations</h2>
 				<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-					{#each data.memberships as membership}
-						<Card variant="outlined" padding="md">
-							<div class="flex items-center gap-3">
-								<div class="flex-1">
-									<p class="font-medium">{membership.organization.name}</p>
-									<p class="text-sm text-surface-500">{membership.role}</p>
+					{#each data?.memberships ?? [] as membership}
+						{#if membership?.organization}
+							<Card variant="outlined" padding="md">
+								<div class="flex items-center gap-3">
+									<div class="flex-1">
+										<p class="font-medium">{membership.organization.name}</p>
+										<p class="text-sm text-surface-500">{membership.role}</p>
+									</div>
+									<a
+										href="/app"
+										class="btn btn-sm preset-tonal-primary"
+									>
+										Open
+									</a>
 								</div>
-								<a
-									href="/app"
-									class="btn btn-sm preset-tonal-primary"
-								>
-									Open
-								</a>
-							</div>
-						</Card>
+							</Card>
+						{/if}
 					{/each}
 				</div>
 				<hr class="my-8 border-surface-300-700" />

@@ -9,9 +9,26 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
-import type { ViolationStatus, ViolationSeverity } from '../../../../generated/prisma/client.js';
+import type { ViolationSeverity } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	ViolationStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VIOLATION_CREATE_WORKFLOW_ERROR: 'VIOLATION_CREATE_WORKFLOW_ERROR'
+} as const;
+
+// Workflow step constants
+const ViolationCreateStep = {
+	CREATE_VIOLATION: 'CREATE_VIOLATION'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'violation_create_status';
 const WORKFLOW_ERROR_EVENT = 'violation_create_error';
@@ -78,7 +95,7 @@ async function createViolation(input: ViolationCreateInput): Promise<{
 				title: input.title,
 				description: input.description,
 				severity: input.severity,
-				status: 'DRAFT',
+				status: ViolationStatus.DRAFT,
 				unitId: input.unitId,
 				commonAreaName: input.commonAreaName,
 				locationDetails: input.locationDetails,
@@ -94,7 +111,7 @@ async function createViolation(input: ViolationCreateInput): Promise<{
 			data: {
 				violationId: v.id,
 				fromStatus: null,
-				toStatus: 'DRAFT',
+				toStatus: ViolationStatus.DRAFT,
 				changedBy: input.userId,
 				notes: 'Violation created'
 			}
@@ -106,15 +123,15 @@ async function createViolation(input: ViolationCreateInput): Promise<{
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'VIOLATION',
+		entityType: ActivityEntityType.VIOLATION,
 		entityId: violation.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Violation created: ${violation.title}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'violationCreateWorkflow_v1',
-		workflowStep: 'CREATE_VIOLATION',
+		workflowStep: ViolationCreateStep.CREATE_VIOLATION,
 		workflowVersion: 'v1',
 		violationId: violation.id,
 		unitId: input.unitId,
@@ -162,8 +179,8 @@ async function violationCreateWorkflow(input: ViolationCreateInput): Promise<Vio
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VIOLATION_CREATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VIOLATION_CREATE_WORKFLOW_ERROR
 		});
 
 		return {

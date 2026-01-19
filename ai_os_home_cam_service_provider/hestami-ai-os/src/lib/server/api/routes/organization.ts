@@ -3,10 +3,12 @@ import { ResponseMetaSchema, OrganizationTypeSchema, OrganizationStatusSchema } 
 import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema } from '../router.js';
 import { prisma } from '../../db.js';
 import type { Prisma, OrganizationType, OrganizationStatus } from '../../../../../generated/prisma/client.js';
+import { ActivityEntityType, ActivityActionType, ActivityEventCategory, ActivityActorType, OrganizationType as OrgType, AssociationStatus } from '../../../../../generated/prisma/enums.js';
 import { recordActivityEvent, recordActivityFromContext, recordWorkflowEvent } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
 import { setOrgContext } from '../../db/rls.js';
 import { startOrganizationWorkflow } from '../../workflows/index.js';
+import { OrganizationWorkflowAction } from '../../workflows/organizationWorkflow.js';
 
 /**
  * Result type for the create_organization_with_admin SECURITY DEFINER function
@@ -78,7 +80,7 @@ export const organizationRouter = {
 			// Create organization and add creator as ADMIN via workflow
 			const createResult = await startOrganizationWorkflow(
 				{
-					action: 'CREATE_WITH_ADMIN',
+					action: OrganizationWorkflowAction.CREATE_WITH_ADMIN,
 					userId: context.user!.id,
 					data: {
 						name: input.name,
@@ -107,13 +109,13 @@ export const organizationRouter = {
 			// This is necessary because the user doesn't have RLS access to the new org yet
 			await recordWorkflowEvent({
 				organizationId: organization.id,
-				entityType: 'ORGANIZATION',
+				entityType: ActivityEntityType.ORGANIZATION,
 				entityId: organization.id,
-				action: 'CREATE',
-				eventCategory: 'EXECUTION',
+				action: ActivityActionType.CREATE,
+				eventCategory: ActivityEventCategory.EXECUTION,
 				summary: `Organization "${organization.name}" created (${organization.type})`,
 				performedById: context.user!.id,
-				performedByType: 'HUMAN',
+				performedByType: ActivityActorType.HUMAN,
 				workflowId: input.idempotencyKey,
 				workflowStep: 'organization_created',
 				newState: {
@@ -131,10 +133,10 @@ export const organizationRouter = {
 			});
 
 			// For self-managed HOAs (COMMUNITY_ASSOCIATION), auto-create the association
-			if (organization.type === 'COMMUNITY_ASSOCIATION') {
+			if (organization.type === OrgType.COMMUNITY_ASSOCIATION) {
 				const assocResult = await startOrganizationWorkflow(
 					{
-						action: 'CREATE_ASSOCIATION',
+						action: OrganizationWorkflowAction.CREATE_ASSOCIATION,
 						userId: context.user!.id,
 						organizationId: organization.id,
 						data: {
@@ -160,19 +162,19 @@ export const organizationRouter = {
 					// Use recordWorkflowEvent which bypasses RLS via SECURITY DEFINER function
 					await recordWorkflowEvent({
 						organizationId: organization.id,
-						entityType: 'ASSOCIATION',
+						entityType: ActivityEntityType.ASSOCIATION,
 						entityId: assocResult.associationId,
-						action: 'CREATE',
-						eventCategory: 'EXECUTION',
+						action: ActivityActionType.CREATE,
+						eventCategory: ActivityEventCategory.EXECUTION,
 						summary: `Association "${organization.name}" auto-created during onboarding`,
 						performedById: context.user!.id,
-						performedByType: 'HUMAN',
+						performedByType: ActivityActorType.HUMAN,
 						workflowId: `${input.idempotencyKey}-assoc`,
 						workflowStep: 'association_created',
 						associationId: assocResult.associationId,
 						newState: {
 							name: organization.name,
-							status: 'ONBOARDING'
+							status: AssociationStatus.ONBOARDING
 						}
 					});
 				}
@@ -336,7 +338,7 @@ export const organizationRouter = {
 			// Clear existing default and set new one via workflow
 			const setDefaultResult = await startOrganizationWorkflow(
 				{
-					action: 'SET_DEFAULT',
+					action: OrganizationWorkflowAction.SET_DEFAULT,
 					userId: context.user!.id,
 					data: {
 						membershipId: membership.id
@@ -358,13 +360,13 @@ export const organizationRouter = {
 			if (newOrg) {
 				await recordWorkflowEvent({
 					organizationId: newOrg.id,
-					entityType: 'USER',
+					entityType: ActivityEntityType.USER,
 					entityId: context.user!.id,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: `User switched organization context to "${newOrg.name}"`,
 					performedById: context.user!.id,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: input.idempotencyKey,
 					workflowStep: 'set_default_organization',
 					previousState: currentDefault ? {
@@ -492,7 +494,7 @@ export const organizationRouter = {
 			// Update organization via workflow
 			const updateResult = await startOrganizationWorkflow(
 				{
-					action: 'UPDATE',
+					action: OrganizationWorkflowAction.UPDATE,
 					userId: context.user!.id,
 					organizationId: context.organization!.id,
 					data: {
@@ -514,10 +516,10 @@ export const organizationRouter = {
 
 			// Record activity event for organization update
 			await recordActivityFromContext(context, {
-				entityType: 'ORGANIZATION',
+				entityType: ActivityEntityType.ORGANIZATION,
 				entityId: organization!.id,
-				action: 'UPDATE',
-				eventCategory: 'EXECUTION',
+				action: ActivityActionType.UPDATE,
+				eventCategory: ActivityEventCategory.EXECUTION,
 				summary: `Organization "${organization!.name}" updated`,
 				previousState: previousState as Record<string, unknown>,
 				newState: {
@@ -566,7 +568,7 @@ export const organizationRouter = {
 			// Delete organization via workflow
 			const deleteResult = await startOrganizationWorkflow(
 				{
-					action: 'DELETE',
+					action: OrganizationWorkflowAction.DELETE,
 					userId: context.user!.id,
 					organizationId: context.organization!.id,
 					data: {}
@@ -582,10 +584,10 @@ export const organizationRouter = {
 
 			// Record activity event for organization deletion
 			await recordActivityFromContext(context, {
-				entityType: 'ORGANIZATION',
+				entityType: ActivityEntityType.ORGANIZATION,
 				entityId: context.organization!.id,
-				action: 'DELETE',
-				eventCategory: 'EXECUTION',
+				action: ActivityActionType.DELETE,
+				eventCategory: ActivityEventCategory.EXECUTION,
 				summary: `Organization "${context.organization!.name}" deleted`,
 				newState: {
 					deletedAt: now.toISOString()

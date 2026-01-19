@@ -3,7 +3,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { vendorApi, type Vendor } from '$lib/api/cam';
+	import { VendorApprovalStatusValues, type Vendor, vendorApi } from '$lib/api/cam';
 
 	interface VendorListItem extends Vendor {
 		licenseExpiry?: string;
@@ -18,9 +18,9 @@
 
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'APPROVED', label: 'Approved' },
-		{ value: 'PENDING', label: 'Pending' },
-		{ value: 'SUSPENDED', label: 'Suspended' }
+		{ value: VendorApprovalStatusValues.APPROVED, label: 'Approved' },
+		{ value: VendorApprovalStatusValues.PENDING, label: 'Pending' },
+		{ value: VendorApprovalStatusValues.SUSPENDED, label: 'Suspended' }
 	];
 
 	async function loadVendors() {
@@ -49,9 +49,9 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'APPROVED': return 'text-success-500 bg-success-500/10';
-			case 'PENDING': return 'text-warning-500 bg-warning-500/10';
-			case 'SUSPENDED': return 'text-error-500 bg-error-500/10';
+			case VendorApprovalStatusValues.APPROVED: return 'text-success-500 bg-success-500/10';
+			case VendorApprovalStatusValues.PENDING: return 'text-warning-500 bg-warning-500/10';
+			case VendorApprovalStatusValues.SUSPENDED: return 'text-error-500 bg-error-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}

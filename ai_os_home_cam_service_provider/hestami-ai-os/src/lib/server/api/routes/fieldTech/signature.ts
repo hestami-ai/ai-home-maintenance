@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startSignatureWorkflow } from '../../../workflows/signatureWorkflow.js';
+import { startSignatureWorkflow, SignatureAction } from '../../../workflows/signatureWorkflow.js';
 
 const jobSignatureOutput = z.object({
 	id: z.string(),
@@ -100,7 +100,7 @@ export const signatureRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSignatureWorkflow(
 				{
-					action: 'CAPTURE_SIGNATURE',
+					action: SignatureAction.CAPTURE_SIGNATURE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -252,7 +252,7 @@ export const signatureRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSignatureWorkflow(
 				{
-					action: 'DELETE_SIGNATURE',
+					action: SignatureAction.DELETE_SIGNATURE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					signatureId: input.id,

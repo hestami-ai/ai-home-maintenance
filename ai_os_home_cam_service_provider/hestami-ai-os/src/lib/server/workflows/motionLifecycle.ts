@@ -7,8 +7,13 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction } from '../db/rls.js';
-import type { BoardMotionStatus } from '../../../../generated/prisma/client.js';
+import { BoardMotionStatus, BoardMotionOutcome, VoteChoice, ActivityActionType } from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	MOTION_LIFECYCLE_ERROR: 'MOTION_LIFECYCLE_ERROR'
+} as const;
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'motion_status';
@@ -16,14 +21,14 @@ const WORKFLOW_ERROR_EVENT = 'motion_error';
 
 // Valid status transitions (Phase 11: Full governance lifecycle)
 const validTransitions: Record<BoardMotionStatus, BoardMotionStatus[]> = {
-	PROPOSED: ['SECONDED', 'WITHDRAWN', 'TABLED'],
-	SECONDED: ['UNDER_DISCUSSION', 'UNDER_VOTE', 'WITHDRAWN', 'TABLED'],
-	UNDER_DISCUSSION: ['UNDER_VOTE', 'TABLED', 'WITHDRAWN'],
-	UNDER_VOTE: ['APPROVED', 'DENIED', 'TABLED'],
-	TABLED: ['PROPOSED', 'WITHDRAWN'], // Can be brought back from table
-	APPROVED: [], // Terminal state
-	DENIED: [], // Terminal state
-	WITHDRAWN: [] // Terminal state
+	[BoardMotionStatus.PROPOSED]: [BoardMotionStatus.SECONDED, BoardMotionStatus.WITHDRAWN, BoardMotionStatus.TABLED],
+	[BoardMotionStatus.SECONDED]: [BoardMotionStatus.UNDER_DISCUSSION, BoardMotionStatus.UNDER_VOTE, BoardMotionStatus.WITHDRAWN, BoardMotionStatus.TABLED],
+	[BoardMotionStatus.UNDER_DISCUSSION]: [BoardMotionStatus.UNDER_VOTE, BoardMotionStatus.TABLED, BoardMotionStatus.WITHDRAWN],
+	[BoardMotionStatus.UNDER_VOTE]: [BoardMotionStatus.APPROVED, BoardMotionStatus.DENIED, BoardMotionStatus.TABLED],
+	[BoardMotionStatus.TABLED]: [BoardMotionStatus.PROPOSED, BoardMotionStatus.WITHDRAWN], // Can be brought back from table
+	[BoardMotionStatus.APPROVED]: [], // Terminal state
+	[BoardMotionStatus.DENIED]: [], // Terminal state
+	[BoardMotionStatus.WITHDRAWN]: [] // Terminal state
 };
 
 interface TransitionInput {
@@ -77,7 +82,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 			});
 
 			if (!motion) {
-				return { valid: false, currentStatus: 'PROPOSED' as BoardMotionStatus, error: 'Motion not found' };
+				return { valid: false, currentStatus: BoardMotionStatus.PROPOSED, error: 'Motion not found' };
 			}
 
 			const currentStatus = motion.status as BoardMotionStatus;
@@ -92,7 +97,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 			}
 
 			// Additional validation for SECONDED transition
-			if (input.toStatus === 'SECONDED' && !input.secondedById) {
+			if (input.toStatus === BoardMotionStatus.SECONDED && !input.secondedById) {
 				return {
 					valid: false,
 					currentStatus,
@@ -128,7 +133,7 @@ async function updateMotionStatus(
 	};
 
 	// Add secondedById if transitioning to SECONDED
-	if (input.toStatus === 'SECONDED' && input.secondedById) {
+	if (input.toStatus === BoardMotionStatus.SECONDED && input.secondedById) {
 		updateData.secondedById = input.secondedById;
 	}
 
@@ -138,20 +143,21 @@ async function updateMotionStatus(
 	}
 
 	// Set decidedAt for terminal states
-	if (['APPROVED', 'DENIED', 'WITHDRAWN'].includes(input.toStatus)) {
+	const terminalStatuses: BoardMotionStatus[] = [BoardMotionStatus.APPROVED, BoardMotionStatus.DENIED, BoardMotionStatus.WITHDRAWN];
+	if (terminalStatuses.includes(input.toStatus)) {
 		updateData.decidedAt = new Date();
-		if (input.toStatus === 'APPROVED') {
-			updateData.outcome = 'PASSED';
-		} else if (input.toStatus === 'DENIED') {
-			updateData.outcome = 'FAILED';
-		} else if (input.toStatus === 'WITHDRAWN') {
-			updateData.outcome = 'WITHDRAWN';
+		if (input.toStatus === BoardMotionStatus.APPROVED) {
+			updateData.outcome = BoardMotionOutcome.PASSED;
+		} else if (input.toStatus === BoardMotionStatus.DENIED) {
+			updateData.outcome = BoardMotionOutcome.FAILED;
+		} else if (input.toStatus === BoardMotionStatus.WITHDRAWN) {
+			updateData.outcome = BoardMotionOutcome.WITHDRAWN;
 		}
 	}
 
 	// Set outcome for TABLED
-	if (input.toStatus === 'TABLED') {
-		updateData.outcome = 'TABLED';
+	if (input.toStatus === BoardMotionStatus.TABLED) {
+		updateData.outcome = BoardMotionOutcome.TABLED;
 	}
 
 	await orgTransaction(
@@ -202,9 +208,9 @@ async function tallyVotes(organizationId: string, userId: string, motionId: stri
 			});
 
 			const allBallots = votes.flatMap(v => v.ballots);
-			const yes = allBallots.filter(b => b.choice === 'YES').length;
-			const no = allBallots.filter(b => b.choice === 'NO').length;
-			const abstain = allBallots.filter(b => b.choice === 'ABSTAIN').length;
+			const yes = allBallots.filter(b => b.choice === VoteChoice.YES).length;
+			const no = allBallots.filter(b => b.choice === VoteChoice.NO).length;
+			const abstain = allBallots.filter(b => b.choice === VoteChoice.ABSTAIN).length;
 			const passed = yes > no;
 
 			return { yes, no, abstain, passed };
@@ -255,7 +261,7 @@ async function motionTransitionWorkflow(input: TransitionInput): Promise<Transit
 
 		// Step 2: If transitioning to APPROVED/DENIED, tally votes first
 		let voteResults: { yes: number; no: number; abstain: number; passed: boolean } | undefined;
-		if (input.toStatus === 'APPROVED' || input.toStatus === 'DENIED') {
+		if (input.toStatus === BoardMotionStatus.APPROVED || input.toStatus === BoardMotionStatus.DENIED) {
 			voteResults = await DBOS.runStep(
 				() => tallyVotes(input.organizationId, input.userId, input.motionId),
 				{ name: 'tallyVotes' }
@@ -263,10 +269,10 @@ async function motionTransitionWorkflow(input: TransitionInput): Promise<Transit
 			await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'votes_tallied', results: voteResults });
 
 			// Override toStatus based on actual vote results
-			if (voteResults.passed && input.toStatus === 'DENIED') {
-				input.toStatus = 'APPROVED';
-			} else if (!voteResults.passed && input.toStatus === 'APPROVED') {
-				input.toStatus = 'DENIED';
+			if (voteResults.passed && input.toStatus === BoardMotionStatus.DENIED) {
+				input.toStatus = BoardMotionStatus.APPROVED;
+			} else if (!voteResults.passed && input.toStatus === BoardMotionStatus.APPROVED) {
+				input.toStatus = BoardMotionStatus.DENIED;
 			}
 		}
 
@@ -290,7 +296,7 @@ async function motionTransitionWorkflow(input: TransitionInput): Promise<Transit
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'notifications_queued' });
 
 		// Step 5: Trigger downstream actions if approved
-		if (input.toStatus === 'APPROVED') {
+		if (input.toStatus === BoardMotionStatus.APPROVED) {
 			await DBOS.runStep(
 				() => triggerDownstreamActions(input.motionId, validation.motion!),
 				{ name: 'triggerDownstreamActions' }
@@ -314,14 +320,14 @@ async function motionTransitionWorkflow(input: TransitionInput): Promise<Transit
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'MOTION_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.MOTION_LIFECYCLE_ERROR
 		});
 
 		return {
 			success: false,
 			motionId: input.motionId,
-			fromStatus: 'PROPOSED',
+			fromStatus: BoardMotionStatus.PROPOSED,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

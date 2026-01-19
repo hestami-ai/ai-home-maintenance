@@ -17,7 +17,8 @@
 		Briefcase
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
-	import { orpc } from '$lib/api';
+	import { orpc } from '$lib/api/orpc';
+	import { StaffStatusValues } from '$lib/api/cam';
 
 	interface Staff {
 		id: string;
@@ -103,6 +104,7 @@
 
 	// Synchronize server data to local state
 	$effect(() => {
+		if (!data) return;
 		if (data.staff) {
 			staff = data.staff;
 		}
@@ -201,13 +203,13 @@
 
 	function getStatusIcon(status: string) {
 		switch (status) {
-			case 'ACTIVE':
+			case StaffStatusValues.ACTIVE:
 				return CheckCircle;
-			case 'PENDING':
+			case StaffStatusValues.PENDING:
 				return Clock;
-			case 'SUSPENDED':
+			case StaffStatusValues.SUSPENDED:
 				return AlertTriangle;
-			case 'DEACTIVATED':
+			case StaffStatusValues.DEACTIVATED:
 				return XCircle;
 			default:
 				return Clock;
@@ -216,13 +218,13 @@
 
 	function getStatusColor(status: string) {
 		switch (status) {
-			case 'ACTIVE':
+			case StaffStatusValues.ACTIVE:
 				return 'text-success-500';
-			case 'PENDING':
+			case StaffStatusValues.PENDING:
 				return 'text-warning-500';
-			case 'SUSPENDED':
+			case StaffStatusValues.SUSPENDED:
 				return 'text-error-500';
-			case 'DEACTIVATED':
+			case StaffStatusValues.DEACTIVATED:
 				return 'text-surface-500';
 			default:
 				return 'text-surface-500';
@@ -273,11 +275,11 @@
 							<p class="text-surface-500">{staff.title}</p>
 						{/if}
 						<div class="mt-2 flex items-center gap-2">
-							{#if staff.status === 'ACTIVE'}
+							{#if staff.status === StaffStatusValues.ACTIVE}
 								<CheckCircle class="h-4 w-4 text-success-500" />
-							{:else if staff.status === 'PENDING'}
+							{:else if staff.status === StaffStatusValues.PENDING}
 								<Clock class="h-4 w-4 text-warning-500" />
-							{:else if staff.status === 'SUSPENDED'}
+							{:else if staff.status === StaffStatusValues.SUSPENDED}
 								<AlertTriangle class="h-4 w-4 text-error-500" />
 							{:else}
 								<XCircle class="h-4 w-4 text-surface-500" />
@@ -291,7 +293,7 @@
 
 				<!-- Action Buttons -->
 				<div class="flex flex-wrap gap-2">
-					{#if staff.status === 'PENDING'}
+					{#if staff.status === StaffStatusValues.PENDING}
 						<button
 							onclick={handleActivate}
 							disabled={actionLoading !== null}
@@ -318,7 +320,7 @@
 						</button>
 					{/if}
 
-					{#if staff.status === 'ACTIVE'}
+					{#if staff.status === StaffStatusValues.ACTIVE}
 						<button
 							onclick={() => (showSuspendModal = true)}
 							disabled={actionLoading !== null}
@@ -337,7 +339,7 @@
 						</button>
 					{/if}
 
-					{#if staff.status === 'SUSPENDED' || staff.status === 'DEACTIVATED'}
+					{#if staff.status === StaffStatusValues.SUSPENDED || staff.status === StaffStatusValues.DEACTIVATED}
 						<button
 							onclick={handleReactivate}
 							disabled={actionLoading !== null}

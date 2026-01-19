@@ -11,7 +11,7 @@ import { VendorInteractionTypeSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startExternalVendorWorkflow } from '../../../workflows/index.js';
+import { startExternalVendorWorkflow, ExternalVendorWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('ExternalVendorRoute');
 
@@ -68,7 +68,7 @@ export const externalVendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalVendorWorkflow(
 				{
-					action: 'CREATE_CONTEXT',
+					action: ExternalVendorWorkflowAction.CREATE_CONTEXT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -297,7 +297,7 @@ export const externalVendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalVendorWorkflow(
 				{
-					action: 'UPDATE_CONTEXT',
+					action: ExternalVendorWorkflowAction.UPDATE_CONTEXT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					contextId: input.id,
@@ -377,7 +377,7 @@ export const externalVendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalVendorWorkflow(
 				{
-					action: 'LINK_TO_SERVICE_PROVIDER',
+					action: ExternalVendorWorkflowAction.LINK_TO_SERVICE_PROVIDER,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					contextId: input.id,
@@ -451,7 +451,7 @@ export const externalVendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalVendorWorkflow(
 				{
-					action: 'LOG_INTERACTION',
+					action: ExternalVendorWorkflowAction.LOG_INTERACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					externalVendorContextId: input.externalVendorContextId,

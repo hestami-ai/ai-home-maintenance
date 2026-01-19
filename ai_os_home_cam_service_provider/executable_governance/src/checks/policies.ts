@@ -101,6 +101,7 @@ function hasCerbosCheckInside(call: CallExpression): boolean {
     if (args.length === 0) return false;
 
     const handlerFn = args[0];
+    if (!handlerFn) return false;
     const body = handlerFn.getText();
 
     // Check for common Cerbos call patterns
@@ -136,7 +137,7 @@ function loadCerbosPolicies(dir: string): Record<string, CerbosPolicy> {
         const content = readFileSync(path.join(dir, file), 'utf8');
         // Match resource: "name"
         const resourceMatch = content.match(/resource:\s*["']?([^"'\s#]+)["']?/);
-        if (resourceMatch) {
+        if (resourceMatch && resourceMatch[1]) {
             const resource = resourceMatch[1];
             const actions: string[] = [];
             // Match actions: ["view", "edit"] or actions: [ 'view', 'edit' ]
@@ -179,10 +180,11 @@ function getCerbosCheck(call: CallExpression): { action: string, resource: strin
             if (name === 'requireAuthorization' || name === 'isAllowed') {
                 const args = call.getArguments();
                 if (args.length >= 3) {
-                    const action = getStringValue(args[2]);
+                    const actionArg = args[2];
+                    const action = actionArg ? getStringValue(actionArg) : 'unknown';
                     const resourceArg = args[1];
                     let resource = 'unknown';
-                    if (resourceArg.getKind() === SyntaxKind.CallExpression) {
+                    if (resourceArg && resourceArg.getKind() === SyntaxKind.CallExpression) {
                         const resCall = resourceArg.asKind(SyntaxKind.CallExpression)!;
                         if (resCall.getExpression().getText().endsWith('createResource')) {
                             const resArgs = resCall.getArguments();

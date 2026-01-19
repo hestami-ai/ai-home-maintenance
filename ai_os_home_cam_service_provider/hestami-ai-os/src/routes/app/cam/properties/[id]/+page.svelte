@@ -4,7 +4,10 @@
 	import { ArrowLeft, Building2, FileText, Clock, Home, MapPin, Pencil } from 'lucide-svelte';
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { propertyApi, documentApi, activityEventApi } from '$lib/api/cam';
+	import { DocumentContextTypeValues, DocumentStatusValues, activityEventApi, documentApi, propertyApi } from '$lib/api/cam';
+
+	// Local constant for common area status - not a Prisma enum
+	const COMMON_AREA_STATUS = { ACTIVE: DocumentStatusValues.ACTIVE } as const;
 
 	interface Property {
 		id: string;
@@ -80,7 +83,7 @@
 		if (!propertyId) return;
 
 		try {
-			const response = await documentApi.list({ contextType: 'PROPERTY', contextId: propertyId });
+			const response = await documentApi.list({ contextType: DocumentContextTypeValues.PROPERTY, contextId: propertyId });
 			if (response.ok) {
 				documents = response.data.documents as any;
 			}
@@ -93,7 +96,7 @@
 		if (!propertyId) return;
 
 		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'PROPERTY' as any, entityId: propertyId });
+			const response = await activityEventApi.getByEntity({ entityType: DocumentContextTypeValues.PROPERTY as any, entityId: propertyId });
 			if (response.ok) {
 				history = response.data.events.map((e: any) => ({
 					id: e.id,
@@ -363,7 +366,7 @@
 							<p class="font-medium">{area.name}</p>
 							<p class="text-sm text-surface-500">{area.areaType.replace(/_/g, ' ')}</p>
 						</div>
-						<span class="rounded-full px-2 py-0.5 text-xs {area.status === 'ACTIVE' ? 'bg-success-500/10 text-success-500' : 'bg-surface-500/10 text-surface-500'}">
+						<span class="rounded-full px-2 py-0.5 text-xs {area.status === COMMON_AREA_STATUS.ACTIVE ? 'bg-success-500/10 text-success-500' : 'bg-surface-500/10 text-surface-500'}">
 							{area.status}
 						</span>
 					</div>

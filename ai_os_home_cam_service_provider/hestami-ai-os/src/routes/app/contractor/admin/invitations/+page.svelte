@@ -1,0 +1,337 @@
+<script lang="ts">
+	import { ActivityEntityTypeValues, ServiceProviderRoleValues, UserRoleValues } from '$lib/api/cam';
+	import { Plus, Mail, Copy, RefreshCw, XCircle, CheckCircle, Users } from 'lucide-svelte';
+	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import {
+		invitationApi,
+		type InvitationListItem,
+		INVITATION_STATUS_LABELS,
+		INVITATION_STATUS_COLORS
+	} from '$lib/api/invitation.js';
+	import { InvitationStatusValues } from '$lib/api/cam.js';
+
+	let invitations = $state<InvitationListItem[]>([]);
+	let isLoading = $state(true);
+	let error = $state<string | null>(null);
+	let showCreateModal = $state(false);
+	let showCodeModal = $state(false);
+	let generatedCode = $state<string | null>(null);
+	let createdInvitationEmail = $state<string | null>(null);
+
+	// Create form state
+	let newEmail = $state('');
+	let newRole = $state(ActivityEntityTypeValues.TECHNICIAN);
+	let isCreating = $state(false);
+	let createError = $state<string | null>(null);
+
+	const roleOptions = [
+		{ value: UserRoleValues.OWNER, label: 'Owner' },
+		{ value: UserRoleValues.ADMIN, label: 'Administrator' },
+		{ value: ServiceProviderRoleValues.OFFICE_MANAGER, label: 'Office Manager' },
+		{ value: ServiceProviderRoleValues.DISPATCHER, label: 'Dispatcher' },
+		{ value: ServiceProviderRoleValues.ESTIMATOR, label: 'Estimator' },
+		{ value: ServiceProviderRoleValues.BOOKKEEPER, label: 'Bookkeeper' },
+		{ value: ActivityEntityTypeValues.TECHNICIAN, label: 'Technician' }
+	];
+
+	async function loadInvitations() {
+		isLoading = true;
+		error = null;
+		try {
+			const response = await invitationApi.list();
+			if (response.ok) {
+				invitations = response.data.invitations;
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load invitations';
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	async function handleCreate(e: Event) {
+		e.preventDefault();
+		if (!newEmail) return;
+
+		isCreating = true;
+		createError = null;
+
+		try {
+			const response = await invitationApi.create({
+				email: newEmail,
+				role: newRole,
+				deliveryMethod: 'CODE'
+			});
+
+			if (response.ok) {
+				generatedCode = response.data.activationCode ?? null;
+				createdInvitationEmail = newEmail;
+				showCreateModal = false;
+				showCodeModal = true;
+				newEmail = '';
+				newRole = ActivityEntityTypeValues.TECHNICIAN;
+				await loadInvitations();
+			}
+		} catch (e) {
+			createError = e instanceof Error ? e.message : 'Failed to create invitation';
+		} finally {
+			isCreating = false;
+		}
+	}
+
+	async function handleResend(invitationId: string) {
+		try {
+			const response = await invitationApi.resend(invitationId);
+			if (response.ok && response.data.activationCode) {
+				const inv = invitations.find(i => i.id === invitationId);
+				generatedCode = response.data.activationCode;
+				createdInvitationEmail = inv?.email ?? null;
+				showCodeModal = true;
+			}
+			await loadInvitations();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to resend invitation';
+		}
+	}
+
+	async function handleRevoke(invitationId: string) {
+		if (!confirm('Are you sure you want to revoke this invitation?')) return;
+
+		try {
+			await invitationApi.revoke(invitationId);
+			await loadInvitations();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to revoke invitation';
+		}
+	}
+
+	function copyCode() {
+		if (generatedCode) {
+			navigator.clipboard.writeText(generatedCode);
+		}
+	}
+
+	function formatDate(dateStr: string): string {
+		return new Date(dateStr).toLocaleDateString('en-US', {
+			month: 'short',
+			day: 'numeric',
+			year: 'numeric'
+		});
+	}
+
+	function isExpired(expiresAt: string): boolean {
+		return new Date(expiresAt) < new Date();
+	}
+
+	$effect(() => {
+		loadInvitations();
+	});
+</script>
+
+<svelte:head>
+	<title>Team Invitations | Contractor Portal</title>
+</svelte:head>
+
+<PageContainer>
+	<div class="flex items-center justify-between">
+		<div>
+			<h1 class="text-2xl font-bold">Team Invitations</h1>
+			<p class="mt-1 text-surface-500">Invite team members to join your contracting business</p>
+		</div>
+		<button
+			class="btn preset-filled-primary-500"
+			onclick={() => showCreateModal = true}
+		>
+			<Plus class="h-4 w-4" />
+			Invite Team Member
+		</button>
+	</div>
+
+	{#if error}
+		<div class="mt-4 rounded-lg bg-error-50 p-4 text-error-700 dark:bg-error-900/20 dark:text-error-400">
+			{error}
+		</div>
+	{/if}
+
+	<div class="mt-6">
+		{#if isLoading}
+			<div class="flex items-center justify-center py-12">
+				<div class="loading loading-spinner loading-lg"></div>
+			</div>
+		{:else if invitations.length === 0}
+			<EmptyState
+				icon={Users}
+				title="No invitations yet"
+				description="Invite team members to join your organization by clicking the button above."
+			/>
+		{:else}
+			<Card variant="outlined" padding="none">
+				<div class="overflow-x-auto">
+					<table class="w-full">
+						<thead class="border-b border-surface-200 bg-surface-50 dark:border-surface-700 dark:bg-surface-800">
+							<tr>
+								<th class="px-4 py-3 text-left text-sm font-medium text-surface-600 dark:text-surface-400">Email</th>
+								<th class="px-4 py-3 text-left text-sm font-medium text-surface-600 dark:text-surface-400">Role</th>
+								<th class="px-4 py-3 text-left text-sm font-medium text-surface-600 dark:text-surface-400">Status</th>
+								<th class="px-4 py-3 text-left text-sm font-medium text-surface-600 dark:text-surface-400">Expires</th>
+								<th class="px-4 py-3 text-left text-sm font-medium text-surface-600 dark:text-surface-400">Invited By</th>
+								<th class="px-4 py-3 text-right text-sm font-medium text-surface-600 dark:text-surface-400">Actions</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-surface-200 dark:divide-surface-700">
+							{#each invitations as invitation}
+								<tr class="hover:bg-surface-50 dark:hover:bg-surface-800/50">
+									<td class="px-4 py-3">
+										<div class="flex items-center gap-2">
+											<Mail class="h-4 w-4 text-surface-400" />
+											<span class="font-medium">{invitation.email}</span>
+										</div>
+									</td>
+									<td class="px-4 py-3 text-sm">{invitation.role}</td>
+									<td class="px-4 py-3">
+										{#if invitation.status === InvitationStatusValues.PENDING && isExpired(invitation.expiresAt)}
+											<span class="badge preset-filled-surface-500">Expired</span>
+										{:else}
+											<span class="badge preset-filled-{INVITATION_STATUS_COLORS[invitation.status]}-500">
+												{INVITATION_STATUS_LABELS[invitation.status]}
+											</span>
+										{/if}
+									</td>
+									<td class="px-4 py-3 text-sm text-surface-500">
+										{formatDate(invitation.expiresAt)}
+									</td>
+									<td class="px-4 py-3 text-sm text-surface-500">
+										{invitation.invitedBy.name ?? 'Unknown'}
+									</td>
+									<td class="px-4 py-3 text-right">
+										{#if invitation.status === InvitationStatusValues.PENDING}
+											<div class="flex items-center justify-end gap-2">
+												<button
+													class="btn btn-sm preset-tonal"
+													title="Resend invitation"
+													onclick={() => handleResend(invitation.id)}
+												>
+													<RefreshCw class="h-4 w-4" />
+												</button>
+												<button
+													class="btn btn-sm preset-tonal-error"
+													title="Revoke invitation"
+													onclick={() => handleRevoke(invitation.id)}
+												>
+													<XCircle class="h-4 w-4" />
+												</button>
+											</div>
+										{/if}
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</Card>
+		{/if}
+	</div>
+</PageContainer>
+
+<!-- Create Invitation Modal -->
+{#if showCreateModal}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+		<Card variant="filled" padding="lg" class="w-full max-w-md">
+			<h2 class="text-xl font-semibold">Invite Team Member</h2>
+			<p class="mt-1 text-sm text-surface-500">
+				Send an invitation to join your team
+			</p>
+
+			<form onsubmit={handleCreate} class="mt-6 space-y-4">
+				<div>
+					<label for="email" class="block text-sm font-medium">Email Address</label>
+					<input
+						type="email"
+						id="email"
+						bind:value={newEmail}
+						placeholder="team.member@company.com"
+						class="input mt-1 w-full"
+						required
+					/>
+				</div>
+
+				<div>
+					<label for="role" class="block text-sm font-medium">Role</label>
+					<select
+						id="role"
+						bind:value={newRole}
+						class="select mt-1 w-full"
+					>
+						{#each roleOptions as option}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
+
+				{#if createError}
+					<div class="rounded-lg bg-error-50 p-3 text-sm text-error-700 dark:bg-error-900/20 dark:text-error-400">
+						{createError}
+					</div>
+				{/if}
+
+				<div class="flex justify-end gap-3 pt-4">
+					<button
+						type="button"
+						class="btn preset-tonal"
+						onclick={() => showCreateModal = false}
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						class="btn preset-filled-primary-500"
+						disabled={isCreating || !newEmail}
+					>
+						{#if isCreating}
+							<span class="loading loading-spinner loading-sm"></span>
+						{/if}
+						Send Invitation
+					</button>
+				</div>
+			</form>
+		</Card>
+	</div>
+{/if}
+
+<!-- Activation Code Modal -->
+{#if showCodeModal && generatedCode}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+		<Card variant="filled" padding="lg" class="w-full max-w-md text-center">
+			<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-500/20">
+				<CheckCircle class="h-6 w-6 text-success-500" />
+			</div>
+			<h2 class="mt-4 text-xl font-semibold">Invitation Created!</h2>
+			<p class="mt-2 text-sm text-surface-500">
+				Share this activation code with <strong>{createdInvitationEmail}</strong>
+			</p>
+
+			<div class="mt-6 rounded-lg bg-surface-100 p-4 dark:bg-surface-800">
+				<p class="text-3xl font-mono font-bold tracking-widest">{generatedCode}</p>
+			</div>
+
+			<button
+				class="btn preset-tonal mt-4 w-full"
+				onclick={copyCode}
+			>
+				<Copy class="h-4 w-4" />
+				Copy Code
+			</button>
+
+			<p class="mt-4 text-xs text-surface-500">
+				This code expires in 72 hours. The team member can use it at the "Join Organization" page.
+			</p>
+
+			<button
+				class="btn preset-filled-primary-500 mt-6 w-full"
+				onclick={() => { showCodeModal = false; generatedCode = null; }}
+			>
+				Done
+			</button>
+		</Card>
+	</div>
+{/if}

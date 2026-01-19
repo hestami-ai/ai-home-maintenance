@@ -27,15 +27,21 @@ export function printReport(report: Report, jsonMode: boolean) {
     const warnings = report.violations.filter(v => v.severity === 'warning');
     const infos = report.violations.filter(v => v.severity === 'info');
 
+    // Print summary line
     if (report.status === 'pass') {
         console.log(chalk.green('✔ All governance checks passed!'));
         if (warnings.length > 0 || infos.length > 0) {
             console.log(chalk.gray(`  (${warnings.length} warnings, ${infos.length} info)`));
         }
+    } else {
+        console.log(chalk.red(`✖ Found ${errors.length} errors, ${warnings.length} warnings, ${infos.length} info:`));
+    }
+
+    // If no violations to print, return early
+    if (errors.length === 0 && warnings.length === 0 && infos.length === 0) {
         return;
     }
 
-    console.log(chalk.red(`✖ Found ${errors.length} errors, ${warnings.length} warnings, ${infos.length} info:`));
     console.log('');
 
     // Print errors first

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { DocumentCategoryValues, DocumentContextTypeValues, DocumentVisibilityValues } from '$lib/api/cam';
 	import { ArrowLeft, Upload, Loader2, Check, X, FileText, Image, File } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
@@ -54,15 +55,23 @@
 
 	let { data }: Props = $props();
 
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let properties = $state<Property[]>([]);
 	let isSubmitting = $state(false);
 	let isLoadingProperties = $state(false);
 	let error = $state<string | null>(null);
-	let properties = $derived(data.properties);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			properties = data.properties ?? [];
+		}
+	});
 
 	// Form state
 	let title = $state('');
 	let description = $state('');
-	let category = $state<ConciergeDocumentCategory>('GENERAL');
+	let category = $state<ConciergeDocumentCategory>(DocumentCategoryValues.GENERAL);
 	let selectedPropertyId = $state('');
 	let selectedFile = $state<globalThis.File | null>(null);
 	let uploadIdempotencyKey = $state<string | null>(null);
@@ -162,7 +171,8 @@
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		if (!isValid || isSubmitting || !selectedFile || !data.organization) return;
+		// Guard against undefined data during navigation
+		if (!isValid || isSubmitting || !selectedFile || data == null || data.organization == null) return;
 
 		isSubmitting = true;
 		error = null;
@@ -178,12 +188,12 @@
 				fileName: selectedFile.name,
 				fileSize: selectedFile.size,
 				mimeType: selectedFile.type,
-				contextType: 'PROPERTY',
+				contextType: DocumentContextTypeValues.PROPERTY,
 				contextId: selectedPropertyId,
 				title: title.trim(),
 				description: description.trim() || undefined,
 				category: category,
-				visibility: 'PRIVATE'
+				visibility: DocumentVisibilityValues.PRIVATE
 			});
 
 			const { documentId, tusEndpoint } = initResult.data;

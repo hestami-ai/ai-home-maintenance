@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, DocumentCategoryValues, JobStatusValues, MediaTypeValues } from '$lib/api/cam';
 	import {
 		Upload,
 		Search,
@@ -44,23 +45,31 @@
 
 	let { data }: Props = $props();
 
-	let documents = $derived(data.documents);
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let documents = $state<Document[]>([]);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let selectedCategory = $state<string>('');
 	let showUploadModal = $state(false);
 
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			documents = data.documents ?? [];
+		}
+	});
+
 	const categories = [
 		{ value: '', label: 'All Categories' },
 		{ value: 'PROPERTY_DEED', label: 'Property Deed' },
-		{ value: 'INSURANCE', label: 'Insurance' },
-		{ value: 'WARRANTY', label: 'Warranty' },
-		{ value: 'INSPECTION', label: 'Inspection' },
+		{ value: DocumentCategoryValues.INSURANCE, label: 'Insurance' },
+		{ value: JobStatusValues.WARRANTY, label: 'Warranty' },
+		{ value: DocumentCategoryValues.INSPECTION, label: 'Inspection' },
 		{ value: 'RECEIPT', label: 'Receipt' },
-		{ value: 'CONTRACT', label: 'Contract' },
-		{ value: 'PHOTO', label: 'Photo' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: DocumentCategoryValues.CONTRACT, label: 'Contract' },
+		{ value: MediaTypeValues.PHOTO, label: 'Photo' },
+		{ value: ARCCategoryValues.OTHER, label: 'Other' }
 	];
 
 	const categoryLabels: Record<string, string> = {
@@ -109,7 +118,13 @@
 
 	async function handleDelete(docId: string) {
 		if (!confirm('Are you sure you want to delete this failed document?')) return;
-		
+
+		// Guard against undefined data during navigation
+		if (data == null || data.organization == null) {
+			error = 'Unable to delete document - organization data not available';
+			return;
+		}
+
 		isLoading = true;
 		try {
 			const client = createOrgClient(data.organization.id);

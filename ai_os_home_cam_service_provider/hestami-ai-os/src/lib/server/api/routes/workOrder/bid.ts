@@ -4,7 +4,9 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { BidStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startBidWorkflow } from '../../../workflows/index.js';
+import { startBidWorkflow, BidWorkflowAction } from '../../../workflows/index.js';
+import { BidStatus, WorkOrderStatus } from '../../../../../../generated/prisma/enums.js';
+import { SortOrder } from '../../../workflows/schemas.js';
 
 const log = createModuleLogger('BidRoute');
 
@@ -63,7 +65,7 @@ export const bidRouter = {
 			if (!workOrder) throw errors.NOT_FOUND({ message: 'Work Order' });
 
 			// Work order must be in TRIAGED status to request bids
-			if (workOrder.status !== 'TRIAGED') {
+			if (workOrder.status !== WorkOrderStatus.TRIAGED) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be triaged before requesting bids' });
 			}
 
@@ -99,7 +101,7 @@ export const bidRouter = {
 			// Create bid requests via workflow
 			const result = await startBidWorkflow(
 				{
-					action: 'REQUEST_BIDS',
+					action: BidWorkflowAction.REQUEST_BIDS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					workOrderId: input.workOrderId,
@@ -189,7 +191,7 @@ export const bidRouter = {
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
 			// Bid must be in REQUESTED or PENDING status
-			if (!['REQUESTED', 'PENDING'].includes(bid.status)) {
+			if (!([BidStatus.REQUESTED, BidStatus.PENDING] as BidStatus[]).includes(bid.status)) {
 				throw errors.BAD_REQUEST({ message: 'Bid cannot be submitted in current status' });
 			}
 
@@ -198,7 +200,7 @@ export const bidRouter = {
 				// Expire via workflow
 				await startBidWorkflow(
 					{
-						action: 'EXPIRE_BID',
+						action: BidWorkflowAction.EXPIRE_BID,
 						organizationId: context.organization!.id,
 						userId: context.user!.id,
 						bidId: input.bidId,
@@ -212,7 +214,7 @@ export const bidRouter = {
 			// Submit bid via workflow
 			const result = await startBidWorkflow(
 				{
-					action: 'SUBMIT_BID',
+					action: BidWorkflowAction.SUBMIT_BID,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					bidId: input.bidId,
@@ -239,7 +241,7 @@ export const bidRouter = {
 					bid: {
 						id: input.bidId,
 						totalAmount: totalAmount.toString(),
-						status: 'SUBMITTED'
+						status: BidStatus.SUBMITTED
 					}
 				},
 				context
@@ -297,7 +299,7 @@ export const bidRouter = {
 			const bids = await prisma.workOrderBid.findMany({
 				where: { workOrderId: input.workOrderId },
 				include: { vendor: true },
-				orderBy: [{ status: 'asc' }, { totalAmount: 'asc' }]
+				orderBy: [{ status: SortOrder.ASC }, { totalAmount: SortOrder.ASC }]
 			});
 
 			return successResponse(
@@ -374,14 +376,14 @@ export const bidRouter = {
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
 			// Bid must be SUBMITTED or UNDER_REVIEW
-			if (!['SUBMITTED', 'UNDER_REVIEW'].includes(bid.status)) {
+			if (!([BidStatus.SUBMITTED, BidStatus.UNDER_REVIEW] as BidStatus[]).includes(bid.status)) {
 				throw errors.BAD_REQUEST({ message: 'Bid must be submitted to accept' });
 			}
 
 			// Accept bid via workflow
 			const result = await startBidWorkflow(
 				{
-					action: 'ACCEPT_BID',
+					action: BidWorkflowAction.ACCEPT_BID,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					bidId: input.bidId,
@@ -406,11 +408,11 @@ export const bidRouter = {
 				{
 					bid: {
 						id: input.bidId,
-						status: 'ACCEPTED'
+						status: BidStatus.ACCEPTED
 					},
 					workOrder: {
 						id: bid.workOrderId,
-						status: 'ASSIGNED',
+						status: WorkOrderStatus.ASSIGNED,
 						assignedVendorId: bid.vendorId
 					}
 				},
@@ -465,14 +467,14 @@ export const bidRouter = {
 			await context.cerbos.authorize('edit', 'work_order', bid.workOrderId);
 
 			// Can only reject submitted bids
-			if (!['SUBMITTED', 'UNDER_REVIEW'].includes(bid.status)) {
+			if (!([BidStatus.SUBMITTED, BidStatus.UNDER_REVIEW] as BidStatus[]).includes(bid.status)) {
 				throw errors.BAD_REQUEST({ message: 'Bid must be submitted to reject' });
 			}
 
 			// Reject bid via workflow
 			const result = await startBidWorkflow(
 				{
-					action: 'REJECT_BID',
+					action: BidWorkflowAction.REJECT_BID,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					bidId: input.bidId,
@@ -491,7 +493,7 @@ export const bidRouter = {
 				{
 					bid: {
 						id: input.bidId,
-						status: 'REJECTED'
+						status: BidStatus.REJECTED
 					}
 				},
 				context
@@ -545,14 +547,14 @@ export const bidRouter = {
 			});
 
 			// Can only withdraw pending or submitted bids
-			if (!['REQUESTED', 'PENDING', 'SUBMITTED'].includes(bid.status)) {
+			if (!([BidStatus.REQUESTED, BidStatus.PENDING, BidStatus.SUBMITTED] as BidStatus[]).includes(bid.status)) {
 				throw errors.BAD_REQUEST({ message: 'Bid cannot be withdrawn in current status' });
 			}
 
 			// Withdraw bid via workflow
 			const result = await startBidWorkflow(
 				{
-					action: 'WITHDRAW_BID',
+					action: BidWorkflowAction.WITHDRAW_BID,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					bidId: input.bidId,
@@ -571,7 +573,7 @@ export const bidRouter = {
 				{
 					bid: {
 						id: input.bidId,
-						status: 'WITHDRAWN'
+						status: BidStatus.WITHDRAWN
 					}
 				},
 				context

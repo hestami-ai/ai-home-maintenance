@@ -15,10 +15,25 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
-import type { JobPriority, JobStatus, WorkOrderStatus } from '../../../../generated/prisma/client.js';
+import {
+	JobPriority,
+	JobStatus,
+	WorkOrderStatus,
+	WorkOrderPriority,
+	WorkOrderCategory,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 
 const WORKFLOW_STATUS_EVENT = 'cross_domain_integration_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'cross_domain_integration_workflow_error';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CROSS_DOMAIN_INTEGRATION_WORKFLOW_ERROR: 'CROSS_DOMAIN_INTEGRATION_WORKFLOW_ERROR'
+} as const;
 
 // Action types for cross-domain integration operations
 export const CrossDomainIntegrationWorkflowAction = {
@@ -76,44 +91,44 @@ export interface CrossDomainIntegrationWorkflowResult extends EntityWorkflowResu
 // Note: These enums have different values, so we map to closest equivalents
 function mapWorkOrderStatusToJobStatus(workOrderStatus: WorkOrderStatus): JobStatus {
 	const statusMap: Partial<Record<WorkOrderStatus, JobStatus>> = {
-		DRAFT: 'LEAD',
-		SUBMITTED: 'TICKET',
-		TRIAGED: 'TICKET',
-		AUTHORIZED: 'JOB_CREATED',
-		ASSIGNED: 'SCHEDULED',
-		SCHEDULED: 'SCHEDULED',
-		IN_PROGRESS: 'IN_PROGRESS',
-		ON_HOLD: 'ON_HOLD',
-		COMPLETED: 'COMPLETED',
-		REVIEW_REQUIRED: 'COMPLETED',
-		INVOICED: 'INVOICED',
-		CLOSED: 'CLOSED',
-		CANCELLED: 'CANCELLED'
+		[WorkOrderStatus.DRAFT]: JobStatus.LEAD,
+		[WorkOrderStatus.SUBMITTED]: JobStatus.TICKET,
+		[WorkOrderStatus.TRIAGED]: JobStatus.TICKET,
+		[WorkOrderStatus.AUTHORIZED]: JobStatus.JOB_CREATED,
+		[WorkOrderStatus.ASSIGNED]: JobStatus.SCHEDULED,
+		[WorkOrderStatus.SCHEDULED]: JobStatus.SCHEDULED,
+		[WorkOrderStatus.IN_PROGRESS]: JobStatus.IN_PROGRESS,
+		[WorkOrderStatus.ON_HOLD]: JobStatus.ON_HOLD,
+		[WorkOrderStatus.COMPLETED]: JobStatus.COMPLETED,
+		[WorkOrderStatus.REVIEW_REQUIRED]: JobStatus.COMPLETED,
+		[WorkOrderStatus.INVOICED]: JobStatus.INVOICED,
+		[WorkOrderStatus.CLOSED]: JobStatus.CLOSED,
+		[WorkOrderStatus.CANCELLED]: JobStatus.CANCELLED
 	};
-	return statusMap[workOrderStatus] || 'TICKET';
+	return statusMap[workOrderStatus] || JobStatus.TICKET;
 }
 
 // Helper function to map Job status to WorkOrder status
 function mapJobStatusToWorkOrderStatus(jobStatus: JobStatus): WorkOrderStatus {
 	const statusMap: Partial<Record<JobStatus, WorkOrderStatus>> = {
-		LEAD: 'DRAFT',
-		TICKET: 'SUBMITTED',
-		ESTIMATE_REQUIRED: 'TRIAGED',
-		ESTIMATE_SENT: 'TRIAGED',
-		ESTIMATE_APPROVED: 'AUTHORIZED',
-		JOB_CREATED: 'AUTHORIZED',
-		SCHEDULED: 'SCHEDULED',
-		DISPATCHED: 'SCHEDULED',
-		IN_PROGRESS: 'IN_PROGRESS',
-		ON_HOLD: 'ON_HOLD',
-		COMPLETED: 'COMPLETED',
-		INVOICED: 'INVOICED',
-		PAID: 'INVOICED',
-		WARRANTY: 'COMPLETED',
-		CLOSED: 'CLOSED',
-		CANCELLED: 'CANCELLED'
+		[JobStatus.LEAD]: WorkOrderStatus.DRAFT,
+		[JobStatus.TICKET]: WorkOrderStatus.SUBMITTED,
+		[JobStatus.ESTIMATE_REQUIRED]: WorkOrderStatus.TRIAGED,
+		[JobStatus.ESTIMATE_SENT]: WorkOrderStatus.TRIAGED,
+		[JobStatus.ESTIMATE_APPROVED]: WorkOrderStatus.AUTHORIZED,
+		[JobStatus.JOB_CREATED]: WorkOrderStatus.AUTHORIZED,
+		[JobStatus.SCHEDULED]: WorkOrderStatus.SCHEDULED,
+		[JobStatus.DISPATCHED]: WorkOrderStatus.SCHEDULED,
+		[JobStatus.IN_PROGRESS]: WorkOrderStatus.IN_PROGRESS,
+		[JobStatus.ON_HOLD]: WorkOrderStatus.ON_HOLD,
+		[JobStatus.COMPLETED]: WorkOrderStatus.COMPLETED,
+		[JobStatus.INVOICED]: WorkOrderStatus.INVOICED,
+		[JobStatus.PAID]: WorkOrderStatus.INVOICED,
+		[JobStatus.WARRANTY]: WorkOrderStatus.COMPLETED,
+		[JobStatus.CLOSED]: WorkOrderStatus.CLOSED,
+		[JobStatus.CANCELLED]: WorkOrderStatus.CANCELLED
 	};
-	return statusMap[jobStatus] || 'SUBMITTED';
+	return statusMap[jobStatus] || WorkOrderStatus.SUBMITTED;
 }
 
 // Step functions
@@ -138,7 +153,7 @@ async function createJobFromWorkOrderStep(
 					organizationId: input.organizationId,
 					title: workOrder.title,
 					description: workOrder.description,
-					priority: 'MEDIUM' as any, // Map from WorkOrderPriority
+					priority: JobPriority.MEDIUM, // Map from WorkOrderPriority
 					status: mapWorkOrderStatusToJobStatus(workOrder.status),
 					workOrderId: workOrder.id
 				} as any
@@ -151,15 +166,15 @@ async function createJobFromWorkOrderStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: result.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Job created from work order ${workOrder.workOrderNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'CREATE_JOB_FROM_WORK_ORDER',
+		workflowStep: CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_WORK_ORDER,
 		workflowVersion: 'v1',
 		newState: { workOrderId: workOrder.id, jobId: result.id }
 	});
@@ -209,15 +224,15 @@ async function syncJobStatusToWorkOrderStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: workOrder.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order status synced from job: ${previousStatus} → ${newStatus}`,
 		performedById: input.userId,
-		performedByType: 'SYSTEM',
+		performedByType: ActivityActorType.SYSTEM,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'SYNC_JOB_STATUS_TO_WORK_ORDER',
+		workflowStep: CrossDomainIntegrationWorkflowAction.SYNC_JOB_STATUS_TO_WORK_ORDER,
 		workflowVersion: 'v1',
 		previousState: { status: previousStatus },
 		newState: { status: newStatus, jobId: job.id }
@@ -272,15 +287,15 @@ async function syncWorkOrderStatusToJobStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: job.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Job status synced from work order: ${previousStatus} → ${newStatus}`,
 		performedById: input.userId,
-		performedByType: 'SYSTEM',
+		performedByType: ActivityActorType.SYSTEM,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'SYNC_WORK_ORDER_STATUS_TO_JOB',
+		workflowStep: CrossDomainIntegrationWorkflowAction.SYNC_WORK_ORDER_STATUS_TO_JOB,
 		workflowVersion: 'v1',
 		previousState: { status: previousStatus },
 		newState: { status: newStatus, workOrderId: workOrder.id }
@@ -320,8 +335,8 @@ async function createJobFromViolationStep(
 					organizationId: input.organizationId,
 					title: `Violation Remediation: ${violation.violationType.name}`,
 					description: violation.description || `Remediation work for violation ${violation.violationNumber}`,
-					priority: 'MEDIUM' as any,
-					status: 'TICKET' as any
+					priority: JobPriority.MEDIUM,
+					status: JobStatus.TICKET
 				} as any
 			});
 		},
@@ -330,15 +345,15 @@ async function createJobFromViolationStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: job.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Job created from violation ${violation.violationNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'CREATE_JOB_FROM_VIOLATION',
+		workflowStep: CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_VIOLATION,
 		workflowVersion: 'v1',
 		newState: { violationId: violation.id, jobId: job.id }
 	});
@@ -374,8 +389,8 @@ async function createJobFromARCRequestStep(
 					organizationId: input.organizationId,
 					title: `ARC Project: ${arcRequest.requestNumber}`,
 					description: `Work for approved ARC request ${arcRequest.requestNumber}`,
-					priority: 'MEDIUM' as any,
-					status: 'JOB_CREATED' as any
+					priority: JobPriority.MEDIUM,
+					status: JobStatus.JOB_CREATED
 				} as any
 			});
 		},
@@ -384,15 +399,15 @@ async function createJobFromARCRequestStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: job.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Job created from ARC request ${arcRequest.requestNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'CREATE_JOB_FROM_ARC_REQUEST',
+		workflowStep: CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_ARC_REQUEST,
 		workflowVersion: 'v1',
 		newState: { arcRequestId: arcRequest.id, jobId: job.id }
 	});
@@ -425,15 +440,15 @@ async function syncVendorComplianceNotesStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: vendor.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Vendor compliance notes updated',
 		performedById: input.userId,
-		performedByType: 'SYSTEM',
+		performedByType: ActivityActorType.SYSTEM,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'SYNC_VENDOR_COMPLIANCE_NOTES',
+		workflowStep: CrossDomainIntegrationWorkflowAction.SYNC_VENDOR_COMPLIANCE_NOTES,
 		workflowVersion: 'v1',
 		newState: { complianceNotes: input.notes }
 	});
@@ -482,9 +497,9 @@ async function createWorkOrderFromViolationStep(
 					workOrderNumber: `WO-${nextNumber.toString().padStart(6, '0')}`,
 					title: `Violation Remediation: ${violation.violationType.name}`,
 					description: violation.description || `Remediation work for violation ${violation.violationNumber}`,
-					priority: 'MEDIUM' as any,
-					status: 'DRAFT' as any,
-					category: 'REPAIR' as any
+					priority: WorkOrderPriority.MEDIUM,
+					status: WorkOrderStatus.DRAFT,
+					category: WorkOrderCategory.REPAIR
 				} as any
 			});
 		},
@@ -493,15 +508,15 @@ async function createWorkOrderFromViolationStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: workOrder.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order created from violation ${violation.violationNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'CREATE_WORK_ORDER_FROM_VIOLATION',
+		workflowStep: CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_VIOLATION,
 		workflowVersion: 'v1',
 		newState: { violationId: violation.id, workOrderId: workOrder.id }
 	});
@@ -550,9 +565,9 @@ async function createWorkOrderFromARCStep(
 					workOrderNumber: `WO-${nextNumber.toString().padStart(6, '0')}`,
 					title: `ARC Project: ${arcRequest.requestNumber}`,
 					description: `Work for approved ARC request ${arcRequest.requestNumber}`,
-					priority: 'MEDIUM' as any,
-					status: 'AUTHORIZED' as any,
-					category: 'MAINTENANCE' as any
+					priority: WorkOrderPriority.MEDIUM,
+					status: WorkOrderStatus.AUTHORIZED,
+					category: WorkOrderCategory.MAINTENANCE
 				} as any
 			});
 		},
@@ -561,15 +576,15 @@ async function createWorkOrderFromARCStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: workOrder.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order created from ARC request ${arcRequest.requestNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'CREATE_WORK_ORDER_FROM_ARC',
+		workflowStep: CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_ARC,
 		workflowVersion: 'v1',
 		newState: { arcRequestId: arcRequest.id, workOrderId: workOrder.id }
 	});
@@ -628,9 +643,9 @@ async function createWorkOrderFromResolutionStep(
 					workOrderNumber: `WO-${nextNumber.toString().padStart(6, '0')}`,
 					title: `Resolution Implementation: ${resolution.title}`,
 					description: `Work for resolution ${resolution.id}`,
-					priority: 'MEDIUM' as any,
-					status: 'AUTHORIZED' as any,
-					category: 'MAINTENANCE' as any
+					priority: WorkOrderPriority.MEDIUM,
+					status: WorkOrderStatus.AUTHORIZED,
+					category: WorkOrderCategory.MAINTENANCE
 				} as any
 			});
 		},
@@ -639,15 +654,15 @@ async function createWorkOrderFromResolutionStep(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: workOrder.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order created from resolution ${resolution.id}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'crossDomainIntegrationWorkflow_v1',
-		workflowStep: 'CREATE_WORK_ORDER_FROM_RESOLUTION',
+		workflowStep: CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_RESOLUTION,
 		workflowVersion: 'v1',
 		newState: { resolutionId: resolution.id, workOrderId: workOrder.id }
 	});
@@ -681,7 +696,7 @@ async function crossDomainIntegrationWorkflow(
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE_JOB_FROM_WORK_ORDER': {
+			case CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_WORK_ORDER: {
 				if (!input.workOrderId) {
 					const error = new Error('Missing required field: workOrderId for CREATE_JOB_FROM_WORK_ORDER');
 					logStepError(log, 'validation', error, { input });
@@ -704,7 +719,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'SYNC_JOB_STATUS_TO_WORK_ORDER': {
+			case CrossDomainIntegrationWorkflowAction.SYNC_JOB_STATUS_TO_WORK_ORDER: {
 				if (!input.jobId || !input.jobStatus) {
 					const error = new Error('Missing required fields: jobId, jobStatus for SYNC_JOB_STATUS_TO_WORK_ORDER');
 					logStepError(log, 'validation', error, { input });
@@ -732,7 +747,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'SYNC_WORK_ORDER_STATUS_TO_JOB': {
+			case CrossDomainIntegrationWorkflowAction.SYNC_WORK_ORDER_STATUS_TO_JOB: {
 				if (!input.workOrderId || !input.workOrderStatus) {
 					const error = new Error(
 						'Missing required fields: workOrderId, workOrderStatus for SYNC_WORK_ORDER_STATUS_TO_JOB'
@@ -759,7 +774,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'CREATE_JOB_FROM_VIOLATION': {
+			case CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_VIOLATION: {
 				if (!input.violationId) {
 					const error = new Error('Missing required field: violationId for CREATE_JOB_FROM_VIOLATION');
 					logStepError(log, 'validation', error, { input });
@@ -782,7 +797,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'CREATE_JOB_FROM_ARC_REQUEST': {
+			case CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_ARC_REQUEST: {
 				if (!input.arcRequestId) {
 					const error = new Error('Missing required field: arcRequestId for CREATE_JOB_FROM_ARC_REQUEST');
 					logStepError(log, 'validation', error, { input });
@@ -805,7 +820,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'SYNC_VENDOR_COMPLIANCE_NOTES': {
+			case CrossDomainIntegrationWorkflowAction.SYNC_VENDOR_COMPLIANCE_NOTES: {
 				if (!input.vendorId) {
 					const error = new Error('Missing required field: vendorId for SYNC_VENDOR_COMPLIANCE_NOTES');
 					logStepError(log, 'validation', error, { input });
@@ -827,7 +842,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'CREATE_WORK_ORDER_FROM_VIOLATION': {
+			case CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_VIOLATION: {
 				if (!input.violationId) {
 					const error = new Error('Missing required field: violationId for CREATE_WORK_ORDER_FROM_VIOLATION');
 					logStepError(log, 'validation', error, { input });
@@ -853,7 +868,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'CREATE_WORK_ORDER_FROM_ARC': {
+			case CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_ARC: {
 				if (!input.arcRequestId) {
 					const error = new Error('Missing required field: arcRequestId for CREATE_WORK_ORDER_FROM_ARC');
 					logStepError(log, 'validation', error, { input });
@@ -879,7 +894,7 @@ async function crossDomainIntegrationWorkflow(
 				return successResult;
 			}
 
-			case 'CREATE_WORK_ORDER_FROM_RESOLUTION': {
+			case CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_RESOLUTION: {
 				if (!input.resolutionId) {
 					const error = new Error('Missing required field: resolutionId for CREATE_WORK_ORDER_FROM_RESOLUTION');
 					logStepError(log, 'validation', error, { input });
@@ -928,8 +943,8 @@ async function crossDomainIntegrationWorkflow(
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CROSS_DOMAIN_INTEGRATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CROSS_DOMAIN_INTEGRATION_WORKFLOW_ERROR
 		});
 		const errorResult: CrossDomainIntegrationWorkflowResult = {
 			success: false,

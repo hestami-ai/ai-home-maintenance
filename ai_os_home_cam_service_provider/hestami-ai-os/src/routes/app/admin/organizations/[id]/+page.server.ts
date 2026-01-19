@@ -2,6 +2,7 @@ import type { PageServerLoad } from './$types';
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { error } from '@sveltejs/kit';
 import { createModuleLogger } from '$lib/server/logger';
+import { StaffRole } from '../../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('OrganizationDetailPage');
 
@@ -36,7 +37,7 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
 			organization: orgResponse.data.organization,
 			members: membersResponse.ok ? membersResponse.data.members : [],
 			membersHasMore: membersResponse.ok ? membersResponse.data.pagination.hasMore : false,
-			isPlatformAdmin: staffRoles.includes('PLATFORM_ADMIN')
+			isPlatformAdmin: (staffRoles as StaffRole[]).includes(StaffRole.PLATFORM_ADMIN)
 		};
 	} catch (err) {
 		log.error('Failed to load organization', {

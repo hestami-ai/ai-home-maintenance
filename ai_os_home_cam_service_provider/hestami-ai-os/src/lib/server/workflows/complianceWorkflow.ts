@@ -9,10 +9,30 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
+import {
+	ActivityActionType,
+	LicenseStatus,
+	InsuranceStatus,
+	ComplianceStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Alias for backward compatibility
+const ComplianceDeadlineStatus = ComplianceStatus;
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	COMPLIANCE_WORKFLOW_ERROR: 'COMPLIANCE_WORKFLOW_ERROR'
+} as const;
+
 const log = createWorkflowLogger('ComplianceWorkflow');
+
+// Expiring item types for compliance checks
+const ExpiringItemType = {
+	LICENSE: 'LICENSE',
+	INSURANCE: 'INSURANCE'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'compliance_status';
 const WORKFLOW_ERROR_EVENT = 'compliance_error';
@@ -68,7 +88,7 @@ async function checkOrganizationCompliance(
 
 	// Check licenses
 	const activeLicenses = profile.licenses.filter(
-		l => l.status === 'ACTIVE' && (!l.expirationDate || l.expirationDate > now)
+		l => l.status === LicenseStatus.ACTIVE && (!l.expirationDate || l.expirationDate > now)
 	);
 
 	if (activeLicenses.length === 0) {
@@ -86,7 +106,7 @@ async function checkOrganizationCompliance(
 
 	// Check insurance
 	const activeInsurance = profile.insurances.filter(
-		i => i.status === 'ACTIVE' && (!i.expirationDate || i.expirationDate > now)
+		i => i.status === InsuranceStatus.ACTIVE && (!i.expirationDate || i.expirationDate > now)
 	);
 
 	if (activeInsurance.length === 0) {
@@ -142,7 +162,7 @@ async function checkUpcomingExpirations(
 		if (license.expirationDate) {
 			const daysUntil = Math.ceil((license.expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 			expiringItems.push({
-				type: 'LICENSE',
+				type: ExpiringItemType.LICENSE,
 				id: license.id,
 				expiresAt: license.expirationDate.toISOString(),
 				daysUntil
@@ -154,7 +174,7 @@ async function checkUpcomingExpirations(
 		if (insurance.expirationDate) {
 			const daysUntil = Math.ceil((insurance.expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 			expiringItems.push({
-				type: 'INSURANCE',
+				type: ExpiringItemType.INSURANCE,
 				id: insurance.id,
 				expiresAt: insurance.expirationDate.toISOString(),
 				daysUntil
@@ -296,7 +316,7 @@ async function updateDeadlineStatusStep(
 		throw new Error('Deadline not found');
 	}
 
-	const isCompleting = status === 'COMPLETED' && deadline.status !== 'COMPLETED';
+	const isCompleting = status === ComplianceDeadlineStatus.COMPLETED && deadline.status !== ComplianceDeadlineStatus.COMPLETED;
 
 	await orgTransaction(organizationId, async (tx) => {
 		await tx.complianceDeadline.update({
@@ -382,7 +402,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CHECK_COMPLIANCE': {
+			case ComplianceAction.CHECK_COMPLIANCE: {
 				const compliance = await DBOS.runStep(
 					() => checkOrganizationCompliance(input.organizationId),
 					{ name: 'checkOrganizationCompliance' }
@@ -405,7 +425,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'CHECK_EXPIRATIONS': {
+			case ComplianceAction.CHECK_EXPIRATIONS: {
 				const expiringItems = await DBOS.runStep(
 					() => checkUpcomingExpirations(input.organizationId),
 					{ name: 'checkUpcomingExpirations' }
@@ -420,7 +440,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'UPDATE_COMPLIANCE_SCORE': {
+			case ComplianceAction.UPDATE_COMPLIANCE_SCORE: {
 				const compliance = await DBOS.runStep(
 					() => checkOrganizationCompliance(input.organizationId),
 					{ name: 'checkOrganizationCompliance' }
@@ -440,7 +460,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'CREATE_REQUIREMENT': {
+			case ComplianceAction.CREATE_REQUIREMENT: {
 				const entityId = await DBOS.runStep(
 					() => createRequirement(input.organizationId, input.userId, input.data!),
 					{ name: 'createRequirement' }
@@ -454,7 +474,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'UPDATE_REQUIREMENT': {
+			case ComplianceAction.UPDATE_REQUIREMENT: {
 				const entityId = await DBOS.runStep(
 					() => updateRequirement(input.organizationId, input.userId, input.data!),
 					{ name: 'updateRequirement' }
@@ -468,7 +488,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'CREATE_DEADLINE': {
+			case ComplianceAction.CREATE_DEADLINE: {
 				const entityId = await DBOS.runStep(
 					() => createDeadline(input.organizationId, input.userId, input.data!),
 					{ name: 'createDeadline' }
@@ -482,7 +502,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'UPDATE_DEADLINE_STATUS': {
+			case ComplianceAction.UPDATE_DEADLINE_STATUS: {
 				const data = input.data || {};
 				const entityId = await DBOS.runStep(
 					() => updateDeadlineStatusStep(
@@ -503,7 +523,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'ADD_EVIDENCE_DOCUMENT': {
+			case ComplianceAction.ADD_EVIDENCE_DOCUMENT: {
 				const data = input.data || {};
 				const entityId = await DBOS.runStep(
 					() => addEvidenceDocumentStep(
@@ -523,7 +543,7 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 				};
 			}
 
-			case 'UPDATE_CHECKLIST_ITEM': {
+			case ComplianceAction.UPDATE_CHECKLIST_ITEM: {
 				const data = input.data || {};
 				const entityId = await DBOS.runStep(
 					() => updateChecklistItemStep(
@@ -560,8 +580,8 @@ async function complianceWorkflow(input: ComplianceWorkflowInput): Promise<Compl
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'COMPLIANCE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.COMPLIANCE_WORKFLOW_ERROR
 		});
 
 		return {

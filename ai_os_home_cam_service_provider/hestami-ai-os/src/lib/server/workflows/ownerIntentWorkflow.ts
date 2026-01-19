@@ -7,11 +7,23 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { Prisma } from '../../../../generated/prisma/client.js';
+import {
+	OwnerIntentStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	OWNER_INTENT_WORKFLOW_ERROR: 'OWNER_INTENT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'owner_intent_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'owner_intent_workflow_error';
@@ -106,7 +118,7 @@ async function createIntent(
 					description: input.description!,
 					category: input.category as any,
 					priority: (input.priority ?? 'NORMAL') as any,
-					status: 'DRAFT',
+					status: OwnerIntentStatus.DRAFT,
 					constraints: (input.constraints ?? undefined) as Prisma.InputJsonValue | undefined,
 					attachments: input.attachments,
 					submittedByPartyId: input.submittedByPartyId
@@ -118,18 +130,18 @@ async function createIntent(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intent.id,
-		action: 'CREATE',
-		eventCategory: 'INTENT',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.INTENT,
 		summary: `Owner intent created: ${input.title}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: OwnerIntentWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		propertyId: input.propertyId,
-		newState: { title: input.title, category: input.category, priority: input.priority, status: 'DRAFT' }
+		newState: { title: input.title, category: input.category, priority: input.priority, status: OwnerIntentStatus.DRAFT }
 	});
 
 	return {
@@ -180,15 +192,15 @@ async function updateIntent(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intent.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Owner intent updated`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: OwnerIntentWorkflowAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: { title: input.title, category: input.category, priority: input.priority }
 	});
@@ -220,7 +232,7 @@ async function submitIntent(
 			return tx.ownerIntent.update({
 				where: { id: intentId },
 				data: {
-					status: 'SUBMITTED',
+					status: OwnerIntentStatus.SUBMITTED,
 					submittedAt: now
 				}
 			});
@@ -230,19 +242,19 @@ async function submitIntent(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intentId,
-		action: 'SUBMIT',
-		eventCategory: 'INTENT',
+		action: ActivityActionType.SUBMIT,
+		eventCategory: ActivityEventCategory.INTENT,
 		summary: `Intent submitted for review: ${title}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'SUBMIT',
+		workflowStep: OwnerIntentWorkflowAction.SUBMIT,
 		workflowVersion: 'v1',
 		propertyId,
-		previousState: { status: 'DRAFT' },
-		newState: { status: 'SUBMITTED' }
+		previousState: { status: OwnerIntentStatus.DRAFT },
+		newState: { status: OwnerIntentStatus.SUBMITTED }
 	});
 
 	return {
@@ -270,7 +282,7 @@ async function acknowledgeIntent(
 			return tx.ownerIntent.update({
 				where: { id: intentId },
 				data: {
-					status: 'ACKNOWLEDGED',
+					status: OwnerIntentStatus.ACKNOWLEDGED,
 					acknowledgedAt: now,
 					acknowledgedBy: userId
 				}
@@ -281,19 +293,19 @@ async function acknowledgeIntent(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intentId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Intent acknowledged by concierge',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'ACKNOWLEDGE',
+		workflowStep: OwnerIntentWorkflowAction.ACKNOWLEDGE,
 		workflowVersion: 'v1',
 		propertyId,
-		previousState: { status: 'SUBMITTED' },
-		newState: { status: 'ACKNOWLEDGED' }
+		previousState: { status: OwnerIntentStatus.SUBMITTED },
+		newState: { status: OwnerIntentStatus.ACKNOWLEDGED }
 	});
 
 	return {
@@ -324,7 +336,7 @@ async function convertToCase(
 			return tx.ownerIntent.update({
 				where: { id: intentId },
 				data: {
-					status: 'CONVERTED_TO_CASE',
+					status: OwnerIntentStatus.CONVERTED_TO_CASE,
 					convertedCaseId: caseId,
 					convertedAt: now
 				}
@@ -335,20 +347,20 @@ async function convertToCase(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intentId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'DECISION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.DECISION,
 		summary: 'Intent converted to case',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'CONVERT_TO_CASE',
+		workflowStep: OwnerIntentWorkflowAction.CONVERT_TO_CASE,
 		workflowVersion: 'v1',
 		propertyId,
 		caseId,
 		previousState: { status: previousStatus },
-		newState: { status: 'CONVERTED_TO_CASE', convertedCaseId: caseId }
+		newState: { status: OwnerIntentStatus.CONVERTED_TO_CASE, convertedCaseId: caseId }
 	});
 
 	return {
@@ -379,7 +391,7 @@ async function declineIntent(
 			return tx.ownerIntent.update({
 				where: { id: intentId },
 				data: {
-					status: 'DECLINED',
+					status: OwnerIntentStatus.DECLINED,
 					declinedAt: now,
 					declinedBy: userId,
 					declineReason: reason
@@ -391,19 +403,19 @@ async function declineIntent(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intentId,
-		action: 'DENY',
-		eventCategory: 'DECISION',
+		action: ActivityActionType.DENY,
+		eventCategory: ActivityEventCategory.DECISION,
 		summary: `Intent declined: ${reason}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'DECLINE',
+		workflowStep: OwnerIntentWorkflowAction.DECLINE,
 		workflowVersion: 'v1',
 		propertyId,
 		previousState: { status: previousStatus },
-		newState: { status: 'DECLINED', declineReason: reason }
+		newState: { status: OwnerIntentStatus.DECLINED, declineReason: reason }
 	});
 
 	return {
@@ -433,7 +445,7 @@ async function withdrawIntent(
 			return tx.ownerIntent.update({
 				where: { id: intentId },
 				data: {
-					status: 'WITHDRAWN',
+					status: OwnerIntentStatus.WITHDRAWN,
 					withdrawnAt: now,
 					withdrawReason
 				}
@@ -444,19 +456,19 @@ async function withdrawIntent(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intentId,
-		action: 'CANCEL',
-		eventCategory: 'INTENT',
+		action: ActivityActionType.CANCEL,
+		eventCategory: ActivityEventCategory.INTENT,
 		summary: `Owner withdrew intent${withdrawReason ? `: ${withdrawReason}` : ''}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'WITHDRAW',
+		workflowStep: OwnerIntentWorkflowAction.WITHDRAW,
 		workflowVersion: 'v1',
 		propertyId,
 		previousState: { status: previousStatus },
-		newState: { status: 'WITHDRAWN', withdrawReason }
+		newState: { status: OwnerIntentStatus.WITHDRAWN, withdrawReason }
 	});
 
 	return {
@@ -497,15 +509,15 @@ async function addNote(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: note.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Note added to intent`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'ADD_NOTE',
+		workflowStep: OwnerIntentWorkflowAction.ADD_NOTE,
 		workflowVersion: 'v1',
 		newState: { isInternal }
 	});
@@ -539,15 +551,15 @@ async function deleteIntent(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNER_INTENT',
+		entityType: ActivityEntityType.OWNER_INTENT,
 		entityId: intentId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Owner intent deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'ownerIntentWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: OwnerIntentWorkflowAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: now.toISOString() }
 	});
@@ -570,7 +582,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case OwnerIntentWorkflowAction.CREATE: {
 				if (!input.propertyId || !input.title || !input.description || !input.category) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -598,7 +610,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case OwnerIntentWorkflowAction.UPDATE: {
 				if (!input.intentId) {
 					const error = new Error('Missing required field: intentId for UPDATE');
 					logStepError(log, 'validation', error, { intentId: input.intentId });
@@ -624,7 +636,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'SUBMIT': {
+			case OwnerIntentWorkflowAction.SUBMIT: {
 				if (!input.intentId || !input.propertyId || !input.title) {
 					const error = new Error('Missing required fields for SUBMIT');
 					logStepError(log, 'validation', error, { input });
@@ -648,7 +660,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'ACKNOWLEDGE': {
+			case OwnerIntentWorkflowAction.ACKNOWLEDGE: {
 				if (!input.intentId || !input.propertyId) {
 					const error = new Error('Missing required fields for ACKNOWLEDGE');
 					logStepError(log, 'validation', error, { input });
@@ -673,7 +685,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'CONVERT_TO_CASE': {
+			case OwnerIntentWorkflowAction.CONVERT_TO_CASE: {
 				if (!input.intentId || !input.caseId || !input.propertyId) {
 					const error = new Error('Missing required fields for CONVERT_TO_CASE');
 					logStepError(log, 'validation', error, { input });
@@ -681,7 +693,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				}
 				log.debug('Step: convertToCase starting', { intentId: input.intentId });
 				const result = await DBOS.runStep(
-					() => convertToCase(input.intentId!, input.caseId!, input.organizationId, input.userId, input.propertyId!, input.priority || 'SUBMITTED'),
+					() => convertToCase(input.intentId!, input.caseId!, input.organizationId, input.userId, input.propertyId!, input.priority || OwnerIntentStatus.SUBMITTED),
 					{ name: 'convertToCase' }
 				);
 				log.info('Step: convertToCase completed', { id: result.intentId });
@@ -698,7 +710,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'DECLINE': {
+			case OwnerIntentWorkflowAction.DECLINE: {
 				if (!input.intentId || !input.reason || !input.propertyId) {
 					const error = new Error('Missing required fields for DECLINE');
 					logStepError(log, 'validation', error, { input });
@@ -706,7 +718,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				}
 				log.debug('Step: declineIntent starting', { intentId: input.intentId });
 				const result = await DBOS.runStep(
-					() => declineIntent(input.intentId!, input.reason!, input.organizationId, input.userId, input.propertyId!, input.priority || 'SUBMITTED'),
+					() => declineIntent(input.intentId!, input.reason!, input.organizationId, input.userId, input.propertyId!, input.priority || OwnerIntentStatus.SUBMITTED),
 					{ name: 'declineIntent' }
 				);
 				log.info('Step: declineIntent completed', { id: result.intentId });
@@ -723,7 +735,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'WITHDRAW': {
+			case OwnerIntentWorkflowAction.WITHDRAW: {
 				if (!input.intentId || !input.propertyId) {
 					const error = new Error('Missing required fields for WITHDRAW');
 					logStepError(log, 'validation', error, { input });
@@ -731,7 +743,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				}
 				log.debug('Step: withdrawIntent starting', { intentId: input.intentId });
 				const result = await DBOS.runStep(
-					() => withdrawIntent(input.intentId!, input.reason, input.organizationId, input.userId, input.propertyId!, input.priority || 'DRAFT'),
+					() => withdrawIntent(input.intentId!, input.reason, input.organizationId, input.userId, input.propertyId!, input.priority || OwnerIntentStatus.DRAFT),
 					{ name: 'withdrawIntent' }
 				);
 				log.info('Step: withdrawIntent completed', { id: result.intentId });
@@ -747,7 +759,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'ADD_NOTE': {
+			case OwnerIntentWorkflowAction.ADD_NOTE: {
 				if (!input.intentId || !input.content) {
 					const error = new Error('Missing required fields for ADD_NOTE');
 					logStepError(log, 'validation', error, { input });
@@ -774,7 +786,7 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case OwnerIntentWorkflowAction.DELETE: {
 				if (!input.intentId) {
 					const error = new Error('Missing required field: intentId for DELETE');
 					logStepError(log, 'validation', error, { intentId: input.intentId });
@@ -821,8 +833,8 @@ async function ownerIntentWorkflow(input: OwnerIntentWorkflowInput): Promise<Own
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'OWNER_INTENT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.OWNER_INTENT_WORKFLOW_ERROR
 		});
 		const errorResult: OwnerIntentWorkflowResult = {
 			success: false,

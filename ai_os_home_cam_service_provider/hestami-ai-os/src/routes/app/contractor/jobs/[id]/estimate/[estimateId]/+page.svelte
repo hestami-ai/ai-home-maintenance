@@ -17,7 +17,7 @@
 		X
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { estimateApi, jobApi, type Estimate, type EstimateLine, type Job } from '$lib/api/cam';
+	import { estimateApi, jobApi, EstimateStatusValues, type Estimate, type EstimateLine, type Job } from '$lib/api/cam';
 
 	const jobId = $derived($page.params.id ?? '');
 	const estimateId = $derived($page.params.estimateId ?? '');
@@ -106,6 +106,7 @@
 
 	// Synchronize server data
 	$effect(() => {
+		if (!data) return;
 		if (data.estimate) {
 			estimate = data.estimate;
 			editNotes = estimate.notes || '';
@@ -263,7 +264,7 @@
 
 				<!-- Actions -->
 				<div class="flex gap-2">
-					{#if estimate.status === 'DRAFT'}
+					{#if estimate.status === EstimateStatusValues.DRAFT}
 						<button
 							onclick={saveEstimate}
 							disabled={isSaving}
@@ -297,7 +298,7 @@
 				<div class="border-b border-surface-300-700 px-6 py-4">
 					<div class="flex items-center justify-between">
 						<h2 class="font-semibold">Line Items</h2>
-						{#if estimate.status === 'DRAFT'}
+						{#if estimate.status === EstimateStatusValues.DRAFT}
 							<div class="flex gap-2">
 								<button
 									onclick={() => showPricebook = true}
@@ -319,7 +320,7 @@
 				</div>
 
 				<!-- Add Line Form -->
-				{#if showAddLine && estimate.status === 'DRAFT'}
+				{#if showAddLine && estimate.status === EstimateStatusValues.DRAFT}
 					<div class="border-b border-surface-300-700 bg-surface-100-900 p-4">
 						<div class="grid gap-4 sm:grid-cols-4">
 							<div class="sm:col-span-2">
@@ -392,7 +393,7 @@
 									<th class="px-6 py-3 text-right">Qty</th>
 									<th class="px-6 py-3 text-right">Unit Price</th>
 									<th class="px-6 py-3 text-right">Total</th>
-									{#if estimate.status === 'DRAFT'}
+									{#if estimate.status === EstimateStatusValues.DRAFT}
 										<th class="px-6 py-3 text-right">Actions</th>
 									{/if}
 								</tr>
@@ -409,7 +410,7 @@
 										<td class="px-6 py-4 text-right">{line.quantity}</td>
 										<td class="px-6 py-4 text-right">{formatCurrency(line.unitPrice)}</td>
 										<td class="px-6 py-4 text-right font-medium">{formatCurrency(line.lineTotal)}</td>
-										{#if estimate.status === 'DRAFT'}
+										{#if estimate.status === EstimateStatusValues.DRAFT}
 											<td class="px-6 py-4 text-right">
 												<button
 													onclick={() => removeLineItem(line.id)}
@@ -463,7 +464,7 @@
 			</Card>
 
 			<!-- Estimate Options (Good/Better/Best) -->
-			{#if estimate.status === 'DRAFT'}
+			{#if estimate.status === EstimateStatusValues.DRAFT}
 				<Card variant="outlined" padding="md">
 					<div class="flex items-center justify-between mb-4">
 						<h3 class="font-medium">Estimate Options</h3>
@@ -513,7 +514,7 @@
 			<div class="grid gap-6 lg:grid-cols-2">
 				<Card variant="outlined" padding="md">
 					<h3 class="font-medium mb-3">Notes</h3>
-					{#if estimate.status === 'DRAFT'}
+					{#if estimate.status === EstimateStatusValues.DRAFT}
 						<textarea
 							bind:value={editNotes}
 							placeholder="Add notes for the customer..."
@@ -529,7 +530,7 @@
 
 				<Card variant="outlined" padding="md">
 					<h3 class="font-medium mb-3">Terms & Conditions</h3>
-					{#if estimate.status === 'DRAFT'}
+					{#if estimate.status === EstimateStatusValues.DRAFT}
 						<textarea
 							bind:value={editTerms}
 							placeholder="Add terms and conditions..."
@@ -545,7 +546,7 @@
 			</div>
 
 			<!-- Status Info -->
-			{#if estimate.status !== 'DRAFT'}
+			{#if estimate.status !== EstimateStatusValues.DRAFT}
 				<Card variant="outlined" padding="md">
 					<h3 class="font-medium mb-3">Status History</h3>
 					<div class="space-y-2 text-sm">

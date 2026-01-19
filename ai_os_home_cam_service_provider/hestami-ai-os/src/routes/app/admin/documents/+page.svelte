@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, DocumentCategoryValues, MediaTypeValues } from '$lib/api/cam';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { FileText, Search, Filter, Upload, Loader2, Calendar, User, Tag } from 'lucide-svelte';
 
@@ -15,25 +16,29 @@
 	let { data }: Props = $props();
 
 	let isLoading = $state(false);
-	let documents = $derived(data.documents);
+	// Use $state with $effect to avoid proxy errors during navigation
+	let documents = $state<any[]>([]);
 	let searchQuery = $state('');
 	let filterType = $state('');
 
-	// Sync filters from server data
+	// Sync all data from server
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
-		searchQuery = data.filters.q;
-		filterType = data.filters.type;
+		if (data == null || typeof data !== 'object') return;
+		documents = data.documents ?? [];
+		searchQuery = data.filters?.q ?? '';
+		filterType = data.filters?.type ?? '';
 	});
 
 
 	const documentTypes = [
 		{ value: '', label: 'All Types' },
-		{ value: 'CONTRACT', label: 'Contracts' },
-		{ value: 'INVOICE', label: 'Invoices' },
-		{ value: 'ESTIMATE', label: 'Estimates' },
-		{ value: 'PHOTO', label: 'Photos' },
+		{ value: DocumentCategoryValues.CONTRACT, label: 'Contracts' },
+		{ value: DocumentCategoryValues.INVOICE, label: 'Invoices' },
+		{ value: DocumentCategoryValues.ESTIMATE, label: 'Estimates' },
+		{ value: MediaTypeValues.PHOTO, label: 'Photos' },
 		{ value: 'REPORT', label: 'Reports' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: ARCCategoryValues.OTHER, label: 'Other' }
 	];
 </script>
 

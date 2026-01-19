@@ -12,23 +12,29 @@
 
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction } from '../db/rls.js';
-import type { EstimateStatus } from '../../../../generated/prisma/client.js';
+import type { EstimateStatus as EstimateStatusType } from '../../../../generated/prisma/client.js';
+import { EstimateStatus, JobStatus, ActivityActionType } from '../../../../generated/prisma/enums.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ESTIMATE_GENERATION_WORKFLOW_ERROR: 'ESTIMATE_GENERATION_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('EstimateGenerationWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'estimate_status';
 const WORKFLOW_ERROR_EVENT = 'estimate_error';
 
-const validTransitions: Record<EstimateStatus, EstimateStatus[]> = {
-	DRAFT: ['SENT', 'REVISED'],
-	SENT: ['VIEWED', 'EXPIRED', 'DECLINED'],
-	VIEWED: ['ACCEPTED', 'DECLINED', 'EXPIRED', 'REVISED'],
-	ACCEPTED: [],
-	DECLINED: ['REVISED'],
-	EXPIRED: ['REVISED'],
-	REVISED: ['DRAFT']
+const validTransitions: Record<EstimateStatusType, EstimateStatusType[]> = {
+	[EstimateStatus.DRAFT]: [EstimateStatus.SENT, EstimateStatus.REVISED],
+	[EstimateStatus.SENT]: [EstimateStatus.VIEWED, EstimateStatus.EXPIRED, EstimateStatus.DECLINED],
+	[EstimateStatus.VIEWED]: [EstimateStatus.ACCEPTED, EstimateStatus.DECLINED, EstimateStatus.EXPIRED, EstimateStatus.REVISED],
+	[EstimateStatus.ACCEPTED]: [],
+	[EstimateStatus.DECLINED]: [EstimateStatus.REVISED],
+	[EstimateStatus.EXPIRED]: [EstimateStatus.REVISED],
+	[EstimateStatus.REVISED]: [EstimateStatus.DRAFT]
 };
 
 interface EstimateGenerationInput {
@@ -66,10 +72,10 @@ async function validateEstimateTransition(input: EstimateGenerationInput): Promi
 			});
 
 			if (!estimate) {
-				return { valid: false, currentStatus: 'DRAFT' as EstimateStatus, error: 'Estimate not found' };
+				return { valid: false, currentStatus: EstimateStatus.DRAFT as EstimateStatusType, error: 'Estimate not found' };
 			}
 
-			const currentStatus = estimate.status as EstimateStatus;
+			const currentStatus = estimate.status as EstimateStatusType;
 			const allowedTransitions = validTransitions[currentStatus] || [];
 
 			if (!allowedTransitions.includes(input.toStatus)) {
@@ -83,7 +89,7 @@ async function validateEstimateTransition(input: EstimateGenerationInput): Promi
 
 			// Check expiration
 			if (estimate.validUntil && new Date() > estimate.validUntil) {
-				if (!['EXPIRED', 'DECLINED'].includes(input.toStatus)) {
+				if (input.toStatus !== EstimateStatus.EXPIRED && input.toStatus !== EstimateStatus.DECLINED) {
 					return {
 						valid: false,
 						currentStatus,
@@ -111,16 +117,16 @@ async function updateEstimateStatus(
 			};
 
 			switch (input.toStatus) {
-				case 'SENT':
+				case EstimateStatus.SENT:
 					updateData.sentAt = new Date();
 					if (input.expiresAt) updateData.validUntil = input.expiresAt;
 					break;
 
-				case 'VIEWED':
+				case EstimateStatus.VIEWED:
 					updateData.viewedAt = new Date();
 					break;
 
-				case 'ACCEPTED':
+				case EstimateStatus.ACCEPTED:
 					updateData.acceptedAt = new Date();
 					updateData.acceptedBy = input.userId;
 					if (input.acceptedOptionId) {
@@ -128,11 +134,11 @@ async function updateEstimateStatus(
 					}
 					break;
 
-				case 'DECLINED':
+				case EstimateStatus.DECLINED:
 					updateData.declinedAt = new Date();
 					break;
 
-				case 'EXPIRED':
+				case EstimateStatus.EXPIRED:
 					// Status change only
 					break;
 			}
@@ -184,7 +190,7 @@ async function convertToJob(organizationId: string, estimateId: string, userId: 
 				}
 			});
 
-			if (!estimate || estimate.status !== 'ACCEPTED') {
+			if (!estimate || estimate.status !== EstimateStatus.ACCEPTED) {
 				return null;
 			}
 
@@ -192,7 +198,7 @@ async function convertToJob(organizationId: string, estimateId: string, userId: 
 			await tx.job.update({
 				where: { id: estimate.jobId },
 				data: {
-					status: 'JOB_CREATED',
+					status: JobStatus.JOB_CREATED,
 					estimatedCost: estimate.totalAmount
 				}
 			});
@@ -250,7 +256,7 @@ async function estimateGenerationWorkflow(input: EstimateGenerationInput): Promi
 
 		// Convert to job if accepted
 		let jobId: string | undefined;
-		if (input.toStatus === 'ACCEPTED') {
+		if (input.toStatus === EstimateStatus.ACCEPTED) {
 			jobId = await DBOS.runStep(
 				() => convertToJob(input.organizationId, input.estimateId, input.userId),
 				{ name: 'convertToJob' }
@@ -281,14 +287,14 @@ async function estimateGenerationWorkflow(input: EstimateGenerationInput): Promi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ESTIMATE_GENERATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ESTIMATE_GENERATION_WORKFLOW_ERROR
 		});
 
 		return {
 			success: false,
 			estimateId: input.estimateId,
-			fromStatus: 'DRAFT',
+			fromStatus: EstimateStatus.DRAFT,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

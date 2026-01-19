@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { vendorApi } from '$lib/api/cam';
+	import { ARCCategoryValues, CaseNoteTypeValues, vendorApi } from '$lib/api/cam';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
@@ -24,7 +24,7 @@
 	const tradeOptions = [
 		'Plumbing',
 		'Electrical',
-		'HVAC',
+		ARCCategoryValues.HVAC,
 		'Landscaping',
 		'Roofing',
 		'Painting',
@@ -67,7 +67,7 @@
 		try {
 			const response = await vendorApi.create({
 				name: formData.name,
-				tradeCategory: 'GENERAL',
+				tradeCategory: CaseNoteTypeValues.GENERAL,
 				contactName: formData.contactName || undefined,
 				contactEmail: formData.email || undefined,
 				contactPhone: formData.phone || undefined,

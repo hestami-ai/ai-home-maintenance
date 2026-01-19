@@ -112,6 +112,8 @@ import './propertyWorkflow.js';
 import './caseCommunicationWorkflow.js';
 import './caseReviewWorkflow.js';
 import './systemSettingsWorkflow.js';
+import './serviceProviderTeamWorkflow.js';
+import './invitationWorkflow.js';
 
 // Work Order Lifecycle (Phase 4)
 export {
@@ -234,6 +236,7 @@ export {
 export {
 	slaWorkflow_v1,
 	startSLAWorkflow,
+	SLAActionValues,
 	type SLAWorkflowInput,
 	type SLAWorkflowResult,
 	type SLAAction
@@ -338,6 +341,7 @@ export {
 export {
 	visitWorkflow_v1,
 	startVisitWorkflow,
+	VisitActionValues,
 	type VisitWorkflowInput,
 	type VisitWorkflowResult,
 	type VisitAction
@@ -688,6 +692,7 @@ export {
 	conciergeActionWorkflow_v1,
 	startConciergeActionWorkflow,
 	getConciergeActionWorkflowStatus,
+	ConciergeActionAction,
 	type ConciergeActionWorkflowInput,
 	type ConciergeActionWorkflowResult
 } from './conciergeActionWorkflow.js';
@@ -1018,6 +1023,22 @@ export {
 	type SystemSettingsWorkflowInput,
 	type SystemSettingsWorkflowResult
 } from './systemSettingsWorkflow.js';
+
+// Service Provider Team Workflow
+export {
+	serviceProviderTeamWorkflow_v1,
+	ServiceProviderTeamWorkflowAction,
+	type ServiceProviderTeamWorkflowInput,
+	type ServiceProviderTeamWorkflowResult
+} from './serviceProviderTeamWorkflow.js';
+
+// Invitation Workflow (Phase 38)
+export {
+	invitationWorkflow_v1,
+	InvitationWorkflowAction,
+	type InvitationWorkflowInput,
+	type InvitationWorkflowResult
+} from './invitationWorkflow.js';
 
 // Future workflows:
 // - apPaymentProcessing_v1 (Phase 13)

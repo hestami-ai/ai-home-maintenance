@@ -11,19 +11,34 @@ import { type SLAPriority } from '../../../../generated/prisma/client.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	SLA_WORKFLOW_ERROR: 'SLA_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'sla_status';
 const WORKFLOW_ERROR_EVENT = 'sla_error';
 const workflowName = 'SLAWorkflow';
 const log = createWorkflowLogger(workflowName);
 
-type SLAAction =
-	| 'CREATE_WINDOW'
-	| 'UPDATE_WINDOW'
-	| 'DELETE_WINDOW'
-	| 'CREATE_RECORD'
-	| 'MARK_RESPONSE'
-	| 'MARK_RESOLUTION';
+// Action types for SLA operations
+export const SLAActionValues = {
+	CREATE_WINDOW: 'CREATE_WINDOW',
+	UPDATE_WINDOW: 'UPDATE_WINDOW',
+	DELETE_WINDOW: 'DELETE_WINDOW',
+	CREATE_RECORD: 'CREATE_RECORD',
+	MARK_RESPONSE: 'MARK_RESPONSE',
+	MARK_RESOLUTION: 'MARK_RESOLUTION'
+} as const;
+
+export type SLAAction = (typeof SLAActionValues)[keyof typeof SLAActionValues];
 
 interface SLAWorkflowInput {
 	action: SLAAction;
@@ -65,15 +80,15 @@ async function createWindow(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: window.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `SLA window created: ${window.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'slaWorkflow_v1',
-		workflowStep: 'CREATE_WINDOW',
+		workflowStep: SLAActionValues.CREATE_WINDOW,
 		workflowVersion: 'v1'
 	});
 
@@ -104,15 +119,15 @@ async function updateWindow(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: window.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `SLA window updated: ${window.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'slaWorkflow_v1',
-		workflowStep: 'UPDATE_WINDOW',
+		workflowStep: SLAActionValues.UPDATE_WINDOW,
 		workflowVersion: 'v1'
 	});
 
@@ -132,15 +147,15 @@ async function deleteWindow(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: windowId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'SLA window deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'slaWorkflow_v1',
-		workflowStep: 'DELETE_WINDOW',
+		workflowStep: SLAActionValues.DELETE_WINDOW,
 		workflowVersion: 'v1'
 	});
 
@@ -169,15 +184,15 @@ async function createRecord(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: record.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'SLA tracking started',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'slaWorkflow_v1',
-		workflowStep: 'CREATE_RECORD',
+		workflowStep: SLAActionValues.CREATE_RECORD,
 		workflowVersion: 'v1',
 		jobId: data.jobId as string
 	});
@@ -201,15 +216,15 @@ async function markResponse(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: record.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'SLA response marked',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'slaWorkflow_v1',
-		workflowStep: 'MARK_RESPONSE',
+		workflowStep: SLAActionValues.MARK_RESPONSE,
 		workflowVersion: 'v1'
 	});
 
@@ -232,15 +247,15 @@ async function markResolution(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: record.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'SLA resolution marked',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'slaWorkflow_v1',
-		workflowStep: 'MARK_RESOLUTION',
+		workflowStep: SLAActionValues.MARK_RESOLUTION,
 		workflowVersion: 'v1'
 	});
 
@@ -254,7 +269,7 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_WINDOW': {
+			case SLAActionValues.CREATE_WINDOW: {
 				const result = await DBOS.runStep(
 					() => createWindow(input.organizationId, input.userId, input.data),
 					{ name: 'createWindow' }
@@ -262,7 +277,7 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 				entityId = result.id;
 				break;
 			}
-			case 'UPDATE_WINDOW': {
+			case SLAActionValues.UPDATE_WINDOW: {
 				if (!input.windowId) throw new Error('windowId required for UPDATE_WINDOW');
 				const result = await DBOS.runStep(
 					() => updateWindow(input.organizationId, input.userId, input.windowId!, input.data),
@@ -271,7 +286,7 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 				entityId = result.id;
 				break;
 			}
-			case 'DELETE_WINDOW': {
+			case SLAActionValues.DELETE_WINDOW: {
 				if (!input.windowId) throw new Error('windowId required for DELETE_WINDOW');
 				const result = await DBOS.runStep(
 					() => deleteWindow(input.organizationId, input.userId, input.windowId!),
@@ -280,7 +295,7 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 				entityId = result.id;
 				break;
 			}
-			case 'CREATE_RECORD': {
+			case SLAActionValues.CREATE_RECORD: {
 				const result = await DBOS.runStep(
 					() => createRecord(input.organizationId, input.userId, input.data),
 					{ name: 'createRecord' }
@@ -288,7 +303,7 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 				entityId = result.id;
 				break;
 			}
-			case 'MARK_RESPONSE': {
+			case SLAActionValues.MARK_RESPONSE: {
 				if (!input.recordId) throw new Error('recordId required for MARK_RESPONSE');
 				const result = await DBOS.runStep(
 					() => markResponse(input.organizationId, input.userId, input.recordId!),
@@ -297,7 +312,7 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 				entityId = result.id;
 				break;
 			}
-			case 'MARK_RESOLUTION': {
+			case SLAActionValues.MARK_RESOLUTION: {
 				if (!input.recordId) throw new Error('recordId required for MARK_RESOLUTION');
 				const result = await DBOS.runStep(
 					() => markResolution(input.organizationId, input.userId, input.recordId!),
@@ -325,8 +340,8 @@ async function slaWorkflow(input: SLAWorkflowInput): Promise<SLAWorkflowResult> 
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'SLA_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.SLA_WORKFLOW_ERROR
 		});
 
 		return {
@@ -350,4 +365,4 @@ export async function startSLAWorkflow(
 	return handle.getResult();
 }
 
-export type { SLAWorkflowInput, SLAWorkflowResult, SLAAction };
+export type { SLAWorkflowInput, SLAWorkflowResult };

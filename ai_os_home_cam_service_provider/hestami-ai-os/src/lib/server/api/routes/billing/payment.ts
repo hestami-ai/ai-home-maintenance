@@ -9,8 +9,9 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { JobPaymentStatus } from '../../../../../../generated/prisma/client.js';
-import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
+import { JobPaymentStatus as JobPaymentStatusType } from '../../../../../../generated/prisma/client.js';
+import { JobPaymentStatus, JobInvoiceStatus } from '../../../../../../generated/prisma/enums.js';
+import { startBillingWorkflow, BillingAction } from '../../../workflows/billingWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('BillingPaymentRoute');
@@ -22,7 +23,7 @@ const paymentIntentOutput = z.object({
 	customerId: z.string(),
 	amount: z.string(),
 	currency: z.string(),
-	status: z.nativeEnum(JobPaymentStatus),
+	status: z.nativeEnum(JobPaymentStatusType),
 	paymentMethod: z.string().nullable(),
 	externalId: z.string().nullable(),
 	externalProvider: z.string().nullable(),
@@ -98,7 +99,7 @@ export const paymentRouter = {
 			});
 			if (!invoice) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (['PAID', 'VOID', 'REFUNDED'].includes(invoice.status)) {
+			if (([JobInvoiceStatus.PAID, JobInvoiceStatus.VOID, JobInvoiceStatus.REFUNDED] as JobInvoiceStatus[]).includes(invoice.status)) {
 				throw errors.BAD_REQUEST({ message: 'Cannot create payment for this invoice' });
 			}
 
@@ -110,7 +111,7 @@ export const paymentRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'CREATE_PAYMENT_INTENT',
+					action: BillingAction.CREATE_PAYMENT_INTENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -172,7 +173,7 @@ export const paymentRouter = {
 				.object({
 					invoiceId: z.string().optional(),
 					customerId: z.string().optional(),
-					status: z.nativeEnum(JobPaymentStatus).optional()
+					status: z.nativeEnum(JobPaymentStatusType).optional()
 				})
 				.merge(PaginationInputSchema)
 				.optional()
@@ -252,14 +253,14 @@ export const paymentRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Payment intent not found' });
 
-			if (existing.status !== 'PENDING') {
+			if (existing.status !== JobPaymentStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: 'Payment intent is not pending' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'PROCESS_PAYMENT',
+					action: BillingAction.PROCESS_PAYMENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -314,14 +315,14 @@ export const paymentRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Payment intent not found' });
 
-			if (!['PENDING', 'PROCESSING'].includes(existing.status)) {
+			if (!([JobPaymentStatus.PENDING, JobPaymentStatus.PROCESSING] as JobPaymentStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Payment intent cannot be marked as failed' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'MARK_PAYMENT_FAILED',
+					action: BillingAction.MARK_PAYMENT_FAILED,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -376,7 +377,7 @@ export const paymentRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Payment intent not found' });
 
-			if (existing.status !== 'SUCCEEDED') {
+			if (existing.status !== JobPaymentStatus.SUCCEEDED) {
 				throw errors.BAD_REQUEST({ message: 'Can only refund succeeded payments' });
 			}
 
@@ -388,7 +389,7 @@ export const paymentRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'REFUND_PAYMENT',
+					action: BillingAction.REFUND_PAYMENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -435,14 +436,14 @@ export const paymentRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Payment intent not found' });
 
-			if (existing.status !== 'PENDING') {
+			if (existing.status !== JobPaymentStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: 'Can only cancel pending payments' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'CANCEL_PAYMENT',
+					action: BillingAction.CANCEL_PAYMENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,

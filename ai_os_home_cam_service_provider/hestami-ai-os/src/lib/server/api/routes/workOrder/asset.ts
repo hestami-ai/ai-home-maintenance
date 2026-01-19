@@ -4,8 +4,10 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { AssetCategorySchema, AssetStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
+import { AssetStatus } from '../../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startAssetWorkflow } from '../../../workflows/index.js';
+import { startAssetWorkflow, AssetWorkflowAction } from '../../../workflows/index.js';
+import { SortOrder } from '../../../workflows/schemas.js';
 
 const log = createModuleLogger('AssetRoute');
 
@@ -100,7 +102,7 @@ export const assetRouter = {
 			// Create asset via workflow
 			const result = await startAssetWorkflow(
 				{
-					action: 'CREATE',
+					action: AssetWorkflowAction.CREATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -138,7 +140,7 @@ export const assetRouter = {
 						assetNumber: result.assetNumber!,
 						name: input.name,
 						category: input.category,
-						status: 'OPERATIONAL'
+						status: AssetStatus.ACTIVE
 					}
 				},
 				context
@@ -213,7 +215,7 @@ export const assetRouter = {
 
 			const assets = await prisma.asset.findMany({
 				where,
-				orderBy: [{ category: 'asc' }, { name: 'asc' }]
+				orderBy: [{ category: SortOrder.ASC }, { name: SortOrder.ASC }]
 			});
 
 			return successResponse(
@@ -387,7 +389,7 @@ export const assetRouter = {
 			// Update asset via workflow
 			const result = await startAssetWorkflow(
 				{
-					action: 'UPDATE',
+					action: AssetWorkflowAction.UPDATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -472,7 +474,7 @@ export const assetRouter = {
 			// Delete asset via workflow
 			const result = await startAssetWorkflow(
 				{
-					action: 'DELETE',
+					action: AssetWorkflowAction.DELETE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -551,7 +553,7 @@ export const assetRouter = {
 			// Log maintenance via workflow
 			const result = await startAssetWorkflow(
 				{
-					action: 'LOG_MAINTENANCE',
+					action: AssetWorkflowAction.LOG_MAINTENANCE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

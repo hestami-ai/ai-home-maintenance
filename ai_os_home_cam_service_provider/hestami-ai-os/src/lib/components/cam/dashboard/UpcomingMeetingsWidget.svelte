@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FundTypeValues, MeetingTypeValues } from '$lib/api/cam';
 	import { Calendar, Clock, MapPin } from 'lucide-svelte';
 
 	interface Meeting {
@@ -37,9 +38,9 @@
 
 	function getTypeColor(type: string): string {
 		switch (type) {
-			case 'BOARD': return 'bg-primary-500';
-			case 'ANNUAL': return 'bg-success-500';
-			case 'SPECIAL': return 'bg-warning-500';
+			case MeetingTypeValues.BOARD: return 'bg-primary-500';
+			case MeetingTypeValues.ANNUAL: return 'bg-success-500';
+			case FundTypeValues.SPECIAL: return 'bg-warning-500';
 			case 'COMMITTEE': return 'bg-secondary-500';
 			default: return 'bg-surface-500';
 		}

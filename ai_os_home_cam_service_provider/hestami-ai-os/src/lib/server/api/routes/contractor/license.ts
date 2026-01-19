@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { LicenseStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
+import { startContractorProfileWorkflow, ContractorProfileAction } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 
 const licenseOutput = z.object({
@@ -69,7 +69,7 @@ export const licenseRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorProfileWorkflow(
 				{
-					action: 'CREATE_OR_UPDATE_LICENSE',
+					action: ContractorProfileAction.CREATE_OR_UPDATE_LICENSE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: id,

@@ -3,7 +3,7 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { VendorApprovalStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startContractorComplianceWorkflow } from '../../../workflows/contractorComplianceWorkflow.js';
+import { startContractorComplianceWorkflow, ContractorComplianceAction } from '../../../workflows/contractorComplianceWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -54,7 +54,7 @@ export const complianceRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorComplianceWorkflow(
 				{
-					action: 'REFRESH',
+					action: ContractorComplianceAction.REFRESH,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					vendorId: input.vendorId,
@@ -91,7 +91,7 @@ export const complianceRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorComplianceWorkflow(
 				{
-					action: 'SET_BLOCK',
+					action: ContractorComplianceAction.SET_BLOCK,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					vendorId: input.vendorId,
@@ -132,7 +132,7 @@ export const complianceRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorComplianceWorkflow(
 				{
-					action: 'LINK_HOA_APPROVAL',
+					action: ContractorComplianceAction.LINK_HOA_APPROVAL,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					vendorId: payload.vendorId,

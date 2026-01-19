@@ -102,7 +102,7 @@ class WorkflowSignatureFixer {
         try {
             // Get violations for this file
             const pathParts = filePath.replace(/\\/g, '/').split('hestami-ai-os/');
-            const relPath = pathParts.length > 1 ? pathParts[1] : filePath;
+            const relPath = pathParts[1] ?? filePath;
             const fileViolations = this.violations.filter(v =>
                 v.file.endsWith(relPath) || relPath.endsWith(v.file)
             );

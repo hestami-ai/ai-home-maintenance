@@ -11,6 +11,21 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	InvoiceStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Alias for backward compatibility
+const APInvoiceStatus = InvoiceStatus;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	AP_INVOICE_WORKFLOW_ERROR: 'AP_INVOICE_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'ap_invoice_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'ap_invoice_workflow_error';
@@ -81,7 +96,7 @@ async function createAPInvoice(
 				totalAmount,
 				balanceDue: totalAmount,
 				workOrderId: input.workOrderId,
-				status: 'DRAFT',
+				status: APInvoiceStatus.DRAFT,
 				lineItems: {
 					create: input.lines!.map((line, index) => ({
 						description: line.description,
@@ -100,15 +115,15 @@ async function createAPInvoice(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INVOICE',
+		entityType: ActivityEntityType.INVOICE,
 		entityId: invoice.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `AP Invoice created: ${invoice.invoiceNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'apInvoiceWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: APInvoiceAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { invoiceNumber: invoice.invoiceNumber, vendorName: invoice.vendor.name, totalAmount: totalAmount.toString() }
 	});
@@ -133,7 +148,7 @@ async function approveAPInvoice(
 		return tx.aPInvoice.update({
 			where: { id: invoiceId },
 			data: {
-				status: 'APPROVED',
+				status: APInvoiceStatus.APPROVED,
 				approvedBy: userId,
 				approvedAt: now
 			}
@@ -143,22 +158,22 @@ async function approveAPInvoice(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INVOICE',
+		entityType: ActivityEntityType.INVOICE,
 		entityId: invoiceId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `AP Invoice approved`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'apInvoiceWorkflow_v1',
-		workflowStep: 'APPROVE',
+		workflowStep: APInvoiceAction.APPROVE,
 		workflowVersion: 'v1',
-		newState: { status: 'APPROVED', approvedAt: now.toISOString() }
+		newState: { status: APInvoiceStatus.APPROVED, approvedAt: now.toISOString() }
 	});
 
 	return {
 		id: invoiceId,
-		status: 'APPROVED',
+		status: APInvoiceStatus.APPROVED,
 		approvedAt: now.toISOString()
 	};
 }
@@ -171,24 +186,24 @@ async function voidAPInvoice(
 	await orgTransaction(organizationId, async (tx) => {
 		return tx.aPInvoice.update({
 			where: { id: invoiceId },
-			data: { status: 'VOIDED' }
+			data: { status: APInvoiceStatus.VOIDED }
 		});
 	}, { userId, reason: 'Void AP invoice' });
 
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INVOICE',
+		entityType: ActivityEntityType.INVOICE,
 		entityId: invoiceId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `AP Invoice voided`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'apInvoiceWorkflow_v1',
-		workflowStep: 'VOID',
+		workflowStep: APInvoiceAction.VOID,
 		workflowVersion: 'v1',
-		newState: { status: 'VOIDED' }
+		newState: { status: APInvoiceStatus.VOIDED }
 	});
 
 	return { success: true };
@@ -209,7 +224,7 @@ async function apInvoiceWorkflow(input: APInvoiceWorkflowInput): Promise<APInvoi
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case APInvoiceAction.CREATE: {
 				if (!input.associationId || !input.vendorId || !input.invoiceNumber || !input.invoiceDate || !input.dueDate || !input.lines) {
 					const error = new Error('Missing required fields for CREATE: associationId, vendorId, invoiceNumber, invoiceDate, dueDate, lines');
 					logStepError(log, 'validation', error, { input });
@@ -235,7 +250,7 @@ async function apInvoiceWorkflow(input: APInvoiceWorkflowInput): Promise<APInvoi
 				return successResult;
 			}
 
-			case 'APPROVE': {
+			case APInvoiceAction.APPROVE: {
 				if (!input.invoiceId) {
 					const error = new Error('Missing required field: invoiceId for APPROVE');
 					logStepError(log, 'validation', error, { invoiceId: input.invoiceId });
@@ -259,7 +274,7 @@ async function apInvoiceWorkflow(input: APInvoiceWorkflowInput): Promise<APInvoi
 				return successResult;
 			}
 
-			case 'VOID': {
+			case APInvoiceAction.VOID: {
 				if (!input.invoiceId) {
 					const error = new Error('Missing required field: invoiceId for VOID');
 					logStepError(log, 'validation', error, { invoiceId: input.invoiceId });
@@ -276,7 +291,7 @@ async function apInvoiceWorkflow(input: APInvoiceWorkflowInput): Promise<APInvoi
 					success: true,
 					entityId: input.invoiceId,
 					invoiceId: input.invoiceId,
-					status: 'VOIDED'
+					status: APInvoiceStatus.VOIDED
 				};
 				logWorkflowEnd(log, input.action, true, startTime, successResult);
 				return successResult;
@@ -307,8 +322,8 @@ async function apInvoiceWorkflow(input: APInvoiceWorkflowInput): Promise<APInvoi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'AP_INVOICE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.AP_INVOICE_WORKFLOW_ERROR
 		});
 		const errorResult: APInvoiceWorkflowResult = {
 			success: false,

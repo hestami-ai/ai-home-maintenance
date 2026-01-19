@@ -14,7 +14,7 @@ import {
 	ServiceContractType,
 	RecurrenceFrequency
 } from '../../../../../../generated/prisma/client.js';
-import { startServiceContractWorkflow } from '../../../workflows/contractWorkflow.js';
+import { startServiceContractWorkflow, ContractAction } from '../../../workflows/contractWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ServiceContractRoute');
@@ -197,7 +197,7 @@ export const serviceContractRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'CREATE_CONTRACT',
+					action: ContractAction.CREATE_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -314,7 +314,7 @@ export const serviceContractRouter = {
 				const futureDate = new Date();
 				futureDate.setDate(futureDate.getDate() + input.expiringWithinDays);
 				where.endDate = { lte: futureDate };
-				where.status = 'ACTIVE';
+				where.status = ServiceContractStatus.ACTIVE;
 			}
 
 			const contracts = await prisma.serviceContract.findMany({
@@ -380,7 +380,7 @@ export const serviceContractRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (!['DRAFT', 'ACTIVE'].includes(existing.status)) {
+			if (!([ServiceContractStatus.DRAFT, ServiceContractStatus.ACTIVE] as ServiceContractStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT or ACTIVE contracts' });
 			}
 
@@ -389,7 +389,7 @@ export const serviceContractRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'UPDATE_CONTRACT',
+					action: ContractAction.UPDATE_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: id,
@@ -434,14 +434,14 @@ export const serviceContractRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (!['DRAFT', 'PENDING_APPROVAL', 'SUSPENDED'].includes(existing.status)) {
+			if (!([ServiceContractStatus.DRAFT, ServiceContractStatus.PENDING_APPROVAL, ServiceContractStatus.SUSPENDED] as ServiceContractStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Cannot activate contract in current status' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'ACTIVATE_CONTRACT',
+					action: ContractAction.ACTIVATE_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: input.id,
@@ -486,14 +486,14 @@ export const serviceContractRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (existing.status !== 'ACTIVE') {
+			if (existing.status !== ServiceContractStatus.ACTIVE) {
 				throw errors.BAD_REQUEST({ message: 'Can only suspend ACTIVE contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'SUSPEND_CONTRACT',
+					action: ContractAction.SUSPEND_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: input.id,
@@ -538,14 +538,14 @@ export const serviceContractRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (['CANCELLED', 'EXPIRED'].includes(existing.status)) {
+			if (([ServiceContractStatus.CANCELLED, ServiceContractStatus.EXPIRED] as ServiceContractStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Contract is already cancelled or expired' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'CANCEL_CONTRACT',
+					action: ContractAction.CANCEL_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: input.id,
@@ -599,14 +599,14 @@ export const serviceContractRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (!['ACTIVE', 'EXPIRED'].includes(existing.status)) {
+			if (!([ServiceContractStatus.ACTIVE, ServiceContractStatus.EXPIRED] as ServiceContractStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only renew ACTIVE or EXPIRED contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'RENEW_CONTRACT',
+					action: ContractAction.RENEW_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: input.id,
@@ -654,14 +654,14 @@ export const serviceContractRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== ServiceContractStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'DELETE_CONTRACT',
+					action: ContractAction.DELETE_CONTRACT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: input.id,
@@ -716,14 +716,14 @@ export const serviceContractRouter = {
 			});
 			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract not found' });
 
-			if (!['DRAFT', 'ACTIVE'].includes(contract.status)) {
+			if (!([ServiceContractStatus.DRAFT, ServiceContractStatus.ACTIVE] as ServiceContractStatus[]).includes(contract.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only add items to DRAFT or ACTIVE contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'ADD_SERVICE_ITEM',
+					action: ContractAction.ADD_SERVICE_ITEM,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					contractId: input.contractId,
@@ -780,14 +780,14 @@ export const serviceContractRouter = {
 
 			await context.cerbos.authorize('edit', 'service_contract', item.contractId);
 
-			if (!['DRAFT', 'ACTIVE'].includes(item.contract.status)) {
+			if (!([ServiceContractStatus.DRAFT, ServiceContractStatus.ACTIVE] as ServiceContractStatus[]).includes(item.contract.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only remove items from DRAFT or ACTIVE contracts' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startServiceContractWorkflow(
 				{
-					action: 'REMOVE_SERVICE_ITEM',
+					action: ContractAction.REMOVE_SERVICE_ITEM,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					serviceItemId: input.itemId,

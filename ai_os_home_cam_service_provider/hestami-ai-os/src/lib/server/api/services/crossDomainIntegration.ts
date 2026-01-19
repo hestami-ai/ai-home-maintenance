@@ -13,8 +13,16 @@
  */
 
 import { prisma } from '../../db.js';
-import { JobStatus, JobSourceType, WorkOrderStatus } from '../../../../../generated/prisma/client.js';
-import { startCrossDomainIntegrationWorkflow } from '../../workflows/index.js';
+import { JobStatus, WorkOrderStatus, LicenseStatus, InsuranceStatus, ARCRequestStatus, ResolutionStatus, ActivityEntityType } from '../../../../../generated/prisma/enums.js';
+import { startCrossDomainIntegrationWorkflow, CrossDomainIntegrationWorkflowAction } from '../../workflows/index.js';
+
+// Schedule event types (not Prisma enums, but typed constants for consistency)
+const ScheduleEventType = {
+	JOB: 'JOB',
+	SCHEDULED_VISIT: 'SCHEDULED_VISIT',
+	WORK_ORDER: 'WORK_ORDER',
+	TIME_OFF: 'TIME_OFF'
+} as const;
 
 // =============================================================================
 // Status Mapping
@@ -24,30 +32,30 @@ import { startCrossDomainIntegrationWorkflow } from '../../workflows/index.js';
  * Map Work Order status to Job status
  */
 const WORK_ORDER_TO_JOB_STATUS: Partial<Record<WorkOrderStatus, JobStatus>> = {
-	DRAFT: 'TICKET',
-	SUBMITTED: 'TICKET',
-	TRIAGED: 'JOB_CREATED',
-	ASSIGNED: 'SCHEDULED',
-	SCHEDULED: 'SCHEDULED',
-	IN_PROGRESS: 'IN_PROGRESS',
-	ON_HOLD: 'ON_HOLD',
-	COMPLETED: 'COMPLETED',
-	CLOSED: 'CLOSED',
-	CANCELLED: 'CANCELLED'
+	[WorkOrderStatus.DRAFT]: JobStatus.TICKET,
+	[WorkOrderStatus.SUBMITTED]: JobStatus.TICKET,
+	[WorkOrderStatus.TRIAGED]: JobStatus.JOB_CREATED,
+	[WorkOrderStatus.ASSIGNED]: JobStatus.SCHEDULED,
+	[WorkOrderStatus.SCHEDULED]: JobStatus.SCHEDULED,
+	[WorkOrderStatus.IN_PROGRESS]: JobStatus.IN_PROGRESS,
+	[WorkOrderStatus.ON_HOLD]: JobStatus.ON_HOLD,
+	[WorkOrderStatus.COMPLETED]: JobStatus.COMPLETED,
+	[WorkOrderStatus.CLOSED]: JobStatus.CLOSED,
+	[WorkOrderStatus.CANCELLED]: JobStatus.CANCELLED
 };
 
 /**
  * Map Job status to Work Order status
  */
 const JOB_TO_WORK_ORDER_STATUS: Partial<Record<JobStatus, WorkOrderStatus>> = {
-	TICKET: 'SUBMITTED',
-	JOB_CREATED: 'TRIAGED',
-	SCHEDULED: 'SCHEDULED',
-	IN_PROGRESS: 'IN_PROGRESS',
-	ON_HOLD: 'ON_HOLD',
-	COMPLETED: 'COMPLETED',
-	CLOSED: 'CLOSED',
-	CANCELLED: 'CANCELLED'
+	[JobStatus.TICKET]: WorkOrderStatus.SUBMITTED,
+	[JobStatus.JOB_CREATED]: WorkOrderStatus.TRIAGED,
+	[JobStatus.SCHEDULED]: WorkOrderStatus.SCHEDULED,
+	[JobStatus.IN_PROGRESS]: WorkOrderStatus.IN_PROGRESS,
+	[JobStatus.ON_HOLD]: WorkOrderStatus.ON_HOLD,
+	[JobStatus.COMPLETED]: WorkOrderStatus.COMPLETED,
+	[JobStatus.CLOSED]: WorkOrderStatus.CLOSED,
+	[JobStatus.CANCELLED]: WorkOrderStatus.CANCELLED
 };
 
 // =============================================================================
@@ -96,7 +104,7 @@ export async function createJobFromWorkOrder(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'CREATE_JOB_FROM_WORK_ORDER',
+			action: CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_WORK_ORDER,
 			organizationId: input.contractorOrgId,
 			userId: input.userId,
 			workOrderId: input.workOrderId
@@ -160,7 +168,7 @@ export async function syncJobStatusToWorkOrder(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'SYNC_JOB_STATUS_TO_WORK_ORDER',
+			action: CrossDomainIntegrationWorkflowAction.SYNC_JOB_STATUS_TO_WORK_ORDER,
 			organizationId,
 			userId,
 			jobId,
@@ -215,7 +223,7 @@ export async function syncWorkOrderStatusToJob(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'SYNC_WORK_ORDER_STATUS_TO_JOB',
+			action: CrossDomainIntegrationWorkflowAction.SYNC_WORK_ORDER_STATUS_TO_JOB,
 			organizationId,
 			userId,
 			workOrderId,
@@ -282,7 +290,7 @@ export async function createJobFromViolation(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'CREATE_JOB_FROM_VIOLATION',
+			action: CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_VIOLATION,
 			organizationId: input.contractorOrgId,
 			userId: input.userId,
 			violationId: input.violationId
@@ -356,7 +364,7 @@ export async function createJobFromARCRequest(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'CREATE_JOB_FROM_ARC_REQUEST',
+			action: CrossDomainIntegrationWorkflowAction.CREATE_JOB_FROM_ARC_REQUEST,
 			organizationId: input.contractorOrgId,
 			userId: input.userId,
 			arcRequestId: input.arcRequestId
@@ -454,13 +462,13 @@ export async function getVendorComplianceStatus(
 
 	// Check licenses (status ACTIVE and not expired)
 	const validLicenses = profile.licenses.filter(
-		(l) => l.status === 'ACTIVE' && (!l.expirationDate || l.expirationDate > now)
+		(l) => l.status === LicenseStatus.ACTIVE && (!l.expirationDate || l.expirationDate > now)
 	);
 	const hasValidLicense = validLicenses.length > 0;
 
 	// Check insurances (status ACTIVE and not expired)
 	const validInsurances = profile.insurances.filter(
-		(i) => i.status === 'ACTIVE' && i.expirationDate > now
+		(i) => i.status === InsuranceStatus.ACTIVE && i.expirationDate > now
 	);
 	const hasValidInsurance = validInsurances.length > 0;
 
@@ -524,7 +532,7 @@ export async function syncVendorComplianceNotes(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'SYNC_VENDOR_COMPLIANCE_NOTES',
+			action: CrossDomainIntegrationWorkflowAction.SYNC_VENDOR_COMPLIANCE_NOTES,
 			organizationId,
 			userId,
 			vendorId,
@@ -590,7 +598,7 @@ export async function getUnifiedSchedule(
 			if (job.scheduledStart && job.scheduledEnd) {
 				events.push({
 					id: `job-${job.id}`,
-					type: 'JOB',
+					type: ActivityEntityType.JOB,
 					title: job.title,
 					start: job.scheduledStart,
 					end: job.scheduledEnd,
@@ -623,7 +631,7 @@ export async function getUnifiedSchedule(
 			if (visit.scheduledStart && visit.scheduledEnd) {
 				events.push({
 					id: `visit-${visit.id}`,
-					type: 'SCHEDULED_VISIT',
+					type: ScheduleEventType.SCHEDULED_VISIT,
 					title: `${visit.contract.name} - Visit #${visit.visitNumber}`,
 					start: visit.scheduledStart,
 					end: visit.scheduledEnd,
@@ -675,7 +683,7 @@ export async function checkSchedulingConflicts(
 	for (const job of jobConflicts) {
 		if (job.scheduledStart && job.scheduledEnd) {
 			conflicts.push({
-				type: 'JOB',
+				type: ActivityEntityType.JOB,
 				id: job.id,
 				title: job.title,
 				start: job.scheduledStart,
@@ -702,7 +710,7 @@ export async function checkSchedulingConflicts(
 	for (const visit of visitConflicts) {
 		if (visit.scheduledStart && visit.scheduledEnd) {
 			conflicts.push({
-				type: 'SCHEDULED_VISIT',
+				type: ScheduleEventType.SCHEDULED_VISIT,
 				id: visit.id,
 				title: `${visit.contract.name} - Visit #${visit.visitNumber}`,
 				start: visit.scheduledStart,
@@ -726,7 +734,7 @@ export async function checkSchedulingConflicts(
 
 	for (const timeOff of timeOffConflicts) {
 		conflicts.push({
-			type: 'TIME_OFF',
+			type: ScheduleEventType.TIME_OFF,
 			id: timeOff.id,
 			title: `Time Off: ${timeOff.reason ?? 'Personal'}`,
 			start: timeOff.startsAt,
@@ -800,7 +808,7 @@ export async function createWorkOrderFromViolation(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'CREATE_WORK_ORDER_FROM_VIOLATION',
+			action: CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_VIOLATION,
 			organizationId: input.organizationId,
 			userId: input.userId,
 			violationId: input.violationId,
@@ -862,7 +870,7 @@ export async function createWorkOrderFromARC(
 		throw new Error('ARC Request does not belong to this association');
 	}
 
-	if (arcRequest.status !== 'APPROVED') {
+	if (arcRequest.status !== ARCRequestStatus.APPROVED) {
 		throw new Error('ARC Request must be approved before creating work order');
 	}
 
@@ -885,7 +893,7 @@ export async function createWorkOrderFromARC(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'CREATE_WORK_ORDER_FROM_ARC',
+			action: CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_ARC,
 			organizationId: input.organizationId,
 			userId: input.userId,
 			arcRequestId: input.arcRequestId,
@@ -949,7 +957,7 @@ export async function createWorkOrderFromResolution(
 		throw new Error('Resolution does not belong to this association');
 	}
 
-	if (resolution.status !== 'ADOPTED') {
+	if (resolution.status !== ResolutionStatus.ADOPTED) {
 		throw new Error('Resolution must be adopted before creating work order');
 	}
 
@@ -972,7 +980,7 @@ export async function createWorkOrderFromResolution(
 	// Delegate to workflow for mutation
 	const result = await startCrossDomainIntegrationWorkflow(
 		{
-			action: 'CREATE_WORK_ORDER_FROM_RESOLUTION',
+			action: CrossDomainIntegrationWorkflowAction.CREATE_WORK_ORDER_FROM_RESOLUTION,
 			organizationId: input.organizationId,
 			userId: input.userId,
 			resolutionId: input.resolutionId,

@@ -3,7 +3,7 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { FundingPlanTypeSchema, ReserveComponentCategorySchema, ReserveStudyTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
-import { startReserveWorkflow } from '../../workflows/reserveWorkflow.js';
+import { startReserveWorkflow, ReserveAction } from '../../workflows/reserveWorkflow.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
 
@@ -71,7 +71,7 @@ export const reserveRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
 				{
-					action: 'CREATE_COMPONENT',
+					action: ReserveAction.CREATE_COMPONENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -311,7 +311,7 @@ export const reserveRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
 				{
-					action: 'UPDATE_COMPONENT',
+					action: ReserveAction.UPDATE_COMPONENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -380,7 +380,7 @@ export const reserveRouter = {
 
 			const result = await startReserveWorkflow(
 				{
-					action: 'DELETE_COMPONENT',
+					action: ReserveAction.DELETE_COMPONENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -451,7 +451,7 @@ export const reserveRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
 				{
-					action: 'CREATE_STUDY',
+					action: ReserveAction.CREATE_STUDY,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -686,7 +686,7 @@ export const reserveRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
 				{
-					action: 'ADD_STUDY_COMPONENT',
+					action: ReserveAction.ADD_STUDY_COMPONENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -827,7 +827,7 @@ export const reserveRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReserveWorkflow(
 				{
-					action: 'GENERATE_FUNDING_SCHEDULE',
+					action: ReserveAction.GENERATE_FUNDING_SCHEDULE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {

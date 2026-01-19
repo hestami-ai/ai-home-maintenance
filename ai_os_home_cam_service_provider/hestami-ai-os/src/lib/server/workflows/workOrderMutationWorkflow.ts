@@ -15,7 +15,21 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
-import type { Prisma, WorkOrderStatus, FundType } from '../../../../generated/prisma/client.js';
+import type { Prisma, FundType } from '../../../../generated/prisma/client.js';
+import {
+	WorkOrderStatus,
+	BoardApprovalStatus,
+	VoteMethod,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	WORK_ORDER_MUTATION_WORKFLOW_ERROR: 'WORK_ORDER_MUTATION_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'work_order_mutation_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'work_order_mutation_workflow_error';
@@ -149,7 +163,7 @@ async function createWorkOrder(
 					description: input.description!,
 					category: input.category! as Prisma.WorkOrderCreateInput['category'],
 					priority: input.priority! as Prisma.WorkOrderCreateInput['priority'],
-					status: 'DRAFT',
+					status: WorkOrderStatus.DRAFT,
 					unitId: input.unitId,
 					commonAreaName: input.commonAreaName,
 					assetId: input.assetId,
@@ -175,7 +189,7 @@ async function createWorkOrder(
 				data: {
 					workOrderId: wo.id,
 					fromStatus: null,
-					toStatus: 'DRAFT',
+					toStatus: WorkOrderStatus.DRAFT,
 					changedBy: input.userId,
 					notes: 'Work order created'
 				}
@@ -188,15 +202,15 @@ async function createWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order created: ${result.title}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: WorkOrderMutationAction.CREATE,
 		workflowVersion: 'v1',
 		newState: {
 			workOrderNumber: result.workOrderNumber,
@@ -223,16 +237,16 @@ async function updateWorkOrderStatus(
 		status: input.newStatus
 	};
 
-	if (input.newStatus === 'IN_PROGRESS') {
+	if (input.newStatus === WorkOrderStatus.IN_PROGRESS) {
 		updateData.startedAt = now;
 	}
-	if (input.newStatus === 'COMPLETED') {
+	if (input.newStatus === WorkOrderStatus.COMPLETED) {
 		updateData.completedAt = now;
 		if (input.slaMet !== undefined) {
 			updateData.slaMet = input.slaMet;
 		}
 	}
-	if (input.newStatus === 'CLOSED') {
+	if (input.newStatus === WorkOrderStatus.CLOSED) {
 		updateData.closedAt = now;
 		updateData.closedBy = input.userId;
 	}
@@ -262,15 +276,15 @@ async function updateWorkOrderStatus(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order status changed from ${input.previousStatus} to ${input.newStatus}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'UPDATE_STATUS',
+		workflowStep: WorkOrderMutationAction.UPDATE_STATUS,
 		workflowVersion: 'v1',
 		previousState: { status: input.previousStatus },
 		newState: { status: result.status }
@@ -295,16 +309,16 @@ async function assignVendorToWorkOrder(
 					assignedVendorId: input.vendorId,
 					assignedAt: new Date(),
 					assignedBy: input.userId,
-					status: 'ASSIGNED'
+					status: WorkOrderStatus.ASSIGNED
 				}
 			});
 
-			if (input.previousStatus !== 'ASSIGNED') {
+			if (input.previousStatus !== WorkOrderStatus.ASSIGNED) {
 				await tx.workOrderStatusHistory.create({
 					data: {
 						workOrderId: input.workOrderId!,
 						fromStatus: input.previousStatus!,
-						toStatus: 'ASSIGNED',
+						toStatus: WorkOrderStatus.ASSIGNED,
 						changedBy: input.userId,
 						notes: input.notes || `Assigned to vendor: ${input.vendorName}`
 					}
@@ -318,15 +332,15 @@ async function assignVendorToWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'ASSIGN',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.ASSIGN,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Vendor assigned to work order: ${input.vendorName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'ASSIGN_VENDOR',
+		workflowStep: WorkOrderMutationAction.ASSIGN_VENDOR,
 		workflowVersion: 'v1',
 		newState: { assignedVendorId: input.vendorId, status: result.status }
 	});
@@ -344,7 +358,7 @@ async function assignTechnicianToWorkOrder(
 	const result = await orgTransaction(
 		input.organizationId,
 		async (tx) => {
-			const newStatus = input.previousStatus === 'TRIAGED' ? 'ASSIGNED' : input.previousStatus!;
+			const newStatus = input.previousStatus === WorkOrderStatus.TRIAGED ? WorkOrderStatus.ASSIGNED : input.previousStatus!;
 			const wo = await tx.workOrder.update({
 				where: { id: input.workOrderId },
 				data: {
@@ -354,12 +368,12 @@ async function assignTechnicianToWorkOrder(
 				}
 			});
 
-			if (input.previousStatus === 'TRIAGED') {
+			if (input.previousStatus === WorkOrderStatus.TRIAGED) {
 				await tx.workOrderStatusHistory.create({
 					data: {
 						workOrderId: input.workOrderId!,
 						fromStatus: input.previousStatus!,
-						toStatus: 'ASSIGNED',
+						toStatus: WorkOrderStatus.ASSIGNED,
 						changedBy: input.userId,
 						notes: input.notes || `Assigned to technician: ${input.technicianName}`
 					}
@@ -373,15 +387,15 @@ async function assignTechnicianToWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'ASSIGN',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.ASSIGN,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Technician assigned to work order: ${input.technicianName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'ASSIGN_TECHNICIAN',
+		workflowStep: WorkOrderMutationAction.ASSIGN_TECHNICIAN,
 		workflowVersion: 'v1',
 		newState: { assignedTechnicianId: input.technicianId, status: result.status }
 	});
@@ -406,16 +420,16 @@ async function scheduleWorkOrder(
 					scheduledEnd: input.scheduledEnd,
 					assignedTechnicianId: input.technicianId,
 					assignedTechnicianBranchId: input.technicianBranchId,
-					status: 'SCHEDULED'
+					status: WorkOrderStatus.SCHEDULED
 				}
 			});
 
-			if (input.previousStatus !== 'SCHEDULED') {
+			if (input.previousStatus !== WorkOrderStatus.SCHEDULED) {
 				await tx.workOrderStatusHistory.create({
 					data: {
 						workOrderId: input.workOrderId!,
 						fromStatus: input.previousStatus!,
-						toStatus: 'SCHEDULED',
+						toStatus: WorkOrderStatus.SCHEDULED,
 						changedBy: input.userId,
 						notes: input.notes || `Scheduled for ${input.scheduledStart?.toISOString()}`
 					}
@@ -429,15 +443,15 @@ async function scheduleWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'SCHEDULE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.SCHEDULE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order scheduled for ${input.scheduledStart?.toISOString()}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'SCHEDULE',
+		workflowStep: WorkOrderMutationAction.SCHEDULE,
 		workflowVersion: 'v1',
 		newState: { scheduledStart: input.scheduledStart?.toISOString(), status: result.status }
 	});
@@ -460,7 +474,7 @@ async function completeWorkOrder(
 			const wo = await tx.workOrder.update({
 				where: { id: input.workOrderId },
 				data: {
-					status: 'COMPLETED',
+					status: WorkOrderStatus.COMPLETED,
 					completedAt: now,
 					actualCost: input.actualCost,
 					actualHours: input.actualHours,
@@ -472,8 +486,8 @@ async function completeWorkOrder(
 			await tx.workOrderStatusHistory.create({
 				data: {
 					workOrderId: input.workOrderId!,
-					fromStatus: 'IN_PROGRESS',
-					toStatus: 'COMPLETED',
+					fromStatus: WorkOrderStatus.IN_PROGRESS,
+					toStatus: WorkOrderStatus.COMPLETED,
 					changedBy: input.userId,
 					notes: input.resolutionNotes || 'Work completed'
 				}
@@ -517,15 +531,15 @@ async function completeWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'COMPLETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.COMPLETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order completed${input.slaMet ? ' (SLA met)' : input.slaMet === false ? ' (SLA missed)' : ''}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'COMPLETE',
+		workflowStep: WorkOrderMutationAction.COMPLETE,
 		workflowVersion: 'v1',
 		newState: {
 			status: result.status,
@@ -555,7 +569,7 @@ async function authorizeWorkOrder(
 			const wo = await tx.workOrder.update({
 				where: { id: input.workOrderId },
 				data: {
-					status: requiresBoardApproval ? 'TRIAGED' : 'AUTHORIZED',
+					status: requiresBoardApproval ? WorkOrderStatus.TRIAGED : WorkOrderStatus.AUTHORIZED,
 					authorizedBy: requiresBoardApproval ? null : input.userId,
 					authorizedAt: requiresBoardApproval ? null : now,
 					authorizationRationale: input.rationale,
@@ -564,7 +578,7 @@ async function authorizeWorkOrder(
 					approvedAmount: input.approvedAmount,
 					constraints: input.constraints,
 					requiresBoardApproval,
-					boardApprovalStatus: requiresBoardApproval ? 'PENDING' : null
+					boardApprovalStatus: requiresBoardApproval ? BoardApprovalStatus.PENDING : null
 				}
 			});
 
@@ -572,8 +586,8 @@ async function authorizeWorkOrder(
 				await tx.workOrderStatusHistory.create({
 					data: {
 						workOrderId: input.workOrderId!,
-						fromStatus: 'TRIAGED',
-						toStatus: 'AUTHORIZED',
+						fromStatus: WorkOrderStatus.TRIAGED,
+						toStatus: WorkOrderStatus.AUTHORIZED,
 						changedBy: input.userId,
 						notes: `Authorized by manager: ${input.rationale}`
 					}
@@ -587,17 +601,17 @@ async function authorizeWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: requiresBoardApproval ? 'UPDATE' : 'APPROVE',
-		eventCategory: 'EXECUTION',
+		action: requiresBoardApproval ? ActivityActionType.UPDATE : ActivityActionType.APPROVE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: requiresBoardApproval
 			? `Work order requires board approval (amount: ${input.approvedAmount})`
 			: `Work order authorized: ${input.rationale}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'AUTHORIZE',
+		workflowStep: WorkOrderMutationAction.AUTHORIZE,
 		workflowVersion: 'v1',
 		newState: {
 			status: result.status,
@@ -627,7 +641,7 @@ async function acceptWorkOrderCompletion(
 			const wo = await tx.workOrder.update({
 				where: { id: input.workOrderId },
 				data: {
-					status: 'CLOSED',
+					status: WorkOrderStatus.CLOSED,
 					closedAt: now,
 					closedBy: input.userId,
 					resolutionNotes: input.resolutionNotes,
@@ -640,7 +654,7 @@ async function acceptWorkOrderCompletion(
 				data: {
 					workOrderId: input.workOrderId!,
 					fromStatus: input.previousStatus!,
-					toStatus: 'CLOSED',
+					toStatus: WorkOrderStatus.CLOSED,
 					changedBy: input.userId,
 					notes: `Completion accepted: ${input.resolutionNotes}`
 				}
@@ -653,15 +667,15 @@ async function acceptWorkOrderCompletion(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: 'APPROVE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.APPROVE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Work order completion accepted: ${input.resolutionNotes}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'ACCEPT_COMPLETION',
+		workflowStep: WorkOrderMutationAction.ACCEPT_COMPLETION,
 		workflowVersion: 'v1',
 		newState: {
 			status: result.status,
@@ -688,7 +702,7 @@ async function requestBoardApprovalForWorkOrder(
 				data: {
 					meetingId: input.meetingId!,
 					question: input.voteQuestion!,
-					method: 'IN_PERSON',
+					method: VoteMethod.IN_PERSON,
 					createdBy: input.userId
 				}
 			});
@@ -698,7 +712,7 @@ async function requestBoardApprovalForWorkOrder(
 				where: { id: input.workOrderId },
 				data: {
 					boardApprovalVoteId: vote.id,
-					boardApprovalStatus: 'PENDING'
+					boardApprovalStatus: BoardApprovalStatus.PENDING
 				}
 			});
 
@@ -709,19 +723,19 @@ async function requestBoardApprovalForWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.workOrder.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Board approval requested for work order ${input.workOrderNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'REQUEST_BOARD_APPROVAL',
+		workflowStep: WorkOrderMutationAction.REQUEST_BOARD_APPROVAL,
 		workflowVersion: 'v1',
 		newState: {
 			boardApprovalVoteId: result.vote.id,
-			boardApprovalStatus: 'PENDING'
+			boardApprovalStatus: BoardApprovalStatus.PENDING
 		}
 	});
 
@@ -736,8 +750,8 @@ async function recordBoardDecisionForWorkOrder(
 	input: WorkOrderMutationInput
 ): Promise<{ id: string; status: string; boardApprovalStatus: string; authorizedAt: string | null }> {
 	const now = new Date();
-	const newStatus = input.approved ? 'AUTHORIZED' : 'CANCELLED';
-	const boardApprovalStatus = input.approved ? 'APPROVED' : 'DENIED';
+	const newStatus = input.approved ? WorkOrderStatus.AUTHORIZED : WorkOrderStatus.CANCELLED;
+	const boardApprovalStatusValue = input.approved ? BoardApprovalStatus.APPROVED : BoardApprovalStatus.DENIED;
 
 	const result = await orgTransaction(
 		input.organizationId,
@@ -754,7 +768,7 @@ async function recordBoardDecisionForWorkOrder(
 				where: { id: input.workOrderId },
 				data: {
 					status: newStatus,
-					boardApprovalStatus,
+					boardApprovalStatus: boardApprovalStatusValue,
 					authorizedBy: input.approved ? input.userId : null,
 					authorizedAt: input.approved ? now : null,
 					authorizingRole: input.approved ? 'BOARD' : null,
@@ -781,17 +795,17 @@ async function recordBoardDecisionForWorkOrder(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: result.id,
-		action: input.approved ? 'APPROVE' : 'DENY',
-		eventCategory: 'EXECUTION',
+		action: input.approved ? ActivityActionType.APPROVE : ActivityActionType.DENY,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: input.approved
 			? `Board approved work order: ${input.rationale}`
 			: `Board denied work order: ${input.rationale}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'RECORD_BOARD_DECISION',
+		workflowStep: WorkOrderMutationAction.RECORD_BOARD_DECISION,
 		workflowVersion: 'v1',
 		newState: {
 			status: result.status,
@@ -828,15 +842,15 @@ async function addWorkOrderComment(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: input.workOrderId!,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Comment added to work order`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'ADD_COMMENT',
+		workflowStep: WorkOrderMutationAction.ADD_COMMENT,
 		workflowVersion: 'v1',
 		newState: { commentId: commentRecord.id, isInternal: commentRecord.isInternal }
 	});
@@ -907,7 +921,7 @@ async function createWorkOrderInvoice(
 				where: { id: input.workOrderId },
 				data: {
 					invoiceId: invoice.id,
-					status: 'INVOICED',
+					status: WorkOrderStatus.INVOICED,
 					actualCost: totalAmount
 				}
 			});
@@ -916,8 +930,8 @@ async function createWorkOrderInvoice(
 			await tx.workOrderStatusHistory.create({
 				data: {
 					workOrderId: input.workOrderId!,
-					fromStatus: 'COMPLETED',
-					toStatus: 'INVOICED',
+					fromStatus: WorkOrderStatus.COMPLETED,
+					toStatus: WorkOrderStatus.INVOICED,
 					changedBy: input.userId,
 					notes: `Invoice ${input.invoiceNumber} created`
 				}
@@ -930,15 +944,15 @@ async function createWorkOrderInvoice(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: input.workOrderId!,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Invoice ${input.invoiceNumber} created for work order`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderMutationWorkflow_v1',
-		workflowStep: 'CREATE_INVOICE',
+		workflowStep: WorkOrderMutationAction.CREATE_INVOICE,
 		workflowVersion: 'v1',
 		newState: {
 			invoiceId: result.invoice.id,
@@ -972,7 +986,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case WorkOrderMutationAction.CREATE: {
 				if (!input.workOrderNumber || !input.title || !input.description) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -996,7 +1010,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'UPDATE_STATUS': {
+			case WorkOrderMutationAction.UPDATE_STATUS: {
 				if (!input.workOrderId || !input.newStatus || !input.previousStatus) {
 					const error = new Error('Missing required fields for UPDATE_STATUS');
 					logStepError(log, 'validation', error, { input });
@@ -1020,7 +1034,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'ASSIGN_VENDOR': {
+			case WorkOrderMutationAction.ASSIGN_VENDOR: {
 				if (!input.workOrderId || !input.vendorId) {
 					const error = new Error('Missing required fields for ASSIGN_VENDOR');
 					logStepError(log, 'validation', error, { input });
@@ -1044,7 +1058,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'ASSIGN_TECHNICIAN': {
+			case WorkOrderMutationAction.ASSIGN_TECHNICIAN: {
 				if (!input.workOrderId || !input.technicianId) {
 					const error = new Error('Missing required fields for ASSIGN_TECHNICIAN');
 					logStepError(log, 'validation', error, { input });
@@ -1068,7 +1082,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'SCHEDULE': {
+			case WorkOrderMutationAction.SCHEDULE: {
 				if (!input.workOrderId || !input.scheduledStart) {
 					const error = new Error('Missing required fields for SCHEDULE');
 					logStepError(log, 'validation', error, { input });
@@ -1092,7 +1106,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'COMPLETE': {
+			case WorkOrderMutationAction.COMPLETE: {
 				if (!input.workOrderId) {
 					const error = new Error('Missing required fields for COMPLETE');
 					logStepError(log, 'validation', error, { input });
@@ -1117,7 +1131,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'AUTHORIZE': {
+			case WorkOrderMutationAction.AUTHORIZE: {
 				if (!input.workOrderId || !input.rationale) {
 					const error = new Error('Missing required fields for AUTHORIZE');
 					logStepError(log, 'validation', error, { input });
@@ -1142,7 +1156,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'ACCEPT_COMPLETION': {
+			case WorkOrderMutationAction.ACCEPT_COMPLETION: {
 				if (!input.workOrderId || !input.resolutionNotes) {
 					const error = new Error('Missing required fields for ACCEPT_COMPLETION');
 					logStepError(log, 'validation', error, { input });
@@ -1166,7 +1180,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'REQUEST_BOARD_APPROVAL': {
+			case WorkOrderMutationAction.REQUEST_BOARD_APPROVAL: {
 				if (!input.workOrderId || !input.meetingId || !input.voteQuestion) {
 					const error = new Error('Missing required fields for REQUEST_BOARD_APPROVAL');
 					logStepError(log, 'validation', error, { input });
@@ -1190,7 +1204,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'RECORD_BOARD_DECISION': {
+			case WorkOrderMutationAction.RECORD_BOARD_DECISION: {
 				if (!input.workOrderId || input.approved === undefined || !input.rationale) {
 					const error = new Error('Missing required fields for RECORD_BOARD_DECISION');
 					logStepError(log, 'validation', error, { input });
@@ -1215,7 +1229,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'ADD_COMMENT': {
+			case WorkOrderMutationAction.ADD_COMMENT: {
 				if (!input.workOrderId || !input.comment) {
 					const error = new Error('Missing required fields for ADD_COMMENT');
 					logStepError(log, 'validation', error, { input });
@@ -1238,7 +1252,7 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 				return successResult;
 			}
 
-			case 'CREATE_INVOICE': {
+			case WorkOrderMutationAction.CREATE_INVOICE: {
 				if (!input.workOrderId || !input.invoiceNumber || !input.glAccountId) {
 					const error = new Error('Missing required fields for CREATE_INVOICE');
 					logStepError(log, 'validation', error, { input });
@@ -1287,8 +1301,8 @@ async function workOrderMutationWorkflow(input: WorkOrderMutationInput): Promise
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'WORK_ORDER_MUTATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.WORK_ORDER_MUTATION_WORKFLOW_ERROR
 		});
 		const errorResult: WorkOrderMutationResult = {
 			success: false,

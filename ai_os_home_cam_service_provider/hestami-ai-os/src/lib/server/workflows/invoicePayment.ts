@@ -8,9 +8,14 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
-import type { JobInvoiceStatus } from '../../../../generated/prisma/client.js';
+import { JobInvoiceStatus, JobPaymentStatus, ActivityActionType, PaymentMethod } from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	INVOICE_PAYMENT_ERROR: 'INVOICE_PAYMENT_ERROR'
+} as const;
 
 const log = createWorkflowLogger('InvoicePaymentWorkflow');
 
@@ -18,14 +23,14 @@ const WORKFLOW_STATUS_EVENT = 'invoice_status';
 const WORKFLOW_ERROR_EVENT = 'invoice_error';
 
 const validTransitions: Record<JobInvoiceStatus, JobInvoiceStatus[]> = {
-	DRAFT: ['SENT', 'VOID'],
-	SENT: ['VIEWED', 'PARTIAL', 'PAID', 'OVERDUE', 'VOID'],
-	VIEWED: ['PARTIAL', 'PAID', 'OVERDUE', 'VOID'],
-	PARTIAL: ['PAID', 'OVERDUE', 'VOID'],
-	PAID: ['REFUNDED'],
-	OVERDUE: ['PARTIAL', 'PAID', 'VOID'],
-	VOID: [],
-	REFUNDED: []
+	[JobInvoiceStatus.DRAFT]: [JobInvoiceStatus.SENT, JobInvoiceStatus.VOID],
+	[JobInvoiceStatus.SENT]: [JobInvoiceStatus.VIEWED, JobInvoiceStatus.PARTIAL, JobInvoiceStatus.PAID, JobInvoiceStatus.OVERDUE, JobInvoiceStatus.VOID],
+	[JobInvoiceStatus.VIEWED]: [JobInvoiceStatus.PARTIAL, JobInvoiceStatus.PAID, JobInvoiceStatus.OVERDUE, JobInvoiceStatus.VOID],
+	[JobInvoiceStatus.PARTIAL]: [JobInvoiceStatus.PAID, JobInvoiceStatus.OVERDUE, JobInvoiceStatus.VOID],
+	[JobInvoiceStatus.PAID]: [JobInvoiceStatus.REFUNDED],
+	[JobInvoiceStatus.OVERDUE]: [JobInvoiceStatus.PARTIAL, JobInvoiceStatus.PAID, JobInvoiceStatus.VOID],
+	[JobInvoiceStatus.VOID]: [],
+	[JobInvoiceStatus.REFUNDED]: []
 };
 
 interface InvoicePaymentInput {
@@ -61,7 +66,7 @@ async function validateInvoiceTransition(input: InvoicePaymentInput): Promise<{
 	});
 
 	if (!invoice) {
-		return { valid: false, currentStatus: 'DRAFT', error: 'Invoice not found' };
+		return { valid: false, currentStatus: JobInvoiceStatus.DRAFT, error: 'Invoice not found' };
 	}
 
 	const currentStatus = invoice.status as JobInvoiceStatus;
@@ -79,7 +84,8 @@ async function validateInvoiceTransition(input: InvoicePaymentInput): Promise<{
 	const amountDue = Number(invoice.totalAmount) - Number(invoice.amountPaid);
 
 	// Validate payment amount for payment transitions
-	if (['PARTIAL', 'PAID'].includes(input.toStatus)) {
+	const paymentStatuses: JobInvoiceStatus[] = [JobInvoiceStatus.PARTIAL, JobInvoiceStatus.PAID];
+	if (paymentStatuses.includes(input.toStatus)) {
 		if (!input.paymentAmount || input.paymentAmount <= 0) {
 			return {
 				valid: false,
@@ -90,7 +96,7 @@ async function validateInvoiceTransition(input: InvoicePaymentInput): Promise<{
 			};
 		}
 
-		if (input.toStatus === 'PAID' && input.paymentAmount < amountDue) {
+		if (input.toStatus === JobInvoiceStatus.PAID && input.paymentAmount < amountDue) {
 			return {
 				valid: false,
 				currentStatus,
@@ -117,16 +123,16 @@ async function updateInvoiceStatus(
 		};
 
 		switch (input.toStatus) {
-			case 'SENT':
+			case JobInvoiceStatus.SENT:
 				updateData.sentAt = new Date();
 				break;
 
-			case 'VIEWED':
+			case JobInvoiceStatus.VIEWED:
 				updateData.viewedAt = new Date();
 				break;
 
-			case 'PARTIAL':
-			case 'PAID':
+			case JobInvoiceStatus.PARTIAL:
+			case JobInvoiceStatus.PAID:
 				if (input.paymentAmount) {
 					// Get invoice details for payment
 					const invoiceDetails = await tx.jobInvoice.findUnique({
@@ -141,7 +147,7 @@ async function updateInvoiceStatus(
 							invoiceId: input.invoiceId,
 							customerId: invoiceDetails!.customerId,
 							amount: input.paymentAmount,
-							status: 'SUCCEEDED',
+							status: JobPaymentStatus.SUCCEEDED,
 							processedAt: new Date()
 						}
 					});
@@ -152,17 +158,17 @@ async function updateInvoiceStatus(
 					updateData.amountPaid = newAmountPaid;
 					updateData.balanceDue = Number(invoiceDetails?.totalAmount ?? 0) - newAmountPaid;
 
-					if (input.toStatus === 'PAID') {
+					if (input.toStatus === JobInvoiceStatus.PAID) {
 						updateData.paidAt = new Date();
 					}
 				}
 				break;
 
-			case 'VOID':
+			case JobInvoiceStatus.VOID:
 				// VOID status - no additional fields needed
 				break;
 
-			case 'REFUNDED':
+			case JobInvoiceStatus.REFUNDED:
 				// REFUNDED status - no additional fields needed
 				break;
 		}
@@ -229,9 +235,10 @@ async function invoicePaymentWorkflow(input: InvoicePaymentInput): Promise<Invoi
 		}
 
 		// Process payment if applicable
-		if (['PARTIAL', 'PAID'].includes(input.toStatus) && input.paymentAmount) {
+		const paymentStatuses: JobInvoiceStatus[] = [JobInvoiceStatus.PARTIAL, JobInvoiceStatus.PAID];
+		if (paymentStatuses.includes(input.toStatus) && input.paymentAmount) {
 			const paymentResult = await DBOS.runStep(
-				() => processPaymentIntent(input.invoiceId, input.paymentAmount!, input.paymentMethod ?? 'OTHER'),
+				() => processPaymentIntent(input.invoiceId, input.paymentAmount!, input.paymentMethod ?? PaymentMethod.OTHER),
 				{ name: 'processPaymentIntent' }
 			);
 			await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'payment_processed', ...paymentResult });
@@ -285,14 +292,14 @@ async function invoicePaymentWorkflow(input: InvoicePaymentInput): Promise<Invoi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'INVOICE_PAYMENT_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.INVOICE_PAYMENT_ERROR
 		});
 
 		return {
 			success: false,
 			invoiceId: input.invoiceId,
-			fromStatus: 'DRAFT',
+			fromStatus: JobInvoiceStatus.DRAFT,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

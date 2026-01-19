@@ -11,6 +11,17 @@ import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	SUPPLIER_WORKFLOW_ERROR: 'SUPPLIER_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const SupplierAction = {
@@ -126,62 +137,62 @@ async function supplierWorkflow(input: SupplierWorkflowInput): Promise<SupplierW
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_SUPPLIER':
+			case SupplierAction.CREATE_SUPPLIER:
 				entityId = await DBOS.runStep(
 					() => createSupplier(input.organizationId, input.userId, input.data),
 					{ name: 'createSupplier' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'EXTERNAL_VENDOR',
+					entityType: ActivityEntityType.EXTERNAL_VENDOR,
 					entityId: entityId,
-					action: 'CREATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: `Supplier created: ${input.data.name}`,
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'supplierWorkflow_v1',
-					workflowStep: 'CREATE_SUPPLIER',
+					workflowStep: SupplierAction.CREATE_SUPPLIER,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'UPDATE_SUPPLIER':
+			case SupplierAction.UPDATE_SUPPLIER:
 				entityId = await DBOS.runStep(
 					() => updateSupplier(input.organizationId, input.userId, input.supplierId!, input.data),
 					{ name: 'updateSupplier' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'EXTERNAL_VENDOR',
+					entityType: ActivityEntityType.EXTERNAL_VENDOR,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Supplier details updated',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'supplierWorkflow_v1',
-					workflowStep: 'UPDATE_SUPPLIER',
+					workflowStep: SupplierAction.UPDATE_SUPPLIER,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'DELETE_SUPPLIER':
+			case SupplierAction.DELETE_SUPPLIER:
 				entityId = await DBOS.runStep(
 					() => deleteSupplier(input.organizationId, input.userId, input.supplierId!),
 					{ name: 'deleteSupplier' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'EXTERNAL_VENDOR',
+					entityType: ActivityEntityType.EXTERNAL_VENDOR,
 					entityId: input.supplierId!,
-					action: 'DELETE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.DELETE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Supplier deleted (soft delete)',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'supplierWorkflow_v1',
-					workflowStep: 'DELETE_SUPPLIER',
+					workflowStep: SupplierAction.DELETE_SUPPLIER,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -206,8 +217,8 @@ async function supplierWorkflow(input: SupplierWorkflowInput): Promise<SupplierW
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'SUPPLIER_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.SUPPLIER_WORKFLOW_ERROR
 		});
 
 		const errorResult = { success: false, error: errorMessage };

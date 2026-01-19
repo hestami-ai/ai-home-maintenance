@@ -11,6 +11,17 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	EXTERNAL_VENDOR_WORKFLOW_ERROR: 'EXTERNAL_VENDOR_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'external_vendor_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'external_vendor_workflow_error';
@@ -92,15 +103,15 @@ async function createContext(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: vendorContext.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `External vendor added: ${input.vendorName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalVendorWorkflow_v1',
-		workflowStep: 'CREATE_CONTEXT',
+		workflowStep: ExternalVendorWorkflowAction.CREATE_CONTEXT,
 		workflowVersion: 'v1',
 		newState: { vendorName: input.vendorName, tradeCategories: input.tradeCategories }
 	});
@@ -137,15 +148,15 @@ async function updateContext(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: updated.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `External vendor updated: ${updated.vendorName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalVendorWorkflow_v1',
-		workflowStep: 'UPDATE_CONTEXT',
+		workflowStep: ExternalVendorWorkflowAction.UPDATE_CONTEXT,
 		workflowVersion: 'v1',
 		newState: updateData
 	});
@@ -173,15 +184,15 @@ async function linkToServiceProvider(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: updated.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Vendor linked to platform provider: ${input.serviceProviderName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalVendorWorkflow_v1',
-		workflowStep: 'LINK_TO_SERVICE_PROVIDER',
+		workflowStep: ExternalVendorWorkflowAction.LINK_TO_SERVICE_PROVIDER,
 		workflowVersion: 'v1',
 		newState: { linkedServiceProviderOrgId: input.serviceProviderOrgId }
 	});
@@ -216,15 +227,15 @@ async function logInteraction(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: interaction.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Vendor interaction: ${input.interactionType} - ${input.description?.substring(0, 50)}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalVendorWorkflow_v1',
-		workflowStep: 'LOG_INTERACTION',
+		workflowStep: ExternalVendorWorkflowAction.LOG_INTERACTION,
 		workflowVersion: 'v1',
 		newState: { interactionType: input.interactionType, description: input.description }
 	});
@@ -251,7 +262,7 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE_CONTEXT': {
+			case ExternalVendorWorkflowAction.CREATE_CONTEXT: {
 				if (!input.vendorName) {
 					const error = new Error('Missing required field: vendorName for CREATE_CONTEXT');
 					logStepError(log, 'validation', error, { input });
@@ -275,7 +286,7 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 				return successResult;
 			}
 
-			case 'UPDATE_CONTEXT': {
+			case ExternalVendorWorkflowAction.UPDATE_CONTEXT: {
 				if (!input.contextId) {
 					const error = new Error('Missing required field: contextId for UPDATE_CONTEXT');
 					logStepError(log, 'validation', error, { contextId: input.contextId });
@@ -299,7 +310,7 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 				return successResult;
 			}
 
-			case 'LINK_TO_SERVICE_PROVIDER': {
+			case ExternalVendorWorkflowAction.LINK_TO_SERVICE_PROVIDER: {
 				if (!input.contextId || !input.serviceProviderOrgId) {
 					const error = new Error('Missing required fields: contextId and serviceProviderOrgId for LINK_TO_SERVICE_PROVIDER');
 					logStepError(log, 'validation', error, { input });
@@ -322,7 +333,7 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 				return successResult;
 			}
 
-			case 'LOG_INTERACTION': {
+			case ExternalVendorWorkflowAction.LOG_INTERACTION: {
 				if (!input.externalVendorContextId || !input.interactionType || !input.interactionDate || !input.description) {
 					const error = new Error('Missing required fields for LOG_INTERACTION');
 					logStepError(log, 'validation', error, { input });
@@ -370,8 +381,8 @@ async function externalVendorWorkflow(input: ExternalVendorWorkflowInput): Promi
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'EXTERNAL_VENDOR_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.EXTERNAL_VENDOR_WORKFLOW_ERROR
 		});
 		const errorResult: ExternalVendorWorkflowResult = {
 			success: false,

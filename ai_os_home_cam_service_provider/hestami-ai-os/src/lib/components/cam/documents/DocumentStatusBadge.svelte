@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { DocumentStatusValues } from '$lib/api/cam';
 	import {
 		Loader2,
 		Clock,
@@ -36,12 +37,12 @@
 	const MAX_RETRY_ATTEMPTS = 3;
 
 	const isProcessingFailedExhausted = $derived(
-		status === 'PROCESSING_FAILED' && 
+		status === DocumentStatusValues.PROCESSING_FAILED && 
 		(processingErrorType === 'PERMANENT' || processingAttemptCount >= MAX_RETRY_ATTEMPTS)
 	);
 
 	const isProcessingFailedRetrying = $derived(
-		status === 'PROCESSING_FAILED' && !isProcessingFailedExhausted
+		status === DocumentStatusValues.PROCESSING_FAILED && !isProcessingFailedExhausted
 	);
 
 	const statusConfigs: Record<string, { label: string; color: string; icon: any; tooltip: string }> = {

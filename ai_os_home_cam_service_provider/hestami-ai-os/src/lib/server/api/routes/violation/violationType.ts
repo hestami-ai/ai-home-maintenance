@@ -3,7 +3,8 @@ import { ResponseMetaSchema, ViolationSeveritySchema } from '$lib/schemas/index.
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startViolationWorkflow } from '../../../workflows/violationWorkflow.js';
+import { startViolationWorkflow, ViolationAction } from '../../../workflows/violationWorkflow.js';
+import { SortOrder } from '../../../workflows/schemas.js';
 
 const log = createModuleLogger('ViolationTypeRoute');
 
@@ -75,7 +76,7 @@ export const violationTypeRouter = {
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'CREATE_TYPE',
+					action: ViolationAction.CREATE_TYPE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -166,7 +167,7 @@ export const violationTypeRouter = {
 					...(input?.category && { category: input.category }),
 					...(input?.isActive !== undefined && { isActive: input.isActive })
 				},
-				orderBy: [{ category: 'asc' }, { code: 'asc' }]
+				orderBy: [{ category: SortOrder.ASC }, { code: SortOrder.ASC }]
 			});
 
 			return successResponse(
@@ -322,7 +323,7 @@ export const violationTypeRouter = {
 
 			const result = await startViolationWorkflow(
 				{
-					action: 'UPDATE_TYPE',
+					action: ViolationAction.UPDATE_TYPE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					typeId: id,

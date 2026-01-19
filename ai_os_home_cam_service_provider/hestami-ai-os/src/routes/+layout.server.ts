@@ -41,6 +41,17 @@ interface StaffRow {
 	updated_at: Date;
 }
 
+// Type for pending invitation
+interface PendingInvitation {
+	id: string;
+	organizationId: string;
+	organizationName: string;
+	organizationType: string;
+	role: string;
+	expiresAt: string;
+	invitedByName: string | null;
+}
+
 export const load: LayoutServerLoad = async ({ request }) => {
 	// 1. Get session from Better Auth
 	const session = await auth.api.getSession({
@@ -55,6 +66,7 @@ export const load: LayoutServerLoad = async ({ request }) => {
 	}> = [];
 	let organization: Organization | null = null;
 	let staff: Staff | null = null;
+	let pendingInvitations: PendingInvitation[] = [];
 
 	// 2. If authenticated, fetch context data using SECURITY DEFINER functions
 	// These functions bypass RLS to solve the chicken-and-egg problem:
@@ -64,10 +76,38 @@ export const load: LayoutServerLoad = async ({ request }) => {
 		log.debug('Fetching user context', { userId: session.user.id, email: session.user.email });
 
 		// Use SECURITY DEFINER functions to bypass RLS for context bootstrapping
-		const [membershipRows, staffRows] = await Promise.all([
+		// Also fetch pending invitations for the user's email
+		const [membershipRows, staffRows, invitationRows] = await Promise.all([
 			prisma.$queryRaw<MembershipRow[]>`SELECT * FROM get_user_memberships(${session.user.id})`,
-			prisma.$queryRaw<StaffRow[]>`SELECT * FROM get_staff_profile(${session.user.id})`
+			prisma.$queryRaw<StaffRow[]>`SELECT * FROM get_staff_profile(${session.user.id})`,
+			prisma.organizationInvitation.findMany({
+				where: {
+					email: session.user.email.toLowerCase(),
+					status: 'PENDING',
+					expiresAt: { gt: new Date() }
+				},
+				include: {
+					organization: { select: { id: true, name: true, type: true } },
+					invitedBy: { select: { name: true } }
+				},
+				orderBy: { createdAt: 'desc' }
+			})
 		]);
+
+		// Transform pending invitations
+		pendingInvitations = invitationRows.map((inv) => ({
+			id: inv.id,
+			organizationId: inv.organizationId,
+			organizationName: inv.organization.name,
+			organizationType: inv.organization.type,
+			role: inv.role,
+			expiresAt: inv.expiresAt.toISOString(),
+			invitedByName: inv.invitedBy.name
+		}));
+
+		if (pendingInvitations.length > 0) {
+			log.debug('Pending invitations found', { count: pendingInvitations.length });
+		}
 
 		log.debug('Context fetched', {
 			membershipsCount: membershipRows.length,
@@ -122,11 +162,24 @@ export const load: LayoutServerLoad = async ({ request }) => {
 		}
 	}
 
-	return {
+	const returnData = {
 		user: session?.user ?? null,
 		session: session?.session ?? null,
 		memberships,
 		organization,
-		staff
+		staff,
+		pendingInvitations
 	};
+
+	log.debug('[NAVIGATION-TRACE] Root layout returning data', {
+		hasUser: !!returnData.user,
+		hasSession: !!returnData.session,
+		membershipsCount: returnData.memberships.length,
+		hasOrganization: !!returnData.organization,
+		hasStaff: !!returnData.staff,
+		pendingInvitationsCount: returnData.pendingInvitations.length,
+		dataKeys: Object.keys(returnData)
+	});
+
+	return returnData;
 };

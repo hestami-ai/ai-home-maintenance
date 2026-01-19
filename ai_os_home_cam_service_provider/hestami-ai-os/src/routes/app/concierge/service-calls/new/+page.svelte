@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, AssetCategoryValues, ConciergeCasePriorityValues, ContractorTradeTypeValues } from '$lib/api/cam';
 	import {
 		ArrowLeft,
 		Loader2,
@@ -70,11 +71,19 @@
 
 	let { data }: Props = $props();
 
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let properties = $state<Property[]>([]);
 	let isSubmitting = $state(false);
 	let isUploadingMedia = $state(false);
 	let isLoadingProperties = $state(false);
 	let error = $state<string | null>(null);
-	let properties = $derived(data.properties);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			properties = data.properties ?? [];
+		}
+	});
 
 	// Reference to media upload component
 	let mediaUploadComponent: ServiceCallMediaUpload | undefined = $state();
@@ -109,19 +118,19 @@
 	};
 
 	const categories: ServiceCallCategory[] = [
-		'PLUMBING',
-		'ELECTRICAL',
-		'HVAC',
+		AssetCategoryValues.PLUMBING,
+		AssetCategoryValues.ELECTRICAL,
+		ARCCategoryValues.HVAC,
 		'GENERAL_REPAIRS',
-		'PEST_CONTROL',
-		'LANDSCAPING',
-		'SECURITY',
-		'ROOFING',
+		ContractorTradeTypeValues.PEST_CONTROL,
+		ARCCategoryValues.LANDSCAPING,
+		AssetCategoryValues.SECURITY,
+		ContractorTradeTypeValues.ROOFING,
 		'APPLIANCES',
-		'OTHER'
+		ARCCategoryValues.OTHER
 	];
 
-	const urgencies: ServiceCallUrgency[] = ['ROUTINE', 'SOON', 'URGENT', 'EMERGENCY'];
+	const urgencies: ServiceCallUrgency[] = ['ROUTINE', 'SOON', ConciergeCasePriorityValues.URGENT, ConciergeCasePriorityValues.EMERGENCY];
 
 	const isValid = $derived(
 		selectedPropertyId !== '' &&
@@ -345,7 +354,7 @@
 							</button>
 						{/each}
 					</div>
-					{#if urgency === 'EMERGENCY'}
+					{#if urgency === ConciergeCasePriorityValues.EMERGENCY}
 						<div class="mt-4 flex items-start gap-3 rounded-lg bg-error-500/10 p-4">
 							<AlertTriangle class="h-5 w-5 shrink-0 text-error-500" />
 							<div>
@@ -539,11 +548,11 @@
 				</Card>
 
 				<!-- Supporting Media -->
-				{#if data.organization}
+				{#if data?.organization}
 					<Card variant="outlined" padding="md">
 						<ServiceCallMediaUpload
 							bind:this={mediaUploadComponent}
-							organizationId={data.organization.id}
+							organizationId={data.organization?.id ?? ''}
 							disabled={isSubmitting}
 						/>
 					</Card>

@@ -110,10 +110,11 @@
 
 	// Synchronize server technicians to local state
 	$effect(() => {
+		if (!data) return;
 		if (data.technicians) {
 			technicians = [...data.technicians];
 		}
-		statusFilter = data.filters.status;
+		statusFilter = data.filters?.status ?? '';
 	});
 
 	// Detail data
@@ -144,11 +145,13 @@
 	];
 
 	async function loadTechnicians() {
+		// Guard against undefined data during navigation
+		if (data == null || data.filters == null) return;
 		if (statusFilter === data.filters.status) return;
-		
+
 		const params = new URLSearchParams();
 		if (statusFilter !== 'all') params.set('status', statusFilter);
-		
+
 		const newUrl = `/app/contractor/technicians${params.toString() ? '?' + params.toString() : ''}`;
 		window.location.href = newUrl;
 	}

@@ -1,14 +1,15 @@
 <script lang="ts">
+	import { JobStatusValues, ViolationStatusValues } from '$lib/api/cam';
 	import { Home, Plus, FileText, Wrench, Bell, Loader2, ArrowRight } from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import type { operations } from '$lib/api/types.generated';
 
 	// Extract types from OpenAPI spec (avoids importing massive Prisma types)
 	type Organization = operations['organization.create']['responses']['200']['content']['application/json']['data']['organization'];
-	import { 
-		getServiceCallStatusLabel, 
-		getServiceCallStatusColor, 
-		getServiceCallStatusDotColor 
+	import {
+		getServiceCallStatusLabel,
+		getServiceCallStatusColor,
+		getServiceCallStatusDotColor
 	} from '$lib/utils/serviceCallTerminology';
 	import type { ConciergeCaseStatus, ConciergeCasePriority } from '$lib/api/cam';
 
@@ -44,11 +45,20 @@
 
 	let { data }: Props = $props();
 
-	let properties = $derived(data.properties);
-	let serviceCalls = $derived(data.serviceCalls);
-	let isLoading = $state(false); 
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let properties = $state<Property[]>([]);
+	let serviceCalls = $state<ServiceCall[]>([]);
+	let isLoading = $state(false);
 
-	const activeCallCount = $derived(serviceCalls.filter(c => c.status !== 'RESOLVED' && c.status !== 'CLOSED').length);
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			properties = data.properties ?? [];
+			serviceCalls = data.serviceCalls ?? [];
+		}
+	}); 
+
+	const activeCallCount = $derived(serviceCalls.filter(c => c.status !== ViolationStatusValues.RESOLVED && c.status !== JobStatusValues.CLOSED).length);
 
 	const quickActions = [
 		{ label: 'Add Property', href: '/app/concierge/properties/new', icon: Home },
@@ -85,10 +95,10 @@
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 			<div>
 				<h1 class="text-2xl font-bold">
-					Welcome back, {data.user?.name?.split(' ')[0] || 'there'}!
+					Welcome back, {data?.user?.name?.split(' ')[0] || 'there'}!
 				</h1>
 				<p class="mt-1 text-surface-500">
-					{data.organization?.name || 'Your Property Dashboard'}
+					{data?.organization?.name || 'Your Property Dashboard'}
 				</p>
 			</div>
 			<a href="/app/concierge/service-calls" class="btn preset-filled-primary-500">
@@ -141,7 +151,7 @@
 							{#if isLoading}
 								<Loader2 class="h-6 w-6 animate-spin text-surface-400" />
 							{:else}
-								<p class="text-2xl font-bold">{data.documentCount}</p>
+								<p class="text-2xl font-bold">{data?.documentCount ?? 0}</p>
 							{/if}
 							<p class="text-sm text-surface-500">Documents</p>
 						</div>

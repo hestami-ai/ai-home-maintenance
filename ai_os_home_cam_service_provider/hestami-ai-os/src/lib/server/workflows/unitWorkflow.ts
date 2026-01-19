@@ -12,6 +12,17 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import type { UnitType } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	UNIT_WORKFLOW_ERROR: 'UNIT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'unit_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'unit_workflow_error';
@@ -102,15 +113,15 @@ async function createUnit(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'UNIT',
+			entityType: ActivityEntityType.UNIT,
 			entityId: unit.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Unit created: ${unitNumber}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'unitWorkflow_v1',
-			workflowStep: 'CREATE',
+			workflowStep: UnitWorkflowAction.CREATE,
 			workflowVersion: 'v1',
 			unitId: unit.id,
 			newState: { unitNumber, unitType }
@@ -169,15 +180,15 @@ async function updateUnit(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'UNIT',
+			entityType: ActivityEntityType.UNIT,
 			entityId: unitId,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Unit updated: ${unit.unitNumber}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'unitWorkflow_v1',
-			workflowStep: 'UPDATE',
+			workflowStep: UnitWorkflowAction.UPDATE,
 			workflowVersion: 'v1',
 			unitId,
 			newState: data
@@ -205,15 +216,15 @@ async function deleteUnit(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'UNIT',
+			entityType: ActivityEntityType.UNIT,
 			entityId: unitId,
-			action: 'DELETE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.DELETE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Unit deleted`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'unitWorkflow_v1',
-			workflowStep: 'DELETE',
+			workflowStep: UnitWorkflowAction.DELETE,
 			workflowVersion: 'v1',
 			unitId,
 			newState: { deletedAt: now.toISOString() }
@@ -238,7 +249,7 @@ async function unitWorkflow(input: UnitWorkflowInput): Promise<UnitWorkflowResul
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case UnitWorkflowAction.CREATE: {
 				if (!input.propertyId || !input.unitNumber || !input.unitType) {
 					const error = new Error('Missing required fields: propertyId, unitNumber, unitType for CREATE');
 					logStepError(log, 'validation', error, { propertyId: input.propertyId, unitNumber: input.unitNumber });
@@ -276,7 +287,7 @@ async function unitWorkflow(input: UnitWorkflowInput): Promise<UnitWorkflowResul
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case UnitWorkflowAction.UPDATE: {
 				if (!input.unitId) {
 					const error = new Error('Missing required field: unitId for UPDATE');
 					logStepError(log, 'validation', error, { unitId: input.unitId });
@@ -316,7 +327,7 @@ async function unitWorkflow(input: UnitWorkflowInput): Promise<UnitWorkflowResul
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case UnitWorkflowAction.DELETE: {
 				if (!input.unitId) {
 					const error = new Error('Missing required field: unitId for DELETE');
 					logStepError(log, 'validation', error, { unitId: input.unitId });
@@ -363,8 +374,8 @@ async function unitWorkflow(input: UnitWorkflowInput): Promise<UnitWorkflowResul
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'UNIT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.UNIT_WORKFLOW_ERROR
 		});
 		const errorResult: UnitWorkflowResult = {
 			success: false,

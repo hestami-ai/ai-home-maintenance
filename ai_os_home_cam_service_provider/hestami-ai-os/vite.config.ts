@@ -3,9 +3,26 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import { playwright } from '@vitest/browser-playwright';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { paraglideVitePlugin } from '@inlang/paraglide-js';
 
 export default defineConfig({
-	plugins: [tailwindcss(), sveltekit(), devtoolsJson()],
+	plugins: [
+		tailwindcss(),
+		sveltekit(),
+		devtoolsJson(),
+		paraglideVitePlugin({
+			project: './project.inlang',
+			outdir: './src/lib/paraglide'
+		})
+	],
+	build: {
+		sourcemap: true,
+		rollupOptions: {
+			output: {
+				sourcemap: true
+			}
+		}
+	},
 	ssr: {
 		// Handle CommonJS modules that don't properly export named exports
 		noExternal: ['ms', 'better-auth']

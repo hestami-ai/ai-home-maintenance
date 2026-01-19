@@ -9,7 +9,18 @@
  * UI Term: Service Call
  */
 
-import type { ConciergeCaseStatus, ConciergeCasePriority } from '$lib/api/cam';
+import { ConciergeCaseStatus, ConciergeCasePriority } from '../../../generated/prisma/enums.js';
+
+// =============================================================================
+// Local Constants for Shared Client/Server Code
+// =============================================================================
+
+// Local const for priority values used in this utility
+// Cannot use direct Prisma imports as this file is shared with client code
+const PriorityValues = {
+	URGENT: 'URGENT',
+	EMERGENCY: 'EMERGENCY'
+} as const;
 
 // =============================================================================
 // Status Mapping
@@ -19,45 +30,45 @@ import type { ConciergeCaseStatus, ConciergeCasePriority } from '$lib/api/cam';
  * Maps ConciergeCase status to user-friendly Service Call status labels
  */
 export const SERVICE_CALL_STATUS_LABELS: Record<ConciergeCaseStatus, string> = {
-	INTAKE: 'Submitted',
-	ASSESSMENT: 'Under Review',
-	IN_PROGRESS: 'In Progress',
-	PENDING_EXTERNAL: 'Awaiting Response',
-	PENDING_OWNER: 'Action Required',
-	ON_HOLD: 'On Hold',
-	RESOLVED: 'Completed',
-	CLOSED: 'Closed',
-	CANCELLED: 'Cancelled'
+	[ConciergeCaseStatus.INTAKE]: 'Submitted',
+	[ConciergeCaseStatus.ASSESSMENT]: 'Under Review',
+	[ConciergeCaseStatus.IN_PROGRESS]: 'In Progress',
+	[ConciergeCaseStatus.PENDING_EXTERNAL]: 'Awaiting Response',
+	[ConciergeCaseStatus.PENDING_OWNER]: 'Action Required',
+	[ConciergeCaseStatus.ON_HOLD]: 'On Hold',
+	[ConciergeCaseStatus.RESOLVED]: 'Completed',
+	[ConciergeCaseStatus.CLOSED]: 'Closed',
+	[ConciergeCaseStatus.CANCELLED]: 'Cancelled'
 };
 
 /**
  * Maps ConciergeCase status to color classes for badges
  */
 export const SERVICE_CALL_STATUS_COLORS: Record<ConciergeCaseStatus, string> = {
-	INTAKE: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-	ASSESSMENT: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-	IN_PROGRESS: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-	PENDING_EXTERNAL: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
-	PENDING_OWNER: 'bg-red-500/10 text-red-600 dark:text-red-400',
-	ON_HOLD: 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
-	RESOLVED: 'bg-green-500/10 text-green-600 dark:text-green-400',
-	CLOSED: 'bg-surface-500/10 text-surface-600 dark:text-surface-400',
-	CANCELLED: 'bg-surface-500/10 text-surface-500'
+	[ConciergeCaseStatus.INTAKE]: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+	[ConciergeCaseStatus.ASSESSMENT]: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
+	[ConciergeCaseStatus.IN_PROGRESS]: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+	[ConciergeCaseStatus.PENDING_EXTERNAL]: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+	[ConciergeCaseStatus.PENDING_OWNER]: 'bg-red-500/10 text-red-600 dark:text-red-400',
+	[ConciergeCaseStatus.ON_HOLD]: 'bg-gray-500/10 text-gray-600 dark:text-gray-400',
+	[ConciergeCaseStatus.RESOLVED]: 'bg-green-500/10 text-green-600 dark:text-green-400',
+	[ConciergeCaseStatus.CLOSED]: 'bg-surface-500/10 text-surface-600 dark:text-surface-400',
+	[ConciergeCaseStatus.CANCELLED]: 'bg-surface-500/10 text-surface-500'
 };
 
 /**
  * Maps ConciergeCase status to dot indicator colors
  */
 export const SERVICE_CALL_STATUS_DOT_COLORS: Record<ConciergeCaseStatus, string> = {
-	INTAKE: 'bg-blue-500',
-	ASSESSMENT: 'bg-purple-500',
-	IN_PROGRESS: 'bg-amber-500',
-	PENDING_EXTERNAL: 'bg-orange-500',
-	PENDING_OWNER: 'bg-red-500',
-	ON_HOLD: 'bg-gray-500',
-	RESOLVED: 'bg-green-500',
-	CLOSED: 'bg-surface-500',
-	CANCELLED: 'bg-surface-400'
+	[ConciergeCaseStatus.INTAKE]: 'bg-blue-500',
+	[ConciergeCaseStatus.ASSESSMENT]: 'bg-purple-500',
+	[ConciergeCaseStatus.IN_PROGRESS]: 'bg-amber-500',
+	[ConciergeCaseStatus.PENDING_EXTERNAL]: 'bg-orange-500',
+	[ConciergeCaseStatus.PENDING_OWNER]: 'bg-red-500',
+	[ConciergeCaseStatus.ON_HOLD]: 'bg-gray-500',
+	[ConciergeCaseStatus.RESOLVED]: 'bg-green-500',
+	[ConciergeCaseStatus.CLOSED]: 'bg-surface-500',
+	[ConciergeCaseStatus.CANCELLED]: 'bg-surface-400'
 };
 
 // =============================================================================
@@ -73,21 +84,21 @@ export type ServiceCallUrgency = 'ROUTINE' | 'SOON' | 'URGENT' | 'EMERGENCY';
  * Maps Service Call urgency to ConciergeCase priority
  */
 export const URGENCY_TO_PRIORITY: Record<ServiceCallUrgency, ConciergeCasePriority> = {
-	ROUTINE: 'LOW',
-	SOON: 'NORMAL',
-	URGENT: 'HIGH',
-	EMERGENCY: 'EMERGENCY'
+	ROUTINE: ConciergeCasePriority.LOW,
+	SOON: ConciergeCasePriority.NORMAL,
+	URGENT: ConciergeCasePriority.HIGH,
+	EMERGENCY: ConciergeCasePriority.EMERGENCY
 };
 
 /**
  * Maps ConciergeCase priority back to Service Call urgency
  */
 export const PRIORITY_TO_URGENCY: Record<ConciergeCasePriority, ServiceCallUrgency> = {
-	LOW: 'ROUTINE',
-	NORMAL: 'SOON',
-	HIGH: 'URGENT',
-	URGENT: 'URGENT',
-	EMERGENCY: 'EMERGENCY'
+	[ConciergeCasePriority.LOW]: 'ROUTINE',
+	[ConciergeCasePriority.NORMAL]: 'SOON',
+	[ConciergeCasePriority.HIGH]: PriorityValues.URGENT,
+	[ConciergeCasePriority.URGENT]: PriorityValues.URGENT,
+	[ConciergeCasePriority.EMERGENCY]: PriorityValues.EMERGENCY
 };
 
 /**
@@ -228,26 +239,27 @@ export function getCategoryLabel(category: ServiceCallCategory): string {
  * Check if a service call needs owner attention
  */
 export function needsOwnerAttention(status: ConciergeCaseStatus): boolean {
-	return status === 'INTAKE' || status === 'PENDING_OWNER';
+	return status === ConciergeCaseStatus.INTAKE || status === ConciergeCaseStatus.PENDING_OWNER;
 }
 
 /**
  * Check if a service call is active (not closed/cancelled/resolved)
  */
 export function isActiveServiceCall(status: ConciergeCaseStatus): boolean {
-	return !['RESOLVED', 'CLOSED', 'CANCELLED'].includes(status);
+	const terminalStatuses: ConciergeCaseStatus[] = [ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CLOSED, ConciergeCaseStatus.CANCELLED];
+	return !terminalStatuses.includes(status);
 }
 
 /**
  * Get active statuses for filtering
  */
 export function getActiveStatuses(): ConciergeCaseStatus[] {
-	return ['INTAKE', 'ASSESSMENT', 'IN_PROGRESS', 'PENDING_EXTERNAL', 'PENDING_OWNER', 'ON_HOLD'];
+	return [ConciergeCaseStatus.INTAKE, ConciergeCaseStatus.ASSESSMENT, ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.ON_HOLD];
 }
 
 /**
  * Get completed statuses for filtering
  */
 export function getCompletedStatuses(): ConciergeCaseStatus[] {
-	return ['RESOLVED', 'CLOSED', 'CANCELLED'];
+	return [ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CLOSED, ConciergeCaseStatus.CANCELLED];
 }

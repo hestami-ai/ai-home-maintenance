@@ -334,9 +334,14 @@ function main() {
 
     const [modelName, operation] = args;
     const outputIndex = args.indexOf('--output');
-    const outputPath = outputIndex >= 0 ? args[outputIndex + 1] : null;
+    const outputPath = outputIndex >= 0 ? args[outputIndex + 1] ?? null : null;
     const formatIndex = args.indexOf('--format');
-    const format = (formatIndex >= 0 ? args[formatIndex + 1] : 'typescript') as 'typescript' | 'markdown';
+    const format = (formatIndex >= 0 ? (args[formatIndex + 1] ?? 'typescript') : 'typescript') as 'typescript' | 'markdown';
+
+    if (!modelName || !operation) {
+        console.error('Usage: generate-workflow-template <modelName> <operation>');
+        process.exit(1);
+    }
 
     const generator = new WorkflowTemplateGenerator(modelName, operation);
     const output = generator.formatOutput(format);

@@ -1,6 +1,7 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction } from '../db/rls.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
+import { ActivityActionType, NotificationReadStatus as NotificationReadStatusEnum } from '../../../../generated/prisma/enums.js';
 import {
     NotificationType,
     NotificationCategory,
@@ -9,6 +10,11 @@ import {
 } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+    NOTIFICATION_WORKFLOW_ERROR: 'NOTIFICATION_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('NotificationWorkflow');
 
@@ -55,7 +61,7 @@ async function createNotificationRecord(
                     message: data.message,
                     type: data.type,
                     category: data.category,
-                    status: 'UNREAD',
+                    status: NotificationReadStatusEnum.UNREAD,
                     link: data.link,
                     metadata: data.metadata ?? undefined
                 }
@@ -140,8 +146,8 @@ async function notificationWorkflow(input: NotificationWorkflowInput): Promise<N
         log.error('Workflow failed', { action: input.action, error: errorObj.message });
 
         await recordSpanError(errorObj, {
-            errorCode: 'NOTIFICATION_FAILED',
-            errorType: 'WORKFLOW_ERROR'
+            errorCode: ActivityActionType.WORKFLOW_FAILED,
+            errorType: WorkflowErrorType.NOTIFICATION_WORKFLOW_ERROR
         });
 
         return { success: false, error: errorObj.message };

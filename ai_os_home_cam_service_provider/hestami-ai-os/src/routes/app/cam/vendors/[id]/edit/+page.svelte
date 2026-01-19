@@ -3,7 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { vendorApi, type Vendor } from '$lib/api/cam';
+	import { ARCCategoryValues, AssetStatusValues, VendorApprovalStatusValues, type Vendor, vendorApi } from '$lib/api/cam';
+	import * as m from '$lib/paraglide/messages.js';
 
 	let vendor = $state<Vendor | null>(null);
 	let isLoading = $state(true);
@@ -19,7 +20,7 @@
 		licenseNumber: '',
 		insuranceExpiry: '',
 		trades: [] as string[],
-		status: 'PENDING'
+		status: VendorApprovalStatusValues.PENDING
 	});
 
 	let newTrade = $state('');
@@ -27,7 +28,7 @@
 	const tradeOptions = [
 		'Plumbing',
 		'Electrical',
-		'HVAC',
+		ARCCategoryValues.HVAC,
 		'Landscaping',
 		'Roofing',
 		'Painting',
@@ -41,10 +42,10 @@
 	];
 
 	const statusOptions = [
-		{ value: 'PENDING', label: 'Pending Approval' },
-		{ value: 'APPROVED', label: 'Approved' },
-		{ value: 'SUSPENDED', label: 'Suspended' },
-		{ value: 'INACTIVE', label: 'Inactive' }
+		{ value: VendorApprovalStatusValues.PENDING, label: 'Pending Approval' },
+		{ value: VendorApprovalStatusValues.APPROVED, label: 'Approved' },
+		{ value: VendorApprovalStatusValues.SUSPENDED, label: 'Suspended' },
+		{ value: AssetStatusValues.INACTIVE, label: 'Inactive' }
 	];
 
 	const vendorId = $derived(($page.params as Record<string, string>).id);
@@ -83,7 +84,7 @@
 				licenseNumber: v.licenseNumber || '',
 				insuranceExpiry: v.insuranceExpiry?.split('T')[0] || '',
 				trades: v.trades || [],
-				status: v.status || 'PENDING'
+				status: v.status || VendorApprovalStatusValues.PENDING
 			};
 		} catch (e) {
 			error = 'Failed to load data';
@@ -155,7 +156,7 @@
 				<ArrowLeft class="h-5 w-5" />
 			</button>
 			<div class="flex-1">
-				<h1 class="text-xl font-semibold">Edit Vendor</h1>
+				<h1 class="text-xl font-semibold">{m.vendor_edit()}</h1>
 				{#if vendor}
 					<p class="mt-0.5 text-sm text-surface-500">{vendor.name}</p>
 				{/if}
@@ -182,12 +183,12 @@
 					{/if}
 
 					<Card variant="outlined" padding="lg">
-						<h3 class="mb-4 font-semibold">Business Information</h3>
+						<h3 class="mb-4 font-semibold">{m.vendor_business_info()}</h3>
 						<div class="space-y-4">
 							<div class="grid gap-4 sm:grid-cols-2">
 								<div>
 									<label for="name" class="mb-1 block text-sm font-medium">
-										Business Name <span class="text-error-500">*</span>
+										{m.vendor_business_name()} <span class="text-error-500">*</span>
 									</label>
 									<input
 										id="name"
@@ -200,7 +201,7 @@
 
 								<div>
 									<label for="status" class="mb-1 block text-sm font-medium">
-										Status
+										{m.label_status()}
 									</label>
 									<select
 										id="status"
@@ -216,7 +217,7 @@
 
 							<div>
 								<label for="contactName" class="mb-1 block text-sm font-medium">
-									Contact Name
+									{m.label_contact_name()}
 								</label>
 								<input
 									id="contactName"
@@ -229,7 +230,7 @@
 							<div class="grid gap-4 sm:grid-cols-2">
 								<div>
 									<label for="email" class="mb-1 block text-sm font-medium">
-										Email
+										{m.label_email()}
 									</label>
 									<input
 										id="email"
@@ -241,7 +242,7 @@
 
 								<div>
 									<label for="phone" class="mb-1 block text-sm font-medium">
-										Phone
+										{m.label_phone()}
 									</label>
 									<input
 										id="phone"
@@ -254,7 +255,7 @@
 
 							<div>
 								<label for="address" class="mb-1 block text-sm font-medium">
-									Address
+									{m.label_address()}
 								</label>
 								<textarea
 									id="address"
@@ -345,7 +346,7 @@
 							onclick={() => goto(`/app/cam/vendors/${vendorId}`)}
 							class="btn preset-tonal-surface"
 						>
-							Cancel
+							{m.common_cancel()}
 						</button>
 						<button
 							type="submit"
@@ -357,7 +358,7 @@
 							{:else}
 								<Save class="mr-2 h-4 w-4" />
 							{/if}
-							Save Changes
+							{m.common_save_changes()}
 						</button>
 					</div>
 				</form>

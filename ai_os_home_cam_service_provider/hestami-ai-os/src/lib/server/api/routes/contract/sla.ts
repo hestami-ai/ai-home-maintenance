@@ -8,7 +8,7 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startContractSLAWorkflow } from '../../../workflows/contractSLAWorkflow.js';
+import { startContractSLAWorkflow, ContractSLAAction } from '../../../workflows/contractSLAWorkflow.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 
 const slaRecordOutput = z.object({
@@ -100,7 +100,7 @@ export const contractSLARouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractSLAWorkflow(
 				{
-					action: 'CREATE_SLA',
+					action: ContractSLAAction.CREATE_SLA,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -268,7 +268,7 @@ export const contractSLARouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractSLAWorkflow(
 				{
-					action: 'UPDATE_SLA',
+					action: ContractSLAAction.UPDATE_SLA,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					slaRecordId: input.id,
@@ -331,7 +331,7 @@ export const contractSLARouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractSLAWorkflow(
 				{
-					action: 'CALCULATE_SLA',
+					action: ContractSLAAction.CALCULATE_SLA,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {

@@ -17,8 +17,14 @@ import {
 } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { ActivityActionType, ViolationStatus as ViolationStatusEnum, HearingOutcome as HearingOutcomeEnum, AppealStatus as AppealStatusEnum, AppealDecision as AppealDecisionEnum } from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('ViolationWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VIOLATION_WORKFLOW_ERROR: 'VIOLATION_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const ViolationAction = {
@@ -156,14 +162,14 @@ async function updateStatus(
 			const updateData: Prisma.ViolationUncheckedUpdateInput = { status: newStatus };
 
 			// Set status-specific fields
-			if (newStatus === 'CURED') {
+			if (newStatus === ViolationStatusEnum.CURED) {
 				updateData.curedDate = now;
 				updateData.resolutionNotes = notes ?? violation.resolutionNotes;
-			} else if (newStatus === 'CLOSED') {
+			} else if (newStatus === ViolationStatusEnum.CLOSED) {
 				updateData.closedDate = now;
 				updateData.closedBy = userId;
 				updateData.resolutionNotes = notes ?? violation.resolutionNotes;
-			} else if (newStatus === 'DISMISSED') {
+			} else if (newStatus === ViolationStatusEnum.DISMISSED) {
 				updateData.closedDate = now;
 				updateData.closedBy = userId;
 				updateData.resolutionNotes = notes ?? violation.resolutionNotes;
@@ -257,7 +263,7 @@ async function sendNotice(
 	const curePeriodEnds = effectiveCurePeriodDays > 0
 		? new Date(now.getTime() + effectiveCurePeriodDays * 24 * 60 * 60 * 1000)
 		: null;
-	const targetStatus = effectiveCurePeriodDays > 0 ? 'CURE_PERIOD' : 'NOTICE_SENT';
+	const targetStatus = effectiveCurePeriodDays > 0 ? ViolationStatusEnum.CURE_PERIOD : ViolationStatusEnum.NOTICE_SENT;
 
 	try {
 		const noticeId = await orgTransaction(organizationId, async (tx) => {
@@ -449,11 +455,11 @@ async function recordHearingOutcome(
 		: null;
 
 	// Determine new violation status based on outcome
-	let newStatus: ViolationStatus = 'HEARING_HELD';
-	if (outcome === 'DISMISSED') {
-		newStatus = 'DISMISSED';
-	} else if (outcome === 'FINE_IMPOSED') {
-		newStatus = 'FINE_ASSESSED';
+	let newStatus: ViolationStatus = ViolationStatusEnum.HEARING_HELD;
+	if (outcome === HearingOutcomeEnum.DISMISSED) {
+		newStatus = ViolationStatusEnum.DISMISSED;
+	} else if (outcome === HearingOutcomeEnum.UPHELD) {
+		newStatus = ViolationStatusEnum.FINE_ASSESSED;
 	}
 
 	try {
@@ -587,7 +593,7 @@ async function recordAppealDecision(
 	const decision = data.decision as string;
 	const notes = data.notes as string | undefined;
 
-	const newStatus: ViolationStatus = decision === 'OVERTURNED' ? 'DISMISSED' : 'CLOSED';
+	const newStatus: ViolationStatus = decision === AppealDecisionEnum.OVERTURNED ? ViolationStatusEnum.DISMISSED : ViolationStatusEnum.CLOSED;
 
 	try {
 		await orgTransaction(organizationId, async (tx) => {
@@ -597,7 +603,7 @@ async function recordAppealDecision(
 					decisionNotes: notes,
 					decisionDate: new Date(),
 					decisionBy: userId,
-					status: 'UPHELD'
+					status: AppealStatusEnum.UPHELD
 				}
 			});
 
@@ -678,91 +684,91 @@ async function violationWorkflow(input: ViolationWorkflowInput): Promise<Violati
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'UPDATE_VIOLATION':
+			case ViolationAction.UPDATE_VIOLATION:
 				entityId = await DBOS.runStep(
 					() => updateViolation(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'updateViolation' }
 				);
 				break;
 
-			case 'UPDATE_STATUS':
+			case ViolationAction.UPDATE_STATUS:
 				entityId = await DBOS.runStep(
 					() => updateStatus(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'updateStatus' }
 				);
 				break;
 
-			case 'DELETE_VIOLATION':
+			case ViolationAction.DELETE_VIOLATION:
 				entityId = await DBOS.runStep(
 					() => deleteViolation(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'deleteViolation' }
 				);
 				break;
 
-			case 'SEND_NOTICE':
+			case ViolationAction.SEND_NOTICE:
 				entityId = await DBOS.runStep(
 					() => sendNotice(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'sendNotice' }
 				);
 				break;
 
-			case 'ESCALATE':
+			case ViolationAction.ESCALATE:
 				entityId = await DBOS.runStep(
 					() => escalateViolation(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'escalateViolation' }
 				);
 				break;
 
-			case 'DISMISS':
+			case ViolationAction.DISMISS:
 				entityId = await DBOS.runStep(
 					() => dismissViolation(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'dismissViolation' }
 				);
 				break;
 
-			case 'SCHEDULE_HEARING':
+			case ViolationAction.SCHEDULE_HEARING:
 				entityId = await DBOS.runStep(
 					() => scheduleHearing(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'scheduleHearing' }
 				);
 				break;
 
-			case 'RECORD_HEARING_OUTCOME':
+			case ViolationAction.RECORD_HEARING_OUTCOME:
 				entityId = await DBOS.runStep(
 					() => recordHearingOutcome(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'recordHearingOutcome' }
 				);
 				break;
 
-			case 'RECORD_APPEAL':
+			case ViolationAction.RECORD_APPEAL:
 				entityId = await DBOS.runStep(
 					() => recordAppeal(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'recordAppeal' }
 				);
 				break;
 
-			case 'SCHEDULE_APPEAL_HEARING':
+			case ViolationAction.SCHEDULE_APPEAL_HEARING:
 				entityId = await DBOS.runStep(
 					() => scheduleAppealHearing(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'scheduleAppealHearing' }
 				);
 				break;
 
-			case 'RECORD_APPEAL_DECISION':
+			case ViolationAction.RECORD_APPEAL_DECISION:
 				entityId = await DBOS.runStep(
 					() => recordAppealDecision(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'recordAppealDecision' }
 				);
 				break;
 
-			case 'CREATE_TYPE':
+			case ViolationAction.CREATE_TYPE:
 				entityId = await DBOS.runStep(
 					() => createViolationType(input.organizationId, input.userId, input.data),
 					{ name: 'createViolationType' }
 				);
 				break;
 
-			case 'UPDATE_TYPE':
+			case ViolationAction.UPDATE_TYPE:
 				entityId = await DBOS.runStep(
 					() => updateViolationType(input.organizationId, input.userId, input.typeId!, input.data),
 					{ name: 'updateViolationType' }
@@ -781,8 +787,8 @@ async function violationWorkflow(input: ViolationWorkflowInput): Promise<Violati
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VIOLATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VIOLATION_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationTypeValues, PropertyTypeValues, UnitTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, Check, Loader2, Home, User, Building2, Sparkles, Wrench } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { propertyOwnerOnboarding } from '$lib/stores';
@@ -45,15 +46,15 @@
 
 			// Map property type from onboarding to enum
 			const propertyTypeMap: Record<string, string> = {
-				single_family: 'SINGLE_FAMILY',
-				condo: 'CONDOMINIUM',
-				townhouse: 'TOWNHOUSE',
-				cooperative: 'COOPERATIVE',
-				mixed_use: 'MIXED_USE',
-				commercial: 'COMMERCIAL'
+				single_family: PropertyTypeValues.SINGLE_FAMILY,
+				condo: PropertyTypeValues.CONDOMINIUM,
+				townhouse: UnitTypeValues.TOWNHOUSE,
+				cooperative: PropertyTypeValues.COOPERATIVE,
+				mixed_use: PropertyTypeValues.MIXED_USE,
+				commercial: PropertyTypeValues.COMMERCIAL
 			};
 
-			const propertyType = propertyTypeMap[propertyData.propertyType] || 'SINGLE_FAMILY';
+			const propertyType = propertyTypeMap[propertyData.propertyType] || PropertyTypeValues.SINGLE_FAMILY;
 
 			await orpc.individualProperty.create({
 				idempotencyKey: crypto.randomUUID(),
@@ -88,7 +89,7 @@
 	}
 
 	const orgTypeLabel = $derived(
-		$propertyOwnerOnboarding.organizationType === 'TRUST_OR_LLC'
+		$propertyOwnerOnboarding.organizationType === OrganizationTypeValues.TRUST_OR_LLC
 			? 'Trust / LLC'
 			: 'Individual'
 	);
@@ -126,7 +127,7 @@
 			<div class="flex items-start justify-between">
 				<div class="flex items-start gap-3">
 					<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary-500/10">
-						{#if $propertyOwnerOnboarding.organizationType === 'TRUST_OR_LLC'}
+						{#if $propertyOwnerOnboarding.organizationType === OrganizationTypeValues.TRUST_OR_LLC}
 							<Building2 class="h-5 w-5 text-secondary-500" />
 						{:else}
 							<User class="h-5 w-5 text-secondary-500" />

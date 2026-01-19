@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startSupplierWorkflow } from '../../../workflows/supplierWorkflow.js';
+import { startSupplierWorkflow, SupplierAction } from '../../../workflows/supplierWorkflow.js';
 
 const supplierOutput = z.object({
 	id: z.string(),
@@ -101,7 +101,7 @@ export const supplierRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSupplierWorkflow(
 				{
-					action: 'CREATE_SUPPLIER',
+					action: SupplierAction.CREATE_SUPPLIER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -278,7 +278,7 @@ export const supplierRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSupplierWorkflow(
 				{
-					action: 'UPDATE_SUPPLIER',
+					action: SupplierAction.UPDATE_SUPPLIER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					supplierId: input.id,
@@ -324,7 +324,7 @@ export const supplierRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSupplierWorkflow(
 				{
-					action: 'DELETE_SUPPLIER',
+					action: SupplierAction.DELETE_SUPPLIER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					supplierId: input.id,

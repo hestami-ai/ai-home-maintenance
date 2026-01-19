@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { StaffStatusValues } from '$lib/api/cam';
 	import { Menu, X, Building2 } from 'lucide-svelte';
 	import { page } from '$app/stores';
 	import Logo from '$lib/components/ui/Logo.svelte';
@@ -26,10 +27,10 @@
 		staff?: Staff | null;
 	}
 
-	let { user, memberships, currentOrganization, staff = null }: Props = $props();
+	let { user, memberships = [], currentOrganization, staff = null }: Props = $props();
 
 	const currentMembership = $derived(
-		currentOrganization 
+		currentOrganization && Array.isArray(memberships)
 			? memberships.find(m => m.organization.id === currentOrganization.id) ?? null
 			: null
 	);
@@ -51,7 +52,7 @@
 		if (!user) return '/';
 		
 		// Hestami staff/admin goes to admin work queue
-		if (staff && staff.status === 'ACTIVE') {
+		if (staff && staff.status === StaffStatusValues.ACTIVE) {
 			return '/app/admin/work-queue';
 		}
 		

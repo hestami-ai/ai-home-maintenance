@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startUsageWorkflow } from '../../../workflows/usageWorkflow.js';
+import { startUsageWorkflow, UsageAction } from '../../../workflows/usageWorkflow.js';
 
 const materialUsageOutput = z.object({
 	id: z.string(),
@@ -105,7 +105,7 @@ export const usageRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startUsageWorkflow(
 				{
-					action: 'RECORD_USAGE',
+					action: UsageAction.RECORD_USAGE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -311,7 +311,7 @@ export const usageRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startUsageWorkflow(
 				{
-					action: 'REVERSE_USAGE',
+					action: UsageAction.REVERSE_USAGE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					usageId: input.id,

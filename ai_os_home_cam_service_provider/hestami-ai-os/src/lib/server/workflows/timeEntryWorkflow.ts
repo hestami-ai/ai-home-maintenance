@@ -10,8 +10,14 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { orgTransaction } from '../db/rls.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, TimeEntryType } from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('TimeEntryWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	TIME_ENTRY_WORKFLOW_ERROR: 'TIME_ENTRY_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const TimeEntryAction = {
@@ -61,7 +67,7 @@ async function createEntry(
 					jobVisitId,
 					technicianId,
 					startTime: startTime ? new Date(startTime) : new Date(),
-					entryType: entryType as 'TRAVEL' | 'WORK' | 'BREAK',
+					entryType: entryType as TimeEntryType,
 					notes,
 					isBillable,
 					hourlyRate,
@@ -161,28 +167,28 @@ async function timeEntryWorkflow(input: TimeEntryWorkflowInput): Promise<TimeEnt
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_ENTRY':
+			case TimeEntryAction.CREATE_ENTRY:
 				entityId = await DBOS.runStep(
 					() => createEntry(input.organizationId, input.userId, input.data),
 					{ name: 'createEntry' }
 				);
 				break;
 
-			case 'STOP_ENTRY':
+			case TimeEntryAction.STOP_ENTRY:
 				entityId = await DBOS.runStep(
 					() => stopEntry(input.organizationId, input.userId, input.entryId!, input.data),
 					{ name: 'stopEntry' }
 				);
 				break;
 
-			case 'UPDATE_ENTRY':
+			case TimeEntryAction.UPDATE_ENTRY:
 				entityId = await DBOS.runStep(
 					() => updateEntry(input.organizationId, input.userId, input.entryId!, input.data),
 					{ name: 'updateEntry' }
 				);
 				break;
 
-			case 'DELETE_ENTRY':
+			case TimeEntryAction.DELETE_ENTRY:
 				entityId = await DBOS.runStep(
 					() => deleteEntry(input.organizationId, input.userId, input.entryId!),
 					{ name: 'deleteEntry' }
@@ -201,8 +207,8 @@ async function timeEntryWorkflow(input: TimeEntryWorkflowInput): Promise<TimeEnt
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'TIME_ENTRY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.TIME_ENTRY_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

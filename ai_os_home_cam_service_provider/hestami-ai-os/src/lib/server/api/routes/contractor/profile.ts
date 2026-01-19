@@ -2,10 +2,11 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
+import { startContractorProfileWorkflow, ContractorProfileAction } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
+import { ActivityEntityType, ActivityActionType } from '../../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('ContractorProfileRoute');
 
@@ -71,7 +72,7 @@ export const profileRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorProfileWorkflow(
 				{
-					action: 'CREATE_OR_UPDATE_PROFILE',
+					action: ContractorProfileAction.CREATE_OR_UPDATE_PROFILE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data
@@ -87,9 +88,9 @@ export const profileRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'CONTRACTOR',
+				entityType: ActivityEntityType.CONTRACTOR,
 				entityId: profile.id,
-				action: 'UPDATE',
+				action: ActivityActionType.UPDATE,
 				summary: `Contractor profile updated: ${profile.legalName}`,
 				newState: { legalName: profile.legalName, dba: profile.dba }
 			});

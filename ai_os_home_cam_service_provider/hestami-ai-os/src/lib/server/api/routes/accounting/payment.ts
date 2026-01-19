@@ -5,7 +5,8 @@ import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 import { PaymentMethodSchema, PaymentStatusSchema } from '../../schemas.js';
-import { startPaymentWorkflow } from '../../../workflows/index.js';
+import { PaymentStatus } from '../../../../../../generated/prisma/enums.js';
+import { startPaymentWorkflow, PaymentWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('PaymentRoute');
 
@@ -87,7 +88,7 @@ export const paymentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPaymentWorkflow(
 				{
-					action: 'CREATE',
+					action: PaymentWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -327,14 +328,14 @@ export const paymentRouter = {
 				throw errors.NOT_FOUND({ message: 'Payment not found' });
 			}
 
-			if (payment.status === 'VOIDED') {
+			if (payment.status === PaymentStatus.VOIDED) {
 				throw errors.CONFLICT({ message: 'Payment already voided' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPaymentWorkflow(
 				{
-					action: 'VOID',
+					action: PaymentWorkflowAction.VOID,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,

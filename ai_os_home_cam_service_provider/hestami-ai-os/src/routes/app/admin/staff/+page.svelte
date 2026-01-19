@@ -20,6 +20,7 @@
 		type StaffStatus,
 		type StaffRole
 	} from '$lib/api/staff';
+	import { StaffStatusValues, StaffRoleValues } from '$lib/api/cam';
 
 	interface Props {
 		data: {
@@ -33,17 +34,21 @@
 
 	let { data }: Props = $props();
 
-	let staffList = $derived(data.staffList);
+	// Use $state with $effect to avoid proxy errors during navigation
+	let staffList = $state<StaffListItem[]>([]);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
 	let statusFilter = $state<StaffStatus | ''>('');
 	let roleFilter = $state<StaffRole | ''>('');
 
-	// Sync filters from server data
+	// Sync all data from server
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
-		statusFilter = data.filters.status;
-		roleFilter = data.filters.role;
+		if (data == null || typeof data !== 'object') return;
+		staffList = data.staffList ?? [];
+		statusFilter = data.filters?.status ?? '';
+		roleFilter = data.filters?.role ?? '';
 	});
 
 	async function loadStaff() {
@@ -54,10 +59,12 @@
 	}
 
 	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data == null || typeof data !== 'object') return;
 		// Reload when filters change (but only after initial sync)
-		if (statusFilter !== '' && statusFilter !== data.filters.status) {
+		if (statusFilter !== '' && statusFilter !== data.filters?.status) {
 			loadStaff();
-		} else if (roleFilter !== '' && roleFilter !== data.filters.role) {
+		} else if (roleFilter !== '' && roleFilter !== data.filters?.role) {
 			loadStaff();
 		}
 	});
@@ -77,10 +84,10 @@
 
 	function getStatusBadgeClass(status: StaffStatus): string {
 		const colorMap: Record<StaffStatus, string> = {
-			PENDING: 'preset-filled-warning-500',
-			ACTIVE: 'preset-filled-success-500',
-			SUSPENDED: 'preset-filled-error-500',
-			DEACTIVATED: 'preset-filled-surface-500'
+			[StaffStatusValues.PENDING]: 'preset-filled-warning-500',
+			[StaffStatusValues.ACTIVE]: 'preset-filled-success-500',
+			[StaffStatusValues.SUSPENDED]: 'preset-filled-error-500',
+			[StaffStatusValues.DEACTIVATED]: 'preset-filled-surface-500'
 		};
 		return colorMap[status] || 'preset-filled-surface-500';
 	}
@@ -118,18 +125,18 @@
 			<div class="flex gap-2">
 				<select bind:value={statusFilter} class="select w-40">
 					<option value="">All Status</option>
-					<option value="PENDING">Pending</option>
-					<option value="ACTIVE">Active</option>
-					<option value="SUSPENDED">Suspended</option>
-					<option value="DEACTIVATED">Deactivated</option>
+					<option value={StaffStatusValues.PENDING}>Pending</option>
+					<option value={StaffStatusValues.ACTIVE}>Active</option>
+					<option value={StaffStatusValues.SUSPENDED}>Suspended</option>
+					<option value={StaffStatusValues.DEACTIVATED}>Deactivated</option>
 				</select>
 				<select bind:value={roleFilter} class="select w-48">
 					<option value="">All Roles</option>
-					<option value="CONCIERGE_OPERATOR">Concierge Operator</option>
-					<option value="OPERATIONS_COORDINATOR">Operations Coordinator</option>
-					<option value="CAM_SPECIALIST">CAM Specialist</option>
-					<option value="VENDOR_LIAISON">Vendor Liaison</option>
-					<option value="PLATFORM_ADMIN">Platform Admin</option>
+					<option value={StaffRoleValues.CONCIERGE_OPERATOR}>Concierge Operator</option>
+					<option value={StaffRoleValues.OPERATIONS_COORDINATOR}>Operations Coordinator</option>
+					<option value={StaffRoleValues.CAM_SPECIALIST}>CAM Specialist</option>
+					<option value={StaffRoleValues.VENDOR_LIAISON}>Vendor Liaison</option>
+					<option value={StaffRoleValues.PLATFORM_ADMIN}>Platform Admin</option>
 				</select>
 			</div>
 		</div>
@@ -276,7 +283,7 @@
 					</div>
 					<div>
 						<p class="text-2xl font-bold">
-							{staffList.filter((s) => s.status === 'ACTIVE').length}
+							{staffList.filter((s) => s.status === StaffStatusValues.ACTIVE).length}
 						</p>
 						<p class="text-sm text-surface-500">Active</p>
 					</div>
@@ -289,7 +296,7 @@
 					</div>
 					<div>
 						<p class="text-2xl font-bold">
-							{staffList.filter((s) => s.status === 'PENDING').length}
+							{staffList.filter((s) => s.status === StaffStatusValues.PENDING).length}
 						</p>
 						<p class="text-sm text-surface-500">Pending</p>
 					</div>
@@ -302,7 +309,7 @@
 					</div>
 					<div>
 						<p class="text-2xl font-bold">
-							{staffList.filter((s) => s.status === 'SUSPENDED').length}
+							{staffList.filter((s) => s.status === StaffStatusValues.SUSPENDED).length}
 						</p>
 						<p class="text-sm text-surface-500">Suspended</p>
 					</div>

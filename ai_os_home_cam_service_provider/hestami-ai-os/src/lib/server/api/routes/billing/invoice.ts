@@ -9,9 +9,10 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { JobInvoiceStatus } from '../../../../../../generated/prisma/client.js';
+import { JobInvoiceStatus as JobInvoiceStatusType } from '../../../../../../generated/prisma/client.js';
+import { JobInvoiceStatus, EstimateStatus } from '../../../../../../generated/prisma/enums.js';
 import { startInvoiceCreateWorkflow } from '../../../workflows/invoiceCreateWorkflow.js';
-import { startBillingWorkflow } from '../../../workflows/billingWorkflow.js';
+import { startBillingWorkflow, BillingAction } from '../../../workflows/billingWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('InvoiceRoute');
@@ -37,7 +38,7 @@ const invoiceOutput = z.object({
 	jobId: z.string(),
 	customerId: z.string(),
 	invoiceNumber: z.string(),
-	status: z.nativeEnum(JobInvoiceStatus),
+	status: z.nativeEnum(JobInvoiceStatusType),
 	issueDate: z.string(),
 	dueDate: z.string().nullable(),
 	sentAt: z.string().nullable(),
@@ -158,14 +159,14 @@ export const invoiceRouter = {
 			});
 			if (!estimate) throw errors.NOT_FOUND({ message: 'Estimate not found' });
 
-			if (estimate.status !== 'ACCEPTED') {
+			if (estimate.status !== EstimateStatus.ACCEPTED) {
 				throw errors.BAD_REQUEST({ message: 'Can only create invoice from ACCEPTED estimate' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'CREATE_INVOICE_FROM_ESTIMATE',
+					action: BillingAction.CREATE_INVOICE_FROM_ESTIMATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -312,7 +313,7 @@ export const invoiceRouter = {
 				.object({
 					jobId: z.string().optional(),
 					customerId: z.string().optional(),
-					status: z.nativeEnum(JobInvoiceStatus).optional(),
+					status: z.nativeEnum(JobInvoiceStatusType).optional(),
 					overdue: z.boolean().optional()
 				})
 				.merge(PaginationInputSchema)
@@ -346,7 +347,7 @@ export const invoiceRouter = {
 			};
 
 			if (input?.overdue) {
-				where.status = { in: ['SENT', 'VIEWED', 'PARTIAL'] };
+				where.status = { in: [JobInvoiceStatus.SENT, JobInvoiceStatus.VIEWED, JobInvoiceStatus.PARTIAL] };
 				where.dueDate = { lt: new Date() };
 			}
 
@@ -409,14 +410,14 @@ export const invoiceRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== JobInvoiceStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only edit DRAFT invoices' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'UPDATE_INVOICE',
+					action: BillingAction.UPDATE_INVOICE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -469,14 +470,14 @@ export const invoiceRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== JobInvoiceStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only send DRAFT invoices' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'SEND_INVOICE',
+					action: BillingAction.SEND_INVOICE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -523,14 +524,14 @@ export const invoiceRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (existing.status !== 'SENT') {
+			if (existing.status !== JobInvoiceStatus.SENT) {
 				return successResponse({ invoice: formatInvoice(existing) }, context);
 			}
 
 			// Mark as viewed via workflow
 			const result = await startBillingWorkflow(
 				{
-					action: 'MARK_INVOICE_VIEWED',
+					action: BillingAction.MARK_INVOICE_VIEWED,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.id,
@@ -588,14 +589,14 @@ export const invoiceRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (!['SENT', 'VIEWED', 'PARTIAL', 'OVERDUE'].includes(existing.status)) {
+			if (!([JobInvoiceStatus.SENT, JobInvoiceStatus.VIEWED, JobInvoiceStatus.PARTIAL, JobInvoiceStatus.OVERDUE] as JobInvoiceStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Cannot record payment on this invoice' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'RECORD_INVOICE_PAYMENT',
+					action: BillingAction.RECORD_INVOICE_PAYMENT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -643,14 +644,14 @@ export const invoiceRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (['VOID', 'REFUNDED'].includes(existing.status)) {
+			if (([JobInvoiceStatus.VOID, JobInvoiceStatus.REFUNDED] as JobInvoiceStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Invoice is already void or refunded' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'VOID_INVOICE',
+					action: BillingAction.VOID_INVOICE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,
@@ -698,14 +699,14 @@ export const invoiceRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Invoice not found' });
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== JobInvoiceStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only delete DRAFT invoices' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startBillingWorkflow(
 				{
-					action: 'DELETE_INVOICE',
+					action: BillingAction.DELETE_INVOICE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: input.id,

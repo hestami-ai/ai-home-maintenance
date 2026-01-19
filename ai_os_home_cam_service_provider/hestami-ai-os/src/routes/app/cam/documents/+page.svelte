@@ -22,7 +22,7 @@
 		getCamCategory,
 		type CamDocumentCategory
 	} from '$lib/utils/documentCategories';
-	import { documentApi, type Document as ApiDocument, type DocumentDetail as ApiDocumentDetail, type DocumentReference as ApiDocumentReference, type DocumentVersion as ApiDocumentVersion } from '$lib/api/cam';
+	import { DocumentStatusValues, MeetingStatusValues, PolicyStatusValues, documentApi, type Document as ApiDocument, type DocumentDetail as ApiDocumentDetail, type DocumentReference as ApiDocumentReference, type DocumentVersion as ApiDocumentVersion } from '$lib/api/cam';
 
 	// Use API types with local aliases for compatibility
 	type Document = ApiDocument;
@@ -67,10 +67,10 @@
 
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'DRAFT', label: 'Draft' },
-		{ value: 'ACTIVE', label: 'Active' },
-		{ value: 'SUPERSEDED', label: 'Superseded' },
-		{ value: 'ARCHIVED', label: 'Archived' }
+		{ value: PolicyStatusValues.DRAFT, label: 'Draft' },
+		{ value: DocumentStatusValues.ACTIVE, label: 'Active' },
+		{ value: DocumentStatusValues.SUPERSEDED, label: 'Superseded' },
+		{ value: MeetingStatusValues.ARCHIVED, label: 'Archived' }
 	];
 
 	const referencedOptions = [
@@ -195,13 +195,13 @@
 	function getStatusBadgeClass(status: string | undefined): string {
 		if (!status) return 'bg-surface-500/10 text-surface-500';
 		switch (status) {
-			case 'ACTIVE':
+			case DocumentStatusValues.ACTIVE:
 				return 'bg-success-500/10 text-success-600';
-			case 'DRAFT':
+			case PolicyStatusValues.DRAFT:
 				return 'bg-warning-500/10 text-warning-600';
-			case 'SUPERSEDED':
+			case DocumentStatusValues.SUPERSEDED:
 				return 'bg-surface-500/10 text-surface-500';
-			case 'ARCHIVED':
+			case MeetingStatusValues.ARCHIVED:
 				return 'bg-error-500/10 text-error-600';
 			default:
 				return 'bg-surface-500/10 text-surface-500';

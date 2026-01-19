@@ -6,6 +6,7 @@ import {
 	type DefaultAccountDefinition
 } from './defaultChartOfAccounts.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
+import { AccountType, FundType, JournalEntryStatus } from '../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../logger.js';
 
 const log = createModuleLogger('GLService');
@@ -65,7 +66,7 @@ async function createAccountFromDefinition(
 	parentId: string | null
 ) {
 	// Determine normal balance based on account type
-	const normalDebit = ['ASSET', 'EXPENSE'].includes(def.accountType);
+	const normalDebit = ([AccountType.ASSET, AccountType.EXPENSE] as AccountType[]).includes(def.accountType);
 
 	return tx.gLAccount.create({
 		data: {
@@ -256,7 +257,7 @@ export async function postPaymentToGL(
 	const associationId = payment.unit.property.association.id;
 
 	// Get the Cash and AR accounts
-	const cashAccountNumber = payment.bankAccount?.fundType === 'RESERVE'
+	const cashAccountNumber = payment.bankAccount?.fundType === FundType.RESERVE
 		? SystemAccounts.RESERVE_CASH
 		: SystemAccounts.OPERATING_CASH;
 
@@ -364,7 +365,7 @@ export async function reversePaymentGL(
 		include: { lines: true }
 	});
 
-	if (!originalEntry || originalEntry.status === 'REVERSED') {
+	if (!originalEntry || originalEntry.status === JournalEntryStatus.REVERSED) {
 		return null;
 	}
 

@@ -64,6 +64,9 @@ model Technician {
   serviceContracts ServiceContract[] @relation("PrimaryTechnician")
   scheduledVisits  ScheduledVisit[]  @relation("ScheduledVisitTechnician")
 
+  // Service Provider Team Member link (optional)
+  teamMember ServiceProviderTeamMember?
+
   @@index([organizationId])
   @@index([branchId])
   @@index([isActive])
@@ -274,6 +277,51 @@ enum PillarAccess {
   CONTRACTOR // Contractor Operations pillar
   VENDOR // Vendor Management pillar
   ADMIN // System Administration pillar
+}
+
+// -----------------------------------------------------------------------------
+// Service Provider Team Member Management
+// -----------------------------------------------------------------------------
+
+enum ServiceProviderTeamMemberStatus {
+  PENDING // Invitation sent, awaiting activation
+  ACTIVE // Active team member
+  SUSPENDED // Emergency suspension (security/policy)
+  DEACTIVATED // Normal deactivation (left company, role change)
+}
+
+enum ServiceProviderRole {
+  OWNER // Full access to all contractor features, can manage team
+  ADMIN // Administrative access, can manage most features except billing settings
+  OFFICE_MANAGER // Scheduling, invoicing, customer communication
+  DISPATCHER // Job assignment, technician scheduling
+  ESTIMATOR // Create and send estimates
+  BOOKKEEPER // Invoicing, payments, financial reports
+  TECHNICIAN // Field work execution (links to Technician entity)
+}
+
+// -----------------------------------------------------------------------------
+// Phase 38: Organization Invitations & Join Requests
+// -----------------------------------------------------------------------------
+
+enum InvitationStatus {
+  PENDING // Invitation sent, awaiting acceptance
+  ACCEPTED // Invitation accepted, membership created
+  EXPIRED // Invitation expired without acceptance
+  REVOKED // Invitation revoked by admin
+}
+
+enum JoinRequestStatus {
+  PENDING // Request submitted, awaiting review
+  APPROVED // Request approved, membership created
+  REJECTED // Request rejected by admin
+  CANCELLED // Request cancelled by requester
+}
+
+enum InvitationDeliveryMethod {
+  CODE // Admin receives code to share manually
+  EMAIL // System sends email with magic link
+  SMS // System sends SMS with code (future)
 }
 
 // -----------------------------------------------------------------------------
@@ -897,6 +945,13 @@ model Organization {
   orgStaff   Staff[]
   committees Committee[]
 
+  // Service Provider Team Members
+  serviceProviderTeamMembers ServiceProviderTeamMember[]
+
+  // Phase 38: Organization Invitations & Join Requests
+  invitations  OrganizationInvitation[]
+  joinRequests JoinRequest[]
+
   @@map("organizations")
 }
 
@@ -933,6 +988,9 @@ model User {
   // Phase 16: Staff Management
   staffProfile Staff?
 
+  // Service Provider Team Memberships
+  serviceProviderTeamMemberships ServiceProviderTeamMember[]
+
   // Phase 16.7: Communications
   sentCommunications CaseCommunication[] @relation("CommunicationSender")
 
@@ -945,7 +1003,86 @@ model User {
   resolvedIssues      CaseIssue[]     @relation("IssueResolver")
   assignedIssues      CaseIssue[]     @relation("IssueAssignee")
 
+  // Phase 38: Organization Invitations & Join Requests
+  sentInvitations      OrganizationInvitation[] @relation("InvitedBy")
+  acceptedInvitations  OrganizationInvitation[] @relation("AcceptedBy")
+  joinRequests         JoinRequest[]
+  reviewedJoinRequests JoinRequest[]            @relation("ReviewedBy")
+
   @@map("users")
+}
+
+// =============================================================================
+// PHASE 38: Organization Invitations & Join Requests
+// =============================================================================
+
+/// @description Invitation to join an organization
+/// Supports multiple delivery methods and tracks full lifecycle
+model OrganizationInvitation {
+  id             String                   @id @default(cuid())
+  organizationId String                   @map("organization_id")
+  email          String                   @db.Citext
+  role           String // Role to assign on acceptance (e.g., OWNER, BOARD_MEMBER, TECHNICIAN)
+  invitedByUserId String                  @map("invited_by_user_id")
+
+  // Invitation code (encrypted)
+  codeEncrypted  String?                  @map("code_encrypted")
+  expiresAt      DateTime                 @db.Timestamptz(3) @map("expires_at")
+
+  // Status & lifecycle
+  status         InvitationStatus         @default(PENDING)
+  acceptedAt     DateTime?                @db.Timestamptz(3) @map("accepted_at")
+  acceptedByUserId String?                @map("accepted_by_user_id")
+
+  // Delivery
+  deliveryMethod InvitationDeliveryMethod @default(CODE) @map("delivery_method")
+  sentAt         DateTime?                @db.Timestamptz(3) @map("sent_at")
+
+  // Pillar-specific metadata (unit number, employee ID, board position, etc.)
+  metadata       Json?
+
+  createdAt      DateTime                 @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt      DateTime                 @db.Timestamptz(3) @updatedAt @map("updated_at")
+
+  // Relations
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy      User                     @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+  acceptedBy     User?                    @relation("AcceptedBy", fields: [acceptedByUserId], references: [id])
+
+  @@index([email, status])
+  @@index([organizationId, status])
+  @@index([codeEncrypted])
+  @@map("organization_invitations")
+}
+
+/// @description Request to join an organization (self-service)
+/// Used when user doesn't have an invitation but wants to join
+model JoinRequest {
+  id               String            @id @default(cuid())
+  organizationId   String            @map("organization_id")
+  userId           String            @map("user_id")
+  requestedRole    String            @map("requested_role") // Role user is requesting
+
+  // Verification data (unit number, employee ID, etc.)
+  verificationData Json?             @map("verification_data")
+
+  // Status & lifecycle
+  status           JoinRequestStatus @default(PENDING)
+  reviewedByUserId String?           @map("reviewed_by_user_id")
+  reviewedAt       DateTime?         @db.Timestamptz(3) @map("reviewed_at")
+  rejectionReason  String?           @map("rejection_reason") @db.Text
+
+  createdAt        DateTime          @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt        DateTime          @db.Timestamptz(3) @updatedAt @map("updated_at")
+
+  // Relations
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy       User?             @relation("ReviewedBy", fields: [reviewedByUserId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, status])
+  @@map("join_requests")
 }
 
 // =============================================================================
@@ -1000,6 +1137,51 @@ model Staff {
   @@index([status])
   @@index([userId])
   @@map("staff")
+}
+
+/// @description Service provider organization team member
+/// Represents employees/contractors of a service provider organization with role-based access
+model ServiceProviderTeamMember {
+  id             String @id @default(cuid())
+  organizationId String @map("organization_id")
+  userId         String @map("user_id")
+
+  // Identity
+  displayName String  @map("display_name")
+  title       String?
+
+  // Status & lifecycle
+  status             ServiceProviderTeamMemberStatus @default(PENDING)
+  activatedAt        DateTime? @db.Timestamptz(3)   @map("activated_at")
+  suspendedAt        DateTime? @db.Timestamptz(3)   @map("suspended_at")
+  deactivatedAt      DateTime? @db.Timestamptz(3)   @map("deactivated_at")
+  suspensionReason   String?   @map("suspension_reason") @db.Text
+  deactivationReason String?   @map("deactivation_reason") @db.Text
+
+  // Roles (team member can have multiple roles)
+  roles ServiceProviderRole[]
+
+  // Onboarding & Activation
+  activationCodeEncrypted String?   @map("activation_code_encrypted")
+  activationCodeExpiresAt DateTime? @db.Timestamptz(3) @map("activation_code_expires_at")
+
+  // Optional link to Technician entity (for TECHNICIAN role)
+  technicianId String? @unique @map("technician_id")
+
+  // Timestamps
+  createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
+  updatedAt DateTime  @db.Timestamptz(3) @updatedAt @map("updated_at")
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  technician   Technician?  @relation(fields: [technicianId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@map("service_provider_team_members")
 }
 
 /// @description Staff case assignment tracking

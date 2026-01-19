@@ -13,6 +13,8 @@ A governance CLI tool designed to programmatically enforce the **Hestami AI Deve
 - **Security Check (R7/R8)**: Scans for raw SQL usage and sensitive variable exposure.
 - **Deep Semantic Trace (R11)**: Traces oRPC handlers to ensure Cerbos authorization is checking `context.cerbos` in the call chain.
 - **RLS Defense in Depth (R12)**: Ensures tenant isolation via explicit org/association filters, proper transaction-scoped RLS context, and connection pooling safety (withRLSContext pattern).
+- **Stringly-Typed Detection (R13)**: Detects magic strings (hardcoded string literals) that should use proper enums/types from the Prisma schema. Catches primitive obsession, magic values, and enum drift.
+- **Svelte Reactivity Safety (R14)**: Detects unsafe `$derived(data.property)` patterns in Svelte components that can crash during navigation transitions. Enforces null-safe access with defaults.
 - **Pipeline Integrity (R4)**: Detects drift between Prisma schemas, Zod models, OpenAPI specs, and generated frontend types.
 
 ## Installation
@@ -48,6 +50,8 @@ bun run src/cli.ts verify timestamps
 bun run src/cli.ts verify security
 bun run src/cli.ts verify trace
 bun run src/cli.ts verify rls
+bun run src/cli.ts verify stringly
+bun run src/cli.ts verify svelte
 ```
 
 ### JSON Output
@@ -65,7 +69,24 @@ Rules and folder boundaries are defined in `haos-guard.config.json`.
 |------|---------|
 | `projectRoot` | Path to the main application source (e.g., `../hestami-ai-os`) |
 | `rules.R5.boundaries` | Definition of forbidden imports for specific file patterns |
+| `rules.R13.options` | Options for stringly-typed code detection (see below) |
 | `paths` | Relative paths to schema and generated artifact files |
+
+### R13 Options
+
+The stringly-typed detection rule has configurable options:
+
+```json
+"R13": {
+    "options": {
+        "skipCaseClauses": false
+    }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `skipCaseClauses` | `false` | When `false`, switch case expressions like `case 'ACTIVE':` are flagged as violations. Set to `true` to skip them (TypeScript narrows types in switch cases, making this somewhat safer). |
 
 ## Rule Reference
 
@@ -76,5 +97,11 @@ Rules and folder boundaries are defined in `haos-guard.config.json`.
 - **R8**: Avoid `z.enum(['A', 'B'])` literals; use imported schemas from `api/schemas.ts`.
 - **R9**: Use `TIMESTAMPTZ(3)` for consistent high-precision time storage.
 - **R10**: Authorization (Cerbos) must be enforced and policies must be valid.
-- **R12**: RLS Defense in Depth - All tenant-scoped queries must include explicit `organizationId` filters. Workflows must use `orgTransaction` helper. CAM pillar tables must also include `associationId` filters when in association context. Connection pooling safety: `orgProcedure` must use `withRLSContext`, and Prisma extensions must use `tx[modelName][operation](args)` instead of `query(args)` inside transactions.
-
+- **R12**: RLS Defense in Depth - All tenant-scoped queries must include explicit `organizationId` filters. Workflows must use `orgTransaction` helper. CAM pillar tables must also include `associationId` filters when in association context. Connection pooling safety: `orgProcedure` must use `withRLSContext`, and Prisma extensions must use `tx[modelName][operation](args)` instead of `query(args)` inside transactions. **SvelteKit page.server.ts files** must use `orgTransaction()` instead of `setOrgContext()` + direct Prisma calls to avoid connection pooling issues where RLS context is set on one connection but queries run on another.
+- **R13**: Stringly-Typed Code - Avoid magic strings (hardcoded string literals like `'ACTIVE'`, `'INDIVIDUAL'`, `'CLOSED'`) that match Prisma enum values. Use imported enum types or Zod schemas from barrel files instead.
+- **R14**: Svelte Reactivity Safety - In `+page.svelte` and `+layout.svelte` files, use null-safe access for server data. During SvelteKit client-side navigation, `data` can be momentarily undefined, causing "right-hand side of 'in' should be an object" errors. This check detects:
+  - `$derived(data.property)` → Use `$derived(data?.property ?? defaultValue)`
+  - `$effect(() => { data.property })` → Add `if (!data) return;` guard at start
+  - `$state(data.property)` → Use `$state(data?.property ?? defaultValue)`
+  - `{data.property}` in templates → Use `{data?.property}` or wrap in `{#if data}`
+  - `{#if data.property}` → Use `{#if data?.property}`

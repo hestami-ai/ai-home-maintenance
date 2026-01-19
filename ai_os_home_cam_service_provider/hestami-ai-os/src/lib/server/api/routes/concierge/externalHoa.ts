@@ -11,7 +11,7 @@ import { prisma } from '../../../db.js';
 import { ExternalApprovalStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ExternalApprovalStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startExternalHoaWorkflow } from '../../../workflows/index.js';
+import { startExternalHoaWorkflow, ExternalHoaWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('ExternalHoaRoute');
 
@@ -67,7 +67,7 @@ export const externalHoaRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalHoaWorkflow(
 				{
-					action: 'CREATE_CONTEXT',
+					action: ExternalHoaWorkflowAction.CREATE_CONTEXT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -305,7 +305,7 @@ export const externalHoaRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalHoaWorkflow(
 				{
-					action: 'UPDATE_CONTEXT',
+					action: ExternalHoaWorkflowAction.UPDATE_CONTEXT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					contextId: input.id,
@@ -381,7 +381,7 @@ export const externalHoaRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalHoaWorkflow(
 				{
-					action: 'CREATE_APPROVAL',
+					action: ExternalHoaWorkflowAction.CREATE_APPROVAL,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					externalHoaContextId: input.externalHoaContextId,
@@ -464,7 +464,7 @@ export const externalHoaRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalHoaWorkflow(
 				{
-					action: 'UPDATE_APPROVAL_STATUS',
+					action: ExternalHoaWorkflowAction.UPDATE_APPROVAL_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					approvalId: input.id,
@@ -542,7 +542,7 @@ export const externalHoaRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalHoaWorkflow(
 				{
-					action: 'ADD_RULE',
+					action: ExternalHoaWorkflowAction.ADD_RULE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					externalHoaContextId: input.externalHoaContextId,
@@ -610,7 +610,7 @@ export const externalHoaRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startExternalHoaWorkflow(
 				{
-					action: 'DELETE_RULE',
+					action: ExternalHoaWorkflowAction.DELETE_RULE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					ruleId: input.id

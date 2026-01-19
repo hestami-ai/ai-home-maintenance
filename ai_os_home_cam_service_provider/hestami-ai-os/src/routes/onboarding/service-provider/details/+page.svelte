@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, PartyTypeValues } from '$lib/api/cam';
 	interface Props {
 		data: {
 			onboardingState: any;
@@ -15,13 +16,13 @@
 
 	const businessTypes = [
 		{ value: 'sole_proprietor', label: 'Sole Proprietor' },
-		{ value: 'llc', label: 'LLC' },
+		{ value: 'llc', label: PartyTypeValues.LLC },
 		{ value: 'corporation', label: 'Corporation' },
 		{ value: 'partnership', label: 'Partnership' }
 	];
 
 	const serviceCategoryOptions = [
-		{ value: 'hvac', label: 'HVAC' },
+		{ value: 'hvac', label: ARCCategoryValues.HVAC },
 		{ value: 'plumbing', label: 'Plumbing' },
 		{ value: 'electrical', label: 'Electrical' },
 		{ value: 'landscaping', label: 'Landscaping' },
@@ -48,8 +49,10 @@
 	let slugError = $state<string | null>(null);
 
 	// Pre-fill with user data if empty (runs once)
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	let hasPreFilled = $state(false);
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
 		if (!hasPreFilled && data.user) {
 			if (!contactName && data.user.name) contactName = data.user.name;
 			if (!contactEmail && data.user.email) contactEmail = data.user.email;

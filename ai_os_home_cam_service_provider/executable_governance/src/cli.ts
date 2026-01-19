@@ -10,6 +10,9 @@ import { verifyTimestamps } from './checks/timestamps.ts';
 import { verifySecurity } from './checks/security.ts';
 import { verifyDeepTrace } from './checks/trace.ts';
 import { verifyRls } from './checks/rls.ts';
+import { verifyStringlyTyped } from './checks/stringlyTyped.ts';
+import { verifySvelteReactivity } from './checks/svelteReactivity.ts';
+import { verifySvelteSnippets } from './checks/svelteSnippets.ts';
 import { printReport, type Report, type Violation } from './reporting/index.ts';
 import path from 'path';
 
@@ -101,8 +104,29 @@ program
                 console.log(rlsViolations.length === 0 ? '✔' : '✖');
             }
 
+            if (check === 'stringly' || check === 'rules') {
+                process.stdout.write('Checking stringly-typed code (R13)... ');
+                const stringlyViolations = await verifyStringlyTyped(config);
+                violations.push(...stringlyViolations);
+                console.log(stringlyViolations.length === 0 ? '✔' : '✖');
+            }
+
+            if (check === 'svelte' || check === 'rules') {
+                process.stdout.write('Checking Svelte reactivity safety (R14)... ');
+                const svelteViolations = await verifySvelteReactivity(config);
+                violations.push(...svelteViolations);
+                console.log(svelteViolations.length === 0 ? '✔' : '✖');
+            }
+
+            if (check === 'snippets' || check === 'rules') {
+                process.stdout.write('Checking Svelte snippet/component safety (R15)... ');
+                const snippetViolations = await verifySvelteSnippets(config);
+                violations.push(...snippetViolations);
+                console.log(snippetViolations.length === 0 ? '✔' : '✖');
+            }
+
             // Add more checks here as they are implemented
-            if (check !== 'boundaries' && check !== 'mutations' && check !== 'types' && check !== 'pipelines' && check !== 'errors' && check !== 'policies' && check !== 'timestamps' && check !== 'security' && check !== 'trace' && check !== 'rls' && check !== 'rules') {
+            if (check !== 'boundaries' && check !== 'mutations' && check !== 'types' && check !== 'pipelines' && check !== 'errors' && check !== 'policies' && check !== 'timestamps' && check !== 'security' && check !== 'trace' && check !== 'rls' && check !== 'stringly' && check !== 'svelte' && check !== 'snippets' && check !== 'rules') {
                 console.warn(`Check '${check}' is not yet implemented.`);
             }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { readFileSync, existsSync } from 'fs';
-import path from 'path';
+import { readFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
 
 const BoundaryRuleSchema = z.object({
     path: z.string(),
@@ -9,10 +9,22 @@ const BoundaryRuleSchema = z.object({
     reason: z.string()
 });
 
+const AllowListEntrySchema = z.object({
+    file: z.string(),
+    values: z.array(z.string()),
+    reason: z.string().optional()
+});
+
+const R13OptionsSchema = z.object({
+    skipCaseClauses: z.boolean().optional().default(false),
+    allowList: z.array(AllowListEntrySchema).optional().default([])
+}).optional();
+
 const RuleSchema = z.object({
     name: z.string(),
     description: z.string(),
     boundaries: z.array(BoundaryRuleSchema).optional(),
+    options: R13OptionsSchema.optional()
 });
 
 export const ConfigSchema = z.object({
@@ -40,7 +52,7 @@ export function loadConfig(configPath: string): Config {
     const result = ConfigSchema.safeParse(json);
 
     if (!result.success) {
-        throw new Error(`Invalid configuration: ${JSON.stringify(result.error.format(), null, 2)}`);
+        throw new Error(`Invalid configuration: ${JSON.stringify(z.treeifyError(result.error), null, 2)}`);
     }
 
     return result.data;

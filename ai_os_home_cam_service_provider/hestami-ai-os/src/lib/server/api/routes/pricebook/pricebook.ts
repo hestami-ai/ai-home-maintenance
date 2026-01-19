@@ -9,8 +9,9 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { ContractorTradeType, PricebookItemType, PricebookVersionStatus, PriceRuleType } from '../../../../../../generated/prisma/client.js';
-import { startPricebookWorkflow } from '../../../workflows/pricebookWorkflow.js';
+import { ContractorTradeType, PricebookItemType, PricebookVersionStatus as PricebookVersionStatusType, PriceRuleType } from '../../../../../../generated/prisma/client.js';
+import { PricebookVersionStatus } from '../../../../../../generated/prisma/enums.js';
+import { startPricebookWorkflow, PricebookAction } from '../../../workflows/pricebookWorkflow.js';
 
 const pricebookOutput = z.object({
 	id: z.string(),
@@ -109,7 +110,7 @@ const ensureVersionMutable = async (versionId: string, orgId: string, errors: an
 		where: { id: versionId, pricebook: { organizationId: orgId } }
 	});
 	if (!version) throw errors.NOT_FOUND({ message: 'Pricebook version not found' });
-	if (version.status !== 'DRAFT') {
+	if (version.status !== PricebookVersionStatus.DRAFT) {
 		throw errors.CONFLICT({ message: 'Version is immutable after publish/activate' });
 	}
 	return version;
@@ -172,7 +173,7 @@ export const pricebookRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPricebookWorkflow(
 				{
-					action: 'UPSERT_PRICEBOOK',
+					action: PricebookAction.UPSERT_PRICEBOOK,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					pricebookId: id,
@@ -301,7 +302,7 @@ export const pricebookRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPricebookWorkflow(
 				{
-					action: 'CREATE_VERSION',
+					action: PricebookAction.CREATE_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					pricebookId: pb.id,
@@ -355,7 +356,7 @@ export const pricebookRouter = {
 			await assertContractorOrg(context.organization.id, errors);
 			const version = await ensureVersionScoped(input.versionId, context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'pricebook_version', version.id);
-			if (version.status !== 'DRAFT') throw errors.CONFLICT({ message: 'Only draft versions can be published' });
+			if (version.status !== PricebookVersionStatus.DRAFT) throw errors.CONFLICT({ message: 'Only draft versions can be published' });
 			if (input.effectiveStart && input.effectiveEnd) {
 				if (new Date(input.effectiveEnd) <= new Date(input.effectiveStart)) {
 					throw errors.BAD_REQUEST({ message: 'effectiveEnd must be after effectiveStart' });
@@ -369,7 +370,7 @@ export const pricebookRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPricebookWorkflow(
 				{
-					action: 'PUBLISH_VERSION',
+					action: PricebookAction.PUBLISH_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					versionId: version.id,
@@ -411,14 +412,14 @@ export const pricebookRouter = {
 			await assertContractorOrg(context.organization.id, errors);
 			const version = await ensureVersionScoped(input.versionId, context.organization.id, errors);
 			await context.cerbos.authorize('edit', 'pricebook_version', version.id);
-			if (version.status !== 'PUBLISHED') {
+			if (version.status !== PricebookVersionStatus.PUBLISHED) {
 				throw errors.CONFLICT({ message: 'Only published versions can be activated' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startPricebookWorkflow(
 				{
-					action: 'ACTIVATE_VERSION',
+					action: PricebookAction.ACTIVATE_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					versionId: version.id,
@@ -529,7 +530,7 @@ export const pricebookRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPricebookWorkflow(
 				{
-					action: 'UPSERT_ITEM',
+					action: PricebookAction.UPSERT_ITEM,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					versionId: version.id,
@@ -650,7 +651,7 @@ export const pricebookRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startPricebookWorkflow(
 				{
-					action: 'UPSERT_RULE',
+					action: PricebookAction.UPSERT_RULE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					versionId: version.id,
@@ -759,7 +760,7 @@ export const pricebookRouter = {
 		.handler(async ({ input, context, errors }) => {
 			await assertContractorOrg(context.organization.id, errors);
 			const version = await ensureVersionScoped(input.pricebookVersionId, context.organization.id, errors);
-			if (version.status !== 'DRAFT') throw errors.CONFLICT({ message: 'Job templates can only be modified on draft versions' });
+			if (version.status !== PricebookVersionStatus.DRAFT) throw errors.CONFLICT({ message: 'Job templates can only be modified on draft versions' });
 			await context.cerbos.authorize('edit', 'job_template', input.id ?? 'new');
 			await ensureServiceAreaOwned(input.defaultServiceAreaId, context.organization.id, errors);
 
@@ -776,7 +777,7 @@ export const pricebookRouter = {
 
 			const workflowResult = await startPricebookWorkflow(
 				{
-					action: 'UPSERT_TEMPLATE',
+					action: PricebookAction.UPSERT_TEMPLATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					versionId: version.id,

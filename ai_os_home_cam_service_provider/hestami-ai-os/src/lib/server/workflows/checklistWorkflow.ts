@@ -10,6 +10,12 @@ import { orgTransaction } from '../db/rls.js';
 import { ChecklistItemStatus, type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CHECKLIST_WORKFLOW_ERROR: 'CHECKLIST_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ChecklistWorkflow');
 
@@ -267,8 +273,8 @@ async function checklistWorkflow(input: ChecklistWorkflowInput): Promise<Checkli
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CHECKLIST_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CHECKLIST_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

@@ -9,9 +9,15 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, BidStatus, WorkOrderStatus } from '../../../../generated/prisma/enums.js';
 import { orgTransaction } from '../db/rls.js';
 
 const log = createWorkflowLogger('BidWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	BID_WORKFLOW_ERROR: 'BID_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const BidWorkflowAction = {
@@ -78,7 +84,7 @@ async function requestBids(
 					data: {
 						workOrderId,
 						vendorId,
-						status: 'REQUESTED',
+						status: BidStatus.REQUESTED,
 						validUntil: new Date(dueDate),
 						notes
 					}
@@ -115,7 +121,7 @@ async function submitBid(
 					proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate) : null,
 					proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate) : null,
 					notes: data.notes,
-					status: 'SUBMITTED',
+					status: BidStatus.SUBMITTED,
 					submittedAt: new Date()
 				}
 			});
@@ -137,7 +143,7 @@ async function expireBid(
 		async (tx) => {
 			return tx.workOrderBid.update({
 				where: { id: bidId },
-				data: { status: 'EXPIRED' }
+				data: { status: BidStatus.EXPIRED }
 			});
 		},
 		{ userId, reason: 'Expire work order bid' }
@@ -168,7 +174,7 @@ async function acceptBid(
 			await tx.workOrderBid.update({
 				where: { id: bidId },
 				data: {
-					status: 'ACCEPTED',
+					status: BidStatus.ACCEPTED,
 					respondedAt: new Date(),
 					respondedBy: userId
 				}
@@ -179,10 +185,10 @@ async function acceptBid(
 				where: {
 					workOrderId,
 					id: { not: bidId },
-					status: { in: ['REQUESTED', 'PENDING', 'SUBMITTED', 'UNDER_REVIEW'] }
+					status: { in: [BidStatus.REQUESTED, BidStatus.PENDING, BidStatus.SUBMITTED, BidStatus.UNDER_REVIEW] }
 				},
 				data: {
-					status: 'REJECTED',
+					status: BidStatus.REJECTED,
 					respondedAt: new Date(),
 					respondedBy: userId
 				}
@@ -195,7 +201,7 @@ async function acceptBid(
 					assignedVendorId: vendorId,
 					assignedAt: new Date(),
 					assignedBy: userId,
-					status: 'ASSIGNED',
+					status: WorkOrderStatus.ASSIGNED,
 					estimatedCost: totalAmount,
 					estimatedHours
 				}
@@ -206,7 +212,7 @@ async function acceptBid(
 				data: {
 					workOrderId,
 					fromStatus: workOrderStatus as any,
-					toStatus: 'ASSIGNED' as any,
+					toStatus: WorkOrderStatus.ASSIGNED,
 					changedBy: userId,
 					notes: notes || `Bid accepted from ${vendorName}`
 				}
@@ -233,7 +239,7 @@ async function rejectBid(
 			await tx.workOrderBid.update({
 				where: { id: bidId },
 				data: {
-					status: 'REJECTED',
+					status: BidStatus.REJECTED,
 					respondedAt: new Date(),
 					respondedBy: userId,
 					notes: data.reason ? `Rejected: ${data.reason}` : bid?.notes
@@ -261,7 +267,7 @@ async function withdrawBid(
 			await tx.workOrderBid.update({
 				where: { id: bidId },
 				data: {
-					status: 'WITHDRAWN',
+					status: BidStatus.WITHDRAWN,
 					notes: data.reason ? `Withdrawn: ${data.reason}` : bid?.notes
 				}
 			});
@@ -334,8 +340,8 @@ async function bidWorkflow(input: BidWorkflowInput): Promise<BidWorkflowResult> 
 		console.error(`[BidWorkflow] Error in ${input.action}:`, errorMessage);
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'BID_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.BID_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

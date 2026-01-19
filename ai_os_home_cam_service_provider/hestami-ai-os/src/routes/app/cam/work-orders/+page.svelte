@@ -5,6 +5,7 @@
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
 	import type { WorkOrder } from '$lib/api/cam';
+	import { CommitteeTypeValues, WorkOrderOriginTypeValues, WorkOrderPriorityValues, WorkOrderStatusValues } from '$lib/api/cam';
 
 	interface WorkOrderListItem extends WorkOrder {
 		locationDescription?: string;
@@ -14,50 +15,50 @@
 
     let { data } = $props();
 
-	let workOrders = $derived(data.workOrders as WorkOrderListItem[]);
+	let workOrders = $derived((data?.workOrders ?? []) as WorkOrderListItem[]);
 	let selectedWorkOrder = $state<WorkOrder | null>(null);
 	let isLoading = $state(false); // No longer loading on mount
-	
-    // Filters derived from URL params - updates on navigation
-	let searchQuery = $derived(data.filters?.search || '');
-	let statusFilter = $derived(data.filters?.status || '');
-	let priorityFilter = $derived(data.filters?.priority || '');
+
+    // Filters - use $state and sync via $effect with untrack for navigation safety
+	let searchQuery = $state('');
+	let statusFilter = $state('');
+	let priorityFilter = $state('');
 
 	// Phase 9: Updated status options with AUTHORIZED and REVIEW_REQUIRED
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'DRAFT', label: 'Draft' },
-		{ value: 'SUBMITTED', label: 'Submitted' },
-		{ value: 'TRIAGED', label: 'Triaged' },
-		{ value: 'AUTHORIZED', label: 'Authorized' },
-		{ value: 'ASSIGNED', label: 'Assigned' },
-		{ value: 'SCHEDULED', label: 'Scheduled' },
-		{ value: 'IN_PROGRESS', label: 'In Progress' },
-		{ value: 'ON_HOLD', label: 'On Hold' },
-		{ value: 'COMPLETED', label: 'Completed' },
-		{ value: 'REVIEW_REQUIRED', label: 'Review Required' },
-		{ value: 'INVOICED', label: 'Invoiced' },
-		{ value: 'CLOSED', label: 'Closed' },
-		{ value: 'CANCELLED', label: 'Cancelled' }
+		{ value: WorkOrderStatusValues.DRAFT, label: 'Draft' },
+		{ value: WorkOrderStatusValues.SUBMITTED, label: 'Submitted' },
+		{ value: WorkOrderStatusValues.TRIAGED, label: 'Triaged' },
+		{ value: WorkOrderStatusValues.AUTHORIZED, label: 'Authorized' },
+		{ value: WorkOrderStatusValues.ASSIGNED, label: 'Assigned' },
+		{ value: WorkOrderStatusValues.SCHEDULED, label: 'Scheduled' },
+		{ value: WorkOrderStatusValues.IN_PROGRESS, label: 'In Progress' },
+		{ value: WorkOrderStatusValues.ON_HOLD, label: 'On Hold' },
+		{ value: WorkOrderStatusValues.COMPLETED, label: 'Completed' },
+		{ value: WorkOrderStatusValues.REVIEW_REQUIRED, label: 'Review Required' },
+		{ value: WorkOrderStatusValues.INVOICED, label: 'Invoiced' },
+		{ value: WorkOrderStatusValues.CLOSED, label: 'Closed' },
+		{ value: WorkOrderStatusValues.CANCELLED, label: 'Cancelled' }
 	];
 
 	// Phase 9: Origin type filter options
 	const originTypeOptions = [
 		{ value: '', label: 'All Origins' },
-		{ value: 'VIOLATION_REMEDIATION', label: 'Violation' },
-		{ value: 'ARC_APPROVAL', label: 'ARC Approval' },
-		{ value: 'PREVENTIVE_MAINTENANCE', label: 'Preventive' },
-		{ value: 'BOARD_DIRECTIVE', label: 'Board Directive' },
-		{ value: 'EMERGENCY_ACTION', label: 'Emergency' },
-		{ value: 'MANUAL', label: 'Manual' }
+		{ value: WorkOrderOriginTypeValues.VIOLATION_REMEDIATION, label: 'Violation' },
+		{ value: WorkOrderOriginTypeValues.ARC_APPROVAL, label: 'ARC Approval' },
+		{ value: WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE, label: 'Preventive' },
+		{ value: WorkOrderOriginTypeValues.BOARD_DIRECTIVE, label: 'Board Directive' },
+		{ value: WorkOrderOriginTypeValues.EMERGENCY_ACTION, label: 'Emergency' },
+		{ value: WorkOrderOriginTypeValues.MANUAL, label: 'Manual' }
 	];
 
 	const priorityOptions = [
 		{ value: '', label: 'All Priorities' },
-		{ value: 'EMERGENCY', label: 'Emergency' },
-		{ value: 'HIGH', label: 'High' },
-		{ value: 'MEDIUM', label: 'Medium' },
-		{ value: 'LOW', label: 'Low' }
+		{ value: WorkOrderPriorityValues.EMERGENCY, label: 'Emergency' },
+		{ value: WorkOrderPriorityValues.HIGH, label: 'High' },
+		{ value: WorkOrderPriorityValues.MEDIUM, label: 'Medium' },
+		{ value: WorkOrderPriorityValues.LOW, label: 'Low' }
 	];
 
     // Debounce search update
@@ -78,16 +79,17 @@
         goto(`?${query.toString()}`, { keepFocus: true, noScroll: true });
     }
 
-    // Trigger update when filters change
+    // Sync filters from server data
+    // Track data to trigger re-runs on navigation, but guard against undefined
     $effect(() => {
+        if (data == null || typeof data !== 'object') return;
         // Sync state from URL/data
         if (data.filters) {
             searchQuery = data.filters.search || '';
             statusFilter = data.filters.status || '';
             priorityFilter = data.filters.priority || '';
         }
-        
-        // Debounce search
+        // Clear timeout on sync
         clearTimeout(searchTimeout);
     });
 
@@ -109,19 +111,19 @@
 	// Phase 9: Updated status colors with new states
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'DRAFT': return 'text-surface-500 bg-surface-500/10';
-			case 'SUBMITTED': return 'text-primary-500 bg-primary-500/10';
-			case 'TRIAGED': return 'text-blue-500 bg-blue-500/10';
-			case 'AUTHORIZED': return 'text-green-600 bg-green-600/10';
-			case 'ASSIGNED': return 'text-secondary-500 bg-secondary-500/10';
-			case 'SCHEDULED': return 'text-indigo-500 bg-indigo-500/10';
-			case 'IN_PROGRESS': return 'text-warning-500 bg-warning-500/10';
-			case 'ON_HOLD': return 'text-orange-500 bg-orange-500/10';
-			case 'COMPLETED': return 'text-success-500 bg-success-500/10';
-			case 'REVIEW_REQUIRED': return 'text-amber-600 bg-amber-600/10';
-			case 'INVOICED': return 'text-purple-500 bg-purple-500/10';
-			case 'CLOSED': return 'text-surface-400 bg-surface-400/10';
-			case 'CANCELLED': return 'text-error-500 bg-error-500/10';
+			case WorkOrderStatusValues.DRAFT: return 'text-surface-500 bg-surface-500/10';
+			case WorkOrderStatusValues.SUBMITTED: return 'text-primary-500 bg-primary-500/10';
+			case WorkOrderStatusValues.TRIAGED: return 'text-blue-500 bg-blue-500/10';
+			case WorkOrderStatusValues.AUTHORIZED: return 'text-green-600 bg-green-600/10';
+			case WorkOrderStatusValues.ASSIGNED: return 'text-secondary-500 bg-secondary-500/10';
+			case WorkOrderStatusValues.SCHEDULED: return 'text-indigo-500 bg-indigo-500/10';
+			case WorkOrderStatusValues.IN_PROGRESS: return 'text-warning-500 bg-warning-500/10';
+			case WorkOrderStatusValues.ON_HOLD: return 'text-orange-500 bg-orange-500/10';
+			case WorkOrderStatusValues.COMPLETED: return 'text-success-500 bg-success-500/10';
+			case WorkOrderStatusValues.REVIEW_REQUIRED: return 'text-amber-600 bg-amber-600/10';
+			case WorkOrderStatusValues.INVOICED: return 'text-purple-500 bg-purple-500/10';
+			case WorkOrderStatusValues.CLOSED: return 'text-surface-400 bg-surface-400/10';
+			case WorkOrderStatusValues.CANCELLED: return 'text-error-500 bg-error-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -129,12 +131,12 @@
 	// Phase 9: Get origin type display label
 	function getOriginTypeLabel(originType?: string): string {
 		switch (originType) {
-			case 'VIOLATION_REMEDIATION': return 'Violation';
-			case 'ARC_APPROVAL': return 'ARC';
-			case 'PREVENTIVE_MAINTENANCE': return 'Preventive';
-			case 'BOARD_DIRECTIVE': return 'Board';
-			case 'EMERGENCY_ACTION': return 'Emergency';
-			case 'MANUAL': return 'Manual';
+			case WorkOrderOriginTypeValues.VIOLATION_REMEDIATION: return 'Violation';
+			case WorkOrderOriginTypeValues.ARC_APPROVAL: return CommitteeTypeValues.ARC;
+			case WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE: return 'Preventive';
+			case WorkOrderOriginTypeValues.BOARD_DIRECTIVE: return 'Board';
+			case WorkOrderOriginTypeValues.EMERGENCY_ACTION: return 'Emergency';
+			case WorkOrderOriginTypeValues.MANUAL: return 'Manual';
 			default: return '-';
 		}
 	}
@@ -142,22 +144,22 @@
 	// Phase 9: Get origin type color
 	function getOriginTypeColor(originType?: string): string {
 		switch (originType) {
-			case 'VIOLATION_REMEDIATION': return 'text-error-600 bg-error-600/10';
-			case 'ARC_APPROVAL': return 'text-blue-600 bg-blue-600/10';
-			case 'PREVENTIVE_MAINTENANCE': return 'text-green-600 bg-green-600/10';
-			case 'BOARD_DIRECTIVE': return 'text-purple-600 bg-purple-600/10';
-			case 'EMERGENCY_ACTION': return 'text-red-600 bg-red-600/10';
-			case 'MANUAL': return 'text-surface-500 bg-surface-500/10';
+			case WorkOrderOriginTypeValues.VIOLATION_REMEDIATION: return 'text-error-600 bg-error-600/10';
+			case WorkOrderOriginTypeValues.ARC_APPROVAL: return 'text-blue-600 bg-blue-600/10';
+			case WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE: return 'text-green-600 bg-green-600/10';
+			case WorkOrderOriginTypeValues.BOARD_DIRECTIVE: return 'text-purple-600 bg-purple-600/10';
+			case WorkOrderOriginTypeValues.EMERGENCY_ACTION: return 'text-red-600 bg-red-600/10';
+			case WorkOrderOriginTypeValues.MANUAL: return 'text-surface-500 bg-surface-500/10';
 			default: return 'text-surface-400 bg-surface-400/10';
 		}
 	}
 
 	function getPriorityColor(priority: string): string {
 		switch (priority) {
-			case 'EMERGENCY': return 'bg-error-500 text-white';
-			case 'HIGH': return 'bg-warning-500 text-white';
-			case 'MEDIUM': return 'bg-yellow-500 text-black';
-			case 'LOW': return 'bg-surface-400 text-white';
+			case WorkOrderPriorityValues.EMERGENCY: return 'bg-error-500 text-white';
+			case WorkOrderPriorityValues.HIGH: return 'bg-warning-500 text-white';
+			case WorkOrderPriorityValues.MEDIUM: return 'bg-yellow-500 text-black';
+			case WorkOrderPriorityValues.LOW: return 'bg-surface-400 text-white';
 			default: return 'bg-surface-300 text-surface-700';
 		}
 	}
@@ -172,7 +174,7 @@
 
 	function isOverdue(dueDate?: string, status?: string): boolean {
 		if (!dueDate) return false;
-		if (['COMPLETED', 'CLOSED', 'CANCELLED'].includes(status || '')) return false;
+		if (([WorkOrderStatusValues.COMPLETED, WorkOrderStatusValues.CLOSED, WorkOrderStatusValues.CANCELLED] as string[]).includes(status ?? '')) return false;
 		return new Date(dueDate) < new Date();
 	}
 
@@ -314,17 +316,17 @@
 
 				{#snippet actions()}
 					{@const wo = selectedWorkOrder!}
-					{#if wo.status === 'SUBMITTED'}
+					{#if wo.status === WorkOrderStatusValues.SUBMITTED}
 						<DecisionButton variant="default">
 							Assign Vendor
 						</DecisionButton>
 					{/if}
-					{#if wo.status === 'IN_PROGRESS'}
+					{#if wo.status === WorkOrderStatusValues.IN_PROGRESS}
 						<DecisionButton variant="approve">
 							Mark Complete
 						</DecisionButton>
 					{/if}
-					{#if !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(wo.status)}
+					{#if !([WorkOrderStatusValues.COMPLETED, WorkOrderStatusValues.CLOSED, WorkOrderStatusValues.CANCELLED] as string[]).includes(wo.status)}
 						<DecisionButton variant="deny">
 							Cancel
 						</DecisionButton>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CaseNoteTypeValues } from '$lib/api/cam';
 	import { Scale, Plus } from 'lucide-svelte';
 	import DecisionCard from './DecisionCard.svelte';
 	import { EmptyState } from '$lib/components/ui';
@@ -12,7 +13,7 @@
 	let { caseDetail, onRecordDecision }: Props = $props();
 
 	const decisionNotes = $derived(
-		caseDetail.notes.filter((n) => n.noteType === 'DECISION_RATIONALE')
+		caseDetail.notes.filter((n) => n.noteType === CaseNoteTypeValues.DECISION_RATIONALE)
 	);
 </script>
 

@@ -8,12 +8,26 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { EstimateStatus } from './schemas.js';
-import type { ProposalStatus, JobPaymentStatus, JobInvoiceStatus } from '../../../../generated/prisma/client.js';
+import {
+	ProposalStatus,
+	JobPaymentStatus,
+	JobInvoiceStatus,
+	JobStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('BillingWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	BILLING_WORKFLOW_ERROR: 'BILLING_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'billing_status';
 const WORKFLOW_ERROR_EVENT = 'billing_error';
@@ -86,7 +100,7 @@ async function createProposal(
 					title: data.title as string | undefined,
 					coverLetter: data.coverLetter as string | undefined,
 					terms: data.terms as string | undefined,
-					status: 'DRAFT',
+					status: ProposalStatus.DRAFT,
 					validUntil: data.validUntil ? new Date(data.validUntil as string) : undefined,
 					createdBy: userId
 				}
@@ -95,15 +109,15 @@ async function createProposal(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId: proposal.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Proposal created: ${proposal.title}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
-			workflowStep: 'CREATE_PROPOSAL',
+			workflowStep: BillingAction.CREATE_PROPOSAL,
 			workflowVersion: 'v1'
 		});
 
@@ -131,13 +145,13 @@ async function updateProposalStatus(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId: proposal.id,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Proposal ${status.toLowerCase()}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
 			workflowStep: step,
 			workflowVersion: 'v1'
@@ -164,7 +178,7 @@ async function createPaymentIntent(
 					invoiceId: data.invoiceId as string,
 					customerId: data.customerId as string,
 					amount: data.amount as number,
-					status: 'PENDING',
+					status: JobPaymentStatus.PENDING,
 					paymentMethod: data.paymentMethod as string | undefined
 				}
 			});
@@ -172,15 +186,15 @@ async function createPaymentIntent(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId: intent.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: 'Payment intent created',
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
-			workflowStep: 'CREATE_PAYMENT_INTENT',
+			workflowStep: BillingAction.CREATE_PAYMENT_INTENT,
 			workflowVersion: 'v1',
 			jobId: data.jobId as string
 		});
@@ -216,13 +230,13 @@ async function updatePaymentStatus(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId: payment.id,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Payment ${status.toLowerCase()}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
 			workflowStep: step,
 			workflowVersion: 'v1'
@@ -253,13 +267,13 @@ async function updateEstimateStatus(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId: estimate.id,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Estimate ${status.toLowerCase()}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
 			workflowStep: step,
 			workflowVersion: 'v1',
@@ -291,13 +305,13 @@ async function updateInvoiceStatus(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId: invoice.id,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Invoice ${status.toLowerCase()}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
 			workflowStep: step,
 			workflowVersion: 'v1',
@@ -329,13 +343,13 @@ async function deleteEntity(
 
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'JOB',
+			entityType: ActivityEntityType.JOB,
 			entityId,
-			action: 'DELETE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.DELETE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `${entityType} deleted`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'billingWorkflow_v1',
 			workflowStep: step,
 			workflowVersion: 'v1'
@@ -385,7 +399,7 @@ async function createInvoiceFromEstimate(
 					jobId: estimate.jobId,
 					customerId: estimate.customerId,
 					invoiceNumber,
-					status: 'DRAFT',
+					status: JobInvoiceStatus.DRAFT,
 					issueDate: new Date(),
 					dueDate: data.dueDate ? new Date(data.dueDate as string) : null,
 					subtotal,
@@ -419,16 +433,16 @@ async function createInvoiceFromEstimate(
 
 			// Auto-transition job to INVOICED if in COMPLETED
 			const job = await tx.job.findUnique({ where: { id: estimate.jobId } });
-			if (job && job.status === 'COMPLETED') {
+			if (job && job.status === JobStatus.COMPLETED) {
 				await tx.job.update({
 					where: { id: estimate.jobId },
-					data: { status: 'INVOICED', invoicedAt: new Date() }
+					data: { status: JobStatus.INVOICED, invoicedAt: new Date() }
 				});
 				await tx.jobStatusHistory.create({
 					data: {
 						jobId: estimate.jobId,
-						fromStatus: 'COMPLETED',
-						toStatus: 'INVOICED',
+						fromStatus: JobStatus.COMPLETED,
+						toStatus: JobStatus.INVOICED,
 						changedBy: userId,
 						notes: `Auto-transitioned: Invoice ${inv.invoiceNumber} created`
 					}
@@ -459,7 +473,7 @@ async function updateInvoice(
 			});
 			if (!existing) throw new Error('Invoice not found');
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== JobInvoiceStatus.DRAFT) {
 				throw new Error('Can only edit DRAFT invoices');
 			}
 
@@ -498,7 +512,7 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 
 		switch (input.action) {
 			// Proposal actions
-			case 'CREATE_PROPOSAL': {
+			case BillingAction.CREATE_PROPOSAL: {
 				const result = await DBOS.runStep(
 					() => createProposal(input.organizationId, input.userId, input.data),
 					{ name: 'createProposal' }
@@ -506,55 +520,55 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 				entityId = result.id;
 				break;
 			}
-			case 'UPDATE_PROPOSAL': {
+			case BillingAction.UPDATE_PROPOSAL: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, input.data.status as ProposalStatus, 'UPDATE_PROPOSAL'),
+					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, input.data.status as ProposalStatus, BillingAction.UPDATE_PROPOSAL),
 					{ name: 'updateProposal' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'SEND_PROPOSAL': {
+			case BillingAction.SEND_PROPOSAL: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, 'SENT', 'SEND_PROPOSAL'),
+					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, ProposalStatus.SENT, BillingAction.SEND_PROPOSAL),
 					{ name: 'sendProposal' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'MARK_PROPOSAL_VIEWED': {
+			case BillingAction.MARK_PROPOSAL_VIEWED: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, 'VIEWED', 'MARK_PROPOSAL_VIEWED'),
+					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, ProposalStatus.VIEWED, BillingAction.MARK_PROPOSAL_VIEWED),
 					{ name: 'markProposalViewed' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'ACCEPT_PROPOSAL': {
+			case BillingAction.ACCEPT_PROPOSAL: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, 'ACCEPTED', 'ACCEPT_PROPOSAL'),
+					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, ProposalStatus.ACCEPTED, BillingAction.ACCEPT_PROPOSAL),
 					{ name: 'acceptProposal' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'DECLINE_PROPOSAL': {
+			case BillingAction.DECLINE_PROPOSAL: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, 'DECLINED', 'DECLINE_PROPOSAL'),
+					() => updateProposalStatus(input.organizationId, input.userId, input.entityId!, ProposalStatus.DECLINED, BillingAction.DECLINE_PROPOSAL),
 					{ name: 'declineProposal' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'DELETE_PROPOSAL': {
+			case BillingAction.DELETE_PROPOSAL: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => deleteEntity(input.organizationId, input.userId, input.entityId!, 'proposal', 'DELETE_PROPOSAL'),
+					() => deleteEntity(input.organizationId, input.userId, input.entityId!, 'proposal', BillingAction.DELETE_PROPOSAL),
 					{ name: 'deleteProposal' }
 				);
 				entityId = result.id;
@@ -562,7 +576,7 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 			}
 
 			// Payment actions
-			case 'CREATE_PAYMENT_INTENT': {
+			case BillingAction.CREATE_PAYMENT_INTENT: {
 				const result = await DBOS.runStep(
 					() => createPaymentIntent(input.organizationId, input.userId, input.data),
 					{ name: 'createPaymentIntent' }
@@ -570,37 +584,37 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 				entityId = result.id;
 				break;
 			}
-			case 'PROCESS_PAYMENT': {
+			case BillingAction.PROCESS_PAYMENT: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, 'SUCCEEDED', 'PROCESS_PAYMENT', { processedAt: new Date().toISOString() }),
+					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, JobPaymentStatus.SUCCEEDED, BillingAction.PROCESS_PAYMENT, { processedAt: new Date().toISOString() }),
 					{ name: 'processPayment' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'MARK_PAYMENT_FAILED': {
+			case BillingAction.MARK_PAYMENT_FAILED: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, 'FAILED', 'MARK_PAYMENT_FAILED', { failedAt: true, failureReason: input.data.reason }),
+					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, JobPaymentStatus.FAILED, BillingAction.MARK_PAYMENT_FAILED, { failedAt: true, failureReason: input.data.reason }),
 					{ name: 'markPaymentFailed' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'REFUND_PAYMENT': {
+			case BillingAction.REFUND_PAYMENT: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, 'REFUNDED', 'REFUND_PAYMENT', { refundedAt: true, refundAmount: input.data.refundAmount }),
+					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, JobPaymentStatus.REFUNDED, BillingAction.REFUND_PAYMENT, { refundedAt: true, refundAmount: input.data.refundAmount }),
 					{ name: 'refundPayment' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'CANCEL_PAYMENT': {
+			case BillingAction.CANCEL_PAYMENT: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, 'CANCELLED', 'CANCEL_PAYMENT', { cancelledAt: true }),
+					() => updatePaymentStatus(input.organizationId, input.userId, input.entityId!, JobPaymentStatus.CANCELLED, BillingAction.CANCEL_PAYMENT, { cancelledAt: true }),
 					{ name: 'cancelPayment' }
 				);
 				entityId = result.id;
@@ -608,28 +622,28 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 			}
 
 			// Estimate actions
-			case 'SEND_ESTIMATE': {
+			case BillingAction.SEND_ESTIMATE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateEstimateStatus(input.organizationId, input.userId, input.entityId!, 'SENT', 'SEND_ESTIMATE'),
+					() => updateEstimateStatus(input.organizationId, input.userId, input.entityId!, EstimateStatus.SENT, BillingAction.SEND_ESTIMATE),
 					{ name: 'sendEstimate' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'ACCEPT_ESTIMATE': {
+			case BillingAction.ACCEPT_ESTIMATE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateEstimateStatus(input.organizationId, input.userId, input.entityId!, 'ACCEPTED', 'ACCEPT_ESTIMATE'),
+					() => updateEstimateStatus(input.organizationId, input.userId, input.entityId!, EstimateStatus.ACCEPTED, BillingAction.ACCEPT_ESTIMATE),
 					{ name: 'acceptEstimate' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'DECLINE_ESTIMATE': {
+			case BillingAction.DECLINE_ESTIMATE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateEstimateStatus(input.organizationId, input.userId, input.entityId!, 'DECLINED', 'DECLINE_ESTIMATE'),
+					() => updateEstimateStatus(input.organizationId, input.userId, input.entityId!, EstimateStatus.DECLINED, BillingAction.DECLINE_ESTIMATE),
 					{ name: 'declineEstimate' }
 				);
 				entityId = result.id;
@@ -637,7 +651,7 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 			}
 
 			// Invoice actions
-			case 'CREATE_INVOICE_FROM_ESTIMATE': {
+			case BillingAction.CREATE_INVOICE_FROM_ESTIMATE: {
 				const result = await DBOS.runStep(
 					() => createInvoiceFromEstimate(input.organizationId, input.userId, input.data),
 					{ name: 'createInvoiceFromEstimate' }
@@ -645,7 +659,7 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 				entityId = result.id;
 				break;
 			}
-			case 'UPDATE_INVOICE': {
+			case BillingAction.UPDATE_INVOICE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
 					() => updateInvoice(input.organizationId, input.userId, input.entityId!, input.data),
@@ -654,37 +668,37 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 				entityId = result.id;
 				break;
 			}
-			case 'SEND_INVOICE': {
+			case BillingAction.SEND_INVOICE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, 'SENT', 'SEND_INVOICE'),
+					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, JobInvoiceStatus.SENT, BillingAction.SEND_INVOICE),
 					{ name: 'sendInvoice' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'MARK_INVOICE_VIEWED': {
+			case BillingAction.MARK_INVOICE_VIEWED: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, 'VIEWED', 'MARK_INVOICE_VIEWED'),
+					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, JobInvoiceStatus.VIEWED, BillingAction.MARK_INVOICE_VIEWED),
 					{ name: 'markInvoiceViewed' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'VOID_INVOICE': {
+			case BillingAction.VOID_INVOICE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, 'VOID', 'VOID_INVOICE'),
+					() => updateInvoiceStatus(input.organizationId, input.userId, input.entityId!, JobInvoiceStatus.VOID, BillingAction.VOID_INVOICE),
 					{ name: 'voidInvoice' }
 				);
 				entityId = result.id;
 				break;
 			}
-			case 'DELETE_INVOICE': {
+			case BillingAction.DELETE_INVOICE: {
 				if (!input.entityId) throw new Error('entityId required');
 				const result = await DBOS.runStep(
-					() => deleteEntity(input.organizationId, input.userId, input.entityId!, 'invoice', 'DELETE_INVOICE'),
+					() => deleteEntity(input.organizationId, input.userId, input.entityId!, 'invoice', BillingAction.DELETE_INVOICE),
 					{ name: 'deleteInvoice' }
 				);
 				entityId = result.id;
@@ -710,8 +724,8 @@ async function billingWorkflow(input: BillingWorkflowInput): Promise<BillingWork
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'BILLING_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.BILLING_WORKFLOW_ERROR
 		});
 
 		return {

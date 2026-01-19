@@ -12,7 +12,18 @@ import type { EntityWorkflowResult, CrudAction } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
-import type { PartyType } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	PartyType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PARTY_WORKFLOW_ERROR: 'PARTY_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'party_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'party_workflow_error';
@@ -97,22 +108,22 @@ async function createParty(
 		}, { userId, reason: 'Creating party via workflow' });
 
 		const displayName =
-			party.partyType === 'INDIVIDUAL'
+			party.partyType === PartyType.INDIVIDUAL
 				? `${party.firstName ?? ''} ${party.lastName ?? ''}`.trim()
 				: party.entityName ?? '';
 
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'PARTY',
+			entityType: ActivityEntityType.PARTY,
 			entityId: party.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Party created: ${displayName}`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'partyWorkflow_v1',
-			workflowStep: 'CREATE',
+			workflowStep: PartyWorkflowAction.CREATE,
 			workflowVersion: 'v1',
 			newState: { partyType: party.partyType, displayName }
 		});
@@ -168,15 +179,15 @@ async function updateParty(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'PARTY',
+			entityType: ActivityEntityType.PARTY,
 			entityId: partyId,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Party updated`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'partyWorkflow_v1',
-			workflowStep: 'UPDATE',
+			workflowStep: PartyWorkflowAction.UPDATE,
 			workflowVersion: 'v1',
 			newState: data
 		});
@@ -204,15 +215,15 @@ async function deleteParty(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'PARTY',
+			entityType: ActivityEntityType.PARTY,
 			entityId: partyId,
-			action: 'DELETE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.DELETE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Party deleted`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'partyWorkflow_v1',
-			workflowStep: 'DELETE',
+			workflowStep: PartyWorkflowAction.DELETE,
 			workflowVersion: 'v1',
 			newState: { deletedAt: now.toISOString() }
 		});
@@ -236,7 +247,7 @@ async function partyWorkflow(input: PartyWorkflowInput): Promise<PartyWorkflowRe
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case PartyWorkflowAction.CREATE: {
 				if (!input.partyType) {
 					const error = new Error('Missing required field: partyType for CREATE');
 					logStepError(log, 'validation', error, { partyType: input.partyType });
@@ -274,7 +285,7 @@ async function partyWorkflow(input: PartyWorkflowInput): Promise<PartyWorkflowRe
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case PartyWorkflowAction.UPDATE: {
 				if (!input.partyId) {
 					const error = new Error('Missing required field: partyId for UPDATE');
 					logStepError(log, 'validation', error, { partyId: input.partyId });
@@ -311,7 +322,7 @@ async function partyWorkflow(input: PartyWorkflowInput): Promise<PartyWorkflowRe
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case PartyWorkflowAction.DELETE: {
 				if (!input.partyId) {
 					const error = new Error('Missing required field: partyId for DELETE');
 					logStepError(log, 'validation', error, { partyId: input.partyId });
@@ -359,8 +370,8 @@ async function partyWorkflow(input: PartyWorkflowInput): Promise<PartyWorkflowRe
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PARTY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PARTY_WORKFLOW_ERROR
 		});
 		const errorResult: PartyWorkflowResult = {
 			success: false,

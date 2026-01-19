@@ -30,7 +30,7 @@
 		ExternalLink
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { jobApi, estimateApi, invoiceApi, technicianApi, type Job, type JobStatus, type JobNote, type JobStatusHistoryItem, type Estimate, type JobInvoice, type Technician } from '$lib/api/cam';
+	import { jobApi, estimateApi, invoiceApi, technicianApi, type Job, type JobStatus, type JobNote, type JobStatusHistoryItem, type Estimate, type JobInvoice, type Technician, JobStatusValues, EstimateStatusValues, JobInvoiceStatusValues, JobPriorityValues } from '$lib/api/cam';
 
 	const jobId = $derived($page.params.id ?? '');
 	
@@ -84,6 +84,7 @@
 
 	// Synchronize server data
 	$effect(() => {
+		if (!data) return;
 		if (data.job) {
 			job = data.job;
 			selectedTechnicianId = job.assignedTechnicianId || '';
@@ -265,8 +266,8 @@
 				job = response.data.job;
 				showScheduleForm = false;
 				// Auto-transition to SCHEDULED if in JOB_CREATED or ESTIMATE_APPROVED
-				if (['JOB_CREATED', 'ESTIMATE_APPROVED'].includes(job.status)) {
-					await transitionStatus('SCHEDULED');
+				if (([JobStatusValues.JOB_CREATED, JobStatusValues.ESTIMATE_APPROVED] as JobStatus[]).includes(job.status)) {
+					await transitionStatus(JobStatusValues.SCHEDULED);
 				}
 			}
 		} catch (e) {
@@ -284,81 +285,81 @@
 
 	function getEstimateStatusColor(status: string): string {
 		const colors: Record<string, string> = {
-			DRAFT: 'preset-filled-surface-500',
-			SENT: 'preset-filled-primary-500',
-			VIEWED: 'preset-filled-secondary-500',
-			ACCEPTED: 'preset-filled-success-500',
-			DECLINED: 'preset-filled-error-500',
-			EXPIRED: 'preset-outlined-surface-500',
-			REVISED: 'preset-filled-warning-500'
+			[EstimateStatusValues.DRAFT]: 'preset-filled-surface-500',
+			[EstimateStatusValues.SENT]: 'preset-filled-primary-500',
+			[EstimateStatusValues.VIEWED]: 'preset-filled-secondary-500',
+			[EstimateStatusValues.ACCEPTED]: 'preset-filled-success-500',
+			[EstimateStatusValues.DECLINED]: 'preset-filled-error-500',
+			[EstimateStatusValues.EXPIRED]: 'preset-outlined-surface-500',
+			[EstimateStatusValues.REVISED]: 'preset-filled-warning-500'
 		};
 		return colors[status] || 'preset-filled-surface-500';
 	}
 
 	function getInvoiceStatusColor(status: string): string {
 		const colors: Record<string, string> = {
-			DRAFT: 'preset-filled-surface-500',
-			SENT: 'preset-filled-primary-500',
-			VIEWED: 'preset-filled-secondary-500',
-			PARTIAL: 'preset-filled-warning-500',
-			PAID: 'preset-filled-success-500',
-			OVERDUE: 'preset-filled-error-500',
-			VOID: 'preset-outlined-surface-500',
-			REFUNDED: 'preset-outlined-error-500'
+			[JobInvoiceStatusValues.DRAFT]: 'preset-filled-surface-500',
+			[JobInvoiceStatusValues.SENT]: 'preset-filled-primary-500',
+			[JobInvoiceStatusValues.VIEWED]: 'preset-filled-secondary-500',
+			[JobInvoiceStatusValues.PARTIAL]: 'preset-filled-warning-500',
+			[JobInvoiceStatusValues.PAID]: 'preset-filled-success-500',
+			[JobInvoiceStatusValues.OVERDUE]: 'preset-filled-error-500',
+			[JobInvoiceStatusValues.VOID]: 'preset-outlined-surface-500',
+			[JobInvoiceStatusValues.REFUNDED]: 'preset-outlined-error-500'
 		};
 		return colors[status] || 'preset-filled-surface-500';
 	}
 
 	function getStatusLabel(status: JobStatus): string {
 		const labels: Record<JobStatus, string> = {
-			LEAD: 'Lead',
-			TICKET: 'Ticket',
-			ESTIMATE_REQUIRED: 'Estimate Required',
-			ESTIMATE_SENT: 'Estimate Sent',
-			ESTIMATE_APPROVED: 'Estimate Approved',
-			JOB_CREATED: 'Job Created',
-			SCHEDULED: 'Scheduled',
-			DISPATCHED: 'Dispatched',
-			IN_PROGRESS: 'In Progress',
-			ON_HOLD: 'On Hold',
-			COMPLETED: 'Completed',
-			INVOICED: 'Invoiced',
-			PAID: 'Paid',
-			WARRANTY: 'Warranty',
-			CLOSED: 'Closed',
-			CANCELLED: 'Cancelled'
+			[JobStatusValues.LEAD]: 'Lead',
+			[JobStatusValues.TICKET]: 'Ticket',
+			[JobStatusValues.ESTIMATE_REQUIRED]: 'Estimate Required',
+			[JobStatusValues.ESTIMATE_SENT]: 'Estimate Sent',
+			[JobStatusValues.ESTIMATE_APPROVED]: 'Estimate Approved',
+			[JobStatusValues.JOB_CREATED]: 'Job Created',
+			[JobStatusValues.SCHEDULED]: 'Scheduled',
+			[JobStatusValues.DISPATCHED]: 'Dispatched',
+			[JobStatusValues.IN_PROGRESS]: 'In Progress',
+			[JobStatusValues.ON_HOLD]: 'On Hold',
+			[JobStatusValues.COMPLETED]: 'Completed',
+			[JobStatusValues.INVOICED]: 'Invoiced',
+			[JobStatusValues.PAID]: 'Paid',
+			[JobStatusValues.WARRANTY]: 'Warranty',
+			[JobStatusValues.CLOSED]: 'Closed',
+			[JobStatusValues.CANCELLED]: 'Cancelled'
 		};
 		return labels[status] || status;
 	}
 
 	function getStatusColor(status: JobStatus): string {
 		const colors: Record<JobStatus, string> = {
-			LEAD: 'preset-filled-surface-500',
-			TICKET: 'preset-filled-primary-500',
-			ESTIMATE_REQUIRED: 'preset-filled-warning-500',
-			ESTIMATE_SENT: 'preset-filled-secondary-500',
-			ESTIMATE_APPROVED: 'preset-filled-success-500',
-			JOB_CREATED: 'preset-filled-primary-500',
-			SCHEDULED: 'preset-filled-tertiary-500',
-			DISPATCHED: 'preset-filled-warning-500',
-			IN_PROGRESS: 'preset-filled-warning-500',
-			ON_HOLD: 'preset-filled-error-500',
-			COMPLETED: 'preset-filled-success-500',
-			INVOICED: 'preset-filled-secondary-500',
-			PAID: 'preset-filled-success-500',
-			WARRANTY: 'preset-filled-tertiary-500',
-			CLOSED: 'preset-outlined-surface-500',
-			CANCELLED: 'preset-outlined-error-500'
+			[JobStatusValues.LEAD]: 'preset-filled-surface-500',
+			[JobStatusValues.TICKET]: 'preset-filled-primary-500',
+			[JobStatusValues.ESTIMATE_REQUIRED]: 'preset-filled-warning-500',
+			[JobStatusValues.ESTIMATE_SENT]: 'preset-filled-secondary-500',
+			[JobStatusValues.ESTIMATE_APPROVED]: 'preset-filled-success-500',
+			[JobStatusValues.JOB_CREATED]: 'preset-filled-primary-500',
+			[JobStatusValues.SCHEDULED]: 'preset-filled-tertiary-500',
+			[JobStatusValues.DISPATCHED]: 'preset-filled-warning-500',
+			[JobStatusValues.IN_PROGRESS]: 'preset-filled-warning-500',
+			[JobStatusValues.ON_HOLD]: 'preset-filled-error-500',
+			[JobStatusValues.COMPLETED]: 'preset-filled-success-500',
+			[JobStatusValues.INVOICED]: 'preset-filled-secondary-500',
+			[JobStatusValues.PAID]: 'preset-filled-success-500',
+			[JobStatusValues.WARRANTY]: 'preset-filled-tertiary-500',
+			[JobStatusValues.CLOSED]: 'preset-outlined-surface-500',
+			[JobStatusValues.CANCELLED]: 'preset-outlined-error-500'
 		};
 		return colors[status] || 'preset-filled-surface-500';
 	}
 
 	function getPriorityColor(priority: string): string {
 		const colors: Record<string, string> = {
-			LOW: 'preset-outlined-surface-500',
-			MEDIUM: 'preset-outlined-primary-500',
-			HIGH: 'preset-filled-warning-500',
-			EMERGENCY: 'preset-filled-error-500'
+			[JobPriorityValues.LOW]: 'preset-outlined-surface-500',
+			[JobPriorityValues.MEDIUM]: 'preset-outlined-primary-500',
+			[JobPriorityValues.HIGH]: 'preset-filled-warning-500',
+			[JobPriorityValues.EMERGENCY]: 'preset-filled-error-500'
 		};
 		return colors[priority] || 'preset-outlined-surface-500';
 	}
@@ -387,22 +388,22 @@
 	// Get available transitions based on current status
 	function getAvailableTransitions(status: JobStatus): JobStatus[] {
 		const transitions: Record<JobStatus, JobStatus[]> = {
-			LEAD: ['TICKET', 'CANCELLED'],
-			TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
-			ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
-			ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'],
-			ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
-			JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
-			SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
-			DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'],
-			IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-			ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
-			COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
-			INVOICED: ['PAID', 'CANCELLED'],
-			PAID: ['WARRANTY', 'CLOSED'],
-			WARRANTY: ['CLOSED', 'IN_PROGRESS'],
-			CLOSED: [],
-			CANCELLED: []
+			[JobStatusValues.LEAD]: [JobStatusValues.TICKET, JobStatusValues.CANCELLED],
+			[JobStatusValues.TICKET]: [JobStatusValues.ESTIMATE_REQUIRED, JobStatusValues.JOB_CREATED, JobStatusValues.CANCELLED],
+			[JobStatusValues.ESTIMATE_REQUIRED]: [JobStatusValues.ESTIMATE_SENT, JobStatusValues.JOB_CREATED, JobStatusValues.CANCELLED],
+			[JobStatusValues.ESTIMATE_SENT]: [JobStatusValues.ESTIMATE_APPROVED, JobStatusValues.ESTIMATE_REQUIRED, JobStatusValues.CANCELLED],
+			[JobStatusValues.ESTIMATE_APPROVED]: [JobStatusValues.JOB_CREATED, JobStatusValues.CANCELLED],
+			[JobStatusValues.JOB_CREATED]: [JobStatusValues.SCHEDULED, JobStatusValues.CANCELLED],
+			[JobStatusValues.SCHEDULED]: [JobStatusValues.DISPATCHED, JobStatusValues.ON_HOLD, JobStatusValues.CANCELLED],
+			[JobStatusValues.DISPATCHED]: [JobStatusValues.IN_PROGRESS, JobStatusValues.SCHEDULED, JobStatusValues.ON_HOLD, JobStatusValues.CANCELLED],
+			[JobStatusValues.IN_PROGRESS]: [JobStatusValues.ON_HOLD, JobStatusValues.COMPLETED, JobStatusValues.CANCELLED],
+			[JobStatusValues.ON_HOLD]: [JobStatusValues.SCHEDULED, JobStatusValues.DISPATCHED, JobStatusValues.IN_PROGRESS, JobStatusValues.CANCELLED],
+			[JobStatusValues.COMPLETED]: [JobStatusValues.INVOICED, JobStatusValues.WARRANTY, JobStatusValues.CLOSED, JobStatusValues.CANCELLED],
+			[JobStatusValues.INVOICED]: [JobStatusValues.PAID, JobStatusValues.CANCELLED],
+			[JobStatusValues.PAID]: [JobStatusValues.WARRANTY, JobStatusValues.CLOSED],
+			[JobStatusValues.WARRANTY]: [JobStatusValues.CLOSED, JobStatusValues.IN_PROGRESS],
+			[JobStatusValues.CLOSED]: [],
+			[JobStatusValues.CANCELLED]: []
 		};
 		return transitions[status] || [];
 	}
@@ -612,7 +613,7 @@
 							{#if job.scheduledStart}
 								{@const now = new Date()}
 								{@const scheduledDate = new Date(job.scheduledStart)}
-								{@const isOverdue = now > scheduledDate && !['COMPLETED', 'CLOSED', 'CANCELLED', 'PAID', 'INVOICED'].includes(job.status)}
+								{@const isOverdue = now > scheduledDate && !([JobStatusValues.COMPLETED, JobStatusValues.CLOSED, JobStatusValues.CANCELLED, JobStatusValues.PAID, JobStatusValues.INVOICED] as JobStatus[]).includes(job.status)}
 								{@const hoursUntil = Math.round((scheduledDate.getTime() - now.getTime()) / (1000 * 60 * 60))}
 								<Card variant="outlined" padding="md" class={isOverdue ? 'border-error-500/50 bg-error-500/5' : hoursUntil <= 24 && hoursUntil > 0 ? 'border-warning-500/50 bg-warning-500/5' : ''}>
 									<h3 class="font-medium mb-3 flex items-center gap-2">
@@ -799,7 +800,7 @@
 												{/if}
 											</div>
 											<div class="flex gap-2">
-												{#if estimate.status === 'DRAFT'}
+												{#if estimate.status === EstimateStatusValues.DRAFT}
 													<button
 														onclick={() => sendEstimate(estimate.id)}
 														disabled={isSendingEstimate}
@@ -811,7 +812,7 @@
 														Send
 													</button>
 												{/if}
-												{#if estimate.status === 'ACCEPTED'}
+												{#if estimate.status === EstimateStatusValues.ACCEPTED}
 													<button
 														onclick={() => createInvoiceFromEstimate(estimate.id)}
 														disabled={isCreatingInvoice}
@@ -877,7 +878,7 @@
 						<Card variant="outlined" padding="md">
 							<div class="flex items-center justify-between mb-4">
 								<h3 class="font-medium">Current Schedule</h3>
-								{#if !job.scheduledStart && ['JOB_CREATED', 'ESTIMATE_APPROVED'].includes(job.status)}
+								{#if !job.scheduledStart && ([JobStatusValues.JOB_CREATED, JobStatusValues.ESTIMATE_APPROVED] as JobStatus[]).includes(job.status)}
 									<button
 										onclick={() => showScheduleForm = !showScheduleForm}
 										class="btn btn-sm preset-filled-primary-500"
@@ -1082,7 +1083,7 @@
 								<div class="flex items-center justify-between">
 									<p class="text-surface-500">Ready to dispatch</p>
 									<button
-										onclick={() => transitionStatus('DISPATCHED')}
+										onclick={() => transitionStatus(JobStatusValues.DISPATCHED)}
 										class="btn btn-sm preset-filled-primary-500"
 									>
 										<Truck class="mr-2 h-4 w-4" />
@@ -1102,7 +1103,7 @@
 
 						<!-- Quick Actions -->
 						<div class="flex gap-3">
-							{#if !job.scheduledStart && ['JOB_CREATED', 'ESTIMATE_APPROVED'].includes(job.status)}
+							{#if !job.scheduledStart && ([JobStatusValues.JOB_CREATED, JobStatusValues.ESTIMATE_APPROVED] as JobStatus[]).includes(job.status)}
 								<a href="/app/contractor/dispatch" class="btn preset-filled-primary-500">
 									<Calendar class="mr-2 h-4 w-4" />
 									Open Dispatch Board
@@ -1128,7 +1129,7 @@
 									{/if}
 								</div>
 								<div class="text-center p-4 rounded-lg bg-surface-100-900">
-									{#if job.status === 'IN_PROGRESS'}
+									{#if job.status === JobStatusValues.IN_PROGRESS}
 										<Clock class="h-6 w-6 mx-auto text-warning-500 animate-pulse" />
 										<div class="mt-2 font-medium text-warning-500">In Progress</div>
 									{:else if job.completedAt}
@@ -1153,7 +1154,7 @@
 						</Card>
 
 						<!-- Quick Actions -->
-						{#if job.status === 'DISPATCHED'}
+						{#if job.status === JobStatusValues.DISPATCHED}
 							<Card variant="outlined" padding="md">
 								<div class="flex items-center justify-between">
 									<div>
@@ -1161,7 +1162,7 @@
 										<p class="text-sm text-surface-500">Mark this job as in progress</p>
 									</div>
 									<button
-										onclick={() => transitionStatus('IN_PROGRESS')}
+										onclick={() => transitionStatus(JobStatusValues.IN_PROGRESS)}
 										class="btn preset-filled-primary-500"
 									>
 										<Play class="mr-2 h-4 w-4" />
@@ -1171,7 +1172,7 @@
 							</Card>
 						{/if}
 
-						{#if job.status === 'IN_PROGRESS'}
+						{#if job.status === JobStatusValues.IN_PROGRESS}
 							<Card variant="outlined" padding="md">
 								<div class="flex items-center justify-between">
 									<div>
@@ -1180,14 +1181,14 @@
 									</div>
 									<div class="flex gap-2">
 										<button
-											onclick={() => transitionStatus('ON_HOLD')}
+											onclick={() => transitionStatus(JobStatusValues.ON_HOLD)}
 											class="btn preset-outlined-warning-500"
 										>
 											<Pause class="mr-2 h-4 w-4" />
 											Put On Hold
 										</button>
 										<button
-											onclick={() => transitionStatus('COMPLETED')}
+											onclick={() => transitionStatus(JobStatusValues.COMPLETED)}
 											class="btn preset-filled-success-500"
 										>
 											<CheckCircle2 class="mr-2 h-4 w-4" />
@@ -1198,7 +1199,7 @@
 							</Card>
 						{/if}
 
-						{#if job.status === 'ON_HOLD'}
+						{#if job.status === JobStatusValues.ON_HOLD}
 							<Card variant="outlined" padding="md">
 								<div class="flex items-center justify-between">
 									<div>
@@ -1206,7 +1207,7 @@
 										<p class="text-sm text-surface-500">Resume work when ready</p>
 									</div>
 									<button
-										onclick={() => transitionStatus('IN_PROGRESS')}
+										onclick={() => transitionStatus(JobStatusValues.IN_PROGRESS)}
 										class="btn preset-filled-primary-500"
 									>
 										<Play class="mr-2 h-4 w-4" />
@@ -1401,7 +1402,7 @@
 												{/if}
 											</div>
 											<div class="flex gap-2">
-												{#if invoice.status === 'DRAFT'}
+												{#if invoice.status === JobInvoiceStatusValues.DRAFT}
 													<button
 														onclick={() => sendInvoice(invoice.id)}
 														class="btn btn-sm preset-filled-primary-500"
@@ -1409,7 +1410,7 @@
 														Send
 													</button>
 												{/if}
-												{#if ['SENT', 'VIEWED', 'PARTIAL', 'OVERDUE'].includes(invoice.status) && Number(invoice.balanceDue) > 0}
+												{#if ([JobInvoiceStatusValues.SENT, JobInvoiceStatusValues.VIEWED, JobInvoiceStatusValues.PARTIAL, JobInvoiceStatusValues.OVERDUE] as string[]).includes(invoice.status) && Number(invoice.balanceDue) > 0}
 													<a
 														href="/app/contractor/jobs/{jobId}/invoice/{invoice.id}?action=payment"
 														class="btn btn-sm preset-filled-success-500"

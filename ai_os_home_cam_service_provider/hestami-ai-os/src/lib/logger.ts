@@ -292,6 +292,11 @@ function captureError(error: unknown, context?: LogContext): void {
  * Capture unhandled promise rejections
  */
 function captureUnhandledRejection(event: PromiseRejectionEvent): void {
+	// Skip transient proxy errors during navigation - these are handled by hooks.client.ts
+	if (isTransientProxyError(event.reason)) {
+		return;
+	}
+	
 	captureError(event.reason, {
 		type: 'unhandledRejection',
 		promise: String(event.promise)
@@ -299,9 +304,23 @@ function captureUnhandledRejection(event: PromiseRejectionEvent): void {
 }
 
 /**
+ * Check if this is the known Svelte proxy error during navigation
+ * This error is transient and should not be logged to the server
+ */
+function isTransientProxyError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return message.includes("right-hand side of 'in' should be an object");
+}
+
+/**
  * Capture global errors
  */
 function captureGlobalError(event: ErrorEvent): void {
+	// Skip transient proxy errors during navigation - these are handled by hooks.client.ts
+	if (isTransientProxyError(event.error || event.message)) {
+		return;
+	}
+	
 	captureError(event.error || event.message, {
 		type: 'globalError',
 		filename: event.filename,

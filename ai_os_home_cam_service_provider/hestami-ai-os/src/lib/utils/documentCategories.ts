@@ -23,19 +23,36 @@ export type DocumentCategoryType = DocumentCategory;
 const ALL_DOCUMENT_CATEGORIES = DocumentCategorySchema.options;
 
 /**
+ * Local const for CAM UI category values used in this utility.
+ * These are UI groupings (not Prisma enum values) that map multiple DocumentCategory values.
+ * Cannot use direct Prisma imports as this file is shared with client code.
+ */
+const CamCategoryValues = {
+	GOVERNING_DOCUMENTS: 'GOVERNING_DOCUMENTS',
+	ARCHITECTURAL_GUIDELINES: 'ARCHITECTURAL_GUIDELINES',
+	POLICIES_RESOLUTIONS: 'POLICIES_RESOLUTIONS',
+	MEETING_MINUTES: 'MEETING_MINUTES',
+	CONTRACTS_AGREEMENTS: 'CONTRACTS_AGREEMENTS',
+	FINANCIAL_RECORDS: 'FINANCIAL_RECORDS',
+	EVIDENCE_INSPECTIONS: 'EVIDENCE_INSPECTIONS',
+	CORRESPONDENCE: 'CORRESPONDENCE',
+	OTHER: 'OTHER'
+} as const;
+
+/**
  * Canonical CAM document categories for UI display and filtering.
  * These are UI groupings that map multiple DocumentCategory values.
  */
 export const CAM_DOCUMENT_CATEGORIES = [
-	'GOVERNING_DOCUMENTS',
-	'ARCHITECTURAL_GUIDELINES',
-	'POLICIES_RESOLUTIONS',
-	'MEETING_MINUTES',
-	'CONTRACTS_AGREEMENTS',
-	'FINANCIAL_RECORDS',
-	'EVIDENCE_INSPECTIONS',
-	'CORRESPONDENCE',
-	'OTHER'
+	CamCategoryValues.GOVERNING_DOCUMENTS,
+	CamCategoryValues.ARCHITECTURAL_GUIDELINES,
+	CamCategoryValues.POLICIES_RESOLUTIONS,
+	CamCategoryValues.MEETING_MINUTES,
+	CamCategoryValues.CONTRACTS_AGREEMENTS,
+	CamCategoryValues.FINANCIAL_RECORDS,
+	CamCategoryValues.EVIDENCE_INSPECTIONS,
+	CamCategoryValues.CORRESPONDENCE,
+	CamCategoryValues.OTHER
 ] as const;
 
 export type CamDocumentCategory = (typeof CAM_DOCUMENT_CATEGORIES)[number];
@@ -61,47 +78,47 @@ export const CAM_CATEGORY_LABELS: Record<CamDocumentCategory, string> = {
  */
 export const DOCUMENT_CATEGORY_TO_CAM: Record<DocumentCategory, CamDocumentCategory> = {
 	// CAM / HOA categories
-	[DocumentCategory.GOVERNING_DOCS]: 'GOVERNING_DOCUMENTS',
-	[DocumentCategory.FINANCIAL]: 'FINANCIAL_RECORDS',
-	[DocumentCategory.MEETING]: 'MEETING_MINUTES',
-	[DocumentCategory.LEGAL]: 'POLICIES_RESOLUTIONS',
-	[DocumentCategory.INSURANCE]: 'CONTRACTS_AGREEMENTS',
-	[DocumentCategory.MAINTENANCE]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.ARCHITECTURAL]: 'ARCHITECTURAL_GUIDELINES',
-	[DocumentCategory.RESERVE_STUDY]: 'FINANCIAL_RECORDS',
-	[DocumentCategory.INSPECTION]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.CONTRACT]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.GOVERNING_DOCS]: CamCategoryValues.GOVERNING_DOCUMENTS,
+	[DocumentCategory.FINANCIAL]: CamCategoryValues.FINANCIAL_RECORDS,
+	[DocumentCategory.MEETING]: CamCategoryValues.MEETING_MINUTES,
+	[DocumentCategory.LEGAL]: CamCategoryValues.POLICIES_RESOLUTIONS,
+	[DocumentCategory.INSURANCE]: CamCategoryValues.CONTRACTS_AGREEMENTS,
+	[DocumentCategory.MAINTENANCE]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.ARCHITECTURAL]: CamCategoryValues.ARCHITECTURAL_GUIDELINES,
+	[DocumentCategory.RESERVE_STUDY]: CamCategoryValues.FINANCIAL_RECORDS,
+	[DocumentCategory.INSPECTION]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.CONTRACT]: CamCategoryValues.CONTRACTS_AGREEMENTS,
 
 	// Property Owner / Concierge categories
-	[DocumentCategory.CC_AND_RS]: 'GOVERNING_DOCUMENTS',
-	[DocumentCategory.PERMIT]: 'POLICIES_RESOLUTIONS',
-	[DocumentCategory.APPROVAL]: 'POLICIES_RESOLUTIONS',
-	[DocumentCategory.CORRESPONDENCE]: 'CORRESPONDENCE',
-	[DocumentCategory.TITLE_DEED]: 'GOVERNING_DOCUMENTS',
-	[DocumentCategory.SURVEY]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.WARRANTY]: 'CONTRACTS_AGREEMENTS',
+	[DocumentCategory.CC_AND_RS]: CamCategoryValues.GOVERNING_DOCUMENTS,
+	[DocumentCategory.PERMIT]: CamCategoryValues.POLICIES_RESOLUTIONS,
+	[DocumentCategory.APPROVAL]: CamCategoryValues.POLICIES_RESOLUTIONS,
+	[DocumentCategory.CORRESPONDENCE]: CamCategoryValues.CORRESPONDENCE,
+	[DocumentCategory.TITLE_DEED]: CamCategoryValues.GOVERNING_DOCUMENTS,
+	[DocumentCategory.SURVEY]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.WARRANTY]: CamCategoryValues.CONTRACTS_AGREEMENTS,
 
 	// Contractor / Service Provider categories
-	[DocumentCategory.LICENSE]: 'CONTRACTS_AGREEMENTS',
-	[DocumentCategory.CERTIFICATION]: 'CONTRACTS_AGREEMENTS',
-	[DocumentCategory.BOND]: 'CONTRACTS_AGREEMENTS',
-	[DocumentCategory.PROPOSAL]: 'CONTRACTS_AGREEMENTS',
-	[DocumentCategory.ESTIMATE]: 'FINANCIAL_RECORDS',
-	[DocumentCategory.INVOICE]: 'FINANCIAL_RECORDS',
-	[DocumentCategory.WORK_ORDER]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.VOICE_NOTE]: 'CORRESPONDENCE',
-	[DocumentCategory.SIGNATURE]: 'CONTRACTS_AGREEMENTS',
-	[DocumentCategory.CHECKLIST]: 'EVIDENCE_INSPECTIONS',
+	[DocumentCategory.LICENSE]: CamCategoryValues.CONTRACTS_AGREEMENTS,
+	[DocumentCategory.CERTIFICATION]: CamCategoryValues.CONTRACTS_AGREEMENTS,
+	[DocumentCategory.BOND]: CamCategoryValues.CONTRACTS_AGREEMENTS,
+	[DocumentCategory.PROPOSAL]: CamCategoryValues.CONTRACTS_AGREEMENTS,
+	[DocumentCategory.ESTIMATE]: CamCategoryValues.FINANCIAL_RECORDS,
+	[DocumentCategory.INVOICE]: CamCategoryValues.FINANCIAL_RECORDS,
+	[DocumentCategory.WORK_ORDER]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.VOICE_NOTE]: CamCategoryValues.CORRESPONDENCE,
+	[DocumentCategory.SIGNATURE]: CamCategoryValues.CONTRACTS_AGREEMENTS,
+	[DocumentCategory.CHECKLIST]: CamCategoryValues.EVIDENCE_INSPECTIONS,
 
 	// Cross-pillar
-	[DocumentCategory.PHOTO]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.VIDEO]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.AUDIO]: 'CORRESPONDENCE',
-	[DocumentCategory.GENERAL]: 'OTHER',
+	[DocumentCategory.PHOTO]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.VIDEO]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.AUDIO]: CamCategoryValues.CORRESPONDENCE,
+	[DocumentCategory.GENERAL]: CamCategoryValues.OTHER,
 
 	// Phase 30: Deprecated categories (migrated to unified Document model)
-	[DocumentCategory.ARC_ATTACHMENT]: 'EVIDENCE_INSPECTIONS',
-	[DocumentCategory.VIOLATION_EVIDENCE]: 'EVIDENCE_INSPECTIONS'
+	[DocumentCategory.ARC_ATTACHMENT]: CamCategoryValues.EVIDENCE_INSPECTIONS,
+	[DocumentCategory.VIOLATION_EVIDENCE]: CamCategoryValues.EVIDENCE_INSPECTIONS
 };
 
 /**
@@ -145,7 +162,9 @@ export function getPrimaryDocumentCategory(camCategory: CamDocumentCategory): Do
  * Check if a category is the discouraged "Other" category
  */
 export function isOtherCategory(category: CamDocumentCategory | DocumentCategory): boolean {
-	if (category === 'OTHER' || category === 'GENERAL') {
+	// CamCategoryValues.OTHER is a CamDocumentCategory UI value (not a Prisma enum)
+	// DocumentCategory.GENERAL is the Prisma enum value
+	if (category === CamCategoryValues.OTHER || category === DocumentCategory.GENERAL) {
 		return true;
 	}
 	return false;

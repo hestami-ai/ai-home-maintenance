@@ -44,10 +44,19 @@
     
     let { data } = $props();
 
-    // Derived state from props
-	let association = $derived(data.association as Association);
-	let documents = $derived(data.documents as AssociationDocument[]);
-	let history = $derived(data.history as AssociationHistoryEvent[]);
+    // Use $state with $effect to avoid proxy errors during navigation
+	let association = $state<Association | null>(null);
+	let documents = $state<AssociationDocument[]>([]);
+	let history = $state<AssociationHistoryEvent[]>([]);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			association = (data.association ?? null) as Association | null;
+			documents = (data.documents ?? []) as AssociationDocument[];
+			history = (data.history ?? []) as AssociationHistoryEvent[];
+		}
+	});
 
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
@@ -247,7 +256,7 @@
 	<Card variant="outlined" padding="lg">
 		<div class="mb-4 flex items-center justify-between">
 			<h3 class="font-semibold">Governing Documents</h3>
-			<a href="/app/cam/documents/upload?contextType=ASSOCIATION&contextId={association.id}" class="btn btn-sm preset-filled-primary-500">
+			<a href="/app/cam/documents/upload?contextType=ASSOCIATION&contextId={association?.id}" class="btn btn-sm preset-filled-primary-500">
 				Upload
 			</a>
 		</div>

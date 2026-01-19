@@ -10,7 +10,7 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
 import { DBOS } from '@dbos-inc/dbos-sdk';
-import { createManagedAssociation_v1_wf, startAssociationManagementWorkflow } from '../../workflows/associationWorkflow.js';
+import { createManagedAssociation_v1_wf, startAssociationManagementWorkflow, AssociationManagementAction } from '../../workflows/associationWorkflow.js';
 import { COATemplateId } from '../../accounting/defaultChartOfAccounts.js';
 import { AssociationStatusSchema } from '../schemas.js';
 
@@ -310,7 +310,7 @@ export const associationRouter = {
 			// Update association via workflow
 			const result = await startAssociationManagementWorkflow(
 				{
-					action: 'UPDATE',
+					action: AssociationManagementAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					associationId: id,
@@ -387,7 +387,7 @@ export const associationRouter = {
 			// Set default association via workflow
 			const result = await startAssociationManagementWorkflow(
 				{
-					action: 'SET_DEFAULT',
+					action: AssociationManagementAction.SET_DEFAULT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					associationId: input.associationId
@@ -453,7 +453,7 @@ export const associationRouter = {
 			// Delete association via workflow
 			const result = await startAssociationManagementWorkflow(
 				{
-					action: 'DELETE',
+					action: AssociationManagementAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					associationId: input.id

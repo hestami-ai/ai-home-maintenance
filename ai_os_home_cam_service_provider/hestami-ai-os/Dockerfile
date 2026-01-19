@@ -23,6 +23,10 @@ RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholde
 # Copy config files needed for build (separate from source for better caching)
 COPY tsconfig.json svelte.config.js vite.config.ts ./
 
+# Copy i18n/paraglide configuration and message files
+COPY project.inlang ./project.inlang
+COPY messages ./messages
+
 # Copy source files
 COPY src ./src
 COPY static ./static

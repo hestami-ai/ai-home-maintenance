@@ -6,13 +6,13 @@
  */
 
 import { prisma } from '../db.js';
-import type { 
-	ActivityEntityType, 
-	ActivityActionType, 
+import type { Prisma } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
 	ActivityEventCategory,
-	ActivityActorType,
-	Prisma
-} from '../../../../generated/prisma/client.js';
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../logger.js';
 
 const log = createModuleLogger('GovernanceActivityService');
@@ -20,7 +20,7 @@ const log = createModuleLogger('GovernanceActivityService');
 interface GovernanceActivityInput {
 	organizationId: string;
 	associationId?: string;
-	entityType: 'MEETING' | 'MOTION' | 'VOTE' | 'RESOLUTION';
+	entityType: ActivityEntityType;
 	entityId: string;
 	action: ActivityActionType;
 	summary: string;
@@ -41,13 +41,13 @@ export async function createGovernanceActivity(input: GovernanceActivityInput): 
 		data: {
 			organizationId: input.organizationId,
 			associationId: input.associationId,
-			entityType: input.entityType as ActivityEntityType,
+			entityType: input.entityType,
 			entityId: input.entityId,
 			action: input.action,
-			eventCategory: input.eventCategory || 'EXECUTION',
+			eventCategory: input.eventCategory || ActivityEventCategory.EXECUTION,
 			summary: input.summary,
 			performedById: input.performedById,
-			performedByType: input.performedByType || 'HUMAN',
+			performedByType: input.performedByType || ActivityActorType.HUMAN,
 			previousState: input.previousState,
 			newState: input.newState,
 			metadata: input.metadata,
@@ -72,12 +72,12 @@ export async function logMeetingCreated(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MEETING',
+		entityType: ActivityEntityType.MEETING,
 		entityId: params.meetingId,
-		action: 'CREATE',
+		action: ActivityActionType.CREATE,
 		summary: `Meeting "${params.title}" created`,
 		performedById: params.userId,
-		eventCategory: 'EXECUTION'
+		eventCategory: ActivityEventCategory.EXECUTION
 	});
 }
 
@@ -93,12 +93,12 @@ export async function logMeetingStarted(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MEETING',
+		entityType: ActivityEntityType.MEETING,
 		entityId: params.meetingId,
-		action: 'START_SESSION',
+		action: ActivityActionType.START_SESSION,
 		summary: `Meeting "${params.title}" started with ${params.presentCount} attendees`,
 		performedById: params.userId,
-		eventCategory: 'EXECUTION',
+		eventCategory: ActivityEventCategory.EXECUTION,
 		metadata: { quorumMet: params.quorumMet, presentCount: params.presentCount }
 	});
 }
@@ -113,12 +113,12 @@ export async function logMeetingAdjourned(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MEETING',
+		entityType: ActivityEntityType.MEETING,
 		entityId: params.meetingId,
-		action: 'ADJOURN',
+		action: ActivityActionType.ADJOURN,
 		summary: `Meeting "${params.title}" adjourned`,
 		performedById: params.userId,
-		eventCategory: 'EXECUTION'
+		eventCategory: ActivityEventCategory.EXECUTION
 	});
 }
 
@@ -132,12 +132,12 @@ export async function logMinutesApproved(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MEETING',
+		entityType: ActivityEntityType.MEETING,
 		entityId: params.meetingId,
-		action: 'APPROVE_MINUTES',
+		action: ActivityActionType.APPROVE_MINUTES,
 		summary: `Minutes approved for meeting "${params.title}"`,
 		performedById: params.userId,
-		eventCategory: 'DECISION'
+		eventCategory: ActivityEventCategory.DECISION
 	});
 }
 
@@ -156,12 +156,12 @@ export async function logMotionProposed(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MOTION',
+		entityType: ActivityEntityType.MOTION,
 		entityId: params.motionId,
-		action: 'PROPOSE',
+		action: ActivityActionType.PROPOSE,
 		summary: `Motion ${params.motionNumber} "${params.title}" proposed`,
 		performedById: params.userId,
-		eventCategory: 'INTENT'
+		eventCategory: ActivityEventCategory.INTENT
 	});
 }
 
@@ -176,12 +176,12 @@ export async function logMotionSeconded(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MOTION',
+		entityType: ActivityEntityType.MOTION,
 		entityId: params.motionId,
-		action: 'SECOND',
+		action: ActivityActionType.SECOND,
 		summary: `Motion ${params.motionNumber} "${params.title}" seconded`,
 		performedById: params.secondedById,
-		eventCategory: 'EXECUTION'
+		eventCategory: ActivityEventCategory.EXECUTION
 	});
 }
 
@@ -196,12 +196,12 @@ export async function logVotingOpened(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MOTION',
+		entityType: ActivityEntityType.MOTION,
 		entityId: params.motionId,
-		action: 'OPEN_VOTING',
+		action: ActivityActionType.OPEN_VOTING,
 		summary: `Voting opened on motion ${params.motionNumber}`,
 		performedById: params.userId,
-		eventCategory: 'EXECUTION',
+		eventCategory: ActivityEventCategory.EXECUTION,
 		metadata: { voteId: params.voteId }
 	});
 }
@@ -218,12 +218,12 @@ export async function logVotingClosed(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MOTION',
+		entityType: ActivityEntityType.MOTION,
 		entityId: params.motionId,
-		action: 'CLOSE_VOTING',
+		action: ActivityActionType.CLOSE_VOTING,
 		summary: `Voting closed on motion ${params.motionNumber}: ${params.outcome}`,
 		performedById: params.userId,
-		eventCategory: 'DECISION',
+		eventCategory: ActivityEventCategory.DECISION,
 		metadata: { outcome: params.outcome, ...params.voteResults }
 	});
 }
@@ -239,12 +239,12 @@ export async function logMotionTabled(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'MOTION',
+		entityType: ActivityEntityType.MOTION,
 		entityId: params.motionId,
-		action: 'TABLE',
+		action: ActivityActionType.TABLE,
 		summary: `Motion ${params.motionNumber} tabled${params.reason ? `: ${params.reason}` : ''}`,
 		performedById: params.userId,
-		eventCategory: 'DECISION'
+		eventCategory: ActivityEventCategory.DECISION
 	});
 }
 
@@ -263,12 +263,12 @@ export async function logBallotCast(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'VOTE',
+		entityType: ActivityEntityType.VOTE,
 		entityId: params.voteId,
-		action: 'CAST_BALLOT',
+		action: ActivityActionType.CAST_BALLOT,
 		summary: `Ballot cast: ${params.choice}${params.hasConflictOfInterest ? ' (with conflict of interest disclosed)' : ''}`,
 		performedById: params.voterId,
-		eventCategory: 'EXECUTION',
+		eventCategory: ActivityEventCategory.EXECUTION,
 		metadata: { choice: params.choice, hasConflictOfInterest: params.hasConflictOfInterest }
 	});
 }
@@ -288,12 +288,12 @@ export async function logResolutionAdopted(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'RESOLUTION',
+		entityType: ActivityEntityType.RESOLUTION,
 		entityId: params.resolutionId,
-		action: 'ADOPT',
+		action: ActivityActionType.ADOPT,
 		summary: `Resolution "${params.title}" adopted`,
 		performedById: params.userId,
-		eventCategory: 'DECISION',
+		eventCategory: ActivityEventCategory.DECISION,
 		metadata: params.motionId ? { linkedMotionId: params.motionId } : undefined
 	});
 }
@@ -309,12 +309,12 @@ export async function logResolutionSuperseded(params: {
 	return createGovernanceActivity({
 		organizationId: params.organizationId,
 		associationId: params.associationId,
-		entityType: 'RESOLUTION',
+		entityType: ActivityEntityType.RESOLUTION,
 		entityId: params.resolutionId,
-		action: 'SUPERSEDE',
+		action: ActivityActionType.SUPERSEDE,
 		summary: `Resolution "${params.title}" superseded`,
 		performedById: params.userId,
-		eventCategory: 'EXECUTION',
+		eventCategory: ActivityEventCategory.EXECUTION,
 		metadata: { supersededById: params.supersededById }
 	});
 }

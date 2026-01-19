@@ -10,7 +10,8 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { MediaType } from '../../../../../../generated/prisma/client.js';
-import { startMediaWorkflow } from '../../../workflows/mediaWorkflow.js';
+import { MediaType as MediaTypeEnum } from '../../../../../../generated/prisma/enums.js';
+import { startMediaWorkflow, MediaAction } from '../../../workflows/mediaWorkflow.js';
 
 const jobMediaOutput = z.object({
 	id: z.string(),
@@ -107,7 +108,7 @@ export const mediaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
 				{
-					action: 'REGISTER_MEDIA',
+					action: MediaAction.REGISTER_MEDIA,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -173,7 +174,7 @@ export const mediaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
 				{
-					action: 'MARK_UPLOADED',
+					action: MediaAction.MARK_UPLOADED,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					mediaId: input.mediaId,
@@ -238,7 +239,7 @@ export const mediaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
 				{
-					action: 'ADD_VOICE_NOTE',
+					action: MediaAction.ADD_VOICE_NOTE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -301,14 +302,14 @@ export const mediaRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Media not found' });
 
-			if (existing.mediaType !== 'AUDIO') {
+			if (existing.mediaType !== MediaTypeEnum.AUDIO) {
 				throw errors.BAD_REQUEST({ message: 'Transcription only applies to audio media' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
 				{
-					action: 'UPDATE_TRANSCRIPTION',
+					action: MediaAction.UPDATE_TRANSCRIPTION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					mediaId: input.mediaId,
@@ -447,7 +448,7 @@ export const mediaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startMediaWorkflow(
 				{
-					action: 'DELETE_MEDIA',
+					action: MediaAction.DELETE_MEDIA,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					mediaId: input.id,

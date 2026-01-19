@@ -1,18 +1,12 @@
 /**
  * Meeting Event Emitter
- * 
+ *
  * Handles real-time event broadcasting for live meetings.
  * Used by SSE endpoint and meeting action handlers.
  */
 
-// Event types for meeting updates
-export type MeetingEventType = 
-	| 'attendance_update'
-	| 'vote_update'
-	| 'motion_update'
-	| 'meeting_state'
-	| 'quorum_update'
-	| 'heartbeat';
+import { MeetingAttendanceStatus, BoardMotionStatus, BoardMotionOutcome, MeetingStatus } from '../../../generated/prisma/enums.js';
+import { MeetingEventType } from './workflows/schemas.js';
 
 export interface MeetingEvent {
 	type: MeetingEventType;
@@ -34,12 +28,12 @@ export function emitMeetingEvent(meetingId: string, event: MeetingEvent): void {
 // Helper functions to emit specific event types
 export function emitAttendanceUpdate(meetingId: string, data: {
 	partyId: string;
-	status: string;
+	status: MeetingAttendanceStatus;
 	presentCount: number;
 	quorumMet: boolean;
 }): void {
 	emitMeetingEvent(meetingId, {
-		type: 'attendance_update',
+		type: MeetingEventType.ATTENDANCE_UPDATE,
 		data,
 		timestamp: new Date().toISOString()
 	});
@@ -54,7 +48,7 @@ export function emitVoteUpdate(meetingId: string, data: {
 	quorumMet: boolean;
 }): void {
 	emitMeetingEvent(meetingId, {
-		type: 'vote_update',
+		type: MeetingEventType.VOTE_UPDATE,
 		data,
 		timestamp: new Date().toISOString()
 	});
@@ -63,22 +57,22 @@ export function emitVoteUpdate(meetingId: string, data: {
 export function emitMotionUpdate(meetingId: string, data: {
 	motionId: string;
 	motionNumber: string;
-	status: string;
-	outcome?: string;
+	status: BoardMotionStatus;
+	outcome?: BoardMotionOutcome;
 }): void {
 	emitMeetingEvent(meetingId, {
-		type: 'motion_update',
+		type: MeetingEventType.MOTION_UPDATE,
 		data,
 		timestamp: new Date().toISOString()
 	});
 }
 
 export function emitMeetingStateChange(meetingId: string, data: {
-	fromStatus: string;
-	toStatus: string;
+	fromStatus: MeetingStatus;
+	toStatus: MeetingStatus;
 }): void {
 	emitMeetingEvent(meetingId, {
-		type: 'meeting_state',
+		type: MeetingEventType.MEETING_STATE,
 		data,
 		timestamp: new Date().toISOString()
 	});
@@ -90,7 +84,7 @@ export function emitQuorumUpdate(meetingId: string, data: {
 	met: boolean;
 }): void {
 	emitMeetingEvent(meetingId, {
-		type: 'quorum_update',
+		type: MeetingEventType.QUORUM_UPDATE,
 		data,
 		timestamp: new Date().toISOString()
 	});

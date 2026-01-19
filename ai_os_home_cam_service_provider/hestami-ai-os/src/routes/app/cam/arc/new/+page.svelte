@@ -3,7 +3,7 @@
 	import { ArrowLeft, ClipboardCheck, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { arcRequestApi, unitApi, type Unit } from '$lib/api/cam';
+	import { ARCCategoryValues, AssetCategoryValues, arcRequestApi, type Unit, unitApi } from '$lib/api/cam';
 
 	let units = $state<Unit[]>([]);
 	let isLoadingData = $state(true);
@@ -23,15 +23,15 @@
 
 	const categoryOptions = [
 		{ value: 'EXTERIOR_MODIFICATION', label: 'Exterior Modification' },
-		{ value: 'LANDSCAPING', label: 'Landscaping' },
+		{ value: ARCCategoryValues.LANDSCAPING, label: 'Landscaping' },
 		{ value: 'FENCE_WALL', label: 'Fence / Wall' },
-		{ value: 'ROOF', label: 'Roof' },
+		{ value: ARCCategoryValues.ROOF, label: 'Roof' },
 		{ value: 'PAINT_COLOR', label: 'Paint / Color Change' },
 		{ value: 'WINDOW_DOOR', label: 'Window / Door' },
-		{ value: 'SOLAR', label: 'Solar Installation' },
-		{ value: 'POOL_SPA', label: 'Pool / Spa' },
+		{ value: ARCCategoryValues.SOLAR, label: 'Solar Installation' },
+		{ value: AssetCategoryValues.POOL_SPA, label: 'Pool / Spa' },
 		{ value: 'PATIO_DECK', label: 'Patio / Deck' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: ARCCategoryValues.OTHER, label: 'Other' }
 	];
 
 	async function loadFormData() {

@@ -11,6 +11,16 @@ import { JobStatus, type EntityWorkflowResult } from './schemas.js';
 import type { CheckpointType } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityActionType,
+	WorkOrderStatus,
+	ConciergeCaseStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	JOB_WORKFLOW_ERROR: 'JOB_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('JobWorkflow');
 
@@ -92,26 +102,26 @@ async function transitionJobStatus(
 		const updateData: Record<string, unknown> = { status: toStatus };
 
 		switch (toStatus) {
-			case 'DISPATCHED':
+			case JobStatus.DISPATCHED:
 				updateData.dispatchedAt = new Date();
 				break;
-			case 'IN_PROGRESS':
+			case JobStatus.IN_PROGRESS:
 				if (!job.startedAt) updateData.startedAt = new Date();
 				break;
-			case 'COMPLETED':
+			case JobStatus.COMPLETED:
 				updateData.completedAt = new Date();
 				break;
-			case 'INVOICED':
+			case JobStatus.INVOICED:
 				updateData.invoicedAt = new Date();
 				break;
-			case 'PAID':
+			case JobStatus.PAID:
 				updateData.paidAt = new Date();
 				break;
-			case 'CLOSED':
+			case JobStatus.CLOSED:
 				updateData.closedAt = new Date();
 				updateData.closedBy = userId;
 				break;
-			case 'CANCELLED':
+			case JobStatus.CANCELLED:
 				updateData.cancelledAt = new Date();
 				break;
 		}
@@ -129,13 +139,13 @@ async function transitionJobStatus(
 
 		// Phase 15.7: Propagate status to linked entities (work orders and concierge cases)
 		// Map job status to work order status
-		const jobToWorkOrderStatus: Partial<Record<JobStatus, string>> = {
-			SCHEDULED: 'SCHEDULED',
-			DISPATCHED: 'SCHEDULED',
-			IN_PROGRESS: 'IN_PROGRESS',
-			COMPLETED: 'COMPLETED',
-			CLOSED: 'CLOSED',
-			CANCELLED: 'CANCELLED'
+		const jobToWorkOrderStatus: Partial<Record<JobStatus, WorkOrderStatus>> = {
+			[JobStatus.SCHEDULED]: WorkOrderStatus.SCHEDULED,
+			[JobStatus.DISPATCHED]: WorkOrderStatus.SCHEDULED,
+			[JobStatus.IN_PROGRESS]: WorkOrderStatus.IN_PROGRESS,
+			[JobStatus.COMPLETED]: WorkOrderStatus.COMPLETED,
+			[JobStatus.CLOSED]: WorkOrderStatus.CLOSED,
+			[JobStatus.CANCELLED]: WorkOrderStatus.CANCELLED
 		};
 
 		const workOrderStatus = jobToWorkOrderStatus[toStatus];
@@ -146,8 +156,8 @@ async function transitionJobStatus(
 				where: { id: job.workOrderId },
 				data: {
 					status: workOrderStatus as any,
-					...(toStatus === 'COMPLETED' ? { completedAt: new Date() } : {}),
-					...(toStatus === 'CLOSED' ? { closedAt: new Date(), closedBy: userId } : {})
+					...(toStatus === JobStatus.COMPLETED ? { completedAt: new Date() } : {}),
+					...(toStatus === JobStatus.CLOSED ? { closedAt: new Date(), closedBy: userId } : {})
 				}
 			}).catch((err) => {
 				log.error(`Failed to update linked work order ${job.workOrderId}:`, { error: err });
@@ -160,12 +170,12 @@ async function transitionJobStatus(
 		});
 
 		if (linkedCases.length > 0) {
-			const jobToCaseStatus: Partial<Record<JobStatus, string>> = {
-				SCHEDULED: 'IN_PROGRESS',
-				IN_PROGRESS: 'IN_PROGRESS',
-				COMPLETED: 'RESOLVED',
-				CLOSED: 'CLOSED',
-				CANCELLED: 'CLOSED'
+			const jobToCaseStatus: Partial<Record<JobStatus, ConciergeCaseStatus>> = {
+				[JobStatus.SCHEDULED]: ConciergeCaseStatus.IN_PROGRESS,
+				[JobStatus.IN_PROGRESS]: ConciergeCaseStatus.IN_PROGRESS,
+				[JobStatus.COMPLETED]: ConciergeCaseStatus.RESOLVED,
+				[JobStatus.CLOSED]: ConciergeCaseStatus.CLOSED,
+				[JobStatus.CANCELLED]: ConciergeCaseStatus.CLOSED
 			};
 
 			const caseStatus = jobToCaseStatus[toStatus];
@@ -175,8 +185,8 @@ async function transitionJobStatus(
 						where: { id: linkedCase.id },
 						data: {
 							status: caseStatus as any,
-							...(toStatus === 'COMPLETED' || toStatus === 'CLOSED' ? { resolvedAt: new Date() } : {}),
-							...(toStatus === 'CLOSED' ? { closedAt: new Date() } : {})
+							...(toStatus === JobStatus.COMPLETED || toStatus === JobStatus.CLOSED ? { resolvedAt: new Date() } : {}),
+							...(toStatus === JobStatus.CLOSED ? { closedAt: new Date() } : {})
 						}
 					}).catch((err) => {
 						log.error(`Failed to update linked case ${linkedCase.id}:`, { error: err });
@@ -221,7 +231,7 @@ async function scheduleJob(
 ): Promise<string> {
 	const updateData: Record<string, unknown> = {
 		scheduledStart: new Date(scheduledStart),
-		status: 'SCHEDULED'
+		status: JobStatus.SCHEDULED
 	};
 
 	if (scheduledEnd) updateData.scheduledEnd = new Date(scheduledEnd);
@@ -409,14 +419,14 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'UPDATE_JOB':
+			case JobAction.UPDATE_JOB:
 				entityId = await DBOS.runStep(
 					() => updateJob(input.organizationId, input.userId, input.jobId!, input.data),
 					{ name: 'updateJob' }
 				);
 				break;
 
-			case 'TRANSITION_STATUS':
+			case JobAction.TRANSITION_STATUS:
 				entityId = await DBOS.runStep(
 					() => transitionJobStatus(
 						input.organizationId,
@@ -429,7 +439,7 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 				);
 				break;
 
-			case 'ASSIGN_TECHNICIAN':
+			case JobAction.ASSIGN_TECHNICIAN:
 				entityId = await DBOS.runStep(
 					() => assignTechnician(
 						input.organizationId,
@@ -441,7 +451,7 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 				);
 				break;
 
-			case 'SCHEDULE_JOB':
+			case JobAction.SCHEDULE_JOB:
 				entityId = await DBOS.runStep(
 					() => scheduleJob(
 						input.organizationId,
@@ -455,7 +465,7 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 				);
 				break;
 
-			case 'ADD_NOTE':
+			case JobAction.ADD_NOTE:
 				entityId = await DBOS.runStep(
 					() => addNote(
 						input.organizationId,
@@ -468,28 +478,28 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 				);
 				break;
 
-			case 'ADD_ATTACHMENT':
+			case JobAction.ADD_ATTACHMENT:
 				entityId = await DBOS.runStep(
 					() => addAttachment(input.organizationId, input.userId, input.jobId!, input.data),
 					{ name: 'addAttachment' }
 				);
 				break;
 
-			case 'DELETE_ATTACHMENT':
+			case JobAction.DELETE_ATTACHMENT:
 				entityId = await DBOS.runStep(
 					() => deleteAttachment(input.organizationId, input.userId, input.entityId!),
 					{ name: 'deleteAttachment' }
 				);
 				break;
 
-			case 'ADD_CHECKPOINT':
+			case JobAction.ADD_CHECKPOINT:
 				entityId = await DBOS.runStep(
 					() => addCheckpoint(input.organizationId, input.userId, input.jobId!, input.data),
 					{ name: 'addCheckpoint' }
 				);
 				break;
 
-			case 'COMPLETE_CHECKPOINT':
+			case JobAction.COMPLETE_CHECKPOINT:
 				entityId = await DBOS.runStep(
 					() => completeCheckpoint(
 						input.organizationId,
@@ -501,21 +511,21 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 				);
 				break;
 
-			case 'ADD_VISIT':
+			case JobAction.ADD_VISIT:
 				entityId = await DBOS.runStep(
 					() => addVisit(input.organizationId, input.userId, input.jobId!, input.data),
 					{ name: 'addVisit' }
 				);
 				break;
 
-			case 'UPDATE_VISIT':
+			case JobAction.UPDATE_VISIT:
 				entityId = await DBOS.runStep(
 					() => updateVisit(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateVisit' }
 				);
 				break;
 
-			case 'DELETE_JOB':
+			case JobAction.DELETE_JOB:
 				entityId = await DBOS.runStep(
 					() => deleteJob(input.organizationId, input.userId, input.jobId!),
 					{ name: 'deleteJob' }
@@ -534,8 +544,8 @@ async function jobWorkflow(input: JobWorkflowInput): Promise<JobWorkflowResult> 
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'JOB_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.JOB_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

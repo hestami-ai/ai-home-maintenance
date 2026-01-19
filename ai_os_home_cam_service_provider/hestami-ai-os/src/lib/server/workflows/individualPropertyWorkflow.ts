@@ -11,12 +11,23 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	INDIVIDUAL_PROPERTY_WORKFLOW_ERROR: 'INDIVIDUAL_PROPERTY_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'individual_property_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'individual_property_workflow_error';
 
 // Action types for individual property operations
-export const IndividualPropertyWorkflowAction = {
+const IndividualPropertyAction = {
 	CREATE: 'CREATE',
 	UPDATE: 'UPDATE',
 	DELETE: 'DELETE',
@@ -24,6 +35,8 @@ export const IndividualPropertyWorkflowAction = {
 	REMOVE_FROM_PORTFOLIO: 'REMOVE_FROM_PORTFOLIO',
 	UPDATE_EXTERNAL_HOA: 'UPDATE_EXTERNAL_HOA'
 } as const;
+
+export const IndividualPropertyWorkflowAction = IndividualPropertyAction;
 
 export type IndividualPropertyWorkflowAction = (typeof IndividualPropertyWorkflowAction)[keyof typeof IndividualPropertyWorkflowAction];
 
@@ -175,15 +188,15 @@ async function createProperty(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: result.property.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Individual property created: ${input.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'individualPropertyWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: IndividualPropertyAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { name: input.name, propertyType: input.propertyType, city: input.city }
 	});
@@ -250,15 +263,15 @@ async function updateProperty(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: property.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Individual property updated: ${property.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'individualPropertyWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: IndividualPropertyAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: updateData
 	});
@@ -303,15 +316,15 @@ async function deleteProperty(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: propertyId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Individual property deactivated`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'individualPropertyWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: IndividualPropertyAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { isActive: false }
 	});
@@ -356,15 +369,15 @@ async function addToPortfolio(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: propertyId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property added to portfolio`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'individualPropertyWorkflow_v1',
-		workflowStep: 'ADD_TO_PORTFOLIO',
+		workflowStep: IndividualPropertyAction.ADD_TO_PORTFOLIO,
 		workflowVersion: 'v1',
 		newState: { portfolioId }
 	});
@@ -412,15 +425,15 @@ async function removeFromPortfolio(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: propertyId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property removed from portfolio`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'individualPropertyWorkflow_v1',
-		workflowStep: 'REMOVE_FROM_PORTFOLIO',
+		workflowStep: IndividualPropertyAction.REMOVE_FROM_PORTFOLIO,
 		workflowVersion: 'v1',
 		newState: { portfolioId, removedAt: new Date().toISOString() }
 	});
@@ -475,15 +488,15 @@ async function updateExternalHoa(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: externalHoa.id,
-		action: wasExisting ? 'UPDATE' : 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: wasExisting ? ActivityActionType.UPDATE : ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `External HOA ${wasExisting ? 'updated' : 'created'}: ${input.hoaName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'individualPropertyWorkflow_v1',
-		workflowStep: 'UPDATE_EXTERNAL_HOA',
+		workflowStep: IndividualPropertyAction.UPDATE_EXTERNAL_HOA,
 		workflowVersion: 'v1',
 		newState: { hoaName: input.hoaName }
 	});
@@ -517,7 +530,7 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case IndividualPropertyWorkflowAction.CREATE: {
 				if (!input.name || !input.addressLine1 || !input.city || !input.state || !input.postalCode || !input.propertyType) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -541,7 +554,7 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case IndividualPropertyWorkflowAction.UPDATE: {
 				if (!input.propertyId) {
 					const error = new Error('Missing required field: propertyId for UPDATE');
 					logStepError(log, 'validation', error, { propertyId: input.propertyId });
@@ -564,7 +577,7 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case IndividualPropertyWorkflowAction.DELETE: {
 				if (!input.propertyId) {
 					const error = new Error('Missing required field: propertyId for DELETE');
 					logStepError(log, 'validation', error, { propertyId: input.propertyId });
@@ -587,7 +600,7 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 				return successResult;
 			}
 
-			case 'ADD_TO_PORTFOLIO': {
+			case IndividualPropertyWorkflowAction.ADD_TO_PORTFOLIO: {
 				if (!input.propertyId || !input.portfolioId) {
 					const error = new Error('Missing required fields: propertyId and portfolioId for ADD_TO_PORTFOLIO');
 					logStepError(log, 'validation', error, { input });
@@ -611,7 +624,7 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 				return successResult;
 			}
 
-			case 'REMOVE_FROM_PORTFOLIO': {
+			case IndividualPropertyWorkflowAction.REMOVE_FROM_PORTFOLIO: {
 				if (!input.propertyId || !input.portfolioId) {
 					const error = new Error('Missing required fields: propertyId and portfolioId for REMOVE_FROM_PORTFOLIO');
 					logStepError(log, 'validation', error, { input });
@@ -634,7 +647,7 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 				return successResult;
 			}
 
-			case 'UPDATE_EXTERNAL_HOA': {
+			case IndividualPropertyWorkflowAction.UPDATE_EXTERNAL_HOA: {
 				if (!input.propertyId || !input.hoaName) {
 					const error = new Error('Missing required fields: propertyId and hoaName for UPDATE_EXTERNAL_HOA');
 					logStepError(log, 'validation', error, { input });
@@ -682,8 +695,8 @@ async function individualPropertyWorkflow(input: IndividualPropertyWorkflowInput
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'INDIVIDUAL_PROPERTY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.INDIVIDUAL_PROPERTY_WORKFLOW_ERROR
 		});
 		const errorResult: IndividualPropertyWorkflowResult = {
 			success: false,

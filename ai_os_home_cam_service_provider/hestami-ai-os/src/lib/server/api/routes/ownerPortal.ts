@@ -7,15 +7,22 @@ import {
 	OwnerRequestStatusSchema,
 	OwnerRequestCategorySchema,
 	PaymentMethodTypeSchema,
-	AutoPayFrequencySchema
+	AutoPayFrequencySchema,
+	DocumentCategorySchema
 } from '../schemas.js';
 import { prisma } from '../../db.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 
 import { PaginationInputSchema, PaginationOutputSchema, IdempotencyKeySchema } from '../router.js';
-import { startOwnerPortalWorkflow } from '../../workflows/ownerPortalWorkflow.js';
+import { startOwnerPortalWorkflow, OwnerPortalAction } from '../../workflows/ownerPortalWorkflow.js';
 import type { RequestContext } from '../context.js';
 import { createModuleLogger } from '../../logger.js';
+import {
+	PartyType,
+	OwnerRequestStatus,
+	DocumentVisibility,
+	DocumentContextType
+} from '../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('OwnerPortalRoute');
 
@@ -78,7 +85,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'UPSERT_USER_PROFILE',
+					action: OwnerPortalAction.UPSERT_USER_PROFILE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -190,7 +197,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'DELETE_USER_PROFILE',
+					action: OwnerPortalAction.DELETE_USER_PROFILE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -247,7 +254,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'UPSERT_CONTACT_PREFERENCE',
+					action: OwnerPortalAction.UPSERT_CONTACT_PREFERENCE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -364,7 +371,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'DELETE_CONTACT_PREFERENCE',
+					action: OwnerPortalAction.DELETE_CONTACT_PREFERENCE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -418,7 +425,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'UPSERT_NOTIFICATION_SETTING',
+					action: OwnerPortalAction.UPSERT_NOTIFICATION_SETTING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -524,7 +531,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'DELETE_NOTIFICATION_SETTING',
+					action: OwnerPortalAction.DELETE_NOTIFICATION_SETTING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -603,7 +610,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'CREATE_OWNER_REQUEST',
+					action: OwnerPortalAction.CREATE_OWNER_REQUEST,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -689,7 +696,7 @@ export const ownerPortalRouter = {
 			await context.cerbos.authorize('view', 'ownerRequest', request.id);
 
 			const displayName =
-				request.party.partyType === 'INDIVIDUAL'
+				request.party.partyType === PartyType.INDIVIDUAL
 					? `${request.party.firstName ?? ''} ${request.party.lastName ?? ''}`.trim()
 					: request.party.entityName ?? '';
 
@@ -783,7 +790,7 @@ export const ownerPortalRouter = {
 						category: r.category,
 						subject: r.subject,
 						partyName:
-							r.party.partyType === 'INDIVIDUAL'
+							r.party.partyType === PartyType.INDIVIDUAL
 								? `${r.party.firstName ?? ''} ${r.party.lastName ?? ''}`.trim()
 								: r.party.entityName ?? '',
 						createdAt: r.createdAt.toISOString()
@@ -833,7 +840,7 @@ export const ownerPortalRouter = {
 				throw errors.NOT_FOUND({ message: 'OwnerRequest' });
 			}
 
-			if (request.status !== 'DRAFT') {
+			if (request.status !== OwnerRequestStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Request must be in DRAFT status to submit' });
 			}
 
@@ -842,7 +849,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'SUBMIT_OWNER_REQUEST',
+					action: OwnerPortalAction.SUBMIT_OWNER_REQUEST,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.id,
@@ -918,7 +925,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'UPDATE_REQUEST_STATUS',
+					action: OwnerPortalAction.UPDATE_REQUEST_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.id,
@@ -1005,7 +1012,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'LINK_WORK_ORDER',
+					action: OwnerPortalAction.LINK_WORK_ORDER,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.id,
@@ -1138,7 +1145,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'ADD_PAYMENT_METHOD',
+					action: OwnerPortalAction.ADD_PAYMENT_METHOD,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1264,7 +1271,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'SET_DEFAULT_PAYMENT',
+					action: OwnerPortalAction.SET_DEFAULT_PAYMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1313,7 +1320,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'DELETE_PAYMENT_METHOD',
+					action: OwnerPortalAction.DELETE_PAYMENT_METHOD,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1376,7 +1383,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'CONFIGURE_AUTO_PAY',
+					action: OwnerPortalAction.CONFIGURE_AUTO_PAY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1504,7 +1511,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'DELETE_AUTO_PAY',
+					action: OwnerPortalAction.DELETE_AUTO_PAY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1529,18 +1536,7 @@ export const ownerPortalRouter = {
 		.input(
 			PaginationInputSchema.extend({
 				associationId: z.string(),
-				category: z
-					.enum([
-						'GOVERNING_DOCS',
-						'FINANCIAL',
-						'MEETING',
-						'LEGAL',
-						'INSURANCE',
-						'MAINTENANCE',
-						'ARCHITECTURAL',
-						'GENERAL'
-					])
-					.optional(),
+				category: DocumentCategorySchema.optional(),
 				partyId: z.string().optional() // For visibility filtering
 			})
 		)
@@ -1582,19 +1578,19 @@ export const ownerPortalRouter = {
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
 			// Build visibility filter based on party role
-			const visibilityFilter: string[] = ['PUBLIC'];
+			const visibilityFilter: DocumentVisibility[] = [DocumentVisibility.PUBLIC];
 			if (input.partyId) {
 				const party = await prisma.party.findFirst({
 					where: { id: input.partyId, organizationId: context.organization.id, deletedAt: null }
 				});
 				if (party) {
-					visibilityFilter.push('OWNERS_ONLY');
+					visibilityFilter.push(DocumentVisibility.OWNERS_ONLY);
 					// Check if party is an active board member
 					const boardMembership = await prisma.boardMember.findFirst({
 						where: { partyId: input.partyId, isActive: true }
 					});
 					if (boardMembership) {
-						visibilityFilter.push('BOARD_ONLY');
+						visibilityFilter.push(DocumentVisibility.BOARD_ONLY);
 					}
 				}
 			}
@@ -1603,11 +1599,11 @@ export const ownerPortalRouter = {
 				where: {
 					organizationId: context.organization.id,
 					deletedAt: null,
-					visibility: { in: visibilityFilter as any },
+					visibility: { in: visibilityFilter },
 					...(input.category && { category: input.category }),
 					contextBindings: {
 						some: {
-							contextType: 'ASSOCIATION',
+							contextType: DocumentContextType.ASSOCIATION,
 							contextId: input.associationId
 						}
 					}
@@ -1690,21 +1686,21 @@ export const ownerPortalRouter = {
 			await context.cerbos.authorize('view', 'document', document.id);
 
 			// Check access
-			let canAccess = document.visibility === 'PUBLIC';
+			let canAccess = document.visibility === DocumentVisibility.PUBLIC;
 			if (!canAccess && input.partyId) {
 				const party = await prisma.party.findFirst({
 					where: { id: input.partyId, organizationId: context.organization.id, deletedAt: null }
 				});
 
 				if (party) {
-					if (document.visibility === 'OWNERS_ONLY') canAccess = true;
-					if (document.visibility === 'BOARD_ONLY') {
+					if (document.visibility === DocumentVisibility.OWNERS_ONLY) canAccess = true;
+					if (document.visibility === DocumentVisibility.BOARD_ONLY) {
 						const boardMembership = await prisma.boardMember.findFirst({
 							where: { partyId: input.partyId, isActive: true }
 						});
 						if (boardMembership) canAccess = true;
 					}
-					if (document.visibility === 'PRIVATE') {
+					if (document.visibility === DocumentVisibility.PRIVATE) {
 						const grant = document.accessGrants.find(
 							(g: { partyId: string; revokedAt: Date | null; expiresAt: Date | null }) => g.partyId === input.partyId && !g.revokedAt && (!g.expiresAt || g.expiresAt > new Date())
 						);
@@ -1773,7 +1769,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'LOG_DOCUMENT_DOWNLOAD',
+					action: OwnerPortalAction.LOG_DOCUMENT_DOWNLOAD,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1838,7 +1834,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'GRANT_DOCUMENT_ACCESS',
+					action: OwnerPortalAction.GRANT_DOCUMENT_ACCESS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1909,7 +1905,7 @@ export const ownerPortalRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerPortalWorkflow(
 				{
-					action: 'REVOKE_DOCUMENT_ACCESS',
+					action: OwnerPortalAction.REVOKE_DOCUMENT_ACCESS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {

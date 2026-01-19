@@ -11,9 +11,11 @@ import {
 	StorageProviderSchema,
 	JsonSchema
 } from '$lib/schemas/index.js';
-import { startDocumentWorkflow, getOrgQueueDepth } from '../../workflows/documentWorkflow.js';
+import { startDocumentWorkflow, getOrgQueueDepth, DocumentAction } from '../../workflows/documentWorkflow.js';
 import { recordActivityFromContext } from '../middleware/activityEvent.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
+import { ActivityEntityType, ActivityActionType, ActivityEventCategory, DocumentStatus, DocumentVisibility, StorageProvider } from '../../../../../generated/prisma/enums.js';
+import { SpanErrorType, ProcessingErrorType } from '../../workflows/schemas.js';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -149,10 +151,10 @@ export const documentRouter = {
 
 				// Create a PENDING_UPLOAD document record via workflow
 				// Status will transition: PENDING_UPLOAD -> PROCESSING -> ACTIVE (after TUS hook completes)
-				reqLog.debug('Starting document workflow', { action: 'CREATE_DOCUMENT_METADATA' });
+				reqLog.debug('Starting document workflow', { action: DocumentAction.CREATE_DOCUMENT_METADATA });
 				const workflowResult = await startDocumentWorkflow(
 					{
-						action: 'CREATE_DOCUMENT_METADATA',
+						action: DocumentAction.CREATE_DOCUMENT_METADATA,
 						organizationId: context.organization.id,
 						associationId: context.associationId, // NEW: Pass association context (Phase 30)
 						userId: context.user.id,
@@ -161,8 +163,8 @@ export const documentRouter = {
 							description: input.description,
 							category: input.category,
 							visibility: input.visibility,
-							status: 'PENDING_UPLOAD',
-							storageProvider: 'SEAWEEDFS',
+							status: DocumentStatus.PENDING_UPLOAD,
+							storageProvider: StorageProvider.SEAWEEDFS,
 							storagePath: `pending/${input.idempotencyKey}/${input.fileName}`,
 							fileUrl: '',
 							fileName: input.fileName,
@@ -263,10 +265,10 @@ export const documentRouter = {
 				reqLog.debug('File saved to local storage', { storagePath, fileUrl });
 
 				// Use DBOS workflow for durable database execution
-				reqLog.debug('Starting document workflow', { action: 'CREATE_DOCUMENT' });
+				reqLog.debug('Starting document workflow', { action: DocumentAction.CREATE_DOCUMENT });
 				const workflowResult = await startDocumentWorkflow(
 					{
-						action: 'CREATE_DOCUMENT',
+						action: DocumentAction.CREATE_DOCUMENT,
 						organizationId: context.organization.id,
 						associationId: context.associationId, // NEW: Pass association context (Phase 30)
 						userId: context.user.id,
@@ -274,7 +276,7 @@ export const documentRouter = {
 							title: input.title,
 							description: input.description,
 							category: input.category,
-							visibility: input.visibility ?? 'PUBLIC',
+							visibility: input.visibility ?? DocumentVisibility.PUBLIC,
 							storagePath,
 							fileUrl,
 							fileName: input.file.name,
@@ -329,7 +331,7 @@ export const documentRouter = {
 				// Record error on span for trace visibility
 				await recordSpanError(errorObj, {
 					errorCode: 'UPLOAD_FAILED',
-					errorType: 'DOCUMENT_UPLOAD_ERROR'
+					errorType: SpanErrorType.DOCUMENT_UPLOAD_ERROR
 				});
 				throw error;
 			}
@@ -402,7 +404,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'CREATE_VERSION',
+					action: DocumentAction.CREATE_VERSION,
 					organizationId: context.organization.id,
 					associationId: context.associationId, // NEW: Pass association context (Phase 30)
 					userId: context.user.id,
@@ -491,7 +493,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'CREATE_DOCUMENT_METADATA',
+					action: DocumentAction.CREATE_DOCUMENT_METADATA,
 					organizationId: context.organization.id,
 					associationId: context.associationId, // NEW: Pass association context (Phase 30)
 					userId: context.user.id,
@@ -499,8 +501,8 @@ export const documentRouter = {
 						title: input.title,
 						description: input.description,
 						category: input.category,
-						visibility: input.visibility ?? 'PUBLIC',
-						storageProvider: input.storageProvider ?? 'LOCAL',
+						visibility: input.visibility ?? DocumentVisibility.PUBLIC,
+						storageProvider: input.storageProvider ?? StorageProvider.LOCAL,
 						storagePath: input.storagePath,
 						fileUrl: input.fileUrl,
 						fileName: input.fileName,
@@ -705,8 +707,8 @@ export const documentRouter = {
 
 			// Only allow downloads for documents that have completed processing
 			// DRAFT, PENDING_UPLOAD, PROCESSING, PROCESSING_FAILED, INFECTED statuses are not downloadable
-			const downloadableStatuses = ['ACTIVE', 'SUPERSEDED', 'ARCHIVED'];
-			if (!downloadableStatuses.includes(document.status)) {
+			const downloadableStatuses: DocumentStatus[] = [DocumentStatus.ACTIVE, DocumentStatus.SUPERSEDED, DocumentStatus.ARCHIVED];
+			if (!downloadableStatuses.includes(document.status as DocumentStatus)) {
 				log.warn('Download attempted for non-downloadable document', {
 					documentId: document.id,
 					status: document.status
@@ -722,7 +724,7 @@ export const documentRouter = {
 			log.info('Generating download URL', { documentId: document.id, storageProvider: document.storageProvider });
 
 			try {
-				if (document.storageProvider === 'SEAWEEDFS' || document.storageProvider === 'S3') {
+				if (document.storageProvider === StorageProvider.SEAWEEDFS || document.storageProvider === StorageProvider.S3) {
 					const s3Bucket = process.env.S3_BUCKET || 'uploads';
 					const command = new GetObjectCommand({
 						Bucket: s3Bucket,
@@ -737,7 +739,7 @@ export const documentRouter = {
 					log.info('Presigned S3 URL generated', { documentId: document.id, expiresAt });
 
 					return successResponse({ downloadUrl, expiresAt }, context);
-				} else if (document.storageProvider === 'LOCAL') {
+				} else if (document.storageProvider === StorageProvider.LOCAL) {
 					// Fallback for locally stored files
 					return successResponse(
 						{
@@ -872,7 +874,7 @@ export const documentRouter = {
 					// Exclude archived and infected documents unless explicitly requested
 					...(!input.status && {
 						status: {
-							notIn: ['ARCHIVED', 'INFECTED'] as const
+							notIn: [DocumentStatus.ARCHIVED, DocumentStatus.INFECTED]
 						}
 					}),
 					...(input.category && { category: input.category }),
@@ -965,7 +967,7 @@ export const documentRouter = {
 				// Record error on span for trace visibility
 				await recordSpanError(errorObj, {
 					errorCode: 'LIST_FAILED',
-					errorType: 'DOCUMENT_LIST_ERROR'
+					errorType: SpanErrorType.DOCUMENT_LIST_ERROR
 				});
 
 				throw error;
@@ -1021,7 +1023,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'UPDATE_DOCUMENT',
+					action: DocumentAction.UPDATE_DOCUMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.id,
@@ -1088,7 +1090,7 @@ export const documentRouter = {
 
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'UPDATE_EXTRACTED_METADATA',
+					action: DocumentAction.UPDATE_EXTRACTED_METADATA,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.id,
@@ -1157,7 +1159,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'CREATE_VERSION',
+					action: DocumentAction.CREATE_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.parentDocumentId,
@@ -1297,7 +1299,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'RESTORE_VERSION',
+					action: DocumentAction.RESTORE_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.documentId,
@@ -1361,7 +1363,7 @@ export const documentRouter = {
 
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'ARCHIVE_DOCUMENT',
+					action: DocumentAction.ARCHIVE_DOCUMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.id,
@@ -1407,7 +1409,7 @@ export const documentRouter = {
 
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'RESTORE_DOCUMENT',
+					action: DocumentAction.RESTORE_DOCUMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.id,
@@ -1461,7 +1463,7 @@ export const documentRouter = {
 
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'LOG_DOWNLOAD',
+					action: DocumentAction.LOG_DOWNLOAD,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.documentId,
@@ -1592,7 +1594,7 @@ export const documentRouter = {
 
 			// Check if document is referenced - referenced documents may have restrictions
 			const hasReferences = document.contextBindings.length > 0;
-			if (hasReferences && document.status === 'ACTIVE') {
+			if (hasReferences && document.status === DocumentStatus.ACTIVE) {
 				// Allow reclassification but log it prominently
 			}
 
@@ -1601,7 +1603,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'CHANGE_CATEGORY',
+					action: DocumentAction.CHANGE_CATEGORY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.id,
@@ -1620,10 +1622,10 @@ export const documentRouter = {
 
 			// Record audit event for classification change
 			await recordActivityFromContext(context, {
-				entityType: 'DOCUMENT',
+				entityType: ActivityEntityType.DOCUMENT,
 				entityId: document.id,
-				action: 'CLASSIFY',
-				eventCategory: 'EXECUTION',
+				action: ActivityActionType.CLASSIFY,
+				eventCategory: ActivityEventCategory.EXECUTION,
 				summary: `Document reclassified from ${previousCategory} to ${input.category}: ${input.reason}`,
 				previousState: { category: previousCategory },
 				newState: { category: input.category },
@@ -1691,7 +1693,7 @@ export const documentRouter = {
 			// Use DBOS workflow for durable database execution
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'ADD_CONTEXT_BINDING',
+					action: DocumentAction.ADD_CONTEXT_BINDING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.documentId,
@@ -1712,10 +1714,10 @@ export const documentRouter = {
 
 			// Record audit event for document reference
 			await recordActivityFromContext(context, {
-				entityType: 'DOCUMENT',
+				entityType: ActivityEntityType.DOCUMENT,
 				entityId: document.id,
-				action: 'REFERENCED',
-				eventCategory: 'EXECUTION',
+				action: ActivityActionType.REFERENCED,
+				eventCategory: ActivityEventCategory.EXECUTION,
 				summary: `Document linked to ${input.contextType} ${input.contextId}`,
 				newState: { contextType: input.contextType, contextId: input.contextId },
 				metadata: {
@@ -1770,7 +1772,7 @@ export const documentRouter = {
 
 			const workflowResult = await startDocumentWorkflow(
 				{
-					action: 'REMOVE_CONTEXT_BINDING',
+					action: DocumentAction.REMOVE_CONTEXT_BINDING,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					documentId: input.documentId,
@@ -1964,7 +1966,8 @@ export const documentRouter = {
 			await context.cerbos.authorize('update', 'document', document.id);
 
 			// Only allow cancellation for PENDING_UPLOAD or PROCESSING
-			if (!['PENDING_UPLOAD', 'PROCESSING'].includes(document.status)) {
+			const cancellableStatuses: DocumentStatus[] = [DocumentStatus.PENDING_UPLOAD, DocumentStatus.PROCESSING];
+			if (!cancellableStatuses.includes(document.status as DocumentStatus)) {
 				throw errors.CONFLICT({ message: `Cannot cancel upload for document in ${document.status} status` });
 			}
 
@@ -1972,7 +1975,7 @@ export const documentRouter = {
 
 			try {
 				// 1. Terminate DBOS workflow if it's processing
-				if (document.status === 'PROCESSING') {
+				if (document.status === DocumentStatus.PROCESSING) {
 					// We use the predictable workflow ID from the TUS hook logic
 					// workflowId = `tus-process-${tusId}`
 					// Note: document.storagePath currently contains the tusId for pending uploads
@@ -1987,7 +1990,7 @@ export const documentRouter = {
 				}
 
 				// 2. Delete S3 object if it exists
-				if (document.storageProvider === 'SEAWEEDFS' || document.storageProvider === 'S3') {
+				if (document.storageProvider === StorageProvider.SEAWEEDFS || document.storageProvider === StorageProvider.S3) {
 					const s3Bucket = process.env.S3_BUCKET || 'uploads';
 					log.info('Deleting S3 object', { bucket: s3Bucket, key: document.storagePath });
 
@@ -2003,21 +2006,21 @@ export const documentRouter = {
 				}
 
 				// 3. Mark document as ARCHIVED using SECURITY DEFINER function
-				await updateDocumentProcessingStatus(document.id, 'ARCHIVED' as any, {
-					type: 'PERMANENT',
+				await updateDocumentProcessingStatus(document.id, DocumentStatus.ARCHIVED, {
+					type: ProcessingErrorType.PERMANENT,
 					message: 'Upload cancelled by user',
 					details: { cancelledBy: context.user.id }
 				});
 
 				// 4. Record activity event
 				await recordActivityFromContext(context, {
-					entityType: 'DOCUMENT',
+					entityType: ActivityEntityType.DOCUMENT,
 					entityId: document.id,
-					action: 'ARCHIVE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.ARCHIVE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Upload cancelled by user',
 					previousState: { status: document.status },
-					newState: { status: 'ARCHIVED' }
+					newState: { status: DocumentStatus.ARCHIVED }
 				});
 
 				return successResponse({ success: true }, context);

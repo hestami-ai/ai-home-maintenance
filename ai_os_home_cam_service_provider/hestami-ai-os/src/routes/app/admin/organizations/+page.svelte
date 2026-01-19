@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationStatusValues, StaffStatusValues } from '$lib/api/cam';
 	import {
 		Building2,
 		Search,
@@ -42,8 +43,22 @@
 
 	let { data }: Props = $props();
 
-	let organizations = $derived(data.organizations);
-	let summary = $derived(data.summary);
+	// Use $state with $effect to avoid proxy errors during navigation
+	let organizations = $state<OrganizationListItem[]>([]);
+	let summary = $state<OrganizationSummary>({
+		total: 0,
+		byStatus: { active: 0, suspended: 0, inactive: 0 },
+		byType: {
+			communityAssociation: 0,
+			managementCompany: 0,
+			serviceProvider: 0,
+			individualPropertyOwner: 0,
+			trustOrLlc: 0,
+			commercialClient: 0,
+			externalServiceProvider: 0,
+			platformOperator: 0
+		}
+	});
 	let isLoading = $state(false);
 
 	// Filter state - initialized empty, synced via $effect
@@ -51,11 +66,15 @@
 	let typeFilter = $state('');
 	let statusFilter = $state('');
 
-	// Sync filters when data changes (navigation)
+	// Sync all data when props change (navigation)
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
-		searchQuery = data.filters.search;
-		typeFilter = data.filters.type;
-		statusFilter = data.filters.status;
+		if (data == null || typeof data !== 'object') return;
+		organizations = data.organizations ?? [];
+		summary = data.summary ?? summary;
+		searchQuery = data.filters?.search ?? '';
+		typeFilter = data.filters?.type ?? '';
+		statusFilter = data.filters?.status ?? '';
 	});
 
 	// Navigate with filter params
@@ -89,12 +108,13 @@
 
 	// Client-side filtering for search (immediate feedback)
 	const filteredOrganizations = $derived(
-		organizations.filter((org) => {
+		(organizations ?? []).filter((org) => {
+			if (!org) return false;
 			if (!searchQuery) return true;
 			const query = searchQuery.toLowerCase();
 			return (
-				org.name.toLowerCase().includes(query) ||
-				org.slug.toLowerCase().includes(query) ||
+				org.name?.toLowerCase().includes(query) ||
+				org.slug?.toLowerCase().includes(query) ||
 				(org.externalContactEmail?.toLowerCase().includes(query) ?? false)
 			);
 		})
@@ -110,11 +130,11 @@
 
 	function getStatusIcon(status: OrganizationStatus) {
 		switch (status) {
-			case 'ACTIVE':
+			case StaffStatusValues.ACTIVE:
 				return CheckCircle;
-			case 'SUSPENDED':
+			case StaffStatusValues.SUSPENDED:
 				return XCircle;
-			case 'INACTIVE':
+			case OrganizationStatusValues.INACTIVE:
 				return MinusCircle;
 			default:
 				return MinusCircle;
@@ -123,11 +143,11 @@
 
 	function getStatusIconClass(status: OrganizationStatus): string {
 		switch (status) {
-			case 'ACTIVE':
+			case StaffStatusValues.ACTIVE:
 				return 'text-success-500';
-			case 'SUSPENDED':
+			case StaffStatusValues.SUSPENDED:
 				return 'text-error-500';
-			case 'INACTIVE':
+			case OrganizationStatusValues.INACTIVE:
 				return 'text-surface-500';
 			default:
 				return 'text-surface-500';

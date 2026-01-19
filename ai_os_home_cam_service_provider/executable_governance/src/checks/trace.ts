@@ -85,6 +85,7 @@ function traceAuthorization(call: CallExpression, project: Project, projectRoot:
     if (args.length === 0) return { authorized: false, path: [] };
 
     const handlerFn = args[0];
+    if (!handlerFn) return { authorized: false, path: [] };
     const bodyText = handlerFn.getText();
 
     // 1. Direct check in handler

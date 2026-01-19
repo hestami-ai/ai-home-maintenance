@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ConciergeCaseStatusValues, JobStatusValues } from '$lib/api/cam';
 	import { Calendar, User, Home, Clock, AlertCircle } from 'lucide-svelte';
 	import CaseStatusBadge from './CaseStatusBadge.svelte';
 	import CasePriorityBadge from './CasePriorityBadge.svelte';
@@ -23,11 +24,11 @@
 
 	function getBlockingReason(): string | null {
 		switch (caseDetail.case.status) {
-			case 'PENDING_OWNER':
+			case ConciergeCaseStatusValues.PENDING_OWNER:
 				return 'Waiting for owner to respond to clarification request';
-			case 'PENDING_EXTERNAL':
+			case ConciergeCaseStatusValues.PENDING_EXTERNAL:
 				return 'Waiting for external party (HOA, vendor, etc.)';
-			case 'ON_HOLD':
+			case JobStatusValues.ON_HOLD:
 				return 'Case is on hold';
 			default:
 				return null;

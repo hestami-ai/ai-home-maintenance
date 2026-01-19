@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startCustomerWorkflow } from '../../../workflows/customerWorkflow.js';
+import { startCustomerWorkflow, CustomerAction } from '../../../workflows/customerWorkflow.js';
 
 const customerOutput = z.object({
 	id: z.string(),
@@ -122,7 +122,7 @@ export const customerRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startCustomerWorkflow(
 				{
-					action: 'CREATE',
+					action: CustomerAction.CREATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -323,7 +323,7 @@ export const customerRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startCustomerWorkflow(
 				{
-					action: 'UPDATE',
+					action: CustomerAction.UPDATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					customerId: id,
@@ -393,7 +393,7 @@ export const customerRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startCustomerWorkflow(
 				{
-					action: 'DELETE',
+					action: CustomerAction.DELETE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					customerId: input.id,

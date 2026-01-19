@@ -14,8 +14,11 @@ import {
 	IdempotencyKeySchema
 } from '../router.js';
 import { prisma } from '../../db.js';
+import type { VendorBid, VendorCandidate } from '../../../../../generated/prisma/client.js';
+import type { Decimal } from '@prisma/client/runtime/library';
 import { recordIntent, recordExecution } from '../middleware/activityEvent.js';
-import { startVendorBidWorkflow } from '../../workflows/index.js';
+import { startVendorBidWorkflow, VendorBidWorkflowAction } from '../../workflows/index.js';
+import { ActivityEntityType, ActivityActionType, BidStatus } from '../../../../../generated/prisma/enums.js';
 
 // =============================================================================
 // Schemas
@@ -62,11 +65,13 @@ const VendorBidListItemSchema = z.object({
 // Helper Functions
 // =============================================================================
 
-function serializeDecimal(d: any): string | null {
+function serializeDecimal(d: Decimal | null | undefined): string | null {
 	return d ? d.toString() : null;
 }
 
-function serializeVendorBid(bid: any) {
+type VendorBidWithCandidate = VendorBid & { vendorCandidate?: Pick<VendorCandidate, 'vendorName'> | null };
+
+function serializeVendorBid(bid: VendorBidWithCandidate) {
 	return {
 		id: bid.id,
 		vendorCandidateId: bid.vendorCandidateId,
@@ -82,7 +87,7 @@ function serializeVendorBid(bid: any) {
 		estimatedStartDate: bid.estimatedStartDate?.toISOString() ?? null,
 		estimatedDuration: bid.estimatedDuration,
 		estimatedEndDate: bid.estimatedEndDate?.toISOString() ?? null,
-		status: bid.status,
+		status: bid.status as 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED',
 		receivedAt: bid.receivedAt.toISOString(),
 		respondedAt: bid.respondedAt?.toISOString() ?? null,
 		notes: bid.notes,
@@ -91,14 +96,14 @@ function serializeVendorBid(bid: any) {
 	};
 }
 
-function serializeVendorBidListItem(bid: any) {
+function serializeVendorBidListItem(bid: VendorBidWithCandidate) {
 	return {
 		id: bid.id,
 		vendorCandidateId: bid.vendorCandidateId,
 		vendorName: bid.vendorCandidate?.vendorName || 'Unknown',
 		amount: serializeDecimal(bid.amount),
 		currency: bid.currency,
-		status: bid.status,
+		status: bid.status as 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED',
 		validUntil: bid.validUntil?.toISOString() ?? null,
 		estimatedDuration: bid.estimatedDuration,
 		receivedAt: bid.receivedAt.toISOString()
@@ -168,7 +173,7 @@ export const vendorBidRouter = {
 			// Create bid via workflow
 			const result = await startVendorBidWorkflow(
 				{
-					action: 'CREATE',
+					action: VendorBidWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -201,14 +206,14 @@ export const vendorBidRouter = {
 			});
 
 			await recordIntent(context, {
-				entityType: 'VENDOR_BID',
+				entityType: ActivityEntityType.VENDOR_BID,
 				entityId: result.bidId,
-				action: 'CREATE',
+				action: ActivityActionType.CREATE,
 				summary: `Bid received from ${vendorCandidate.vendorName}: ${input.amount ? `$${input.amount}` : 'Amount TBD'}`,
 				caseId: input.caseId,
 				newState: {
 					amount: input.amount,
-					status: 'PENDING'
+					status: BidStatus.PENDING
 				}
 			});
 
@@ -367,7 +372,7 @@ export const vendorBidRouter = {
 			// Update bid via workflow
 			const result = await startVendorBidWorkflow(
 				{
-					action: 'UPDATE',
+					action: VendorBidWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					bidId: input.id,
@@ -398,9 +403,9 @@ export const vendorBidRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'VENDOR_BID',
+				entityType: ActivityEntityType.VENDOR_BID,
 				entityId: bid.id,
-				action: 'UPDATE',
+				action: ActivityActionType.UPDATE,
 				summary: `Bid updated for ${existing.vendorCandidate?.vendorName}`,
 				caseId: existing.caseId
 			});
@@ -444,7 +449,7 @@ export const vendorBidRouter = {
 				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
-			if (existing.status !== 'PENDING') {
+			if (existing.status !== BidStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: `Cannot accept bid with status ${existing.status}` });
 			}
 
@@ -453,7 +458,7 @@ export const vendorBidRouter = {
 			// Accept bid via workflow
 			const result = await startVendorBidWorkflow(
 				{
-					action: 'ACCEPT',
+					action: VendorBidWorkflowAction.ACCEPT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					bidId: input.id,
@@ -476,13 +481,13 @@ export const vendorBidRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'VENDOR_BID',
+				entityType: ActivityEntityType.VENDOR_BID,
 				entityId: bid.id,
-				action: 'APPROVE',
+				action: ActivityActionType.APPROVE,
 				summary: `Bid accepted from ${existing.vendorCandidate?.vendorName}${input.reason ? `: ${input.reason}` : ''}`,
 				caseId: existing.caseId,
 				previousState: { status: existing.status },
-				newState: { status: 'ACCEPTED' }
+				newState: { status: BidStatus.ACCEPTED }
 			});
 
 			return successResponse({ bid: serializeVendorBid(bid) }, context);
@@ -524,7 +529,7 @@ export const vendorBidRouter = {
 				throw errors.NOT_FOUND({ message: 'VendorBid' });
 			}
 
-			if (existing.status !== 'PENDING') {
+			if (existing.status !== BidStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: `Cannot reject bid with status ${existing.status}` });
 			}
 
@@ -533,7 +538,7 @@ export const vendorBidRouter = {
 			// Reject bid via workflow
 			const result = await startVendorBidWorkflow(
 				{
-					action: 'REJECT',
+					action: VendorBidWorkflowAction.REJECT,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					bidId: input.id,
@@ -557,13 +562,13 @@ export const vendorBidRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'VENDOR_BID',
+				entityType: ActivityEntityType.VENDOR_BID,
 				entityId: bid.id,
-				action: 'DENY',
+				action: ActivityActionType.DENY,
 				summary: `Bid rejected from ${existing.vendorCandidate?.vendorName}${input.reason ? `: ${input.reason}` : ''}`,
 				caseId: existing.caseId,
 				previousState: { status: existing.status },
-				newState: { status: 'REJECTED' }
+				newState: { status: BidStatus.REJECTED }
 			});
 
 			return successResponse({ bid: serializeVendorBid(bid) }, context);

@@ -4,7 +4,7 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startVendorWorkflow } from '../../../workflows/index.js';
+import { startVendorWorkflow, VendorWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('VendorRoute');
 
@@ -78,7 +78,7 @@ export const vendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startVendorWorkflow(
 				{
-					action: 'CREATE',
+					action: VendorWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -340,7 +340,7 @@ export const vendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startVendorWorkflow(
 				{
-					action: 'UPDATE',
+					action: VendorWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -430,7 +430,7 @@ export const vendorRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startVendorWorkflow(
 				{
-					action: 'DELETE',
+					action: VendorWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,

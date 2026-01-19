@@ -259,6 +259,7 @@ Policies in `cerbos/policies/resource/`. Derived roles in `cerbos/policies/deriv
 11. Create Cerbos policies (if new resources)  
 12. Run `bun run check` (must pass)
 
+(bunx prisma generate && bun run openapi:generate && bun run types:generate)
 ---
 
 ## **Common Pitfalls**

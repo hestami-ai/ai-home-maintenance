@@ -345,7 +345,7 @@ function isInlineRouteHandlerCall(call: CallExpression, sourceFile: any): boolea
                     const name = varDecl?.getName();
 
                     // Common SvelteKit handler names
-                    if (name && ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'load'].includes(name)) {
+                    if (name && ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'load'].includes(name) && varDecl) {
                         // Check if it's exported
                         const varStatement = varDecl.getParent()?.getParent();
                         if (varStatement && varStatement.getKind() === SyntaxKind.VariableStatement) {

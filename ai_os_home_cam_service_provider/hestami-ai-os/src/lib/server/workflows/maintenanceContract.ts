@@ -12,6 +12,28 @@ import type { ServiceContractStatus, RecurrenceFrequency } from '../../../../gen
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	RecurrenceFrequency as RecurrenceFrequencyEnum,
+	ServiceContractStatus as ServiceContractStatusEnum,
+	ScheduledVisitStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Action types for maintenance contract operations
+const MaintenanceContractAction = {
+	GENERATE_VISITS: 'GENERATE_VISITS',
+	PROCESS_RENEWAL: 'PROCESS_RENEWAL',
+	CALCULATE_SLA: 'CALCULATE_SLA',
+	CHECK_EXPIRATION: 'CHECK_EXPIRATION'
+} as const;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	MAINTENANCE_CONTRACT_WORKFLOW_ERROR: 'MAINTENANCE_CONTRACT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'contract_status';
 const WORKFLOW_ERROR_EVENT = 'contract_error';
@@ -46,10 +68,10 @@ function calculateNextVisitDate(
 	const next = new Date(fromDate);
 
 	switch (frequency) {
-		case 'DAILY':
+		case RecurrenceFrequencyEnum.DAILY:
 			next.setDate(next.getDate() + 1);
 			break;
-		case 'WEEKLY':
+		case RecurrenceFrequencyEnum.WEEKLY:
 			next.setDate(next.getDate() + 7);
 			if (preferredDayOfWeek !== null && preferredDayOfWeek !== undefined) {
 				const currentDay = next.getDay();
@@ -57,22 +79,22 @@ function calculateNextVisitDate(
 				next.setDate(next.getDate() + daysUntil);
 			}
 			break;
-		case 'BIWEEKLY':
+		case RecurrenceFrequencyEnum.BIWEEKLY:
 			next.setDate(next.getDate() + 14);
 			break;
-		case 'MONTHLY':
+		case RecurrenceFrequencyEnum.MONTHLY:
 			next.setMonth(next.getMonth() + 1);
 			if (preferredDayOfMonth !== null && preferredDayOfMonth !== undefined) {
 				next.setDate(Math.min(preferredDayOfMonth, new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()));
 			}
 			break;
-		case 'QUARTERLY':
+		case RecurrenceFrequencyEnum.QUARTERLY:
 			next.setMonth(next.getMonth() + 3);
 			break;
-		case 'SEMI_ANNUAL':
+		case RecurrenceFrequencyEnum.SEMI_ANNUAL:
 			next.setMonth(next.getMonth() + 6);
 			break;
-		case 'ANNUAL':
+		case RecurrenceFrequencyEnum.ANNUAL:
 			next.setFullYear(next.getFullYear() + 1);
 			break;
 	}
@@ -158,7 +180,7 @@ async function processContractRenewal(
 		where: { id: contractId }
 	});
 
-	if (!contract || !['ACTIVE', 'EXPIRED'].includes(contract.status)) {
+	if (!contract || !([ServiceContractStatusEnum.ACTIVE, ServiceContractStatusEnum.EXPIRED] as ServiceContractStatus[]).includes(contract.status)) {
 		return false;
 	}
 
@@ -189,7 +211,7 @@ async function processContractRenewal(
 		await tx.serviceContract.update({
 			where: { id: contractId },
 			data: {
-				status: 'ACTIVE',
+				status: ServiceContractStatusEnum.ACTIVE,
 				endDate: newEndDate,
 				contractValue: newValue
 			}
@@ -219,7 +241,7 @@ async function calculateSLAScore(
 	}
 
 	const completedOnTime = visits.filter(v => {
-		if (v.status !== 'COMPLETED') return false;
+		if (v.status !== ScheduledVisitStatus.COMPLETED) return false;
 		if (!v.completedAt) return false;
 		// Consider on-time if completed within 24 hours of scheduled date
 		const scheduledEnd = v.scheduledEnd ?? v.scheduledDate;
@@ -247,14 +269,14 @@ async function calculateSLAScore(
 				periodStart,
 				periodEnd,
 				scheduledVisits: visits.length,
-				completedVisits: visits.filter(v => v.status === 'COMPLETED').length,
-				missedVisits: visits.filter(v => v.status === 'MISSED').length,
+				completedVisits: visits.filter(v => v.status === ScheduledVisitStatus.COMPLETED).length,
+				missedVisits: visits.filter(v => v.status === ScheduledVisitStatus.MISSED).length,
 				visitCompliancePercent: score
 			},
 			update: {
 				scheduledVisits: visits.length,
-				completedVisits: visits.filter(v => v.status === 'COMPLETED').length,
-				missedVisits: visits.filter(v => v.status === 'MISSED').length,
+				completedVisits: visits.filter(v => v.status === ScheduledVisitStatus.COMPLETED).length,
+				missedVisits: visits.filter(v => v.status === ScheduledVisitStatus.MISSED).length,
 				visitCompliancePercent: score
 			}
 		});
@@ -280,12 +302,12 @@ async function checkContractExpiration(
 	const now = new Date();
 	const daysUntilExpiration = Math.ceil((contract.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-	if (daysUntilExpiration <= 0 && contract.status === 'ACTIVE') {
+	if (daysUntilExpiration <= 0 && contract.status === ServiceContractStatusEnum.ACTIVE) {
 		// Mark as expired
 		await orgTransaction(organizationId, async (tx) => {
 			await tx.serviceContract.update({
 				where: { id: contractId },
-				data: { status: 'EXPIRED' }
+				data: { status: ServiceContractStatusEnum.EXPIRED }
 			});
 		}, { userId, reason: 'Mark contract as expired' });
 		return { expired: true, daysUntilExpiration };
@@ -331,15 +353,15 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 
 				await recordWorkflowEvent({
 					organizationId: contract.organizationId,
-					entityType: 'JOB',
+					entityType: ActivityEntityType.JOB,
 					entityId: input.contractId,
-					action: 'CREATE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: `Generated ${visitsGenerated} visits for contract`,
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'maintenanceContract_v1',
-					workflowStep: 'GENERATE_VISITS',
+					workflowStep: MaintenanceContractAction.GENERATE_VISITS,
 					workflowVersion: 'v1'
 				});
 
@@ -376,15 +398,15 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 				if (renewed) {
 					await recordWorkflowEvent({
 						organizationId: contract.organizationId,
-						entityType: 'JOB',
+						entityType: ActivityEntityType.JOB,
 						entityId: input.contractId,
-						action: 'UPDATE', // RENEWAL is an update to contract status
-						eventCategory: 'EXECUTION',
+						action: ActivityActionType.UPDATE, // RENEWAL is an update to contract status
+						eventCategory: ActivityEventCategory.EXECUTION,
 						summary: 'Contract renewed',
 						performedById: input.userId,
-						performedByType: 'HUMAN',
+						performedByType: ActivityActorType.HUMAN,
 						workflowId: 'maintenanceContract_v1',
-						workflowStep: 'PROCESS_RENEWAL',
+						workflowStep: MaintenanceContractAction.PROCESS_RENEWAL,
 						workflowVersion: 'v1'
 					});
 				}
@@ -458,8 +480,8 @@ async function maintenanceContractWorkflow(input: ContractWorkflowInput): Promis
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'MAINTENANCE_CONTRACT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.MAINTENANCE_CONTRACT_WORKFLOW_ERROR
 		});
 
 		const errorResult = {

@@ -17,8 +17,15 @@
 
     let { data } = $props();
 
-    // Data from layout
-	let associations = $derived(data.associations as Association[]);
+    // Use $state with $effect to avoid proxy errors during navigation
+	let associations = $state<Association[]>([]);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			associations = (data.associations ?? []) as Association[];
+		}
+	});
 	
 	let selectedAssociation = $state<Association | null>(null);
 	let isLoading = $state(false);

@@ -10,6 +10,18 @@ import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, JobStatus } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	DISPATCH_ASSIGNMENT_WORKFLOW_ERROR: 'DISPATCH_ASSIGNMENT_WORKFLOW_ERROR'
+} as const;
+
+// Conflict types for scheduling
+const ConflictType = {
+	SCHEDULE: 'SCHEDULE',
+	TIME_OFF: 'TIME_OFF'
+} as const;
 
 const log = createWorkflowLogger('DispatchAssignmentWorkflow');
 
@@ -100,7 +112,7 @@ async function checkScheduleConflicts(
 	const overlappingJobs = await prisma.job.findMany({
 		where: {
 			assignedTechnicianId: technicianId,
-			status: { in: ['SCHEDULED', 'IN_PROGRESS'] },
+			status: { in: [JobStatus.SCHEDULED, JobStatus.IN_PROGRESS] },
 			OR: [
 				{
 					scheduledStart: { lte: scheduledEnd },
@@ -113,7 +125,7 @@ async function checkScheduleConflicts(
 
 	for (const job of overlappingJobs) {
 		conflicts.push({
-			type: 'SCHEDULE',
+			type: ConflictType.SCHEDULE,
 			description: `Overlaps with job ${job.jobNumber}`,
 			conflictingJobId: job.id
 		});
@@ -130,7 +142,7 @@ async function checkScheduleConflicts(
 
 	if (timeOff) {
 		conflicts.push({
-			type: 'TIME_OFF',
+			type: ConflictType.TIME_OFF,
 			description: `Technician has approved time off during this period`
 		});
 	}
@@ -150,7 +162,7 @@ async function calculateRouting(
 	const previousJob = await prisma.job.findFirst({
 		where: {
 			assignedTechnicianId: technicianId,
-			status: { in: ['COMPLETED', 'SCHEDULED'] },
+			status: { in: [JobStatus.COMPLETED, JobStatus.SCHEDULED] },
 			scheduledEnd: scheduledStart ? { lt: scheduledStart } : undefined
 		},
 		orderBy: { scheduledEnd: 'desc' },
@@ -173,7 +185,7 @@ async function assignTechnicianToJob(
 			where: { id: input.jobId },
 			data: {
 				assignedTechnicianId: input.technicianId,
-				status: 'SCHEDULED',
+				status: JobStatus.SCHEDULED,
 				scheduledStart: input.scheduledStart,
 				scheduledEnd: input.scheduledEnd
 			}
@@ -291,8 +303,8 @@ async function dispatchAssignmentWorkflow(input: DispatchAssignmentInput): Promi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'DISPATCH_ASSIGNMENT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.DISPATCH_ASSIGNMENT_WORKFLOW_ERROR
 		});
 
 		return {

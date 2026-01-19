@@ -12,6 +12,7 @@ import {
 	logRequestError
 } from '$server/api/middleware/logging';
 import { recordSpanError, enrichSpanWithRPC, enrichSpanWithRequestId } from '$server/api/middleware/tracing';
+import { StaffStatus, OrganizationType } from '../../../../../../generated/prisma/enums.js';
 
 /**
  * oRPC handler for /api/v1/rpc/*
@@ -115,7 +116,7 @@ async function createContext(
 
 		// Set staff roles and pillar access if user is active Hestami staff
 		// For non-staff users (e.g., Concierge homeowners), staffRows is empty and this is skipped
-		const staffProfile = staffRows.find((s) => s.status === 'ACTIVE');
+		const staffProfile = staffRows.find((s) => s.status === StaffStatus.ACTIVE);
 		if (staffProfile) {
 			context.staffRoles = staffProfile.roles as any[];
 			context.pillarAccess = staffProfile.pillar_access as any[];
@@ -161,8 +162,8 @@ async function createContext(
 		if (context.organization) {
 			const currentMembership = membershipRows.find((m) => m.organization_id === context.organization!.id);
 			if (currentMembership) {
-				context.isStaff = currentMembership.org_type === 'PLATFORM_OPERATOR' ||
-					currentMembership.org_type === 'MANAGEMENT_COMPANY';
+				context.isStaff = currentMembership.org_type === OrganizationType.PLATFORM_OPERATOR ||
+					currentMembership.org_type === OrganizationType.MANAGEMENT_COMPANY;
 			}
 		}
 	}

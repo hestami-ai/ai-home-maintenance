@@ -13,7 +13,7 @@
 		Filter
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { jobApi, type Job, type JobStatus } from '$lib/api/cam';
+	import { jobApi, type Job, type JobStatus, JobStatusValues, WorkOrderPriorityValues } from '$lib/api/cam';
 
 	interface Props {
 		data: {
@@ -29,6 +29,7 @@
 
 	// Synchronize server jobs to local state
 	$effect(() => {
+		if (!data) return;
 		if (data.jobs) {
 			jobs = [...data.jobs];
 		}
@@ -111,11 +112,11 @@
 
 	// Filter jobs
 	const scheduledJobs = $derived(
-		jobs.filter(j => j.scheduledStart && ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS'].includes(j.status))
+		jobs.filter(j => j.scheduledStart && ([JobStatusValues.SCHEDULED, JobStatusValues.DISPATCHED, JobStatusValues.IN_PROGRESS] as string[]).includes(j.status))
 	);
 
 	const unscheduledJobs = $derived(
-		jobs.filter(j => !j.scheduledStart && ['JOB_CREATED', 'ESTIMATE_APPROVED'].includes(j.status))
+		jobs.filter(j => !j.scheduledStart && ([JobStatusValues.JOB_CREATED, JobStatusValues.ESTIMATE_APPROVED] as string[]).includes(j.status))
 	);
 
 	// Get jobs for a specific date
@@ -138,8 +139,8 @@
 	}
 
 	function getPriorityIndicator(priority: string): string {
-		if (priority === 'EMERGENCY') return '🔴';
-		if (priority === 'HIGH') return '🟠';
+		if (priority === WorkOrderPriorityValues.EMERGENCY) return '🔴';
+		if (priority === WorkOrderPriorityValues.HIGH) return '🟠';
 		return '';
 	}
 
@@ -154,7 +155,7 @@
 		try {
 			const response = await jobApi.transitionStatus({
 				id: jobId,
-				toStatus: 'DISPATCHED',
+				toStatus: JobStatusValues.DISPATCHED,
 				idempotencyKey: crypto.randomUUID()
 			});
 			if (response.ok) {
@@ -313,7 +314,7 @@
 												<div>
 													<div class="flex items-center gap-2">
 														<span class="font-medium">{job.title}</span>
-														{#if job.priority === 'EMERGENCY' || job.priority === 'HIGH'}
+														{#if job.priority === WorkOrderPriorityValues.EMERGENCY || job.priority === WorkOrderPriorityValues.HIGH}
 															<span class="badge preset-filled-error-500 text-xs">{job.priority}</span>
 														{/if}
 													</div>
@@ -336,7 +337,7 @@
 												</div>
 											</div>
 											<div class="flex gap-2">
-												{#if job.status === 'SCHEDULED' && job.assignedTechnicianId}
+												{#if job.status === JobStatusValues.SCHEDULED && job.assignedTechnicianId}
 													<button
 														onclick={() => dispatchJob(job.id)}
 														class="btn btn-sm preset-filled-primary-500"
@@ -380,9 +381,9 @@
 									class="block p-3 hover:bg-surface-200-800 transition-colors"
 								>
 									<div class="flex items-start gap-2">
-										{#if job.priority === 'EMERGENCY'}
+										{#if job.priority === WorkOrderPriorityValues.EMERGENCY}
 											<AlertTriangle class="h-4 w-4 text-error-500 flex-shrink-0 mt-0.5" />
-										{:else if job.priority === 'HIGH'}
+										{:else if job.priority === WorkOrderPriorityValues.HIGH}
 											<AlertTriangle class="h-4 w-4 text-warning-500 flex-shrink-0 mt-0.5" />
 										{/if}
 										<div class="min-w-0 flex-1">

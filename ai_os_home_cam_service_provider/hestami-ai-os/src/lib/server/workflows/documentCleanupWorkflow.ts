@@ -13,6 +13,12 @@ import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } 
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+    CLEANUP_WORKFLOW_ERROR: 'CLEANUP_WORKFLOW_ERROR'
+} as const;
 
 const s3 = new S3Client({
     region: process.env.S3_REGION || 'us-east-1',
@@ -123,8 +129,8 @@ async function cleanupInfectedFiles(scheduledTime: Date, actualTime: Date): Prom
         const errorMessage = error instanceof Error ? error.message : String(error);
         log.error(`Cleanup workflow failed: ${errorMessage}`);
         await recordSpanError(error instanceof Error ? error : new Error(errorMessage), {
-            errorCode: 'WORKFLOW_FAILED',
-            errorType: 'CLEANUP_WORKFLOW_ERROR'
+            errorCode: ActivityActionType.WORKFLOW_FAILED,
+            errorType: WorkflowErrorType.CLEANUP_WORKFLOW_ERROR
         });
     }
 }

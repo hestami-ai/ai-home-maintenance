@@ -1,6 +1,7 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
+import { DocumentContextType, ActivityEntityType } from '../../../../../../generated/prisma/enums.js';
 
 export const load: PageServerLoad = async ({ params, parent, locals }) => {
     // Get organization and memberships from parent layout (fetched via SECURITY DEFINER)
@@ -25,11 +26,11 @@ export const load: PageServerLoad = async ({ params, parent, locals }) => {
         const [associationRes, documentsRes, historyRes] = await Promise.all([
             client.association.get({ id: associationId }),
             client.document.listDocuments({
-                contextType: 'ASSOCIATION',
+                contextType: DocumentContextType.ASSOCIATION,
                 contextId: associationId
             }),
             client.activityEvent.getByEntity({
-                entityType: 'ASSOCIATION',
+                entityType: ActivityEntityType.ASSOCIATION,
                 entityId: associationId,
                 limit: 10
             })

@@ -1,7 +1,7 @@
 import { Project, SyntaxKind, type CallExpression } from 'ts-morph';
 import { type Config, getAbsolutePath } from '../config/index.js';
 import type { Violation } from '../reporting/index.ts';
-import path from 'path';
+import path from 'node:path';
 
 /**
  * R6: Error contract (type-safe errors only)
@@ -15,11 +15,11 @@ export async function verifyErrors(config: Config): Promise<Violation[]> {
 
     // Scan all TypeScript files - don't rely on directory conventions
     // Code patterns (isOrpcHandler) determine what gets checked
-    const globPath = path.join(projectRoot, 'src/**/*.ts').replace(/\\/g, '/');
+    const globPath = path.join(projectRoot, 'src/**/*.ts').replaceAll('\\', '/');
     const files = project.addSourceFilesAtPaths(globPath);
 
     for (const file of files) {
-        const relativePath = path.relative(projectRoot, file.getFilePath()).replace(/\\/g, '/');
+        const relativePath = path.relative(projectRoot, file.getFilePath()).replaceAll('\\', '/');
 
         // Skip generated files
         if (relativePath.includes('/generated/') || relativePath.includes('.generated.')) continue;
@@ -27,7 +27,10 @@ export async function verifyErrors(config: Config): Promise<Violation[]> {
         const calls = file.getDescendantsOfKind(SyntaxKind.CallExpression);
         for (const call of calls) {
             if (isOrpcHandler(call)) {
-                if (!hasErrorsCall(call)) {
+                if (hasErrorsCall(call)) {
+                    // Check for raw throws inside the handler
+                    checkRawThrows(call, relativePath, violations);
+                } else {
                     violations.push({
                         rule: 'R6',
                         file: relativePath,
@@ -35,9 +38,6 @@ export async function verifyErrors(config: Config): Promise<Violation[]> {
                         suggestion: 'Add .errors({...}) before .handler() to enable type-safe error handling and proper observability (non-500 errors).',
                         line: call.getStartLineNumber()
                     });
-                } else {
-                    // Check for raw throws inside the handler
-                    checkRawThrows(call, relativePath, violations);
                 }
             }
         }
@@ -83,6 +83,7 @@ function checkRawThrows(call: CallExpression, relativePath: string, violations: 
     if (args.length === 0) return;
 
     const handlerFn = args[0];
+    if (!handlerFn) return;
     const throws = handlerFn.getDescendantsOfKind(SyntaxKind.ThrowStatement);
     for (const t of throws) {
         const expr = t.getExpression();

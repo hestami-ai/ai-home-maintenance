@@ -5,7 +5,8 @@ import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 import { JournalEntryStatusSchema } from '../../schemas.js';
-import { startJournalEntryWorkflow } from '../../../workflows/index.js';
+import { JournalEntryStatus } from '../../../../../../generated/prisma/enums.js';
+import { startJournalEntryWorkflow, JournalEntryWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('JournalEntryRoute');
 
@@ -113,7 +114,7 @@ export const journalEntryRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startJournalEntryWorkflow(
 				{
-					action: 'CREATE',
+					action: JournalEntryWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -356,14 +357,14 @@ export const journalEntryRouter = {
 				throw errors.NOT_FOUND({ message: 'Journal Entry not found' });
 			}
 
-			if (entry.status !== 'DRAFT' && entry.status !== 'PENDING_APPROVAL') {
+			if (entry.status !== JournalEntryStatus.DRAFT && entry.status !== JournalEntryStatus.PENDING_APPROVAL) {
 				throw errors.CONFLICT({ message: `Cannot post entry with status: ${entry.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startJournalEntryWorkflow(
 				{
-					action: 'POST',
+					action: JournalEntryWorkflowAction.POST,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entryId: input.id
@@ -435,7 +436,7 @@ export const journalEntryRouter = {
 				throw errors.NOT_FOUND({ message: 'Journal Entry not found' });
 			}
 
-			if (entry.status !== 'POSTED') {
+			if (entry.status !== JournalEntryStatus.POSTED) {
 				throw errors.CONFLICT({ message: 'Can only reverse posted entries' });
 			}
 
@@ -450,7 +451,7 @@ export const journalEntryRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startJournalEntryWorkflow(
 				{
-					action: 'REVERSE',
+					action: JournalEntryWorkflowAction.REVERSE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,

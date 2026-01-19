@@ -11,7 +11,13 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
-import type { Prisma, OrganizationType, OrganizationStatus } from '../../../../generated/prisma/client.js';
+import type { Prisma } from '../../../../generated/prisma/client.js';
+import { ActivityActionType, ServiceProviderTeamMemberStatus, ServiceProviderRole, OrganizationType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ORGANIZATION_WORKFLOW_ERROR: 'ORGANIZATION_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('OrganizationWorkflow');
 
@@ -95,6 +101,41 @@ async function createOrganizationWithAdmin(
 		type: orgResult.type,
 		status: orgResult.status
 	};
+}
+
+/**
+ * Create the organization admin as an OWNER team member for SERVICE_PROVIDER orgs.
+ * This is called automatically when a SERVICE_PROVIDER org is created.
+ */
+async function createOwnerTeamMember(
+	organizationId: string,
+	userId: string
+): Promise<{ teamMemberId: string }> {
+	// Get user info for display name
+	const user = await prisma.user.findUniqueOrThrow({
+		where: { id: userId },
+		select: { name: true, email: true }
+	});
+
+	// Create the team member with OWNER and ADMIN roles, already ACTIVE
+	const teamMember = await prisma.serviceProviderTeamMember.create({
+		data: {
+			organizationId,
+			userId,
+			displayName: user.name || user.email.split('@')[0],
+			status: ServiceProviderTeamMemberStatus.ACTIVE,
+			roles: [ServiceProviderRole.OWNER, ServiceProviderRole.ADMIN],
+			activatedAt: new Date()
+		}
+	});
+
+	log.info('Created OWNER team member for SERVICE_PROVIDER org', {
+		organizationId,
+		userId,
+		teamMemberId: teamMember.id
+	});
+
+	return { teamMemberId: teamMember.id };
 }
 
 async function createAssociation(
@@ -191,7 +232,7 @@ async function setDefaultOrganization(
 async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<OrganizationWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE_WITH_ADMIN': {
+			case OrganizationWorkflowAction.CREATE_WITH_ADMIN: {
 				const result = await DBOS.runStep(
 					() => createOrganizationWithAdmin(
 						input.userId,
@@ -201,6 +242,15 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 					),
 					{ name: 'createOrganizationWithAdmin' }
 				);
+
+				// For SERVICE_PROVIDER orgs, auto-create the admin as an OWNER team member
+				if (result.type === OrganizationType.SERVICE_PROVIDER) {
+					await DBOS.runStep(
+						() => createOwnerTeamMember(result.id, input.userId),
+						{ name: 'createOwnerTeamMember' }
+					);
+				}
+
 				return {
 					success: true,
 					entityId: result.id,
@@ -210,7 +260,7 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 				};
 			}
 
-			case 'CREATE_ASSOCIATION': {
+			case OrganizationWorkflowAction.CREATE_ASSOCIATION: {
 				const result = await DBOS.runStep(
 					() => createAssociation(
 						input.organizationId!,
@@ -227,7 +277,7 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 				};
 			}
 
-			case 'UPDATE': {
+			case OrganizationWorkflowAction.UPDATE: {
 				const result = await DBOS.runStep(
 					() => updateOrganization(input.organizationId!, input.userId, input.data),
 					{ name: 'updateOrganization' }
@@ -241,7 +291,7 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 				};
 			}
 
-			case 'DELETE': {
+			case OrganizationWorkflowAction.DELETE: {
 				const result = await DBOS.runStep(
 					() => deleteOrganization(input.organizationId!, input.userId),
 					{ name: 'deleteOrganization' }
@@ -252,7 +302,7 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 				};
 			}
 
-			case 'SET_DEFAULT': {
+			case OrganizationWorkflowAction.SET_DEFAULT: {
 				await DBOS.runStep(
 					() => setDefaultOrganization(input.userId, input.data.membershipId!),
 					{ name: 'setDefaultOrganization' }
@@ -269,8 +319,8 @@ async function organizationWorkflow(input: OrganizationWorkflowInput): Promise<O
 		console.error(`[OrganizationWorkflow] Error in ${input.action}:`, errorMessage);
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ORGANIZATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ORGANIZATION_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

@@ -11,6 +11,23 @@ import type { ContractorTradeType, PricebookItemType } from '../../../../generat
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Action types for work order line item operations
+const WorkOrderLineItemAction = {
+	ADD_LINE_ITEM: 'ADD_LINE_ITEM',
+	REMOVE_LINE_ITEM: 'REMOVE_LINE_ITEM'
+} as const;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	WO_LINE_ITEM_WORKFLOW_ERROR: 'WO_LINE_ITEM_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('WorkOrderLineItemWorkflow');
 
@@ -121,15 +138,15 @@ async function addLineItem(input: AddLineItemInput): Promise<{
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: input.workOrderId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Line item added: ${itemName || 'Custom item'}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderLineItemWorkflow_v1',
-		workflowStep: 'ADD_LINE_ITEM',
+		workflowStep: WorkOrderLineItemAction.ADD_LINE_ITEM,
 		workflowVersion: 'v1',
 		workOrderId: input.workOrderId,
 		newState: {
@@ -174,15 +191,15 @@ async function removeLineItem(input: RemoveLineItemInput): Promise<void> {
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'WORK_ORDER',
+		entityType: ActivityEntityType.WORK_ORDER,
 		entityId: input.workOrderId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Line item removed: ${lineItemInfo.itemName || 'Custom item'}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'workOrderLineItemWorkflow_v1',
-		workflowStep: 'REMOVE_LINE_ITEM',
+		workflowStep: WorkOrderLineItemAction.REMOVE_LINE_ITEM,
 		workflowVersion: 'v1',
 		workOrderId: input.workOrderId,
 		previousState: {
@@ -218,8 +235,8 @@ async function addLineItemWorkflow(input: AddLineItemInput): Promise<LineItemRes
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'WO_LINE_ITEM_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.WO_LINE_ITEM_WORKFLOW_ERROR
 		});
 
 		return {
@@ -253,8 +270,8 @@ async function removeLineItemWorkflow(input: RemoveLineItemInput): Promise<LineI
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'WO_LINE_ITEM_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.WO_LINE_ITEM_WORKFLOW_ERROR
 		});
 
 		return {

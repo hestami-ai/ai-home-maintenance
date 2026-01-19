@@ -10,18 +10,18 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { DispatchStatus, SLAPriority } from '../../../../../../generated/prisma/client.js';
-import { startDispatchWorkflow } from '../../../workflows/dispatchWorkflow.js';
+import { startDispatchWorkflow, DispatchAction } from '../../../workflows/dispatchWorkflow.js';
 
 // Valid dispatch status transitions
 const DISPATCH_TRANSITIONS: Record<DispatchStatus, DispatchStatus[]> = {
-	PENDING: ['ASSIGNED', 'CANCELLED'],
-	ASSIGNED: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
-	ACCEPTED: ['EN_ROUTE', 'CANCELLED'],
-	DECLINED: ['ASSIGNED'], // Can be reassigned
-	EN_ROUTE: ['ON_SITE', 'CANCELLED'],
-	ON_SITE: ['COMPLETED', 'CANCELLED'],
-	COMPLETED: [],
-	CANCELLED: []
+	[DispatchStatus.PENDING]: [DispatchStatus.ASSIGNED, DispatchStatus.CANCELLED],
+	[DispatchStatus.ASSIGNED]: [DispatchStatus.ACCEPTED, DispatchStatus.DECLINED, DispatchStatus.CANCELLED],
+	[DispatchStatus.ACCEPTED]: [DispatchStatus.EN_ROUTE, DispatchStatus.CANCELLED],
+	[DispatchStatus.DECLINED]: [DispatchStatus.ASSIGNED], // Can be reassigned
+	[DispatchStatus.EN_ROUTE]: [DispatchStatus.ON_SITE, DispatchStatus.CANCELLED],
+	[DispatchStatus.ON_SITE]: [DispatchStatus.COMPLETED, DispatchStatus.CANCELLED],
+	[DispatchStatus.COMPLETED]: [],
+	[DispatchStatus.CANCELLED]: []
 };
 
 const dispatchAssignmentOutput = z.object({
@@ -304,7 +304,7 @@ export const dispatchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDispatchWorkflow(
 				{
-					action: 'CREATE_ASSIGNMENT',
+					action: DispatchAction.CREATE_ASSIGNMENT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -368,7 +368,7 @@ export const dispatchRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Dispatch assignment not found' });
 
-			if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
+			if (existing.status === DispatchStatus.COMPLETED || existing.status === DispatchStatus.CANCELLED) {
 				throw errors.BAD_REQUEST({ message: `Cannot reassign ${existing.status} dispatch` });
 			}
 
@@ -393,7 +393,7 @@ export const dispatchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDispatchWorkflow(
 				{
-					action: 'REASSIGN',
+					action: DispatchAction.REASSIGN,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					assignmentId: input.assignmentId,
@@ -468,7 +468,7 @@ export const dispatchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDispatchWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: DispatchAction.UPDATE_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					assignmentId: input.assignmentId,
@@ -683,7 +683,7 @@ export const dispatchRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Dispatch assignment not found' });
 
-			if (['COMPLETED', 'CANCELLED', 'ON_SITE'].includes(existing.status)) {
+			if (existing.status === DispatchStatus.COMPLETED || existing.status === DispatchStatus.CANCELLED || existing.status === DispatchStatus.ON_SITE) {
 				throw errors.BAD_REQUEST({ message: `Cannot reschedule ${existing.status} dispatch` });
 			}
 
@@ -703,7 +703,7 @@ export const dispatchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDispatchWorkflow(
 				{
-					action: 'RESCHEDULE',
+					action: DispatchAction.RESCHEDULE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					assignmentId: input.assignmentId,
@@ -774,7 +774,7 @@ export const dispatchRouter = {
 			if (!routePlan) {
 				const result = await startDispatchWorkflow(
 					{
-						action: 'CREATE_ROUTE_PLAN',
+						action: DispatchAction.CREATE_ROUTE_PLAN,
 						organizationId: context.organization!.id,
 						userId: context.user!.id,
 						data: {
@@ -857,7 +857,7 @@ export const dispatchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDispatchWorkflow(
 				{
-					action: 'OPTIMIZE_ROUTE',
+					action: DispatchAction.OPTIMIZE_ROUTE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					technicianId: input.technicianId,

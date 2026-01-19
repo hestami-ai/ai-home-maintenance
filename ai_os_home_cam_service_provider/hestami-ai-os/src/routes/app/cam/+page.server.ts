@@ -1,5 +1,6 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import type { PageServerLoad } from './$types';
+import { MeetingStatus } from '../../../../generated/prisma/enums.js';
 
 export const load: PageServerLoad = async ({ parent, locals }) => {
 	// Get organization, memberships, and staff from parent layout (fetched via SECURITY DEFINER)
@@ -34,7 +35,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 			client.reportDefinition.list({}),
 
 			// Fetch scheduled meetings
-			client.governanceMeeting.list({ status: 'SCHEDULED' })
+			client.governanceMeeting.list({ status: MeetingStatus.SCHEDULED })
 		]);
 
 		let dashboardData = null;

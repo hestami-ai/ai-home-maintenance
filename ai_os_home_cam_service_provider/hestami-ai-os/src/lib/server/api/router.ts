@@ -15,7 +15,8 @@ import {
 	type CerbosResourceAttr,
 	type QueryPlanResult
 } from '../cerbos/index.js';
-import type { User, Organization, UserRole } from '../../../../generated/prisma/client.js';
+import type { User, Organization } from '../../../../generated/prisma/client.js';
+import { UserRole } from '../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../logger.js';
 import { withRLSContext } from '../db.js';
 
@@ -265,7 +266,7 @@ export const orgProcedure = authedProcedure
  * Admin procedure - requires ADMIN role in org
  */
 export const adminProcedure = orgProcedure.use(async ({ context, next, errors }) => {
-	if (context.role !== 'ADMIN') {
+	if (context.role !== UserRole.ADMIN) {
 		throw errors.FORBIDDEN({ message: 'Admin access required' });
 	}
 	return next({ context });

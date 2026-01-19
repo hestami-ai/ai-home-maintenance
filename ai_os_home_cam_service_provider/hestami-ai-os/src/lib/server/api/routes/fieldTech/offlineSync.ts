@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startOfflineSyncWorkflow } from '../../../workflows/offlineSyncWorkflow.js';
+import { startOfflineSyncWorkflow, OfflineSyncAction } from '../../../workflows/offlineSyncWorkflow.js';
 
 const syncQueueItemOutput = z.object({
 	id: z.string(),
@@ -88,7 +88,7 @@ export const offlineSyncRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
 				{
-					action: 'QUEUE_ITEM',
+					action: OfflineSyncAction.QUEUE_ITEM,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -160,7 +160,7 @@ export const offlineSyncRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
 				{
-					action: 'BATCH_QUEUE',
+					action: OfflineSyncAction.BATCH_QUEUE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -284,7 +284,7 @@ export const offlineSyncRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
 				{
-					action: 'MARK_SYNCED',
+					action: OfflineSyncAction.MARK_SYNCED,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					queueItemId: input.queueItemId,
@@ -339,7 +339,7 @@ export const offlineSyncRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
 				{
-					action: 'MARK_FAILED',
+					action: OfflineSyncAction.MARK_FAILED,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					queueItemId: input.queueItemId,
@@ -395,7 +395,7 @@ export const offlineSyncRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startOfflineSyncWorkflow(
 				{
-					action: 'CLEAR_SYNCED',
+					action: OfflineSyncAction.CLEAR_SYNCED,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {

@@ -4,9 +4,10 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { OwnershipTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
+import { PartyType } from '../../../../../generated/prisma/enums.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../logger.js';
-import { ownershipWorkflow_v1 } from '../../workflows/ownershipWorkflow.js';
+import { ownershipWorkflow_v1, OwnershipWorkflowAction } from '../../workflows/ownershipWorkflow.js';
 
 const log = createModuleLogger('OwnershipRoute');
 
@@ -80,7 +81,7 @@ export const ownershipRouter = {
 			const handle = await DBOS.startWorkflow(ownershipWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CREATE',
+				action: OwnershipWorkflowAction.CREATE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				unitId: input.unitId,
@@ -173,7 +174,7 @@ export const ownershipRouter = {
 			});
 
 			const displayName =
-				ownership.party.partyType === 'INDIVIDUAL'
+				ownership.party.partyType === PartyType.INDIVIDUAL
 					? `${ownership.party.firstName ?? ''} ${ownership.party.lastName ?? ''}`.trim()
 					: ownership.party.entityName ?? '';
 
@@ -279,7 +280,7 @@ export const ownershipRouter = {
 						id: o.id,
 						partyId: o.partyId,
 						partyName:
-							o.party.partyType === 'INDIVIDUAL'
+							o.party.partyType === PartyType.INDIVIDUAL
 								? `${o.party.firstName ?? ''} ${o.party.lastName ?? ''}`.trim()
 								: o.party.entityName ?? '',
 						ownershipType: o.ownershipType,
@@ -345,7 +346,7 @@ export const ownershipRouter = {
 			const handle = await DBOS.startWorkflow(ownershipWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'END',
+				action: OwnershipWorkflowAction.END,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				ownershipId: input.id,
@@ -414,7 +415,7 @@ export const ownershipRouter = {
 			const handle = await DBOS.startWorkflow(ownershipWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'DELETE',
+				action: OwnershipWorkflowAction.DELETE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				ownershipId: input.id

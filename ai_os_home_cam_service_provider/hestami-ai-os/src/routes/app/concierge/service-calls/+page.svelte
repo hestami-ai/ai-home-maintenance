@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues } from '$lib/api/cam';
 	import { Wrench, ArrowLeft, Home, Droplets, Zap, Wind, Hammer, Bug, Leaf, Shield } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { goto } from '$app/navigation';
@@ -6,7 +7,7 @@
 	const serviceCategories = [
 		{ id: 'plumbing', label: 'Plumbing', icon: Droplets, description: 'Leaks, clogs, water heater, fixtures' },
 		{ id: 'electrical', label: 'Electrical', icon: Zap, description: 'Outlets, wiring, lighting, panels' },
-		{ id: 'hvac', label: 'HVAC', icon: Wind, description: 'Heating, cooling, ventilation' },
+		{ id: 'hvac', label: ARCCategoryValues.HVAC, icon: Wind, description: 'Heating, cooling, ventilation' },
 		{ id: 'general', label: 'General Repairs', icon: Hammer, description: 'Doors, windows, drywall, painting' },
 		{ id: 'pest', label: 'Pest Control', icon: Bug, description: 'Insects, rodents, wildlife' },
 		{ id: 'landscaping', label: 'Landscaping', icon: Leaf, description: 'Lawn, trees, irrigation' },

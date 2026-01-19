@@ -3,8 +3,9 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { ReportFormatSchema, ScheduleFrequencySchema, ReportDeliveryMethodSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startReportScheduleWorkflow } from '../../../workflows/reportScheduleWorkflow.js';
+import { startReportScheduleWorkflow, ReportScheduleAction } from '../../../workflows/reportScheduleWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
+import { ScheduleFrequency } from '../../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('ReportScheduleRoute');
 
@@ -24,24 +25,27 @@ const getAssociationOrThrow = async (organizationId: string, errors: any) => {
 const calculateNextRun = (frequency: string, cronExpression?: string | null): Date => {
 	const now = new Date();
 	switch (frequency) {
-		case 'DAILY':
+		case ScheduleFrequency.DAILY:
 			return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-		case 'WEEKLY':
+		case ScheduleFrequency.WEEKLY:
 			return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-		case 'BIWEEKLY':
+		case ScheduleFrequency.BIWEEKLY:
 			return new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-		case 'MONTHLY':
+		case ScheduleFrequency.MONTHLY: {
 			const nextMonth = new Date(now);
 			nextMonth.setMonth(nextMonth.getMonth() + 1);
 			return nextMonth;
-		case 'QUARTERLY':
+		}
+		case ScheduleFrequency.QUARTERLY: {
 			const nextQuarter = new Date(now);
 			nextQuarter.setMonth(nextQuarter.getMonth() + 3);
 			return nextQuarter;
-		case 'ANNUALLY':
+		}
+		case ScheduleFrequency.ANNUALLY: {
 			const nextYear = new Date(now);
 			nextYear.setFullYear(nextYear.getFullYear() + 1);
 			return nextYear;
+		}
 		default:
 			// For CUSTOM, would parse cron expression - stub returns tomorrow
 			return new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -87,7 +91,7 @@ export const reportScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
 				{
-					action: 'CREATE_SCHEDULE',
+					action: ReportScheduleAction.CREATE_SCHEDULE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -299,7 +303,7 @@ export const reportScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
 				{
-					action: 'UPDATE_SCHEDULE',
+					action: ReportScheduleAction.UPDATE_SCHEDULE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -360,7 +364,7 @@ export const reportScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
 				{
-					action: 'DELETE_SCHEDULE',
+					action: ReportScheduleAction.DELETE_SCHEDULE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -406,7 +410,7 @@ export const reportScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportScheduleWorkflow(
 				{
-					action: 'RUN_NOW',
+					action: ReportScheduleAction.RUN_NOW,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

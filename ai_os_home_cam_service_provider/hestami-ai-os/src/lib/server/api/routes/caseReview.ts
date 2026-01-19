@@ -14,7 +14,8 @@ import {
 import { prisma } from '../../db.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import { createModuleLogger } from '../../logger.js';
-import { startCaseReviewWorkflow } from '../../workflows/caseReviewWorkflow.js';
+import { startCaseReviewWorkflow, CaseReviewAction } from '../../workflows/caseReviewWorkflow.js';
+import { ActivityActionType, ActivityEntityType } from '../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('CaseReviewRoute');
 
@@ -137,7 +138,7 @@ export const caseReviewRouter = {
 			// Create review via workflow
 			const result = await startCaseReviewWorkflow(
 				{
-					action: 'CREATE',
+					action: CaseReviewAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					caseId: input.caseId,
@@ -169,9 +170,9 @@ export const caseReviewRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
+				entityType: ActivityEntityType.CONCIERGE_CASE,
 				entityId: input.caseId,
-				action: 'UPDATE',
+				action: ActivityActionType.UPDATE,
 				summary: `Case review completed with overall satisfaction: ${input.overallSatisfaction || 'N/A'}/5`,
 				caseId: input.caseId,
 				newState: {
@@ -276,7 +277,7 @@ export const caseReviewRouter = {
 			// Update review via workflow
 			const result = await startCaseReviewWorkflow(
 				{
-					action: 'UPDATE',
+					action: CaseReviewAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					caseId: input.caseId,
@@ -308,9 +309,9 @@ export const caseReviewRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
+				entityType: ActivityEntityType.CONCIERGE_CASE,
 				entityId: input.caseId,
-				action: 'UPDATE',
+				action: ActivityActionType.UPDATE,
 				summary: 'Case review updated',
 				caseId: input.caseId
 			});

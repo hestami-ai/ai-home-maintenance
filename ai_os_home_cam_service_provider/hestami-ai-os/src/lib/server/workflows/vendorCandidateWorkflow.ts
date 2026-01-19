@@ -11,6 +11,12 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
 import type { VendorCandidateStatus } from '../../../../generated/prisma/client.js';
+import { ActivityActionType, VendorCandidateStatus as VendorCandidateStatusEnum } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VENDOR_CANDIDATE_WORKFLOW_ERROR: 'VENDOR_CANDIDATE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('VendorCandidateWorkflow');
 
@@ -83,7 +89,7 @@ async function createVendorCandidate(
 					coverageArea: data.coverageArea,
 					licensesAndCerts: data.licensesAndCerts ?? [],
 					notes: data.notes,
-					status: 'IDENTIFIED',
+					status: VendorCandidateStatusEnum.IDENTIFIED,
 					sourceUrl: data.sourceUrl,
 					sourceHtml: data.sourceHtml,
 					sourcePlainText: data.sourcePlainText,
@@ -181,7 +187,7 @@ async function deleteVendorCandidate(
 async function vendorCandidateWorkflow(input: VendorCandidateWorkflowInput): Promise<VendorCandidateWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE': {
+			case VendorCandidateWorkflowAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createVendorCandidate(input.organizationId, input.userId, input.data),
 					{ name: 'createVendorCandidate' }
@@ -193,7 +199,7 @@ async function vendorCandidateWorkflow(input: VendorCandidateWorkflowInput): Pro
 				};
 			}
 
-			case 'UPDATE': {
+			case VendorCandidateWorkflowAction.UPDATE: {
 				const result = await DBOS.runStep(
 					() => updateVendorCandidate(input.organizationId, input.userId, input.vendorCandidateId!, input.data),
 					{ name: 'updateVendorCandidate' }
@@ -201,7 +207,7 @@ async function vendorCandidateWorkflow(input: VendorCandidateWorkflowInput): Pro
 				return { success: true, entityId: result.vendorCandidateId, vendorCandidateId: result.vendorCandidateId };
 			}
 
-			case 'UPDATE_STATUS': {
+			case VendorCandidateWorkflowAction.UPDATE_STATUS: {
 				const result = await DBOS.runStep(
 					() => updateVendorCandidateStatus(input.organizationId, input.userId, input.vendorCandidateId!, input.data.status!),
 					{ name: 'updateVendorCandidateStatus' }
@@ -209,7 +215,7 @@ async function vendorCandidateWorkflow(input: VendorCandidateWorkflowInput): Pro
 				return { success: true, entityId: result.vendorCandidateId, vendorCandidateId: result.vendorCandidateId };
 			}
 
-			case 'DELETE': {
+			case VendorCandidateWorkflowAction.DELETE: {
 				const result = await DBOS.runStep(
 					() => deleteVendorCandidate(input.organizationId, input.userId, input.vendorCandidateId!),
 					{ name: 'deleteVendorCandidate' }
@@ -226,8 +232,8 @@ async function vendorCandidateWorkflow(input: VendorCandidateWorkflowInput): Pro
 		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VENDOR_CANDIDATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VENDOR_CANDIDATE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

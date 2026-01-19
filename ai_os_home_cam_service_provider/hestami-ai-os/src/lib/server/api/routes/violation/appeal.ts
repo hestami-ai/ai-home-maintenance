@@ -4,7 +4,7 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { AppealStatusSchema, AppealDecisionSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import type { AppealStatus } from '../../../../../../generated/prisma/client.js';
-import { startAppealWorkflow } from '../../../workflows/appealWorkflow.js';
+import { startAppealWorkflow, AppealAction } from '../../../workflows/appealWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('AppealRoute');
@@ -53,7 +53,7 @@ export const appealRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
 				{
-					action: 'FILE_APPEAL',
+					action: AppealAction.FILE_APPEAL,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -235,7 +235,7 @@ export const appealRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
 				{
-					action: 'SCHEDULE_HEARING',
+					action: AppealAction.SCHEDULE_HEARING,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -299,7 +299,7 @@ export const appealRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
 				{
-					action: 'RECORD_DECISION',
+					action: AppealAction.RECORD_DECISION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -360,7 +360,7 @@ export const appealRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startAppealWorkflow(
 				{
-					action: 'WITHDRAW_APPEAL',
+					action: AppealAction.WITHDRAW_APPEAL,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

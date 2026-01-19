@@ -12,6 +12,12 @@ import type { VendorApprovalStatus } from '../../../../generated/prisma/client.j
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CONTRACTOR_COMPLIANCE_WORKFLOW_ERROR: 'CONTRACTOR_COMPLIANCE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ContractorComplianceWorkflow');
 
@@ -254,8 +260,8 @@ async function contractorComplianceWorkflow(input: ContractorComplianceWorkflowI
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CONTRACTOR_COMPLIANCE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CONTRACTOR_COMPLIANCE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

@@ -17,12 +17,12 @@ import {
 	ARCDocumentTypeSchema,
 	ARCReviewActionSchema
 } from '$lib/schemas/index.js';
-import { startARCRequestWorkflow } from '../../../workflows/arcRequestWorkflow.js';
+import { startARCRequestWorkflow, ARCRequestAction } from '../../../workflows/arcRequestWorkflow.js';
 import {
 	Prisma,
-	type ARCRequestStatus,
 	type ARCCategory
 } from '../../../../../../generated/prisma/client.js';
+import { ARCRequestStatus, ActivityEntityType, ActivityActionType } from '../../../../../../generated/prisma/enums.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -32,7 +32,7 @@ const log = createModuleLogger('ARCRequestRoute');
 const arcCategoryEnum = ARCCategorySchema;
 const arcRequestStatusEnum = ARCRequestStatusSchema;
 const arcDocumentTypeEnum = ARCDocumentTypeSchema;
-const terminalStatuses: ARCRequestStatus[] = ['APPROVED', 'DENIED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'];
+const terminalStatuses: ARCRequestStatus[] = [ARCRequestStatus.APPROVED, ARCRequestStatus.DENIED, ARCRequestStatus.WITHDRAWN, ARCRequestStatus.CANCELLED, ARCRequestStatus.EXPIRED];
 
 const getAssociationOrThrow = async (organizationId: string, associationId: string | null, errors: any) => {
 	const association = await prisma.association.findFirst({
@@ -115,7 +115,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
 				{
-					action: 'CREATE_REQUEST',
+					action: ARCRequestAction.CREATE_REQUEST,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -142,9 +142,9 @@ export const arcRequestRouter = {
 
 			// Record activity event
 			await recordIntent(context, {
-				entityType: 'ARC_REQUEST',
+				entityType: ActivityEntityType.ARC_REQUEST,
 				entityId: result.id,
-				action: 'CREATE',
+				action: ActivityActionType.CREATE,
 				summary: `ARC request created: ${result.title}`,
 				arcRequestId: result.id,
 				associationId: rest.associationId,
@@ -311,7 +311,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
 				{
-					action: 'UPDATE_REQUEST',
+					action: ARCRequestAction.UPDATE_REQUEST,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					requestId: rest.id,
@@ -357,14 +357,14 @@ export const arcRequestRouter = {
 			if (terminalStatuses.includes(existing.status as ARCRequestStatus)) {
 				throw errors.BAD_REQUEST({ message: 'Cannot submit a finalized ARC request' });
 			}
-			if (existing.status === 'SUBMITTED' || existing.status === 'UNDER_REVIEW') {
+			if (existing.status === ARCRequestStatus.SUBMITTED || existing.status === ARCRequestStatus.UNDER_REVIEW) {
 				return successResponse({ request: { id: existing.id, status: existing.status, submittedAt: existing.submittedAt?.toISOString() ?? null } }, context);
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
 				{
-					action: 'SUBMIT_REQUEST',
+					action: ARCRequestAction.SUBMIT_REQUEST,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					requestId: input.id,
@@ -381,9 +381,9 @@ export const arcRequestRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'ARC_REQUEST',
+				entityType: ActivityEntityType.ARC_REQUEST,
 				entityId: updated.id,
-				action: 'SUBMIT',
+				action: ActivityActionType.SUBMIT,
 				summary: `ARC request submitted for review`,
 				arcRequestId: updated.id,
 				newState: { status: updated.status }
@@ -414,7 +414,7 @@ export const arcRequestRouter = {
 				throw errors.NOT_FOUND({ message: 'ARC Request' });
 			}
 
-			if (existing.status === 'WITHDRAWN') {
+			if (existing.status === ARCRequestStatus.WITHDRAWN) {
 				return successResponse({ request: { id: existing.id, status: existing.status, withdrawnAt: existing.withdrawnAt?.toISOString() ?? null } }, context);
 			}
 			if (terminalStatuses.includes(existing.status as ARCRequestStatus)) {
@@ -424,7 +424,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
 				{
-					action: 'WITHDRAW_REQUEST',
+					action: ARCRequestAction.WITHDRAW_REQUEST,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					requestId: input.id,
@@ -441,9 +441,9 @@ export const arcRequestRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'ARC_REQUEST',
+				entityType: ActivityEntityType.ARC_REQUEST,
 				entityId: updated.id,
-				action: 'CANCEL',
+				action: ActivityActionType.CANCEL,
 				summary: `ARC request withdrawn${input.reason ? `: ${input.reason}` : ''}`,
 				arcRequestId: updated.id,
 				newState: { status: updated.status }
@@ -492,7 +492,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
 				{
-					action: 'ADD_DOCUMENT',
+					action: ARCRequestAction.ADD_DOCUMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					requestId: rest.requestId,
@@ -549,7 +549,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startARCRequestWorkflow(
 				{
-					action: 'RECORD_DECISION',
+					action: ARCRequestAction.RECORD_DECISION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					requestId: rest.requestId,
@@ -570,17 +570,17 @@ export const arcRequestRouter = {
 			const updated = await prisma.aRCRequest.findFirstOrThrow({ where: { id: rest.requestId, organizationId: context.organization.id } });
 
 			// Record activity event
-			const actionToEventAction: Record<string, 'APPROVE' | 'DENY' | 'STATUS_CHANGE'> = {
-				APPROVE: 'APPROVE',
-				DENY: 'DENY',
-				REQUEST_CHANGES: 'STATUS_CHANGE',
-				TABLE: 'STATUS_CHANGE'
+			const actionToEventAction: Record<string, ActivityActionType> = {
+				APPROVE: ActivityActionType.APPROVE,
+				DENY: ActivityActionType.DENY,
+				REQUEST_CHANGES: ActivityActionType.STATUS_CHANGE,
+				TABLE: ActivityActionType.STATUS_CHANGE
 			};
 
 			await recordDecision(context, {
-				entityType: 'ARC_REQUEST',
+				entityType: ActivityEntityType.ARC_REQUEST,
 				entityId: updated.id,
-				action: actionToEventAction[rest.action] || 'STATUS_CHANGE',
+				action: actionToEventAction[rest.action] || ActivityActionType.STATUS_CHANGE,
 				summary: `ARC request ${rest.action.toLowerCase().replace('_', ' ')}: ${rest.notes?.substring(0, 100) || 'No notes'}`,
 				arcRequestId: updated.id,
 				previousState: { status: previousStatus },
@@ -728,7 +728,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCRequestWorkflow(
 				{
-					action: 'REQUEST_INFO',
+					action: ARCRequestAction.REQUEST_INFO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					requestId: rest.requestId,
@@ -747,9 +747,9 @@ export const arcRequestRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'ARC_REQUEST',
+				entityType: ActivityEntityType.ARC_REQUEST,
 				entityId: updated.id,
-				action: 'STATUS_CHANGE',
+				action: ActivityActionType.STATUS_CHANGE,
 				summary: `Additional information requested: ${infoNeeded.substring(0, 100)}`,
 				arcRequestId: updated.id,
 				previousState: { status: previousStatus },
@@ -789,7 +789,7 @@ export const arcRequestRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCRequestWorkflow(
 				{
-					action: 'SUBMIT_INFO',
+					action: ARCRequestAction.SUBMIT_INFO,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					requestId: rest.requestId,
@@ -808,9 +808,9 @@ export const arcRequestRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'ARC_REQUEST',
+				entityType: ActivityEntityType.ARC_REQUEST,
 				entityId: updated.id,
-				action: 'SUBMIT',
+				action: ActivityActionType.SUBMIT,
 				summary: `Information submitted: ${response.substring(0, 100)}`,
 				arcRequestId: updated.id,
 				previousState: { status: previousStatus },

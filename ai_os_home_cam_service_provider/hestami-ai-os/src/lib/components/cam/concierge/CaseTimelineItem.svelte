@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CaseNoteTypeValues } from '$lib/api/cam';
 	import { MessageSquare, HelpCircle, CheckCircle, Settings, FileText, Users, Link } from 'lucide-svelte';
 	import type { CaseNoteType } from '$lib/api/cam';
 
@@ -16,11 +17,11 @@
 	function getIcon() {
 		if (type === 'note' && noteType) {
 			switch (noteType) {
-				case 'CLARIFICATION_REQUEST':
+				case CaseNoteTypeValues.CLARIFICATION_REQUEST:
 					return HelpCircle;
-				case 'CLARIFICATION_RESPONSE':
+				case CaseNoteTypeValues.CLARIFICATION_RESPONSE:
 					return CheckCircle;
-				case 'DECISION_RATIONALE':
+				case CaseNoteTypeValues.DECISION_RATIONALE:
 					return Settings;
 				default:
 					return MessageSquare;
@@ -43,11 +44,11 @@
 	function getIconColor() {
 		if (type === 'note' && noteType) {
 			switch (noteType) {
-				case 'CLARIFICATION_REQUEST':
+				case CaseNoteTypeValues.CLARIFICATION_REQUEST:
 					return 'text-amber-500 bg-amber-500/10';
-				case 'CLARIFICATION_RESPONSE':
+				case CaseNoteTypeValues.CLARIFICATION_RESPONSE:
 					return 'text-green-500 bg-green-500/10';
-				case 'DECISION_RATIONALE':
+				case CaseNoteTypeValues.DECISION_RATIONALE:
 					return 'text-purple-500 bg-purple-500/10';
 				default:
 					return 'text-blue-500 bg-blue-500/10';

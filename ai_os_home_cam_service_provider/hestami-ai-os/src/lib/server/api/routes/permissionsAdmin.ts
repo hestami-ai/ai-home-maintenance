@@ -19,6 +19,7 @@ import { prisma } from '../../db.js';
 import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
 import { createModuleLogger } from '../../logger.js';
 import type { Prisma } from '../../../../../generated/prisma/client.js';
+import { OrganizationStatus, UserRole, ActivityEntityType as ActivityEntityTypeEnum, ActivityActionType as ActivityActionTypeEnum } from '../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('PermissionsAdminRoute');
 
@@ -79,7 +80,7 @@ export const permissionsAdminRouter = {
 			// Get organization counts
 			const [totalOrgs, activeOrgs] = await Promise.all([
 				prisma.organization.count({ where: { deletedAt: null } }),
-				prisma.organization.count({ where: { deletedAt: null, status: 'ACTIVE' } })
+				prisma.organization.count({ where: { deletedAt: null, status: OrganizationStatus.ACTIVE } })
 			]);
 
 			// Get user and membership counts
@@ -193,7 +194,7 @@ export const permissionsAdminRouter = {
 						select: { memberships: true }
 					},
 					memberships: {
-						where: { role: 'ADMIN' },
+						where: { role: UserRole.ADMIN },
 						select: { id: true }
 					}
 				},
@@ -405,10 +406,10 @@ export const permissionsAdminRouter = {
 			}
 
 			const limit = input.limit ?? 50;
-			
+
 			// Filter for permission-related events
-			const permissionEntityTypes: ActivityEntityType[] = ['USER', 'USER_ROLE', 'ORGANIZATION', 'STAFF', 'STAFF_ASSIGNMENT'];
-			const permissionActions: ActivityActionType[] = ['CREATE', 'UPDATE', 'DELETE', 'ROLE_CHANGE', 'ASSIGN', 'UNASSIGN'];
+			const permissionEntityTypes: ActivityEntityType[] = [ActivityEntityTypeEnum.USER, ActivityEntityTypeEnum.USER_ROLE, ActivityEntityTypeEnum.ORGANIZATION, ActivityEntityTypeEnum.STAFF, ActivityEntityTypeEnum.STAFF_ASSIGNMENT];
+			const permissionActions: ActivityActionType[] = [ActivityActionTypeEnum.CREATE, ActivityActionTypeEnum.UPDATE, ActivityActionTypeEnum.DELETE, ActivityActionTypeEnum.ROLE_CHANGE, ActivityActionTypeEnum.ASSIGN, ActivityActionTypeEnum.UNASSIGN];
 
 			const where: Prisma.ActivityEventWhereInput = {
 				entityType: { in: permissionEntityTypes },
@@ -532,10 +533,10 @@ export const permissionsAdminRouter = {
 			}
 
 			const limit = input?.limit ?? 10;
-			
+
 			// Filter for permission-related events
-			const permissionEntityTypes: ActivityEntityType[] = ['USER', 'USER_ROLE', 'ORGANIZATION', 'STAFF', 'STAFF_ASSIGNMENT'];
-			const permissionActions: ActivityActionType[] = ['CREATE', 'UPDATE', 'DELETE', 'ROLE_CHANGE', 'ASSIGN', 'UNASSIGN'];
+			const permissionEntityTypes: ActivityEntityType[] = [ActivityEntityTypeEnum.USER, ActivityEntityTypeEnum.USER_ROLE, ActivityEntityTypeEnum.ORGANIZATION, ActivityEntityTypeEnum.STAFF, ActivityEntityTypeEnum.STAFF_ASSIGNMENT];
+			const permissionActions: ActivityActionType[] = [ActivityActionTypeEnum.CREATE, ActivityActionTypeEnum.UPDATE, ActivityActionTypeEnum.DELETE, ActivityActionTypeEnum.ROLE_CHANGE, ActivityActionTypeEnum.ASSIGN, ActivityActionTypeEnum.UNASSIGN];
 
 			const events = await prisma.activityEvent.findMany({
 				where: {

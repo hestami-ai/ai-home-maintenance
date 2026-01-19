@@ -4,8 +4,10 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { WidgetTypeSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { recordActivityFromContext } from '../../middleware/activityEvent.js';
-import { startDashboardWorkflow } from '../../../workflows/dashboardWorkflow.js';
+import { startDashboardWorkflow, DashboardAction } from '../../../workflows/dashboardWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
+import { ViolationSeverity, ActivityEntityType, ActivityActionType, ActivityEventCategory } from '../../../../../../generated/prisma/enums.js';
+import { GovernanceItemType } from '../../../workflows/schemas.js';
 
 const log = createModuleLogger('DashboardRoute');
 
@@ -165,7 +167,7 @@ export const dashboardRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
 				{
-					action: 'CREATE_WIDGET',
+					action: DashboardAction.CREATE_WIDGET,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -291,7 +293,7 @@ export const dashboardRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
 				{
-					action: 'UPDATE_WIDGET',
+					action: DashboardAction.UPDATE_WIDGET,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -350,7 +352,7 @@ export const dashboardRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
 				{
-					action: 'DELETE_WIDGET',
+					action: DashboardAction.DELETE_WIDGET,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -391,7 +393,7 @@ export const dashboardRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startDashboardWorkflow(
 				{
-					action: 'REORDER_WIDGETS',
+					action: DashboardAction.REORDER_WIDGETS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -583,10 +585,10 @@ export const dashboardRouter = {
 				select: { severity: true }
 			});
 			const escalatedBySeverity = {
-				critical: escalatedViolations.filter(v => v.severity === 'CRITICAL').length,
-				major: escalatedViolations.filter(v => v.severity === 'MAJOR').length,
-				moderate: escalatedViolations.filter(v => v.severity === 'MODERATE').length,
-				minor: escalatedViolations.filter(v => v.severity === 'MINOR').length
+				critical: escalatedViolations.filter(v => v.severity === ViolationSeverity.CRITICAL).length,
+				major: escalatedViolations.filter(v => v.severity === ViolationSeverity.MAJOR).length,
+				moderate: escalatedViolations.filter(v => v.severity === ViolationSeverity.MODERATE).length,
+				minor: escalatedViolations.filter(v => v.severity === ViolationSeverity.MINOR).length
 			};
 
 			// Work orders awaiting authorization
@@ -641,10 +643,10 @@ export const dashboardRouter = {
 				select: { severity: true }
 			});
 			const violationsBySeverity = {
-				critical: openViolations.filter(v => v.severity === 'CRITICAL').length,
-				major: openViolations.filter(v => v.severity === 'MAJOR').length,
-				moderate: openViolations.filter(v => v.severity === 'MODERATE').length,
-				minor: openViolations.filter(v => v.severity === 'MINOR').length,
+				critical: openViolations.filter(v => v.severity === ViolationSeverity.CRITICAL).length,
+				major: openViolations.filter(v => v.severity === ViolationSeverity.MAJOR).length,
+				moderate: openViolations.filter(v => v.severity === ViolationSeverity.MODERATE).length,
+				minor: openViolations.filter(v => v.severity === ViolationSeverity.MINOR).length,
 				total: openViolations.length
 			};
 
@@ -786,7 +788,7 @@ export const dashboardRouter = {
 			recentApprovedArc.forEach(arc => {
 				recentGovernanceItems.push({
 					id: arc.id,
-					type: 'ARC_APPROVED',
+					type: GovernanceItemType.ARC_APPROVED,
 					title: `ARC ${arc.requestNumber}: ${arc.title}`,
 					actorRole: 'ARC Committee',
 					occurredAt: arc.updatedAt.toISOString(),
@@ -810,7 +812,7 @@ export const dashboardRouter = {
 			recentClosedViolations.forEach(v => {
 				recentGovernanceItems.push({
 					id: v.id,
-					type: 'VIOLATION_CLOSED',
+					type: GovernanceItemType.VIOLATION_CLOSED,
 					title: `Violation ${v.violationNumber}: ${v.title}`,
 					actorRole: 'Manager',
 					occurredAt: v.closedDate?.toISOString() ?? new Date().toISOString(),
@@ -833,7 +835,7 @@ export const dashboardRouter = {
 			recentApprovedMotions.forEach(m => {
 				recentGovernanceItems.push({
 					id: m.id,
-					type: 'MOTION_APPROVED',
+					type: GovernanceItemType.MOTION_APPROVED,
 					title: `Motion ${m.motionNumber}: ${m.title}`,
 					actorRole: 'Board',
 					occurredAt: m.decidedAt?.toISOString() ?? new Date().toISOString(),
@@ -856,7 +858,7 @@ export const dashboardRouter = {
 			recentResolutions.forEach(r => {
 				recentGovernanceItems.push({
 					id: r.id,
-					type: 'RESOLUTION_ADOPTED',
+					type: GovernanceItemType.RESOLUTION_ADOPTED,
 					title: r.title,
 					actorRole: 'Board',
 					occurredAt: r.adoptedAt?.toISOString() ?? new Date().toISOString(),
@@ -956,10 +958,10 @@ export const dashboardRouter = {
 			// Record the activity event
 			// Using 'OTHER' entityType and 'CUSTOM' action since dashboard is a derived view
 			await recordActivityFromContext(context, {
-				entityType: 'OTHER',
+				entityType: ActivityEntityType.OTHER,
 				entityId: association.id,
-				action: 'CUSTOM',
-				eventCategory: 'SYSTEM',
+				action: ActivityActionType.CUSTOM,
+				eventCategory: ActivityEventCategory.SYSTEM,
 				summary,
 				metadata: {
 					dashboardEventType: input.eventType,

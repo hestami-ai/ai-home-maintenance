@@ -6,12 +6,19 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { seedDefaultChartOfAccounts } from '../accounting/glService.js';
 import { COATemplateId } from '../accounting/defaultChartOfAccounts.js';
-import type {
-    Prisma,
+import type { Prisma } from '../../../../generated/prisma/client.js';
+import {
     ActivityEntityType,
     ActivityActionType,
-    ActivityEventCategory
-} from '../../../../generated/prisma/client.js';
+    ActivityEventCategory,
+    AssociationStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+    ASSOCIATION_CREATION_ERROR: 'ASSOCIATION_CREATION_ERROR',
+    ASSOCIATION_MANAGEMENT_ERROR: 'ASSOCIATION_MANAGEMENT_ERROR'
+} as const;
 
 /**
  * Input for the CREATE_MANAGED_ASSOCIATION workflow
@@ -67,7 +74,7 @@ async function createManagedAssociation_v1(input: CreateManagedAssociationInput)
                             incorporationDate: input.associationData.incorporationDate,
                             fiscalYearEnd: input.associationData.fiscalYearEnd,
                             settings: input.associationData.settings ?? {},
-                            status: 'ONBOARDING'
+                            status: AssociationStatus.ONBOARDING
                         }
                     });
 
@@ -101,12 +108,12 @@ async function createManagedAssociation_v1(input: CreateManagedAssociationInput)
         // 3. Record activity event
         await recordWorkflowEvent({
             organizationId: input.organizationId,
-            entityType: 'ASSOCIATION' as ActivityEntityType,
+            entityType: ActivityEntityType.ASSOCIATION,
             entityId: association.id,
-            action: 'CREATE' as ActivityActionType,
-            eventCategory: 'EXECUTION' as ActivityEventCategory,
+            action: ActivityActionType.CREATE,
+            eventCategory: ActivityEventCategory.EXECUTION,
             workflowId: 'createManagedAssociation_v1',
-            workflowStep: 'COMPLETE',
+            workflowStep: 'CREATE_MANAGED_ASSOCIATION',
             summary: `Association created: ${association.name}`,
             associationId: association.id,
             newState: { name: association.name, status: association.status } as Record<string, unknown>
@@ -121,8 +128,8 @@ async function createManagedAssociation_v1(input: CreateManagedAssociationInput)
         log.error('Workflow failed', { action: input.action, error: errorObj.message });
 
         await recordSpanError(errorObj, {
-            errorCode: 'WORKFLOW_FAILED',
-            errorType: 'ASSOCIATION_CREATION_ERROR'
+            errorCode: ActivityActionType.WORKFLOW_FAILED,
+            errorType: WorkflowErrorType.ASSOCIATION_CREATION_ERROR
         });
 
         const errorResult = { success: false, error: errorObj.message };
@@ -231,7 +238,7 @@ async function associationManagementWorkflow(input: AssociationManagementInput):
 
     try {
         switch (input.action) {
-            case 'UPDATE': {
+            case AssociationManagementAction.UPDATE: {
                 if (!input.data) {
                     return { success: false, error: 'Update data is required' };
                 }
@@ -242,7 +249,7 @@ async function associationManagementWorkflow(input: AssociationManagementInput):
                 return { success: true, associationId: result.id };
             }
 
-            case 'SET_DEFAULT': {
+            case AssociationManagementAction.SET_DEFAULT: {
                 await DBOS.runStep(
                     () => setDefaultAssociationStep(input.userId, input.organizationId, input.associationId),
                     { name: 'setDefaultAssociation' }
@@ -250,7 +257,7 @@ async function associationManagementWorkflow(input: AssociationManagementInput):
                 return { success: true, associationId: input.associationId };
             }
 
-            case 'DELETE': {
+            case AssociationManagementAction.DELETE: {
                 await DBOS.runStep(
                     () => deleteAssociationStep(input.organizationId, input.userId, input.associationId!),
                     { name: 'deleteAssociation' }
@@ -266,8 +273,8 @@ async function associationManagementWorkflow(input: AssociationManagementInput):
         log.error('Workflow failed', { action: input.action, error: errorObj.message });
 
         await recordSpanError(errorObj, {
-            errorCode: 'WORKFLOW_FAILED',
-            errorType: 'ASSOCIATION_MANAGEMENT_ERROR'
+            errorCode: ActivityActionType.WORKFLOW_FAILED,
+            errorType: WorkflowErrorType.ASSOCIATION_MANAGEMENT_ERROR
         });
 
         return { success: false, error: errorObj.message };

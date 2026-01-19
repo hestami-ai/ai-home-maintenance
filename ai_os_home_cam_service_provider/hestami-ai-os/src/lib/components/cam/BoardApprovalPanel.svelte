@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCRequestStatusValues, BidStatusValues, InvoiceStatusValues } from '$lib/api/cam';
 	import { Shield, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 
@@ -28,18 +29,18 @@
 
 	function getStatusColor(status?: string): string {
 		switch (status) {
-			case 'APPROVED': return 'text-success-600 bg-success-600/10';
-			case 'DENIED': return 'text-error-600 bg-error-600/10';
-			case 'PENDING': return 'text-warning-600 bg-warning-600/10';
+			case InvoiceStatusValues.APPROVED: return 'text-success-600 bg-success-600/10';
+			case ARCRequestStatusValues.DENIED: return 'text-error-600 bg-error-600/10';
+			case BidStatusValues.PENDING: return 'text-warning-600 bg-warning-600/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
 
 	function getStatusIcon(status?: string) {
 		switch (status) {
-			case 'APPROVED': return CheckCircle;
-			case 'DENIED': return XCircle;
-			case 'PENDING': return Clock;
+			case InvoiceStatusValues.APPROVED: return CheckCircle;
+			case ARCRequestStatusValues.DENIED: return XCircle;
+			case BidStatusValues.PENDING: return Clock;
 			default: return AlertTriangle;
 		}
 	}
@@ -77,11 +78,11 @@
 						<div class="flex justify-between">
 							<span class="text-surface-500">Status:</span>
 							<span class="flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium {getStatusColor(boardApprovalStatus)}">
-								{#if boardApprovalStatus === 'APPROVED'}
+								{#if boardApprovalStatus === InvoiceStatusValues.APPROVED}
 									<CheckCircle class="h-3.5 w-3.5" />
-								{:else if boardApprovalStatus === 'DENIED'}
+								{:else if boardApprovalStatus === ARCRequestStatusValues.DENIED}
 									<XCircle class="h-3.5 w-3.5" />
-								{:else if boardApprovalStatus === 'PENDING'}
+								{:else if boardApprovalStatus === BidStatusValues.PENDING}
 									<Clock class="h-3.5 w-3.5" />
 								{:else}
 									<AlertTriangle class="h-3.5 w-3.5" />
@@ -92,7 +93,7 @@
 					</div>
 				</div>
 
-				{#if !boardApprovalVoteId && boardApprovalStatus !== 'APPROVED' && boardApprovalStatus !== 'DENIED'}
+				{#if !boardApprovalVoteId && boardApprovalStatus !== InvoiceStatusValues.APPROVED && boardApprovalStatus !== ARCRequestStatusValues.DENIED}
 					<div class="mt-4">
 						<button
 							type="button"
@@ -108,7 +109,7 @@
 					</div>
 				{/if}
 
-				{#if boardApprovalStatus === 'PENDING' && boardApprovalVoteId}
+				{#if boardApprovalStatus === BidStatusValues.PENDING && boardApprovalVoteId}
 					<div class="mt-4 flex gap-2">
 						<button
 							type="button"
@@ -129,14 +130,14 @@
 					</div>
 				{/if}
 
-				{#if boardApprovalStatus === 'APPROVED'}
+				{#if boardApprovalStatus === InvoiceStatusValues.APPROVED}
 					<div class="mt-4 flex items-center gap-2 text-success-600">
 						<CheckCircle class="h-5 w-5" />
 						<span class="font-medium">Board has approved this work order</span>
 					</div>
 				{/if}
 
-				{#if boardApprovalStatus === 'DENIED'}
+				{#if boardApprovalStatus === ARCRequestStatusValues.DENIED}
 					<div class="mt-4 flex items-center gap-2 text-error-600">
 						<XCircle class="h-5 w-5" />
 						<span class="font-medium">Board has denied this work order</span>

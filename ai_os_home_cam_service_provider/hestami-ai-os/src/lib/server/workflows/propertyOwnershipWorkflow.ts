@@ -12,6 +12,19 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import type { PropertyOwnershipRole } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	PropertyOwnershipStatus,
+	DelegatedAuthorityStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PROPERTY_OWNERSHIP_WORKFLOW_ERROR: 'PROPERTY_OWNERSHIP_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'property_ownership_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'property_ownership_workflow_error';
@@ -93,7 +106,7 @@ async function createPropertyOwnership(
 				propertyId: input.propertyId!,
 				partyId: input.partyId!,
 				role: input.role!,
-				status: 'ACTIVE',
+				status: PropertyOwnershipStatus.ACTIVE,
 				ownershipPercentage: input.ownershipPercentage,
 				isPrimaryContact: input.isPrimaryContact ?? false,
 				effectiveFrom: input.effectiveFrom ?? new Date(),
@@ -105,15 +118,15 @@ async function createPropertyOwnership(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: propertyOwnership.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property ownership created for role ${input.role}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyOwnershipWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: PropertyOwnershipWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { role: input.role, isPrimaryContact: input.isPrimaryContact }
 	});
@@ -169,15 +182,15 @@ async function updatePropertyOwnership(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: propertyOwnership.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property ownership updated`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyOwnershipWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: PropertyOwnershipWorkflowAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: { isPrimaryContact: input.isPrimaryContact, ownershipPercentage: input.ownershipPercentage }
 	});
@@ -206,7 +219,7 @@ async function verifyPropertyOwnership(
 		return tx.propertyOwnership.update({
 			where: { id: propertyOwnershipId },
 			data: {
-				status: 'ACTIVE',
+				status: PropertyOwnershipStatus.ACTIVE,
 				verifiedAt: now,
 				verifiedBy: userId
 			}
@@ -215,17 +228,17 @@ async function verifyPropertyOwnership(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: propertyOwnershipId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property ownership verified`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyOwnershipWorkflow_v1',
 		workflowStep: 'VERIFY',
 		workflowVersion: 'v1',
-		newState: { status: 'ACTIVE', verifiedAt: now.toISOString() }
+		newState: { status: PropertyOwnershipStatus.ACTIVE, verifiedAt: now.toISOString() }
 	});
 
 	return {
@@ -251,7 +264,7 @@ async function terminatePropertyOwnership(
 		const ownership = await tx.propertyOwnership.update({
 			where: { id: propertyOwnershipId },
 			data: {
-				status: 'TERMINATED',
+				status: PropertyOwnershipStatus.TERMINATED,
 				effectiveTo,
 				isPrimaryContact: false
 			}
@@ -261,10 +274,10 @@ async function terminatePropertyOwnership(
 		await tx.delegatedAuthority.updateMany({
 			where: {
 				propertyOwnershipId,
-				status: 'ACTIVE'
+				status: DelegatedAuthorityStatus.ACTIVE
 			},
 			data: {
-				status: 'REVOKED',
+				status: DelegatedAuthorityStatus.REVOKED,
 				revokedAt: new Date(),
 				revokedBy: userId,
 				revokeReason: 'Property ownership terminated'
@@ -276,17 +289,17 @@ async function terminatePropertyOwnership(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: propertyOwnershipId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property ownership terminated`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyOwnershipWorkflow_v1',
 		workflowStep: 'TERMINATE',
 		workflowVersion: 'v1',
-		newState: { status: 'TERMINATED', effectiveTo: effectiveTo.toISOString() }
+		newState: { status: PropertyOwnershipStatus.TERMINATED, effectiveTo: effectiveTo.toISOString() }
 	});
 
 	return {
@@ -314,7 +327,7 @@ async function deletePropertyOwnership(
 		await tx.delegatedAuthority.updateMany({
 			where: { propertyOwnershipId },
 			data: {
-				status: 'REVOKED',
+				status: DelegatedAuthorityStatus.REVOKED,
 				revokedAt: now,
 				revokedBy: userId,
 				revokeReason: 'Property ownership deleted'
@@ -324,15 +337,15 @@ async function deletePropertyOwnership(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: propertyOwnershipId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property ownership deleted`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyOwnershipWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: PropertyOwnershipWorkflowAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: now.toISOString() }
 	});
@@ -355,7 +368,7 @@ async function propertyOwnershipWorkflow(input: PropertyOwnershipWorkflowInput):
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case PropertyOwnershipWorkflowAction.CREATE: {
 				if (!input.propertyId || !input.partyId || !input.role) {
 					const error = new Error('Missing required fields: propertyId, partyId, role for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -386,7 +399,7 @@ async function propertyOwnershipWorkflow(input: PropertyOwnershipWorkflowInput):
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case PropertyOwnershipWorkflowAction.UPDATE: {
 				if (!input.propertyOwnershipId || !input.propertyId) {
 					const error = new Error('Missing required fields: propertyOwnershipId, propertyId for UPDATE');
 					logStepError(log, 'validation', error, { propertyOwnershipId: input.propertyOwnershipId });
@@ -412,7 +425,7 @@ async function propertyOwnershipWorkflow(input: PropertyOwnershipWorkflowInput):
 				return successResult;
 			}
 
-			case 'VERIFY': {
+			case PropertyOwnershipWorkflowAction.VERIFY: {
 				if (!input.propertyOwnershipId) {
 					const error = new Error('Missing required field: propertyOwnershipId for VERIFY');
 					logStepError(log, 'validation', error, { propertyOwnershipId: input.propertyOwnershipId });
@@ -437,7 +450,7 @@ async function propertyOwnershipWorkflow(input: PropertyOwnershipWorkflowInput):
 				return successResult;
 			}
 
-			case 'TERMINATE': {
+			case PropertyOwnershipWorkflowAction.TERMINATE: {
 				if (!input.propertyOwnershipId) {
 					const error = new Error('Missing required field: propertyOwnershipId for TERMINATE');
 					logStepError(log, 'validation', error, { propertyOwnershipId: input.propertyOwnershipId });
@@ -462,7 +475,7 @@ async function propertyOwnershipWorkflow(input: PropertyOwnershipWorkflowInput):
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case PropertyOwnershipWorkflowAction.DELETE: {
 				if (!input.propertyOwnershipId) {
 					const error = new Error('Missing required field: propertyOwnershipId for DELETE');
 					logStepError(log, 'validation', error, { propertyOwnershipId: input.propertyOwnershipId });
@@ -509,8 +522,8 @@ async function propertyOwnershipWorkflow(input: PropertyOwnershipWorkflowInput):
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PROPERTY_OWNERSHIP_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PROPERTY_OWNERSHIP_WORKFLOW_ERROR
 		});
 		const errorResult: PropertyOwnershipWorkflowResult = {
 			success: false,

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CommitteeTypeValues, FundTypeValues, MeetingTypeValues } from '$lib/api/cam';
 	import { X, Loader2, Calendar, Users, FileText, Check, ChevronLeft, ChevronRight, Video, MapPin } from 'lucide-svelte';
 
 	interface Props {
@@ -38,11 +39,11 @@
 	const totalSteps = 4;
 
 	const meetingTypes = [
-		{ value: 'BOARD', label: 'Board Meeting', description: 'Regular board of directors meeting', icon: Users },
-		{ value: 'ANNUAL', label: 'Annual Meeting', description: 'Annual homeowner meeting', icon: Calendar },
-		{ value: 'SPECIAL', label: 'Special Meeting', description: 'Special purpose meeting', icon: FileText },
+		{ value: MeetingTypeValues.BOARD, label: 'Board Meeting', description: 'Regular board of directors meeting', icon: Users },
+		{ value: MeetingTypeValues.ANNUAL, label: 'Annual Meeting', description: 'Annual homeowner meeting', icon: Calendar },
+		{ value: FundTypeValues.SPECIAL, label: 'Special Meeting', description: 'Special purpose meeting', icon: FileText },
 		{ value: 'COMMITTEE', label: 'Committee Meeting', description: 'Committee or subcommittee meeting', icon: Users },
-		{ value: 'BUDGET', label: 'Budget Meeting', description: 'Budget review and approval', icon: FileText },
+		{ value: CommitteeTypeValues.BUDGET, label: 'Budget Meeting', description: 'Budget review and approval', icon: FileText },
 		{ value: 'EXECUTIVE', label: 'Executive Session', description: 'Closed session for sensitive matters', icon: Users }
 	];
 

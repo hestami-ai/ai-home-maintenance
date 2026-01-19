@@ -7,6 +7,7 @@
 
 import { prisma } from '../db.js';
 import { createModuleLogger } from '../logger.js';
+import { MeetingAttendanceStatus, VoteChoice } from '../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('MinutesGenerationService');
 
@@ -147,15 +148,15 @@ export async function generateMinutesDraft(input: MinutesGenerationInput): Promi
 				return 'Unknown';
 			};
 			const present = attendance
-				.filter(a => a.status === 'PRESENT')
+				.filter(a => a.status === MeetingAttendanceStatus.PRESENT)
 				.map(a => getPartyName(a.party))
 				.join(', ');
 			const absent = attendance
-				.filter(a => a.status === 'ABSENT' || a.status === 'EXCUSED')
+				.filter(a => a.status === MeetingAttendanceStatus.ABSENT || a.status === MeetingAttendanceStatus.EXCUSED)
 				.map(a => getPartyName(a.party))
 				.join(', ');
-			const quorumMet = meeting.quorumRequired 
-				? attendance.filter(a => a.status !== 'ABSENT' && a.status !== 'EXCUSED').length >= meeting.quorumRequired
+			const quorumMet = meeting.quorumRequired
+				? attendance.filter(a => a.status !== MeetingAttendanceStatus.ABSENT && a.status !== MeetingAttendanceStatus.EXCUSED).length >= meeting.quorumRequired
 				: true;
 
 			sections.push({
@@ -218,9 +219,9 @@ export async function generateMinutesDraft(input: MinutesGenerationInput): Promi
 
 		if (votes.length > 0) {
 			const votesContent = votes.map(vote => {
-				const yes = vote.ballots.filter(b => b.choice === 'YES').length;
-				const no = vote.ballots.filter(b => b.choice === 'NO').length;
-				const abstain = vote.ballots.filter(b => b.choice === 'ABSTAIN').length;
+				const yes = vote.ballots.filter(b => b.choice === VoteChoice.YES).length;
+				const no = vote.ballots.filter(b => b.choice === VoteChoice.NO).length;
+				const abstain = vote.ballots.filter(b => b.choice === VoteChoice.ABSTAIN).length;
 				const result = vote.closedAt ? (yes > no ? 'Passed' : 'Failed') : 'Pending';
 				return `${vote.question}\n  Yes: ${yes}, No: ${no}, Abstain: ${abstain}\n  Result: ${result}`;
 			}).join('\n\n');

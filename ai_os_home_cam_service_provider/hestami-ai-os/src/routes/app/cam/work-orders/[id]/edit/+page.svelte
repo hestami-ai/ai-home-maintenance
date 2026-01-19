@@ -4,7 +4,7 @@
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { workOrderApi, unitApi, vendorApi, type Unit, type Vendor, type WorkOrder } from '$lib/api/cam';
+	import { ARCCategoryValues, AssetCategoryValues, DocumentCategoryValues, OwnerIntentPriorityValues, WorkOrderCategoryValues, WorkOrderPriorityValues, type Unit, type Vendor, type WorkOrder, unitApi, vendorApi, workOrderApi } from '$lib/api/cam';
 
 	let workOrder = $state<WorkOrder | null>(null);
 	let units = $state<Unit[]>([]);
@@ -13,35 +13,45 @@
 	let isSaving = $state(false);
 	let error = $state<string | null>(null);
 
-	let formData = $state({
-		locationType: 'unit' as 'unit' | 'common_area',
+	let formData = $state<{
+		locationType: 'unit' | 'common_area';
+		unitId: string;
+		commonAreaDescription: string;
+		title: string;
+		description: string;
+		category: string;
+		priority: string;
+		vendorId: string;
+		dueDate: string;
+	}>({
+		locationType: 'unit',
 		unitId: '',
 		commonAreaDescription: '',
 		title: '',
 		description: '',
-		category: 'MAINTENANCE',
-		priority: 'NORMAL',
+		category: DocumentCategoryValues.MAINTENANCE,
+		priority: OwnerIntentPriorityValues.NORMAL,
 		vendorId: '',
 		dueDate: ''
 	});
 
 	const categoryOptions = [
-		{ value: 'MAINTENANCE', label: 'Maintenance' },
-		{ value: 'REPAIR', label: 'Repair' },
-		{ value: 'LANDSCAPING', label: 'Landscaping' },
-		{ value: 'CLEANING', label: 'Cleaning' },
-		{ value: 'ELECTRICAL', label: 'Electrical' },
-		{ value: 'PLUMBING', label: 'Plumbing' },
-		{ value: 'HVAC', label: 'HVAC' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: DocumentCategoryValues.MAINTENANCE, label: 'Maintenance' },
+		{ value: WorkOrderCategoryValues.REPAIR, label: 'Repair' },
+		{ value: ARCCategoryValues.LANDSCAPING, label: 'Landscaping' },
+		{ value: WorkOrderCategoryValues.CLEANING, label: 'Cleaning' },
+		{ value: AssetCategoryValues.ELECTRICAL, label: 'Electrical' },
+		{ value: AssetCategoryValues.PLUMBING, label: 'Plumbing' },
+		{ value: ARCCategoryValues.HVAC, label: ARCCategoryValues.HVAC },
+		{ value: WorkOrderCategoryValues.OTHER, label: 'Other' }
 	];
 
 	const priorityOptions = [
-		{ value: 'EMERGENCY', label: 'Emergency' },
-		{ value: 'URGENT', label: 'Urgent' },
-		{ value: 'HIGH', label: 'High' },
-		{ value: 'NORMAL', label: 'Normal' },
-		{ value: 'LOW', label: 'Low' }
+		{ value: WorkOrderPriorityValues.EMERGENCY, label: 'Emergency' },
+		{ value: OwnerIntentPriorityValues.URGENT, label: 'Urgent' },
+		{ value: WorkOrderPriorityValues.HIGH, label: 'High' },
+		{ value: OwnerIntentPriorityValues.NORMAL, label: 'Normal' },
+		{ value: WorkOrderPriorityValues.LOW, label: 'Low' }
 	];
 
 	const workOrderId = $derived(($page.params as Record<string, string>).id);
@@ -68,8 +78,8 @@
 					commonAreaDescription: wo.commonAreaName || '',
 					title: wo.title || '',
 					description: wo.description || '',
-					category: wo.category || 'MAINTENANCE',
-					priority: wo.priority || 'NORMAL',
+					category: (wo.category as string) || DocumentCategoryValues.MAINTENANCE,
+					priority: (wo.priority as string) || OwnerIntentPriorityValues.NORMAL,
 					vendorId: wo.assignedVendorId || '',
 					dueDate: wo.slaDeadline?.split('T')[0] || ''
 				};

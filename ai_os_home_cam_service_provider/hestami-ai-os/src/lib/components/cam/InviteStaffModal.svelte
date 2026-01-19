@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { X, Loader2, Mail, Shield, Check } from 'lucide-svelte';
-	import { orgStaffApi, type StaffRole, type PillarAccess } from '$lib/api/cam';
+	import { OrganizationTypeValues, PillarAccessValues, StaffRoleValues, UserRoleValues, orgStaffApi, type PillarAccess, type StaffRole } from '$lib/api/cam';
 	import { nanoid } from 'nanoid';
 
 	interface Props {
@@ -22,28 +22,28 @@
 	let error = $state('');
 
 	const roles: { value: StaffRole; label: string }[] = [
-		{ value: 'PLATFORM_ADMIN', label: 'Platform Admin' },
-		{ value: 'CAM_SPECIALIST', label: 'CAM Specialist' },
-		{ value: 'OPERATIONS_COORDINATOR', label: 'Operations Coordinator' },
-		{ value: 'CONCIERGE_OPERATOR', label: 'Concierge Operator' },
-		{ value: 'VENDOR_LIAISON', label: 'Vendor Liaison' }
+		{ value: StaffRoleValues.PLATFORM_ADMIN, label: 'Platform Admin' },
+		{ value: StaffRoleValues.CAM_SPECIALIST, label: 'CAM Specialist' },
+		{ value: StaffRoleValues.OPERATIONS_COORDINATOR, label: 'Operations Coordinator' },
+		{ value: StaffRoleValues.CONCIERGE_OPERATOR, label: 'Concierge Operator' },
+		{ value: StaffRoleValues.VENDOR_LIAISON, label: 'Vendor Liaison' }
 	];
 
 	const pillars: { value: PillarAccess; label: string }[] = [
-		{ value: 'CAM', label: 'CAM Pillar' },
-		{ value: 'CONCIERGE', label: 'Concierge Pillar' },
-		{ value: 'CONTRACTOR', label: 'Contractor Pillar' },
-		{ value: 'VENDOR', label: 'Vendor Pillar' },
-		{ value: 'ADMIN', label: 'Admin Pillar' }
+		{ value: PillarAccessValues.CAM, label: 'CAM Pillar' },
+		{ value: PillarAccessValues.CONCIERGE, label: 'Concierge Pillar' },
+		{ value: PillarAccessValues.CONTRACTOR, label: 'Contractor Pillar' },
+		{ value: UserRoleValues.VENDOR, label: 'Vendor Pillar' },
+		{ value: UserRoleValues.ADMIN, label: 'Admin Pillar' }
 	];
 
 	// Enforce CAM-only for CAM org types
-	const isCamOnly = $derived(['MANAGEMENT_COMPANY', 'COMMUNITY_ASSOCIATION'].includes(orgType));
+	const isCamOnly = $derived(([OrganizationTypeValues.MANAGEMENT_COMPANY, OrganizationTypeValues.COMMUNITY_ASSOCIATION] as string[]).includes(orgType));
 
 	$effect(() => {
 		if (open) {
 			if (isCamOnly) {
-				selectedPillars = ['CAM'];
+				selectedPillars = [PillarAccessValues.CAM];
 			}
 		} else {
 			// Reset form
@@ -51,7 +51,7 @@
 			displayName = '';
 			title = '';
 			selectedRoles = [];
-			selectedPillars = isCamOnly ? ['CAM'] : [];
+			selectedPillars = isCamOnly ? [PillarAccessValues.CAM] : [];
 			canBeAssignedCases = false;
 			error = '';
 		}
@@ -66,7 +66,7 @@
 	}
 
 	function togglePillar(pillar: PillarAccess) {
-		if (isCamOnly && pillar !== 'CAM') return;
+		if (isCamOnly && pillar !== PillarAccessValues.CAM) return;
 		if (selectedPillars.includes(pillar)) {
 			selectedPillars = selectedPillars.filter((p) => p !== pillar);
 		} else {
@@ -199,14 +199,14 @@
 							<button
 								type="button"
 								onclick={() => togglePillar(pillar.value)}
-								disabled={isCamOnly && pillar.value !== 'CAM'}
-								class="flex w-full items-center justify-between rounded-lg border p-3 transition-colors {selectedPillars.includes(pillar.value) ? 'border-primary-500 bg-primary-500/10' : 'border-surface-300-700 bg-surface-100-900 hover:bg-surface-200-800'} {isCamOnly && pillar.value !== 'CAM' ? 'opacity-50 cursor-not-allowed' : ''}"
+								disabled={isCamOnly && pillar.value !== PillarAccessValues.CAM}
+								class="flex w-full items-center justify-between rounded-lg border p-3 transition-colors {selectedPillars.includes(pillar.value) ? 'border-primary-500 bg-primary-500/10' : 'border-surface-300-700 bg-surface-100-900 hover:bg-surface-200-800'} {isCamOnly && pillar.value !== PillarAccessValues.CAM ? 'opacity-50 cursor-not-allowed' : ''}"
 							>
 								<div class="flex items-center gap-3">
 									<Shield class="h-5 w-5 {selectedPillars.includes(pillar.value) ? 'text-primary-500' : 'text-surface-500'}" />
 									<div class="text-left">
 										<p class="text-sm font-medium {selectedPillars.includes(pillar.value) ? 'text-primary-500' : ''}">{pillar.label}</p>
-										{#if isCamOnly && pillar.value === 'CAM'}
+										{#if isCamOnly && pillar.value === PillarAccessValues.CAM}
 											<p class="text-xs text-surface-500 italic">Enforced for your organization type</p>
 										{/if}
 									</div>

@@ -11,6 +11,17 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CUSTOMER_WORKFLOW_ERROR: 'CUSTOMER_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('CustomerWorkflow');
 
@@ -20,7 +31,11 @@ const WORKFLOW_ERROR_EVENT = 'customer_error';
 export const CustomerAction = {
 	CREATE: 'CREATE',
 	UPDATE: 'UPDATE',
-	DELETE: 'DELETE'
+	DELETE: 'DELETE',
+	// WorkflowStep constants
+	CREATE_CUSTOMER: 'CREATE_CUSTOMER',
+	UPDATE_CUSTOMER: 'UPDATE_CUSTOMER',
+	DELETE_CUSTOMER: 'DELETE_CUSTOMER'
 } as const;
 
 export type CustomerAction = (typeof CustomerAction)[keyof typeof CustomerAction];
@@ -69,15 +84,15 @@ async function createCustomer(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: customer.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Customer created: ${customer.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'customerWorkflow_v1',
-		workflowStep: 'CREATE_CUSTOMER',
+		workflowStep: CustomerAction.CREATE_CUSTOMER,
 		workflowVersion: 'v1'
 	});
 
@@ -117,15 +132,15 @@ async function updateCustomer(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: customer.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Customer updated: ${customer.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'customerWorkflow_v1',
-		workflowStep: 'UPDATE_CUSTOMER',
+		workflowStep: CustomerAction.UPDATE_CUSTOMER,
 		workflowVersion: 'v1'
 	});
 
@@ -150,15 +165,15 @@ async function deleteCustomer(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: customerId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Customer deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'customerWorkflow_v1',
-		workflowStep: 'DELETE_CUSTOMER',
+		workflowStep: CustomerAction.DELETE_CUSTOMER,
 		workflowVersion: 'v1'
 	});
 
@@ -172,7 +187,7 @@ async function customerWorkflow(input: CustomerWorkflowInput): Promise<CustomerW
 		let customerId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE': {
+			case CustomerAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createCustomer(input.organizationId, input.userId, input.data),
 					{ name: 'createCustomer' }
@@ -180,7 +195,7 @@ async function customerWorkflow(input: CustomerWorkflowInput): Promise<CustomerW
 				customerId = result.id;
 				break;
 			}
-			case 'UPDATE': {
+			case CustomerAction.UPDATE: {
 				if (!input.customerId) throw new Error('customerId required for UPDATE');
 				const result = await DBOS.runStep(
 					() => updateCustomer(input.organizationId, input.userId, input.customerId!, input.data),
@@ -189,7 +204,7 @@ async function customerWorkflow(input: CustomerWorkflowInput): Promise<CustomerW
 				customerId = result.id;
 				break;
 			}
-			case 'DELETE': {
+			case CustomerAction.DELETE: {
 				if (!input.customerId) throw new Error('customerId required for DELETE');
 				const result = await DBOS.runStep(
 					() => deleteCustomer(input.organizationId, input.userId, input.customerId!),
@@ -217,8 +232,8 @@ async function customerWorkflow(input: CustomerWorkflowInput): Promise<CustomerW
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CUSTOMER_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CUSTOMER_WORKFLOW_ERROR
 		});
 
 		return {

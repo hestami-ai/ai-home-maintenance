@@ -3,8 +3,9 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { ReportCategorySchema, ReportFormatSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startReportDefinitionWorkflow } from '../../../workflows/reportDefinitionWorkflow.js';
+import { startReportDefinitionWorkflow, ReportDefinitionAction } from '../../../workflows/reportDefinitionWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
+import { SortOrder } from '../../../workflows/schemas.js';
 
 const log = createModuleLogger('ReportDefinitionRoute');
 
@@ -59,7 +60,7 @@ export const reportDefinitionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportDefinitionWorkflow(
 				{
-					action: 'CREATE_REPORT',
+					action: ReportDefinitionAction.CREATE_REPORT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -146,7 +147,7 @@ export const reportDefinitionRouter = {
 
 			const reports = await prisma.reportDefinition.findMany({
 				where,
-				orderBy: [{ category: 'asc' }, { name: 'asc' }],
+				orderBy: [{ category: SortOrder.ASC }, { name: SortOrder.ASC }],
 				take: limit + 1,
 				...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
 			});
@@ -272,7 +273,7 @@ export const reportDefinitionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportDefinitionWorkflow(
 				{
-					action: 'UPDATE_REPORT',
+					action: ReportDefinitionAction.UPDATE_REPORT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -332,7 +333,7 @@ export const reportDefinitionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportDefinitionWorkflow(
 				{
-					action: 'DELETE_REPORT',
+					action: ReportDefinitionAction.DELETE_REPORT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

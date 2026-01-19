@@ -10,8 +10,9 @@ import {
 import { prisma } from '../../../db.js';
 import { PropertyOwnershipRoleSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipRoleSchema.js';
 import { PropertyOwnershipStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyOwnershipStatusSchema.js';
+import { PartyType, PropertyOwnershipRole, PropertyOwnershipStatus } from '../../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startPropertyOwnershipWorkflow } from '../../../workflows/index.js';
+import { startPropertyOwnershipWorkflow, PropertyOwnershipWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('PropertyOwnershipRoute');
 
@@ -100,13 +101,13 @@ export const propertyOwnershipRouter = {
 			}
 
 			// Validate: at least one OWNER must exist (or this is creating the first OWNER)
-			if (input.role !== 'OWNER') {
+			if (input.role !== PropertyOwnershipRole.OWNER) {
 				// Defense in depth: explicit org filter via property relationship for connection pool safety
 				const ownerExists = await prisma.propertyOwnership.findFirst({
 					where: {
 						propertyId: input.propertyId,
-						role: 'OWNER',
-						status: 'ACTIVE',
+						role: PropertyOwnershipRole.OWNER,
+						status: PropertyOwnershipStatus.ACTIVE,
 						deletedAt: null,
 						property: { ownerOrgId: context.organization.id }
 					}
@@ -120,7 +121,7 @@ export const propertyOwnershipRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyOwnershipWorkflow(
 				{
-					action: 'CREATE',
+					action: PropertyOwnershipWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -227,7 +228,7 @@ export const propertyOwnershipRouter = {
 			});
 
 			const displayName =
-				propertyOwnership.party.partyType === 'INDIVIDUAL'
+				propertyOwnership.party.partyType === PartyType.INDIVIDUAL
 					? `${propertyOwnership.party.firstName ?? ''} ${propertyOwnership.party.lastName ?? ''}`.trim()
 					: propertyOwnership.party.entityName ?? '';
 
@@ -345,7 +346,7 @@ export const propertyOwnershipRouter = {
 						id: po.id,
 						partyId: po.partyId,
 						partyName:
-							po.party.partyType === 'INDIVIDUAL'
+							po.party.partyType === PartyType.INDIVIDUAL
 								? `${po.party.firstName ?? ''} ${po.party.lastName ?? ''}`.trim()
 								: po.party.entityName ?? '',
 						partyType: po.party.partyType,
@@ -512,7 +513,7 @@ export const propertyOwnershipRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyOwnershipWorkflow(
 				{
-					action: 'UPDATE',
+					action: PropertyOwnershipWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyOwnershipId: input.id,
@@ -591,7 +592,7 @@ export const propertyOwnershipRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyOwnershipWorkflow(
 				{
-					action: 'VERIFY',
+					action: PropertyOwnershipWorkflowAction.VERIFY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyOwnershipId: input.id
@@ -663,13 +664,13 @@ export const propertyOwnershipRouter = {
 			await context.cerbos.authorize('terminate', 'property_ownership', existing.id);
 
 			// Check if this is the last OWNER - cannot terminate
-			if (existing.role === 'OWNER') {
+			if (existing.role === PropertyOwnershipRole.OWNER) {
 				// Defense in depth: explicit org filter via property relationship for connection pool safety
 				const otherOwners = await prisma.propertyOwnership.count({
 					where: {
 						propertyId: existing.propertyId,
-						role: 'OWNER',
-						status: 'ACTIVE',
+						role: PropertyOwnershipRole.OWNER,
+						status: PropertyOwnershipStatus.ACTIVE,
 						id: { not: input.id },
 						deletedAt: null,
 						property: { ownerOrgId: context.organization.id }
@@ -684,7 +685,7 @@ export const propertyOwnershipRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyOwnershipWorkflow(
 				{
-					action: 'TERMINATE',
+					action: PropertyOwnershipWorkflowAction.TERMINATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyOwnershipId: input.id,
@@ -752,13 +753,13 @@ export const propertyOwnershipRouter = {
 			await context.cerbos.authorize('delete', 'property_ownership', existing.id);
 
 			// Check if this is the last OWNER - cannot delete
-			if (existing.role === 'OWNER') {
+			if (existing.role === PropertyOwnershipRole.OWNER) {
 				// Defense in depth: explicit org filter via property relationship for connection pool safety
 				const otherOwners = await prisma.propertyOwnership.count({
 					where: {
 						propertyId: existing.propertyId,
-						role: 'OWNER',
-						status: 'ACTIVE',
+						role: PropertyOwnershipRole.OWNER,
+						status: PropertyOwnershipStatus.ACTIVE,
 						id: { not: input.id },
 						deletedAt: null,
 						property: { ownerOrgId: context.organization.id }
@@ -773,7 +774,7 @@ export const propertyOwnershipRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyOwnershipWorkflow(
 				{
-					action: 'DELETE',
+					action: PropertyOwnershipWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyOwnershipId: input.id

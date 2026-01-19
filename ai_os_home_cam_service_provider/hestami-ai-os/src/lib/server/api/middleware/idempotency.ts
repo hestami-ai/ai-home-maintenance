@@ -1,6 +1,7 @@
 import { prisma } from '../../db.js';
 import type { RequestContext } from '../context.js';
 import { createModuleLogger } from '../../logger.js';
+import { WorkflowErrorType } from '../../workflows/schemas.js';
 
 const log = createModuleLogger('IdempotencyMiddleware');
 
@@ -207,7 +208,7 @@ export async function withIdempotency<T>(
 						code: error.code,
 						message: error.message,
 						data: error.data,
-						type: 'ORPC_ERROR'
+						type: WorkflowErrorType.ORPC_ERROR
 					}
 				},
 				statusCode

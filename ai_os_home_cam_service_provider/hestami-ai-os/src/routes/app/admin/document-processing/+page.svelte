@@ -1,26 +1,25 @@
 <script lang="ts">
-	import { onMount, onDestroy, untrack } from 'svelte';
-	import { 
-		Activity, 
-		AlertCircle, 
-		CheckCircle2, 
-		Clock, 
-		FileText, 
-		RefreshCw, 
-		Search, 
-		Settings, 
-		ShieldAlert, 
-		Trash2, 
+	import {
+		Activity,
+		AlertCircle,
+		CheckCircle2,
+		Clock,
+		FileText,
+		RefreshCw,
+		Search,
+		Settings,
+		ShieldAlert,
+		Trash2,
 		Upload,
 		MoreVertical,
 		ExternalLink,
 		ChevronRight,
 		Filter
 	} from 'lucide-svelte';
-	import { 
-		PageContainer, 
-		Card, 
-		Alert, 
+	import {
+		PageContainer,
+		Card,
+		Alert,
 		LoadingSpinner,
 		EmptyState
 	} from '$lib/components/ui';
@@ -33,37 +32,37 @@
 
 	let { data } = $props();
 
-	// State for metrics and settings
-	let stats = $state(untrack(() => data.stats) || []);
-	let settings = $state(untrack(() => data.settings) || {});
+	// State for metrics and settings - initialize with safe defaults
+	let stats = $state<any[]>([]);
+	let settings = $state<Record<string, any>>({});
 	let showSettings = $state(false);
 	let isLoading = $state(false);
 	let lastUpdated = $state(new Date());
 
 	// State for queue items
-	let queueItems = $state(untrack(() => data.initialQueue) || []);
+	let queueItems = $state<any[]>([]);
 	let activeTab = $state('processing');
-	let pagination = $state(untrack(() => data.pagination) || { nextCursor: null, hasMore: false });
+	let pagination = $state<{ nextCursor: string | null; hasMore: boolean }>({ nextCursor: null, hasMore: false });
 	let selectedIds = $state(new Set<string>());
 
-	// Sync local state if props change (e.g. on navigation)
+	// Sync local state from props - track data to re-run on navigation, guard against undefined
 	$effect(() => {
-		stats = data.stats || [];
-		settings = data.settings || {};
-		queueItems = data.initialQueue || [];
-		pagination = data.pagination || { nextCursor: null, hasMore: false };
+		if (data == null || typeof data !== 'object') return;
+		stats = data.stats ?? [];
+		settings = (data.settings ?? {}) as Record<string, any>;
+		queueItems = data.initialQueue ?? [];
+		pagination = data.pagination ?? { nextCursor: null, hasMore: false };
 	});
 
-	// Polling for updates
-	let pollInterval: any;
-
-	onMount(() => {
+	// Polling for updates using $effect for reliable cleanup during SPA navigation
+	$effect(() => {
 		// Refresh metrics every 30 seconds as per requirements
-		pollInterval = setInterval(refreshData, 30000);
-	});
+		const pollInterval = setInterval(refreshData, 30000);
 
-	onDestroy(() => {
-		if (pollInterval) clearInterval(pollInterval);
+		// Cleanup function runs when effect re-runs or component unmounts
+		return () => {
+			clearInterval(pollInterval);
+		};
 	});
 
 	async function refreshData() {
@@ -132,7 +131,7 @@
 	]);
 </script>
 
-{#snippet MetricCard(title: string, value: string | number, icon: any, color: string, description?: string)}
+{#snippet MetricCard(title: string, value: string | number, IconComponent: any, color: string, description?: string)}
 	<div class="rounded-xl border border-surface-300-700 bg-surface-50-950 p-5 shadow-sm">
 		<div class="flex items-center justify-between">
 			<div>
@@ -140,7 +139,7 @@
 				<p class="mt-1 text-2xl font-bold {color}">{value}</p>
 			</div>
 			<div class="rounded-lg bg-surface-100-900 p-2 text-surface-500">
-				{@render icon()}
+				<IconComponent class="h-5 w-5" />
 			</div>
 		</div>
 		{#if description}
@@ -326,12 +325,12 @@
 
 	<!-- Dashboard Metrics -->
 	<div class="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-		{@render MetricCard('Processing', processingCount, () => Activity, 'text-blue-500', 'Active worker jobs')}
-		{@render MetricCard('Auto-Retry', awaitingRetryCount, () => Clock, 'text-amber-500', 'Scheduled for retry')}
-		{@render MetricCard('Attention', needsAttentionCount, () => AlertCircle, 'text-red-500', 'Needs intervention')}
-		{@render MetricCard('Infected', infectedCount, () => ShieldAlert, 'text-red-600', 'Quarantined files')}
-		{@render MetricCard('Processed', processedToday, () => CheckCircle2, 'text-green-500', 'Successfully today')}
-		{@render MetricCard('Success Rate', `${successRate}%`, () => Activity, 'text-primary-500', 'Last 24 hours')}
+		{@render MetricCard('Processing', processingCount, Activity, 'text-blue-500', 'Active worker jobs')}
+		{@render MetricCard('Auto-Retry', awaitingRetryCount, Clock, 'text-amber-500', 'Scheduled for retry')}
+		{@render MetricCard('Attention', needsAttentionCount, AlertCircle, 'text-red-500', 'Needs intervention')}
+		{@render MetricCard('Infected', infectedCount, ShieldAlert, 'text-red-600', 'Quarantined files')}
+		{@render MetricCard('Processed', processedToday, CheckCircle2, 'text-green-500', 'Successfully today')}
+		{@render MetricCard('Success Rate', `${successRate}%`, Activity, 'text-primary-500', 'Last 24 hours')}
 	</div>
 
 	{#if needsAttentionCount > 0}

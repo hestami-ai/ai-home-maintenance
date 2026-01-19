@@ -9,9 +9,14 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { ARCRequestStatus, type EntityWorkflowResult } from './schemas.js';
-import type { ARCReviewAction } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, ARCRequestStatus as ARCRequestStatusEnum, ARCReviewAction } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ARC_REVIEW_WORKFLOW_ERROR: 'ARC_REVIEW_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ARCReviewWorkflow');
 
@@ -75,7 +80,7 @@ const getReviewStats = async (requestId: string) => {
 	const counts = reviews.reduce(
 		(acc, r) => {
 			acc.total += 1;
-			if (r.action === 'APPROVE') acc.approvals += 1;
+			if (r.action === ARCReviewAction.APPROVE) acc.approvals += 1;
 			return acc;
 		},
 		{ total: 0, approvals: 0 }
@@ -183,7 +188,7 @@ async function assignCommittee(
 		const updated = await orgTransaction(organizationId, async (tx) => {
 			return tx.aRCRequest.update({
 				where: { id: requestId },
-				data: { committeeId, status: 'UNDER_REVIEW', reviewedAt: null, decisionDate: null }
+				data: { committeeId, status: ARCRequestStatusEnum.UNDER_REVIEW, reviewedAt: null, decisionDate: null }
 			});
 		}, { userId, reason: 'Assigning committee to ARC request via workflow' });
 
@@ -224,8 +229,8 @@ async function submitReview(
 
 	try {
 		const review = await orgTransaction(organizationId, async (tx) => {
-			if (request.status === 'SUBMITTED') {
-				await tx.aRCRequest.update({ where: { id: request.id }, data: { status: 'UNDER_REVIEW' } });
+			if (request.status === ARCRequestStatusEnum.SUBMITTED) {
+				await tx.aRCRequest.update({ where: { id: request.id }, data: { status: ARCRequestStatusEnum.UNDER_REVIEW } });
 			}
 
 			return tx.aRCReview.create({
@@ -287,7 +292,7 @@ async function recordDecision(
 			throw new Error('Quorum not met for committee decision');
 		}
 
-		if (action === 'APPROVE' && committee.approvalThreshold !== null) {
+		if (action === ARCReviewAction.APPROVE && committee.approvalThreshold !== null) {
 			const threshold = Number(committee.approvalThreshold);
 			const approvalPct = activeMembers > 0 ? (approvals / activeMembers) * 100 : 0;
 			if (approvalPct < threshold) {
@@ -332,7 +337,7 @@ async function recordDecision(
 async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCReviewWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'ADD_MEMBER': {
+			case ARCReviewAction_WF.ADD_MEMBER: {
 				const entityId = await DBOS.runStep(
 					() => addMember(input.organizationId, input.userId, input.committeeId!, input.data),
 					{ name: 'addMember' }
@@ -340,7 +345,7 @@ async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCRevi
 				return { success: true, entityId };
 			}
 
-			case 'REMOVE_MEMBER': {
+			case ARCReviewAction_WF.REMOVE_MEMBER: {
 				const leftAt = await DBOS.runStep(
 					() => removeMember(input.organizationId, input.userId, input.committeeId!, input.data),
 					{ name: 'removeMember' }
@@ -348,7 +353,7 @@ async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCRevi
 				return { success: true, leftAt };
 			}
 
-			case 'ASSIGN_COMMITTEE': {
+			case ARCReviewAction_WF.ASSIGN_COMMITTEE: {
 				const result = await DBOS.runStep(
 					() => assignCommittee(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'assignCommittee' }
@@ -356,7 +361,7 @@ async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCRevi
 				return { success: true, entityId: result.entityId, status: result.status };
 			}
 
-			case 'SUBMIT_REVIEW': {
+			case ARCReviewAction_WF.SUBMIT_REVIEW: {
 				const entityId = await DBOS.runStep(
 					() => submitReview(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'submitReview' }
@@ -364,7 +369,7 @@ async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCRevi
 				return { success: true, entityId };
 			}
 
-			case 'RECORD_DECISION': {
+			case ARCReviewAction_WF.RECORD_DECISION: {
 				const result = await DBOS.runStep(
 					() => recordDecision(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'recordDecision' }
@@ -382,8 +387,8 @@ async function arcReviewWorkflow(input: ARCReviewWorkflowInput): Promise<ARCRevi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ARC_REVIEW_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ARC_REVIEW_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

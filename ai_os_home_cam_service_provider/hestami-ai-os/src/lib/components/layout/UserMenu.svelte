@@ -21,12 +21,14 @@
 		memberships: OrganizationMembership[];
 	}
 
-	let { 
+	let {
 		user,
-		currentOrganization, 
-		memberships 
+		currentOrganization,
+		memberships = []
 	}: Props = $props();
 
+	// Safe memberships access for navigation transitions
+	const safeMemberships = $derived(Array.isArray(memberships) ? memberships : []);
 
 	let isOpen = $state(false);
 
@@ -57,7 +59,7 @@
 	});
 
 	const userInitial = $derived(user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?');
-	const hasMultipleOrgs = $derived(memberships.length > 1);
+	const hasMultipleOrgs = $derived(safeMemberships.length > 1);
 </script>
 
 <div class="relative">
@@ -110,14 +112,14 @@
 				</div>
 
 				<!-- Organizations Section -->
-				{#if memberships.length > 0}
+				{#if safeMemberships.length > 0}
 					<hr class="my-2 border-surface-300-700" />
 
 					<p class="px-3 py-1 text-xs font-semibold uppercase text-surface-500">
 						{hasMultipleOrgs ? 'Switch Organization' : 'Organization'}
 					</p>
 
-					{#each memberships as membership}
+					{#each safeMemberships as membership}
 						<form action="/api/organization/switch" method="POST" class="w-full">
 							<input type="hidden" name="organizationId" value={membership.organization.id} />
 							<button

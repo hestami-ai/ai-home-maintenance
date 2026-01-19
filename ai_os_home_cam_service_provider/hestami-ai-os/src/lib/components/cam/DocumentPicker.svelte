@@ -7,7 +7,7 @@
 		getCamCategory,
 		type CamDocumentCategory
 	} from '$lib/utils/documentCategories';
-	import { documentApi } from '$lib/api/cam';
+	import { DocumentStatusValues, PolicyStatusValues, documentApi } from '$lib/api/cam';
 
 	interface Document {
 		id: string;
@@ -49,7 +49,7 @@
 	let documents = $state<Document[]>([]);
 	let isLoading = $state(false);
 	let searchQuery = $state('');
-	let statusFilter = $state<string>('ACTIVE');
+	let statusFilter = $state<string>(DocumentStatusValues.ACTIVE);
 	let localCategoryFilter = $state<string>('');
 	let localSelected = $state<SelectedDocument[]>([]);
 
@@ -63,8 +63,8 @@
 
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'ACTIVE', label: 'Active' },
-		{ value: 'DRAFT', label: 'Draft' }
+		{ value: DocumentStatusValues.ACTIVE, label: 'Active' },
+		{ value: PolicyStatusValues.DRAFT, label: 'Draft' }
 	];
 
 	$effect(() => {

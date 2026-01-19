@@ -11,6 +11,12 @@ import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import type { CommunicationChannel, CommunicationDirection } from '../../../../generated/prisma/client.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CASE_COMMUNICATION_WORKFLOW_ERROR: 'CASE_COMMUNICATION_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('CaseCommunicationWorkflow');
 
@@ -115,7 +121,7 @@ async function updateCommunicationStatus(
 async function caseCommunicationWorkflow(input: CaseCommunicationWorkflowInput): Promise<CaseCommunicationWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE': {
+			case CaseCommunicationAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createCaseCommunication(input.organizationId, input.userId, input.data),
 					{ name: 'createCaseCommunication' }
@@ -144,8 +150,8 @@ async function caseCommunicationWorkflow(input: CaseCommunicationWorkflowInput):
 		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CASE_COMMUNICATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CASE_COMMUNICATION_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

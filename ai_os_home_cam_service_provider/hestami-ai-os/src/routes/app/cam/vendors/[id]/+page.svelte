@@ -4,7 +4,7 @@
 	import { ArrowLeft, Users, FileText, Clock, Phone, Mail, MapPin } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, VendorApprovalModal, UploadComplianceDocModal } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { vendorApi, documentApi, activityEventApi, type Vendor, type Document } from '$lib/api/cam';
+	import { ARCReviewActionValues, DocumentContextTypeValues, DocumentVisibilityValues, VendorApprovalStatusValues, WorkOrderCategoryValues, activityEventApi, documentApi, type Document, type Vendor, vendorApi } from '$lib/api/cam';
 	import { orpc } from '$lib/api';
 
 	interface VendorHistoryEvent {
@@ -53,7 +53,7 @@
 	async function loadDocuments() {
 		if (!vendorId) return;
 		try {
-			const response = await documentApi.list({ contextType: 'VENDOR', contextId: vendorId });
+			const response = await documentApi.list({ contextType: DocumentContextTypeValues.VENDOR, contextId: vendorId });
 			if (response.ok) {
 				documents = response.data.documents;
 			}
@@ -65,7 +65,7 @@
 	async function loadHistory() {
 		if (!vendorId) return;
 		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'VENDOR' as any, entityId: vendorId });
+			const response = await activityEventApi.getByEntity({ entityType: DocumentContextTypeValues.VENDOR as any, entityId: vendorId });
 			if (response.ok) {
 				history = response.data.events.map((e: any) => ({
 					id: e.id,
@@ -82,10 +82,10 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'APPROVED': return 'text-success-500 bg-success-500/10';
-			case 'PENDING': return 'text-warning-500 bg-warning-500/10';
-			case 'SUSPENDED': return 'text-error-500 bg-error-500/10';
-			case 'INACTIVE': return 'text-surface-500 bg-surface-500/10';
+			case VendorApprovalStatusValues.APPROVED: return 'text-success-500 bg-success-500/10';
+			case VendorApprovalStatusValues.PENDING: return 'text-warning-500 bg-warning-500/10';
+			case VendorApprovalStatusValues.SUSPENDED: return 'text-error-500 bg-error-500/10';
+			// Note: INACTIVE is not a valid VendorApprovalStatus value, kept as fallback for legacy data
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -119,7 +119,7 @@
 		isActionLoading = true;
 		try {
 			const response = await vendorApi.update(vendor.id, {
-				isActive: data.action === 'APPROVE'
+				isActive: data.action === ARCReviewActionValues.APPROVE
 			});
 
 			if (response.ok) {
@@ -144,12 +144,12 @@
 			const result = await orpc.document.uploadWithFile({
 				idempotencyKey: crypto.randomUUID(),
 				file: data.file,
-				contextType: 'VENDOR',
+				contextType: DocumentContextTypeValues.VENDOR,
 				contextId: vendor.id,
 				title: data.file.name.replace(/\.[^/.]+$/, ''),
 				description: data.notes,
 				category: mapDocumentTypeToCategory(data.documentType),
-				visibility: 'STAFF_ONLY',
+				visibility: DocumentVisibilityValues.STAFF_ONLY,
 				expirationDate: data.expirationDate ? new Date(data.expirationDate).toISOString() : undefined
 			});
 
@@ -216,8 +216,8 @@
 					<a href="/app/cam/vendors/{vendor.id}/edit" class="btn btn-sm preset-tonal-surface">
 						Edit
 					</a>
-					{#if (vendor as any).status === 'PENDING'}
-						<DecisionButton variant="approve" onclick={() => openApprovalModal('APPROVE')}>
+					{#if (vendor as any).status === VendorApprovalStatusValues.PENDING}
+						<DecisionButton variant="approve" onclick={() => openApprovalModal(ARCReviewActionValues.APPROVE)}>
 							Approve
 						</DecisionButton>
 						<DecisionButton variant="deny" onclick={() => openApprovalModal('REJECT')}>
@@ -226,7 +226,7 @@
 						<DecisionButton variant="default" onclick={() => openApprovalModal('REQUEST_INFO')}>
 							Request Info
 						</DecisionButton>
-					{:else if (vendor as any).status === 'APPROVED'}
+					{:else if (vendor as any).status === VendorApprovalStatusValues.APPROVED}
 						<DecisionButton variant="deny" onclick={() => openApprovalModal('REJECT')}>
 							Suspend
 						</DecisionButton>

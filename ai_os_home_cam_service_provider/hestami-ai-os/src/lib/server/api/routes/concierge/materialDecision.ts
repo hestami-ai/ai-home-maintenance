@@ -11,7 +11,7 @@ import { prisma } from '../../../db.js';
 import { DecisionCategorySchema } from '../../../../../../generated/zod/inputTypeSchemas/DecisionCategorySchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startMaterialDecisionWorkflow } from '../../../workflows/index.js';
+import { startMaterialDecisionWorkflow, MaterialDecisionWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('MaterialDecisionRoute');
 
@@ -79,7 +79,7 @@ export const materialDecisionRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startMaterialDecisionWorkflow(
 				{
-					action: 'CREATE',
+					action: MaterialDecisionWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					caseId: input.caseId,
@@ -301,7 +301,7 @@ export const materialDecisionRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startMaterialDecisionWorkflow(
 				{
-					action: 'RECORD_OUTCOME',
+					action: MaterialDecisionWorkflowAction.RECORD_OUTCOME,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					decisionId: input.id,
@@ -379,7 +379,7 @@ export const materialDecisionRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startMaterialDecisionWorkflow(
 				{
-					action: 'UPDATE',
+					action: MaterialDecisionWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					decisionId: input.id,
@@ -440,7 +440,7 @@ export const materialDecisionRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startMaterialDecisionWorkflow(
 				{
-					action: 'DELETE',
+					action: MaterialDecisionWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					decisionId: input.id

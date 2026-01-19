@@ -7,7 +7,7 @@
 		Wrench
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
-	import { jobApi, type JobSourceType } from '$lib/api/cam';
+	import { ARCCategoryValues, ActivityEntityTypeValues, JobPriorityValues, JobSourceTypeValues, JobStatusValues, jobApi, type JobSourceType } from '$lib/api/cam';
 
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
@@ -15,9 +15,9 @@
 	// Form fields
 	let title = $state('');
 	let description = $state('');
-	let sourceType = $state<JobSourceType>('DIRECT_CUSTOMER');
+	let sourceType = $state<JobSourceType>(JobSourceTypeValues.DIRECT_CUSTOMER);
 	let category = $state('');
-	let priority = $state<'EMERGENCY' | 'HIGH' | 'MEDIUM' | 'LOW'>('MEDIUM');
+	let priority = $state<string>(JobPriorityValues.MEDIUM);
 	let addressLine1 = $state('');
 	let addressLine2 = $state('');
 	let city = $state('');
@@ -28,23 +28,23 @@
 	let estimatedCost = $state<number | undefined>(undefined);
 
 	const sourceTypes: Array<{ value: JobSourceType; label: string }> = [
-		{ value: 'DIRECT_CUSTOMER', label: 'Direct Customer' },
-		{ value: 'LEAD', label: 'Lead' },
-		{ value: 'WORK_ORDER', label: 'Work Order' },
-		{ value: 'VIOLATION', label: 'Violation' },
-		{ value: 'ARC_REQUEST', label: 'ARC Request' },
-		{ value: 'RECURRING', label: 'Recurring' }
+		{ value: JobSourceTypeValues.DIRECT_CUSTOMER, label: 'Direct Customer' },
+		{ value: JobStatusValues.LEAD, label: 'Lead' },
+		{ value: ActivityEntityTypeValues.WORK_ORDER, label: 'Work Order' },
+		{ value: ActivityEntityTypeValues.VIOLATION, label: 'Violation' },
+		{ value: ActivityEntityTypeValues.ARC_REQUEST, label: 'ARC Request' },
+		{ value: JobSourceTypeValues.RECURRING, label: 'Recurring' }
 	];
 
 	const priorities = [
-		{ value: 'EMERGENCY', label: 'Emergency' },
-		{ value: 'HIGH', label: 'High' },
-		{ value: 'MEDIUM', label: 'Medium' },
-		{ value: 'LOW', label: 'Low' }
+		{ value: JobPriorityValues.EMERGENCY, label: 'Emergency' },
+		{ value: JobPriorityValues.HIGH, label: 'High' },
+		{ value: JobPriorityValues.MEDIUM, label: 'Medium' },
+		{ value: JobPriorityValues.LOW, label: 'Low' }
 	] as const;
 
 	const categories = [
-		'HVAC',
+		ARCCategoryValues.HVAC,
 		'Plumbing',
 		'Electrical',
 		'Roofing',
@@ -72,7 +72,7 @@
 				title: title.trim(),
 				description: description.trim() || undefined,
 				category: category || undefined,
-				priority,
+				priority: priority as import('$lib/api/cam').JobPriority,
 				addressLine1: addressLine1.trim() || undefined,
 				addressLine2: addressLine2.trim() || undefined,
 				city: city.trim() || undefined,

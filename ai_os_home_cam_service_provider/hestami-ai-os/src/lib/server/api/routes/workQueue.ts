@@ -17,6 +17,16 @@ import { authedProcedure, successResponse, PaginationInputSchema, PaginationOutp
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
 import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
+import {
+	ConciergeCaseStatus,
+	WorkOrderStatus,
+	ViolationStatus,
+	ARCRequestStatus,
+	WorkOrderPriority,
+	ConciergeCasePriority,
+	ActivityEntityType,
+	PillarAccess
+} from '../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('WorkQueueRoute');
 
@@ -26,6 +36,22 @@ const log = createModuleLogger('WorkQueueRoute');
 
 const WorkQueuePillarSchema = z.enum(['CONCIERGE', 'CAM', 'CONTRACTOR', 'ALL']);
 const WorkQueueUrgencySchema = z.enum(['CRITICAL', 'HIGH', 'NORMAL', 'LOW']);
+
+// Constants for SLA status and urgency (avoiding stringly-typed pattern)
+const SLAStatus = {
+	BREACHED: 'BREACHED',
+	AT_RISK: 'AT_RISK',
+	ON_TRACK: 'ON_TRACK'
+} as const;
+
+const UrgencyLevel = {
+	CRITICAL: 'CRITICAL',
+	HIGH: 'HIGH',
+	NORMAL: 'NORMAL',
+	LOW: 'LOW'
+} as const;
+
+type UrgencyLevelType = (typeof UrgencyLevel)[keyof typeof UrgencyLevel];
 
 const WorkQueueItemSchema = z.object({
 	id: z.string(),
@@ -72,19 +98,19 @@ function formatTimeInState(ms: number): string {
 
 function getRequiredAction(status: string, itemType: string): string {
 	// Concierge Case actions
-	if (itemType === 'CONCIERGE_CASE') {
+	if (itemType === ActivityEntityType.CONCIERGE_CASE) {
 		switch (status) {
-			case 'INTAKE':
+			case ConciergeCaseStatus.INTAKE:
 				return 'Assess case and determine next steps';
-			case 'ASSESSMENT':
+			case ConciergeCaseStatus.ASSESSMENT:
 				return 'Complete assessment and begin work';
-			case 'IN_PROGRESS':
+			case ConciergeCaseStatus.IN_PROGRESS:
 				return 'Continue case resolution';
-			case 'PENDING_EXTERNAL':
+			case ConciergeCaseStatus.PENDING_EXTERNAL:
 				return 'Follow up with external party';
-			case 'PENDING_OWNER':
+			case ConciergeCaseStatus.PENDING_OWNER:
 				return 'Await owner response or follow up';
-			case 'ON_HOLD':
+			case ConciergeCaseStatus.ON_HOLD:
 				return 'Review hold status and resume';
 			default:
 				return 'Review case';
@@ -92,21 +118,21 @@ function getRequiredAction(status: string, itemType: string): string {
 	}
 
 	// Work Order actions
-	if (itemType === 'WORK_ORDER') {
+	if (itemType === ActivityEntityType.WORK_ORDER) {
 		switch (status) {
-			case 'SUBMITTED':
+			case WorkOrderStatus.SUBMITTED:
 				return 'Triage and assign vendor';
-			case 'TRIAGED':
+			case WorkOrderStatus.TRIAGED:
 				return 'Authorize work';
-			case 'AUTHORIZED':
+			case WorkOrderStatus.AUTHORIZED:
 				return 'Assign vendor';
-			case 'ASSIGNED':
+			case WorkOrderStatus.ASSIGNED:
 				return 'Schedule work';
-			case 'SCHEDULED':
+			case WorkOrderStatus.SCHEDULED:
 				return 'Monitor for completion';
-			case 'IN_PROGRESS':
+			case WorkOrderStatus.IN_PROGRESS:
 				return 'Monitor progress';
-			case 'COMPLETED':
+			case WorkOrderStatus.COMPLETED:
 				return 'Review and close';
 			default:
 				return 'Review work order';
@@ -114,15 +140,15 @@ function getRequiredAction(status: string, itemType: string): string {
 	}
 
 	// Violation actions
-	if (itemType === 'VIOLATION') {
+	if (itemType === ActivityEntityType.VIOLATION) {
 		switch (status) {
-			case 'OPEN':
+			case ViolationStatus.OPEN:
 				return 'Send initial notice';
-			case 'NOTICE_SENT':
+			case ViolationStatus.NOTICE_SENT:
 				return 'Monitor cure period';
-			case 'HEARING_SCHEDULED':
+			case ViolationStatus.HEARING_SCHEDULED:
 				return 'Prepare for hearing';
-			case 'ESCALATED':
+			case ViolationStatus.ESCALATED:
 				return 'Review escalation';
 			default:
 				return 'Review violation';
@@ -130,13 +156,13 @@ function getRequiredAction(status: string, itemType: string): string {
 	}
 
 	// ARC Request actions
-	if (itemType === 'ARC_REQUEST') {
+	if (itemType === ActivityEntityType.ARC_REQUEST) {
 		switch (status) {
-			case 'SUBMITTED':
+			case ARCRequestStatus.SUBMITTED:
 				return 'Review application';
-			case 'UNDER_REVIEW':
+			case ARCRequestStatus.UNDER_REVIEW:
 				return 'Complete review';
-			case 'PENDING_INFO':
+			case ARCRequestStatus.CHANGES_REQUESTED:
 				return 'Follow up for information';
 			default:
 				return 'Review request';
@@ -150,23 +176,23 @@ function calculateUrgency(
 	priority: string,
 	timeInState: number,
 	slaStatus: string | null
-): 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW' {
+): UrgencyLevelType {
 	// SLA breached = CRITICAL
-	if (slaStatus === 'BREACHED') return 'CRITICAL';
+	if (slaStatus === SLAStatus.BREACHED) return UrgencyLevel.CRITICAL;
 
 	// SLA at risk = HIGH
-	if (slaStatus === 'AT_RISK') return 'HIGH';
+	if (slaStatus === SLAStatus.AT_RISK) return UrgencyLevel.HIGH;
 
 	// Priority-based urgency
-	if (priority === 'EMERGENCY' || priority === 'URGENT') return 'CRITICAL';
-	if (priority === 'HIGH') return 'HIGH';
-	if (priority === 'LOW') return 'LOW';
+	if (priority === WorkOrderPriority.EMERGENCY || priority === ConciergeCasePriority.URGENT) return UrgencyLevel.CRITICAL;
+	if (priority === WorkOrderPriority.HIGH) return UrgencyLevel.HIGH;
+	if (priority === WorkOrderPriority.LOW) return UrgencyLevel.LOW;
 
 	// Time-based escalation (over 48 hours in state = bump up urgency)
 	const hoursInState = timeInState / (1000 * 60 * 60);
-	if (hoursInState > 48) return 'HIGH';
+	if (hoursInState > 48) return UrgencyLevel.HIGH;
 
-	return 'NORMAL';
+	return UrgencyLevel.NORMAL;
 }
 
 // =============================================================================
@@ -270,7 +296,7 @@ export const workQueueRouter = {
 
 			for (const row of rawItems) {
 				// Filter by pillar
-				const itemPillar = row.item_type === 'CONCIERGE_CASE' ? 'CONCIERGE' : 'CAM';
+				const itemPillar = row.item_type === ActivityEntityType.CONCIERGE_CASE ? PillarAccess.CONCIERGE : PillarAccess.CAM;
 				if (pillar !== 'ALL' && itemPillar !== pillar) continue;
 
 				// Filter by state if specified
@@ -325,10 +351,10 @@ export const workQueueRouter = {
 			// Calculate summary
 			const summary = {
 				total: items.length,
-				critical: items.filter((i) => i.urgency === 'CRITICAL').length,
-				high: items.filter((i) => i.urgency === 'HIGH').length,
-				normal: items.filter((i) => i.urgency === 'NORMAL').length,
-				low: items.filter((i) => i.urgency === 'LOW').length,
+				critical: items.filter((i) => i.urgency === UrgencyLevel.CRITICAL).length,
+				high: items.filter((i) => i.urgency === UrgencyLevel.HIGH).length,
+				normal: items.filter((i) => i.urgency === UrgencyLevel.NORMAL).length,
+				low: items.filter((i) => i.urgency === UrgencyLevel.LOW).length,
 				unassigned: items.filter((i) => !i.assignedToId).length
 			};
 

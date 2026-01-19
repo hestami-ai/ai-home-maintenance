@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, DocumentCategoryValues } from '$lib/api/cam';
 	import { X, Loader2, Upload, FileText } from 'lucide-svelte';
 
 	interface Props {
@@ -28,12 +29,12 @@
 		{ value: 'INSURANCE_COI', label: 'Certificate of Insurance (COI)' },
 		{ value: 'INSURANCE_GL', label: 'General Liability Insurance' },
 		{ value: 'INSURANCE_WC', label: "Workers' Compensation Insurance" },
-		{ value: 'LICENSE', label: 'Business License' },
+		{ value: DocumentCategoryValues.LICENSE, label: 'Business License' },
 		{ value: 'LICENSE_CONTRACTOR', label: 'Contractor License' },
 		{ value: 'W9', label: 'W-9 Form' },
-		{ value: 'CONTRACT', label: 'Service Contract' },
-		{ value: 'BOND', label: 'Surety Bond' },
-		{ value: 'OTHER', label: 'Other Compliance Document' }
+		{ value: DocumentCategoryValues.CONTRACT, label: 'Service Contract' },
+		{ value: DocumentCategoryValues.BOND, label: 'Surety Bond' },
+		{ value: ARCCategoryValues.OTHER, label: 'Other Compliance Document' }
 	];
 
 	function handleFileSelect(event: Event) {

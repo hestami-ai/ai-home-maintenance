@@ -12,6 +12,12 @@ import {
 } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	COMMUNICATION_WORKFLOW_ERROR: 'COMMUNICATION_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('CommunicationWorkflow');
 
@@ -524,8 +530,8 @@ async function communicationWorkflow(input: CommunicationWorkflowInput): Promise
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'COMMUNICATION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.COMMUNICATION_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

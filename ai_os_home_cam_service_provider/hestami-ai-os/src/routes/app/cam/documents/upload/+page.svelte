@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ActivityEntityTypeValues, DocumentContextTypeValues, DocumentVisibilityValues, WorkOrderCategoryValues } from '$lib/api/cam';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { ArrowLeft, Upload, FileText, X, AlertTriangle, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-svelte';
@@ -28,8 +29,8 @@
 	let validationErrors = $state<string[]>([]);
 
 	let sharedMetadata = $state({
-		category: 'OTHER' as CamDocumentCategory,
-		visibility: 'PUBLIC',
+		category: WorkOrderCategoryValues.OTHER as CamDocumentCategory,
+		visibility: DocumentVisibilityValues.PUBLIC,
 		effectiveDate: new Date().toISOString().split('T')[0],
 		contextType: '',
 		contextId: ''
@@ -41,11 +42,11 @@
 	}));
 
 	const visibilityOptions = [
-		{ value: 'PUBLIC', label: 'Public (All Members)' },
-		{ value: 'OWNERS_ONLY', label: 'Owners Only' },
-		{ value: 'BOARD_ONLY', label: 'Board Only' },
-		{ value: 'STAFF_ONLY', label: 'Staff Only' },
-		{ value: 'PRIVATE', label: 'Private' }
+		{ value: DocumentVisibilityValues.PUBLIC, label: 'Public (All Members)' },
+		{ value: DocumentVisibilityValues.OWNERS_ONLY, label: 'Owners Only' },
+		{ value: DocumentVisibilityValues.BOARD_ONLY, label: 'Board Only' },
+		{ value: DocumentVisibilityValues.STAFF_ONLY, label: 'Staff Only' },
+		{ value: DocumentVisibilityValues.PRIVATE, label: 'Private' }
 	];
 
 	const contextTypeLabels: Record<string, string> = {
@@ -57,7 +58,7 @@
 		ASSOCIATION: 'Association'
 	};
 
-	const isOtherCategory = $derived(sharedMetadata.category === 'OTHER');
+	const isOtherCategory = $derived(sharedMetadata.category === WorkOrderCategoryValues.OTHER);
 	const isNotYetEffective = $derived(() => {
 		if (!sharedMetadata.effectiveDate) return false;
 		return new Date(sharedMetadata.effectiveDate) > new Date();
@@ -71,10 +72,10 @@
 		if (contextType) sharedMetadata.contextType = contextType;
 		if (contextId) sharedMetadata.contextId = contextId;
 
-		if (contextType === 'VIOLATION') sharedMetadata.category = 'EVIDENCE_INSPECTIONS';
-		else if (contextType === 'ARC_REQUEST') sharedMetadata.category = 'ARCHITECTURAL_GUIDELINES';
-		else if (contextType === 'WORK_ORDER') sharedMetadata.category = 'EVIDENCE_INSPECTIONS';
-		else if (contextType === 'ASSOCIATION') sharedMetadata.category = 'GOVERNING_DOCUMENTS';
+		if (contextType === ActivityEntityTypeValues.VIOLATION) sharedMetadata.category = 'EVIDENCE_INSPECTIONS';
+		else if (contextType === ActivityEntityTypeValues.ARC_REQUEST) sharedMetadata.category = 'ARCHITECTURAL_GUIDELINES';
+		else if (contextType === ActivityEntityTypeValues.WORK_ORDER) sharedMetadata.category = 'EVIDENCE_INSPECTIONS';
+		else if (contextType === ActivityEntityTypeValues.ASSOCIATION) sharedMetadata.category = 'GOVERNING_DOCUMENTS';
 	});
 
 	function handleFileSelect(e: Event) {
@@ -183,7 +184,7 @@
 			// Use oRPC's native file upload support
 			const uploadPromises = files.map(async (uploadedFile) => {
 				// Determine context - use provided context or default to ASSOCIATION
-				const contextType = sharedMetadata.contextType || 'ASSOCIATION';
+				const contextType = sharedMetadata.contextType || ActivityEntityTypeValues.ASSOCIATION;
 				const contextId = sharedMetadata.contextId || $currentAssociation!.id;
 
 				const result = await orpc.document.uploadWithFile({
@@ -223,12 +224,12 @@
 
 	function getContextPath(contextType: string, contextId: string): string {
 		switch (contextType) {
-			case 'VIOLATION': return `/app/cam/violations/${contextId}`;
-			case 'ARC_REQUEST': return `/app/cam/arc/${contextId}`;
-			case 'WORK_ORDER': return `/app/cam/work-orders/${contextId}`;
-			case 'UNIT': return `/app/cam/units/${contextId}`;
-			case 'VENDOR': return `/app/cam/vendors/${contextId}`;
-			case 'ASSOCIATION': return `/app/cam/associations/${contextId}`;
+			case ActivityEntityTypeValues.VIOLATION: return `/app/cam/violations/${contextId}`;
+			case ActivityEntityTypeValues.ARC_REQUEST: return `/app/cam/arc/${contextId}`;
+			case ActivityEntityTypeValues.WORK_ORDER: return `/app/cam/work-orders/${contextId}`;
+			case ActivityEntityTypeValues.UNIT: return `/app/cam/units/${contextId}`;
+			case DocumentContextTypeValues.VENDOR: return `/app/cam/vendors/${contextId}`;
+			case ActivityEntityTypeValues.ASSOCIATION: return `/app/cam/associations/${contextId}`;
 			default: return '/app/cam/documents';
 		}
 	}

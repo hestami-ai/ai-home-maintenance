@@ -115,6 +115,10 @@ class WorkflowMappingFixer {
 
         // Options object exists - check if it already has workflowID
         const optionsArg = args[1];
+        if (!optionsArg) {
+            call.insertArgument(1, '{ workflowID: idempotencyKey }');
+            return true;
+        }
         const optionsText = optionsArg.getText();
 
         // Skip if already has workflowID

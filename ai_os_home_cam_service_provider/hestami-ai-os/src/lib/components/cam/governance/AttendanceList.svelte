@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { MeetingAttendanceStatusValues } from '$lib/api/cam';
 	import { Check, X, UserMinus, UserCheck } from 'lucide-svelte';
 
 	interface Attendee {
@@ -22,7 +23,7 @@
 		EXCUSED: { color: 'text-warning-500', icon: X, label: 'Excused' }
 	};
 
-	const presentCount = $derived(attendees.filter(a => a.status !== 'ABSENT').length);
+	const presentCount = $derived(attendees.filter(a => a.status !== MeetingAttendanceStatusValues.ABSENT).length);
 	const totalCount = $derived(attendees.length);
 
 	function handleStatusChange(partyId: string, newStatus: string) {
@@ -69,9 +70,9 @@
 						<button
 							type="button"
 							class="btn btn-sm"
-							class:variant-filled-error={attendee.status === 'ABSENT'}
-							class:variant-ghost={attendee.status !== 'ABSENT'}
-							onclick={() => handleStatusChange(attendee.partyId, 'ABSENT')}
+							class:variant-filled-error={attendee.status === MeetingAttendanceStatusValues.ABSENT}
+							class:variant-ghost={attendee.status !== MeetingAttendanceStatusValues.ABSENT}
+							onclick={() => handleStatusChange(attendee.partyId, MeetingAttendanceStatusValues.ABSENT)}
 							title="Absent"
 						>
 							<X size={14} />

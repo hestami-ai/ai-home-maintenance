@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startContractorBranchWorkflow } from '../../../workflows/contractorBranchWorkflow.js';
+import { startContractorBranchWorkflow, ContractorBranchAction } from '../../../workflows/contractorBranchWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { createModuleLogger } from '../../../logger.js';
 
@@ -69,7 +69,7 @@ export const branchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorBranchWorkflow(
 				{
-					action: 'CREATE_OR_UPDATE_BRANCH',
+					action: ContractorBranchAction.CREATE_OR_UPDATE_BRANCH,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					branchId: id,
@@ -185,7 +185,7 @@ export const branchRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorBranchWorkflow(
 				{
-					action: 'ARCHIVE_BRANCH',
+					action: ContractorBranchAction.ARCHIVE_BRANCH,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					branchId: id,

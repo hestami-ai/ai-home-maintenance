@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { UserRoleValues } from '$lib/api/cam';
 	import { Shield, Check, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { organizationStore } from '$lib/stores';
@@ -23,21 +24,21 @@
 
 		const perms: Permission[] = [];
 
-		if (role === 'ADMIN') {
+		if (role === UserRoleValues.ADMIN) {
 			perms.push(
 				{ name: 'Manage Organization', description: 'Edit organization settings', granted: true },
 				{ name: 'Manage Members', description: 'Add/remove members and change roles', granted: true },
 				{ name: 'View All Data', description: 'Access all organization data', granted: true },
 				{ name: 'Manage Billing', description: 'View and manage billing', granted: true }
 			);
-		} else if (role === 'MANAGER') {
+		} else if (role === UserRoleValues.MANAGER) {
 			perms.push(
 				{ name: 'Manage Organization', description: 'Edit organization settings', granted: false },
 				{ name: 'Manage Members', description: 'Add/remove members and change roles', granted: true },
 				{ name: 'View All Data', description: 'Access all organization data', granted: true },
 				{ name: 'Manage Billing', description: 'View and manage billing', granted: false }
 			);
-		} else if (role === 'BOARD_MEMBER') {
+		} else if (role === UserRoleValues.BOARD_MEMBER) {
 			perms.push(
 				{ name: 'Manage Organization', description: 'Edit organization settings', granted: false },
 				{ name: 'Approve Decisions', description: 'Vote on board decisions', granted: true },

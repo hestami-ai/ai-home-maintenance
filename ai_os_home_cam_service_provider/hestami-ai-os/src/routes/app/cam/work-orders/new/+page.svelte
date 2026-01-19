@@ -3,7 +3,7 @@
 	import { ArrowLeft, Wrench, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { workOrderApi, unitApi, vendorApi, type Unit, type Vendor } from '$lib/api/cam';
+	import { ARCCategoryValues, AssetCategoryValues, FundTypeValues, WorkOrderCategoryValues, WorkOrderOriginTypeValues, WorkOrderPriorityValues, type Unit, type Vendor, unitApi, vendorApi, workOrderApi } from '$lib/api/cam';
 
 	let units = $state<Unit[]>([]);
 	let vendors = $state<Vendor[]>([]);
@@ -17,12 +17,12 @@
 		commonAreaDescription: '',
 		title: '',
 		description: '',
-		category: 'MAINTENANCE',
-		priority: 'MEDIUM',
+		category: WorkOrderCategoryValues.MAINTENANCE,
+		priority: WorkOrderPriorityValues.MEDIUM,
 		vendorId: '',
 		dueDate: '',
 		// Phase 9: Origin tracking
-		originType: 'MANUAL' as string,
+		originType: WorkOrderOriginTypeValues.MANUAL as string,
 		violationId: '',
 		arcRequestId: '',
 		resolutionId: '',
@@ -36,39 +36,39 @@
 
 	// Phase 9: Origin type options
 	const originTypeOptions = [
-		{ value: 'MANUAL', label: 'Manual Entry' },
-		{ value: 'VIOLATION_REMEDIATION', label: 'Violation Remediation' },
-		{ value: 'ARC_APPROVAL', label: 'ARC Approval' },
-		{ value: 'PREVENTIVE_MAINTENANCE', label: 'Preventive Maintenance' },
-		{ value: 'BOARD_DIRECTIVE', label: 'Board Directive' },
-		{ value: 'EMERGENCY_ACTION', label: 'Emergency Action' }
+		{ value: WorkOrderOriginTypeValues.MANUAL, label: 'Manual Entry' },
+		{ value: WorkOrderOriginTypeValues.VIOLATION_REMEDIATION, label: 'Violation Remediation' },
+		{ value: WorkOrderOriginTypeValues.ARC_APPROVAL, label: 'ARC Approval' },
+		{ value: WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE, label: 'Preventive Maintenance' },
+		{ value: WorkOrderOriginTypeValues.BOARD_DIRECTIVE, label: 'Board Directive' },
+		{ value: WorkOrderOriginTypeValues.EMERGENCY_ACTION, label: 'Emergency Action' }
 	];
 
 	// Phase 9: Budget source options
 	const budgetSourceOptions = [
 		{ value: '', label: 'Select budget source' },
-		{ value: 'OPERATING', label: 'Operating Fund' },
-		{ value: 'RESERVE', label: 'Reserve Fund' },
-		{ value: 'SPECIAL', label: 'Special Assessment' }
+		{ value: FundTypeValues.OPERATING, label: 'Operating Fund' },
+		{ value: FundTypeValues.RESERVE, label: 'Reserve Fund' },
+		{ value: FundTypeValues.SPECIAL, label: 'Special Assessment' }
 	];
 
 	const categoryOptions = [
-		{ value: 'MAINTENANCE', label: 'Maintenance' },
-		{ value: 'REPAIR', label: 'Repair' },
-		{ value: 'LANDSCAPING', label: 'Landscaping' },
-		{ value: 'CLEANING', label: 'Cleaning' },
-		{ value: 'ELECTRICAL', label: 'Electrical' },
-		{ value: 'PLUMBING', label: 'Plumbing' },
-		{ value: 'HVAC', label: 'HVAC' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: WorkOrderCategoryValues.MAINTENANCE, label: 'Maintenance' },
+		{ value: WorkOrderCategoryValues.REPAIR, label: 'Repair' },
+		{ value: WorkOrderCategoryValues.LANDSCAPING, label: 'Landscaping' },
+		{ value: WorkOrderCategoryValues.CLEANING, label: 'Cleaning' },
+		{ value: AssetCategoryValues.ELECTRICAL, label: 'Electrical' },
+		{ value: AssetCategoryValues.PLUMBING, label: 'Plumbing' },
+		{ value: ARCCategoryValues.HVAC, label: ARCCategoryValues.HVAC },
+		{ value: WorkOrderCategoryValues.OTHER, label: 'Other' }
 	];
 
 	const priorityOptions = [
-		{ value: 'EMERGENCY', label: 'Emergency' },
-		{ value: 'HIGH', label: 'High' },
-		{ value: 'MEDIUM', label: 'Medium' },
-		{ value: 'LOW', label: 'Low' },
-		{ value: 'SCHEDULED', label: 'Scheduled' }
+		{ value: WorkOrderPriorityValues.EMERGENCY, label: 'Emergency' },
+		{ value: WorkOrderPriorityValues.HIGH, label: 'High' },
+		{ value: WorkOrderPriorityValues.MEDIUM, label: 'Medium' },
+		{ value: WorkOrderPriorityValues.LOW, label: 'Low' },
+		{ value: WorkOrderPriorityValues.SCHEDULED, label: 'Scheduled' }
 	];
 
 	async function loadFormData() {
@@ -213,7 +213,7 @@
 								</p>
 							</div>
 
-							{#if formData.originType !== 'MANUAL'}
+							{#if formData.originType !== WorkOrderOriginTypeValues.MANUAL}
 								<div>
 									<label for="originNotes" class="mb-1 block text-sm font-medium">
 										Origin Notes

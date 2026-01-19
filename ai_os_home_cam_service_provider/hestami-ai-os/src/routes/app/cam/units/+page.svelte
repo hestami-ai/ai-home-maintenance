@@ -3,7 +3,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { unitApi, type Unit } from '$lib/api/cam';
+	import { PropertyTypeValues, UnitTypeValues, type Unit, unitApi } from '$lib/api/cam';
 
 	let units = $state<any[]>([]);
 	let selectedUnit = $state<Unit | null>(null);
@@ -13,11 +13,11 @@
 
 	const typeOptions = [
 		{ value: '', label: 'All Types' },
-		{ value: 'SINGLE_FAMILY', label: 'Single Family' },
-		{ value: 'TOWNHOUSE', label: 'Townhouse' },
+		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family' },
+		{ value: UnitTypeValues.TOWNHOUSE, label: 'Townhouse' },
 		{ value: 'CONDO', label: 'Condo' },
 		{ value: 'APARTMENT', label: 'Apartment' },
-		{ value: 'LOT', label: 'Lot' }
+		{ value: UnitTypeValues.LOT, label: 'Lot' }
 	];
 
 	async function loadUnits() {

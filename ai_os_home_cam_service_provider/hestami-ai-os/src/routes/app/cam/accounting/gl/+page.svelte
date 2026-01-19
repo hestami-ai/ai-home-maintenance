@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { accountingApi } from '$lib/api/cam';
+	import { AccountTypeValues, InvoiceStatusValues, JournalEntryStatusValues, PolicyStatusValues, accountingApi } from '$lib/api/cam';
 
 	interface GLAccount {
 		id: string;
@@ -57,20 +57,20 @@
 
 	function getTypeColor(type: string): string {
 		switch (type) {
-			case 'ASSET': return 'text-primary-500 bg-primary-500/10';
-			case 'LIABILITY': return 'text-error-500 bg-error-500/10';
-			case 'EQUITY': return 'text-success-500 bg-success-500/10';
-			case 'REVENUE': return 'text-success-600 bg-success-500/20';
-			case 'EXPENSE': return 'text-warning-500 bg-warning-500/10';
+			case AccountTypeValues.ASSET: return 'text-primary-500 bg-primary-500/10';
+			case AccountTypeValues.LIABILITY: return 'text-error-500 bg-error-500/10';
+			case AccountTypeValues.EQUITY: return 'text-success-500 bg-success-500/10';
+			case AccountTypeValues.REVENUE: return 'text-success-600 bg-success-500/20';
+			case AccountTypeValues.EXPENSE: return 'text-warning-500 bg-warning-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'POSTED': return 'text-success-500 bg-success-500/10';
-			case 'DRAFT': return 'text-warning-500 bg-warning-500/10';
-			case 'VOIDED': return 'text-error-500 bg-error-500/10';
+			case JournalEntryStatusValues.POSTED: return 'text-success-500 bg-success-500/10';
+			case PolicyStatusValues.DRAFT: return 'text-warning-500 bg-warning-500/10';
+			case InvoiceStatusValues.VOIDED: return 'text-error-500 bg-error-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -95,11 +95,11 @@
 	);
 
 	const accountsByType = $derived({
-		ASSET: filteredAccounts.filter(a => a.type === 'ASSET'),
-		LIABILITY: filteredAccounts.filter(a => a.type === 'LIABILITY'),
-		EQUITY: filteredAccounts.filter(a => a.type === 'EQUITY'),
-		REVENUE: filteredAccounts.filter(a => a.type === 'REVENUE'),
-		EXPENSE: filteredAccounts.filter(a => a.type === 'EXPENSE')
+		ASSET: filteredAccounts.filter(a => a.type === AccountTypeValues.ASSET),
+		LIABILITY: filteredAccounts.filter(a => a.type === AccountTypeValues.LIABILITY),
+		EQUITY: filteredAccounts.filter(a => a.type === AccountTypeValues.EQUITY),
+		REVENUE: filteredAccounts.filter(a => a.type === AccountTypeValues.REVENUE),
+		EXPENSE: filteredAccounts.filter(a => a.type === AccountTypeValues.EXPENSE)
 	});
 
 	$effect(() => {

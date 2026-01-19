@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, AssetCategoryValues, ContractorTradeTypeValues, WorkOrderCategoryValues } from '$lib/api/cam';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -111,21 +112,21 @@
 	];
 
 	const tradeOptions = [
-		'HVAC',
-		'ELECTRICAL',
-		'PLUMBING',
-		'CARPENTRY',
-		'PAINTING',
-		'ROOFING',
-		'FLOORING',
+		ARCCategoryValues.HVAC,
+		AssetCategoryValues.ELECTRICAL,
+		AssetCategoryValues.PLUMBING,
+		ContractorTradeTypeValues.CARPENTRY,
+		ContractorTradeTypeValues.PAINTING,
+		ContractorTradeTypeValues.ROOFING,
+		ContractorTradeTypeValues.FLOORING,
 		'GENERAL_MAINTENANCE',
-		'LANDSCAPING',
-		'APPLIANCE_REPAIR',
-		'LOCKSMITH',
-		'PEST_CONTROL',
-		'CLEANING',
+		ARCCategoryValues.LANDSCAPING,
+		ContractorTradeTypeValues.APPLIANCE_REPAIR,
+		ContractorTradeTypeValues.LOCKSMITH,
+		ContractorTradeTypeValues.PEST_CONTROL,
+		WorkOrderCategoryValues.CLEANING,
 		'POOL_SERVICE',
-		'OTHER'
+		WorkOrderCategoryValues.OTHER
 	];
 
 	// Form state
@@ -140,7 +141,9 @@
 	let isActive = $state(false);
 
 	// Synchronize server data to local state
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
 		if (data.technician) {
 			technician = data.technician;
 			firstName = technician.firstName;

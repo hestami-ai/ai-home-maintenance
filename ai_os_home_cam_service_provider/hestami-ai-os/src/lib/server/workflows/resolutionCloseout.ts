@@ -9,7 +9,13 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
 import type { ResolutionStatus, WorkOrderStatus, WorkOrderPriority } from '../../../../generated/prisma/client.js';
+import { ActivityActionType, ResolutionStatus as ResolutionStatusEnum, WorkOrderStatus as WorkOrderStatusEnum, WorkOrderCategory, WorkOrderOriginType, WorkOrderPriority as WorkOrderPriorityEnum } from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	RESOLUTION_CLOSEOUT_ERROR: 'RESOLUTION_CLOSEOUT_ERROR'
+} as const;
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 
 // Event keys for workflow status tracking
@@ -18,10 +24,10 @@ const WORKFLOW_ERROR_EVENT = 'resolution_error';
 
 // Valid status transitions
 const validTransitions: Record<ResolutionStatus, ResolutionStatus[]> = {
-	PROPOSED: ['ADOPTED', 'ARCHIVED'],
-	ADOPTED: ['SUPERSEDED', 'ARCHIVED'],
-	SUPERSEDED: ['ARCHIVED'],
-	ARCHIVED: []
+	[ResolutionStatusEnum.PROPOSED]: [ResolutionStatusEnum.ADOPTED, ResolutionStatusEnum.ARCHIVED],
+	[ResolutionStatusEnum.ADOPTED]: [ResolutionStatusEnum.SUPERSEDED, ResolutionStatusEnum.ARCHIVED],
+	[ResolutionStatusEnum.SUPERSEDED]: [ResolutionStatusEnum.ARCHIVED],
+	[ResolutionStatusEnum.ARCHIVED]: []
 };
 
 interface CloseoutInput {
@@ -75,7 +81,7 @@ async function validateTransition(input: CloseoutInput): Promise<{
 	});
 
 	if (!resolution) {
-		return { valid: false, currentStatus: 'PROPOSED', error: 'Resolution not found' };
+		return { valid: false, currentStatus: ResolutionStatusEnum.PROPOSED, error: 'Resolution not found' };
 	}
 
 	const currentStatus = resolution.status as ResolutionStatus;
@@ -140,7 +146,7 @@ async function updateResolutionStatus(
 	};
 
 	// Set adoptedAt for ADOPTED status
-	if (input.toStatus === 'ADOPTED') {
+	if (input.toStatus === ResolutionStatusEnum.ADOPTED) {
 		updateData.adoptedAt = new Date();
 		updateData.adoptedBy = input.userId;
 	}
@@ -179,10 +185,10 @@ async function createDownstreamWorkOrder(
 				workOrderNumber,
 				title: workOrderData.title,
 				description: workOrderData.description || '',
-				category: 'OTHER',
-				priority: (workOrderData.priority as WorkOrderPriority) ?? ('MEDIUM' as WorkOrderPriority),
-				status: 'DRAFT' as WorkOrderStatus,
-				originType: 'BOARD_DIRECTIVE',
+				category: WorkOrderCategory.OTHER,
+				priority: (workOrderData.priority as WorkOrderPriority) ?? WorkOrderPriorityEnum.MEDIUM,
+				status: WorkOrderStatusEnum.DRAFT as WorkOrderStatus,
+				originType: WorkOrderOriginType.BOARD_DIRECTIVE,
 				resolutionId: resolution.id,
 				requestedBy: userId,
 				requestedAt: new Date()
@@ -275,7 +281,7 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 
 		// Step 4: Create work order if requested
 		let createdWorkOrderId: string | undefined;
-		if (input.createWorkOrder && input.toStatus === 'ADOPTED') {
+		if (input.createWorkOrder && input.toStatus === ResolutionStatusEnum.ADOPTED) {
 			createdWorkOrderId = await DBOS.runStep(
 				() => createDownstreamWorkOrder(
 					validation.resolution!,
@@ -289,7 +295,7 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 
 		// Step 5: Update policy if requested
 		let updatedPolicyId: string | undefined;
-		if (input.updatePolicyId && input.toStatus === 'ADOPTED') {
+		if (input.updatePolicyId && input.toStatus === ResolutionStatusEnum.ADOPTED) {
 			await DBOS.runStep(
 				() => updatePolicyDocument(input.updatePolicyId!, input.resolutionId, input.organizationId, input.userId),
 				{ name: 'updatePolicy' }
@@ -330,14 +336,14 @@ async function resolutionLifecycleWorkflow(input: CloseoutInput): Promise<Closeo
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'RESOLUTION_CLOSEOUT_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.RESOLUTION_CLOSEOUT_ERROR
 		});
 
 		const errorResult = {
 			success: false,
 			resolutionId: input.resolutionId,
-			fromStatus: 'PROPOSED' as ResolutionStatus,
+			fromStatus: ResolutionStatusEnum.PROPOSED as ResolutionStatus,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

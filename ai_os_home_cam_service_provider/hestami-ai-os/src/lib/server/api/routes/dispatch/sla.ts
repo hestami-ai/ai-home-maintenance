@@ -10,7 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { SLAPriority } from '../../../../../../generated/prisma/client.js';
-import { startSLAWorkflow } from '../../../workflows/slaWorkflow.js';
+import { startSLAWorkflow, SLAActionValues, type SLAAction } from '../../../workflows/slaWorkflow.js';
 
 const slaWindowOutput = z.object({
 	id: z.string(),
@@ -113,7 +113,7 @@ export const slaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
 				{
-					action: 'CREATE_WINDOW',
+					action: SLAActionValues.CREATE_WINDOW,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -275,7 +275,7 @@ export const slaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
 				{
-					action: 'UPDATE_WINDOW',
+					action: SLAActionValues.UPDATE_WINDOW,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					windowId: id,
@@ -324,7 +324,7 @@ export const slaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
 				{
-					action: 'DELETE_WINDOW',
+					action: SLAActionValues.DELETE_WINDOW,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					windowId: input.id,
@@ -398,7 +398,7 @@ export const slaRouter = {
 					MEDIUM: 'STANDARD',
 					LOW: 'LOW'
 				};
-				const priority = priorityMap[job.priority] ?? 'STANDARD';
+				const priority = priorityMap[job.priority] ?? SLAPriority.STANDARD;
 
 				slaWindow = await prisma.sLAWindow.findFirst({
 					where: {
@@ -419,7 +419,7 @@ export const slaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
 				{
-					action: 'CREATE_RECORD',
+					action: SLAActionValues.CREATE_RECORD,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -510,7 +510,7 @@ export const slaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
 				{
-					action: 'MARK_RESPONSE',
+					action: SLAActionValues.MARK_RESPONSE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					recordId: existing.id,
@@ -567,7 +567,7 @@ export const slaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startSLAWorkflow(
 				{
-					action: 'MARK_RESOLUTION',
+					action: SLAActionValues.MARK_RESOLUTION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					recordId: existing.id,

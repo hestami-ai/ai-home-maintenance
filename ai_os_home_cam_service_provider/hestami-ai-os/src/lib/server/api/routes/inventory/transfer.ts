@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { startTransferWorkflow } from '../../../workflows/transferWorkflow.js';
+import { startTransferWorkflow, TransferAction, TransferStatus } from '../../../workflows/transferWorkflow.js';
 
 const transferLineOutput = z.object({
 	id: z.string(),
@@ -126,7 +126,7 @@ export const transferRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startTransferWorkflow(
 				{
-					action: 'CREATE_TRANSFER',
+					action: TransferAction.CREATE_TRANSFER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -274,14 +274,14 @@ export const transferRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
-			if (existing.status !== 'PENDING') {
+			if (existing.status !== TransferStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: 'Transfer is not pending' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startTransferWorkflow(
 				{
-					action: 'SHIP_TRANSFER',
+					action: TransferAction.SHIP_TRANSFER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					transferId: input.id,
@@ -349,14 +349,14 @@ export const transferRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
-			if (existing.status !== 'IN_TRANSIT') {
+			if (existing.status !== TransferStatus.IN_TRANSIT) {
 				throw errors.BAD_REQUEST({ message: 'Transfer is not in transit' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startTransferWorkflow(
 				{
-					action: 'RECEIVE_TRANSFER',
+					action: TransferAction.RECEIVE_TRANSFER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					transferId: input.id,
@@ -411,19 +411,19 @@ export const transferRouter = {
 			});
 			if (!existing) throw errors.NOT_FOUND({ message: 'Transfer not found' });
 
-			if (!['PENDING', 'IN_TRANSIT'].includes(existing.status)) {
+			if (existing.status !== TransferStatus.PENDING && existing.status !== TransferStatus.IN_TRANSIT) {
 				throw errors.BAD_REQUEST({ message: 'Cannot cancel completed or already cancelled transfer' });
 			}
 
 			// Get lines if in transit (needed for stock return)
-			const lines = existing.status === 'IN_TRANSIT'
+			const lines = existing.status === TransferStatus.IN_TRANSIT
 				? await prisma.inventoryTransferLine.findMany({ where: { transferId: input.id } })
 				: [];
 
 			// Use DBOS workflow for durable execution
 			const result = await startTransferWorkflow(
 				{
-					action: 'CANCEL_TRANSFER',
+					action: TransferAction.CANCEL_TRANSFER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					transferId: input.id,

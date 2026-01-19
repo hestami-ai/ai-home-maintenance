@@ -5,7 +5,7 @@ import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputS
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
 import { UnitTypeSchema } from '../schemas.js';
-import { unitWorkflow_v1 } from '../../workflows/unitWorkflow.js';
+import { unitWorkflow_v1, UnitWorkflowAction } from '../../workflows/unitWorkflow.js';
 
 const log = createModuleLogger('UnitRoute');
 
@@ -72,7 +72,7 @@ export const unitRouter = {
 			const handle = await DBOS.startWorkflow(unitWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CREATE',
+				action: UnitWorkflowAction.CREATE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				propertyId: input.propertyId,
@@ -326,7 +326,7 @@ export const unitRouter = {
 			const handle = await DBOS.startWorkflow(unitWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UPDATE',
+				action: UnitWorkflowAction.UPDATE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				unitId: input.id,
@@ -405,7 +405,7 @@ export const unitRouter = {
 			const handle = await DBOS.startWorkflow(unitWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'DELETE',
+				action: UnitWorkflowAction.DELETE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				unitId: input.id

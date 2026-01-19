@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { InsuranceTypeSchema, InsuranceStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startContractorProfileWorkflow } from '../../../workflows/contractorProfileWorkflow.js';
+import { startContractorProfileWorkflow, ContractorProfileAction } from '../../../workflows/contractorProfileWorkflow.js';
 import { assertContractorOrg } from './utils.js';
 import { Prisma } from '../../../../../../generated/prisma/client.js';
 
@@ -78,7 +78,7 @@ export const insuranceRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startContractorProfileWorkflow(
 				{
-					action: 'CREATE_OR_UPDATE_INSURANCE',
+					action: ContractorProfileAction.CREATE_OR_UPDATE_INSURANCE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					entityId: id,

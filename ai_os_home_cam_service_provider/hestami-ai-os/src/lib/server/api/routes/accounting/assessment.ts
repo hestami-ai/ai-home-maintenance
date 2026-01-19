@@ -5,7 +5,7 @@ import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
 import { AssessmentFrequencySchema, ChargeStatusSchema } from '../../schemas.js';
-import { startAssessmentWorkflow } from '../../../workflows/index.js';
+import { startAssessmentWorkflow, AssessmentWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('AssessmentRoute');
 
@@ -103,7 +103,7 @@ export const assessmentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startAssessmentWorkflow(
 				{
-					action: 'CREATE_TYPE',
+					action: AssessmentWorkflowAction.CREATE_TYPE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -283,7 +283,7 @@ export const assessmentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startAssessmentWorkflow(
 				{
-					action: 'CREATE_CHARGE',
+					action: AssessmentWorkflowAction.CREATE_CHARGE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,

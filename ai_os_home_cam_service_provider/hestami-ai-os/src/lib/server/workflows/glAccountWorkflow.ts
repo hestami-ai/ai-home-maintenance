@@ -12,16 +12,31 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import type { AccountType, AccountCategory, FundType } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	AccountType as AccountTypeEnum,
+	FundType as FundTypeEnum
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	GL_ACCOUNT_WORKFLOW_ERROR: 'GL_ACCOUNT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'gl_account_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'gl_account_workflow_error';
 
 // Action types for GL account operations
-export const GLAccountWorkflowAction = {
+const GLAccountAction = {
 	CREATE: 'CREATE',
 	UPDATE: 'UPDATE',
 	DELETE: 'DELETE'
 } as const;
+
+export const GLAccountWorkflowAction = GLAccountAction;
 
 export type GLAccountWorkflowAction = (typeof GLAccountWorkflowAction)[keyof typeof GLAccountWorkflowAction];
 
@@ -60,7 +75,7 @@ async function createGLAccount(
 	input: GLAccountWorkflowInput
 ): Promise<{ id: string; accountNumber: string; name: string; accountType: string; category: string; fundType: string; isActive: boolean }> {
 	// Determine normal balance based on account type
-	const normalDebit = ['ASSET', 'EXPENSE'].includes(input.accountType!);
+	const normalDebit = ([AccountTypeEnum.ASSET, AccountTypeEnum.EXPENSE] as AccountType[]).includes(input.accountType!);
 
 	const account = await orgTransaction(input.organizationId, async (tx) => {
 		return tx.gLAccount.create({
@@ -72,7 +87,7 @@ async function createGLAccount(
 				description: input.description,
 				accountType: input.accountType!,
 				category: input.category!,
-				fundType: input.fundType ?? 'OPERATING',
+				fundType: input.fundType ?? FundTypeEnum.OPERATING,
 				parentId: input.parentId,
 				isActive: input.isActive ?? true,
 				normalDebit
@@ -83,15 +98,15 @@ async function createGLAccount(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ORGANIZATION',
+		entityType: ActivityEntityType.ORGANIZATION,
 		entityId: account.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `GL Account created: ${account.accountNumber} - ${account.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'glAccountWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: GLAccountAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { accountNumber: account.accountNumber, name: account.name, accountType: account.accountType }
 	});
@@ -126,15 +141,15 @@ async function updateGLAccount(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ORGANIZATION',
+		entityType: ActivityEntityType.ORGANIZATION,
 		entityId: account.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `GL Account updated: ${account.accountNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'glAccountWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: GLAccountAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: updateData
 	});
@@ -162,15 +177,15 @@ async function deleteGLAccount(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'ORGANIZATION',
+		entityType: ActivityEntityType.ORGANIZATION,
 		entityId: accountId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `GL Account soft deleted`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'glAccountWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: GLAccountAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: new Date().toISOString() }
 	});
@@ -193,7 +208,7 @@ async function glAccountWorkflow(input: GLAccountWorkflowInput): Promise<GLAccou
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case GLAccountWorkflowAction.CREATE: {
 				if (!input.associationId || !input.accountNumber || !input.name || !input.accountType || !input.category) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -221,7 +236,7 @@ async function glAccountWorkflow(input: GLAccountWorkflowInput): Promise<GLAccou
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case GLAccountWorkflowAction.UPDATE: {
 				if (!input.accountId) {
 					const error = new Error('Missing required field: accountId for UPDATE');
 					logStepError(log, 'validation', error, { accountId: input.accountId });
@@ -246,7 +261,7 @@ async function glAccountWorkflow(input: GLAccountWorkflowInput): Promise<GLAccou
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case GLAccountWorkflowAction.DELETE: {
 				if (!input.accountId) {
 					const error = new Error('Missing required field: accountId for DELETE');
 					logStepError(log, 'validation', error, { accountId: input.accountId });
@@ -293,8 +308,8 @@ async function glAccountWorkflow(input: GLAccountWorkflowInput): Promise<GLAccou
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'GL_ACCOUNT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.GL_ACCOUNT_WORKFLOW_ERROR
 		});
 		const errorResult: GLAccountWorkflowResult = {
 			success: false,

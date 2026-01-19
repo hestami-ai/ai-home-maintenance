@@ -7,7 +7,7 @@ import {
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startPropertyPortfolioWorkflow } from '../../../workflows/index.js';
+import { startPropertyPortfolioWorkflow, PropertyPortfolioWorkflowAction } from '../../../workflows/index.js';
 
 /**
  * Property Portfolio Schema for responses
@@ -56,7 +56,7 @@ export const propertyPortfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyPortfolioWorkflow(
 				{
-					action: 'CREATE',
+					action: PropertyPortfolioWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					name: input.name,
@@ -285,7 +285,7 @@ export const propertyPortfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyPortfolioWorkflow(
 				{
-					action: 'UPDATE',
+					action: PropertyPortfolioWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					portfolioId: input.portfolioId,
@@ -358,7 +358,7 @@ export const propertyPortfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyPortfolioWorkflow(
 				{
-					action: 'DELETE',
+					action: PropertyPortfolioWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					portfolioId: input.portfolioId
@@ -398,7 +398,7 @@ export const propertyPortfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPropertyPortfolioWorkflow(
 				{
-					action: 'GET_OR_CREATE_DEFAULT',
+					action: PropertyPortfolioWorkflowAction.GET_OR_CREATE_DEFAULT,
 					organizationId: context.organization.id,
 					userId: context.user.id
 				},

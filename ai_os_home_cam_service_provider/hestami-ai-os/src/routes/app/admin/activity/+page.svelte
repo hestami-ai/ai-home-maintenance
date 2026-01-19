@@ -33,6 +33,12 @@
 		type ActivityEventCategory,
 		type ActivityActorType
 	} from '$lib/api/activityEvent';
+	import {
+		ActivityEntityTypeValues,
+		ActivityActionTypeValues,
+		ActivityActorTypeValues,
+		ActivityEventCategoryValues
+	} from '$lib/api/cam';
 	import type { operations } from '$lib/api/types.generated';
 
 	// Use the actual type from staffList response which includes organizationName
@@ -63,8 +69,9 @@
 	let events = $state<StaffActivityEvent[]>([]);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
-	let hasMore = $derived(data.pagination.hasMore);
-	let nextCursor = $derived(data.pagination.nextCursor);
+	// Use $state instead of $derived to avoid proxy errors during navigation
+	let hasMore = $state(false);
+	let nextCursor = $state<string | null>(null);
 
 	// Filters (initialized with defaults, synced via $effect below)
 	let entityTypeFilter = $state<ActivityEntityType | ''>('');
@@ -75,16 +82,20 @@
 	let endDate = $state('');
 
 	// Synchronize server data to local state
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
 		if (data.events) {
 			events = [...data.events];
 		}
-		entityTypeFilter = data.filters.entityType;
-		actionFilter = data.filters.action;
-		categoryFilter = data.filters.eventCategory;
-		actorTypeFilter = data.filters.actorType;
-		startDate = data.filters.startDate;
-		endDate = data.filters.endDate;
+		hasMore = data.pagination?.hasMore ?? false;
+		nextCursor = data.pagination?.nextCursor ?? null;
+		entityTypeFilter = data.filters?.entityType ?? '';
+		actionFilter = data.filters?.action ?? '';
+		categoryFilter = data.filters?.eventCategory ?? '';
+		actorTypeFilter = data.filters?.actorType ?? '';
+		startDate = data.filters?.startDate ?? '';
+		endDate = data.filters?.endDate ?? '';
 	});
 
 	// Selected event for detail view
@@ -153,11 +164,11 @@
 
 	function getActorIcon(actorType: ActivityActorType) {
 		switch (actorType) {
-			case 'HUMAN':
+			case ActivityActorTypeValues.HUMAN:
 				return User;
-			case 'AI':
+			case ActivityActorTypeValues.AI:
 				return Bot;
-			case 'SYSTEM':
+			case ActivityActorTypeValues.SYSTEM:
 				return Server;
 			default:
 				return User;
@@ -166,10 +177,10 @@
 
 	function getCategoryBadgeClass(category: ActivityEventCategory): string {
 		const colorMap: Record<ActivityEventCategory, string> = {
-			INTENT: 'preset-outlined-primary-500',
-			DECISION: 'preset-outlined-warning-500',
-			EXECUTION: 'preset-outlined-success-500',
-			SYSTEM: 'preset-outlined-surface-500'
+			[ActivityEventCategoryValues.INTENT]: 'preset-outlined-primary-500',
+			[ActivityEventCategoryValues.DECISION]: 'preset-outlined-warning-500',
+			[ActivityEventCategoryValues.EXECUTION]: 'preset-outlined-success-500',
+			[ActivityEventCategoryValues.SYSTEM]: 'preset-outlined-surface-500'
 		};
 		return colorMap[category] || 'preset-outlined-surface-500';
 	}
@@ -180,17 +191,42 @@
 	}
 
 	const entityTypes: ActivityEntityType[] = [
-		'CONCIERGE_CASE', 'WORK_ORDER', 'VIOLATION', 'ARC_REQUEST',
-		'USER', 'ORGANIZATION', 'INDIVIDUAL_PROPERTY', 'ASSOCIATION'
+		ActivityEntityTypeValues.CONCIERGE_CASE,
+		ActivityEntityTypeValues.WORK_ORDER,
+		ActivityEntityTypeValues.VIOLATION,
+		ActivityEntityTypeValues.ARC_REQUEST,
+		ActivityEntityTypeValues.USER,
+		ActivityEntityTypeValues.ORGANIZATION,
+		ActivityEntityTypeValues.INDIVIDUAL_PROPERTY,
+		ActivityEntityTypeValues.ASSOCIATION
 	];
 
 	const actionTypes: ActivityActionType[] = [
-		'CREATE', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'ASSIGN', 'UNASSIGN',
-		'APPROVE', 'DENY', 'COMPLETE', 'CLOSE', 'CANCEL', 'ESCALATE'
+		ActivityActionTypeValues.CREATE,
+		ActivityActionTypeValues.UPDATE,
+		ActivityActionTypeValues.DELETE,
+		ActivityActionTypeValues.STATUS_CHANGE,
+		ActivityActionTypeValues.ASSIGN,
+		ActivityActionTypeValues.UNASSIGN,
+		ActivityActionTypeValues.APPROVE,
+		ActivityActionTypeValues.DENY,
+		ActivityActionTypeValues.COMPLETE,
+		ActivityActionTypeValues.CLOSE,
+		ActivityActionTypeValues.CANCEL,
+		ActivityActionTypeValues.ESCALATE
 	];
 
-	const categories: ActivityEventCategory[] = ['INTENT', 'DECISION', 'EXECUTION', 'SYSTEM'];
-	const actorTypes: ActivityActorType[] = ['HUMAN', 'AI', 'SYSTEM'];
+	const categories: ActivityEventCategory[] = [
+		ActivityEventCategoryValues.INTENT,
+		ActivityEventCategoryValues.DECISION,
+		ActivityEventCategoryValues.EXECUTION,
+		ActivityEventCategoryValues.SYSTEM
+	];
+	const actorTypes: ActivityActorType[] = [
+		ActivityActorTypeValues.HUMAN,
+		ActivityActorTypeValues.AI,
+		ActivityActorTypeValues.SYSTEM
+	];
 </script>
 
 <svelte:head>

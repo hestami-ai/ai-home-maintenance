@@ -16,6 +16,18 @@ import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } 
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import {
+    ActivityEntityType,
+    ActivityActionType,
+    ActivityEventCategory,
+    ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+import {
+    ErrorType,
+    LimitType,
+    ProcessingResultStatus,
+    WorkerResultStatus
+} from './documentWorkflow.js';
+import {
     dispatchProcessing,
     finalizeProcessing,
     updateDocumentProcessingStatus,
@@ -35,6 +47,22 @@ import {
 export const DocumentRetryAction = {
     RETRY_DOCUMENT: 'RETRY_DOCUMENT',
     SCHEDULED_RETRY_POLL: 'SCHEDULED_RETRY_POLL'
+} as const;
+
+// Processing type for metrics
+const ProcessingType = {
+    RETRY: 'RETRY'
+} as const;
+
+// Triggered by values
+const TriggeredBy = {
+    SYSTEM: ActivityActorType.SYSTEM
+} as const;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+    DOCUMENT_RETRY_WORKFLOW_ERROR: 'DOCUMENT_RETRY_WORKFLOW_ERROR',
+    DOCUMENT_RETRY_POLL_ERROR: 'DOCUMENT_RETRY_POLL_ERROR'
 } as const;
 
 export type DocumentRetryAction = (typeof DocumentRetryAction)[keyof typeof DocumentRetryAction];
@@ -72,7 +100,7 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
         }
 
         const maxAttempts = parseInt(process.env.DPQ_MAX_RETRY_ATTEMPTS || '3', 10);
-        if (doc.processingAttemptCount >= maxAttempts && input.triggeredBy === 'SYSTEM') {
+        if (doc.processingAttemptCount >= maxAttempts && input.triggeredBy === TriggeredBy.SYSTEM) {
             log.info('Max retry attempts reached, skipping automatic retry', { documentId: input.documentId, attempts: doc.processingAttemptCount });
             return { success: true, entityId: input.documentId };
         }
@@ -89,14 +117,14 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
         ]);
 
         if (orgCount >= orgLimit || globalCount >= globalLimit) {
-            const limitType = orgCount >= orgLimit ? 'ORGANIZATION' : 'GLOBAL';
+            const limitType = orgCount >= orgLimit ? LimitType.ORGANIZATION : LimitType.GLOBAL;
             log.info(`Concurrency limit reached during retry (${limitType})`, { orgCount, globalCount, orgLimit, globalLimit });
 
             // Schedule another retry (without incrementing attempt count)
             const nextRetryAt = new Date(Date.now() + 60 * 1000); // Retry in 1 minute
             await DBOS.runStep(
                 () => updateDocumentProcessingStatus(input.documentId, DocumentStatus.PROCESSING_FAILED, {
-                    type: 'TRANSIENT',
+                    type: ErrorType.TRANSIENT,
                     message: `Concurrency limit reached during retry (${limitType})`,
                     details: { code: 'CONCURRENCY_LIMIT_REACHED', limitType },
                     nextRetryAt
@@ -107,13 +135,13 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
             await DBOS.runStep(
                 () => recordWorkflowEvent({
                     organizationId: doc.organizationId,
-                    entityType: 'DOCUMENT',
+                    entityType: ActivityEntityType.DOCUMENT,
                     entityId: input.documentId,
-                    action: 'STATUS_CHANGE',
-                    eventCategory: 'SYSTEM',
+                    action: ActivityActionType.STATUS_CHANGE,
+                    eventCategory: ActivityEventCategory.SYSTEM,
                     summary: `Retry delayed: ${limitType} concurrency limit reached`,
                     workflowId: 'DocumentRetryWorkflow',
-                    workflowStep: 'markLimitReached',
+                    workflowStep: DocumentRetryAction.RETRY_DOCUMENT,
                     previousState: { status: doc.status },
                     newState: { status: DocumentStatus.PROCESSING_FAILED },
                     metadata: { limitType, nextRetryAt }
@@ -134,13 +162,13 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
         await DBOS.runStep(
             () => recordWorkflowEvent({
                 organizationId: doc.organizationId,
-                entityType: 'DOCUMENT',
+                entityType: ActivityEntityType.DOCUMENT,
                 entityId: input.documentId,
-                action: 'DISPATCH',
-                eventCategory: 'SYSTEM',
+                action: ActivityActionType.DISPATCH,
+                eventCategory: ActivityEventCategory.SYSTEM,
                 summary: `Document processing retry ${doc.processingAttemptCount + 1} started by ${input.triggeredBy}`,
                 workflowId: 'DocumentRetryWorkflow',
-                workflowStep: 'markProcessing',
+                workflowStep: DocumentRetryAction.RETRY_DOCUMENT,
                 previousState: { status: doc.status, attempts: doc.processingAttemptCount },
                 newState: { status: DocumentStatus.PROCESSING, attempts: doc.processingAttemptCount + 1 }
             }),
@@ -148,7 +176,7 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
         );
 
         // Metric: Processing Started
-        processingStartedCounter.add(1, { organizationId: doc.organizationId, type: 'RETRY' });
+        processingStartedCounter.add(1, { organizationId: doc.organizationId, type: ProcessingType.RETRY });
         const processingStartTime = Date.now();
 
         try {
@@ -161,7 +189,7 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
 
             // 4. Finalize
             log.info('Finalizing retry processing', { documentId: input.documentId, status: workerResult.status });
-            const isClean = workerResult.status === 'clean' || workerResult.malwareScan?.status === 'clean';
+            const isClean = workerResult.status === WorkerResultStatus.CLEAN || workerResult.malwareScan?.status === WorkerResultStatus.CLEAN;
 
             await DBOS.runStep(
                 () => finalizeProcessing(input.documentId, {
@@ -182,15 +210,15 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
             await DBOS.runStep(
                 () => recordWorkflowEvent({
                     organizationId: doc.organizationId,
-                    entityType: 'DOCUMENT',
+                    entityType: ActivityEntityType.DOCUMENT,
                     entityId: input.documentId,
-                    action: isClean ? 'COMPLETE' : 'STATUS_CHANGE',
-                    eventCategory: 'SYSTEM',
+                    action: isClean ? ActivityActionType.COMPLETE : ActivityActionType.STATUS_CHANGE,
+                    eventCategory: ActivityEventCategory.SYSTEM,
                     summary: isClean
                         ? `Document processing retry completed successfully`
                         : `Malware detected in document during retry`,
                     workflowId: 'DocumentRetryWorkflow',
-                    workflowStep: 'finalizeProcessing',
+                    workflowStep: DocumentRetryAction.RETRY_DOCUMENT,
                     previousState: { status: DocumentStatus.PROCESSING },
                     newState: { status: finalStatus }
                 }),
@@ -199,12 +227,12 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
 
             // Metrics: Completion, Infection, Duration
             const duration = (Date.now() - processingStartTime) / 1000;
-            processingDurationHistogram.record(duration, { organizationId: doc.organizationId, status: isClean ? 'SUCCESS' : 'INFECTED', type: 'RETRY' });
+            processingDurationHistogram.record(duration, { organizationId: doc.organizationId, status: isClean ? ProcessingResultStatus.SUCCESS : ProcessingResultStatus.INFECTED, type: ProcessingType.RETRY });
 
             if (isClean) {
-                processingCompletedCounter.add(1, { organizationId: doc.organizationId, type: 'RETRY' });
+                processingCompletedCounter.add(1, { organizationId: doc.organizationId, type: ProcessingType.RETRY });
             } else {
-                processingInfectedCounter.add(1, { organizationId: doc.organizationId, type: 'RETRY' });
+                processingInfectedCounter.add(1, { organizationId: doc.organizationId, type: ProcessingType.RETRY });
             }
 
         } catch (error) {
@@ -237,13 +265,13 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
             await DBOS.runStep(
                 () => recordWorkflowEvent({
                     organizationId: doc.organizationId,
-                    entityType: 'DOCUMENT',
+                    entityType: ActivityEntityType.DOCUMENT,
                     entityId: input.documentId,
-                    action: 'WORKFLOW_FAILED',
-                    eventCategory: 'SYSTEM',
+                    action: ActivityActionType.WORKFLOW_FAILED,
+                    eventCategory: ActivityEventCategory.SYSTEM,
                     summary: `Document processing retry failed: ${errorObj.message}`,
                     workflowId: 'DocumentRetryWorkflow',
-                    workflowStep: 'markProcessingFailed',
+                    workflowStep: DocumentRetryAction.RETRY_DOCUMENT,
                     previousState: { status: DocumentStatus.PROCESSING },
                     newState: { status: DocumentStatus.PROCESSING_FAILED },
                     metadata: {
@@ -259,7 +287,7 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
             );
 
             // Metric: Processing Failed
-            processingFailedCounter.add(1, { organizationId: doc.organizationId, errorType: classification.type, type: 'RETRY' });
+            processingFailedCounter.add(1, { organizationId: doc.organizationId, errorType: classification.type, type: ProcessingType.RETRY });
 
             throw error;
         }
@@ -274,8 +302,8 @@ async function retryDocument(input: DocumentRetryWorkflowInput): Promise<Documen
         logWorkflowEnd(log, DocumentRetryAction.RETRY_DOCUMENT, false, startTime, { error: errorMessage });
 
         await recordSpanError(error instanceof Error ? error : new Error(errorMessage), {
-            errorCode: 'WORKFLOW_FAILED',
-            errorType: 'DOCUMENT_RETRY_WORKFLOW_ERROR'
+            errorCode: ActivityActionType.WORKFLOW_FAILED,
+            errorType: WorkflowErrorType.DOCUMENT_RETRY_WORKFLOW_ERROR
         });
 
         return { success: false, error: errorMessage };
@@ -301,7 +329,7 @@ async function scheduledRetryPoll(scheduledTime: Date, actualTime: Date): Promis
             () => prisma.document.findMany({
                 where: {
                     status: DocumentStatus.PROCESSING_FAILED,
-                    processingErrorType: 'TRANSIENT',
+                    processingErrorType: ErrorType.TRANSIENT,
                     processingAttemptCount: { lt: maxAttempts },
                     processingNextRetryAt: { lte: new Date() }
                 },
@@ -325,19 +353,19 @@ async function scheduledRetryPoll(scheduledTime: Date, actualTime: Date): Promis
 
             await DBOS.startWorkflow(documentProcessingRetryWorkflow_v1, { workflowID: idempotencyKey })({
                 documentId: doc.id,
-                triggeredBy: 'SYSTEM'
+                triggeredBy: TriggeredBy.SYSTEM
             });
 
             await DBOS.runStep(
                 () => recordWorkflowEvent({
                     organizationId: doc.organizationId,
-                    entityType: 'DOCUMENT',
+                    entityType: ActivityEntityType.DOCUMENT,
                     entityId: doc.id,
-                    action: 'SCHEDULE',
-                    eventCategory: 'SYSTEM',
+                    action: ActivityActionType.SCHEDULE,
+                    eventCategory: ActivityEventCategory.SYSTEM,
                     summary: `Automatic retry scheduled by polling job`,
                     workflowId: 'DocumentRetryWorkflow',
-                    workflowStep: 'scheduledRetryPoll',
+                    workflowStep: DocumentRetryAction.SCHEDULED_RETRY_POLL,
                     newState: { status: DocumentStatus.PROCESSING_FAILED }
                 }),
                 { name: `recordRetryScheduled-${doc.id}` }
@@ -349,8 +377,8 @@ async function scheduledRetryPoll(scheduledTime: Date, actualTime: Date): Promis
         log.error(`Scheduled retry poll failed: ${errorMessage}`);
 
         await recordSpanError(error instanceof Error ? error : new Error(errorMessage), {
-            errorCode: 'WORKFLOW_FAILED',
-            errorType: 'DOCUMENT_RETRY_POLL_ERROR'
+            errorCode: ActivityActionType.WORKFLOW_FAILED,
+            errorType: WorkflowErrorType.DOCUMENT_RETRY_POLL_ERROR
         });
     }
 }

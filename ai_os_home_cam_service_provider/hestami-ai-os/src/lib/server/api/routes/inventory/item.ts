@@ -10,7 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { UnitOfMeasure } from '../../../../../../generated/prisma/client.js';
-import { startInventoryItemWorkflow } from '../../../workflows/inventoryItemWorkflow.js';
+import { startInventoryItemWorkflow, InventoryItemAction } from '../../../workflows/inventoryItemWorkflow.js';
 
 const inventoryItemOutput = z.object({
 	id: z.string(),
@@ -96,7 +96,7 @@ export const inventoryItemRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryItemWorkflow(
 				{
-					action: 'CREATE_ITEM',
+					action: InventoryItemAction.CREATE_ITEM,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -271,7 +271,7 @@ export const inventoryItemRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryItemWorkflow(
 				{
-					action: 'UPDATE_ITEM',
+					action: InventoryItemAction.UPDATE_ITEM,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					itemId: input.id,
@@ -317,7 +317,7 @@ export const inventoryItemRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryItemWorkflow(
 				{
-					action: 'DELETE_ITEM',
+					action: InventoryItemAction.DELETE_ITEM,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					itemId: input.id,

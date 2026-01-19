@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, ActivityEntityTypeValues, BoardMotionCategoryValues, CommitteeTypeValues, DocumentCategoryValues } from '$lib/api/cam';
 	import { Gavel, FileText, Link, Upload, X } from 'lucide-svelte';
 	import { Button, Textarea, Input, Label, Select } from 'flowbite-svelte';
 
@@ -30,13 +31,13 @@
 
 	const categoryOptions = [
 		{ value: '', name: 'Select category...' },
-		{ value: 'POLICY', name: 'Policy Change' },
-		{ value: 'BUDGET', name: 'Budget/Financial' },
-		{ value: 'ARC', name: 'ARC Decision' },
-		{ value: 'VIOLATION', name: 'Violation Action' },
-		{ value: 'MAINTENANCE', name: 'Maintenance/Repair' },
+		{ value: BoardMotionCategoryValues.POLICY, name: 'Policy Change' },
+		{ value: CommitteeTypeValues.BUDGET, name: 'Budget/Financial' },
+		{ value: CommitteeTypeValues.ARC, name: 'ARC Decision' },
+		{ value: ActivityEntityTypeValues.VIOLATION, name: 'Violation Action' },
+		{ value: DocumentCategoryValues.MAINTENANCE, name: 'Maintenance/Repair' },
 		{ value: 'PERSONNEL', name: 'Personnel' },
-		{ value: 'OTHER', name: 'Other' }
+		{ value: ARCCategoryValues.OTHER, name: 'Other' }
 	];
 
 	const isValid = $derived(title.trim().length > 0 && description.trim().length > 0);

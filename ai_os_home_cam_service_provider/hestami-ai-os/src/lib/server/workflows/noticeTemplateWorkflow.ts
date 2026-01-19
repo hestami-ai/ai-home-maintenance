@@ -12,8 +12,14 @@ import type { NoticeType } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('NoticeTemplateWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	NOTICE_TEMPLATE_WORKFLOW_ERROR: 'NOTICE_TEMPLATE_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const NoticeTemplateAction = {
@@ -162,21 +168,21 @@ async function noticeTemplateWorkflow(input: NoticeTemplateWorkflowInput): Promi
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_TEMPLATE':
+			case NoticeTemplateAction.CREATE_TEMPLATE:
 				entityId = await DBOS.runStep(
 					() => createTemplate(input.organizationId, input.userId, input.associationId, input.data),
 					{ name: 'createTemplate' }
 				);
 				break;
 
-			case 'UPDATE_TEMPLATE':
+			case NoticeTemplateAction.UPDATE_TEMPLATE:
 				entityId = await DBOS.runStep(
 					() => updateTemplate(input.organizationId, input.userId, input.associationId, input.templateId!, input.data),
 					{ name: 'updateTemplate' }
 				);
 				break;
 
-			case 'DELETE_TEMPLATE':
+			case NoticeTemplateAction.DELETE_TEMPLATE:
 				entityId = await DBOS.runStep(
 					() => deleteTemplate(input.organizationId, input.userId, input.associationId, input.templateId!),
 					{ name: 'deleteTemplate' }
@@ -195,8 +201,8 @@ async function noticeTemplateWorkflow(input: NoticeTemplateWorkflowInput): Promi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'NOTICE_TEMPLATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.NOTICE_TEMPLATE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

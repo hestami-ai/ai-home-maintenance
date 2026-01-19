@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CaseNoteTypeValues } from '$lib/api/cam';
 	import { HelpCircle, CheckCircle, Clock } from 'lucide-svelte';
 	import type { CaseNote } from '$lib/api/cam';
 
@@ -10,7 +11,7 @@
 
 	const clarificationNotes = $derived(
 		notes.filter(
-			(n) => n.noteType === 'CLARIFICATION_REQUEST' || n.noteType === 'CLARIFICATION_RESPONSE'
+			(n) => n.noteType === CaseNoteTypeValues.CLARIFICATION_REQUEST || n.noteType === CaseNoteTypeValues.CLARIFICATION_RESPONSE
 		).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 	);
 
@@ -24,8 +25,8 @@
 	}
 
 	function hasPendingClarification(): boolean {
-		const requests = clarificationNotes.filter((n) => n.noteType === 'CLARIFICATION_REQUEST');
-		const responses = clarificationNotes.filter((n) => n.noteType === 'CLARIFICATION_RESPONSE');
+		const requests = clarificationNotes.filter((n) => n.noteType === CaseNoteTypeValues.CLARIFICATION_REQUEST);
+		const responses = clarificationNotes.filter((n) => n.noteType === CaseNoteTypeValues.CLARIFICATION_RESPONSE);
 		return requests.length > responses.length;
 	}
 </script>
@@ -39,18 +40,17 @@
 	{:else}
 		{#each clarificationNotes as note}
 			<div
-				class="rounded-lg p-4 {note.noteType === 'CLARIFICATION_REQUEST'
+				class="rounded-lg p-4 {note.noteType === CaseNoteTypeValues.CLARIFICATION_REQUEST
 					? 'bg-amber-500/5 border border-amber-500/20'
 					: 'bg-green-500/5 border border-green-500/20'}"
 			>
 				<div class="flex items-start gap-3">
 					<div
-						class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full {note.noteType ===
-						'CLARIFICATION_REQUEST'
+						class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full {note.noteType === CaseNoteTypeValues.CLARIFICATION_REQUEST
 							? 'bg-amber-500/10 text-amber-500'
 							: 'bg-green-500/10 text-green-500'}"
 					>
-						{#if note.noteType === 'CLARIFICATION_REQUEST'}
+						{#if note.noteType === CaseNoteTypeValues.CLARIFICATION_REQUEST}
 							<HelpCircle size={16} />
 						{:else}
 							<CheckCircle size={16} />
@@ -59,7 +59,7 @@
 					<div class="flex-1 min-w-0">
 						<div class="flex items-center gap-2">
 							<span class="text-sm font-medium">
-								{note.noteType === 'CLARIFICATION_REQUEST' ? 'Question from Concierge' : 'Response from Owner'}
+								{note.noteType === CaseNoteTypeValues.CLARIFICATION_REQUEST ? 'Question from Concierge' : 'Response from Owner'}
 							</span>
 							<span class="text-xs text-surface-500">{formatTimestamp(note.createdAt)}</span>
 						</div>

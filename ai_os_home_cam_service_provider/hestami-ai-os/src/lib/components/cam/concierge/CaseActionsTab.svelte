@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { JobPaymentStatusValues, JobStatusValues } from '$lib/api/cam';
 	import { Play, CheckCircle, Clock, AlertCircle } from 'lucide-svelte';
 	import LinkedEntityCard from './LinkedEntityCard.svelte';
 	import { EmptyState } from '$lib/components/ui';
@@ -20,11 +21,11 @@
 
 	function getActionStatusIcon(status: string) {
 		switch (status) {
-			case 'COMPLETED':
+			case JobStatusValues.COMPLETED:
 				return CheckCircle;
-			case 'IN_PROGRESS':
+			case JobStatusValues.IN_PROGRESS:
 				return Play;
-			case 'PENDING':
+			case JobPaymentStatusValues.PENDING:
 				return Clock;
 			default:
 				return AlertCircle;
@@ -33,11 +34,11 @@
 
 	function getActionStatusColor(status: string): string {
 		switch (status) {
-			case 'COMPLETED':
+			case JobStatusValues.COMPLETED:
 				return 'text-green-500';
-			case 'IN_PROGRESS':
+			case JobStatusValues.IN_PROGRESS:
 				return 'text-amber-500';
-			case 'PENDING':
+			case JobPaymentStatusValues.PENDING:
 				return 'text-surface-500';
 			default:
 				return 'text-surface-500';

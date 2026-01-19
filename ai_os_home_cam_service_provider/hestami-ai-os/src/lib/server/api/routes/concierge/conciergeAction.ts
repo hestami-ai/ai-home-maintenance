@@ -11,25 +11,26 @@ import { prisma } from '../../../db.js';
 import { ConciergeActionTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeActionTypeSchema.js';
 import { ConciergeActionStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeActionStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
+import { ConciergeActionStatus, ActivityEntityType, ActivityActionType } from '../../../../../../generated/prisma/enums.js';
 import { recordDecision, recordExecution } from '../../middleware/activityEvent.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startConciergeActionWorkflow } from '../../../workflows/index.js';
+import { startConciergeActionWorkflow, ConciergeActionAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('ConciergeActionRoute');
 
 // Valid status transitions for the action state machine
-const VALID_ACTION_STATUS_TRANSITIONS: Record<string, string[]> = {
-	PLANNED: ['IN_PROGRESS', 'CANCELLED'],
-	IN_PROGRESS: ['COMPLETED', 'BLOCKED', 'CANCELLED'],
-	BLOCKED: ['IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: [], // Terminal state
-	CANCELLED: [] // Terminal state
+const VALID_ACTION_STATUS_TRANSITIONS: Record<ConciergeActionStatus, ConciergeActionStatus[]> = {
+	[ConciergeActionStatus.PLANNED]: [ConciergeActionStatus.IN_PROGRESS, ConciergeActionStatus.CANCELLED],
+	[ConciergeActionStatus.IN_PROGRESS]: [ConciergeActionStatus.COMPLETED, ConciergeActionStatus.BLOCKED, ConciergeActionStatus.CANCELLED],
+	[ConciergeActionStatus.BLOCKED]: [ConciergeActionStatus.IN_PROGRESS, ConciergeActionStatus.CANCELLED],
+	[ConciergeActionStatus.COMPLETED]: [], // Terminal state
+	[ConciergeActionStatus.CANCELLED]: [] // Terminal state
 };
 
 /**
  * Validate action status transition
  */
-function isValidActionStatusTransition(from: string, to: string): boolean {
+function isValidActionStatusTransition(from: ConciergeActionStatus, to: ConciergeActionStatus): boolean {
 	return VALID_ACTION_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
@@ -93,7 +94,7 @@ export const conciergeActionRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'CREATE_ACTION',
+					action: ConciergeActionAction.CREATE_ACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					caseId: input.caseId,
@@ -113,9 +114,9 @@ export const conciergeActionRouter = {
 
 			// Record activity event
 			await recordDecision(context, {
-				entityType: 'CONCIERGE_ACTION',
+				entityType: ActivityEntityType.CONCIERGE_ACTION,
 				entityId: workflowResult.actionId!,
-				action: 'CREATE',
+				action: ActivityActionType.CREATE,
 				summary: `Action planned: ${input.actionType} - ${input.description}`,
 				caseId: input.caseId,
 				newState: {
@@ -360,14 +361,14 @@ export const conciergeActionRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
-			if (!isValidActionStatusTransition(action.status, 'IN_PROGRESS')) {
+			if (!isValidActionStatusTransition(action.status as ConciergeActionStatus, ConciergeActionStatus.IN_PROGRESS)) {
 				throw errors.BAD_REQUEST({ message: `Cannot start action in status ${action.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'START_ACTION',
+					action: ConciergeActionAction.START_ACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					actionId: input.id
@@ -381,13 +382,13 @@ export const conciergeActionRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_ACTION',
+				entityType: ActivityEntityType.CONCIERGE_ACTION,
 				entityId: action.id,
-				action: 'STATUS_CHANGE',
+				action: ActivityActionType.STATUS_CHANGE,
 				summary: `Action started: ${action.actionType}`,
 				caseId: action.caseId,
 				previousState: { status: action.status },
-				newState: { status: 'IN_PROGRESS' }
+				newState: { status: ConciergeActionStatus.IN_PROGRESS }
 			});
 
 			return successResponse(
@@ -449,14 +450,14 @@ export const conciergeActionRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
-			if (!isValidActionStatusTransition(action.status, 'COMPLETED')) {
+			if (!isValidActionStatusTransition(action.status as ConciergeActionStatus, ConciergeActionStatus.COMPLETED)) {
 				throw errors.BAD_REQUEST({ message: `Cannot complete action in status ${action.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'COMPLETE_ACTION',
+					action: ConciergeActionAction.COMPLETE_ACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					actionId: input.id,
@@ -472,13 +473,13 @@ export const conciergeActionRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_ACTION',
+				entityType: ActivityEntityType.CONCIERGE_ACTION,
 				entityId: action.id,
-				action: 'COMPLETE',
+				action: ActivityActionType.COMPLETE,
 				summary: `Action completed: ${input.outcome.substring(0, 100)}`,
 				caseId: action.caseId,
 				previousState: { status: action.status },
-				newState: { status: 'COMPLETED', outcome: input.outcome }
+				newState: { status: ConciergeActionStatus.COMPLETED, outcome: input.outcome }
 			});
 
 			return successResponse(
@@ -538,14 +539,14 @@ export const conciergeActionRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
-			if (!isValidActionStatusTransition(action.status, 'BLOCKED')) {
+			if (!isValidActionStatusTransition(action.status as ConciergeActionStatus, ConciergeActionStatus.BLOCKED)) {
 				throw errors.BAD_REQUEST({ message: `Cannot block action in status ${action.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'BLOCK_ACTION',
+					action: ConciergeActionAction.BLOCK_ACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					actionId: input.id,
@@ -560,13 +561,13 @@ export const conciergeActionRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_ACTION',
+				entityType: ActivityEntityType.CONCIERGE_ACTION,
 				entityId: action.id,
-				action: 'STATUS_CHANGE',
+				action: ActivityActionType.STATUS_CHANGE,
 				summary: `Action blocked: ${input.reason}`,
 				caseId: action.caseId,
 				previousState: { status: action.status },
-				newState: { status: 'BLOCKED', reason: input.reason }
+				newState: { status: ConciergeActionStatus.BLOCKED, reason: input.reason }
 			});
 
 			return successResponse(
@@ -624,14 +625,14 @@ export const conciergeActionRouter = {
 
 			await context.cerbos.authorize('delete', 'concierge_action', action.id);
 
-			if (!isValidActionStatusTransition(action.status, 'CANCELLED')) {
+			if (!isValidActionStatusTransition(action.status as ConciergeActionStatus, ConciergeActionStatus.CANCELLED)) {
 				throw errors.BAD_REQUEST({ message: `Cannot cancel action in status ${action.status}` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'CANCEL_ACTION',
+					action: ConciergeActionAction.CANCEL_ACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					actionId: input.id,
@@ -646,13 +647,13 @@ export const conciergeActionRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_ACTION',
+				entityType: ActivityEntityType.CONCIERGE_ACTION,
 				entityId: action.id,
-				action: 'CANCEL',
+				action: ActivityActionType.CANCEL,
 				summary: `Action cancelled: ${input.reason}`,
 				caseId: action.caseId,
 				previousState: { status: action.status },
-				newState: { status: 'CANCELLED', reason: input.reason }
+				newState: { status: ConciergeActionStatus.CANCELLED, reason: input.reason }
 			});
 
 			return successResponse(
@@ -710,14 +711,14 @@ export const conciergeActionRouter = {
 
 			await context.cerbos.authorize('update', 'concierge_action', action.id);
 
-			if (action.status !== 'BLOCKED') {
+			if (action.status !== ConciergeActionStatus.BLOCKED) {
 				throw errors.BAD_REQUEST({ message: 'Can only resume blocked actions' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'RESUME_ACTION',
+					action: ConciergeActionAction.RESUME_ACTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					actionId: input.id,
@@ -732,13 +733,13 @@ export const conciergeActionRouter = {
 
 			// Record activity event
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_ACTION',
+				entityType: ActivityEntityType.CONCIERGE_ACTION,
 				entityId: action.id,
-				action: 'STATUS_CHANGE',
+				action: ActivityActionType.STATUS_CHANGE,
 				summary: `Action resumed`,
 				caseId: action.caseId,
-				previousState: { status: 'BLOCKED' },
-				newState: { status: 'IN_PROGRESS' }
+				previousState: { status: ConciergeActionStatus.BLOCKED },
+				newState: { status: ConciergeActionStatus.IN_PROGRESS }
 			});
 
 			return successResponse(
@@ -802,7 +803,7 @@ export const conciergeActionRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startConciergeActionWorkflow(
 				{
-					action: 'ADD_LOG',
+					action: ConciergeActionAction.ADD_LOG,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					actionId: input.actionId,

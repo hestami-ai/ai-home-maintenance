@@ -23,7 +23,7 @@
 		Truck
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { jobApi, type Job, type JobStatus, type JobSourceType } from '$lib/api/cam';
+	import { ActivityEntityTypeValues, JobSourceTypeValues, JobStatusValues, jobApi, type Job, type JobSourceType, type JobStatus } from '$lib/api/cam';
 
 	interface Props {
 		data: {
@@ -57,12 +57,13 @@
 
 	// Synchronize server jobs to local state
 	$effect(() => {
+		if (!data) return;
 		if (data.jobs) {
 			jobs = [...data.jobs];
 		}
-		searchQuery = data.filters.search;
-		statusFilter = data.filters.status;
-		sourceFilter = data.filters.sourceType;
+		searchQuery = data.filters?.search ?? '';
+		statusFilter = data.filters?.status ?? '';
+		sourceFilter = data.filters?.sourceType ?? '';
 	});
 
 	async function loadJobs() {
@@ -201,32 +202,32 @@
 
 	const statuses: Array<{ value: JobStatus | ''; label: string }> = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'LEAD', label: 'Lead' },
-		{ value: 'TICKET', label: 'Ticket' },
-		{ value: 'ESTIMATE_REQUIRED', label: 'Estimate Required' },
-		{ value: 'ESTIMATE_SENT', label: 'Estimate Sent' },
-		{ value: 'ESTIMATE_APPROVED', label: 'Estimate Approved' },
-		{ value: 'JOB_CREATED', label: 'Job Created' },
-		{ value: 'SCHEDULED', label: 'Scheduled' },
-		{ value: 'DISPATCHED', label: 'Dispatched' },
-		{ value: 'IN_PROGRESS', label: 'In Progress' },
-		{ value: 'ON_HOLD', label: 'On Hold' },
-		{ value: 'COMPLETED', label: 'Completed' },
-		{ value: 'INVOICED', label: 'Invoiced' },
-		{ value: 'PAID', label: 'Paid' },
-		{ value: 'WARRANTY', label: 'Warranty' },
-		{ value: 'CLOSED', label: 'Closed' },
-		{ value: 'CANCELLED', label: 'Cancelled' }
+		{ value: JobStatusValues.LEAD, label: 'Lead' },
+		{ value: JobStatusValues.TICKET, label: 'Ticket' },
+		{ value: JobStatusValues.ESTIMATE_REQUIRED, label: 'Estimate Required' },
+		{ value: JobStatusValues.ESTIMATE_SENT, label: 'Estimate Sent' },
+		{ value: JobStatusValues.ESTIMATE_APPROVED, label: 'Estimate Approved' },
+		{ value: JobStatusValues.JOB_CREATED, label: 'Job Created' },
+		{ value: JobStatusValues.SCHEDULED, label: 'Scheduled' },
+		{ value: JobStatusValues.DISPATCHED, label: 'Dispatched' },
+		{ value: JobStatusValues.IN_PROGRESS, label: 'In Progress' },
+		{ value: JobStatusValues.ON_HOLD, label: 'On Hold' },
+		{ value: JobStatusValues.COMPLETED, label: 'Completed' },
+		{ value: JobStatusValues.INVOICED, label: 'Invoiced' },
+		{ value: JobStatusValues.PAID, label: 'Paid' },
+		{ value: JobStatusValues.WARRANTY, label: 'Warranty' },
+		{ value: JobStatusValues.CLOSED, label: 'Closed' },
+		{ value: JobStatusValues.CANCELLED, label: 'Cancelled' }
 	];
 
 	const sources: Array<{ value: JobSourceType | ''; label: string }> = [
 		{ value: '', label: 'All Sources' },
-		{ value: 'WORK_ORDER', label: 'Work Order' },
-		{ value: 'VIOLATION', label: 'Violation' },
-		{ value: 'ARC_REQUEST', label: 'ARC Request' },
-		{ value: 'DIRECT_CUSTOMER', label: 'Direct Customer' },
-		{ value: 'LEAD', label: 'Lead' },
-		{ value: 'RECURRING', label: 'Recurring' }
+		{ value: ActivityEntityTypeValues.WORK_ORDER, label: 'Work Order' },
+		{ value: ActivityEntityTypeValues.VIOLATION, label: 'Violation' },
+		{ value: ActivityEntityTypeValues.ARC_REQUEST, label: 'ARC Request' },
+		{ value: JobSourceTypeValues.DIRECT_CUSTOMER, label: 'Direct Customer' },
+		{ value: JobStatusValues.LEAD, label: 'Lead' },
+		{ value: JobSourceTypeValues.RECURRING, label: 'Recurring' }
 	];
 </script>
 

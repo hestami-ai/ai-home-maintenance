@@ -3,7 +3,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent, DecisionButton, RationaleModal } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { arcRequestApi, arcReviewApi, type ARCRequest } from '$lib/api/cam';
+	import { ARCRequestStatusValues, ARCReviewActionValues, arcRequestApi, arcReviewApi, type ARCRequest } from '$lib/api/cam';
 	import { nanoid } from 'nanoid';
 
 	interface ARCRequestListItem extends ARCRequest {
@@ -23,13 +23,13 @@
 
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'SUBMITTED', label: 'Submitted' },
-		{ value: 'UNDER_REVIEW', label: 'Under Review' },
-		{ value: 'APPROVED', label: 'Approved' },
+		{ value: ARCRequestStatusValues.SUBMITTED, label: 'Submitted' },
+		{ value: ARCRequestStatusValues.UNDER_REVIEW, label: 'Under Review' },
+		{ value: ARCRequestStatusValues.APPROVED, label: 'Approved' },
 		{ value: 'APPROVED_WITH_CONDITIONS', label: 'Approved w/ Conditions' },
-		{ value: 'DENIED', label: 'Denied' },
-		{ value: 'TABLED', label: 'Tabled' },
-		{ value: 'WITHDRAWN', label: 'Withdrawn' }
+		{ value: ARCRequestStatusValues.DENIED, label: 'Denied' },
+		{ value: ARCRequestStatusValues.TABLED, label: 'Tabled' },
+		{ value: ARCRequestStatusValues.WITHDRAWN, label: 'Withdrawn' }
 	];
 
 	async function loadRequests() {
@@ -58,13 +58,13 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'SUBMITTED': return 'text-primary-500 bg-primary-500/10';
-			case 'UNDER_REVIEW': return 'text-warning-500 bg-warning-500/10';
-			case 'APPROVED': return 'text-success-500 bg-success-500/10';
+			case ARCRequestStatusValues.SUBMITTED: return 'text-primary-500 bg-primary-500/10';
+			case ARCRequestStatusValues.UNDER_REVIEW: return 'text-warning-500 bg-warning-500/10';
+			case ARCRequestStatusValues.APPROVED: return 'text-success-500 bg-success-500/10';
 			case 'APPROVED_WITH_CONDITIONS': return 'text-success-600 bg-success-500/10';
-			case 'DENIED': return 'text-error-500 bg-error-500/10';
-			case 'TABLED': return 'text-surface-500 bg-surface-500/10';
-			case 'WITHDRAWN': return 'text-surface-400 bg-surface-400/10';
+			case ARCRequestStatusValues.DENIED: return 'text-error-500 bg-error-500/10';
+			case ARCRequestStatusValues.TABLED: return 'text-surface-500 bg-surface-500/10';
+			case ARCRequestStatusValues.WITHDRAWN: return 'text-surface-400 bg-surface-400/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -89,13 +89,13 @@
 		try {
 			// Map decision to action type
 			const actionMap: Record<string, 'APPROVE' | 'DENY' | 'REQUEST_CHANGES' | 'TABLE'> = {
-				'APPROVE': 'APPROVE',
-				'APPROVE_WITH_CONDITIONS': 'APPROVE',
-				'DENY': 'DENY',
-				'REQUEST_CHANGES': 'REQUEST_CHANGES',
-				'TABLE': 'TABLE'
+				'APPROVE': ARCReviewActionValues.APPROVE,
+				'APPROVE_WITH_CONDITIONS': ARCReviewActionValues.APPROVE,
+				'DENY': ARCReviewActionValues.DENY,
+				'REQUEST_CHANGES': ARCReviewActionValues.REQUEST_CHANGES,
+				'TABLE': ARCReviewActionValues.TABLE
 			};
-			const action = actionMap[rationaleAction.type] || 'APPROVE';
+			const action = actionMap[rationaleAction.type] || ARCReviewActionValues.APPROVE;
 
 			const response = await arcReviewApi.submitReview({
 				requestId: selectedRequest.id,
@@ -242,25 +242,25 @@
 
 				{#snippet actions()}
 					{@const r = selectedRequest!}
-					{#if ['SUBMITTED', 'UNDER_REVIEW'].includes(r.status)}
+					{#if ([ARCRequestStatusValues.SUBMITTED, ARCRequestStatusValues.UNDER_REVIEW] as string[]).includes(r.status)}
 						<DecisionButton
 							variant="approve"
 							requiresRationale
-							onclick={() => openRationaleModal('APPROVED', 'Approve', 'approve')}
+							onclick={() => openRationaleModal(ARCRequestStatusValues.APPROVED, 'Approve', 'approve')}
 						>
 							Approve
 						</DecisionButton>
 						<DecisionButton
 							variant="deny"
 							requiresRationale
-							onclick={() => openRationaleModal('DENIED', 'Deny', 'deny')}
+							onclick={() => openRationaleModal(ARCRequestStatusValues.DENIED, 'Deny', 'deny')}
 						>
 							Deny
 						</DecisionButton>
 						<DecisionButton
 							variant="default"
 							requiresRationale
-							onclick={() => openRationaleModal('TABLED', 'Table', 'default')}
+							onclick={() => openRationaleModal(ARCRequestStatusValues.TABLED, 'Table', 'default')}
 						>
 							Table
 						</DecisionButton>

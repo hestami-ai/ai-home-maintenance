@@ -15,7 +15,10 @@
 		associations: Association[];
 	}
 
-	let { currentAssociation, associations }: Props = $props();
+	let { currentAssociation, associations = [] }: Props = $props();
+
+	// Safe associations access for navigation transitions
+	const safeAssociations = $derived(Array.isArray(associations) ? associations : []);
 
 	let isOpen = $state(false);
 	let isSwitching = $state(false);
@@ -39,7 +42,7 @@
 		return () => document.removeEventListener('keydown', handleKeydown);
 	});
 
-	const hasMultiple = $derived(associations.length > 1);
+	const hasMultiple = $derived(safeAssociations.length > 1);
 
 	/**
 	 * Switch to a different association.
@@ -53,10 +56,10 @@
 		try {
 			// Call oRPC to set the default association in the database
 			const result = await orpc.association.setDefault({ idempotencyKey: crypto.randomUUID(), associationId });
-			
+
 			if (result.ok) {
 				// Update the store immediately for optimistic UI
-				const newAssociation = associations.find(a => a.id === associationId);
+				const newAssociation = safeAssociations.find(a => a.id === associationId);
 				if (newAssociation) {
 					associationStore.setCurrent(newAssociation as any);
 				}
@@ -108,7 +111,7 @@
 						Switch Association
 					</p>
 
-					{#each associations as association}
+					{#each safeAssociations as association}
 						{@const isSelected = association.id === currentAssociation?.id}
 						<button
 							type="button"
@@ -129,7 +132,7 @@
 						</button>
 					{/each}
 
-					{#if associations.length === 0}
+					{#if safeAssociations.length === 0}
 						<p class="px-3 py-4 text-center text-sm text-surface-500">No associations available</p>
 					{/if}
 				</div>

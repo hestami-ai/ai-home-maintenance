@@ -14,6 +14,23 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type BaseWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	JobStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	INVOICE_CREATE_WORKFLOW_ERROR: 'INVOICE_CREATE_WORKFLOW_ERROR'
+} as const;
+
+// Workflow step constants
+const InvoiceCreateStep = {
+	CREATE_INVOICE: 'CREATE_INVOICE'
+} as const;
 
 const log = createWorkflowLogger('InvoiceCreateWorkflow');
 
@@ -62,7 +79,7 @@ async function generateInvoiceNumber(organizationId: string): Promise<string> {
 
 function recalculateInvoiceTotals(
 	lines: Array<{ quantity: number; unitPrice: number; isTaxable?: boolean; taxRate?: number }>,
-	discount?: number
+	discount: number = 0
 ): { subtotal: number; taxAmount: number; totalAmount: number } {
 	let subtotal = 0;
 	let taxAmount = 0;
@@ -75,8 +92,7 @@ function recalculateInvoiceTotals(
 		}
 	}
 
-	const discountAmount = discount ?? 0;
-	const totalAmount = subtotal - discountAmount + taxAmount;
+	const totalAmount = subtotal - discount + taxAmount;
 
 	return { subtotal, taxAmount, totalAmount };
 }
@@ -138,37 +154,48 @@ async function createInvoice(input: InvoiceCreateInput): Promise<{
 
 		// Phase 15: Auto-transition job to INVOICED if in COMPLETED
 		const job = await tx.job.findUnique({ where: { id: input.jobId } });
-		if (job && job.status === 'COMPLETED') {
+		if (job?.status === JobStatus.COMPLETED) {
 			await tx.job.update({
 				where: { id: input.jobId },
-				data: { status: 'INVOICED', invoicedAt: new Date() }
+				data: { status: JobStatus.INVOICED, invoicedAt: new Date() }
 			});
 			await tx.jobStatusHistory.create({
 				data: {
 					jobId: input.jobId,
-					fromStatus: 'COMPLETED',
-					toStatus: 'INVOICED',
+					fromStatus: JobStatus.COMPLETED,
+					toStatus: JobStatus.INVOICED,
 					changedBy: input.userId,
 					notes: `Auto-transitioned: Invoice ${createdInvoice.invoiceNumber} created`
 				}
+			});
+			log.info('Job auto-transitioned to INVOICED status', {
+				jobId: input.jobId,
+				invoiceNumber: createdInvoice.invoiceNumber
 			});
 		}
 
 		return createdInvoice;
 	});
 
+	log.info('Invoice created successfully', {
+		invoiceId: invoice.id,
+		invoiceNumber: invoice.invoiceNumber,
+		jobId: input.jobId,
+		totalAmount: invoice.totalAmount
+	});
+
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INVOICE',
+		entityType: ActivityEntityType.INVOICE,
 		entityId: invoice.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Invoice created: ${invoice.invoiceNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'invoiceCreateWorkflow_v1',
-		workflowStep: 'CREATE_INVOICE',
+		workflowStep: InvoiceCreateStep.CREATE_INVOICE,
 		workflowVersion: 'v1',
 		jobId: input.jobId,
 		newState: {
@@ -180,12 +207,13 @@ async function createInvoice(input: InvoiceCreateInput): Promise<{
 	return {
 		id: invoice.id,
 		invoiceNumber: invoice.invoiceNumber,
-		status: invoice.status as JobInvoiceStatus
+		status: invoice.status
 	};
 }
 
 async function invoiceCreateWorkflow(input: InvoiceCreateInput): Promise<InvoiceCreateResult> {
 	try {
+		log.info('Starting invoice creation workflow', { jobId: input.jobId, organizationId: input.organizationId });
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started' });
 
 		const result = await DBOS.runStep(() => createInvoice(input), { name: 'createInvoice' });
@@ -194,6 +222,12 @@ async function invoiceCreateWorkflow(input: InvoiceCreateInput): Promise<Invoice
 			step: 'completed',
 			invoiceId: result.id,
 			invoiceNumber: result.invoiceNumber
+		});
+
+		log.info('Invoice creation workflow completed successfully', {
+			invoiceId: result.id,
+			invoiceNumber: result.invoiceNumber,
+			jobId: input.jobId
 		});
 
 		return {
@@ -206,12 +240,17 @@ async function invoiceCreateWorkflow(input: InvoiceCreateInput): Promise<Invoice
 	} catch (error) {
 		const errorObj = error instanceof Error ? error : new Error(String(error));
 		const errorMessage = errorObj.message;
+		log.error('Invoice creation workflow failed', {
+			error: errorMessage,
+			jobId: input.jobId,
+			organizationId: input.organizationId
+		});
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'INVOICE_CREATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.INVOICE_CREATE_WORKFLOW_ERROR
 		});
 
 		return {

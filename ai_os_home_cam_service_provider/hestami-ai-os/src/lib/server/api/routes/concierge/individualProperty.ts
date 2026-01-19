@@ -9,7 +9,7 @@ import {
 import { prisma } from '../../../db.js';
 import { PropertyTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/PropertyTypeSchema.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startIndividualPropertyWorkflow } from '../../../workflows/index.js';
+import { startIndividualPropertyWorkflow, IndividualPropertyWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('IndividualPropertyRoute');
 
@@ -124,7 +124,7 @@ export const individualPropertyRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startIndividualPropertyWorkflow(
 				{
-					action: 'CREATE',
+					action: IndividualPropertyWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					name: input.name,
@@ -433,7 +433,7 @@ export const individualPropertyRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startIndividualPropertyWorkflow(
 				{
-					action: 'UPDATE',
+					action: IndividualPropertyWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId,
@@ -524,7 +524,7 @@ export const individualPropertyRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startIndividualPropertyWorkflow(
 				{
-					action: 'DELETE',
+					action: IndividualPropertyWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId
@@ -609,7 +609,7 @@ export const individualPropertyRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startIndividualPropertyWorkflow(
 				{
-					action: 'ADD_TO_PORTFOLIO',
+					action: IndividualPropertyWorkflowAction.ADD_TO_PORTFOLIO,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -668,7 +668,7 @@ export const individualPropertyRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startIndividualPropertyWorkflow(
 				{
-					action: 'REMOVE_FROM_PORTFOLIO',
+					action: IndividualPropertyWorkflowAction.REMOVE_FROM_PORTFOLIO,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -737,7 +737,7 @@ export const individualPropertyRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startIndividualPropertyWorkflow(
 				{
-					action: 'UPDATE_EXTERNAL_HOA',
+					action: IndividualPropertyWorkflowAction.UPDATE_EXTERNAL_HOA,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,

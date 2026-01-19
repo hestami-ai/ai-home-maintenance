@@ -19,6 +19,11 @@ import {
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
+import {
+	ActivityEntityType,
+	ActivityEventCategory,
+	ActivityActionType
+} from '../../../../generated/prisma/enums.js';
 import { notificationWorkflow_v1, NotificationAction } from './notificationWorkflow.js';
 import { NotificationCategory, NotificationType } from './schemas.js';
 import {
@@ -28,6 +33,61 @@ import {
 	processingInfectedCounter,
 	processingDurationHistogram
 } from '../metrics.js';
+
+// Error classification types for retry logic
+export const ErrorType = {
+	TRANSIENT: 'TRANSIENT',
+	PERMANENT: 'PERMANENT'
+} as const;
+export type ErrorType = (typeof ErrorType)[keyof typeof ErrorType];
+
+// Error codes for document processing
+export const ErrorCode = {
+	WORKER_ERROR: 'WORKER_ERROR',
+	TIMEOUT: 'TIMEOUT',
+	NETWORK_ERROR: 'NETWORK_ERROR',
+	CLAMAV_UNAVAILABLE: 'CLAMAV_UNAVAILABLE',
+	CORRUPT_FILE: 'CORRUPT_FILE',
+	UNSUPPORTED_FORMAT: 'UNSUPPORTED_FORMAT',
+	FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+	UNKNOWN_FAILURE: 'UNKNOWN_FAILURE',
+	CONCURRENCY_LIMIT_REACHED: 'CONCURRENCY_LIMIT_REACHED'
+} as const;
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
+
+// Malware scan status values
+export const MalwareScanStatus = {
+	CLEAN: 'CLEAN',
+	INFECTED: 'INFECTED'
+} as const;
+export type MalwareScanStatus = (typeof MalwareScanStatus)[keyof typeof MalwareScanStatus];
+
+// Concurrency limit types
+export const LimitType = {
+	ORGANIZATION: 'ORGANIZATION',
+	GLOBAL: 'GLOBAL'
+} as const;
+export type LimitType = (typeof LimitType)[keyof typeof LimitType];
+
+// Processing result status for metrics
+export const ProcessingResultStatus = {
+	SUCCESS: 'SUCCESS',
+	INFECTED: 'INFECTED'
+} as const;
+export type ProcessingResultStatus = (typeof ProcessingResultStatus)[keyof typeof ProcessingResultStatus];
+
+// Worker result status values
+export const WorkerResultStatus = {
+	CLEAN: 'clean',
+	INFECTED: 'infected'
+} as const;
+export type WorkerResultStatus = (typeof WorkerResultStatus)[keyof typeof WorkerResultStatus];
+
+// Workflow error types for tracing
+export const WorkflowErrorType = {
+	DOCUMENT_WORKFLOW_ERROR: 'DOCUMENT_WORKFLOW_ERROR'
+} as const;
+export type WorkflowErrorType = (typeof WorkflowErrorType)[keyof typeof WorkflowErrorType];
 
 // Action types for document operations
 export const DocumentAction = {
@@ -263,7 +323,7 @@ async function createVersion(
 		// Mark previous version as superseded
 		await tx.document.update({
 			where: { id: parentId },
-			data: { status: 'SUPERSEDED' }
+			data: { status: DocumentStatus.SUPERSEDED }
 		});
 
 		// Create new version
@@ -339,7 +399,7 @@ async function restoreVersion(
 		// Mark current as superseded
 		await tx.document.update({
 			where: { id: currentId },
-			data: { status: 'SUPERSEDED' }
+			data: { status: DocumentStatus.SUPERSEDED }
 		});
 
 		// Create restored version
@@ -500,7 +560,7 @@ async function archiveDocument(
 		await tx.document.update({
 			where: { id: documentId },
 			data: {
-				status: 'ARCHIVED',
+				status: DocumentStatus.ARCHIVED,
 				archivedAt: now,
 				archivedBy: userId,
 				archiveReason: reason
@@ -522,7 +582,7 @@ async function restoreDocument(
 		await tx.document.update({
 			where: { id: documentId },
 			data: {
-				status: 'ACTIVE',
+				status: DocumentStatus.ACTIVE,
 				archivedAt: null,
 				archivedBy: null,
 				archiveReason: null
@@ -610,12 +670,12 @@ export async function finalizeProcessing(
 	workerResult: any,
 	storagePath: string
 ): Promise<void> {
-	const isClean = workerResult.status === 'clean' || workerResult.malwareScan?.status === 'clean';
+	const isClean = workerResult.status === WorkerResultStatus.CLEAN || workerResult.malwareScan?.status === WorkerResultStatus.CLEAN;
 	const s3Bucket = process.env.S3_BUCKET || 'uploads';
 	const s3Endpoint = process.env.S3_ENDPOINT || 'https://dev-s3.hestami-ai.com';
 
 	const status = isClean ? DocumentStatus.ACTIVE : DocumentStatus.ARCHIVED;
-	const malwareScanStatus = isClean ? 'CLEAN' : 'INFECTED';
+	const malwareScanStatus = isClean ? MalwareScanStatus.CLEAN : MalwareScanStatus.INFECTED;
 	const fileUrl = `${s3Endpoint}/${s3Bucket}/${storagePath}`;
 	const thumbnailUrl = workerResult.derivatives?.thumbnail
 		? `${s3Endpoint}/${s3Bucket}/${workerResult.derivatives.thumbnail}`
@@ -680,36 +740,36 @@ export async function getOrgQueueDepth(organizationId: string): Promise<number> 
 /**
  * Classifies an error into TRANSIENT or PERMANENT categories for retry logic.
  */
-export function classifyError(error: Error): { type: 'TRANSIENT' | 'PERMANENT'; code: string } {
+export function classifyError(error: Error): { type: ErrorType; code: ErrorCode } {
 	const message = error.message.toLowerCase();
 
 	// Transient errors (auto-retry eligible)
 	if (message.includes('500') || message.includes('502') || message.includes('503')) {
-		return { type: 'TRANSIENT', code: 'WORKER_ERROR' };
+		return { type: ErrorType.TRANSIENT, code: ErrorCode.WORKER_ERROR };
 	}
 	if (message.includes('timeout') || message.includes('timed out')) {
-		return { type: 'TRANSIENT', code: 'TIMEOUT' };
+		return { type: ErrorType.TRANSIENT, code: ErrorCode.TIMEOUT };
 	}
 	if (message.includes('connection') || message.includes('network')) {
-		return { type: 'TRANSIENT', code: 'NETWORK_ERROR' };
+		return { type: ErrorType.TRANSIENT, code: ErrorCode.NETWORK_ERROR };
 	}
 	if (message.includes('clamav') && message.includes('unavailable')) {
-		return { type: 'TRANSIENT', code: 'CLAMAV_UNAVAILABLE' };
+		return { type: ErrorType.TRANSIENT, code: ErrorCode.CLAMAV_UNAVAILABLE };
 	}
 
 	// Permanent errors (no auto-retry)
 	if (message.includes('corrupt') || message.includes('invalid')) {
-		return { type: 'PERMANENT', code: 'CORRUPT_FILE' };
+		return { type: ErrorType.PERMANENT, code: ErrorCode.CORRUPT_FILE };
 	}
 	if (message.includes('unsupported') || message.includes('format')) {
-		return { type: 'PERMANENT', code: 'UNSUPPORTED_FORMAT' };
+		return { type: ErrorType.PERMANENT, code: ErrorCode.UNSUPPORTED_FORMAT };
 	}
 	if (message.includes('size limit') || message.includes('too large')) {
-		return { type: 'PERMANENT', code: 'FILE_TOO_LARGE' };
+		return { type: ErrorType.PERMANENT, code: ErrorCode.FILE_TOO_LARGE };
 	}
 
 	// Default to transient (safer - allows retry)
-	return { type: 'TRANSIENT', code: 'UNKNOWN_FAILURE' };
+	return { type: ErrorType.TRANSIENT, code: ErrorCode.UNKNOWN_FAILURE };
 }
 
 /**
@@ -770,7 +830,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 		let entityId: string;
 
 		switch (input.action) {
-			case 'CREATE_DOCUMENT':
+			case DocumentAction.CREATE_DOCUMENT:
 				log.debug('Executing CREATE_DOCUMENT step');
 				entityId = await DBOS.runStep(
 					() => createDocument(input.organizationId, input.userId, input.data, log, input.associationId),
@@ -778,7 +838,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'CREATE_DOCUMENT_METADATA':
+			case DocumentAction.CREATE_DOCUMENT_METADATA:
 				log.debug('Executing CREATE_DOCUMENT_METADATA step');
 				entityId = await DBOS.runStep(
 					() => createDocumentMetadata(input.organizationId, input.userId, input.data, log, input.associationId),
@@ -786,7 +846,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'UPDATE_DOCUMENT':
+			case DocumentAction.UPDATE_DOCUMENT:
 				log.debug('Executing UPDATE_DOCUMENT step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => updateDocument(input.organizationId, input.userId, input.documentId!, input.data, log),
@@ -794,7 +854,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'CREATE_VERSION':
+			case DocumentAction.CREATE_VERSION:
 				log.debug('Executing CREATE_VERSION step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => createVersion(input.organizationId, input.userId, input.documentId!, input.data, log),
@@ -802,7 +862,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'RESTORE_VERSION':
+			case DocumentAction.RESTORE_VERSION:
 				log.debug('Executing RESTORE_VERSION step', { documentId: input.documentId, targetVersionId: input.data.targetVersionId });
 				entityId = await DBOS.runStep(
 					() => restoreVersion(input.organizationId, input.userId, input.documentId!, input.data, log),
@@ -810,7 +870,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'CHANGE_CATEGORY':
+			case DocumentAction.CHANGE_CATEGORY:
 				log.debug('Executing CHANGE_CATEGORY step', { documentId: input.documentId, category: input.data.category });
 				entityId = await DBOS.runStep(
 					() => changeCategory(input.organizationId, input.userId, input.documentId!, input.data, log),
@@ -818,7 +878,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'ADD_CONTEXT_BINDING':
+			case DocumentAction.ADD_CONTEXT_BINDING:
 				log.debug('Executing ADD_CONTEXT_BINDING step', { documentId: input.documentId, contextType: input.data.contextType });
 				entityId = await DBOS.runStep(
 					() => addContextBinding(input.organizationId, input.userId, input.documentId!, input.data, log),
@@ -826,7 +886,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'REMOVE_CONTEXT_BINDING':
+			case DocumentAction.REMOVE_CONTEXT_BINDING:
 				log.debug('Executing REMOVE_CONTEXT_BINDING step', { documentId: input.documentId, contextType: input.data.contextType });
 				entityId = await DBOS.runStep(
 					() => removeContextBinding(input.organizationId, input.userId, input.documentId!, input.data.contextType!, input.data.contextId!, log),
@@ -834,7 +894,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'UPDATE_EXTRACTED_METADATA':
+			case DocumentAction.UPDATE_EXTRACTED_METADATA:
 				log.debug('Executing UPDATE_EXTRACTED_METADATA step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => updateExtractedMetadata(input.organizationId, input.userId, input.documentId!, {
@@ -847,7 +907,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'ARCHIVE_DOCUMENT':
+			case DocumentAction.ARCHIVE_DOCUMENT:
 				log.debug('Executing ARCHIVE_DOCUMENT step', { documentId: input.documentId });
 				const archiveResult = await DBOS.runStep(
 					() => archiveDocument(input.organizationId, input.userId, input.documentId!, input.data.archiveReason, log),
@@ -856,7 +916,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				entityId = archiveResult.id;
 				break;
 
-			case 'RESTORE_DOCUMENT':
+			case DocumentAction.RESTORE_DOCUMENT:
 				log.debug('Executing RESTORE_DOCUMENT step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => restoreDocument(input.organizationId, input.userId, input.documentId!, log),
@@ -864,7 +924,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'LOG_DOWNLOAD':
+			case DocumentAction.LOG_DOWNLOAD:
 				log.debug('Executing LOG_DOWNLOAD step', { documentId: input.documentId });
 				entityId = await DBOS.runStep(
 					() => logDownload(input.organizationId, input.userId, input.documentId!, {
@@ -876,7 +936,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 				);
 				break;
 
-			case 'HANDLE_TUS_HOOK':
+			case DocumentAction.HANDLE_TUS_HOOK:
 				const tusPayload = input.data.tusPayload;
 				if (!tusPayload) throw new Error('Missing TUS payload');
 
@@ -931,16 +991,16 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 					]);
 
 					if (orgCount >= orgLimit || globalCount >= globalLimit) {
-						const limitType = orgCount >= orgLimit ? 'ORGANIZATION' : 'GLOBAL';
+						const limitType = orgCount >= orgLimit ? LimitType.ORGANIZATION : LimitType.GLOBAL;
 						log.info(`Concurrency limit reached (${limitType})`, { orgCount, globalCount, orgLimit, globalLimit });
 
 						// Mark as failed with transient error to trigger retry (without incrementing attempt count)
 						const nextRetryAt = new Date(Date.now() + 60 * 1000); // Retry in 1 minute
 						await DBOS.runStep(
 							() => updateDocumentProcessingStatus(docIdFromMeta, DocumentStatus.PROCESSING_FAILED, {
-								type: 'TRANSIENT',
+								type: ErrorType.TRANSIENT,
 								message: `Concurrency limit reached (${limitType})`,
-								details: { code: 'CONCURRENCY_LIMIT_REACHED', limitType },
+								details: { code: ErrorCode.CONCURRENCY_LIMIT_REACHED, limitType },
 								nextRetryAt
 							}),
 							{ name: 'markLimitReached' }
@@ -949,13 +1009,13 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 						await DBOS.runStep(
 							() => recordWorkflowEvent({
 								organizationId: actualOrgId,
-								entityType: 'DOCUMENT',
+								entityType: ActivityEntityType.DOCUMENT,
 								entityId: docIdFromMeta,
-								action: 'STATUS_CHANGE',
-								eventCategory: 'SYSTEM',
+								action: ActivityActionType.STATUS_CHANGE,
+								eventCategory: ActivityEventCategory.SYSTEM,
 								summary: `Processing delayed: ${limitType} concurrency limit reached`,
 								workflowId: 'DocumentWorkflow',
-								workflowStep: 'markLimitReached',
+								workflowStep: DocumentAction.HANDLE_TUS_HOOK,
 								previousState: { status: DocumentStatus.PENDING_UPLOAD },
 								newState: { status: DocumentStatus.PROCESSING_FAILED },
 								metadata: { limitType, nextRetryAt }
@@ -979,13 +1039,13 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 					await DBOS.runStep(
 						() => recordWorkflowEvent({
 							organizationId: actualOrgId,
-							entityType: 'DOCUMENT',
+							entityType: ActivityEntityType.DOCUMENT,
 							entityId: docIdFromMeta,
-							action: 'STATUS_CHANGE',
-							eventCategory: 'SYSTEM',
+							action: ActivityActionType.STATUS_CHANGE,
+							eventCategory: ActivityEventCategory.SYSTEM,
 							summary: `Document processing started for ${s3ObjectKey}`,
 							workflowId: 'DocumentWorkflow',
-							workflowStep: 'markProcessing',
+							workflowStep: DocumentAction.HANDLE_TUS_HOOK,
 							previousState: { status: docBefore?.status },
 							newState: { status: DocumentStatus.PROCESSING }
 						}),
@@ -1005,7 +1065,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 
 					// 3. Finalize
 					log.info('Finalizing processing', { docIdFromMeta, status: workerResult.status });
-					const isClean = workerResult.status === 'clean' || workerResult.malwareScan?.status === 'clean';
+					const isClean = workerResult.status === WorkerResultStatus.CLEAN || workerResult.malwareScan?.status === WorkerResultStatus.CLEAN;
 
 					await DBOS.runStep(
 						() => finalizeProcessing(docIdFromMeta, {
@@ -1027,15 +1087,15 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 					await DBOS.runStep(
 						() => recordWorkflowEvent({
 							organizationId: actualOrgId,
-							entityType: 'DOCUMENT',
+							entityType: ActivityEntityType.DOCUMENT,
 							entityId: docIdFromMeta,
-							action: isClean ? 'COMPLETE' : 'STATUS_CHANGE',
-							eventCategory: 'SYSTEM',
+							action: isClean ? ActivityActionType.COMPLETE : ActivityActionType.STATUS_CHANGE,
+							eventCategory: ActivityEventCategory.SYSTEM,
 							summary: isClean
 								? `Document processing completed successfully`
 								: `Malware detected in document ${s3ObjectKey}`,
 							workflowId: 'DocumentWorkflow',
-							workflowStep: 'finalizeProcessing',
+							workflowStep: DocumentAction.HANDLE_TUS_HOOK,
 							previousState: { status: DocumentStatus.PROCESSING },
 							newState: { status: finalStatus },
 							metadata: {
@@ -1047,7 +1107,7 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 
 					// Metrics: Completion, Infection, Duration
 					const duration = (Date.now() - processingStartTime) / 1000;
-					processingDurationHistogram.record(duration, { organizationId: actualOrgId, status: isClean ? 'SUCCESS' : 'INFECTED' });
+					processingDurationHistogram.record(duration, { organizationId: actualOrgId, status: isClean ? ProcessingResultStatus.SUCCESS : ProcessingResultStatus.INFECTED });
 
 					if (isClean) {
 						processingCompletedCounter.add(1, { organizationId: actualOrgId });
@@ -1111,13 +1171,13 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 					await DBOS.runStep(
 						() => recordWorkflowEvent({
 							organizationId: actualOrgId,
-							entityType: 'DOCUMENT',
+							entityType: ActivityEntityType.DOCUMENT,
 							entityId: docIdFromMeta,
-							action: 'WORKFLOW_FAILED',
-							eventCategory: 'SYSTEM',
+							action: ActivityActionType.WORKFLOW_FAILED,
+							eventCategory: ActivityEventCategory.SYSTEM,
 							summary: `Document processing failed: ${errorObj.message}`,
 							workflowId: 'DocumentWorkflow',
-							workflowStep: 'markProcessingFailed',
+							workflowStep: DocumentAction.HANDLE_TUS_HOOK,
 							previousState: { status: DocumentStatus.PROCESSING },
 							newState: { status: DocumentStatus.PROCESSING_FAILED },
 							metadata: {
@@ -1180,8 +1240,8 @@ async function documentWorkflow(input: DocumentWorkflowInput): Promise<DocumentW
 
 		// Record error on span for trace visibility
 		await recordSpanError(error instanceof Error ? error : new Error(errorMessage), {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'DOCUMENT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.DOCUMENT_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

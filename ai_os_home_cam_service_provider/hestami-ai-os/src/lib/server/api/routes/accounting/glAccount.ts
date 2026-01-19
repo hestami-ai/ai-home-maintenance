@@ -6,7 +6,7 @@ import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { seedDefaultChartOfAccounts } from '../../../accounting/index.js';
 import { createModuleLogger } from '../../../logger.js';
 import { AccountTypeSchema, AccountCategorySchema, FundTypeSchema } from '../../schemas.js';
-import { startGLAccountWorkflow } from '../../../workflows/index.js';
+import { startGLAccountWorkflow, GLAccountWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('GLAccountRoute');
 
@@ -93,7 +93,7 @@ export const glAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGLAccountWorkflow(
 				{
-					action: 'CREATE',
+					action: GLAccountWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -368,7 +368,7 @@ export const glAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGLAccountWorkflow(
 				{
-					action: 'UPDATE',
+					action: GLAccountWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					accountId: input.id,
@@ -458,7 +458,7 @@ export const glAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startGLAccountWorkflow(
 				{
-					action: 'DELETE',
+					action: GLAccountWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					accountId: input.id

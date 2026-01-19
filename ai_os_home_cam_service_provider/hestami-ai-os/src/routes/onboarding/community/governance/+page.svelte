@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { communityOnboarding } from '$lib/stores';
@@ -34,7 +35,7 @@
 		goto('/onboarding/community/data');
 	}
 
-	const isAssociation = $derived($communityOnboarding.organizationType === 'COMMUNITY_ASSOCIATION');
+	const isAssociation = $derived($communityOnboarding.organizationType === OrganizationTypeValues.COMMUNITY_ASSOCIATION);
 </script>
 
 <div class="space-y-6">

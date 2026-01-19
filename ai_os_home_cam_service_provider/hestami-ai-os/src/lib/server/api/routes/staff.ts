@@ -11,10 +11,12 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { authedProcedure, orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { StaffStatusSchema, StaffRoleSchema, PillarAccessSchema } from '../../../../../generated/zod/index.js';
+import { StaffStatus, OrganizationType, PillarAccess } from '../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../logger.js';
 import { encrypt, decrypt, generateActivationCode } from '../../security/encryption.js';
 import { recordSpanError } from '../middleware/tracing.js';
-import { staffWorkflow_v1 } from '../../workflows/staffWorkflow.js';
+import { staffWorkflow_v1, StaffWorkflowAction } from '../../workflows/staffWorkflow.js';
+import { SpanErrorType } from '../../workflows/schemas.js';
 
 const log = createModuleLogger('StaffRoute');
 
@@ -121,7 +123,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CREATE',
+				action: StaffWorkflowAction.CREATE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				data: {
@@ -421,7 +423,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UPDATE',
+				action: StaffWorkflowAction.UPDATE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -508,7 +510,7 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			if (existingStaff.status !== 'PENDING') {
+			if (existingStaff.status !== StaffStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: `Cannot activate staff with status: ${existingStaff.status}` });
 			}
 
@@ -516,7 +518,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'ACTIVATE',
+				action: StaffWorkflowAction.ACTIVATE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId
@@ -600,7 +602,7 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			if (existingStaff.status === 'SUSPENDED' || existingStaff.status === 'DEACTIVATED') {
+			if (existingStaff.status === StaffStatus.SUSPENDED || existingStaff.status === StaffStatus.DEACTIVATED) {
 				throw errors.BAD_REQUEST({ message: `Cannot suspend staff with status: ${existingStaff.status}` });
 			}
 
@@ -608,7 +610,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'SUSPEND',
+				action: StaffWorkflowAction.SUSPEND,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -701,7 +703,7 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			if (existingStaff.status === 'DEACTIVATED') {
+			if (existingStaff.status === StaffStatus.DEACTIVATED) {
 				throw errors.BAD_REQUEST({ message: 'Staff is already deactivated' });
 			}
 
@@ -717,7 +719,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'DEACTIVATE',
+				action: StaffWorkflowAction.DEACTIVATE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -803,11 +805,11 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			if (existingStaff.status === 'ACTIVE') {
+			if (existingStaff.status === StaffStatus.ACTIVE) {
 				throw errors.BAD_REQUEST({ message: 'Staff is already active' });
 			}
 
-			if (existingStaff.status === 'PENDING') {
+			if (existingStaff.status === StaffStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: 'Use activate endpoint for pending staff' });
 			}
 
@@ -815,7 +817,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'REACTIVATE',
+				action: StaffWorkflowAction.REACTIVATE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId
@@ -901,7 +903,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UPDATE_ROLES',
+				action: StaffWorkflowAction.UPDATE_ROLES,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -990,7 +992,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UPDATE_PILLAR_ACCESS',
+				action: StaffWorkflowAction.UPDATE_PILLAR_ACCESS,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -1141,7 +1143,7 @@ export const staffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff' });
 			}
 
-			if (staff.status !== 'PENDING') {
+			if (staff.status !== StaffStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: 'Can only regenerate code for PENDING staff' });
 			}
 
@@ -1153,7 +1155,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'REGENERATE_ACTIVATION_CODE',
+				action: StaffWorkflowAction.REGENERATE_ACTIVATION_CODE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -1212,11 +1214,11 @@ export const staffRouter = {
 				throw errors.FORBIDDEN({ message: 'Not a staff member' });
 			}
 
-			if (staff.status === 'ACTIVE') {
+			if (staff.status === StaffStatus.ACTIVE) {
 				return successResponse({ success: true }, context);
 			}
 
-			if (staff.status !== 'PENDING') {
+			if (staff.status !== StaffStatus.PENDING) {
 				throw errors.FORBIDDEN({ message: 'Account cannot be activated' });
 			}
 
@@ -1241,7 +1243,7 @@ export const staffRouter = {
 				// Record error on span for trace visibility
 				await recordSpanError(errorObj, {
 					errorCode: 'ACTIVATION_FAILED',
-					errorType: 'STAFF_ACTIVATION_ERROR'
+					errorType: SpanErrorType.STAFF_ACTIVATION_ERROR
 				});
 
 				throw errors.BAD_REQUEST({ message: 'Invalid activation code' });
@@ -1251,7 +1253,7 @@ export const staffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'ACTIVATE_WITH_CODE',
+				action: StaffWorkflowAction.ACTIVATE_WITH_CODE,
 				organizationId: 'hestami-platform',
 				userId: context.user!.id,
 				staffId: staff.id,
@@ -1280,15 +1282,15 @@ export const staffRouter = {
  * staff can ONLY be granted access to the CAM pillar.
  * This helper validates pillar access requests against org type.
  */
-const CAM_ONLY_ORG_TYPES = ['MANAGEMENT_COMPANY', 'COMMUNITY_ASSOCIATION'];
-const ALLOWED_PILLAR_FOR_CAM = 'CAM';
+const CAM_ONLY_ORG_TYPES = new Set<OrganizationType>([OrganizationType.MANAGEMENT_COMPANY, OrganizationType.COMMUNITY_ASSOCIATION]);
+const ALLOWED_PILLAR_FOR_CAM = PillarAccess.CAM;
 
 function validatePillarAccessForOrgType(
 	pillarAccess: string[],
 	orgType: string,
 	errors: { BAD_REQUEST: (opts: { message: string }) => Error }
 ): void {
-	if (CAM_ONLY_ORG_TYPES.includes(orgType)) {
+	if (CAM_ONLY_ORG_TYPES.has(orgType as OrganizationType)) {
 		const invalidPillars = pillarAccess.filter(p => p !== ALLOWED_PILLAR_FOR_CAM);
 		if (invalidPillars.length > 0) {
 			throw errors.BAD_REQUEST({
@@ -1569,7 +1571,7 @@ export const orgStaffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CREATE',
+				action: StaffWorkflowAction.CREATE,
 				organizationId: context.organization.id,
 				userId: context.user!.id,
 				data: {
@@ -1688,7 +1690,7 @@ export const orgStaffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UPDATE',
+				action: StaffWorkflowAction.UPDATE,
 				organizationId: context.organization.id,
 				userId: context.user!.id,
 				staffId: input.staffId,
@@ -1784,7 +1786,7 @@ export const orgStaffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
 			}
 
-			if (existingStaff.status !== 'PENDING') {
+			if (existingStaff.status !== StaffStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: `Cannot activate staff with status: ${existingStaff.status}` });
 			}
 
@@ -1792,7 +1794,7 @@ export const orgStaffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'ACTIVATE',
+				action: StaffWorkflowAction.ACTIVATE,
 				organizationId: context.organization.id,
 				userId: context.user!.id,
 				staffId: input.staffId
@@ -1882,7 +1884,7 @@ export const orgStaffRouter = {
 				throw errors.NOT_FOUND({ message: 'Staff not found in this organization' });
 			}
 
-			if (existingStaff.status === 'DEACTIVATED') {
+			if (existingStaff.status === StaffStatus.DEACTIVATED) {
 				throw errors.BAD_REQUEST({ message: 'Staff is already deactivated' });
 			}
 
@@ -1890,7 +1892,7 @@ export const orgStaffRouter = {
 			const handle = await DBOS.startWorkflow(staffWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'DEACTIVATE',
+				action: StaffWorkflowAction.DEACTIVATE,
 				organizationId: context.organization.id,
 				userId: context.user!.id,
 				staffId: input.staffId,

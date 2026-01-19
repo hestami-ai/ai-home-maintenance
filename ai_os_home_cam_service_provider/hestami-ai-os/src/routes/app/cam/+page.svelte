@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { AlertTriangle, Wrench, RefreshCw } from 'lucide-svelte';
 	import { Skeleton } from '$lib/components/ui';
-	import { 
-		RequiresActionCard, 
-		RiskComplianceCard, 
-		FinancialAttentionCard, 
+	import {
+		RequiresActionCard,
+		RiskComplianceCard,
+		FinancialAttentionCard,
 		RecentGovernanceCard,
-		ReportWidget, 
-		UpcomingMeetingsWidget 
+		ReportWidget,
+		UpcomingMeetingsWidget
 	} from '$lib/components/cam/dashboard';
 	import { auth, currentAssociation } from '$lib/stores';
     import { invalidateAll } from '$app/navigation';
@@ -33,11 +33,20 @@
 
 	let isLoading = $state(false); // No client loading
 	let error = $state<string | null>(null);
-    
-    // Derived state from props
-	let reports = $derived(data.reports as ReportSummary[]);
-	let meetings = $derived(data.meetings as Meeting[]);
-	let dashboardData = $derived(data.dashboardData as DashboardData | null);
+
+    // Use $state with $effect to avoid proxy errors during navigation
+	let reports = $state<ReportSummary[]>([]);
+	let meetings = $state<Meeting[]>([]);
+	let dashboardData = $state<DashboardData | null>(null);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			reports = (data.reports ?? []) as ReportSummary[];
+			meetings = (data.meetings ?? []) as Meeting[];
+			dashboardData = (data.dashboardData ?? null) as DashboardData | null;
+		}
+	});
 	
     let hasRecordedView = $state(false);
 

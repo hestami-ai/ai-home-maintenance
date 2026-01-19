@@ -1,4 +1,4 @@
-import type { AccountType, AccountCategory, FundType } from '../../../../generated/prisma/client.js';
+import { AccountType, AccountCategory, FundType } from '../../../../generated/prisma/enums.js';
 
 /**
  * Default Chart of Accounts for HOA/Community Associations
@@ -46,9 +46,9 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 	{
 		accountNumber: '1000',
 		name: 'Assets',
-		accountType: 'ASSET',
-		category: 'CASH',
-		fundType: 'OPERATING',
+		accountType: AccountType.ASSET,
+		category: AccountCategory.CASH,
+		fundType: FundType.OPERATING,
 		description: 'Parent account for all assets',
 		isSystemAccount: true,
 		children: [
@@ -56,27 +56,27 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '1010',
 				name: 'Operating Cash',
-				accountType: 'ASSET',
-				category: 'CASH',
-				fundType: 'OPERATING',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.CASH,
+				fundType: FundType.OPERATING,
 				description: 'Primary operating bank account',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '1020',
 				name: 'Reserve Cash',
-				accountType: 'ASSET',
-				category: 'CASH',
-				fundType: 'RESERVE',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.CASH,
+				fundType: FundType.RESERVE,
 				description: 'Reserve fund bank account',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '1030',
 				name: 'Petty Cash',
-				accountType: 'ASSET',
-				category: 'CASH',
-				fundType: 'OPERATING',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.CASH,
+				fundType: FundType.OPERATING,
 				description: 'Petty cash on hand',
 				isSystemAccount: false
 			},
@@ -84,18 +84,18 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '1100',
 				name: 'Accounts Receivable - Assessments',
-				accountType: 'ASSET',
-				category: 'ACCOUNTS_RECEIVABLE',
-				fundType: 'OPERATING',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.ACCOUNTS_RECEIVABLE,
+				fundType: FundType.OPERATING,
 				description: 'Outstanding assessment charges',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '1110',
 				name: 'Accounts Receivable - Other',
-				accountType: 'ASSET',
-				category: 'ACCOUNTS_RECEIVABLE',
-				fundType: 'OPERATING',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.ACCOUNTS_RECEIVABLE,
+				fundType: FundType.OPERATING,
 				description: 'Other receivables',
 				isSystemAccount: false
 			},
@@ -103,18 +103,18 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '1200',
 				name: 'Prepaid Insurance',
-				accountType: 'ASSET',
-				category: 'PREPAID',
-				fundType: 'OPERATING',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.PREPAID,
+				fundType: FundType.OPERATING,
 				description: 'Prepaid insurance premiums',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '1210',
 				name: 'Prepaid Expenses',
-				accountType: 'ASSET',
-				category: 'PREPAID',
-				fundType: 'OPERATING',
+				accountType: AccountType.ASSET,
+				category: AccountCategory.PREPAID,
+				fundType: FundType.OPERATING,
 				description: 'Other prepaid expenses',
 				isSystemAccount: false
 			}
@@ -127,45 +127,45 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 	{
 		accountNumber: '2000',
 		name: 'Liabilities',
-		accountType: 'LIABILITY',
-		category: 'ACCOUNTS_PAYABLE',
-		fundType: 'OPERATING',
+		accountType: AccountType.LIABILITY,
+		category: AccountCategory.ACCOUNTS_PAYABLE,
+		fundType: FundType.OPERATING,
 		description: 'Parent account for all liabilities',
 		isSystemAccount: true,
 		children: [
 			{
 				accountNumber: '2010',
 				name: 'Accounts Payable',
-				accountType: 'LIABILITY',
-				category: 'ACCOUNTS_PAYABLE',
-				fundType: 'OPERATING',
+				accountType: AccountType.LIABILITY,
+				category: AccountCategory.ACCOUNTS_PAYABLE,
+				fundType: FundType.OPERATING,
 				description: 'Amounts owed to vendors',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '2020',
 				name: 'Accrued Expenses',
-				accountType: 'LIABILITY',
-				category: 'ACCRUED_LIABILITY',
-				fundType: 'OPERATING',
+				accountType: AccountType.LIABILITY,
+				category: AccountCategory.ACCRUED_LIABILITY,
+				fundType: FundType.OPERATING,
 				description: 'Accrued but unpaid expenses',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '2100',
 				name: 'Prepaid Assessments',
-				accountType: 'LIABILITY',
-				category: 'DEFERRED_REVENUE',
-				fundType: 'OPERATING',
+				accountType: AccountType.LIABILITY,
+				category: AccountCategory.DEFERRED_REVENUE,
+				fundType: FundType.OPERATING,
 				description: 'Assessments received in advance',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '2110',
 				name: 'Owner Credits',
-				accountType: 'LIABILITY',
-				category: 'DEFERRED_REVENUE',
-				fundType: 'OPERATING',
+				accountType: AccountType.LIABILITY,
+				category: AccountCategory.DEFERRED_REVENUE,
+				fundType: FundType.OPERATING,
 				description: 'Credit balances owed to owners',
 				isSystemAccount: true
 			}
@@ -178,36 +178,36 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 	{
 		accountNumber: '3000',
 		name: 'Equity',
-		accountType: 'EQUITY',
-		category: 'FUND_BALANCE',
-		fundType: 'OPERATING',
+		accountType: AccountType.EQUITY,
+		category: AccountCategory.FUND_BALANCE,
+		fundType: FundType.OPERATING,
 		description: 'Parent account for equity',
 		isSystemAccount: true,
 		children: [
 			{
 				accountNumber: '3010',
 				name: 'Operating Fund Balance',
-				accountType: 'EQUITY',
-				category: 'FUND_BALANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EQUITY,
+				category: AccountCategory.FUND_BALANCE,
+				fundType: FundType.OPERATING,
 				description: 'Accumulated operating surplus/deficit',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '3020',
 				name: 'Reserve Fund Balance',
-				accountType: 'EQUITY',
-				category: 'RESERVE_FUND',
-				fundType: 'RESERVE',
+				accountType: AccountType.EQUITY,
+				category: AccountCategory.RESERVE_FUND,
+				fundType: FundType.RESERVE,
 				description: 'Accumulated reserve contributions',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '3100',
 				name: 'Current Year Surplus/Deficit',
-				accountType: 'EQUITY',
-				category: 'RETAINED_EARNINGS',
-				fundType: 'OPERATING',
+				accountType: AccountType.EQUITY,
+				category: AccountCategory.RETAINED_EARNINGS,
+				fundType: FundType.OPERATING,
 				description: 'Current year net income',
 				isSystemAccount: true
 			}
@@ -220,9 +220,9 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 	{
 		accountNumber: '4000',
 		name: 'Revenue',
-		accountType: 'REVENUE',
-		category: 'ASSESSMENT_INCOME',
-		fundType: 'OPERATING',
+		accountType: AccountType.REVENUE,
+		category: AccountCategory.ASSESSMENT_INCOME,
+		fundType: FundType.OPERATING,
 		description: 'Parent account for all revenue',
 		isSystemAccount: true,
 		children: [
@@ -230,27 +230,27 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '4010',
 				name: 'Regular Assessments',
-				accountType: 'REVENUE',
-				category: 'ASSESSMENT_INCOME',
-				fundType: 'OPERATING',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.ASSESSMENT_INCOME,
+				fundType: FundType.OPERATING,
 				description: 'Monthly/quarterly regular assessments',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '4020',
 				name: 'Special Assessments',
-				accountType: 'REVENUE',
-				category: 'ASSESSMENT_INCOME',
-				fundType: 'OPERATING',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.ASSESSMENT_INCOME,
+				fundType: FundType.OPERATING,
 				description: 'Special assessment income',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '4030',
 				name: 'Reserve Contributions',
-				accountType: 'REVENUE',
-				category: 'ASSESSMENT_INCOME',
-				fundType: 'RESERVE',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.ASSESSMENT_INCOME,
+				fundType: FundType.RESERVE,
 				description: 'Portion of assessments for reserves',
 				isSystemAccount: true
 			},
@@ -258,18 +258,18 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '4100',
 				name: 'Late Fees',
-				accountType: 'REVENUE',
-				category: 'LATE_FEE_INCOME',
-				fundType: 'OPERATING',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.LATE_FEE_INCOME,
+				fundType: FundType.OPERATING,
 				description: 'Late payment fees',
 				isSystemAccount: true
 			},
 			{
 				accountNumber: '4110',
 				name: 'Interest on Late Payments',
-				accountType: 'REVENUE',
-				category: 'LATE_FEE_INCOME',
-				fundType: 'OPERATING',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.LATE_FEE_INCOME,
+				fundType: FundType.OPERATING,
 				description: 'Interest charged on past due balances',
 				isSystemAccount: false
 			},
@@ -277,27 +277,27 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '4200',
 				name: 'Interest Income',
-				accountType: 'REVENUE',
-				category: 'INTEREST_INCOME',
-				fundType: 'OPERATING',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.INTEREST_INCOME,
+				fundType: FundType.OPERATING,
 				description: 'Bank interest earned',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '4210',
 				name: 'Reserve Interest Income',
-				accountType: 'REVENUE',
-				category: 'INTEREST_INCOME',
-				fundType: 'RESERVE',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.INTEREST_INCOME,
+				fundType: FundType.RESERVE,
 				description: 'Interest earned on reserve funds',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '4300',
 				name: 'Other Income',
-				accountType: 'REVENUE',
-				category: 'OTHER_INCOME',
-				fundType: 'OPERATING',
+				accountType: AccountType.REVENUE,
+				category: AccountCategory.OTHER_INCOME,
+				fundType: FundType.OPERATING,
 				description: 'Miscellaneous income',
 				isSystemAccount: false
 			}
@@ -310,9 +310,9 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 	{
 		accountNumber: '5000',
 		name: 'Expenses',
-		accountType: 'EXPENSE',
-		category: 'ADMINISTRATIVE',
-		fundType: 'OPERATING',
+		accountType: AccountType.EXPENSE,
+		category: AccountCategory.ADMINISTRATIVE,
+		fundType: FundType.OPERATING,
 		description: 'Parent account for all expenses',
 		isSystemAccount: true,
 		children: [
@@ -320,36 +320,36 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5010',
 				name: 'Management Fees',
-				accountType: 'EXPENSE',
-				category: 'ADMINISTRATIVE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.ADMINISTRATIVE,
+				fundType: FundType.OPERATING,
 				description: 'Property management company fees',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5020',
 				name: 'Office Supplies',
-				accountType: 'EXPENSE',
-				category: 'ADMINISTRATIVE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.ADMINISTRATIVE,
+				fundType: FundType.OPERATING,
 				description: 'Office and administrative supplies',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5030',
 				name: 'Postage & Mailing',
-				accountType: 'EXPENSE',
-				category: 'ADMINISTRATIVE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.ADMINISTRATIVE,
+				fundType: FundType.OPERATING,
 				description: 'Postage and mailing costs',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5040',
 				name: 'Bank Charges',
-				accountType: 'EXPENSE',
-				category: 'ADMINISTRATIVE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.ADMINISTRATIVE,
+				fundType: FundType.OPERATING,
 				description: 'Bank fees and charges',
 				isSystemAccount: false
 			},
@@ -357,36 +357,36 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5100',
 				name: 'Electric - Common Areas',
-				accountType: 'EXPENSE',
-				category: 'UTILITIES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.UTILITIES,
+				fundType: FundType.OPERATING,
 				description: 'Electricity for common areas',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5110',
 				name: 'Water & Sewer',
-				accountType: 'EXPENSE',
-				category: 'UTILITIES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.UTILITIES,
+				fundType: FundType.OPERATING,
 				description: 'Water and sewer charges',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5120',
 				name: 'Gas',
-				accountType: 'EXPENSE',
-				category: 'UTILITIES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.UTILITIES,
+				fundType: FundType.OPERATING,
 				description: 'Natural gas charges',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5130',
 				name: 'Trash Removal',
-				accountType: 'EXPENSE',
-				category: 'UTILITIES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.UTILITIES,
+				fundType: FundType.OPERATING,
 				description: 'Trash and recycling services',
 				isSystemAccount: false
 			},
@@ -394,45 +394,45 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5200',
 				name: 'Landscaping',
-				accountType: 'EXPENSE',
-				category: 'MAINTENANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.MAINTENANCE,
+				fundType: FundType.OPERATING,
 				description: 'Lawn care and landscaping',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5210',
 				name: 'Pool Maintenance',
-				accountType: 'EXPENSE',
-				category: 'MAINTENANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.MAINTENANCE,
+				fundType: FundType.OPERATING,
 				description: 'Pool cleaning and chemicals',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5220',
 				name: 'Building Maintenance',
-				accountType: 'EXPENSE',
-				category: 'MAINTENANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.MAINTENANCE,
+				fundType: FundType.OPERATING,
 				description: 'General building repairs',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5230',
 				name: 'Pest Control',
-				accountType: 'EXPENSE',
-				category: 'MAINTENANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.MAINTENANCE,
+				fundType: FundType.OPERATING,
 				description: 'Pest control services',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5240',
 				name: 'Snow Removal',
-				accountType: 'EXPENSE',
-				category: 'MAINTENANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.MAINTENANCE,
+				fundType: FundType.OPERATING,
 				description: 'Snow plowing and removal',
 				isSystemAccount: false
 			},
@@ -440,27 +440,27 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5300',
 				name: 'Property Insurance',
-				accountType: 'EXPENSE',
-				category: 'INSURANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.INSURANCE,
+				fundType: FundType.OPERATING,
 				description: 'Master property insurance',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5310',
 				name: 'Liability Insurance',
-				accountType: 'EXPENSE',
-				category: 'INSURANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.INSURANCE,
+				fundType: FundType.OPERATING,
 				description: 'General liability insurance',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5320',
 				name: 'D&O Insurance',
-				accountType: 'EXPENSE',
-				category: 'INSURANCE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.INSURANCE,
+				fundType: FundType.OPERATING,
 				description: 'Directors & Officers insurance',
 				isSystemAccount: false
 			},
@@ -468,27 +468,27 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5400',
 				name: 'Legal Fees',
-				accountType: 'EXPENSE',
-				category: 'PROFESSIONAL_FEES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.PROFESSIONAL_FEES,
+				fundType: FundType.OPERATING,
 				description: 'Attorney and legal services',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5410',
 				name: 'Accounting Fees',
-				accountType: 'EXPENSE',
-				category: 'PROFESSIONAL_FEES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.PROFESSIONAL_FEES,
+				fundType: FundType.OPERATING,
 				description: 'CPA and accounting services',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5420',
 				name: 'Audit Fees',
-				accountType: 'EXPENSE',
-				category: 'PROFESSIONAL_FEES',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.PROFESSIONAL_FEES,
+				fundType: FundType.OPERATING,
 				description: 'Annual audit or review',
 				isSystemAccount: false
 			},
@@ -496,9 +496,9 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5500',
 				name: 'Reserve Expenditures',
-				accountType: 'EXPENSE',
-				category: 'RESERVE_CONTRIBUTION',
-				fundType: 'RESERVE',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.RESERVE_CONTRIBUTION,
+				fundType: FundType.RESERVE,
 				description: 'Capital expenditures from reserves',
 				isSystemAccount: true
 			},
@@ -506,18 +506,18 @@ export const standardHOAChartOfAccounts: DefaultAccountDefinition[] = [
 			{
 				accountNumber: '5900',
 				name: 'Miscellaneous Expense',
-				accountType: 'EXPENSE',
-				category: 'OTHER_EXPENSE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.OTHER_EXPENSE,
+				fundType: FundType.OPERATING,
 				description: 'Other miscellaneous expenses',
 				isSystemAccount: false
 			},
 			{
 				accountNumber: '5910',
 				name: 'Bad Debt Expense',
-				accountType: 'EXPENSE',
-				category: 'OTHER_EXPENSE',
-				fundType: 'OPERATING',
+				accountType: AccountType.EXPENSE,
+				category: AccountCategory.OTHER_EXPENSE,
+				fundType: FundType.OPERATING,
 				description: 'Uncollectible assessment write-offs',
 				isSystemAccount: true
 			}
@@ -540,27 +540,27 @@ export const condoChartOfAccounts: DefaultAccountDefinition[] = [
 					{
 						accountNumber: '5250',
 						name: 'Elevator Maintenance',
-						accountType: 'EXPENSE',
-						category: 'MAINTENANCE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.MAINTENANCE,
+						fundType: FundType.OPERATING,
 						description: 'Elevator service and inspections',
 						isSystemAccount: false
 					},
 					{
 						accountNumber: '5260',
 						name: 'Life Safety Systems',
-						accountType: 'EXPENSE',
-						category: 'MAINTENANCE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.MAINTENANCE,
+						fundType: FundType.OPERATING,
 						description: 'Fire alarm and sprinkler inspections',
 						isSystemAccount: false
 					},
 					{
 						accountNumber: '5270',
 						name: 'HVAC - Common Areas',
-						accountType: 'EXPENSE',
-						category: 'MAINTENANCE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.MAINTENANCE,
+						fundType: FundType.OPERATING,
 						description: 'Heating and cooling for common areas',
 						isSystemAccount: false
 					}
@@ -585,9 +585,9 @@ export const singleFamilyChartOfAccounts: DefaultAccountDefinition[] = [
 					{
 						accountNumber: '5280',
 						name: 'Detention Pond Maintenance',
-						accountType: 'EXPENSE',
-						category: 'MAINTENANCE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.MAINTENANCE,
+						fundType: FundType.OPERATING,
 						description: 'Maintenance of storm water management areas',
 						isSystemAccount: false
 					}
@@ -612,9 +612,9 @@ export const townhomeChartOfAccounts: DefaultAccountDefinition[] = [
 					{
 						accountNumber: '5290',
 						name: 'Roof Maintenance',
-						accountType: 'EXPENSE',
-						category: 'MAINTENANCE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.MAINTENANCE,
+						fundType: FundType.OPERATING,
 						description: 'Common roof repairs',
 						isSystemAccount: false
 					}
@@ -639,9 +639,9 @@ export const mixedUseChartOfAccounts: DefaultAccountDefinition[] = [
 					{
 						accountNumber: '4400',
 						name: 'Commercial Assessments',
-						accountType: 'REVENUE',
-						category: 'ASSESSMENT_INCOME',
-						fundType: 'OPERATING',
+						accountType: AccountType.REVENUE,
+						category: AccountCategory.ASSESSMENT_INCOME,
+						fundType: FundType.OPERATING,
 						description: 'Revenue from commercial units',
 						isSystemAccount: false
 					}
@@ -666,18 +666,18 @@ export const seniorLivingChartOfAccounts: DefaultAccountDefinition[] = [
 					{
 						accountNumber: '5600',
 						name: 'Dining Services',
-						accountType: 'EXPENSE',
-						category: 'ADMINISTRATIVE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.ADMINISTRATIVE,
+						fundType: FundType.OPERATING,
 						description: 'On-site dining operations',
 						isSystemAccount: false
 					},
 					{
 						accountNumber: '5700',
 						name: 'Transportation Services',
-						accountType: 'EXPENSE',
-						category: 'ADMINISTRATIVE',
-						fundType: 'OPERATING',
+						accountType: AccountType.EXPENSE,
+						category: AccountCategory.ADMINISTRATIVE,
+						fundType: FundType.OPERATING,
 						description: 'Resident shuttle services',
 						isSystemAccount: false
 					}

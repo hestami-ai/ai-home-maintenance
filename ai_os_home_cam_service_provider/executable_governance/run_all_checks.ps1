@@ -11,7 +11,8 @@ $checks = @(
     "timestamps",
     "security",
     "trace",
-    "rls"
+    "rls",
+    "stringly"
 )
 
 # Create output directory if it doesn't exist

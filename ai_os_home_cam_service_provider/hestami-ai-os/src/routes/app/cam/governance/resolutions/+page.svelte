@@ -4,7 +4,10 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { governanceApi } from '$lib/api/cam';
+	import { BoardMotionStatusValues, JobPaymentStatusValues, PolicyStatusValues, governanceApi } from '$lib/api/cam';
+
+	// UI-only status for resolutions before they're formally proposed (not in Prisma enum)
+	const UI_STATUS = { DRAFT: PolicyStatusValues.DRAFT, PASSED: 'PASSED', FAILED: JobPaymentStatusValues.FAILED } as const;
 
 	interface Resolution {
 		id: string;
@@ -30,11 +33,11 @@
 
 	const statusOptions = [
 		{ value: 'all', label: 'All Status' },
-		{ value: 'DRAFT', label: 'Draft' },
-		{ value: 'PROPOSED', label: 'Proposed' },
+		{ value: PolicyStatusValues.DRAFT, label: 'Draft' },
+		{ value: BoardMotionStatusValues.PROPOSED, label: 'Proposed' },
 		{ value: 'PASSED', label: 'Passed' },
-		{ value: 'FAILED', label: 'Failed' },
-		{ value: 'TABLED', label: 'Tabled' }
+		{ value: JobPaymentStatusValues.FAILED, label: 'Failed' },
+		{ value: BoardMotionStatusValues.TABLED, label: 'Tabled' }
 	];
 
 	async function loadResolutions() {
@@ -67,11 +70,11 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'PASSED': return 'text-success-500 bg-success-500/10';
-			case 'FAILED': return 'text-error-500 bg-error-500/10';
-			case 'PROPOSED': return 'text-primary-500 bg-primary-500/10';
-			case 'DRAFT': return 'text-surface-500 bg-surface-500/10';
-			case 'TABLED': return 'text-warning-500 bg-warning-500/10';
+			case UI_STATUS.PASSED: return 'text-success-500 bg-success-500/10';
+			case UI_STATUS.FAILED: return 'text-error-500 bg-error-500/10';
+			case BoardMotionStatusValues.PROPOSED: return 'text-primary-500 bg-primary-500/10';
+			case UI_STATUS.DRAFT: return 'text-surface-500 bg-surface-500/10';
+			case BoardMotionStatusValues.TABLED: return 'text-warning-500 bg-warning-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -201,7 +204,7 @@
 						{/snippet}
 
 						{#snippet actions()}
-							{#if r.status === 'DRAFT'}
+							{#if r.status === UI_STATUS.DRAFT}
 								<button class="btn btn-sm preset-tonal-surface">
 									Edit
 								</button>
@@ -209,7 +212,7 @@
 									Propose
 								</button>
 							{/if}
-							{#if r.status === 'PROPOSED'}
+							{#if r.status === BoardMotionStatusValues.PROPOSED}
 								<button class="btn btn-sm preset-filled-primary-500">
 									Record Vote
 								</button>

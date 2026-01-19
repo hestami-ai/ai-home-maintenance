@@ -8,10 +8,19 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
-import type { ScheduleFrequency, ReportFormat, ReportDeliveryMethod } from '../../../../generated/prisma/client.js';
+import type { ReportFormat, ReportDeliveryMethod } from '../../../../generated/prisma/client.js';
+import {
+	ScheduleFrequency,
+	ActivityActionType
+} from '../../../../generated/prisma/enums.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	REPORT_SCHEDULE_WORKFLOW_ERROR: 'REPORT_SCHEDULE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ReportScheduleWorkflow');
 
@@ -42,24 +51,27 @@ export interface ReportScheduleWorkflowResult extends EntityWorkflowResult {
 const calculateNextRun = (frequency: string, cronExpression?: string | null): Date => {
 	const now = new Date();
 	switch (frequency) {
-		case 'DAILY':
+		case ScheduleFrequency.DAILY:
 			return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-		case 'WEEKLY':
+		case ScheduleFrequency.WEEKLY:
 			return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-		case 'BIWEEKLY':
+		case ScheduleFrequency.BIWEEKLY:
 			return new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-		case 'MONTHLY':
+		case ScheduleFrequency.MONTHLY: {
 			const nextMonth = new Date(now);
 			nextMonth.setMonth(nextMonth.getMonth() + 1);
 			return nextMonth;
-		case 'QUARTERLY':
+		}
+		case ScheduleFrequency.QUARTERLY: {
 			const nextQuarter = new Date(now);
 			nextQuarter.setMonth(nextQuarter.getMonth() + 3);
 			return nextQuarter;
-		case 'ANNUALLY':
+		}
+		case ScheduleFrequency.ANNUALLY: {
 			const nextYear = new Date(now);
 			nextYear.setFullYear(nextYear.getFullYear() + 1);
 			return nextYear;
+		}
 		default:
 			return new Date(now.getTime() + 24 * 60 * 60 * 1000);
 	}
@@ -221,28 +233,28 @@ async function reportScheduleWorkflow(input: ReportScheduleWorkflowInput): Promi
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_SCHEDULE':
+			case ReportScheduleAction.CREATE_SCHEDULE:
 				entityId = await DBOS.runStep(
 					() => createSchedule(input.organizationId, input.userId, input.associationId, input.data),
 					{ name: 'createSchedule' }
 				);
 				break;
 
-			case 'UPDATE_SCHEDULE':
+			case ReportScheduleAction.UPDATE_SCHEDULE:
 				entityId = await DBOS.runStep(
 					() => updateSchedule(input.organizationId, input.userId, input.associationId, input.scheduleId!, input.data),
 					{ name: 'updateSchedule' }
 				);
 				break;
 
-			case 'DELETE_SCHEDULE':
+			case ReportScheduleAction.DELETE_SCHEDULE:
 				entityId = await DBOS.runStep(
 					() => deleteSchedule(input.organizationId, input.userId, input.associationId, input.scheduleId!),
 					{ name: 'deleteSchedule' }
 				);
 				break;
 
-			case 'RUN_NOW':
+			case ReportScheduleAction.RUN_NOW:
 				entityId = await DBOS.runStep(
 					() => runNow(input.organizationId, input.userId, input.associationId, input.scheduleId!),
 					{ name: 'runNow' }
@@ -261,8 +273,8 @@ async function reportScheduleWorkflow(input: ReportScheduleWorkflowInput): Promi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'REPORT_SCHEDULE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.REPORT_SCHEDULE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

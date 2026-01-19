@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { communityOnboarding } from '$lib/stores';
@@ -32,8 +33,10 @@
 	});
 
 	// Pre-fill contact email from auth (once)
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	let hasPreFilled = $state(false);
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
 		if (!hasPreFilled && data.user?.email && !contactEmail) {
 			contactEmail = data.user.email;
 			hasPreFilled = true;
@@ -88,7 +91,7 @@
 	<div>
 		<h2 class="text-lg font-semibold">Organization Details</h2>
 		<p class="mt-1 text-sm text-surface-500">
-			{#if $communityOnboarding.organizationType === 'MANAGEMENT_COMPANY'}
+			{#if $communityOnboarding.organizationType === OrganizationTypeValues.MANAGEMENT_COMPANY}
 				Enter your management company information
 			{:else}
 				Enter your community association information
@@ -108,7 +111,7 @@
 					bind:value={name}
 					oninput={handleNameChange}
 					class="input mt-1 w-full"
-					placeholder={$communityOnboarding.organizationType === 'MANAGEMENT_COMPANY'
+					placeholder={$communityOnboarding.organizationType === OrganizationTypeValues.MANAGEMENT_COMPANY
 						? 'ABC Property Management'
 						: 'Sunset Valley HOA'}
 					required

@@ -40,6 +40,20 @@
                     "reason": "Directly importing types.generated.ts in .svelte files causes memory crashes."
                 }
             ]
+        },
+        "R13": {
+            "name": "Stringly-Typed Code Detection",
+            "description": "Detect magic strings that should use proper enums/types from Prisma schema. Catches primitive obsession, magic values, and enum drift.",
+            "options": {
+                "skipCaseClauses": false,
+                "allowList": [
+                    {
+                        "file": "src/lib/server/api/openapi.ts",
+                        "values": ["http", "bearer", "JWT"],
+                        "reason": "OpenAPI 3.0 specification requires these literal values for security scheme definitions"
+                    }
+                ]
+            }
         }
     },
     "paths": {

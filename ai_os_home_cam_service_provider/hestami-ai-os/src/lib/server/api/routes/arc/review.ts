@@ -2,9 +2,10 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startARCReviewWorkflow } from '../../../workflows/arcReviewWorkflow.js';
+import { startARCReviewWorkflow, ARCReviewAction_WF } from '../../../workflows/arcReviewWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 import { ARCReviewActionSchema } from '../../schemas.js';
+import { ARCReviewAction } from '../../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('ARCReviewRoute');
 
@@ -40,7 +41,7 @@ export const arcReviewRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCReviewWorkflow(
 				{
-					action: 'ADD_MEMBER',
+					action: ARCReviewAction_WF.ADD_MEMBER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					committeeId: rest.committeeId,
@@ -87,7 +88,7 @@ export const arcReviewRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCReviewWorkflow(
 				{
-					action: 'REMOVE_MEMBER',
+					action: ARCReviewAction_WF.REMOVE_MEMBER,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					committeeId: rest.committeeId,
@@ -185,7 +186,7 @@ export const arcReviewRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCReviewWorkflow(
 				{
-					action: 'ASSIGN_COMMITTEE',
+					action: ARCReviewAction_WF.ASSIGN_COMMITTEE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					requestId: rest.requestId,
@@ -234,7 +235,7 @@ export const arcReviewRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCReviewWorkflow(
 				{
-					action: 'SUBMIT_REVIEW',
+					action: ARCReviewAction_WF.SUBMIT_REVIEW,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					requestId: rest.requestId,
@@ -290,7 +291,7 @@ export const arcReviewRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startARCReviewWorkflow(
 				{
-					action: 'RECORD_DECISION',
+					action: ARCReviewAction_WF.RECORD_DECISION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					requestId: rest.requestId,
@@ -375,10 +376,10 @@ export const arcReviewRouter = {
 			// Calculate vote summary
 			const summary = {
 				total: reviews.length,
-				approve: reviews.filter((r) => r.action === 'APPROVE').length,
-				deny: reviews.filter((r) => r.action === 'DENY').length,
-				requestChanges: reviews.filter((r) => r.action === 'REQUEST_CHANGES').length,
-				table: reviews.filter((r) => r.action === 'TABLE').length
+				approve: reviews.filter((r) => r.action === ARCReviewAction.APPROVE).length,
+				deny: reviews.filter((r) => r.action === ARCReviewAction.DENY).length,
+				requestChanges: reviews.filter((r) => r.action === ARCReviewAction.REQUEST_CHANGES).length,
+				table: reviews.filter((r) => r.action === ARCReviewAction.TABLE).length
 			};
 
 			// Get committee info for quorum/threshold

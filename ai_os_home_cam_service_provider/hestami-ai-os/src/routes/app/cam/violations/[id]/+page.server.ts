@@ -1,6 +1,7 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { DocumentContextType, ActivityEntityType } from '../../../../../../generated/prisma/enums.js';
 
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
     const { id } = params;
@@ -30,8 +31,8 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
         // responsesRes
     ] = await Promise.all([
         client.violation.get({ id }),
-        client.document.listDocuments({ contextType: 'VIOLATION', contextId: id }),
-        client.activityEvent.getByEntity({ entityType: 'VIOLATION', entityId: id }),
+        client.document.listDocuments({ contextType: DocumentContextType.VIOLATION, contextId: id }),
+        client.activityEvent.getByEntity({ entityType: ActivityEntityType.VIOLATION, entityId: id }),
         client.violation.listNotices({ violationId: id }),
         // (client.violation as any).getResponses({ id }) 
     ]);

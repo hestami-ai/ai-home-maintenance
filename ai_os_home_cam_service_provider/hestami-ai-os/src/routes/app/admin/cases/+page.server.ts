@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { prisma } from '$lib/server/db';
+import { StaffStatus } from '../../../../../generated/prisma/enums.js';
 
 /**
  * Server-side load function for admin cases list view.
@@ -13,7 +14,7 @@ export const load: PageServerLoad = async ({ parent, url }) => {
     const { staff, user } = await parent();
 
     // Verify the user is active staff (layout already checks but double-check)
-    if (!staff || staff.status !== 'ACTIVE' || !user) {
+    if (!staff || staff.status !== StaffStatus.ACTIVE || !user) {
         throw error(403, 'Staff access required');
     }
 

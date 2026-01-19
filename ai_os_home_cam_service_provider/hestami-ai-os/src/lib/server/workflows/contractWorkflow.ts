@@ -12,8 +12,20 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ServiceContractStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('ContractWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CONTRACT_WORKFLOW_ERROR: 'CONTRACT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'contract_status';
 const WORKFLOW_ERROR_EVENT = 'contract_error';
@@ -59,7 +71,7 @@ async function createContract(
 				name: data.name as string,
 				type: data.type as ServiceContractType,
 				description: data.description as string | undefined,
-				status: 'DRAFT',
+				status: ServiceContractStatus.DRAFT,
 				startDate: new Date(data.startDate as string),
 				endDate: new Date(data.endDate as string),
 				billingFrequency: data.billingFrequency as RecurrenceFrequency,
@@ -73,15 +85,15 @@ async function createContract(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contract.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Service contract created: ${contract.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'CREATE_CONTRACT',
+		workflowStep: ContractAction.CREATE_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -112,15 +124,15 @@ async function updateContract(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contract.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Service contract updated: ${contract.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'UPDATE_CONTRACT',
+		workflowStep: ContractAction.UPDATE_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -136,22 +148,22 @@ async function activateContract(
 		return tx.serviceContract.update({
 			where: { id: contractId },
 			data: {
-				status: 'ACTIVE'
+				status: ServiceContractStatus.ACTIVE
 			}
 		});
 	}, { userId, reason: 'Activate service contract' });
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contract.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service contract activated',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'ACTIVATE_CONTRACT',
+		workflowStep: ContractAction.ACTIVATE_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -168,7 +180,7 @@ async function suspendContract(
 		return tx.serviceContract.update({
 			where: { id: contractId },
 			data: {
-				status: 'SUSPENDED',
+				status: ServiceContractStatus.SUSPENDED,
 				notes: reason
 			}
 		});
@@ -176,15 +188,15 @@ async function suspendContract(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contract.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service contract suspended',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'SUSPEND_CONTRACT',
+		workflowStep: ContractAction.SUSPEND_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -201,7 +213,7 @@ async function cancelContract(
 		return tx.serviceContract.update({
 			where: { id: contractId },
 			data: {
-				status: 'CANCELLED',
+				status: ServiceContractStatus.CANCELLED,
 				notes: reason
 			}
 		});
@@ -209,15 +221,15 @@ async function cancelContract(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contract.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service contract cancelled',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'CANCEL_CONTRACT',
+		workflowStep: ContractAction.CANCEL_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -234,7 +246,7 @@ async function renewContract(
 		return tx.serviceContract.update({
 			where: { id: contractId },
 			data: {
-				status: 'ACTIVE',
+				status: ServiceContractStatus.ACTIVE,
 				startDate: new Date(data.newStartDate as string),
 				endDate: new Date(data.newEndDate as string)
 			}
@@ -243,15 +255,15 @@ async function renewContract(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contract.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service contract renewed',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'RENEW_CONTRACT',
+		workflowStep: ContractAction.RENEW_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -272,15 +284,15 @@ async function deleteContract(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: contractId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service contract deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'DELETE_CONTRACT',
+		workflowStep: ContractAction.DELETE_CONTRACT,
 		workflowVersion: 'v1'
 	});
 
@@ -310,15 +322,15 @@ async function addServiceItem(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: item.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service item added to contract',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'ADD_SERVICE_ITEM',
+		workflowStep: ContractAction.ADD_SERVICE_ITEM,
 		workflowVersion: 'v1'
 	});
 
@@ -338,15 +350,15 @@ async function removeServiceItem(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: serviceItemId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Service item removed from contract',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'contractWorkflow_v1',
-		workflowStep: 'REMOVE_SERVICE_ITEM',
+		workflowStep: ContractAction.REMOVE_SERVICE_ITEM,
 		workflowVersion: 'v1'
 	});
 
@@ -360,7 +372,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_CONTRACT': {
+			case ContractAction.CREATE_CONTRACT: {
 				const result = await DBOS.runStep(
 					() => createContract(input.organizationId, input.userId, input.data),
 					{ name: 'createContract' }
@@ -368,7 +380,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'UPDATE_CONTRACT': {
+			case ContractAction.UPDATE_CONTRACT: {
 				if (!input.contractId) throw new Error('contractId required for UPDATE_CONTRACT');
 				const result = await DBOS.runStep(
 					() => updateContract(input.organizationId, input.userId, input.contractId!, input.data),
@@ -377,7 +389,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'ACTIVATE_CONTRACT': {
+			case ContractAction.ACTIVATE_CONTRACT: {
 				if (!input.contractId) throw new Error('contractId required for ACTIVATE_CONTRACT');
 				const result = await DBOS.runStep(
 					() => activateContract(input.organizationId, input.userId, input.contractId!),
@@ -386,7 +398,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'SUSPEND_CONTRACT': {
+			case ContractAction.SUSPEND_CONTRACT: {
 				if (!input.contractId) throw new Error('contractId required for SUSPEND_CONTRACT');
 				const result = await DBOS.runStep(
 					() => suspendContract(input.organizationId, input.userId, input.contractId!, input.data.reason as string | undefined),
@@ -395,7 +407,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'CANCEL_CONTRACT': {
+			case ContractAction.CANCEL_CONTRACT: {
 				if (!input.contractId) throw new Error('contractId required for CANCEL_CONTRACT');
 				const result = await DBOS.runStep(
 					() => cancelContract(input.organizationId, input.userId, input.contractId!, input.data.reason as string | undefined),
@@ -404,7 +416,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'RENEW_CONTRACT': {
+			case ContractAction.RENEW_CONTRACT: {
 				if (!input.contractId) throw new Error('contractId required for RENEW_CONTRACT');
 				const result = await DBOS.runStep(
 					() => renewContract(input.organizationId, input.userId, input.contractId!, input.data),
@@ -413,7 +425,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'DELETE_CONTRACT': {
+			case ContractAction.DELETE_CONTRACT: {
 				if (!input.contractId) throw new Error('contractId required for DELETE_CONTRACT');
 				const result = await DBOS.runStep(
 					() => deleteContract(input.organizationId, input.userId, input.contractId!),
@@ -422,7 +434,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'ADD_SERVICE_ITEM': {
+			case ContractAction.ADD_SERVICE_ITEM: {
 				if (!input.contractId) throw new Error('contractId required for ADD_SERVICE_ITEM');
 				const result = await DBOS.runStep(
 					() => addServiceItem(input.organizationId, input.userId, input.contractId!, input.data),
@@ -431,7 +443,7 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 				entityId = result.id;
 				break;
 			}
-			case 'REMOVE_SERVICE_ITEM': {
+			case ContractAction.REMOVE_SERVICE_ITEM: {
 				if (!input.serviceItemId) throw new Error('serviceItemId required for REMOVE_SERVICE_ITEM');
 				const result = await DBOS.runStep(
 					() => removeServiceItem(input.organizationId, input.userId, input.serviceItemId!),
@@ -459,8 +471,8 @@ async function contractWorkflow(input: ServiceContractWorkflowInput): Promise<Se
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CONTRACT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CONTRACT_WORKFLOW_ERROR
 		});
 
 		return {

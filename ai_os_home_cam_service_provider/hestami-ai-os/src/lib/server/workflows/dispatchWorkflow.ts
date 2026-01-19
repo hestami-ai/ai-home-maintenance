@@ -12,6 +12,17 @@ import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	DISPATCH_WORKFLOW_ERROR: 'DISPATCH_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('DispatchWorkflow');
 
@@ -92,15 +103,15 @@ async function createAssignment(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: result.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Dispatch assignment created',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'dispatchWorkflow_v1',
-		workflowStep: 'CREATE_ASSIGNMENT',
+		workflowStep: DispatchAction.CREATE_ASSIGNMENT,
 		workflowVersion: 'v1',
 		jobId: data.jobId as string
 	});
@@ -157,15 +168,15 @@ async function reassignDispatch(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: result.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Dispatch reassigned',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'dispatchWorkflow_v1',
-		workflowStep: 'REASSIGN',
+		workflowStep: DispatchAction.REASSIGN,
 		workflowVersion: 'v1',
 		jobId: result.jobId
 	});
@@ -193,15 +204,15 @@ async function updateDispatchStatus(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: assignment.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Dispatch status updated to ${data.status}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'dispatchWorkflow_v1',
-		workflowStep: 'UPDATE_STATUS',
+		workflowStep: DispatchAction.UPDATE_STATUS,
 		workflowVersion: 'v1',
 		jobId: assignment.jobId
 	});
@@ -243,15 +254,15 @@ async function rescheduleDispatch(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: result.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Dispatch rescheduled',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'dispatchWorkflow_v1',
-		workflowStep: 'RESCHEDULE',
+		workflowStep: DispatchAction.RESCHEDULE,
 		workflowVersion: 'v1',
 		jobId: result.jobId
 	});
@@ -278,15 +289,15 @@ async function optimizeRoute(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: routePlan.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Route plan created',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'dispatchWorkflow_v1',
-		workflowStep: 'OPTIMIZE_ROUTE',
+		workflowStep: DispatchAction.OPTIMIZE_ROUTE,
 		workflowVersion: 'v1'
 	});
 
@@ -319,7 +330,7 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_ASSIGNMENT': {
+			case DispatchAction.CREATE_ASSIGNMENT: {
 				const result = await DBOS.runStep(
 					() => createAssignment(input.organizationId, input.userId, input.data),
 					{ name: 'createAssignment' }
@@ -327,7 +338,7 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 				entityId = result.id;
 				break;
 			}
-			case 'REASSIGN': {
+			case DispatchAction.REASSIGN: {
 				if (!input.assignmentId) throw new Error('assignmentId required for REASSIGN');
 				const result = await DBOS.runStep(
 					() => reassignDispatch(input.organizationId, input.userId, input.assignmentId!, input.data),
@@ -336,7 +347,7 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 				entityId = result.id;
 				break;
 			}
-			case 'UPDATE_STATUS': {
+			case DispatchAction.UPDATE_STATUS: {
 				if (!input.assignmentId) throw new Error('assignmentId required for UPDATE_STATUS');
 				const result = await DBOS.runStep(
 					() => updateDispatchStatus(input.organizationId, input.userId, input.assignmentId!, input.data),
@@ -345,7 +356,7 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 				entityId = result.id;
 				break;
 			}
-			case 'RESCHEDULE': {
+			case DispatchAction.RESCHEDULE: {
 				if (!input.assignmentId) throw new Error('assignmentId required for RESCHEDULE');
 				const result = await DBOS.runStep(
 					() => rescheduleDispatch(input.organizationId, input.userId, input.assignmentId!, input.data),
@@ -354,7 +365,7 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 				entityId = result.id;
 				break;
 			}
-			case 'OPTIMIZE_ROUTE': {
+			case DispatchAction.OPTIMIZE_ROUTE: {
 				const result = await DBOS.runStep(
 					() => optimizeRoute(input.organizationId, input.userId, input.data),
 					{ name: 'optimizeRoute' }
@@ -362,7 +373,7 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 				entityId = result.id;
 				break;
 			}
-			case 'CREATE_ROUTE_PLAN': {
+			case DispatchAction.CREATE_ROUTE_PLAN: {
 				const result = await DBOS.runStep(
 					() => createRoutePlan(input.organizationId, input.userId, input.data),
 					{ name: 'createRoutePlan' }
@@ -389,8 +400,8 @@ async function dispatchWorkflow(input: DispatchWorkflowInput): Promise<DispatchW
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'DISPATCH_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.DISPATCH_WORKFLOW_ERROR
 		});
 
 		return {

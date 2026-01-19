@@ -4,7 +4,7 @@
 	import { ArrowLeft, Home, FileText, Clock, AlertTriangle, ClipboardCheck, Wrench } from 'lucide-svelte';
 	import { TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { unitApi, documentApi, activityEventApi, violationApi, arcRequestApi, workOrderApi, type Unit, type Document } from '$lib/api/cam';
+	import { ActivityEntityTypeValues, activityEventApi, arcRequestApi, documentApi, type Document, type Unit, unitApi, violationApi, workOrderApi } from '$lib/api/cam';
 
 	interface UnitHistoryEvent {
 		id: string;
@@ -53,7 +53,7 @@
 	async function loadDocuments() {
 		if (!unitId) return;
 		try {
-			const response = await documentApi.list({ contextType: 'UNIT', contextId: unitId });
+			const response = await documentApi.list({ contextType: ActivityEntityTypeValues.UNIT, contextId: unitId });
 			if (response.ok) {
 				documents = response.data.documents as any;
 			}
@@ -65,7 +65,7 @@
 	async function loadHistory() {
 		if (!unitId) return;
 		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'UNIT', entityId: unitId });
+			const response = await activityEventApi.getByEntity({ entityType: ActivityEntityTypeValues.UNIT, entityId: unitId });
 			if (response.ok) {
 				history = response.data.events.map((e: any) => ({
 					id: e.id,

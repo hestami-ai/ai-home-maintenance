@@ -10,6 +10,12 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ASSET_WORKFLOW_ERROR: 'ASSET_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('AssetWorkflow');
 
@@ -206,7 +212,7 @@ async function logMaintenance(
 async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE': {
+			case AssetWorkflowAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createAsset(input.organizationId, input.associationId, input.userId, input.data),
 					{ name: 'createAsset' }
@@ -218,7 +224,7 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 				};
 			}
 
-			case 'UPDATE': {
+			case AssetWorkflowAction.UPDATE: {
 				const result = await DBOS.runStep(
 					() => updateAsset(input.organizationId, input.assetId!, input.userId, input.data),
 					{ name: 'updateAsset' }
@@ -226,7 +232,7 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 				return { success: true, entityId: result.id };
 			}
 
-			case 'DELETE': {
+			case AssetWorkflowAction.DELETE: {
 				await DBOS.runStep(
 					() => deleteAsset(input.organizationId, input.assetId!, input.userId),
 					{ name: 'deleteAsset' }
@@ -234,7 +240,7 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 				return { success: true, entityId: input.assetId };
 			}
 
-			case 'LOG_MAINTENANCE': {
+			case AssetWorkflowAction.LOG_MAINTENANCE: {
 				const result = await DBOS.runStep(
 					() => logMaintenance(input.organizationId, input.assetId!, input.userId, input.data),
 					{ name: 'logMaintenance' }
@@ -255,8 +261,8 @@ async function assetWorkflow(input: AssetWorkflowInput): Promise<AssetWorkflowRe
 		console.error(`[AssetWorkflow] Error in ${input.action}:`, errorMessage);
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ASSET_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ASSET_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

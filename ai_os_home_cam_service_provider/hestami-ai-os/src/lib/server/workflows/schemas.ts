@@ -87,6 +87,104 @@ export {
 	InvoiceStatus
 } from '../../../../generated/prisma/enums.js';
 
+// Phase 38: Organization Invitations & Join Requests
+export {
+	InvitationStatus,
+	JoinRequestStatus,
+	InvitationDeliveryMethod
+} from '../../../../generated/prisma/enums.js';
+
+// Activity Actions (for workflow tracing)
+export {
+	ActivityActionType
+} from '../../../../generated/prisma/enums.js';
+
+// =============================================================================
+// Workflow Error Types (for tracing/observability)
+// =============================================================================
+
+/**
+ * Error type discriminators for workflow error categorization.
+ * Used in recordSpanError() for observability and filtering in SigNoz.
+ */
+export const WorkflowErrorType = {
+	// Workflow-specific errors
+	INVITATION_WORKFLOW_ERROR: 'INVITATION_WORKFLOW_ERROR',
+	DOCUMENT_WORKFLOW_ERROR: 'DOCUMENT_WORKFLOW_ERROR',
+	CASE_WORKFLOW_ERROR: 'CASE_WORKFLOW_ERROR',
+	VIOLATION_WORKFLOW_ERROR: 'VIOLATION_WORKFLOW_ERROR',
+	WORK_ORDER_WORKFLOW_ERROR: 'WORK_ORDER_WORKFLOW_ERROR',
+	JOB_WORKFLOW_ERROR: 'JOB_WORKFLOW_ERROR',
+	GOVERNANCE_WORKFLOW_ERROR: 'GOVERNANCE_WORKFLOW_ERROR',
+	DISPATCH_WORKFLOW_ERROR: 'DISPATCH_WORKFLOW_ERROR',
+	ESTIMATE_WORKFLOW_ERROR: 'ESTIMATE_WORKFLOW_ERROR',
+	INVOICE_WORKFLOW_ERROR: 'INVOICE_WORKFLOW_ERROR',
+	ARC_WORKFLOW_ERROR: 'ARC_WORKFLOW_ERROR',
+	CONTRACT_WORKFLOW_ERROR: 'CONTRACT_WORKFLOW_ERROR',
+	INVENTORY_WORKFLOW_ERROR: 'INVENTORY_WORKFLOW_ERROR',
+	MEETING_WORKFLOW_ERROR: 'MEETING_WORKFLOW_ERROR',
+	MOTION_WORKFLOW_ERROR: 'MOTION_WORKFLOW_ERROR',
+	// Generic errors
+	AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
+	VALIDATION_ERROR: 'VALIDATION_ERROR',
+	DATABASE_ERROR: 'DATABASE_ERROR',
+	EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+	// API/Route-level errors
+	ORPC_ERROR: 'ORPC_ERROR',
+	INVITATION_ERROR: 'INVITATION_ERROR'
+} as const;
+
+export type WorkflowErrorType = (typeof WorkflowErrorType)[keyof typeof WorkflowErrorType];
+
+// =============================================================================
+// Cerbos Effect Kinds (for authorization policy evaluation)
+// =============================================================================
+
+/**
+ * Cerbos policy effect kinds.
+ * Used when evaluating authorization rules.
+ */
+export const CerbosEffectKind = {
+	ALWAYS_ALLOWED: 'always_allowed',
+	ALWAYS_DENIED: 'always_denied',
+	CONDITIONAL: 'conditional'
+} as const;
+
+export type CerbosEffectKind = (typeof CerbosEffectKind)[keyof typeof CerbosEffectKind];
+
+// =============================================================================
+// Meeting Event Types (for real-time meeting updates)
+// =============================================================================
+
+/**
+ * Event types for real-time meeting updates via SSE/WebSocket.
+ */
+export const MeetingEventType = {
+	ATTENDANCE_UPDATE: 'attendance_update',
+	VOTE_UPDATE: 'vote_update',
+	MOTION_UPDATE: 'motion_update',
+	MEETING_STATE: 'meeting_state',
+	QUORUM_UPDATE: 'quorum_update',
+	HEARTBEAT: 'heartbeat'
+} as const;
+
+export type MeetingEventType = (typeof MeetingEventType)[keyof typeof MeetingEventType];
+
+// =============================================================================
+// Vote Event Types (for real-time vote updates)
+// =============================================================================
+
+/**
+ * Event types for real-time vote updates via SSE/WebSocket.
+ */
+export const VoteEventType = {
+	BALLOT_CAST: 'ballot_cast',
+	TALLY_UPDATE: 'tally_update',
+	VOTE_CLOSED: 'vote_closed'
+} as const;
+
+export type VoteEventType = (typeof VoteEventType)[keyof typeof VoteEventType];
+
 // =============================================================================
 // Base Workflow Types
 // =============================================================================
@@ -211,3 +309,65 @@ export { InvoiceStatusSchema } from '../../../../generated/zod/inputTypeSchemas/
 export { NotificationTypeSchema } from '../../../../generated/zod/inputTypeSchemas/NotificationTypeSchema.js';
 export { NotificationReadStatusSchema } from '../../../../generated/zod/inputTypeSchemas/NotificationReadStatusSchema.js';
 export { NotificationCategorySchema } from '../../../../generated/zod/inputTypeSchemas/NotificationCategorySchema.js';
+
+// =============================================================================
+// Type Discriminator Const Objects
+// =============================================================================
+
+/**
+ * Processing error types for Document Processing Queue (DPQ) and similar systems.
+ * TRANSIENT errors can be retried, PERMANENT errors cannot, INFECTED indicates malware.
+ */
+export const ProcessingErrorType = {
+	TRANSIENT: 'TRANSIENT',
+	PERMANENT: 'PERMANENT',
+	INFECTED: 'INFECTED'
+} as const;
+
+export type ProcessingErrorType = (typeof ProcessingErrorType)[keyof typeof ProcessingErrorType];
+
+/**
+ * Span error types for OpenTelemetry tracing observability.
+ * Used with recordSpanError to categorize errors in traces.
+ */
+export const SpanErrorType = {
+	DOCUMENT_UPLOAD_ERROR: 'DOCUMENT_UPLOAD_ERROR',
+	DOCUMENT_LIST_ERROR: 'DOCUMENT_LIST_ERROR',
+	STAFF_ACTIVATION_ERROR: 'STAFF_ACTIVATION_ERROR'
+} as const;
+
+export type SpanErrorType = (typeof SpanErrorType)[keyof typeof SpanErrorType];
+
+/**
+ * Health status values for health check endpoints.
+ */
+export const HealthStatus = {
+	HEALTHY: 'healthy',
+	UNHEALTHY: 'unhealthy'
+} as const;
+
+export type HealthStatus = (typeof HealthStatus)[keyof typeof HealthStatus];
+
+/**
+ * Governance item types for dashboard recent activity.
+ */
+export const GovernanceItemType = {
+	ARC_APPROVED: 'ARC_APPROVED',
+	VIOLATION_CLOSED: 'VIOLATION_CLOSED',
+	MOTION_APPROVED: 'MOTION_APPROVED',
+	POLICY_CREATED: 'POLICY_CREATED',
+	RESOLUTION_ADOPTED: 'RESOLUTION_ADOPTED'
+} as const;
+
+export type GovernanceItemType = (typeof GovernanceItemType)[keyof typeof GovernanceItemType];
+
+/**
+ * Prisma sort order values.
+ * While Prisma types narrow to 'asc' | 'desc', this provides runtime const values.
+ */
+export const SortOrder = {
+	ASC: 'asc',
+	DESC: 'desc'
+} as const;
+
+export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder];

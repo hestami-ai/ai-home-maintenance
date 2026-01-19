@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ActivityEntityTypeValues, ConciergeCaseStatusValues, JobStatusValues } from '$lib/api/cam';
 	import { User, Building2, Truck, Clock } from 'lucide-svelte';
 	import type { ConciergeCaseStatus } from '$lib/api/cam';
 
@@ -13,13 +14,13 @@
 
 	function getWaitingOn(status: ConciergeCaseStatus): WaitingOn {
 		switch (status) {
-			case 'PENDING_OWNER':
+			case ConciergeCaseStatusValues.PENDING_OWNER:
 				return 'owner';
-			case 'PENDING_EXTERNAL':
+			case ConciergeCaseStatusValues.PENDING_EXTERNAL:
 				return 'external';
-			case 'INTAKE':
-			case 'ASSESSMENT':
-			case 'IN_PROGRESS':
+			case ConciergeCaseStatusValues.INTAKE:
+			case ActivityEntityTypeValues.ASSESSMENT:
+			case JobStatusValues.IN_PROGRESS:
 				return 'concierge';
 			default:
 				return 'none';

@@ -181,7 +181,7 @@ export async function orgTransaction<T>(
 
 /**
  * Looks up the organization ID for a work queue item
- * This uses a view without RLS to allow staff to determine context
+ * Uses the SECURITY DEFINER function get_work_item_org to bypass RLS
  * 
  * @param itemType - The type of work item (CONCIERGE_CASE, WORK_ORDER, etc.)
  * @param itemId - The ID of the work item
@@ -191,13 +191,10 @@ export async function lookupWorkItemOrgId(
 	itemType: string,
 	itemId: string
 ): Promise<string | null> {
-	const result = await prisma.$queryRaw<[{ organization_id: string }]>`
-		SELECT organization_id 
-		FROM staff_work_queue_org_lookup 
-		WHERE item_type = ${itemType} AND item_id = ${itemId}
-		LIMIT 1
+	const result = await prisma.$queryRaw<[{ get_work_item_org: string | null }]>`
+		SELECT get_work_item_org(${itemType}, ${itemId})
 	`;
-	return result[0]?.organization_id ?? null;
+	return result[0]?.get_work_item_org ?? null;
 }
 
 /**

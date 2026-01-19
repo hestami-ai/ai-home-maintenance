@@ -4,7 +4,7 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { governanceApi } from '$lib/api/cam';
+	import { ARCCategoryValues, BoardMotionCategoryValues, DocumentCategoryValues, DocumentStatusValues, MeetingStatusValues, PolicyStatusValues, ReportCategoryValues, governanceApi } from '$lib/api/cam';
 
 	interface Policy {
 		id: string;
@@ -27,12 +27,12 @@
 
 	const categoryOptions = [
 		{ value: 'all', label: 'All Categories' },
-		{ value: 'ARCHITECTURAL', label: 'Architectural' },
-		{ value: 'FINANCIAL', label: 'Financial' },
-		{ value: 'ENFORCEMENT', label: 'Enforcement' },
-		{ value: 'OPERATIONAL', label: 'Operational' },
-		{ value: 'GOVERNANCE', label: 'Governance' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: DocumentCategoryValues.ARCHITECTURAL, label: 'Architectural' },
+		{ value: ReportCategoryValues.FINANCIAL, label: 'Financial' },
+		{ value: BoardMotionCategoryValues.ENFORCEMENT, label: 'Enforcement' },
+		{ value: ReportCategoryValues.OPERATIONAL, label: 'Operational' },
+		{ value: ReportCategoryValues.GOVERNANCE, label: 'Governance' },
+		{ value: ARCCategoryValues.OTHER, label: 'Other' }
 	];
 
 	async function loadPolicies() {
@@ -59,10 +59,10 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'ACTIVE': return 'text-success-500 bg-success-500/10';
-			case 'DRAFT': return 'text-warning-500 bg-warning-500/10';
-			case 'SUPERSEDED': return 'text-surface-500 bg-surface-500/10';
-			case 'ARCHIVED': return 'text-surface-400 bg-surface-400/10';
+			case DocumentStatusValues.ACTIVE: return 'text-success-500 bg-success-500/10';
+			case PolicyStatusValues.DRAFT: return 'text-warning-500 bg-warning-500/10';
+			case DocumentStatusValues.SUPERSEDED: return 'text-surface-500 bg-surface-500/10';
+			case MeetingStatusValues.ARCHIVED: return 'text-surface-400 bg-surface-400/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}

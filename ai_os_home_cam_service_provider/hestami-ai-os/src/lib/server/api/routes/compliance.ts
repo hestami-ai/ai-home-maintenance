@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { prisma } from '../../db.js';
-import { startComplianceWorkflow } from '../../workflows/complianceWorkflow.js';
+import { startComplianceWorkflow, ComplianceAction } from '../../workflows/complianceWorkflow.js';
 import { createModuleLogger } from '../../logger.js';
 import {
 	ComplianceRequirementTypeSchema,
@@ -66,7 +66,7 @@ export const complianceRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startComplianceWorkflow(
 				{
-					action: 'CREATE_REQUIREMENT',
+					action: ComplianceAction.CREATE_REQUIREMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -285,7 +285,7 @@ export const complianceRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startComplianceWorkflow(
 				{
-					action: 'UPDATE_REQUIREMENT',
+					action: ComplianceAction.UPDATE_REQUIREMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -377,7 +377,7 @@ export const complianceRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startComplianceWorkflow(
 				{
-					action: 'CREATE_DEADLINE',
+					action: ComplianceAction.CREATE_DEADLINE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -626,7 +626,7 @@ export const complianceRouter = {
 			// Update deadline status via workflow
 			const result = await startComplianceWorkflow(
 				{
-					action: 'UPDATE_DEADLINE_STATUS',
+					action: ComplianceAction.UPDATE_DEADLINE_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.id,
@@ -701,7 +701,7 @@ export const complianceRouter = {
 			if (!deadline.evidenceDocumentIds.includes(input.documentId)) {
 				const result = await startComplianceWorkflow(
 					{
-						action: 'ADD_EVIDENCE_DOCUMENT',
+						action: ComplianceAction.ADD_EVIDENCE_DOCUMENT,
 						organizationId: context.organization.id,
 						userId: context.user.id,
 						entityId: input.deadlineId,
@@ -767,7 +767,7 @@ export const complianceRouter = {
 			// Update checklist item via workflow
 			const result = await startComplianceWorkflow(
 				{
-					action: 'UPDATE_CHECKLIST_ITEM',
+					action: ComplianceAction.UPDATE_CHECKLIST_ITEM,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: id,

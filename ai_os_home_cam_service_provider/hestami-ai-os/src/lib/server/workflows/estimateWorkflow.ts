@@ -10,6 +10,12 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ESTIMATE_WORKFLOW_ERROR: 'ESTIMATE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('EstimateWorkflow');
 
@@ -385,70 +391,70 @@ async function estimateWorkflow(input: EstimateWorkflowInput): Promise<EstimateW
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'UPDATE_ESTIMATE':
+			case EstimateAction.UPDATE_ESTIMATE:
 				entityId = await DBOS.runStep(
 					() => updateEstimate(input.organizationId, input.userId, input.estimateId!, input.data),
 					{ name: 'updateEstimate' }
 				);
 				break;
 
-			case 'ADD_LINE':
+			case EstimateAction.ADD_LINE:
 				entityId = await DBOS.runStep(
 					() => addLine(input.organizationId, input.userId, input.estimateId!, input.data),
 					{ name: 'addLine' }
 				);
 				break;
 
-			case 'REMOVE_LINE':
+			case EstimateAction.REMOVE_LINE:
 				entityId = await DBOS.runStep(
 					() => removeLine(input.organizationId, input.userId, input.estimateId!, input.lineId!),
 					{ name: 'removeLine' }
 				);
 				break;
 
-			case 'SEND_ESTIMATE':
+			case EstimateAction.SEND_ESTIMATE:
 				entityId = await DBOS.runStep(
 					() => sendEstimate(input.organizationId, input.userId, input.estimateId!),
 					{ name: 'sendEstimate' }
 				);
 				break;
 
-			case 'MARK_VIEWED':
+			case EstimateAction.MARK_VIEWED:
 				entityId = await DBOS.runStep(
 					() => markViewed(input.organizationId, input.userId, input.estimateId!),
 					{ name: 'markViewed' }
 				);
 				break;
 
-			case 'ACCEPT_ESTIMATE':
+			case EstimateAction.ACCEPT_ESTIMATE:
 				entityId = await DBOS.runStep(
 					() => acceptEstimate(input.organizationId, input.userId, input.estimateId!, input.data),
 					{ name: 'acceptEstimate' }
 				);
 				break;
 
-			case 'DECLINE_ESTIMATE':
+			case EstimateAction.DECLINE_ESTIMATE:
 				entityId = await DBOS.runStep(
 					() => declineEstimate(input.organizationId, input.userId, input.estimateId!),
 					{ name: 'declineEstimate' }
 				);
 				break;
 
-			case 'REVISE_ESTIMATE':
+			case EstimateAction.REVISE_ESTIMATE:
 				entityId = await DBOS.runStep(
 					() => reviseEstimate(input.organizationId, input.userId, input.estimateId!),
 					{ name: 'reviseEstimate' }
 				);
 				break;
 
-			case 'DELETE_ESTIMATE':
+			case EstimateAction.DELETE_ESTIMATE:
 				entityId = await DBOS.runStep(
 					() => deleteEstimate(input.organizationId, input.userId, input.estimateId!),
 					{ name: 'deleteEstimate' }
 				);
 				break;
 
-			case 'GENERATE_FROM_PRICEBOOK':
+			case EstimateAction.GENERATE_FROM_PRICEBOOK:
 				entityId = await DBOS.runStep(
 					() => generateFromPricebook(input.organizationId, input.userId, input.data),
 					{ name: 'generateFromPricebook' }
@@ -467,8 +473,8 @@ async function estimateWorkflow(input: EstimateWorkflowInput): Promise<EstimateW
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ESTIMATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ESTIMATE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

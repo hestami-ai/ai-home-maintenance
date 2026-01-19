@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startPortfolioWorkflow } from '../../../workflows/index.js';
+import { startPortfolioWorkflow, PortfolioWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('PortfolioRoute');
 
@@ -53,7 +53,7 @@ export const portfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPortfolioWorkflow(
 				{
-					action: 'CREATE',
+					action: PortfolioWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					name: input.name,
@@ -270,7 +270,7 @@ export const portfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPortfolioWorkflow(
 				{
-					action: 'UPDATE',
+					action: PortfolioWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					portfolioId: input.id,
@@ -342,7 +342,7 @@ export const portfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPortfolioWorkflow(
 				{
-					action: 'DELETE',
+					action: PortfolioWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					portfolioId: input.id
@@ -441,7 +441,7 @@ export const portfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPortfolioWorkflow(
 				{
-					action: 'ADD_PROPERTY',
+					action: PortfolioWorkflowAction.ADD_PROPERTY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					portfolioId: input.portfolioId,
@@ -527,7 +527,7 @@ export const portfolioRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startPortfolioWorkflow(
 				{
-					action: 'REMOVE_PROPERTY',
+					action: PortfolioWorkflowAction.REMOVE_PROPERTY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					portfolioPropertyId: existingPortfolioProperty.id

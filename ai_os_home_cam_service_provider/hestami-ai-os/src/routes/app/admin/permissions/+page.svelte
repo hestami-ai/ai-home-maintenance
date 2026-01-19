@@ -24,6 +24,7 @@
 		type OrganizationType,
 		type OrganizationStatus
 	} from '$lib/api/permissionsAdmin';
+	import { OrganizationStatusValues } from '$lib/api/cam';
 
 	// Tab state
 	type TabId = 'overview' | 'organizations' | 'roles' | 'audit';
@@ -46,10 +47,10 @@
 	let activeTab = $state<TabId>('overview');
 
 
-	// Data state
-	let stats = $derived(data.stats);
+	// Data state - use $state with $effect to avoid proxy errors during navigation
+	let stats = $state<PermissionStats | null>(null);
 	let organizations = $state<OrganizationListItem[]>([]);
-	let recentChanges = $derived(data.recentChanges);
+	let recentChanges = $state<RecentChange[]>([]);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
@@ -59,13 +60,17 @@
 	let orgStatusFilter = $state<OrganizationStatus | ''>('');
 
 	// Synchronize server data to local state
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
+		stats = data.stats ?? null;
+		recentChanges = data.recentChanges ?? [];
 		if (data.organizations) {
 			organizations = [...data.organizations];
 		}
-		orgSearch = data.filters.orgSearch;
-		orgTypeFilter = data.filters.orgType;
-		orgStatusFilter = data.filters.orgStatus;
+		orgSearch = data.filters?.orgSearch ?? '';
+		orgTypeFilter = data.filters?.orgType ?? '';
+		orgStatusFilter = data.filters?.orgStatus ?? '';
 	});
 
 	const tabs = [
@@ -378,7 +383,7 @@
 												{org.adminCount}
 											</td>
 											<td class="px-6 py-4">
-												<span class="badge {org.status === 'ACTIVE' ? 'preset-filled-success-500' : 'preset-filled-surface-500'}">
+												<span class="badge {org.status === OrganizationStatusValues.ACTIVE ? 'preset-filled-success-500' : 'preset-filled-surface-500'}">
 													{org.status}
 												</span>
 											</td>

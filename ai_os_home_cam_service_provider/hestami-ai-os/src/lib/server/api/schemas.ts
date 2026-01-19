@@ -150,6 +150,10 @@ export type { ReporterTypeType } from '../../../../generated/zod/inputTypeSchema
 export { MediaTypeSchema } from '../../../../generated/zod/inputTypeSchemas/MediaTypeSchema.js';
 export type { MediaTypeType } from '../../../../generated/zod/inputTypeSchemas/MediaTypeSchema.js';
 
+// Document
+export { DocumentCategorySchema } from '../../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
+export type { DocumentCategoryType } from '../../../../generated/zod/inputTypeSchemas/DocumentCategorySchema.js';
+
 // Reserve
 export { FundingPlanTypeSchema } from '../../../../generated/zod/inputTypeSchemas/FundingPlanTypeSchema.js';
 export type { FundingPlanTypeType } from '../../../../generated/zod/inputTypeSchemas/FundingPlanTypeSchema.js';
@@ -197,6 +201,14 @@ export { JobPrioritySchema } from '../../../../generated/zod/inputTypeSchemas/Jo
 export type { JobPriorityType } from '../../../../generated/zod/inputTypeSchemas/JobPrioritySchema.js';
 export { JobVisitStatusSchema } from '../../../../generated/zod/inputTypeSchemas/JobVisitStatusSchema.js';
 export type { JobVisitStatusType } from '../../../../generated/zod/inputTypeSchemas/JobVisitStatusSchema.js';
+
+// Phase 38: Organization Invitations & Join Requests
+export { InvitationStatusSchema } from '../../../../generated/zod/inputTypeSchemas/InvitationStatusSchema.js';
+export type { InvitationStatusType } from '../../../../generated/zod/inputTypeSchemas/InvitationStatusSchema.js';
+export { JoinRequestStatusSchema } from '../../../../generated/zod/inputTypeSchemas/JoinRequestStatusSchema.js';
+export type { JoinRequestStatusType } from '../../../../generated/zod/inputTypeSchemas/JoinRequestStatusSchema.js';
+export { InvitationDeliveryMethodSchema } from '../../../../generated/zod/inputTypeSchemas/InvitationDeliveryMethodSchema.js';
+export type { InvitationDeliveryMethodType } from '../../../../generated/zod/inputTypeSchemas/InvitationDeliveryMethodSchema.js';
 
 // =============================================================================
 // Response Metadata Schema

@@ -12,6 +12,18 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	JournalEntryStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	JOURNAL_ENTRY_WORKFLOW_ERROR: 'JOURNAL_ENTRY_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'journal_entry_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'journal_entry_workflow_error';
@@ -92,7 +104,7 @@ async function createJournalEntry(
 				description: input.description!,
 				memo: input.memo,
 				createdBy: input.userId,
-				status: 'DRAFT',
+				status: JournalEntryStatus.DRAFT,
 				lines: {
 					create: input.lines!.map((line, index) => ({
 						accountId: line.accountId,
@@ -111,15 +123,15 @@ async function createJournalEntry(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ORGANIZATION',
+		entityType: ActivityEntityType.ORGANIZATION,
 		entityId: journalEntry.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Journal entry created: ${journalEntry.entryNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'journalEntryWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: JournalEntryWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { entryNumber: journalEntry.entryNumber, description: journalEntry.description }
 	});
@@ -173,7 +185,7 @@ async function postJournalEntry(
 		await tx.journalEntry.update({
 			where: { id: input.entryId },
 			data: {
-				status: 'POSTED',
+				status: JournalEntryStatus.POSTED,
 				postedAt: now,
 				approvedBy: input.userId,
 				approvedAt: now
@@ -184,22 +196,22 @@ async function postJournalEntry(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ORGANIZATION',
+		entityType: ActivityEntityType.ORGANIZATION,
 		entityId: input.entryId!,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Journal entry posted`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'journalEntryWorkflow_v1',
-		workflowStep: 'POST',
+		workflowStep: JournalEntryWorkflowAction.POST,
 		workflowVersion: 'v1',
-		newState: { status: 'POSTED', postedAt: now.toISOString() }
+		newState: { status: JournalEntryStatus.POSTED, postedAt: now.toISOString() }
 	});
 
 	return {
 		id: input.entryId!,
-		status: 'POSTED',
+		status: JournalEntryStatus.POSTED,
 		postedAt: now.toISOString()
 	};
 }
@@ -219,7 +231,7 @@ async function reverseJournalEntry(
 				entryDate: new Date(input.reversalDate!),
 				description: `Reversal of ${originalEntry.entryNumber}: ${originalEntry.description}`,
 				createdBy: input.userId,
-				status: 'POSTED',
+				status: JournalEntryStatus.POSTED,
 				isReversal: true,
 				reversedEntryId: originalEntry.id,
 				postedAt: now,
@@ -243,7 +255,7 @@ async function reverseJournalEntry(
 		// Update original entry status
 		await tx.journalEntry.update({
 			where: { id: originalEntry.id },
-			data: { status: 'REVERSED' }
+			data: { status: JournalEntryStatus.REVERSED }
 		});
 
 		// Update GL balances (reverse the original posting)
@@ -273,15 +285,15 @@ async function reverseJournalEntry(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'ORGANIZATION',
+		entityType: ActivityEntityType.ORGANIZATION,
 		entityId: reversalEntry.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Journal entry reversed: ${originalEntry.entryNumber}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'journalEntryWorkflow_v1',
-		workflowStep: 'REVERSE',
+		workflowStep: JournalEntryWorkflowAction.REVERSE,
 		workflowVersion: 'v1',
 		newState: { reversalEntryNumber: reversalEntry.entryNumber, originalEntryId: originalEntry.id }
 	});
@@ -307,7 +319,7 @@ async function journalEntryWorkflow(input: JournalEntryWorkflowInput): Promise<J
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case JournalEntryWorkflowAction.CREATE: {
 				if (!input.associationId || !input.entryDate || !input.description || !input.lines || !input.entryNumber) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -335,7 +347,7 @@ async function journalEntryWorkflow(input: JournalEntryWorkflowInput): Promise<J
 				return successResult;
 			}
 
-			case 'POST': {
+			case JournalEntryWorkflowAction.POST: {
 				if (!input.entryId) {
 					const error = new Error('Missing required field: entryId for POST');
 					logStepError(log, 'validation', error, { entryId: input.entryId });
@@ -359,7 +371,7 @@ async function journalEntryWorkflow(input: JournalEntryWorkflowInput): Promise<J
 				return successResult;
 			}
 
-			case 'REVERSE': {
+			case JournalEntryWorkflowAction.REVERSE: {
 				if (!input.originalEntry || !input.reversalDate || !input.entryNumber || !input.associationId) {
 					const error = new Error('Missing required fields for REVERSE');
 					logStepError(log, 'validation', error, { input });
@@ -407,8 +419,8 @@ async function journalEntryWorkflow(input: JournalEntryWorkflowInput): Promise<J
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'JOURNAL_ENTRY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.JOURNAL_ENTRY_WORKFLOW_ERROR
 		});
 		const errorResult: JournalEntryWorkflowResult = {
 			success: false,

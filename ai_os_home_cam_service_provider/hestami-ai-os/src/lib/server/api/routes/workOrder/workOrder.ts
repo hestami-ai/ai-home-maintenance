@@ -10,21 +10,21 @@ import {
 	WorkOrderOriginTypeSchema,
 	FundTypeSchema
 } from '$lib/schemas/index.js';
-import type { Prisma, TechnicianAvailability, WorkOrderStatus } from '../../../../../../generated/prisma/client.js';
+import type { Prisma, TechnicianAvailability } from '../../../../../../generated/prisma/client.js';
 import { ContractorTradeType, PricebookItemType } from '../../../../../../generated/prisma/client.js';
+import { WorkOrderStatus, BoardApprovalStatus, UserRole, InvoiceStatus } from '../../../../../../generated/prisma/enums.js';
 import { prisma } from '../../../db.js';
 import {
 	startWorkOrderTransition,
 	getWorkOrderTransitionStatus,
-	getWorkOrderTransitionError,
-	type TransitionInput
+	getWorkOrderTransitionError
 } from '../../../workflows/workOrderLifecycle.js';
 import {
 	startAddLineItemWorkflow,
 	startRemoveLineItemWorkflow
 } from '../../../workflows/workOrderLineItemWorkflow.js';
-import { startWorkOrderConfigWorkflow } from '../../../workflows/workOrderConfigWorkflow.js';
-import { startWorkOrderMutationWorkflow } from '../../../workflows/index.js';
+import { startWorkOrderConfigWorkflow, WorkOrderConfigAction } from '../../../workflows/workOrderConfigWorkflow.js';
+import { startWorkOrderMutationWorkflow, WorkOrderMutationAction } from '../../../workflows/index.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('WorkOrderRoute');
@@ -38,19 +38,19 @@ const workOrderCategoryEnum = WorkOrderCategorySchema;
 
 // Valid status transitions (Phase 9: Added AUTHORIZED and REVIEW_REQUIRED)
 const validTransitions: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-	DRAFT: ['SUBMITTED', 'CANCELLED'],
-	SUBMITTED: ['TRIAGED', 'CANCELLED'],
-	TRIAGED: ['AUTHORIZED', 'CANCELLED'], // Phase 9: Must go through AUTHORIZED
-	AUTHORIZED: ['ASSIGNED', 'CANCELLED'], // Phase 9: New state
-	ASSIGNED: ['SCHEDULED', 'IN_PROGRESS', 'CANCELLED'],
-	SCHEDULED: ['IN_PROGRESS', 'ON_HOLD', 'CANCELLED'],
-	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-	ON_HOLD: ['IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: ['REVIEW_REQUIRED', 'INVOICED', 'CLOSED'], // Phase 9: Added REVIEW_REQUIRED
-	REVIEW_REQUIRED: ['COMPLETED', 'CLOSED', 'CANCELLED'], // Phase 9: New state
-	INVOICED: ['CLOSED'],
-	CLOSED: [],
-	CANCELLED: []
+	[WorkOrderStatus.DRAFT]: [WorkOrderStatus.SUBMITTED, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.SUBMITTED]: [WorkOrderStatus.TRIAGED, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.TRIAGED]: [WorkOrderStatus.AUTHORIZED, WorkOrderStatus.CANCELLED], // Phase 9: Must go through AUTHORIZED
+	[WorkOrderStatus.AUTHORIZED]: [WorkOrderStatus.ASSIGNED, WorkOrderStatus.CANCELLED], // Phase 9: New state
+	[WorkOrderStatus.ASSIGNED]: [WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.SCHEDULED]: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.ON_HOLD, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.IN_PROGRESS]: [WorkOrderStatus.ON_HOLD, WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.ON_HOLD]: [WorkOrderStatus.IN_PROGRESS, WorkOrderStatus.CANCELLED],
+	[WorkOrderStatus.COMPLETED]: [WorkOrderStatus.REVIEW_REQUIRED, WorkOrderStatus.INVOICED, WorkOrderStatus.CLOSED], // Phase 9: Added REVIEW_REQUIRED
+	[WorkOrderStatus.REVIEW_REQUIRED]: [WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED, WorkOrderStatus.CANCELLED], // Phase 9: New state
+	[WorkOrderStatus.INVOICED]: [WorkOrderStatus.CLOSED],
+	[WorkOrderStatus.CLOSED]: [],
+	[WorkOrderStatus.CANCELLED]: []
 };
 
 const dayIndexToName: Record<number, keyof Pick<TechnicianAvailability, 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday'>> = {
@@ -63,12 +63,18 @@ const dayIndexToName: Record<number, keyof Pick<TechnicianAvailability, 'sunday'
 	6: 'saturday'
 };
 
+type ErrorHelper = (opts?: { message?: string }) => Error;
+type ErrorHelpers = {
+	FORBIDDEN: ErrorHelper;
+	BAD_REQUEST: ErrorHelper;
+};
+
 const assertTechnicianEligibleForSchedule = async (
 	technicianId: string,
 	orgId: string,
 	start: Date,
 	end: Date,
-	errors: any,
+	errors: ErrorHelpers,
 	options?: {
 		requiredTrade?: ContractorTradeType;
 		serviceAreaId?: string;
@@ -91,14 +97,14 @@ const assertTechnicianEligibleForSchedule = async (
 
 	const hasSkills = await prisma.technicianSkill.count({ where: { technicianId: tech.id } });
 	if (hasSkills === 0) {
-		throw errors.CONFLICT({ message: 'Technician has no recorded skills' });
+		throw errors.BAD_REQUEST({ message: 'Technician has no recorded skills' });
 	}
 	if (options?.requiredTrade) {
 		const skill = await prisma.technicianSkill.findFirst({
 			where: { technicianId: tech.id, trade: options.requiredTrade }
 		});
 		if (!skill) {
-			throw errors.CONFLICT({ message: 'Technician lacks required trade/skill for this job' });
+			throw errors.BAD_REQUEST({ message: 'Technician lacks required trade/skill for this job' });
 		}
 	}
 
@@ -107,7 +113,7 @@ const assertTechnicianEligibleForSchedule = async (
 			where: { technicianId: tech.id, serviceAreaId: options.serviceAreaId }
 		});
 		if (!territory) {
-			throw errors.CONFLICT({ message: 'Technician is not assigned to the required service area' });
+			throw errors.BAD_REQUEST({ message: 'Technician is not assigned to the required service area' });
 		}
 	}
 
@@ -145,7 +151,7 @@ const assertTechnicianEligibleForSchedule = async (
 			return rangeStart <= windowStart && rangeEnd >= windowEnd;
 		});
 		if (!fits) {
-			throw errors.CONFLICT({ message: 'Technician is not available in the requested window' });
+			throw errors.BAD_REQUEST({ message: 'Technician is not available in the requested window' });
 		}
 	}
 
@@ -157,13 +163,13 @@ const assertTechnicianEligibleForSchedule = async (
 		}
 	});
 	if (timeOff) {
-		throw errors.CONFLICT({ message: 'Technician is on time off during the requested window' });
+		throw errors.BAD_REQUEST({ message: 'Technician is on time off during the requested window' });
 	}
 
 	return tech;
 };
 
-const assertTechnicianActiveForOrg = async (technicianId: string, orgId: string, errors: any) => {
+const assertTechnicianActiveForOrg = async (technicianId: string, orgId: string, errors: Pick<ErrorHelpers, 'FORBIDDEN'>) => {
 	const tech = await prisma.technician.findFirst({
 		where: {
 			id: technicianId,
@@ -250,7 +256,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('create', 'work_order', 'new');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -263,7 +269,7 @@ export const workOrderRouter = {
 					where: { id: input.unitId, organizationId: context.organization.id },
 					include: { property: { include: { association: true } } }
 				});
-				if (!unit || unit.property.association.organizationId !== context.organization!.id) {
+				if (!unit || unit.property.association.organizationId !== context.organization.id) {
 					throw errors.NOT_FOUND({ message: 'Unit' });
 				}
 			}
@@ -324,12 +330,14 @@ export const workOrderRouter = {
 				}
 			}
 
+			log.info('Creating work order', { workOrderNumber, orgId: context.organization.id, userId: context.user.id });
+
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'CREATE',
+					action: WorkOrderMutationAction.CREATE,
 					organizationId: context.organization.id,
-					userId: context.user!.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderNumber,
 					title: input.title,
@@ -420,7 +428,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('view', 'work_order', '*');
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -520,7 +528,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('view', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -604,7 +612,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -631,16 +639,18 @@ export const workOrderRouter = {
 
 			// Calculate slaMet for COMPLETED status
 			let slaMet: boolean | null = null;
-			if (input.status === 'COMPLETED' && wo.slaDeadline) {
+			if (input.status === WorkOrderStatus.COMPLETED && wo.slaDeadline) {
 				slaMet = new Date() <= wo.slaDeadline;
 			}
+
+			log.info('Updating work order status', { workOrderId: input.id, previousStatus, newStatus: input.status });
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.UPDATE_STATUS,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.id,
 					previousStatus,
@@ -652,6 +662,7 @@ export const workOrderRouter = {
 			);
 
 			if (!workflowResult.success) {
+				log.error('Failed to update work order status', { workOrderId: input.id, error: workflowResult.error });
 				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to update work order status' });
 			}
 
@@ -700,7 +711,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -725,18 +736,20 @@ export const workOrderRouter = {
 			}
 
 			// Phase 9: Must be in AUTHORIZED status to assign (or already ASSIGNED)
-			if (wo.status !== 'AUTHORIZED' && wo.status !== 'ASSIGNED') {
+			if (wo.status !== WorkOrderStatus.AUTHORIZED && wo.status !== WorkOrderStatus.ASSIGNED) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be authorized before assigning vendor' });
 			}
 
 			const previousStatus = wo.status;
 
+			log.info('Assigning vendor to work order', { workOrderId: input.id, vendorId: input.vendorId, vendorName: vendor.name });
+
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'ASSIGN_VENDOR',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.ASSIGN_VENDOR,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.id,
 					vendorId: input.vendorId,
@@ -748,6 +761,7 @@ export const workOrderRouter = {
 			);
 
 			if (!workflowResult.success) {
+				log.error('Failed to assign vendor', { workOrderId: input.id, vendorId: input.vendorId, error: workflowResult.error });
 				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to assign vendor' });
 			}
 
@@ -796,7 +810,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -812,10 +826,11 @@ export const workOrderRouter = {
 			}
 
 			// Validate technician
-			const tech = await assertTechnicianActiveForOrg(input.technicianId, context.organization!.id, errors);
+			const tech = await assertTechnicianActiveForOrg(input.technicianId, context.organization.id, errors);
 
 			// Phase 9: Must be in AUTHORIZED/ASSIGNED/SCHEDULED to assign technician
-			if (!['AUTHORIZED', 'ASSIGNED', 'SCHEDULED'].includes(wo.status)) {
+			const assignableTechnicianStatuses: WorkOrderStatus[] = [WorkOrderStatus.AUTHORIZED, WorkOrderStatus.ASSIGNED, WorkOrderStatus.SCHEDULED];
+			if (!assignableTechnicianStatuses.includes(wo.status)) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be authorized or assigned before assigning technician' });
 			}
 
@@ -824,9 +839,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'ASSIGN_TECHNICIAN',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.ASSIGN_TECHNICIAN,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.id,
 					technicianId: tech.id,
@@ -891,7 +906,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -928,12 +943,14 @@ export const workOrderRouter = {
 
 			const previousStatus = wo.status;
 
+			log.info('Scheduling work order', { workOrderId: input.id, scheduledStart: start, scheduledEnd: end, technicianId });
+
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'SCHEDULE',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.SCHEDULE,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.id,
 					scheduledStart: start,
@@ -947,6 +964,7 @@ export const workOrderRouter = {
 			);
 
 			if (!workflowResult.success) {
+				log.error('Failed to schedule work order', { workOrderId: input.id, error: workflowResult.error });
 				throw errors.BAD_REQUEST({ message: workflowResult.error || 'Failed to schedule work order' });
 			}
 
@@ -997,7 +1015,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.id);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1012,19 +1030,21 @@ export const workOrderRouter = {
 				throw errors.NOT_FOUND({ message: 'Work Order' });
 			}
 
-			if (wo.status !== 'IN_PROGRESS') {
+			if (wo.status !== WorkOrderStatus.IN_PROGRESS) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be in progress to complete' });
 			}
 
 			const now = new Date();
 			const slaMet = wo.slaDeadline ? now <= wo.slaDeadline : null;
 
+			log.info('Completing work order', { workOrderId: input.id, slaMet, actualCost: input.actualCost, actualHours: input.actualHours });
+
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'COMPLETE',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.COMPLETE,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.id,
 					actualCost: input.actualCost,
@@ -1093,7 +1113,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('authorize', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1109,7 +1129,7 @@ export const workOrderRouter = {
 			}
 
 			// Must be in TRIAGED status to authorize
-			if (wo.status !== 'TRIAGED') {
+			if (wo.status !== WorkOrderStatus.TRIAGED) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be triaged before authorization' });
 			}
 
@@ -1135,9 +1155,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'AUTHORIZE',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.AUTHORIZE,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.workOrderId,
 					rationale: input.rationale,
@@ -1145,7 +1165,7 @@ export const workOrderRouter = {
 					approvedAmount: input.approvedAmount,
 					constraints: input.constraints,
 					requiresBoardApproval,
-					authorizingRole: 'MANAGER'
+					authorizingRole: UserRole.MANAGER
 				},
 				input.idempotencyKey
 			);
@@ -1201,7 +1221,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('accept', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1217,7 +1237,7 @@ export const workOrderRouter = {
 			}
 
 			// Must be in COMPLETED or REVIEW_REQUIRED status
-			if (wo.status !== 'COMPLETED' && wo.status !== 'REVIEW_REQUIRED') {
+			if (wo.status !== WorkOrderStatus.COMPLETED && wo.status !== WorkOrderStatus.REVIEW_REQUIRED) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be completed before accepting' });
 			}
 
@@ -1226,9 +1246,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'ACCEPT_COMPLETION',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.ACCEPT_COMPLETION,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.workOrderId,
 					resolutionNotes: input.outcomeSummary,
@@ -1292,7 +1312,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('request_board_approval', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1331,9 +1351,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'REQUEST_BOARD_APPROVAL',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.REQUEST_BOARD_APPROVAL,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.workOrderId,
 					workOrderNumber: wo.workOrderNumber,
@@ -1398,7 +1418,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('record_board_decision', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1417,16 +1437,16 @@ export const workOrderRouter = {
 				throw errors.BAD_REQUEST({ message: 'Work order does not require board approval' });
 			}
 
-			if (wo.boardApprovalStatus !== 'PENDING') {
+			if (wo.boardApprovalStatus !== BoardApprovalStatus.PENDING) {
 				throw errors.BAD_REQUEST({ message: 'Board decision has already been recorded' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'RECORD_BOARD_DECISION',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.RECORD_BOARD_DECISION,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.workOrderId,
 					approved: input.approved,
@@ -1486,7 +1506,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1504,9 +1524,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'ADD_COMMENT',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.ADD_COMMENT,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.workOrderId,
 					comment: input.comment,
@@ -1561,7 +1581,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('view', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1641,7 +1661,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1661,7 +1681,7 @@ export const workOrderRouter = {
 				throw errors.BAD_REQUEST({ message: 'Work order must have an assigned vendor' });
 			}
 
-			if (wo.status !== 'COMPLETED') {
+			if (wo.status !== WorkOrderStatus.COMPLETED) {
 				throw errors.BAD_REQUEST({ message: 'Work order must be completed before creating invoice' });
 			}
 
@@ -1689,9 +1709,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startWorkOrderMutationWorkflow(
 				{
-					action: 'CREATE_INVOICE',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderMutationAction.CREATE_INVOICE,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					associationId: association.id,
 					workOrderId: input.workOrderId,
 					workOrderNumber: wo.workOrderNumber,
@@ -1719,7 +1739,7 @@ export const workOrderRouter = {
 						id: workflowResult.invoiceId!,
 						invoiceNumber: input.invoiceNumber,
 						totalAmount: totalAmount.toString(),
-						status: 'PENDING_APPROVAL'
+						status: InvoiceStatus.PENDING_APPROVAL
 					},
 					workOrder: {
 						id: workflowResult.workOrderId!,
@@ -1770,7 +1790,7 @@ export const workOrderRouter = {
 
 			// Verify work order exists and belongs to org
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 
 			if (!association) {
@@ -1789,8 +1809,8 @@ export const workOrderRouter = {
 			const { workflowId } = await startWorkOrderTransition({
 				workOrderId: input.workOrderId,
 				toStatus: input.toStatus as WorkOrderStatus,
-				userId: context.user!.id,
-				organizationId: context.organization!.id,
+				userId: context.user.id,
+				organizationId: context.organization.id,
 				notes: input.notes,
 				vendorId: input.vendorId,
 				scheduledStart: input.scheduledStart ? new Date(input.scheduledStart) : undefined,
@@ -1879,7 +1899,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
@@ -1908,9 +1928,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startWorkOrderConfigWorkflow(
 				{
-					action: 'SET_PRICEBOOK_OR_TEMPLATE',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderConfigAction.SET_PRICEBOOK_OR_TEMPLATE,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					workOrderId: input.workOrderId,
 					data: {
 						pricebookVersionId: input.pricebookVersionId,
@@ -1983,7 +2003,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
@@ -1995,8 +2015,8 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
 			const result = await startAddLineItemWorkflow(
 				{
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					workOrderId: input.workOrderId,
 					pricebookItemId: input.pricebookItemId,
 					quantity: input.quantity,
@@ -2074,7 +2094,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('view', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
@@ -2141,7 +2161,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
@@ -2158,8 +2178,8 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution with idempotencyKey as workflowID
 			const result = await startRemoveLineItemWorkflow(
 				{
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					workOrderId: input.workOrderId,
 					lineItemId: input.lineItemId
 				},
@@ -2207,7 +2227,7 @@ export const workOrderRouter = {
 			await context.cerbos.authorize('edit', 'work_order', input.workOrderId);
 
 			const association = await prisma.association.findFirst({
-				where: { organizationId: context.organization!.id, deletedAt: null }
+				where: { organizationId: context.organization.id, deletedAt: null }
 			});
 			if (!association) throw errors.NOT_FOUND({ message: 'Association' });
 
@@ -2225,9 +2245,9 @@ export const workOrderRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startWorkOrderConfigWorkflow(
 				{
-					action: 'APPLY_JOB_TEMPLATE',
-					organizationId: context.organization!.id,
-					userId: context.user!.id,
+					action: WorkOrderConfigAction.APPLY_JOB_TEMPLATE,
+					organizationId: context.organization.id,
+					userId: context.user.id,
 					workOrderId: input.workOrderId,
 					data: {
 						jobTemplateId: input.jobTemplateId,

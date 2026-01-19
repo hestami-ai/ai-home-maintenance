@@ -14,6 +14,24 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { type BaseWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	JobStatus as JobStatusEnum,
+	JobSourceType as JobSourceTypeEnum
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	JOB_CREATE_WORKFLOW_ERROR: 'JOB_CREATE_WORKFLOW_ERROR'
+} as const;
+
+// Workflow step constants
+const JobCreateStep = {
+	CREATE_JOB: 'CREATE_JOB'
+} as const;
 
 const log = createWorkflowLogger('JobCreateWorkflow');
 
@@ -71,7 +89,7 @@ async function createJob(input: JobCreateInput): Promise<{
 	title: string;
 }> {
 	const jobNumber = await generateJobNumber(input.organizationId);
-	const initialStatus: JobStatus = input.sourceType === 'LEAD' ? 'LEAD' : 'TICKET';
+	const initialStatus: JobStatus = input.sourceType === JobSourceTypeEnum.LEAD ? JobStatusEnum.LEAD : JobStatusEnum.TICKET;
 
 	const job = await prisma.$transaction(async (tx) => {
 		const createdJob = await tx.job.create({
@@ -117,15 +135,15 @@ async function createJob(input: JobCreateInput): Promise<{
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: job.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Job created: ${job.title}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'jobCreateWorkflow_v1',
-		workflowStep: 'CREATE_JOB',
+		workflowStep: JobCreateStep.CREATE_JOB,
 		workflowVersion: 'v1',
 		jobId: job.id,
 		newState: {
@@ -171,8 +189,8 @@ async function jobCreateWorkflow(input: JobCreateInput): Promise<JobCreateResult
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'JOB_CREATE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.JOB_CREATE_WORKFLOW_ERROR
 		});
 
 		return {

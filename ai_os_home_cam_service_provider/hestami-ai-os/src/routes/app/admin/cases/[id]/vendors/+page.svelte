@@ -19,7 +19,7 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { conciergeCaseApi, type ConciergeCaseDetail } from '$lib/api/cam';
+	import { BidStatusValues, VendorCandidateStatusValues, conciergeCaseApi, type ConciergeCaseDetail } from '$lib/api/cam';
 	import { page } from '$app/state';
 	import {
 		vendorCandidateApi,
@@ -44,14 +44,18 @@
 
 	let { data }: Props = $props();
 
-	let caseDetail = $derived(data.caseDetail);
+	// Use $state with $effect to avoid proxy errors during navigation
+	let caseDetail = $state<ConciergeCaseDetail | null>(null);
 	let vendors = $state<VendorCandidateListItem[]>([]);
 	let isLoading = $state(false);
 	let isLoadingVendors = $state(false);
 	let error = $state<string | null>(null);
 
-	// Synchronize server vendors to local state
+	// Synchronize server data to local state
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
+		caseDetail = data.caseDetail ?? null;
 		if (data.vendors) {
 			vendors = [...data.vendors];
 		}
@@ -219,9 +223,9 @@
 
 	function getStatusIcon(status: VendorCandidateStatus) {
 		switch (status) {
-			case 'SELECTED':
+			case VendorCandidateStatusValues.SELECTED:
 				return CheckCircle;
-			case 'REJECTED':
+			case BidStatusValues.REJECTED:
 				return XCircle;
 			default:
 				return Building2;

@@ -29,12 +29,7 @@
 		CaseHistoryTab,
 		CaseParticipantsTab
 	} from '$lib/components/cam';
-	import {
-		conciergeCaseApi,
-		type ConciergeCaseDetail,
-		type CaseNoteType,
-		type ConciergeCaseStatus
-	} from '$lib/api/cam';
+	import { ActivityEntityTypeValues, CaseNoteTypeValues, ConciergeCaseStatusValues, DocumentCategoryValues, JobStatusValues, ViolationStatusValues, conciergeCaseApi, type CaseNoteType, type ConciergeCaseDetail, type ConciergeCaseStatus } from '$lib/api/cam';
 
 	let caseDetail = $state<ConciergeCaseDetail | null>(null);
 	let isLoading = $state(true);
@@ -42,7 +37,7 @@
 	let activeTab = $state<string>('overview');
 
 	let noteContent = $state('');
-	let noteType = $state<CaseNoteType>('GENERAL');
+	let noteType = $state<CaseNoteType>(DocumentCategoryValues.GENERAL);
 	let isSubmittingNote = $state(false);
 
 	let clarificationQuestion = $state('');
@@ -149,11 +144,11 @@
 
 	function getNoteTypeIcon(noteType: CaseNoteType) {
 		switch (noteType) {
-			case 'CLARIFICATION_REQUEST':
+			case CaseNoteTypeValues.CLARIFICATION_REQUEST:
 				return HelpCircle;
-			case 'CLARIFICATION_RESPONSE':
+			case CaseNoteTypeValues.CLARIFICATION_RESPONSE:
 				return CheckCircle;
-			case 'DECISION_RATIONALE':
+			case CaseNoteTypeValues.DECISION_RATIONALE:
 				return Settings;
 			default:
 				return MessageSquare;
@@ -179,7 +174,7 @@
 
 			if (response.ok) {
 				noteContent = '';
-				noteType = 'GENERAL';
+				noteType = DocumentCategoryValues.GENERAL;
 				await loadCaseDetail();
 			}
 		} catch (err) {
@@ -237,15 +232,15 @@
 	}
 
 	const statusOptions: ConciergeCaseStatus[] = [
-		'INTAKE',
-		'ASSESSMENT',
-		'IN_PROGRESS',
-		'PENDING_EXTERNAL',
-		'PENDING_OWNER',
-		'ON_HOLD',
-		'RESOLVED',
-		'CLOSED',
-		'CANCELLED'
+		ConciergeCaseStatusValues.INTAKE,
+		ActivityEntityTypeValues.ASSESSMENT,
+		JobStatusValues.IN_PROGRESS,
+		ConciergeCaseStatusValues.PENDING_EXTERNAL,
+		ConciergeCaseStatusValues.PENDING_OWNER,
+		JobStatusValues.ON_HOLD,
+		ViolationStatusValues.RESOLVED,
+		JobStatusValues.CLOSED,
+		JobStatusValues.CANCELLED
 	];
 
 	const tabs = [

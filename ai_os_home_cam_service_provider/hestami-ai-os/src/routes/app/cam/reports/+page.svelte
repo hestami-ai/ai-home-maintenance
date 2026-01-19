@@ -3,7 +3,7 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { reportApi } from '$lib/api/cam';
+	import { CommitteeTypeValues, ReportCategoryValues, reportApi } from '$lib/api/cam';
 
 	interface ReportDefinition {
 		id: string;
@@ -23,10 +23,10 @@
 
 	const categoryOptions = [
 		{ value: '', label: 'All Categories' },
-		{ value: 'FINANCIAL', label: 'Financial' },
-		{ value: 'OPERATIONAL', label: 'Operational' },
-		{ value: 'COMPLIANCE', label: 'Compliance' },
-		{ value: 'CUSTOM', label: 'Custom' }
+		{ value: ReportCategoryValues.FINANCIAL, label: 'Financial' },
+		{ value: ReportCategoryValues.OPERATIONAL, label: 'Operational' },
+		{ value: ReportCategoryValues.COMPLIANCE, label: 'Compliance' },
+		{ value: CommitteeTypeValues.CUSTOM, label: 'Custom' }
 	];
 
 	async function loadReports() {

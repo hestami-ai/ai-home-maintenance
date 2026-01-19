@@ -4,7 +4,7 @@ import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputS
 import { PropertyTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
-import { startPropertyWorkflow } from '../../workflows/index.js';
+import { startPropertyWorkflow, PropertyWorkflowAction } from '../../workflows/index.js';
 
 const log = createModuleLogger('PropertyRoute');
 
@@ -71,7 +71,7 @@ export const propertyRouter = {
 			// Create property via workflow
 			const result = await startPropertyWorkflow(
 				{
-					action: 'CREATE',
+					action: PropertyWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: propertyData
@@ -271,9 +271,7 @@ export const propertyRouter = {
                 idempotencyKey: z.string().uuid(),
                 id: z.string(),
 				name: z.string().min(1).max(255).optional(),
-				propertyType: z
-					.enum(['SINGLE_FAMILY', 'CONDOMINIUM', 'TOWNHOUSE', 'COOPERATIVE', 'MIXED_USE', 'COMMERCIAL'])
-					.optional(),
+				propertyType: PropertyTypeSchema.optional(),
 				addressLine1: z.string().min(1).max(255).optional(),
 				addressLine2: z.string().max(255).optional(),
 				city: z.string().min(1).max(100).optional(),
@@ -320,7 +318,7 @@ export const propertyRouter = {
 			// Update property via workflow
 			const result = await startPropertyWorkflow(
 				{
-					action: 'UPDATE',
+					action: PropertyWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: id,
@@ -389,7 +387,7 @@ export const propertyRouter = {
 			// Delete property via workflow
 			const result = await startPropertyWorkflow(
 				{
-					action: 'DELETE',
+					action: PropertyWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.id,

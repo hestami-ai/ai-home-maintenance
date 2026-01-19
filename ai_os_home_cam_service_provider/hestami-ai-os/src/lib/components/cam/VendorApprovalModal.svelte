@@ -1,10 +1,11 @@
 <script lang="ts">
+	import { ARCReviewActionValues, ActivityActionTypeValues } from '$lib/api/cam';
 	import { X, Loader2 } from 'lucide-svelte';
 
 	interface Props {
 		open: boolean;
 		vendorName?: string;
-		action: 'APPROVE' | 'REJECT' | 'REQUEST_INFO' | null;
+		action: string | null;
 		loading?: boolean;
 		onConfirm: (data: { action: string; notes: string; expirationDate?: string }) => void;
 		onCancel: () => void;
@@ -63,7 +64,7 @@
 
 	// Set default expiration to 1 year from now for approvals
 	$effect(() => {
-		if (open && action === 'APPROVE' && !expirationDate) {
+		if (open && action === ARCReviewActionValues.APPROVE && !expirationDate) {
 			const oneYearFromNow = new Date();
 			oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
 			expirationDate = oneYearFromNow.toISOString().split('T')[0];
@@ -108,7 +109,7 @@
 					</div>
 				{/if}
 
-				{#if action === 'APPROVE'}
+				{#if action === ARCReviewActionValues.APPROVE}
 					<div>
 						<label for="expiration-date" class="block text-sm font-medium">
 							Approval Expiration Date <span class="text-error-500">*</span>
@@ -128,7 +129,7 @@
 
 				<div>
 					<label for="notes" class="block text-sm font-medium">
-						{#if action === 'REQUEST_INFO'}
+						{#if action === ActivityActionTypeValues.REQUEST_INFO}
 							Information Requested <span class="text-error-500">*</span>
 						{:else}
 							Notes <span class="text-error-500">*</span>
@@ -138,7 +139,7 @@
 						id="notes"
 						bind:value={notes}
 						rows={4}
-						placeholder={action === 'REQUEST_INFO' 
+						placeholder={action === ActivityActionTypeValues.REQUEST_INFO 
 							? 'Describe what additional information is needed...'
 							: action === 'REJECT'
 								? 'Provide reason for rejection...'

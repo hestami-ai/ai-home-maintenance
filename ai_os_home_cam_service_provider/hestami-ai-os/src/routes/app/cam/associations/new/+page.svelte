@@ -4,8 +4,15 @@
 
 	let { data } = $props();
 
-	// SSR-loaded data
-	const coaTemplates = $derived(data.coaTemplates);
+	// Use $state with $effect to avoid proxy errors during navigation
+	let coaTemplates = $state<any[]>([]);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			coaTemplates = data.coaTemplates ?? [];
+		}
+	});
 
 	// Form state (reactive)
 	let formData = $state({

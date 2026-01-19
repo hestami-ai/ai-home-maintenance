@@ -10,6 +10,22 @@ import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	TRANSFER_WORKFLOW_ERROR: 'TRANSFER_WORKFLOW_ERROR'
+} as const;
+
+// Transfer status values (matches schema comment: PENDING, IN_TRANSIT, COMPLETED, CANCELLED)
+export const TransferStatus = {
+	PENDING: 'PENDING',
+	IN_TRANSIT: 'IN_TRANSIT',
+	RECEIVED: 'RECEIVED',
+	CANCELLED: 'CANCELLED'
+} as const;
+
+export type TransferStatus = (typeof TransferStatus)[keyof typeof TransferStatus];
 
 const log = createWorkflowLogger('TransferWorkflow');
 
@@ -136,7 +152,7 @@ async function shipTransfer(
 		await tx.inventoryTransfer.update({
 			where: { id: transferId },
 			data: {
-				status: 'IN_TRANSIT',
+				status: TransferStatus.IN_TRANSIT,
 				shippedAt: new Date()
 			}
 		});
@@ -209,7 +225,7 @@ async function receiveTransfer(
 		await tx.inventoryTransfer.update({
 			where: { id: transferId },
 			data: {
-				status: 'RECEIVED',
+				status: TransferStatus.RECEIVED,
 				receivedAt: new Date()
 			}
 		});
@@ -239,7 +255,7 @@ async function cancelTransfer(
 
 	return orgTransaction(organizationId, async (tx) => {
 		// If in transit, return stock to source
-		if (existingStatus === 'IN_TRANSIT') {
+		if (existingStatus === TransferStatus.IN_TRANSIT) {
 			for (const line of existingLines) {
 				if (line.quantityShipped > 0) {
 					const level = await tx.inventoryLevel.findFirst({
@@ -278,7 +294,7 @@ async function cancelTransfer(
 		await tx.inventoryTransfer.update({
 			where: { id: transferId },
 			data: {
-				status: 'CANCELLED',
+				status: TransferStatus.CANCELLED,
 				notes: reason ? `${existingNotes ?? ''}\nCancelled: ${reason}`.trim() : existingNotes
 			}
 		});
@@ -294,28 +310,28 @@ async function transferWorkflow(input: TransferWorkflowInput): Promise<TransferW
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_TRANSFER':
+			case TransferAction.CREATE_TRANSFER:
 				entityId = await DBOS.runStep(
 					() => createTransfer(input.organizationId, input.userId, input.data),
 					{ name: 'createTransfer' }
 				);
 				break;
 
-			case 'SHIP_TRANSFER':
+			case TransferAction.SHIP_TRANSFER:
 				entityId = await DBOS.runStep(
 					() => shipTransfer(input.organizationId, input.userId, input.transferId!, input.data),
 					{ name: 'shipTransfer' }
 				);
 				break;
 
-			case 'RECEIVE_TRANSFER':
+			case TransferAction.RECEIVE_TRANSFER:
 				entityId = await DBOS.runStep(
 					() => receiveTransfer(input.organizationId, input.userId, input.transferId!, input.data),
 					{ name: 'receiveTransfer' }
 				);
 				break;
 
-			case 'CANCEL_TRANSFER':
+			case TransferAction.CANCEL_TRANSFER:
 				entityId = await DBOS.runStep(
 					() => cancelTransfer(input.organizationId, input.userId, input.transferId!, input.data),
 					{ name: 'cancelTransfer' }
@@ -334,8 +350,8 @@ async function transferWorkflow(input: TransferWorkflowInput): Promise<TransferW
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'TRANSFER_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.TRANSFER_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

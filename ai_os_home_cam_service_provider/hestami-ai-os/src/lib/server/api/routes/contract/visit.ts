@@ -10,7 +10,8 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ScheduledVisitStatus } from '../../../../../../generated/prisma/client.js';
-import { startVisitWorkflow } from '../../../workflows/visitWorkflow.js';
+import { ScheduledVisitStatus as ScheduledVisitStatusEnum } from '../../../../../../generated/prisma/enums.js';
+import { startVisitWorkflow, VisitActionValues } from '../../../workflows/visitWorkflow.js';
 
 const visitOutput = z.object({
 	id: z.string(),
@@ -106,7 +107,7 @@ export const scheduledVisitRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'CREATE_VISIT',
+					action: VisitActionValues.CREATE_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -271,7 +272,7 @@ export const scheduledVisitRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'ASSIGN_VISIT',
+					action: VisitActionValues.ASSIGN_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					visitId: input.id,
@@ -318,14 +319,14 @@ export const scheduledVisitRouter = {
 				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
-			if (visit.status !== 'SCHEDULED') {
+			if (visit.status !== ScheduledVisitStatusEnum.SCHEDULED) {
 				throw errors.BAD_REQUEST({ message: 'Can only confirm SCHEDULED visits' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'CONFIRM_VISIT',
+					action: VisitActionValues.CONFIRM_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					visitId: input.id,
@@ -372,14 +373,14 @@ export const scheduledVisitRouter = {
 				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
-			if (!['SCHEDULED', 'CONFIRMED'].includes(visit.status)) {
+			if (!([ScheduledVisitStatusEnum.SCHEDULED, ScheduledVisitStatusEnum.CONFIRMED] as ScheduledVisitStatusEnum[]).includes(visit.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only start SCHEDULED or CONFIRMED visits' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'START_VISIT',
+					action: VisitActionValues.START_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					visitId: input.id,
@@ -434,14 +435,14 @@ export const scheduledVisitRouter = {
 				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
-			if (visit.status !== 'IN_PROGRESS') {
+			if (visit.status !== ScheduledVisitStatusEnum.IN_PROGRESS) {
 				throw errors.BAD_REQUEST({ message: 'Can only complete IN_PROGRESS visits' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'COMPLETE_VISIT',
+					action: VisitActionValues.COMPLETE_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					visitId: input.id,
@@ -488,14 +489,14 @@ export const scheduledVisitRouter = {
 				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
-			if (['COMPLETED', 'CANCELLED'].includes(visit.status)) {
+			if (([ScheduledVisitStatusEnum.COMPLETED, ScheduledVisitStatusEnum.CANCELLED] as ScheduledVisitStatusEnum[]).includes(visit.status)) {
 				throw errors.BAD_REQUEST({ message: 'Cannot cancel completed or already cancelled visits' });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'CANCEL_VISIT',
+					action: VisitActionValues.CANCEL_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					visitId: input.id,
@@ -552,7 +553,7 @@ export const scheduledVisitRouter = {
 				throw errors.NOT_FOUND({ message: 'Scheduled visit not found' });
 			}
 
-			if (!['SCHEDULED', 'CONFIRMED'].includes(visit.status)) {
+			if (!([ScheduledVisitStatusEnum.SCHEDULED, ScheduledVisitStatusEnum.CONFIRMED] as ScheduledVisitStatusEnum[]).includes(visit.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only reschedule SCHEDULED or CONFIRMED visits' });
 			}
 
@@ -565,7 +566,7 @@ export const scheduledVisitRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startVisitWorkflow(
 				{
-					action: 'RESCHEDULE_VISIT',
+					action: VisitActionValues.RESCHEDULE_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					visitId: input.id,
@@ -624,7 +625,7 @@ export const scheduledVisitRouter = {
 			const visits = await prisma.scheduledVisit.findMany({
 				where: {
 					contract: { organizationId: context.organization!.id, deletedAt: null },
-					status: { in: ['SCHEDULED', 'CONFIRMED'] },
+					status: { in: [ScheduledVisitStatusEnum.SCHEDULED, ScheduledVisitStatusEnum.CONFIRMED] },
 					scheduledDate: { gte: new Date(), lte: endDate },
 					...(input?.technicianId && { technicianId: input.technicianId })
 				},

@@ -12,6 +12,17 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
 import type { BankAccountType, FundType } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	BANK_ACCOUNT_WORKFLOW_ERROR: 'BANK_ACCOUNT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'bank_account_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'bank_account_workflow_error';
@@ -99,15 +110,15 @@ async function createBankAccount(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId: input.organizationId,
-			entityType: 'ORGANIZATION',
+			entityType: ActivityEntityType.ORGANIZATION,
 			entityId: bankAccount.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Bank account created: ${bankAccount.bankName} - ${bankAccount.accountName}`,
 			performedById: input.userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'bankAccountWorkflow_v1',
-			workflowStep: 'CREATE',
+			workflowStep: BankAccountWorkflowAction.CREATE,
 			workflowVersion: 'v1',
 			newState: { bankName: bankAccount.bankName, accountName: bankAccount.accountName, fundType: bankAccount.fundType }
 		});
@@ -158,15 +169,15 @@ async function updateBankAccount(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId: input.organizationId,
-			entityType: 'ORGANIZATION',
+			entityType: ActivityEntityType.ORGANIZATION,
 			entityId: bankAccount.id,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Bank account updated: ${bankAccount.bankName}`,
 			performedById: input.userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'bankAccountWorkflow_v1',
-			workflowStep: 'UPDATE',
+			workflowStep: BankAccountWorkflowAction.UPDATE,
 			workflowVersion: 'v1',
 			newState: updateData
 		});
@@ -195,15 +206,15 @@ async function deactivateBankAccount(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'ORGANIZATION',
+			entityType: ActivityEntityType.ORGANIZATION,
 			entityId: bankAccountId,
-			action: 'DELETE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.DELETE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Bank account deactivated`,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'bankAccountWorkflow_v1',
-			workflowStep: 'DEACTIVATE',
+			workflowStep: BankAccountWorkflowAction.DEACTIVATE,
 			workflowVersion: 'v1',
 			newState: { isActive: false, isPrimary: false }
 		});
@@ -229,15 +240,15 @@ async function updateBankBalance(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId: input.organizationId,
-			entityType: 'ORGANIZATION',
+			entityType: ActivityEntityType.ORGANIZATION,
 			entityId: bankAccount.id,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Bank balance updated for reconciliation`,
 			performedById: input.userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'bankAccountWorkflow_v1',
-			workflowStep: 'UPDATE_BALANCE',
+			workflowStep: BankAccountWorkflowAction.UPDATE_BALANCE,
 			workflowVersion: 'v1',
 			newState: { bankBalance: bankAccount.bankBalance.toString(), lastReconciled: bankAccount.lastReconciled?.toISOString() }
 		});
@@ -267,7 +278,7 @@ async function bankAccountWorkflow(input: BankAccountWorkflowInput & { existingF
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case BankAccountWorkflowAction.CREATE: {
 				if (!input.associationId || !input.glAccountId || !input.bankName || !input.accountName || !input.accountNumber || !input.accountType) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -294,7 +305,7 @@ async function bankAccountWorkflow(input: BankAccountWorkflowInput & { existingF
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case BankAccountWorkflowAction.UPDATE: {
 				if (!input.bankAccountId) {
 					const error = new Error('Missing required field: bankAccountId for UPDATE');
 					logStepError(log, 'validation', error, { bankAccountId: input.bankAccountId });
@@ -320,7 +331,7 @@ async function bankAccountWorkflow(input: BankAccountWorkflowInput & { existingF
 				return successResult;
 			}
 
-			case 'DEACTIVATE': {
+			case BankAccountWorkflowAction.DEACTIVATE: {
 				if (!input.bankAccountId) {
 					const error = new Error('Missing required field: bankAccountId for DEACTIVATE');
 					logStepError(log, 'validation', error, { bankAccountId: input.bankAccountId });
@@ -342,7 +353,7 @@ async function bankAccountWorkflow(input: BankAccountWorkflowInput & { existingF
 				return successResult;
 			}
 
-			case 'UPDATE_BALANCE': {
+			case BankAccountWorkflowAction.UPDATE_BALANCE: {
 				if (!input.bankAccountId || input.bankBalance === undefined) {
 					const error = new Error('Missing required fields for UPDATE_BALANCE');
 					logStepError(log, 'validation', error, { input });
@@ -393,8 +404,8 @@ async function bankAccountWorkflow(input: BankAccountWorkflowInput & { existingF
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'BANK_ACCOUNT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.BANK_ACCOUNT_WORKFLOW_ERROR
 		});
 		const errorResult: BankAccountWorkflowResult = {
 			success: false,

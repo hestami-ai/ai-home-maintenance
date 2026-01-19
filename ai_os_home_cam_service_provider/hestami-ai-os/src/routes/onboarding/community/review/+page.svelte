@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, Check, Loader2, Building2, Users, FileText } from 'lucide-svelte';
 	import { Card, RoleBadge } from '$lib/components/ui';
 	import { communityOnboarding } from '$lib/stores';
@@ -18,7 +19,7 @@
 
 		try {
 			// Build association config for self-managed HOAs
-			const associationConfig = $communityOnboarding.organizationType === 'COMMUNITY_ASSOCIATION'
+			const associationConfig = $communityOnboarding.organizationType === OrganizationTypeValues.COMMUNITY_ASSOCIATION
 				? {
 					boardSeats: $communityOnboarding.governance.boardSeats,
 					totalUnits: $communityOnboarding.initialData.totalUnits || undefined,
@@ -52,7 +53,7 @@
 	}
 
 	const orgTypeLabel = $derived(
-		$communityOnboarding.organizationType === 'MANAGEMENT_COMPANY'
+		$communityOnboarding.organizationType === OrganizationTypeValues.MANAGEMENT_COMPANY
 			? 'Management Company'
 			: 'Community Association'
 	);
@@ -92,7 +93,7 @@
 			</div>
 		</Card>
 
-		{#if $communityOnboarding.organizationType === 'COMMUNITY_ASSOCIATION'}
+		{#if $communityOnboarding.organizationType === OrganizationTypeValues.COMMUNITY_ASSOCIATION}
 			<Card variant="outlined" padding="md">
 				<div class="flex items-start justify-between">
 					<div class="flex items-start gap-3">

@@ -5,7 +5,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent, DecisionButton, RationaleModal } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { violationApi, type Violation } from '$lib/api/cam';
+	import { violationApi, type Violation, ViolationStatusValues, ViolationSeverityValues } from '$lib/api/cam';
 	import type { Snippet } from 'svelte';
 
 	interface ViolationListItem extends Violation {
@@ -32,23 +32,23 @@
 	const statusOptions = [
 		{ value: '', label: 'All Statuses' },
 		{ value: 'DETECTED', label: 'Detected' },
-		{ value: 'UNDER_REVIEW', label: 'Under Review' },
-		{ value: 'NOTICE_SENT', label: 'Notice Sent' },
+		{ value: ViolationStatusValues.UNDER_REVIEW, label: 'Under Review' },
+		{ value: ViolationStatusValues.NOTICE_SENT, label: 'Notice Sent' },
 		{ value: 'OWNER_RESPONSE_PENDING', label: 'Response Pending' },
-		{ value: 'CURE_PERIOD', label: 'Cure Period' },
-		{ value: 'ESCALATED', label: 'Escalated' },
-		{ value: 'HEARING_SCHEDULED', label: 'Hearing Scheduled' },
+		{ value: ViolationStatusValues.CURE_PERIOD, label: 'Cure Period' },
+		{ value: ViolationStatusValues.ESCALATED, label: 'Escalated' },
+		{ value: ViolationStatusValues.HEARING_SCHEDULED, label: 'Hearing Scheduled' },
 		{ value: 'REMEDIATION_IN_PROGRESS', label: 'Remediation' },
-		{ value: 'RESOLVED', label: 'Resolved' },
-		{ value: 'CLOSED', label: 'Closed' }
+		{ value: ViolationStatusValues.RESOLVED, label: 'Resolved' },
+		{ value: ViolationStatusValues.CLOSED, label: 'Closed' }
 	];
 
 	const severityOptions = [
 		{ value: '', label: 'All Severities' },
-		{ value: 'CRITICAL', label: 'Critical' },
-		{ value: 'MAJOR', label: 'Major' },
-		{ value: 'MODERATE', label: 'Moderate' },
-		{ value: 'MINOR', label: 'Minor' }
+		{ value: ViolationSeverityValues.CRITICAL, label: 'Critical' },
+		{ value: ViolationSeverityValues.MAJOR, label: 'Major' },
+		{ value: ViolationSeverityValues.MODERATE, label: 'Moderate' },
+		{ value: ViolationSeverityValues.MINOR, label: 'Minor' }
 	];
 
 	async function loadViolations() {
@@ -78,26 +78,26 @@
 
 	function getSeverityColor(severity: string): string {
 		switch (severity) {
-			case 'CRITICAL': return 'bg-error-500 text-white';
-			case 'MAJOR': return 'bg-warning-500 text-white';
-			case 'MODERATE': return 'bg-yellow-500 text-black';
-			case 'MINOR': return 'bg-surface-400 text-white';
+			case ViolationSeverityValues.CRITICAL: return 'bg-error-500 text-white';
+			case ViolationSeverityValues.MAJOR: return 'bg-warning-500 text-white';
+			case ViolationSeverityValues.MODERATE: return 'bg-yellow-500 text-black';
+			case ViolationSeverityValues.MINOR: return 'bg-surface-400 text-white';
 			default: return 'bg-surface-300 text-surface-700';
 		}
 	}
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'DETECTED': return 'text-blue-500 bg-blue-500/10';
-			case 'UNDER_REVIEW': return 'text-indigo-500 bg-indigo-500/10';
-			case 'NOTICE_SENT': return 'text-warning-500 bg-warning-500/10';
-			case 'OWNER_RESPONSE_PENDING': return 'text-orange-500 bg-orange-500/10';
-			case 'CURE_PERIOD': return 'text-yellow-600 bg-yellow-500/10';
-			case 'ESCALATED': return 'text-error-600 bg-error-500/20';
-			case 'HEARING_SCHEDULED': return 'text-primary-500 bg-primary-500/10';
-			case 'REMEDIATION_IN_PROGRESS': return 'text-cyan-500 bg-cyan-500/10';
-			case 'RESOLVED': return 'text-success-500 bg-success-500/10';
-			case 'CLOSED': return 'text-surface-500 bg-surface-500/10';
+			case ViolationStatusValues.DETECTED: return 'text-blue-500 bg-blue-500/10';
+			case ViolationStatusValues.UNDER_REVIEW: return 'text-indigo-500 bg-indigo-500/10';
+			case ViolationStatusValues.NOTICE_SENT: return 'text-warning-500 bg-warning-500/10';
+			case ViolationStatusValues.OWNER_RESPONSE_PENDING: return 'text-orange-500 bg-orange-500/10';
+			case ViolationStatusValues.CURE_PERIOD: return 'text-yellow-600 bg-yellow-500/10';
+			case ViolationStatusValues.ESCALATED: return 'text-error-600 bg-error-500/20';
+			case ViolationStatusValues.HEARING_SCHEDULED: return 'text-primary-500 bg-primary-500/10';
+			case ViolationStatusValues.REMEDIATION_IN_PROGRESS: return 'text-cyan-500 bg-cyan-500/10';
+			case ViolationStatusValues.RESOLVED: return 'text-success-500 bg-success-500/10';
+			case ViolationStatusValues.CLOSED: return 'text-surface-500 bg-surface-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -124,9 +124,9 @@
 	}
 
 	function isEscalated(violation: Violation): boolean {
-		return violation.status === 'ESCALATED' || 
-			violation.status === 'HEARING_SCHEDULED' || 
-			violation.status === 'HEARING_HELD';
+		return violation.status === ViolationStatusValues.ESCALATED ||
+			violation.status === ViolationStatusValues.HEARING_SCHEDULED ||
+			violation.status === ViolationStatusValues.HEARING_HELD;
 	}
 
 	function openRationaleModal(type: string, label: string, variant: 'approve' | 'deny' | 'escalate' | 'default') {
@@ -401,7 +401,7 @@
 											<span class="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium {getStatusColor(violation.status)}">
 												{violation.status.replace(/_/g, ' ')}
 											</span>
-											{#if !['RESOLVED', 'CLOSED'].includes(violation.status)}
+											{#if !([ViolationStatusValues.RESOLVED, ViolationStatusValues.CLOSED] as string[]).includes(violation.status)}
 												<span class="text-xs font-medium {getDaysOpenColor(daysOpen)}" title="Days open">
 													{daysOpen}d
 												</span>
@@ -441,7 +441,7 @@
 
 				{#snippet actions()}
 					{@const v = selectedViolation!}
-					{#if v.status === 'OPEN'}
+					{#if v.status === ViolationStatusValues.OPEN}
 						<DecisionButton
 							variant="default"
 							requiresRationale
@@ -450,7 +450,7 @@
 							Send Notice
 						</DecisionButton>
 					{/if}
-					{#if ['OPEN', 'NOTICE_SENT', 'CURE_PERIOD'].includes(v.status)}
+					{#if ([ViolationStatusValues.OPEN, ViolationStatusValues.NOTICE_SENT, ViolationStatusValues.CURE_PERIOD] as string[]).includes(v.status)}
 						<DecisionButton
 							variant="escalate"
 							requiresRationale
@@ -459,7 +459,7 @@
 							Escalate
 						</DecisionButton>
 					{/if}
-					{#if !['RESOLVED', 'CLOSED'].includes(v.status)}
+					{#if !([ViolationStatusValues.RESOLVED, ViolationStatusValues.CLOSED] as string[]).includes(v.status)}
 						<DecisionButton
 							variant="approve"
 							requiresRationale

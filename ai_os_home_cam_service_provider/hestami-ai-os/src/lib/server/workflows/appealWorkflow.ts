@@ -9,8 +9,18 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
 import { AppealStatus, type EntityWorkflowResult } from './schemas.js';
+import {
+	ActivityActionType,
+	HearingOutcome,
+	ViolationStatus
+} from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	APPEAL_WORKFLOW_ERROR: 'APPEAL_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('AppealWorkflow');
 
@@ -59,7 +69,7 @@ async function fileAppeal(
 	}
 
 	// Check if hearing has a decision
-	if (hearing.outcome === 'PENDING') {
+	if (hearing.outcome === HearingOutcome.PENDING) {
 		throw new Error('Cannot appeal a hearing that has not been held');
 	}
 
@@ -100,7 +110,7 @@ async function fileAppeal(
 
 			await tx.violation.update({
 				where: { id: hearing.violationId },
-				data: { status: 'APPEALED' }
+				data: { status: ViolationStatus.APPEALED }
 			});
 
 			return appeal.id;
@@ -132,7 +142,7 @@ async function scheduleHearing(
 		throw new Error('Appeal not found');
 	}
 
-	if (appeal.status !== 'PENDING') {
+	if (appeal.status !== AppealStatus.PENDING) {
 		throw new Error('Can only schedule hearing for pending appeals');
 	}
 
@@ -175,7 +185,7 @@ async function recordDecision(
 		throw new Error('Appeal not found');
 	}
 
-	if (!['PENDING', 'SCHEDULED'].includes(appeal.status)) {
+	if (!([AppealStatus.PENDING, AppealStatus.SCHEDULED] as AppealStatus[]).includes(appeal.status)) {
 		throw new Error('Appeal decision has already been recorded');
 	}
 
@@ -197,7 +207,7 @@ async function recordDecision(
 			await tx.violation.update({
 				where: { id: appeal.hearing.violationId },
 				data: {
-					status: status === 'REVERSED' ? 'DISMISSED' : 'CLOSED'
+					status: status === AppealStatus.REVERSED ? ViolationStatus.DISMISSED : ViolationStatus.CLOSED
 				}
 			});
 		}, { userId, reason: 'Recording appeal decision via workflow' });
@@ -224,7 +234,7 @@ async function withdrawAppeal(
 		throw new Error('Appeal not found');
 	}
 
-	if (!['PENDING', 'SCHEDULED'].includes(appeal.status)) {
+	if (!([AppealStatus.PENDING, AppealStatus.SCHEDULED] as AppealStatus[]).includes(appeal.status)) {
 		throw new Error('Cannot withdraw appeal after decision');
 	}
 
@@ -233,12 +243,12 @@ async function withdrawAppeal(
 		await orgTransaction(organizationId, async (tx) => {
 			await tx.violationAppeal.update({
 				where: { id: appealId },
-				data: { status: 'WITHDRAWN' }
+				data: { status: AppealStatus.WITHDRAWN }
 			});
 
 			await tx.violation.update({
 				where: { id: appeal.hearing.violationId },
-				data: { status: 'FINE_ASSESSED' }
+				data: { status: ViolationStatus.FINE_ASSESSED }
 			});
 		}, { userId, reason: 'Withdrawing appeal via workflow' });
 
@@ -255,28 +265,28 @@ async function appealWorkflow(input: AppealWorkflowInput): Promise<AppealWorkflo
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'FILE_APPEAL':
+			case AppealAction.FILE_APPEAL:
 				entityId = await DBOS.runStep(
 					() => fileAppeal(input.organizationId, input.userId, input.associationId, input.data),
 					{ name: 'fileAppeal' }
 				);
 				break;
 
-			case 'SCHEDULE_HEARING':
+			case AppealAction.SCHEDULE_HEARING:
 				entityId = await DBOS.runStep(
 					() => scheduleHearing(input.organizationId, input.userId, input.associationId, input.appealId!, input.data),
 					{ name: 'scheduleHearing' }
 				);
 				break;
 
-			case 'RECORD_DECISION':
+			case AppealAction.RECORD_DECISION:
 				entityId = await DBOS.runStep(
 					() => recordDecision(input.organizationId, input.userId, input.associationId, input.appealId!, input.data),
 					{ name: 'recordDecision' }
 				);
 				break;
 
-			case 'WITHDRAW_APPEAL':
+			case AppealAction.WITHDRAW_APPEAL:
 				entityId = await DBOS.runStep(
 					() => withdrawAppeal(input.organizationId, input.userId, input.associationId, input.appealId!),
 					{ name: 'withdrawAppeal' }
@@ -295,8 +305,8 @@ async function appealWorkflow(input: AppealWorkflowInput): Promise<AppealWorkflo
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'APPEAL_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.APPEAL_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ActivityEntityTypeValues, PillarAccessValues } from '$lib/api/cam';
 	import {
 		Inbox,
 		AlertTriangle,
@@ -42,16 +43,30 @@
 
 	let { data }: Props = $props();
 
-	let items = $derived(data.items);
-	let summary = $derived(data.summary);
+	// Use $state with $effect and untrack to avoid proxy errors during navigation
+	let items = $state<WorkQueueItem[]>([]);
+	let summary = $state<WorkQueueSummary | null>(null);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 
-	// Filters derived from server data - updates on navigation
-	let pillarFilter = $derived(data.filters.pillar);
-	let urgencyFilter = $derived(data.filters.urgency);
-	let assignedToMeFilter = $derived(data.filters.assignedToMe);
-	let unassignedOnlyFilter = $derived(data.filters.unassignedOnly);
+	// Filters - sync from server data via $effect
+	let pillarFilter = $state<WorkQueuePillar>('ALL');
+	let urgencyFilter = $state<WorkQueueUrgency | ''>('');
+	let assignedToMeFilter = $state(false);
+	let unassignedOnlyFilter = $state(false);
+
+	// Sync all data from props
+	// Track data to trigger re-runs on navigation, but guard against undefined
+	$effect(() => {
+		if (data != null && typeof data === 'object') {
+			items = data.items ?? [];
+			summary = data.summary ?? null;
+			pillarFilter = data.filters?.pillar ?? 'ALL';
+			urgencyFilter = data.filters?.urgency ?? '';
+			assignedToMeFilter = data.filters?.assignedToMe ?? false;
+			unassignedOnlyFilter = data.filters?.unassignedOnly ?? false;
+		}
+	});
 
 	// Navigate with new filter params
 	function applyFilter(filterName: string, value: string | boolean) {
@@ -88,13 +103,13 @@
 
 	function getItemIcon(itemType: string) {
 		switch (itemType) {
-			case 'CONCIERGE_CASE':
+			case ActivityEntityTypeValues.CONCIERGE_CASE:
 				return Home;
-			case 'WORK_ORDER':
+			case ActivityEntityTypeValues.WORK_ORDER:
 				return Wrench;
-			case 'VIOLATION':
+			case ActivityEntityTypeValues.VIOLATION:
 				return AlertTriangle;
-			case 'ARC_REQUEST':
+			case ActivityEntityTypeValues.ARC_REQUEST:
 				return FileText;
 			default:
 				return Inbox;
@@ -103,11 +118,11 @@
 
 	function getPillarBadgeClass(pillar: string): string {
 		switch (pillar) {
-			case 'CONCIERGE':
+			case PillarAccessValues.CONCIERGE:
 				return 'preset-outlined-primary-500';
-			case 'CAM':
+			case PillarAccessValues.CAM:
 				return 'preset-outlined-secondary-500';
-			case 'CONTRACTOR':
+			case ActivityEntityTypeValues.CONTRACTOR:
 				return 'preset-outlined-tertiary-500';
 			default:
 				return 'preset-outlined-surface-500';
@@ -212,9 +227,9 @@
 				class="select w-40"
 			>
 				<option value="ALL">All Pillars</option>
-				<option value="CONCIERGE">Concierge</option>
-				<option value="CAM">CAM</option>
-				<option value="CONTRACTOR">Contractor</option>
+				<option value=PillarAccessValues.CONCIERGE>Concierge</option>
+				<option value=PillarAccessValues.CAM>CAM</option>
+				<option value=ActivityEntityTypeValues.CONTRACTOR>Contractor</option>
 			</select>
 			<select 
 				value={urgencyFilter} 

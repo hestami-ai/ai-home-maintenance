@@ -16,8 +16,9 @@ import {
 import { prisma } from '../../db.js';
 import { recordExecution } from '../middleware/activityEvent.js';
 import type { CommunicationChannel, CommunicationDirection } from '../../../../../generated/prisma/client.js';
+import { ActivityEntityType, ActivityActionType } from '../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../logger.js';
-import { startCaseCommunicationWorkflow } from '../../workflows/caseCommunicationWorkflow.js';
+import { startCaseCommunicationWorkflow, CaseCommunicationAction } from '../../workflows/caseCommunicationWorkflow.js';
 import { CommunicationChannelSchema, CommunicationDirectionSchema } from '../schemas.js';
 
 const log = createModuleLogger('CaseCommunicationRoute');
@@ -156,7 +157,7 @@ export const caseCommunicationRouter = {
 			// Create communication via workflow
 			const result = await startCaseCommunicationWorkflow(
 				{
-					action: 'CREATE',
+					action: CaseCommunicationAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -185,9 +186,9 @@ export const caseCommunicationRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'CONCIERGE_CASE',
+				entityType: ActivityEntityType.CONCIERGE_CASE,
 				entityId: input.caseId,
-				action: 'CREATE',
+				action: ActivityActionType.CREATE,
 				summary: `${input.direction} ${input.channel} ${input.subject ? `"${input.subject}"` : 'communication'} logged`,
 				caseId: input.caseId,
 				newState: {
@@ -350,7 +351,7 @@ export const caseCommunicationRouter = {
 			// Update communication status via workflow
 			const result = await startCaseCommunicationWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: CaseCommunicationAction.UPDATE_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					communicationId: input.id,

@@ -4,7 +4,7 @@
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { accountingApi } from '$lib/api/cam';
+	import { accountingApi, InvoiceStatusValues } from '$lib/api/cam';
 
 	interface Payable {
 		id: string;
@@ -26,10 +26,10 @@
 
 	const statusOptions = [
 		{ value: 'all', label: 'All Status' },
-		{ value: 'PENDING', label: 'Pending' },
-		{ value: 'APPROVED', label: 'Approved' },
-		{ value: 'OVERDUE', label: 'Overdue' },
-		{ value: 'PAID', label: 'Paid' }
+		{ value: InvoiceStatusValues.PENDING_APPROVAL, label: 'Pending Approval' },
+		{ value: InvoiceStatusValues.APPROVED, label: 'Approved' },
+		{ value: InvoiceStatusValues.PARTIALLY_PAID, label: 'Partially Paid' },
+		{ value: InvoiceStatusValues.PAID, label: 'Paid' }
 	];
 
 	async function loadPayables() {
@@ -56,10 +56,11 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'PAID': return 'text-success-500 bg-success-500/10';
-			case 'PENDING': return 'text-warning-500 bg-warning-500/10';
-			case 'APPROVED': return 'text-primary-500 bg-primary-500/10';
-			case 'OVERDUE': return 'text-error-500 bg-error-500/10';
+			case InvoiceStatusValues.PAID: return 'text-success-500 bg-success-500/10';
+			case InvoiceStatusValues.PENDING_APPROVAL: return 'text-warning-500 bg-warning-500/10';
+			case InvoiceStatusValues.APPROVED: return 'text-primary-500 bg-primary-500/10';
+			case InvoiceStatusValues.PARTIALLY_PAID: return 'text-warning-500 bg-warning-500/10';
+			case InvoiceStatusValues.VOIDED: return 'text-error-500 bg-error-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -191,12 +192,12 @@
 						{/snippet}
 
 						{#snippet actions()}
-							{#if p.status === 'PENDING'}
+							{#if p.status === InvoiceStatusValues.PENDING_APPROVAL}
 								<button class="btn btn-sm preset-filled-primary-500">
 									Approve
 								</button>
 							{/if}
-							{#if p.status === 'APPROVED'}
+							{#if p.status === InvoiceStatusValues.APPROVED}
 								<button class="btn btn-sm preset-filled-success-500">
 									Mark Paid
 								</button>

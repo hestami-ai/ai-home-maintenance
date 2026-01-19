@@ -4,7 +4,7 @@
 	import { ArrowLeft, Wrench, FileText, Clock, UserPlus, CheckCircle, XCircle, Calendar, Pencil } from 'lucide-svelte';
 	import { TabbedContent, DecisionButton, AssignVendorModal, ScheduleWorkModal, CompleteWorkOrderModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
-	import { workOrderApi, vendorApi, documentApi, activityEventApi, type WorkOrder, type Vendor, type Document } from '$lib/api/cam';
+	import { ActivityEntityTypeValues, BidStatusValues, DispatchStatusValues, JobStatusValues, OwnerIntentPriorityValues, VendorApprovalStatusValues, WorkOrderPriorityValues, activityEventApi, documentApi, type Document, type Vendor, type WorkOrder, vendorApi, workOrderApi } from '$lib/api/cam';
 	import { refreshBadgeCounts } from '$lib/stores';
 
 	interface WorkOrderHistoryEvent {
@@ -55,7 +55,7 @@
 	async function loadDocuments() {
 		if (!workOrderId) return;
 		try {
-			const response = await documentApi.list({ contextType: 'WORK_ORDER', contextId: workOrderId });
+			const response = await documentApi.list({ contextType: ActivityEntityTypeValues.WORK_ORDER, contextId: workOrderId });
 			if (response.ok) {
 				documents = response.data.documents;
 			}
@@ -67,7 +67,7 @@
 	async function loadHistory() {
 		if (!workOrderId) return;
 		try {
-			const response = await activityEventApi.getByEntity({ entityType: 'WORK_ORDER', entityId: workOrderId });
+			const response = await activityEventApi.getByEntity({ entityType: ActivityEntityTypeValues.WORK_ORDER, entityId: workOrderId });
 			if (response.ok) {
 				history = response.data.events.map((e: any) => ({
 					id: e.id,
@@ -84,25 +84,25 @@
 
 	function getPriorityColor(priority: string): string {
 		switch (priority) {
-			case 'EMERGENCY': return 'bg-error-500 text-white';
-			case 'URGENT': return 'bg-warning-500 text-white';
-			case 'HIGH': return 'bg-yellow-500 text-black';
-			case 'NORMAL': return 'bg-primary-500 text-white';
-			case 'LOW': return 'bg-surface-400 text-white';
+			case WorkOrderPriorityValues.EMERGENCY: return 'bg-error-500 text-white';
+			case OwnerIntentPriorityValues.URGENT: return 'bg-warning-500 text-white';
+			case WorkOrderPriorityValues.HIGH: return 'bg-yellow-500 text-black';
+			case OwnerIntentPriorityValues.NORMAL: return 'bg-primary-500 text-white';
+			case WorkOrderPriorityValues.LOW: return 'bg-surface-400 text-white';
 			default: return 'bg-surface-300 text-surface-700';
 		}
 	}
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'SUBMITTED': return 'text-primary-500 bg-primary-500/10';
-			case 'APPROVED': return 'text-success-500 bg-success-500/10';
-			case 'ASSIGNED': return 'text-warning-500 bg-warning-500/10';
-			case 'SCHEDULED': return 'text-yellow-600 bg-yellow-500/10';
-			case 'IN_PROGRESS': return 'text-primary-600 bg-primary-500/20';
-			case 'COMPLETED': return 'text-success-500 bg-success-500/10';
-			case 'CLOSED': return 'text-surface-500 bg-surface-500/10';
-			case 'CANCELLED': return 'text-error-500 bg-error-500/10';
+			case BidStatusValues.SUBMITTED: return 'text-primary-500 bg-primary-500/10';
+			case VendorApprovalStatusValues.APPROVED: return 'text-success-500 bg-success-500/10';
+			case DispatchStatusValues.ASSIGNED: return 'text-warning-500 bg-warning-500/10';
+			case JobStatusValues.SCHEDULED: return 'text-yellow-600 bg-yellow-500/10';
+			case JobStatusValues.IN_PROGRESS: return 'text-primary-600 bg-primary-500/20';
+			case JobStatusValues.COMPLETED: return 'text-success-500 bg-success-500/10';
+			case JobStatusValues.CLOSED: return 'text-surface-500 bg-surface-500/10';
+			case JobStatusValues.CANCELLED: return 'text-error-500 bg-error-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -132,7 +132,7 @@
 
 	function isOverdue(dueDate?: string, status?: string): boolean {
 		if (!dueDate || !status) return false;
-		if (['COMPLETED', 'CLOSED', 'CANCELLED'].includes(status)) return false;
+		if (([JobStatusValues.COMPLETED, JobStatusValues.CLOSED, JobStatusValues.CANCELLED] as string[]).includes(status)) return false;
 		return new Date(dueDate) < new Date();
 	}
 
@@ -232,7 +232,7 @@
 			for (const doc of selectedDocs) {
 				const response = await documentApi.linkToContext({
 					documentId: doc.documentId,
-					contextType: 'WORK_ORDER',
+					contextType: ActivityEntityTypeValues.WORK_ORDER,
 					contextId: workOrderId,
 					bindingNotes: `Linked as authorization/supporting document`,
 					idempotencyKey: crypto.randomUUID()
@@ -304,25 +304,25 @@
 						<Pencil class="mr-1 h-4 w-4" />
 						Edit
 					</a>
-					{#if workOrder.status === 'SUBMITTED' || !workOrder.assignedVendorId}
+					{#if workOrder.status === BidStatusValues.SUBMITTED || !workOrder.assignedVendorId}
 						<DecisionButton variant="default" onclick={openAssignVendorModal}>
 							<UserPlus class="mr-1 h-4 w-4" />
 							Assign Vendor
 						</DecisionButton>
 					{/if}
-					{#if workOrder.status === 'ASSIGNED' || (workOrder.assignedVendorId && !workOrder.scheduledStart)}
+					{#if workOrder.status === DispatchStatusValues.ASSIGNED || (workOrder.assignedVendorId && !workOrder.scheduledStart)}
 						<DecisionButton variant="default" onclick={() => showScheduleWorkModal = true}>
 							<Calendar class="mr-1 h-4 w-4" />
 							Schedule
 						</DecisionButton>
 					{/if}
-					{#if ['ASSIGNED', 'SCHEDULED', 'IN_PROGRESS'].includes(workOrder.status)}
+					{#if ([DispatchStatusValues.ASSIGNED, JobStatusValues.SCHEDULED, JobStatusValues.IN_PROGRESS] as string[]).includes(workOrder.status)}
 						<DecisionButton variant="approve" onclick={() => showCompleteModal = true}>
 							<CheckCircle class="mr-1 h-4 w-4" />
 							Mark Complete
 						</DecisionButton>
 					{/if}
-					{#if !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(workOrder.status)}
+					{#if !([JobStatusValues.COMPLETED, JobStatusValues.CLOSED, JobStatusValues.CANCELLED] as string[]).includes(workOrder.status)}
 						<DecisionButton variant="deny">
 							<XCircle class="mr-1 h-4 w-4" />
 							Cancel

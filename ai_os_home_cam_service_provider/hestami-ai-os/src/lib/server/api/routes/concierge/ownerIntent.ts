@@ -12,8 +12,9 @@ import { OwnerIntentCategorySchema } from '../../../../../../generated/zod/input
 import { OwnerIntentPrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentPrioritySchema.js';
 import { OwnerIntentStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/OwnerIntentStatusSchema.js';
 import { Prisma } from '../../../../../../generated/prisma/client.js';
+import { OwnerIntentStatus, PartyType } from '../../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startOwnerIntentWorkflow } from '../../../workflows/index.js';
+import { startOwnerIntentWorkflow, OwnerIntentWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('OwnerIntentRoute');
 
@@ -83,7 +84,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'CREATE',
+					action: OwnerIntentWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -191,7 +192,7 @@ export const ownerIntentRouter = {
 			});
 
 			const submitterDisplayName = intent.submittedByParty
-				? intent.submittedByParty.partyType === 'INDIVIDUAL'
+				? intent.submittedByParty.partyType === PartyType.INDIVIDUAL
 					? `${intent.submittedByParty.firstName ?? ''} ${intent.submittedByParty.lastName ?? ''}`.trim()
 					: intent.submittedByParty.entityName ?? ''
 				: null;
@@ -368,7 +369,7 @@ export const ownerIntentRouter = {
 			}
 
 			// Can only update while in DRAFT status
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== OwnerIntentStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only update intents in DRAFT status' });
 			}
 
@@ -378,7 +379,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'UPDATE',
+					action: OwnerIntentWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id,
@@ -449,7 +450,7 @@ export const ownerIntentRouter = {
 				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
-			if (existing.status !== 'DRAFT') {
+			if (existing.status !== OwnerIntentStatus.DRAFT) {
 				throw errors.BAD_REQUEST({ message: 'Can only submit intents in DRAFT status' });
 			}
 
@@ -459,7 +460,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'SUBMIT',
+					action: OwnerIntentWorkflowAction.SUBMIT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id,
@@ -525,7 +526,7 @@ export const ownerIntentRouter = {
 				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
-			if (existing.status !== 'SUBMITTED') {
+			if (existing.status !== OwnerIntentStatus.SUBMITTED) {
 				throw errors.BAD_REQUEST({ message: 'Can only acknowledge intents in SUBMITTED status' });
 			}
 
@@ -535,7 +536,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'ACKNOWLEDGE',
+					action: OwnerIntentWorkflowAction.ACKNOWLEDGE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id,
@@ -603,7 +604,7 @@ export const ownerIntentRouter = {
 				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
-			if (!['SUBMITTED', 'ACKNOWLEDGED'].includes(existing.status)) {
+			if (existing.status !== OwnerIntentStatus.SUBMITTED && existing.status !== OwnerIntentStatus.ACKNOWLEDGED) {
 				throw errors.BAD_REQUEST({
 					message: 'Can only convert intents in SUBMITTED or ACKNOWLEDGED status'
 				});
@@ -615,7 +616,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'CONVERT_TO_CASE',
+					action: OwnerIntentWorkflowAction.CONVERT_TO_CASE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id,
@@ -684,7 +685,7 @@ export const ownerIntentRouter = {
 				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
-			if (!['SUBMITTED', 'ACKNOWLEDGED'].includes(existing.status)) {
+			if (existing.status !== OwnerIntentStatus.SUBMITTED && existing.status !== OwnerIntentStatus.ACKNOWLEDGED) {
 				throw errors.BAD_REQUEST({
 					message: 'Can only decline intents in SUBMITTED or ACKNOWLEDGED status'
 				});
@@ -696,7 +697,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'DECLINE',
+					action: OwnerIntentWorkflowAction.DECLINE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id,
@@ -764,7 +765,7 @@ export const ownerIntentRouter = {
 				throw errors.NOT_FOUND({ message: 'OwnerIntent' });
 			}
 
-			if (!['DRAFT', 'SUBMITTED', 'ACKNOWLEDGED'].includes(existing.status)) {
+			if (existing.status !== OwnerIntentStatus.DRAFT && existing.status !== OwnerIntentStatus.SUBMITTED && existing.status !== OwnerIntentStatus.ACKNOWLEDGED) {
 				throw errors.BAD_REQUEST({ message: 'Cannot withdraw intent in current status' });
 			}
 
@@ -774,7 +775,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'WITHDRAW',
+					action: OwnerIntentWorkflowAction.WITHDRAW,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id,
@@ -850,7 +851,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'ADD_NOTE',
+					action: OwnerIntentWorkflowAction.ADD_NOTE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.intentId,
@@ -989,7 +990,7 @@ export const ownerIntentRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startOwnerIntentWorkflow(
 				{
-					action: 'DELETE',
+					action: OwnerIntentWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					intentId: input.id

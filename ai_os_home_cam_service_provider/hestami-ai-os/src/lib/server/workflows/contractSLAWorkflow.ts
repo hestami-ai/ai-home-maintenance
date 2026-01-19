@@ -11,6 +11,12 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, ScheduledVisitStatus } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CONTRACT_SLA_WORKFLOW_ERROR: 'CONTRACT_SLA_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ContractSLAWorkflow');
 
@@ -158,8 +164,8 @@ async function calculateSLA(
 	});
 
 	const scheduledVisits = visits.length;
-	const completedVisits = visits.filter(v => v.status === 'COMPLETED').length;
-	const missedVisits = visits.filter(v => v.status === 'MISSED').length;
+	const completedVisits = visits.filter(v => v.status === ScheduledVisitStatus.COMPLETED).length;
+	const missedVisits = visits.filter(v => v.status === ScheduledVisitStatus.MISSED).length;
 
 	const visitCompliancePercent = scheduledVisits > 0
 		? (completedVisits / scheduledVisits) * 100
@@ -203,21 +209,21 @@ async function contractSLAWorkflow(input: ContractSLAWorkflowInput): Promise<Con
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_SLA':
+			case ContractSLAAction.CREATE_SLA:
 				entityId = await DBOS.runStep(
 					() => createSLA(input.organizationId, input.userId, input.data),
 					{ name: 'createSLA' }
 				);
 				break;
 
-			case 'UPDATE_SLA':
+			case ContractSLAAction.UPDATE_SLA:
 				entityId = await DBOS.runStep(
 					() => updateSLA(input.organizationId, input.userId, input.slaRecordId!, input.data),
 					{ name: 'updateSLA' }
 				);
 				break;
 
-			case 'CALCULATE_SLA':
+			case ContractSLAAction.CALCULATE_SLA:
 				entityId = await DBOS.runStep(
 					() => calculateSLA(input.organizationId, input.userId, input.data),
 					{ name: 'calculateSLA' }
@@ -236,8 +242,8 @@ async function contractSLAWorkflow(input: ContractSLAWorkflowInput): Promise<Con
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CONTRACT_SLA_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CONTRACT_SLA_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

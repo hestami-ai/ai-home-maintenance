@@ -18,7 +18,9 @@ import { VendorCandidateStatusSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
 import { recordIntent, recordExecution } from '../middleware/activityEvent.js';
 import { startVendorCandidateWorkflow } from '../../workflows/index.js';
-import type { VendorCandidateStatus } from '../../../../../generated/prisma/client.js';
+import { VendorCandidateWorkflowAction } from '../../workflows/vendorCandidateWorkflow.js';
+import type { VendorCandidateStatus as VendorCandidateStatusType } from '../../../../../generated/prisma/client.js';
+import { ActivityEntityType, ActivityActionType, VendorCandidateStatus } from '../../../../../generated/prisma/enums.js';
 
 // =============================================================================
 // Schemas
@@ -62,14 +64,14 @@ const VendorCandidateListItemSchema = z.object({
 });
 
 // Valid status transitions
-const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
-	IDENTIFIED: ['CONTACTED', 'REJECTED', 'ARCHIVED'],
-	CONTACTED: ['RESPONDED', 'REJECTED', 'ARCHIVED'],
-	RESPONDED: ['QUOTED', 'REJECTED', 'ARCHIVED'],
-	QUOTED: ['SELECTED', 'REJECTED', 'ARCHIVED'],
-	SELECTED: ['ARCHIVED'],
-	REJECTED: ['ARCHIVED'],
-	ARCHIVED: []
+const VALID_STATUS_TRANSITIONS: Record<VendorCandidateStatusType, VendorCandidateStatusType[]> = {
+	[VendorCandidateStatus.IDENTIFIED]: [VendorCandidateStatus.CONTACTED, VendorCandidateStatus.REJECTED, VendorCandidateStatus.ARCHIVED],
+	[VendorCandidateStatus.CONTACTED]: [VendorCandidateStatus.RESPONDED, VendorCandidateStatus.REJECTED, VendorCandidateStatus.ARCHIVED],
+	[VendorCandidateStatus.RESPONDED]: [VendorCandidateStatus.QUOTED, VendorCandidateStatus.REJECTED, VendorCandidateStatus.ARCHIVED],
+	[VendorCandidateStatus.QUOTED]: [VendorCandidateStatus.SELECTED, VendorCandidateStatus.REJECTED, VendorCandidateStatus.ARCHIVED],
+	[VendorCandidateStatus.SELECTED]: [VendorCandidateStatus.ARCHIVED],
+	[VendorCandidateStatus.REJECTED]: [VendorCandidateStatus.ARCHIVED],
+	[VendorCandidateStatus.ARCHIVED]: []
 };
 
 // =============================================================================
@@ -177,7 +179,7 @@ export const vendorCandidateRouter = {
 			// Create vendor candidate via workflow
 			const result = await startVendorCandidateWorkflow(
 				{
-					action: 'CREATE',
+					action: VendorCandidateWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					data: {
@@ -213,9 +215,9 @@ export const vendorCandidateRouter = {
 
 			// Record activity event
 			await recordIntent(context, {
-				entityType: 'VENDOR_CANDIDATE',
+				entityType: ActivityEntityType.VENDOR_CANDIDATE,
 				entityId: vendorCandidate.id,
-				action: 'CREATE',
+				action: VendorCandidateWorkflowAction.CREATE,
 				summary: `Vendor candidate identified: ${vendorCandidate.vendorName}`,
 				caseId: input.caseId,
 				newState: {
@@ -303,7 +305,7 @@ export const vendorCandidateRouter = {
 					organizationId: context.organization.id,
 					caseId: input.caseId,
 					deletedAt: null,
-					...(input.status && { status: input.status as VendorCandidateStatus })
+					...(input.status && { status: input.status as VendorCandidateStatusType })
 				},
 				orderBy: { createdAt: 'desc' },
 				take: limit + 1,
@@ -375,7 +377,7 @@ export const vendorCandidateRouter = {
 			// Update vendor candidate via workflow
 			const result = await startVendorCandidateWorkflow(
 				{
-					action: 'UPDATE',
+					action: VendorCandidateWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					vendorCandidateId: input.id,
@@ -406,9 +408,9 @@ export const vendorCandidateRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'VENDOR_CANDIDATE',
+				entityType: ActivityEntityType.VENDOR_CANDIDATE,
 				entityId: vendorCandidate.id,
-				action: 'UPDATE',
+				action: VendorCandidateWorkflowAction.UPDATE,
 				summary: `Vendor candidate updated: ${vendorCandidate.vendorName}`,
 				caseId: existing.caseId,
 				previousState: { vendorName: existing.vendorName },
@@ -471,7 +473,7 @@ export const vendorCandidateRouter = {
 			// Update status via workflow
 			const result = await startVendorCandidateWorkflow(
 				{
-					action: 'UPDATE_STATUS',
+					action: VendorCandidateWorkflowAction.UPDATE_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					vendorCandidateId: input.id,
@@ -492,9 +494,9 @@ export const vendorCandidateRouter = {
 			});
 
 			await recordExecution(context, {
-				entityType: 'VENDOR_CANDIDATE',
+				entityType: ActivityEntityType.VENDOR_CANDIDATE,
 				entityId: vendorCandidate.id,
-				action: 'STATUS_CHANGE',
+				action: ActivityActionType.STATUS_CHANGE,
 				summary: `Vendor candidate status changed: ${existing.status} → ${input.status}${input.reason ? `: ${input.reason}` : ''}`,
 				caseId: existing.caseId,
 				previousState: { status: existing.status },
@@ -546,7 +548,7 @@ export const vendorCandidateRouter = {
 			// Delete vendor candidate via workflow
 			const result = await startVendorCandidateWorkflow(
 				{
-					action: 'DELETE',
+					action: VendorCandidateWorkflowAction.DELETE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					vendorCandidateId: input.id,
@@ -560,9 +562,9 @@ export const vendorCandidateRouter = {
 			}
 
 			await recordExecution(context, {
-				entityType: 'VENDOR_CANDIDATE',
+				entityType: ActivityEntityType.VENDOR_CANDIDATE,
 				entityId: existing.id,
-				action: 'DELETE',
+				action: VendorCandidateWorkflowAction.DELETE,
 				summary: `Vendor candidate deleted: ${existing.vendorName}`,
 				caseId: existing.caseId
 			});

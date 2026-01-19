@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { DocumentContextTypeValues, DocumentVisibilityValues } from '$lib/api/cam';
 	import { Upload, X, FileText, Image, Video, File, Loader2, AlertTriangle, Check } from 'lucide-svelte';
 	import * as tus from 'tus-js-client';
 	import { createOrgClient } from '$lib/api/orpc';
@@ -140,11 +141,11 @@
 				fileName: trackedFile.file.name,
 				fileSize: trackedFile.file.size,
 				mimeType: trackedFile.file.type,
-				contextType: 'CASE',
+				contextType: DocumentContextTypeValues.CASE,
 				contextId: caseId,
 				title: trackedFile.file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
 				category: trackedFile.category,
-				visibility: 'PRIVATE'
+				visibility: DocumentVisibilityValues.PRIVATE
 			});
 
 			const { documentId, tusEndpoint } = initResult.data;

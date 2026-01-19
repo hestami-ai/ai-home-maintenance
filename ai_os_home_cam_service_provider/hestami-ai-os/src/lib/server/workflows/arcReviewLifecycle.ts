@@ -17,11 +17,16 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction, clearOrgContext } from '../db/rls.js';
-import type { ARCRequestStatus } from '../../../../generated/prisma/client.js';
+import { ARCRequestStatus, ActivityActionType } from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 
 const log = createWorkflowLogger('ARCReviewLifecycleWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ARC_REVIEW_LIFECYCLE_ERROR: 'ARC_REVIEW_LIFECYCLE_ERROR'
+} as const;
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'arc_status';
@@ -29,16 +34,16 @@ const WORKFLOW_ERROR_EVENT = 'arc_error';
 
 // Valid status transitions
 const validTransitions: Record<ARCRequestStatus, ARCRequestStatus[]> = {
-	DRAFT: ['SUBMITTED', 'CANCELLED'],
-	SUBMITTED: ['UNDER_REVIEW', 'WITHDRAWN', 'CANCELLED'],
-	UNDER_REVIEW: ['APPROVED', 'DENIED', 'CHANGES_REQUESTED', 'TABLED', 'WITHDRAWN', 'CANCELLED'],
-	APPROVED: ['EXPIRED'],
-	DENIED: [],
-	CHANGES_REQUESTED: ['SUBMITTED', 'WITHDRAWN', 'CANCELLED'],
-	TABLED: ['UNDER_REVIEW', 'WITHDRAWN', 'CANCELLED'],
-	WITHDRAWN: [],
-	CANCELLED: [],
-	EXPIRED: []
+	[ARCRequestStatus.DRAFT]: [ARCRequestStatus.SUBMITTED, ARCRequestStatus.CANCELLED],
+	[ARCRequestStatus.SUBMITTED]: [ARCRequestStatus.UNDER_REVIEW, ARCRequestStatus.WITHDRAWN, ARCRequestStatus.CANCELLED],
+	[ARCRequestStatus.UNDER_REVIEW]: [ARCRequestStatus.APPROVED, ARCRequestStatus.DENIED, ARCRequestStatus.CHANGES_REQUESTED, ARCRequestStatus.TABLED, ARCRequestStatus.WITHDRAWN, ARCRequestStatus.CANCELLED],
+	[ARCRequestStatus.APPROVED]: [ARCRequestStatus.EXPIRED],
+	[ARCRequestStatus.DENIED]: [],
+	[ARCRequestStatus.CHANGES_REQUESTED]: [ARCRequestStatus.SUBMITTED, ARCRequestStatus.WITHDRAWN, ARCRequestStatus.CANCELLED],
+	[ARCRequestStatus.TABLED]: [ARCRequestStatus.UNDER_REVIEW, ARCRequestStatus.WITHDRAWN, ARCRequestStatus.CANCELLED],
+	[ARCRequestStatus.WITHDRAWN]: [],
+	[ARCRequestStatus.CANCELLED]: [],
+	[ARCRequestStatus.EXPIRED]: []
 };
 
 // Default approval expiration days
@@ -84,7 +89,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 	});
 
 	if (!request) {
-		return { valid: false, currentStatus: 'DRAFT', error: 'ARC request not found' };
+		return { valid: false, currentStatus: ARCRequestStatus.DRAFT, error: 'ARC request not found' };
 	}
 
 	const currentStatus = request.status as ARCRequestStatus;
@@ -99,7 +104,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 	}
 
 	// Additional validation for specific transitions
-	if (input.toStatus === 'UNDER_REVIEW') {
+	if (input.toStatus === ARCRequestStatus.UNDER_REVIEW) {
 		// Must have a committee assigned
 		if (!request.committeeId && !input.committeeId) {
 			return {
@@ -110,7 +115,8 @@ async function validateTransition(input: TransitionInput): Promise<{
 		}
 	}
 
-	if (['APPROVED', 'DENIED', 'CHANGES_REQUESTED', 'TABLED'].includes(input.toStatus)) {
+	const decisionStatuses: ARCRequestStatus[] = [ARCRequestStatus.APPROVED, ARCRequestStatus.DENIED, ARCRequestStatus.CHANGES_REQUESTED, ARCRequestStatus.TABLED];
+	if (decisionStatuses.includes(input.toStatus)) {
 		// Must have at least one review
 		const reviewCount = await prisma.aRCReview.count({
 			where: { requestId: input.requestId }
@@ -156,18 +162,18 @@ async function updateARCRequestStatus(
 
 			// Handle specific transitions
 			switch (input.toStatus) {
-				case 'SUBMITTED':
+				case ARCRequestStatus.SUBMITTED:
 					updateData.submittedAt = new Date();
 					break;
 
-				case 'UNDER_REVIEW':
+				case ARCRequestStatus.UNDER_REVIEW:
 					if (input.committeeId) {
 						updateData.committeeId = input.committeeId;
 					}
 					updateData.reviewedAt = new Date();
 					break;
 
-				case 'APPROVED':
+				case ARCRequestStatus.APPROVED:
 					updateData.decisionDate = new Date();
 					updateData.conditions = input.conditions;
 					// Set expiration date
@@ -176,29 +182,29 @@ async function updateARCRequestStatus(
 					updateData.expiresAt = approvalExpires;
 					break;
 
-				case 'DENIED':
-				case 'CHANGES_REQUESTED':
-				case 'TABLED':
+				case ARCRequestStatus.DENIED:
+				case ARCRequestStatus.CHANGES_REQUESTED:
+				case ARCRequestStatus.TABLED:
 					updateData.decisionDate = new Date();
 					if (input.conditions) {
 						updateData.conditions = input.conditions;
 					}
 					break;
 
-				case 'WITHDRAWN':
+				case ARCRequestStatus.WITHDRAWN:
 					updateData.withdrawnAt = new Date();
 					if (input.notes) {
 						updateData.cancellationReason = input.notes;
 					}
 					break;
 
-				case 'CANCELLED':
+				case ARCRequestStatus.CANCELLED:
 					if (input.notes) {
 						updateData.cancellationReason = input.notes;
 					}
 					break;
 
-				case 'EXPIRED':
+				case ARCRequestStatus.EXPIRED:
 					// No additional fields needed
 					break;
 			}
@@ -229,7 +235,7 @@ async function checkApprovalExpiration(requestId: string): Promise<{
 		select: { expiresAt: true, status: true }
 	});
 
-	if (!request?.expiresAt || request.status !== 'APPROVED') {
+	if (!request?.expiresAt || request.status !== ARCRequestStatus.APPROVED) {
 		return { isExpired: false, daysRemaining: null, shouldExpire: false };
 	}
 
@@ -312,7 +318,7 @@ async function arcReviewTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Step 3: Check approval expiration (if applicable)
 		let expirationStatus = { isExpired: false, daysRemaining: null as number | null, shouldExpire: false };
-		if (input.toStatus === 'APPROVED' || validation.currentStatus === 'APPROVED') {
+		if (input.toStatus === ARCRequestStatus.APPROVED || validation.currentStatus === ARCRequestStatus.APPROVED) {
 			expirationStatus = await DBOS.runStep(
 				() => checkApprovalExpiration(input.requestId),
 				{ name: 'checkApprovalExpiration' }
@@ -353,14 +359,14 @@ async function arcReviewTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ARC_REVIEW_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ARC_REVIEW_LIFECYCLE_ERROR
 		});
 
 		return {
 			success: false,
 			requestId: input.requestId,
-			fromStatus: 'DRAFT',
+			fromStatus: ARCRequestStatus.DRAFT,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

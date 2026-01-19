@@ -11,8 +11,24 @@ import type { ConciergeActionType } from '../../../../generated/prisma/client.js
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ConciergeActionStatus, ActivityActionType } from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('ConciergeActionWorkflow');
+
+// Event types for action logs
+const ActionLogEventType = {
+	CREATED: 'created',
+	STATUS_CHANGE: 'status_change',
+	COMPLETED: 'completed',
+	BLOCKED: 'blocked',
+	RESUMED: 'resumed',
+	CANCELLED: 'cancelled'
+} as const;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CONCIERGE_ACTION_WORKFLOW_ERROR: 'CONCIERGE_ACTION_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'concierge_action_status';
 const WORKFLOW_ERROR_EVENT = 'concierge_action_error';
@@ -65,11 +81,11 @@ export interface ConciergeActionWorkflowResult extends LifecycleWorkflowResult {
 }
 
 const VALID_ACTION_STATUS_TRANSITIONS: Record<string, string[]> = {
-	PLANNED: ['IN_PROGRESS', 'CANCELLED'],
-	IN_PROGRESS: ['COMPLETED', 'BLOCKED', 'CANCELLED'],
-	BLOCKED: ['IN_PROGRESS', 'CANCELLED'],
-	COMPLETED: [],
-	CANCELLED: []
+	[ConciergeActionStatus.PLANNED]: [ConciergeActionStatus.IN_PROGRESS, ConciergeActionStatus.CANCELLED],
+	[ConciergeActionStatus.IN_PROGRESS]: [ConciergeActionStatus.COMPLETED, ConciergeActionStatus.BLOCKED, ConciergeActionStatus.CANCELLED],
+	[ConciergeActionStatus.BLOCKED]: [ConciergeActionStatus.IN_PROGRESS, ConciergeActionStatus.CANCELLED],
+	[ConciergeActionStatus.COMPLETED]: [],
+	[ConciergeActionStatus.CANCELLED]: []
 };
 
 async function createAction(
@@ -89,7 +105,7 @@ async function createAction(
 				caseId,
 				actionType,
 				description,
-				status: 'PLANNED',
+				status: ConciergeActionStatus.PLANNED,
 				performedByUserId: userId,
 				plannedAt: plannedAt ? new Date(plannedAt) : null,
 				notes,
@@ -101,8 +117,8 @@ async function createAction(
 		await tx.conciergeActionLog.create({
 			data: {
 				actionId: action.id,
-				eventType: 'created',
-				toStatus: 'PLANNED',
+				eventType: ActionLogEventType.CREATED,
+				toStatus: ConciergeActionStatus.PLANNED,
 				description: 'Action created',
 				changedBy: userId
 			}
@@ -162,22 +178,22 @@ async function startAction(organizationId: string, actionId: string, userId: str
 		}
 
 		const validTransitions = VALID_ACTION_STATUS_TRANSITIONS[action.status] || [];
-		if (!validTransitions.includes('IN_PROGRESS')) {
+		if (!validTransitions.includes(ConciergeActionStatus.IN_PROGRESS)) {
 			throw new Error(`Cannot start action in status ${action.status}`);
 		}
 
 		const now = new Date();
 		await tx.conciergeAction.update({
 			where: { id: actionId },
-			data: { status: 'IN_PROGRESS', startedAt: now }
+			data: { status: ConciergeActionStatus.IN_PROGRESS, startedAt: now }
 		});
 
 		await tx.conciergeActionLog.create({
 			data: {
 				actionId,
-				eventType: 'status_change',
+				eventType: ActionLogEventType.STATUS_CHANGE,
 				fromStatus: action.status,
-				toStatus: 'IN_PROGRESS',
+				toStatus: ConciergeActionStatus.IN_PROGRESS,
 				description: 'Action started',
 				changedBy: userId
 			}
@@ -185,7 +201,7 @@ async function startAction(organizationId: string, actionId: string, userId: str
 
 		log.info('Concierge action started', { actionId, fromStatus: action.status });
 
-		return { status: 'IN_PROGRESS', startedAt: now.toISOString() };
+		return { status: ConciergeActionStatus.IN_PROGRESS, startedAt: now.toISOString() };
 	}, { userId, reason: 'Start concierge action' });
 }
 
@@ -206,7 +222,7 @@ async function completeAction(
 		}
 
 		const validTransitions = VALID_ACTION_STATUS_TRANSITIONS[action.status] || [];
-		if (!validTransitions.includes('COMPLETED')) {
+		if (!validTransitions.includes(ConciergeActionStatus.COMPLETED)) {
 			throw new Error(`Cannot complete action in status ${action.status}`);
 		}
 
@@ -214,7 +230,7 @@ async function completeAction(
 		await tx.conciergeAction.update({
 			where: { id: actionId },
 			data: {
-				status: 'COMPLETED',
+				status: ConciergeActionStatus.COMPLETED,
 				completedAt: now,
 				outcome,
 				notes: notes ?? action.notes
@@ -224,9 +240,9 @@ async function completeAction(
 		await tx.conciergeActionLog.create({
 			data: {
 				actionId,
-				eventType: 'completed',
+				eventType: ActionLogEventType.COMPLETED,
 				fromStatus: action.status,
-				toStatus: 'COMPLETED',
+				toStatus: ConciergeActionStatus.COMPLETED,
 				description: `Action completed: ${outcome.substring(0, 100)}`,
 				changedBy: userId
 			}
@@ -234,7 +250,7 @@ async function completeAction(
 
 		log.info('Concierge action completed', { actionId, fromStatus: action.status, outcome: outcome.substring(0, 50) });
 
-		return { status: 'COMPLETED', completedAt: now.toISOString(), outcome };
+		return { status: ConciergeActionStatus.COMPLETED, completedAt: now.toISOString(), outcome };
 	}, { userId, reason: 'Complete concierge action' });
 }
 
@@ -254,21 +270,21 @@ async function blockAction(
 		}
 
 		const validTransitions = VALID_ACTION_STATUS_TRANSITIONS[action.status] || [];
-		if (!validTransitions.includes('BLOCKED')) {
+		if (!validTransitions.includes(ConciergeActionStatus.BLOCKED)) {
 			throw new Error(`Cannot block action in status ${action.status}`);
 		}
 
 		await tx.conciergeAction.update({
 			where: { id: actionId },
-			data: { status: 'BLOCKED', notes: blockReason }
+			data: { status: ConciergeActionStatus.BLOCKED, notes: blockReason }
 		});
 
 		await tx.conciergeActionLog.create({
 			data: {
 				actionId,
-				eventType: 'blocked',
+				eventType: ActionLogEventType.BLOCKED,
 				fromStatus: action.status,
-				toStatus: 'BLOCKED',
+				toStatus: ConciergeActionStatus.BLOCKED,
 				description: `Action blocked: ${blockReason}`,
 				changedBy: userId
 			}
@@ -276,7 +292,7 @@ async function blockAction(
 
 		log.info('Concierge action blocked', { actionId, fromStatus: action.status, blockReason });
 
-		return { status: 'BLOCKED' };
+		return { status: ConciergeActionStatus.BLOCKED };
 	}, { userId, reason: 'Block concierge action' });
 }
 
@@ -290,21 +306,21 @@ async function resumeAction(organizationId: string, actionId: string, userId: st
 			throw new Error('Action not found');
 		}
 
-		if (action.status !== 'BLOCKED') {
+		if (action.status !== ConciergeActionStatus.BLOCKED) {
 			throw new Error('Can only resume blocked actions');
 		}
 
 		await tx.conciergeAction.update({
 			where: { id: actionId },
-			data: { status: 'IN_PROGRESS', notes: notes ?? action.notes }
+			data: { status: ConciergeActionStatus.IN_PROGRESS, notes: notes ?? action.notes }
 		});
 
 		await tx.conciergeActionLog.create({
 			data: {
 				actionId,
-				eventType: 'resumed',
-				fromStatus: 'BLOCKED',
-				toStatus: 'IN_PROGRESS',
+				eventType: ActionLogEventType.RESUMED,
+				fromStatus: ConciergeActionStatus.BLOCKED,
+				toStatus: ConciergeActionStatus.IN_PROGRESS,
 				description: notes ?? 'Action resumed',
 				changedBy: userId
 			}
@@ -312,7 +328,7 @@ async function resumeAction(organizationId: string, actionId: string, userId: st
 
 		log.info('Concierge action resumed', { actionId });
 
-		return { status: 'IN_PROGRESS' };
+		return { status: ConciergeActionStatus.IN_PROGRESS };
 	}, { userId, reason: 'Resume concierge action' });
 }
 
@@ -332,21 +348,21 @@ async function cancelAction(
 		}
 
 		const validTransitions = VALID_ACTION_STATUS_TRANSITIONS[action.status] || [];
-		if (!validTransitions.includes('CANCELLED')) {
+		if (!validTransitions.includes(ConciergeActionStatus.CANCELLED)) {
 			throw new Error(`Cannot cancel action in status ${action.status}`);
 		}
 
 		await tx.conciergeAction.update({
 			where: { id: actionId },
-			data: { status: 'CANCELLED' }
+			data: { status: ConciergeActionStatus.CANCELLED }
 		});
 
 		await tx.conciergeActionLog.create({
 			data: {
 				actionId,
-				eventType: 'cancelled',
+				eventType: ActionLogEventType.CANCELLED,
 				fromStatus: action.status,
-				toStatus: 'CANCELLED',
+				toStatus: ConciergeActionStatus.CANCELLED,
 				description: `Action cancelled: ${cancelReason}`,
 				changedBy: userId
 			}
@@ -354,7 +370,7 @@ async function cancelAction(
 
 		log.info('Concierge action cancelled', { actionId, fromStatus: action.status, cancelReason });
 
-		return { status: 'CANCELLED' };
+		return { status: ConciergeActionStatus.CANCELLED };
 	}, { userId, reason: 'Cancel concierge action' });
 }
 
@@ -365,7 +381,7 @@ async function conciergeActionWorkflow(
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE_ACTION': {
+			case ConciergeActionAction.CREATE_ACTION: {
 				if (!input.caseId || !input.actionType || !input.description) {
 					throw new Error('Missing required fields for CREATE_ACTION');
 				}
@@ -399,7 +415,7 @@ async function conciergeActionWorkflow(
 				};
 			}
 
-			case 'START_ACTION': {
+			case ConciergeActionAction.START_ACTION: {
 				if (!input.actionId) {
 					throw new Error('Missing actionId for START_ACTION');
 				}
@@ -417,7 +433,7 @@ async function conciergeActionWorkflow(
 				};
 			}
 
-			case 'COMPLETE_ACTION': {
+			case ConciergeActionAction.COMPLETE_ACTION: {
 				if (!input.actionId || !input.outcome) {
 					throw new Error('Missing actionId or outcome for COMPLETE_ACTION');
 				}
@@ -437,7 +453,7 @@ async function conciergeActionWorkflow(
 				};
 			}
 
-			case 'BLOCK_ACTION': {
+			case ConciergeActionAction.BLOCK_ACTION: {
 				if (!input.actionId || !input.blockReason) {
 					throw new Error('Missing actionId or blockReason for BLOCK_ACTION');
 				}
@@ -455,7 +471,7 @@ async function conciergeActionWorkflow(
 				};
 			}
 
-			case 'RESUME_ACTION': {
+			case ConciergeActionAction.RESUME_ACTION: {
 				if (!input.actionId) {
 					throw new Error('Missing actionId for RESUME_ACTION');
 				}
@@ -473,7 +489,7 @@ async function conciergeActionWorkflow(
 				};
 			}
 
-			case 'CANCEL_ACTION': {
+			case ConciergeActionAction.CANCEL_ACTION: {
 				if (!input.actionId || !input.cancelReason) {
 					throw new Error('Missing actionId or cancelReason for CANCEL_ACTION');
 				}
@@ -491,7 +507,7 @@ async function conciergeActionWorkflow(
 				};
 			}
 
-			case 'ADD_LOG': {
+			case ConciergeActionAction.ADD_LOG: {
 				if (!input.actionId || !input.eventType || !input.logDescription) {
 					throw new Error('Missing actionId, eventType or logDescription for ADD_LOG');
 				}
@@ -524,8 +540,8 @@ async function conciergeActionWorkflow(
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CONCIERGE_ACTION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CONCIERGE_ACTION_WORKFLOW_ERROR
 		});
 
 		return {

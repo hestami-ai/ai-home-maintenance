@@ -3,7 +3,7 @@
 	import { ArrowLeft, AlertTriangle, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { violationApi, violationTypeApi, unitApi, type ViolationType, type Unit } from '$lib/api/cam';
+	import { ViolationSeverityValues, type Unit, type ViolationType, unitApi, violationApi, violationTypeApi } from '$lib/api/cam';
 
 	let violationTypes = $state<ViolationType[]>([]);
 	let units = $state<Unit[]>([]);
@@ -11,20 +11,27 @@
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
-	let formData = $state({
+	let formData = $state<{
+		unitId: string;
+		violationTypeId: string;
+		title: string;
+		description: string;
+		severity: string;
+		reportedDate: string;
+	}>({
 		unitId: '',
 		violationTypeId: '',
 		title: '',
 		description: '',
-		severity: 'MODERATE',
+		severity: ViolationSeverityValues.MODERATE,
 		reportedDate: new Date().toISOString().split('T')[0]
 	});
 
 	const severityOptions = [
-		{ value: 'CRITICAL', label: 'Critical' },
-		{ value: 'MAJOR', label: 'Major' },
-		{ value: 'MODERATE', label: 'Moderate' },
-		{ value: 'MINOR', label: 'Minor' }
+		{ value: ViolationSeverityValues.CRITICAL, label: 'Critical' },
+		{ value: ViolationSeverityValues.MAJOR, label: 'Major' },
+		{ value: ViolationSeverityValues.MODERATE, label: 'Moderate' },
+		{ value: ViolationSeverityValues.MINOR, label: 'Minor' }
 	];
 
 	async function loadFormData() {
@@ -54,7 +61,7 @@
 	function handleViolationTypeChange() {
 		const selectedType = violationTypes.find(t => t.id === formData.violationTypeId);
 		if (selectedType?.defaultSeverity) {
-			formData.severity = selectedType.defaultSeverity;
+			formData.severity = selectedType.defaultSeverity as string;
 		}
 	}
 

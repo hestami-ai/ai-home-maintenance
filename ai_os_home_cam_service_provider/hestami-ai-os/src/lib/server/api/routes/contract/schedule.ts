@@ -9,15 +9,16 @@ import {
 } from '../../router.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { RecurrenceFrequency } from '../../../../../../generated/prisma/client.js';
-import { startScheduleWorkflow } from '../../../workflows/scheduleWorkflow.js';
+import { RecurrenceFrequency as RecurrenceFrequencyType } from '../../../../../../generated/prisma/client.js';
+import { RecurrenceFrequency, ServiceContractStatus } from '../../../../../../generated/prisma/enums.js';
+import { startScheduleWorkflow, ScheduleAction } from '../../../workflows/scheduleWorkflow.js';
 
 const scheduleOutput = z.object({
 	id: z.string(),
 	contractId: z.string(),
 	name: z.string(),
 	description: z.string().nullable(),
-	frequency: z.nativeEnum(RecurrenceFrequency),
+	frequency: z.nativeEnum(RecurrenceFrequencyType),
 	isActive: z.boolean(),
 	startDate: z.string(),
 	endDate: z.string().nullable(),
@@ -55,7 +56,7 @@ const formatSchedule = (s: any) => ({
 });
 
 function calculateNextGenerateDate(
-	frequency: RecurrenceFrequency,
+	frequency: RecurrenceFrequencyType,
 	fromDate: Date,
 	preferredDayOfWeek?: number | null,
 	preferredDayOfMonth?: number | null
@@ -63,10 +64,10 @@ function calculateNextGenerateDate(
 	const next = new Date(fromDate);
 
 	switch (frequency) {
-		case 'DAILY':
+		case RecurrenceFrequency.DAILY:
 			next.setDate(next.getDate() + 1);
 			break;
-		case 'WEEKLY':
+		case RecurrenceFrequency.WEEKLY:
 			next.setDate(next.getDate() + 7);
 			if (preferredDayOfWeek !== null && preferredDayOfWeek !== undefined) {
 				const currentDay = next.getDay();
@@ -74,22 +75,22 @@ function calculateNextGenerateDate(
 				next.setDate(next.getDate() + daysUntil);
 			}
 			break;
-		case 'BIWEEKLY':
+		case RecurrenceFrequency.BIWEEKLY:
 			next.setDate(next.getDate() + 14);
 			break;
-		case 'MONTHLY':
+		case RecurrenceFrequency.MONTHLY:
 			next.setMonth(next.getMonth() + 1);
 			if (preferredDayOfMonth !== null && preferredDayOfMonth !== undefined) {
 				next.setDate(Math.min(preferredDayOfMonth, new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()));
 			}
 			break;
-		case 'QUARTERLY':
+		case RecurrenceFrequency.QUARTERLY:
 			next.setMonth(next.getMonth() + 3);
 			break;
-		case 'SEMI_ANNUAL':
+		case RecurrenceFrequency.SEMI_ANNUAL:
 			next.setMonth(next.getMonth() + 6);
 			break;
-		case 'ANNUAL':
+		case RecurrenceFrequency.ANNUAL:
 			next.setFullYear(next.getFullYear() + 1);
 			break;
 	}
@@ -105,7 +106,7 @@ export const contractScheduleRouter = {
 					contractId: z.string(),
 					name: z.string().min(1),
 					description: z.string().optional(),
-					frequency: z.nativeEnum(RecurrenceFrequency),
+					frequency: z.nativeEnum(RecurrenceFrequencyType),
 					startDate: z.string(),
 					endDate: z.string().optional(),
 					preferredDayOfWeek: z.number().int().min(0).max(6).optional(),
@@ -140,7 +141,7 @@ export const contractScheduleRouter = {
 			});
 			if (!contract) throw errors.NOT_FOUND({ message: 'Service contract' });
 
-			if (!['DRAFT', 'ACTIVE'].includes(contract.status)) {
+			if (!([ServiceContractStatus.DRAFT, ServiceContractStatus.ACTIVE] as ServiceContractStatus[]).includes(contract.status)) {
 				throw errors.BAD_REQUEST({ message: 'Can only add schedules to DRAFT or ACTIVE contracts' });
 			}
 
@@ -156,7 +157,7 @@ export const contractScheduleRouter = {
 				// Use DBOS workflow for durable execution
 				const result = await startScheduleWorkflow(
 					{
-						action: 'CREATE_SCHEDULE',
+						action: ScheduleAction.CREATE_SCHEDULE,
 						organizationId: context.organization!.id,
 						userId: context.user!.id,
 						data: {
@@ -321,7 +322,7 @@ export const contractScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startScheduleWorkflow(
 				{
-					action: 'UPDATE_SCHEDULE',
+					action: ScheduleAction.UPDATE_SCHEDULE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					scheduleId: input.id,
@@ -379,7 +380,7 @@ export const contractScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startScheduleWorkflow(
 				{
-					action: 'DELETE_SCHEDULE',
+					action: ScheduleAction.DELETE_SCHEDULE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					scheduleId: input.id,
@@ -442,7 +443,7 @@ export const contractScheduleRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startScheduleWorkflow(
 				{
-					action: 'GENERATE_VISITS',
+					action: ScheduleAction.GENERATE_VISITS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					scheduleId: input.scheduleId,

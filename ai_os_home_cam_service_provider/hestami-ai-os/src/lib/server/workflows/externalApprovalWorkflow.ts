@@ -8,10 +8,18 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
-import type { ExternalApprovalStatus } from '../../../../generated/prisma/client.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
+import {
+	ActivityActionType,
+	ExternalApprovalStatus
+} from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	EXTERNAL_APPROVAL_WORKFLOW_ERROR: 'EXTERNAL_APPROVAL_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ExternalApprovalWorkflow');
 
@@ -62,20 +70,20 @@ async function submitApproval(
 				throw new Error('Approval not found');
 			}
 
-			if (approval.status !== 'PENDING') {
+			if (approval.status !== ExternalApprovalStatus.PENDING) {
 				throw new Error(`Cannot submit approval in status ${approval.status}`);
 			}
 
 			await tx.externalHOAApproval.update({
 				where: { id: approvalId },
 				data: {
-					status: 'SUBMITTED',
+					status: ExternalApprovalStatus.SUBMITTED,
 					submittedAt: new Date(),
 					...(approvalReference && { approvalReference })
 				}
 			});
 
-			return { status: 'SUBMITTED' };
+			return { status: ExternalApprovalStatus.SUBMITTED };
 		},
 		{ userId, reason: 'Submit external HOA approval' }
 	);
@@ -100,11 +108,11 @@ async function recordResponse(
 				throw new Error('Approval not found');
 			}
 
-			if (approval.status !== 'SUBMITTED') {
+			if (approval.status !== ExternalApprovalStatus.SUBMITTED) {
 				throw new Error(`Cannot record response for approval in status ${approval.status}`);
 			}
 
-			if (!['APPROVED', 'DENIED'].includes(status)) {
+			if (!([ExternalApprovalStatus.APPROVED, ExternalApprovalStatus.DENIED] as ExternalApprovalStatus[]).includes(status)) {
 				throw new Error('Response status must be APPROVED or DENIED');
 			}
 
@@ -138,7 +146,7 @@ async function checkExpiringApprovals(
 			const approvals = await tx.externalHOAApproval.findMany({
 				where: {
 					externalHoaContext: { organizationId },
-					status: 'APPROVED',
+					status: ExternalApprovalStatus.APPROVED,
 					expiresAt: { gte: now, lte: futureDate },
 					deletedAt: null
 				}
@@ -169,11 +177,11 @@ async function markExpiredApprovals(organizationId: string, userId: string): Pro
 			return tx.externalHOAApproval.updateMany({
 				where: {
 					externalHoaContext: { organizationId },
-					status: 'APPROVED',
+					status: ExternalApprovalStatus.APPROVED,
 					expiresAt: { lt: now },
 					deletedAt: null
 				},
-				data: { status: 'EXPIRED' }
+				data: { status: ExternalApprovalStatus.EXPIRED }
 			});
 		},
 		{ userId, reason: 'Mark expired external HOA approvals' }
@@ -200,7 +208,7 @@ async function extendApproval(
 				throw new Error('Approval not found');
 			}
 
-			if (approval.status !== 'APPROVED') {
+			if (approval.status !== ExternalApprovalStatus.APPROVED) {
 				throw new Error('Can only extend approved approvals');
 			}
 
@@ -225,7 +233,7 @@ async function externalApprovalWorkflow(
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'SUBMIT_APPROVAL': {
+			case ExternalApprovalAction.SUBMIT_APPROVAL: {
 				if (!input.approvalId) {
 					throw new Error('Missing approvalId for SUBMIT_APPROVAL');
 				}
@@ -243,7 +251,7 @@ async function externalApprovalWorkflow(
 				};
 			}
 
-			case 'RECORD_RESPONSE': {
+			case ExternalApprovalAction.RECORD_RESPONSE: {
 				if (!input.approvalId || !input.status) {
 					throw new Error('Missing approvalId or status for RECORD_RESPONSE');
 				}
@@ -269,7 +277,7 @@ async function externalApprovalWorkflow(
 				};
 			}
 
-			case 'CHECK_EXPIRATIONS': {
+			case ExternalApprovalAction.CHECK_EXPIRATIONS: {
 				// First mark any already expired
 				const expiredCount = await DBOS.runStep(
 					() => markExpiredApprovals(input.organizationId, input.userId),
@@ -294,7 +302,7 @@ async function externalApprovalWorkflow(
 				};
 			}
 
-			case 'EXTEND_APPROVAL': {
+			case ExternalApprovalAction.EXTEND_APPROVAL: {
 				if (!input.approvalId || !input.expiresAt) {
 					throw new Error('Missing approvalId or expiresAt for EXTEND_APPROVAL');
 				}
@@ -326,8 +334,8 @@ async function externalApprovalWorkflow(
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'EXTERNAL_APPROVAL_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.EXTERNAL_APPROVAL_WORKFLOW_ERROR
 		});
 
 		return {

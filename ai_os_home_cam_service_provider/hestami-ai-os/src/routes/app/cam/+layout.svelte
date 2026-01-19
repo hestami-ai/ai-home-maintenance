@@ -29,6 +29,22 @@
 
 	let { data, children }: Props = $props();
 
+	// Buffer the data to prevent proxy errors during navigation transitions
+	// Initialize with empty/null values, then sync when data is available
+	let associations = $state<Association[]>([]);
+	let currentAssociation = $state<Association | null>(null);
+	let badgeCounts = $state<BadgeCounts>({ violations: 0, arcRequests: 0, workOrders: 0 });
+
+	// Sync buffered state from data prop when available
+	// Track data to trigger re-runs on navigation, but guard against undefined
+	$effect(() => {
+		if (data != null && typeof data === 'object') {
+			associations = data.associations ?? [];
+			currentAssociation = data.currentAssociation ?? null;
+			badgeCounts = data.badgeCounts ?? { violations: 0, arcRequests: 0, workOrders: 0 };
+		}
+	});
+
 	// Routes that should always render children even without a current association
 	const alwaysRenderRoutes = ['/app/cam/associations'];
 	const shouldAlwaysRender = $derived(
@@ -38,13 +54,13 @@
 	// Make CAM state available to deep children via context if needed to avoid prop drilling
 	setContext('cam-state', {
 		get currentAssociation() {
-			return data.currentAssociation;
+			return currentAssociation;
 		},
 		get associations() {
-			return data.associations;
+			return associations;
 		},
 		get badgeCounts() {
-			return data.badgeCounts;
+			return badgeCounts;
 		}
 	});
 
@@ -53,28 +69,28 @@
 	import { camStore } from '$lib/stores';
 	import { associationStore } from '$lib/stores/association';
 	$effect(() => {
-		if (data.associations) {
-			camStore.setAssociations(data.associations);
+		if (associations.length > 0) {
+			camStore.setAssociations(associations);
 			// Also sync to associationStore so oRPC client sends correct X-Assoc-Id header
-			associationStore.setAssociations(data.associations as any);
+			associationStore.setAssociations(associations as any);
 		}
-		if (data.currentAssociation) {
-			camStore.setCurrentAssociation(data.currentAssociation);
+		if (currentAssociation) {
+			camStore.setCurrentAssociation(currentAssociation);
 			// Also sync to associationStore so oRPC client sends correct X-Assoc-Id header
-			associationStore.setCurrent(data.currentAssociation as any);
+			associationStore.setCurrent(currentAssociation as any);
 		}
-		if (data.badgeCounts) {
-			camStore.setBadgeCounts(data.badgeCounts);
+		if (badgeCounts) {
+			camStore.setBadgeCounts(badgeCounts);
 		}
 	});
 </script>
 
 <div class="flex h-[calc(100vh-4rem)]">
-	<CamSidebar badgeCounts={data.badgeCounts} />
+	<CamSidebar badgeCounts={badgeCounts} />
 
 	<div class="flex flex-1 flex-col overflow-hidden">
-		{#if !data.currentAssociation && !shouldAlwaysRender}
-			{#if data.associations.length > 0}
+		{#if !currentAssociation && !shouldAlwaysRender}
+			{#if associations.length > 0}
 				<!-- Should theoretically not happen if load function defaults correctly, but handle anyway -->
 				<div class="flex flex-1 items-center justify-center">
 					<div class="max-w-md text-center">
@@ -82,8 +98,8 @@
 						<p class="mt-2 text-surface-500">Please select an association to continue.</p>
 						<div class="mx-auto mt-4 max-w-xs">
 							<AssociationSelector
-								associations={data.associations}
-								currentAssociation={data.currentAssociation}
+								associations={associations}
+								currentAssociation={currentAssociation}
 							/>
 						</div>
 					</div>
@@ -103,8 +119,8 @@
 				<div class="flex items-center justify-between">
 					<div class="max-w-xs">
 						<AssociationSelector
-							associations={data.associations}
-							currentAssociation={data.currentAssociation}
+							associations={associations}
+							currentAssociation={currentAssociation}
 						/>
 					</div>
 				</div>

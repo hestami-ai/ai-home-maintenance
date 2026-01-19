@@ -132,6 +132,7 @@
 
 	// Synchronize server data to local state (SSR-loaded, no client-side race conditions)
 	$effect(() => {
+		if (!data) return;
 		if (data.property) {
 			property = data.property;
 		}

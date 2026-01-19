@@ -10,7 +10,7 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { InventoryLocationType } from '../../../../../../generated/prisma/client.js';
-import { startInventoryLocationWorkflow } from '../../../workflows/inventoryLocationWorkflow.js';
+import { startInventoryLocationWorkflow, InventoryLocationAction } from '../../../workflows/inventoryLocationWorkflow.js';
 
 const inventoryLocationOutput = z.object({
 	id: z.string(),
@@ -104,7 +104,7 @@ export const inventoryLocationRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryLocationWorkflow(
 				{
-					action: 'CREATE_LOCATION',
+					action: InventoryLocationAction.CREATE_LOCATION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -268,7 +268,7 @@ export const inventoryLocationRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryLocationWorkflow(
 				{
-					action: 'UPDATE_LOCATION',
+					action: InventoryLocationAction.UPDATE_LOCATION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					locationId: input.id,
@@ -323,7 +323,7 @@ export const inventoryLocationRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startInventoryLocationWorkflow(
 				{
-					action: 'DELETE_LOCATION',
+					action: InventoryLocationAction.DELETE_LOCATION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					locationId: input.id,

@@ -10,6 +10,12 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, ViolationStatus } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VIOLATION_FINE_WORKFLOW_ERROR: 'VIOLATION_FINE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ViolationFineWorkflow');
 
@@ -178,16 +184,16 @@ async function assessFine(
 			where: { id: violationId },
 			data: {
 				totalFinesAssessed: { increment: amount },
-				status: 'FINE_ASSESSED'
+				status: ViolationStatus.FINE_ASSESSED
 			}
 		});
 
-		if (currentStatus !== 'FINE_ASSESSED') {
+		if (currentStatus !== ViolationStatus.FINE_ASSESSED) {
 			await tx.violationStatusHistory.create({
 				data: {
 					violationId,
 					fromStatus: currentStatus as any,
-					toStatus: 'FINE_ASSESSED',
+					toStatus: ViolationStatus.FINE_ASSESSED,
 					changedBy: userId,
 					notes: `Fine #${fineNumber} assessed: $${amount}`
 				}
@@ -252,7 +258,7 @@ async function waiveFine(
 async function violationFineWorkflow(input: ViolationFineWorkflowInput): Promise<ViolationFineWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'FINE_TO_CHARGE': {
+			case ViolationFineAction.FINE_TO_CHARGE: {
 				const result = await DBOS.runStep(
 					() => fineToCharge(input.organizationId, input.userId, input.associationId, input.fineId!),
 					{ name: 'fineToCharge' }
@@ -260,7 +266,7 @@ async function violationFineWorkflow(input: ViolationFineWorkflowInput): Promise
 				return { success: true, entityId: result.fineId, chargeId: result.chargeId };
 			}
 
-			case 'ASSESS_FINE': {
+			case ViolationFineAction.ASSESS_FINE: {
 				const result = await DBOS.runStep(
 					() => assessFine(input.organizationId, input.userId, input.violationId!, input.data),
 					{ name: 'assessFine' }
@@ -268,7 +274,7 @@ async function violationFineWorkflow(input: ViolationFineWorkflowInput): Promise
 				return { success: true, entityId: result.fineId };
 			}
 
-			case 'WAIVE_FINE': {
+			case ViolationFineAction.WAIVE_FINE: {
 				const result = await DBOS.runStep(
 					() => waiveFine(input.organizationId, input.userId, input.fineId!, input.data),
 					{ name: 'waiveFine' }
@@ -286,8 +292,8 @@ async function violationFineWorkflow(input: ViolationFineWorkflowInput): Promise
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VIOLATION_FINE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VIOLATION_FINE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

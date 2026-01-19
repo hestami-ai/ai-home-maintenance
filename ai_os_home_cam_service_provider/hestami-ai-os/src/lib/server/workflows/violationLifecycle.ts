@@ -17,10 +17,22 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
-import type { ViolationStatus } from '../../../../generated/prisma/client.js';
+import {
+	ViolationStatus,
+	ViolationSeverity,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VIOLATION_LIFECYCLE_ERROR: 'VIOLATION_LIFECYCLE_ERROR'
+} as const;
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'violation_status';
@@ -28,18 +40,18 @@ const WORKFLOW_ERROR_EVENT = 'violation_error';
 
 // Valid status transitions
 const validTransitions: Record<ViolationStatus, ViolationStatus[]> = {
-	DRAFT: ['OPEN', 'DISMISSED'],
-	OPEN: ['NOTICE_SENT', 'CURED', 'DISMISSED'],
-	NOTICE_SENT: ['CURE_PERIOD', 'ESCALATED', 'CURED', 'DISMISSED'],
-	CURE_PERIOD: ['CURED', 'ESCALATED', 'DISMISSED'],
-	CURED: ['CLOSED'],
-	ESCALATED: ['HEARING_SCHEDULED', 'FINE_ASSESSED', 'DISMISSED'],
-	HEARING_SCHEDULED: ['HEARING_HELD', 'DISMISSED'],
-	HEARING_HELD: ['FINE_ASSESSED', 'CURED', 'DISMISSED'],
-	FINE_ASSESSED: ['APPEALED', 'CLOSED'],
-	APPEALED: ['FINE_ASSESSED', 'CURED', 'DISMISSED', 'CLOSED'],
-	CLOSED: [],
-	DISMISSED: []
+	[ViolationStatus.DRAFT]: [ViolationStatus.OPEN, ViolationStatus.DISMISSED],
+	[ViolationStatus.OPEN]: [ViolationStatus.NOTICE_SENT, ViolationStatus.CURED, ViolationStatus.DISMISSED],
+	[ViolationStatus.NOTICE_SENT]: [ViolationStatus.CURE_PERIOD, ViolationStatus.ESCALATED, ViolationStatus.CURED, ViolationStatus.DISMISSED],
+	[ViolationStatus.CURE_PERIOD]: [ViolationStatus.CURED, ViolationStatus.ESCALATED, ViolationStatus.DISMISSED],
+	[ViolationStatus.CURED]: [ViolationStatus.CLOSED],
+	[ViolationStatus.ESCALATED]: [ViolationStatus.HEARING_SCHEDULED, ViolationStatus.FINE_ASSESSED, ViolationStatus.DISMISSED],
+	[ViolationStatus.HEARING_SCHEDULED]: [ViolationStatus.HEARING_HELD, ViolationStatus.DISMISSED],
+	[ViolationStatus.HEARING_HELD]: [ViolationStatus.FINE_ASSESSED, ViolationStatus.CURED, ViolationStatus.DISMISSED],
+	[ViolationStatus.FINE_ASSESSED]: [ViolationStatus.APPEALED, ViolationStatus.CLOSED],
+	[ViolationStatus.APPEALED]: [ViolationStatus.FINE_ASSESSED, ViolationStatus.CURED, ViolationStatus.DISMISSED, ViolationStatus.CLOSED],
+	[ViolationStatus.CLOSED]: [],
+	[ViolationStatus.DISMISSED]: []
 };
 
 // Default cure period days by severity
@@ -99,7 +111,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 	});
 
 	if (!violation) {
-		return { valid: false, currentStatus: 'DRAFT' as ViolationStatus, error: 'Violation not found' };
+		return { valid: false, currentStatus: ViolationStatus.DRAFT, error: 'Violation not found' };
 	}
 
 	const currentStatus = violation.status as ViolationStatus;
@@ -116,7 +128,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 	}
 
 	// Additional validation for specific transitions
-	if (input.toStatus === 'NOTICE_SENT' && !input.noticeId) {
+	if (input.toStatus === ViolationStatus.NOTICE_SENT && !input.noticeId) {
 		// Check if there's at least one notice
 		const noticeCount = await prisma.violationNotice.count({
 			where: { violationId: input.violationId }
@@ -131,7 +143,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 		}
 	}
 
-	if (input.toStatus === 'HEARING_SCHEDULED' && !input.hearingId) {
+	if (input.toStatus === ViolationStatus.HEARING_SCHEDULED && !input.hearingId) {
 		// Check if there's a scheduled hearing (one with PENDING outcome)
 		const hearing = await prisma.violationHearing.findFirst({
 			where: { violationId: input.violationId, outcome: 'PENDING' }
@@ -172,19 +184,19 @@ async function updateViolationStatus(
 
 		// Handle specific transitions
 		switch (input.toStatus) {
-			case 'CURE_PERIOD':
+			case ViolationStatus.CURE_PERIOD:
 				// Calculate cure period end date
-				const cureDays = input.curePeriodDays || CURE_PERIOD_DAYS[severity || 'MODERATE'];
+				const cureDays = input.curePeriodDays || CURE_PERIOD_DAYS[severity || ViolationSeverity.MODERATE];
 				curePeriodEnds = new Date(Date.now() + cureDays * 24 * 60 * 60 * 1000);
 				updateData.curePeriodEnds = curePeriodEnds;
 				break;
 
-			case 'CURED':
+			case ViolationStatus.CURED:
 				updateData.curedDate = new Date();
 				break;
 
-			case 'CLOSED':
-			case 'DISMISSED':
+			case ViolationStatus.CLOSED:
+			case ViolationStatus.DISMISSED:
 				updateData.closedDate = new Date();
 				updateData.closedBy = input.userId;
 				break;
@@ -224,7 +236,7 @@ async function checkCurePeriodCompliance(violationId: string): Promise<{
 		select: { curePeriodEnds: true, status: true }
 	});
 
-	if (!violation?.curePeriodEnds || violation.status !== 'CURE_PERIOD') {
+	if (!violation?.curePeriodEnds || violation.status !== ViolationStatus.CURE_PERIOD) {
 		return { isOverdue: false, daysRemaining: null, shouldEscalate: false };
 	}
 
@@ -304,15 +316,15 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 		if (validation.organizationId) {
 			await recordWorkflowEvent({
 				organizationId: validation.organizationId,
-				entityType: 'VIOLATION',
+				entityType: ActivityEntityType.VIOLATION,
 				entityId: input.violationId,
-				action: 'STATUS_CHANGE',
-				eventCategory: 'EXECUTION',
+				action: ActivityActionType.STATUS_CHANGE,
+				eventCategory: ActivityEventCategory.EXECUTION,
 				summary: `Violation status changed to ${input.toStatus}`,
 				performedById: input.userId,
-				performedByType: 'HUMAN',
+				performedByType: ActivityActorType.HUMAN,
 				workflowId: 'violationLifecycle_v1',
-				workflowStep: 'STATUS_CHANGE',
+				workflowStep: ActivityActionType.STATUS_CHANGE,
 				workflowVersion: 'v1',
 				previousState: { status: validation.currentStatus },
 				newState: { status: input.toStatus }
@@ -323,7 +335,7 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Step 3: Check cure period compliance (if applicable)
 		let cureStatus = { isOverdue: false, daysRemaining: null as number | null, shouldEscalate: false };
-		if (input.toStatus === 'CURE_PERIOD' || validation.currentStatus === 'CURE_PERIOD') {
+		if (input.toStatus === ViolationStatus.CURE_PERIOD || validation.currentStatus === ViolationStatus.CURE_PERIOD) {
 			cureStatus = await DBOS.runStep(
 				() => checkCurePeriodCompliance(input.violationId),
 				{ name: 'checkCurePeriodCompliance' }
@@ -368,14 +380,14 @@ async function violationTransitionWorkflow(input: TransitionInput): Promise<Tran
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VIOLATION_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VIOLATION_LIFECYCLE_ERROR
 		});
 
 		const errorResult = {
 			success: false,
 			violationId: input.violationId,
-			fromStatus: 'DRAFT' as ViolationStatus,
+			fromStatus: ViolationStatus.DRAFT,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

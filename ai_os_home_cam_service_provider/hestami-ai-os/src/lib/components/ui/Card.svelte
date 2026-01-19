@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		variant?: 'default' | 'outlined' | 'elevated';
+		variant?: 'default' | 'outlined' | 'elevated' | 'filled';
 		padding?: 'none' | 'sm' | 'md' | 'lg';
 		class?: string;
 		children: Snippet;
@@ -13,7 +13,8 @@
 	const variantClasses = {
 		default: 'bg-surface-100-900',
 		outlined: 'bg-surface-100-900 border border-surface-300-700',
-		elevated: 'bg-surface-100-900 shadow-lg'
+		elevated: 'bg-surface-100-900 shadow-lg',
+		filled: 'bg-surface-200-800'
 	};
 
 	const paddingClasses = {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PillarAccessValues, UserRoleValues } from '$lib/api/cam';
 	import { Users, User, Building2, Truck, Plus } from 'lucide-svelte';
 	import { EmptyState } from '$lib/components/ui';
 	import type { ConciergeCaseDetail } from '$lib/api/cam';
@@ -11,11 +12,11 @@
 
 	function getRoleIcon(role: string) {
 		switch (role) {
-			case 'OWNER':
+			case UserRoleValues.OWNER:
 				return User;
 			case 'HOA':
 				return Building2;
-			case 'VENDOR':
+			case UserRoleValues.VENDOR:
 				return Truck;
 			default:
 				return Users;
@@ -24,13 +25,13 @@
 
 	function getRoleColor(role: string): string {
 		switch (role) {
-			case 'OWNER':
+			case UserRoleValues.OWNER:
 				return 'text-blue-500 bg-blue-500/10';
 			case 'HOA':
 				return 'text-purple-500 bg-purple-500/10';
-			case 'VENDOR':
+			case UserRoleValues.VENDOR:
 				return 'text-amber-500 bg-amber-500/10';
-			case 'CONCIERGE':
+			case PillarAccessValues.CONCIERGE:
 				return 'text-green-500 bg-green-500/10';
 			default:
 				return 'text-surface-500 bg-surface-500/10';

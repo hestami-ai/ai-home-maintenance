@@ -12,6 +12,18 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import type { Prisma } from '../../../../generated/prisma/client.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	DelegatedAuthorityStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	DELEGATED_AUTHORITY_WORKFLOW_ERROR: 'DELEGATED_AUTHORITY_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'delegated_authority_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'delegated_authority_workflow_error';
@@ -84,7 +96,7 @@ async function grantAuthority(
 					propertyOwnershipId: input.propertyOwnershipId!,
 					delegatePartyId: input.delegatePartyId!,
 					authorityType: input.authorityType as any,
-					status: 'PENDING_ACCEPTANCE',
+					status: DelegatedAuthorityStatus.PENDING_ACCEPTANCE,
 					monetaryLimit: input.monetaryLimit,
 					scopeDescription: input.scopeDescription,
 					scopeRestrictions: input.scopeRestrictions as Prisma.InputJsonValue | undefined,
@@ -99,15 +111,15 @@ async function grantAuthority(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: delegatedAuthority.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Delegated authority granted: ${delegatedAuthority.authorityType}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'delegatedAuthorityWorkflow_v1',
-		workflowStep: 'GRANT',
+		workflowStep: DelegatedAuthorityWorkflowAction.GRANT,
 		workflowVersion: 'v1',
 		newState: {
 			authorityType: delegatedAuthority.authorityType,
@@ -142,7 +154,7 @@ async function acceptAuthority(
 			return tx.delegatedAuthority.update({
 				where: { id: delegatedAuthorityId },
 				data: {
-					status: 'ACTIVE',
+					status: DelegatedAuthorityStatus.ACTIVE,
 					acceptedAt: now
 				}
 			});
@@ -153,18 +165,18 @@ async function acceptAuthority(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: delegatedAuthority.id,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Delegated authority accepted`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'delegatedAuthorityWorkflow_v1',
-		workflowStep: 'ACCEPT',
+		workflowStep: DelegatedAuthorityWorkflowAction.ACCEPT,
 		workflowVersion: 'v1',
-		previousState: { status: 'PENDING_ACCEPTANCE' },
-		newState: { status: 'ACTIVE', acceptedAt: now.toISOString() }
+		previousState: { status: DelegatedAuthorityStatus.PENDING_ACCEPTANCE },
+		newState: { status: DelegatedAuthorityStatus.ACTIVE, acceptedAt: now.toISOString() }
 	});
 
 	return {
@@ -187,7 +199,7 @@ async function revokeAuthority(
 			return tx.delegatedAuthority.update({
 				where: { id: delegatedAuthorityId },
 				data: {
-					status: 'REVOKED',
+					status: DelegatedAuthorityStatus.REVOKED,
 					revokedAt: now,
 					revokedBy: userId,
 					revokeReason: reason
@@ -200,18 +212,18 @@ async function revokeAuthority(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'OWNERSHIP',
+		entityType: ActivityEntityType.OWNERSHIP,
 		entityId: delegatedAuthority.id,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Delegated authority revoked${reason ? `: ${reason}` : ''}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'delegatedAuthorityWorkflow_v1',
-		workflowStep: 'REVOKE',
+		workflowStep: DelegatedAuthorityWorkflowAction.REVOKE,
 		workflowVersion: 'v1',
 		previousState: { status: delegatedAuthority.status },
-		newState: { status: 'REVOKED', revokedAt: now.toISOString(), revokedBy: userId }
+		newState: { status: DelegatedAuthorityStatus.REVOKED, revokedAt: now.toISOString(), revokedBy: userId }
 	});
 
 	return {
@@ -237,7 +249,7 @@ async function delegatedAuthorityWorkflow(input: DelegatedAuthorityWorkflowInput
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'GRANT': {
+			case DelegatedAuthorityWorkflowAction.GRANT: {
 				if (!input.propertyOwnershipId || !input.delegatePartyId || !input.authorityType) {
 					const error = new Error('Missing required fields: propertyOwnershipId, delegatePartyId, and authorityType for GRANT');
 					logStepError(log, 'validation', error, { input });
@@ -268,7 +280,7 @@ async function delegatedAuthorityWorkflow(input: DelegatedAuthorityWorkflowInput
 				return successResult;
 			}
 
-			case 'ACCEPT': {
+			case DelegatedAuthorityWorkflowAction.ACCEPT: {
 				if (!input.delegatedAuthorityId) {
 					const error = new Error('Missing required field: delegatedAuthorityId for ACCEPT');
 					logStepError(log, 'validation', error, { delegatedAuthorityId: input.delegatedAuthorityId });
@@ -292,7 +304,7 @@ async function delegatedAuthorityWorkflow(input: DelegatedAuthorityWorkflowInput
 				return successResult;
 			}
 
-			case 'REVOKE': {
+			case DelegatedAuthorityWorkflowAction.REVOKE: {
 				if (!input.delegatedAuthorityId) {
 					const error = new Error('Missing required field: delegatedAuthorityId for REVOKE');
 					logStepError(log, 'validation', error, { delegatedAuthorityId: input.delegatedAuthorityId });
@@ -342,8 +354,8 @@ async function delegatedAuthorityWorkflow(input: DelegatedAuthorityWorkflowInput
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'DELEGATED_AUTHORITY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.DELEGATED_AUTHORITY_WORKFLOW_ERROR
 		});
 		const errorResult: DelegatedAuthorityWorkflowResult = {
 			success: false,

@@ -24,10 +24,18 @@
 
 	let { data }: Props = $props();
 
-	let properties = $derived(data.properties);
+	// Use $state + $effect to sync data - track data reference but guard against undefined
+	let properties = $state<Property[]>([]);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let searchQuery = $state('');
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			properties = data.properties ?? [];
+		}
+	});
 
 	const filteredProperties = $derived(
 		properties.filter((p) => {

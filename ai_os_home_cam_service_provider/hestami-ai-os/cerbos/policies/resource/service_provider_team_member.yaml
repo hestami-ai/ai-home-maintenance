@@ -1,0 +1,90 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: "default"
+  resource: "service_provider_team_member"
+  importDerivedRoles:
+    - common_roles
+  rules:
+    # Organization owners have full access to team members
+    - actions: ["view", "create", "update", "delete", "activate", "suspend", "deactivate", "reactivate", "update_roles", "link_technician", "unlink_technician"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_owner
+      condition:
+        match:
+          expr: "request.resource.attr.organizationId == request.principal.attr.organizationId"
+
+    # Organization admins have full access to team members (except deleting owners)
+    - actions: ["view", "create", "update", "activate", "suspend", "deactivate", "reactivate", "update_roles", "link_technician", "unlink_technician"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_admin
+      condition:
+        match:
+          expr: "request.resource.attr.organizationId == request.principal.attr.organizationId"
+
+    # Admins cannot modify team members with OWNER role
+    - actions: ["update", "suspend", "deactivate", "update_roles"]
+      effect: EFFECT_DENY
+      roles:
+        - org_admin
+      condition:
+        match:
+          expr: "'OWNER' in request.resource.attr.roles"
+
+    # Office managers can view team members in their organization
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_office_manager
+      condition:
+        match:
+          expr: "request.resource.attr.organizationId == request.principal.attr.organizationId"
+
+    # Dispatchers can view team members (for assignment purposes)
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_dispatcher
+      condition:
+        match:
+          expr: "request.resource.attr.organizationId == request.principal.attr.organizationId"
+
+    # Team members can view their own profile
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_team_member
+      condition:
+        match:
+          expr: "request.resource.attr.userId == request.principal.id"
+
+    # Team members can activate their own account with code
+    - actions: ["activate_with_code"]
+      effect: EFFECT_ALLOW
+      roles:
+        - org_team_member
+      condition:
+        match:
+          expr: "request.resource.attr.userId == request.principal.id && request.resource.attr.status == 'PENDING'"
+
+    # Hestami platform admins have full cross-org access for support
+    - actions: ["view", "activate", "suspend", "deactivate", "reactivate"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_platform_admin
+    - actions: ["view", "activate", "suspend", "deactivate", "reactivate"]
+      effect: EFFECT_ALLOW
+      roles:
+        - hestami_platform_admin
+
+    # Hestami staff can view for support purposes
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      derivedRoles:
+        - hestami_staff
+    - actions: ["view"]
+      effect: EFFECT_ALLOW
+      roles:
+        - hestami_staff

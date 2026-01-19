@@ -11,6 +11,16 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityActionType,
+	OwnerRequestStatus,
+	AutoPayFrequency
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	OWNER_PORTAL_WORKFLOW_ERROR: 'OWNER_PORTAL_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('OwnerPortalWorkflow');
 
@@ -75,7 +85,7 @@ async function createOwnerRequest(
 				category: data.category as any,
 				subject: data.subject as string,
 				description: data.description as string,
-				status: 'DRAFT',
+				status: OwnerRequestStatus.DRAFT,
 				attachments: data.metadata as any
 			}
 		});
@@ -108,7 +118,7 @@ async function submitOwnerRequest(
 		const req = await tx.ownerRequest.update({
 			where: { id: requestId },
 			data: {
-				status: 'SUBMITTED',
+				status: OwnerRequestStatus.SUBMITTED,
 				submittedAt: now
 			}
 		});
@@ -143,15 +153,15 @@ async function updateRequestStatus(
 	const notes = data.notes as string | undefined;
 	const updateData: Record<string, unknown> = { status };
 
-	if (status === 'IN_PROGRESS' && data.assignedTo) {
+	if (status === OwnerRequestStatus.IN_PROGRESS && data.assignedTo) {
 		updateData.assignedTo = data.assignedTo as string;
 		updateData.assignedAt = now;
 	}
-	if (status === 'RESOLVED') {
+	if (status === OwnerRequestStatus.RESOLVED) {
 		updateData.resolvedAt = now;
 		updateData.resolution = data.resolution as string;
 	}
-	if (status === 'CLOSED') {
+	if (status === OwnerRequestStatus.CLOSED) {
 		updateData.closedAt = now;
 	}
 
@@ -311,7 +321,7 @@ async function configureAutoPay(
 					associationId,
 					paymentMethodId: methodId,
 					isEnabled: data.isEnabled as boolean ?? true,
-					frequency: 'MONTHLY',
+					frequency: AutoPayFrequency.MONTHLY,
 					maxAmount: data.maxAmount as number | undefined,
 					dayOfMonth: data.paymentDayOfMonth as number | undefined
 				}
@@ -591,126 +601,126 @@ async function ownerPortalWorkflow(input: OwnerPortalWorkflowInput): Promise<Own
 		let entityId: string;
 
 		switch (input.action) {
-			case 'CREATE_OWNER_REQUEST':
+			case OwnerPortalAction.CREATE_OWNER_REQUEST:
 				entityId = await DBOS.runStep(
 					() => createOwnerRequest(input.organizationId, input.userId, input.data),
 					{ name: 'createOwnerRequest' }
 				);
 				break;
 
-			case 'SUBMIT_OWNER_REQUEST':
+			case OwnerPortalAction.SUBMIT_OWNER_REQUEST:
 				entityId = await DBOS.runStep(
 					() => submitOwnerRequest(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'submitOwnerRequest' }
 				);
 				break;
 
-			case 'UPDATE_REQUEST_STATUS':
+			case OwnerPortalAction.UPDATE_REQUEST_STATUS:
 				entityId = await DBOS.runStep(
 					() => updateRequestStatus(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateRequestStatus' }
 				);
 				break;
 
-			case 'LINK_WORK_ORDER':
+			case OwnerPortalAction.LINK_WORK_ORDER:
 				entityId = await DBOS.runStep(
 					() => linkWorkOrder(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'linkWorkOrder' }
 				);
 				break;
 
-			case 'ADD_PAYMENT_METHOD':
+			case OwnerPortalAction.ADD_PAYMENT_METHOD:
 				entityId = await DBOS.runStep(
 					() => addPaymentMethod(input.organizationId, input.userId, input.data),
 					{ name: 'addPaymentMethod' }
 				);
 				break;
 
-			case 'SET_DEFAULT_PAYMENT':
+			case OwnerPortalAction.SET_DEFAULT_PAYMENT:
 				entityId = await DBOS.runStep(
 					() => setDefaultPayment(input.organizationId, input.userId, input.data),
 					{ name: 'setDefaultPayment' }
 				);
 				break;
 
-			case 'CONFIGURE_AUTO_PAY':
+			case OwnerPortalAction.CONFIGURE_AUTO_PAY:
 				entityId = await DBOS.runStep(
 					() => configureAutoPay(input.organizationId, input.userId, input.data),
 					{ name: 'configureAutoPay' }
 				);
 				break;
 
-			case 'GRANT_DOCUMENT_ACCESS':
+			case OwnerPortalAction.GRANT_DOCUMENT_ACCESS:
 				entityId = await DBOS.runStep(
 					() => grantDocumentAccess(input.organizationId, input.userId, input.data),
 					{ name: 'grantDocumentAccess' }
 				);
 				break;
 
-			case 'REVOKE_DOCUMENT_ACCESS':
+			case OwnerPortalAction.REVOKE_DOCUMENT_ACCESS:
 				entityId = await DBOS.runStep(
 					() => revokeDocumentAccess(input.organizationId, input.userId, input.data),
 					{ name: 'revokeDocumentAccess' }
 				);
 				break;
 
-			case 'LOG_DOCUMENT_DOWNLOAD':
+			case OwnerPortalAction.LOG_DOCUMENT_DOWNLOAD:
 				entityId = await DBOS.runStep(
 					() => logDocumentDownload(input.organizationId, input.userId, input.data),
 					{ name: 'logDocumentDownload' }
 				);
 				break;
 
-			case 'DELETE_PAYMENT_METHOD':
+			case OwnerPortalAction.DELETE_PAYMENT_METHOD:
 				entityId = await DBOS.runStep(
 					() => deletePaymentMethod(input.organizationId, input.userId, input.data),
 					{ name: 'deletePaymentMethod' }
 				);
 				break;
 
-			case 'DELETE_AUTO_PAY':
+			case OwnerPortalAction.DELETE_AUTO_PAY:
 				entityId = await DBOS.runStep(
 					() => deleteAutoPay(input.organizationId, input.userId, input.data),
 					{ name: 'deleteAutoPay' }
 				);
 				break;
 
-			case 'UPSERT_USER_PROFILE':
+			case OwnerPortalAction.UPSERT_USER_PROFILE:
 				entityId = await DBOS.runStep(
 					() => upsertUserProfile(input.organizationId, input.userId, input.data),
 					{ name: 'upsertUserProfile' }
 				);
 				break;
 
-			case 'DELETE_USER_PROFILE':
+			case OwnerPortalAction.DELETE_USER_PROFILE:
 				entityId = await DBOS.runStep(
 					() => deleteUserProfile(input.organizationId, input.userId, input.data),
 					{ name: 'deleteUserProfile' }
 				);
 				break;
 
-			case 'UPSERT_CONTACT_PREFERENCE':
+			case OwnerPortalAction.UPSERT_CONTACT_PREFERENCE:
 				entityId = await DBOS.runStep(
 					() => upsertContactPreference(input.organizationId, input.userId, input.data),
 					{ name: 'upsertContactPreference' }
 				);
 				break;
 
-			case 'DELETE_CONTACT_PREFERENCE':
+			case OwnerPortalAction.DELETE_CONTACT_PREFERENCE:
 				entityId = await DBOS.runStep(
 					() => deleteContactPreference(input.organizationId, input.userId, input.data),
 					{ name: 'deleteContactPreference' }
 				);
 				break;
 
-			case 'UPSERT_NOTIFICATION_SETTING':
+			case OwnerPortalAction.UPSERT_NOTIFICATION_SETTING:
 				entityId = await DBOS.runStep(
 					() => upsertNotificationSetting(input.organizationId, input.userId, input.data),
 					{ name: 'upsertNotificationSetting' }
 				);
 				break;
 
-			case 'DELETE_NOTIFICATION_SETTING':
+			case OwnerPortalAction.DELETE_NOTIFICATION_SETTING:
 				entityId = await DBOS.runStep(
 					() => deleteNotificationSetting(input.organizationId, input.userId, input.data),
 					{ name: 'deleteNotificationSetting' }
@@ -729,8 +739,8 @@ async function ownerPortalWorkflow(input: OwnerPortalWorkflowInput): Promise<Own
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'OWNER_PORTAL_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.OWNER_PORTAL_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

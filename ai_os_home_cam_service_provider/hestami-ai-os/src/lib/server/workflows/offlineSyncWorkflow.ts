@@ -12,6 +12,17 @@ import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workfl
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	OFFLINE_SYNC_WORKFLOW_ERROR: 'OFFLINE_SYNC_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const OfflineSyncAction = {
@@ -187,47 +198,47 @@ async function offlineSyncWorkflow(input: OfflineSyncWorkflowInput): Promise<Off
 		let deletedCount: number | undefined;
 
 		switch (input.action) {
-			case 'QUEUE_ITEM':
+			case OfflineSyncAction.QUEUE_ITEM:
 				entityId = await DBOS.runStep(
 					() => queueItem(input.organizationId, input.userId, input.data),
 					{ name: 'queueItem' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'OTHER', // Offline sync queue items
+					entityType: ActivityEntityType.OTHER, // Offline sync queue items
 					entityId: entityId,
-					action: 'CREATE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: `Queued offline item for ${(input.data.entityType as string) || 'unknown'}`,
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'offlineSyncWorkflow_v1',
-					workflowStep: 'QUEUE_ITEM',
+					workflowStep: OfflineSyncAction.QUEUE_ITEM,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'BATCH_QUEUE':
+			case OfflineSyncAction.BATCH_QUEUE:
 				entityIds = await DBOS.runStep(
 					() => batchQueue(input.organizationId, input.userId, input.data),
 					{ name: 'batchQueue' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'OTHER',
+					entityType: ActivityEntityType.OTHER,
 					entityId: input.userId, // Using user ID as proxy for batch
-					action: 'CREATE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: `Queued ${entityIds.length} offline items`,
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'offlineSyncWorkflow_v1',
-					workflowStep: 'BATCH_QUEUE',
+					workflowStep: OfflineSyncAction.BATCH_QUEUE,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'MARK_SYNCED':
+			case OfflineSyncAction.MARK_SYNCED:
 				entityId = await DBOS.runStep(
 					() => markSynced(input.organizationId, input.userId, input.queueItemId!, input.data),
 					{ name: 'markSynced' }
@@ -236,55 +247,55 @@ async function offlineSyncWorkflow(input: OfflineSyncWorkflowInput): Promise<Off
 				// but let's do it for consistency and traceability.
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'OTHER',
+					entityType: ActivityEntityType.OTHER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: 'Offline item marked as synced',
 					performedById: input.userId,
-					performedByType: 'SYSTEM',
+					performedByType: ActivityActorType.SYSTEM,
 					workflowId: 'offlineSyncWorkflow_v1',
-					workflowStep: 'MARK_SYNCED',
+					workflowStep: OfflineSyncAction.MARK_SYNCED,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'MARK_FAILED':
+			case OfflineSyncAction.MARK_FAILED:
 				entityId = await DBOS.runStep(
 					() => markFailed(input.organizationId, input.userId, input.queueItemId!, input.data),
 					{ name: 'markFailed' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'OTHER',
+					entityType: ActivityEntityType.OTHER,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: `Offline item sync failed: ${input.data.errorMessage}`,
 					performedById: input.userId,
-					performedByType: 'SYSTEM',
+					performedByType: ActivityActorType.SYSTEM,
 					workflowId: 'offlineSyncWorkflow_v1',
-					workflowStep: 'MARK_FAILED',
+					workflowStep: OfflineSyncAction.MARK_FAILED,
 					workflowVersion: 'v1'
 				});
 				break;
 
-			case 'CLEAR_SYNCED':
+			case OfflineSyncAction.CLEAR_SYNCED:
 				deletedCount = await DBOS.runStep(
 					() => clearSynced(input.organizationId, input.userId, input.data),
 					{ name: 'clearSynced' }
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'OTHER',
+					entityType: ActivityEntityType.OTHER,
 					entityId: input.organizationId, // Organization level action
-					action: 'DELETE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.DELETE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: `Cleared ${deletedCount} synced items`,
 					performedById: input.userId,
-					performedByType: 'SYSTEM',
+					performedByType: ActivityActorType.SYSTEM,
 					workflowId: 'offlineSyncWorkflow_v1',
-					workflowStep: 'CLEAR_SYNCED',
+					workflowStep: OfflineSyncAction.CLEAR_SYNCED,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -309,8 +320,8 @@ async function offlineSyncWorkflow(input: OfflineSyncWorkflowInput): Promise<Off
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'OFFLINE_SYNC_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.OFFLINE_SYNC_WORKFLOW_ERROR
 		});
 
 		const errorResult = { success: false, error: errorMessage };

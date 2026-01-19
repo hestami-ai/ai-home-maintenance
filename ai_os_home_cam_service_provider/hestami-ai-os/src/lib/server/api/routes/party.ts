@@ -4,8 +4,9 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
 import { PartyTypeSchema } from '../schemas.js';
 import { prisma } from '../../db.js';
+import { PartyType } from '../../../../../generated/prisma/enums.js';
 import { createModuleLogger } from '../../logger.js';
-import { partyWorkflow_v1 } from '../../workflows/partyWorkflow.js';
+import { partyWorkflow_v1, PartyWorkflowAction } from '../../workflows/partyWorkflow.js';
 
 const log = createModuleLogger('PartyRoute');
 
@@ -61,7 +62,7 @@ export const partyRouter = {
 			const handle = await DBOS.startWorkflow(partyWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CREATE',
+				action: PartyWorkflowAction.CREATE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				partyType: input.partyType,
@@ -243,7 +244,7 @@ export const partyRouter = {
 						id: p.id,
 						partyType: p.partyType,
 						displayName:
-							p.partyType === 'INDIVIDUAL'
+							p.partyType === PartyType.INDIVIDUAL
 								? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim()
 								: p.entityName ?? '',
 						email: p.email
@@ -311,7 +312,7 @@ export const partyRouter = {
 			const handle = await DBOS.startWorkflow(partyWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UPDATE',
+				action: PartyWorkflowAction.UPDATE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				partyId: input.id,
@@ -386,7 +387,7 @@ export const partyRouter = {
 			const handle = await DBOS.startWorkflow(partyWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'DELETE',
+				action: PartyWorkflowAction.DELETE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				partyId: input.id

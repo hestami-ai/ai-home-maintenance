@@ -9,6 +9,20 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import {
+	ActivityActionType,
+	MeetingStatus,
+	BoardMotionStatus,
+	BoardMotionOutcome,
+	ResolutionStatus,
+	PolicyStatus,
+	ARCRequestStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	GOVERNANCE_WORKFLOW_ERROR: 'GOVERNANCE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('GovernanceWorkflow');
 
@@ -129,7 +143,7 @@ async function createMeeting(
 				boardId,
 				title,
 				type: meetingType as any,
-				status: 'SCHEDULED',
+				status: MeetingStatus.SCHEDULED,
 				scheduledFor: new Date(scheduledAt),
 				location,
 				description,
@@ -187,7 +201,7 @@ async function createMotion(
 				movedById: movedBy,
 				secondedById: secondedBy,
 				category: category as any,
-				status: 'PROPOSED',
+				status: BoardMotionStatus.PROPOSED,
 				createdBy: userId
 			}
 		});
@@ -248,7 +262,7 @@ async function createResolution(
 				summary: content,
 				effectiveDate: effectiveDate ? new Date(effectiveDate) : null,
 				motionId,
-				status: 'PROPOSED'
+				status: ResolutionStatus.PROPOSED
 			}
 		});
 		return resolution.id;
@@ -271,7 +285,7 @@ async function secondMotion(
 			where: { id: motionId },
 			data: {
 				secondedById,
-				status: 'SECONDED'
+				status: BoardMotionStatus.SECONDED
 			}
 		});
 		return motionId;
@@ -342,8 +356,8 @@ async function withdrawMotion(
 		await tx.boardMotion.update({
 			where: { id: motionId },
 			data: {
-				status: 'WITHDRAWN',
-				outcome: 'WITHDRAWN',
+				status: BoardMotionStatus.WITHDRAWN,
+				outcome: BoardMotionOutcome.WITHDRAWN,
 				outcomeNotes: reason
 			}
 		});
@@ -375,7 +389,7 @@ async function openVoting(
 
 		await tx.boardMotion.update({
 			where: { id: motionId },
-			data: { status: 'UNDER_VOTE', voteId: vote.id }
+			data: { status: BoardMotionStatus.UNDER_VOTE, voteId: vote.id }
 		});
 
 		return vote.id;
@@ -431,8 +445,8 @@ async function tableMotion(
 		await tx.boardMotion.update({
 			where: { id: motionId },
 			data: {
-				status: 'TABLED',
-				outcome: 'TABLED',
+				status: BoardMotionStatus.TABLED,
+				outcome: BoardMotionOutcome.TABLED,
 				outcomeNotes: reason
 			}
 		});
@@ -452,7 +466,7 @@ async function linkArcToMotion(
 	const arcRequestId = data.arcRequestId as string;
 	const motionStatus = data.motionStatus as string;
 
-	const newArcStatus = motionStatus === 'APPROVED' ? 'APPROVED' : 'DENIED';
+	const newArcStatus = motionStatus === BoardMotionStatus.APPROVED ? ARCRequestStatus.APPROVED : ARCRequestStatus.DENIED;
 
 	const resultId = await orgTransaction(organizationId, async (tx) => {
 		await tx.aRCRequest.update({
@@ -502,7 +516,7 @@ async function createPolicy(
 				resolutionId: data.resolutionId as string | undefined,
 				title: data.title as string,
 				description: data.description as string | undefined,
-				status: 'DRAFT'
+				status: PolicyStatus.DRAFT
 			}
 		});
 		return policy.id;
@@ -531,7 +545,7 @@ async function createPolicyVersion(
 				policyDocumentId,
 				version: nextVersion,
 				content: data.content as string,
-				status: 'DRAFT'
+				status: PolicyStatus.DRAFT
 			}
 		});
 
@@ -558,19 +572,19 @@ async function setActivePolicyVersion(
 		// Deactivate all versions
 		await tx.policyVersion.updateMany({
 			where: { policyDocumentId },
-			data: { status: 'DRAFT' }
+			data: { status: PolicyStatus.DRAFT }
 		});
 
 		// Activate the selected version
 		await tx.policyVersion.update({
 			where: { id: versionId },
-			data: { status: 'ACTIVE', approvedAt: new Date(), approvedBy: userId }
+			data: { status: PolicyStatus.ACTIVE, approvedAt: new Date(), approvedBy: userId }
 		});
 
 		// Update policy's active version reference
 		await tx.policyDocument.update({
 			where: { id: policyDocumentId },
-			data: { currentVersion: version.version, status: 'ACTIVE' }
+			data: { currentVersion: version.version, status: PolicyStatus.ACTIVE }
 		});
 
 		return policyDocumentId;
@@ -766,7 +780,7 @@ async function startMeeting(
 	const resultId = await orgTransaction(organizationId, async (tx) => {
 		await tx.meeting.update({
 			where: { id: meetingId },
-			data: { status: 'IN_SESSION' }
+			data: { status: MeetingStatus.IN_SESSION }
 		});
 		return meetingId;
 	}, { userId, reason: 'Starting meeting via workflow' });
@@ -784,7 +798,7 @@ async function adjournMeeting(
 	const resultId = await orgTransaction(organizationId, async (tx) => {
 		await tx.meeting.update({
 			where: { id: meetingId },
-			data: { status: 'ADJOURNED' }
+			data: { status: MeetingStatus.ADJOURNED }
 		});
 
 		// Create minutes placeholder if not exists
@@ -832,7 +846,7 @@ async function updateMinutes(
 		// Update meeting status to indicate minutes are in draft
 		await tx.meeting.update({
 			where: { id: meetingId },
-			data: { status: 'MINUTES_DRAFT' }
+			data: { status: MeetingStatus.MINUTES_DRAFT }
 		});
 
 		return meetingId;
@@ -852,7 +866,7 @@ async function approveMinutes(
 		// Update meeting status to indicate minutes are approved
 		await tx.meeting.update({
 			where: { id: meetingId },
-			data: { status: 'MINUTES_APPROVED' }
+			data: { status: MeetingStatus.MINUTES_APPROVED }
 		});
 		return meetingId;
 	}, { userId, reason: 'Approving meeting minutes via workflow' });
@@ -870,7 +884,7 @@ async function archiveMeeting(
 	const resultId = await orgTransaction(organizationId, async (tx) => {
 		await tx.meeting.update({
 			where: { id: meetingId },
-			data: { status: 'ARCHIVED' }
+			data: { status: MeetingStatus.ARCHIVED }
 		});
 		return meetingId;
 	}, { userId, reason: 'Archiving meeting via workflow' });
@@ -1069,217 +1083,217 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_BOARD':
+			case GovernanceAction.CREATE_BOARD:
 				entityId = await DBOS.runStep(
 					() => createBoard(input.organizationId, input.userId, input.data),
 					{ name: 'createBoard' }
 				);
 				break;
 
-			case 'CREATE_MEETING':
+			case GovernanceAction.CREATE_MEETING:
 				entityId = await DBOS.runStep(
 					() => createMeeting(input.organizationId, input.userId, input.data),
 					{ name: 'createMeeting' }
 				);
 				break;
 
-			case 'CREATE_MOTION':
+			case GovernanceAction.CREATE_MOTION:
 				entityId = await DBOS.runStep(
 					() => createMotion(input.organizationId, input.userId, input.data),
 					{ name: 'createMotion' }
 				);
 				break;
 
-			case 'UPDATE_MOTION':
+			case GovernanceAction.UPDATE_MOTION:
 				entityId = await DBOS.runStep(
 					() => updateMotion(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateMotion' }
 				);
 				break;
 
-			case 'CREATE_RESOLUTION':
+			case GovernanceAction.CREATE_RESOLUTION:
 				entityId = await DBOS.runStep(
 					() => createResolution(input.organizationId, input.userId, input.data),
 					{ name: 'createResolution' }
 				);
 				break;
 
-			case 'SECOND_MOTION':
+			case GovernanceAction.SECOND_MOTION:
 				entityId = await DBOS.runStep(
 					() => secondMotion(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'secondMotion' }
 				);
 				break;
 
-			case 'UPDATE_MOTION_STATUS':
+			case GovernanceAction.UPDATE_MOTION_STATUS:
 				entityId = await DBOS.runStep(
 					() => updateMotionStatus(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateMotionStatus' }
 				);
 				break;
 
-			case 'RECORD_MOTION_OUTCOME':
+			case GovernanceAction.RECORD_MOTION_OUTCOME:
 				entityId = await DBOS.runStep(
 					() => recordMotionOutcome(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'recordMotionOutcome' }
 				);
 				break;
 
-			case 'WITHDRAW_MOTION':
+			case GovernanceAction.WITHDRAW_MOTION:
 				entityId = await DBOS.runStep(
 					() => withdrawMotion(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'withdrawMotion' }
 				);
 				break;
 
-			case 'OPEN_VOTING':
+			case GovernanceAction.OPEN_VOTING:
 				entityId = await DBOS.runStep(
 					() => openVoting(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'openVoting' }
 				);
 				break;
 
-			case 'CLOSE_VOTING':
+			case GovernanceAction.CLOSE_VOTING:
 				entityId = await DBOS.runStep(
 					() => closeVoting(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'closeVoting' }
 				);
 				break;
 
-			case 'TABLE_MOTION':
+			case GovernanceAction.TABLE_MOTION:
 				entityId = await DBOS.runStep(
 					() => tableMotion(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'tableMotion' }
 				);
 				break;
 
-			case 'LINK_ARC_TO_MOTION':
+			case GovernanceAction.LINK_ARC_TO_MOTION:
 				entityId = await DBOS.runStep(
 					() => linkArcToMotion(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'linkArcToMotion' }
 				);
 				break;
 
-			case 'UPDATE_RESOLUTION_STATUS':
+			case GovernanceAction.UPDATE_RESOLUTION_STATUS:
 				entityId = await DBOS.runStep(
 					() => updateResolutionStatus(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateResolutionStatus' }
 				);
 				break;
 
-			case 'CREATE_POLICY':
+			case GovernanceAction.CREATE_POLICY:
 				entityId = await DBOS.runStep(
 					() => createPolicy(input.organizationId, input.userId, input.data),
 					{ name: 'createPolicy' }
 				);
 				break;
 
-			case 'CREATE_POLICY_VERSION':
+			case GovernanceAction.CREATE_POLICY_VERSION:
 				entityId = await DBOS.runStep(
 					() => createPolicyVersion(input.organizationId, input.userId, input.data),
 					{ name: 'createPolicyVersion' }
 				);
 				break;
 
-			case 'SET_ACTIVE_POLICY_VERSION':
+			case GovernanceAction.SET_ACTIVE_POLICY_VERSION:
 				entityId = await DBOS.runStep(
 					() => setActivePolicyVersion(input.organizationId, input.userId, input.data),
 					{ name: 'setActivePolicyVersion' }
 				);
 				break;
 
-			case 'LINK_RESOLUTION_TO_MOTION':
+			case GovernanceAction.LINK_RESOLUTION_TO_MOTION:
 				entityId = await DBOS.runStep(
 					() => linkResolutionToMotion(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'linkResolutionToMotion' }
 				);
 				break;
 
-			case 'ADD_AGENDA_ITEM':
+			case GovernanceAction.ADD_AGENDA_ITEM:
 				entityId = await DBOS.runStep(
 					() => addAgendaItem(input.organizationId, input.userId, input.data),
 					{ name: 'addAgendaItem' }
 				);
 				break;
 
-			case 'ADD_MEETING_MINUTES':
+			case GovernanceAction.ADD_MEETING_MINUTES:
 				entityId = await DBOS.runStep(
 					() => addMeetingMinutes(input.organizationId, input.userId, input.data),
 					{ name: 'addMeetingMinutes' }
 				);
 				break;
 
-			case 'RECORD_ATTENDANCE':
+			case GovernanceAction.RECORD_ATTENDANCE:
 				entityId = await DBOS.runStep(
 					() => recordAttendance(input.organizationId, input.userId, input.data),
 					{ name: 'recordAttendance' }
 				);
 				break;
 
-			case 'CREATE_VOTE':
+			case GovernanceAction.CREATE_VOTE:
 				entityId = await DBOS.runStep(
 					() => createVote(input.organizationId, input.userId, input.data),
 					{ name: 'createVote' }
 				);
 				break;
 
-			case 'CAST_BALLOT':
+			case GovernanceAction.CAST_BALLOT:
 				entityId = await DBOS.runStep(
 					() => castBallot(input.organizationId, input.userId, input.data),
 					{ name: 'castBallot' }
 				);
 				break;
 
-			case 'CLOSE_VOTE':
+			case GovernanceAction.CLOSE_VOTE:
 				entityId = await DBOS.runStep(
 					() => closeVoteSession(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'closeVoteSession' }
 				);
 				break;
 
-			case 'START_MEETING':
+			case GovernanceAction.START_MEETING:
 				entityId = await DBOS.runStep(
 					() => startMeeting(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'startMeeting' }
 				);
 				break;
 
-			case 'ADJOURN_MEETING':
+			case GovernanceAction.ADJOURN_MEETING:
 				entityId = await DBOS.runStep(
 					() => adjournMeeting(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'adjournMeeting' }
 				);
 				break;
 
-			case 'UPDATE_MINUTES':
+			case GovernanceAction.UPDATE_MINUTES:
 				entityId = await DBOS.runStep(
 					() => updateMinutes(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateMinutes' }
 				);
 				break;
 
-			case 'APPROVE_MINUTES':
+			case GovernanceAction.APPROVE_MINUTES:
 				entityId = await DBOS.runStep(
 					() => approveMinutes(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'approveMinutes' }
 				);
 				break;
 
-			case 'ARCHIVE_MEETING':
+			case GovernanceAction.ARCHIVE_MEETING:
 				entityId = await DBOS.runStep(
 					() => archiveMeeting(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'archiveMeeting' }
 				);
 				break;
 
-			case 'ADD_BOARD_MEMBER':
+			case GovernanceAction.ADD_BOARD_MEMBER:
 				entityId = await DBOS.runStep(
 					() => addBoardMember(input.organizationId, input.userId, input.data),
 					{ name: 'addBoardMember' }
 				);
 				break;
 
-			case 'REMOVE_BOARD_MEMBER':
+			case GovernanceAction.REMOVE_BOARD_MEMBER:
 				entityId = await DBOS.runStep(
 					() => removeBoardMember(input.organizationId, input.userId, input.data),
 					{ name: 'removeBoardMember' }
@@ -1287,28 +1301,28 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 				break;
 
 			// Phase 28: Committee actions
-			case 'CREATE_COMMITTEE':
+			case GovernanceAction.CREATE_COMMITTEE:
 				entityId = await DBOS.runStep(
 					() => createCommittee(input.organizationId, input.userId, input.data),
 					{ name: 'createCommittee' }
 				);
 				break;
 
-			case 'UPDATE_COMMITTEE':
+			case GovernanceAction.UPDATE_COMMITTEE:
 				entityId = await DBOS.runStep(
 					() => updateCommittee(input.organizationId, input.userId, input.entityId!, input.data),
 					{ name: 'updateCommittee' }
 				);
 				break;
 
-			case 'ADD_COMMITTEE_MEMBER':
+			case GovernanceAction.ADD_COMMITTEE_MEMBER:
 				entityId = await DBOS.runStep(
 					() => addCommitteeMember(input.organizationId, input.userId, input.data),
 					{ name: 'addCommitteeMember' }
 				);
 				break;
 
-			case 'REMOVE_COMMITTEE_MEMBER':
+			case GovernanceAction.REMOVE_COMMITTEE_MEMBER:
 				entityId = await DBOS.runStep(
 					() => removeCommitteeMember(input.organizationId, input.userId, input.data),
 					{ name: 'removeCommitteeMember' }
@@ -1327,8 +1341,8 @@ async function governanceWorkflow(input: GovernanceWorkflowInput): Promise<Gover
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'GOVERNANCE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.GOVERNANCE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

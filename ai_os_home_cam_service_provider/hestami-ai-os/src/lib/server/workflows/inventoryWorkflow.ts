@@ -11,6 +11,12 @@ import { orgTransaction } from '../db/rls.js';
 import { type LifecycleWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, PurchaseOrderStatus } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	INVENTORY_WORKFLOW_ERROR: 'INVENTORY_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('InventoryWorkflow');
 
@@ -169,7 +175,7 @@ async function receivePurchaseOrder(
 			include: { lines: true }
 		});
 
-		if (!po || po.status !== 'SUBMITTED') {
+		if (!po || po.status !== PurchaseOrderStatus.SUBMITTED) {
 			return false;
 		}
 
@@ -228,7 +234,7 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'LOG_USAGE': {
+			case InventoryAction.LOG_USAGE: {
 				if (!input.itemId || !input.locationId || !input.jobId || !input.quantity) {
 					return {
 						success: false,
@@ -259,7 +265,7 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 				};
 			}
 
-			case 'CHECK_REORDER': {
+			case InventoryAction.CHECK_REORDER: {
 				const reorderItems = await DBOS.runStep(
 					() => checkReorderLevels(input.organizationId, input.userId),
 					{ name: 'checkReorderLevels' }
@@ -274,7 +280,7 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 				};
 			}
 
-			case 'CREATE_PO': {
+			case InventoryAction.CREATE_PO: {
 				if (!input.supplierId || !input.items || input.items.length === 0) {
 					return {
 						success: false,
@@ -303,7 +309,7 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 				};
 			}
 
-			case 'RECEIVE_PO': {
+			case InventoryAction.RECEIVE_PO: {
 				if (!input.purchaseOrderId) {
 					return {
 						success: false,
@@ -343,8 +349,8 @@ async function inventoryWorkflow(input: InventoryWorkflowInput): Promise<Invento
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'INVENTORY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.INVENTORY_WORKFLOW_ERROR
 		});
 
 		return {

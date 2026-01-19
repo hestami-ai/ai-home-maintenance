@@ -13,6 +13,24 @@ import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } 
 import { postPaymentToGL, reversePaymentGL } from '../accounting/index.js';
 import type { PaymentMethod } from '../../../../generated/prisma/client.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	PaymentStatus,
+	ChargeStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Alias for backward compatibility
+const AssessmentChargeStatus = ChargeStatus;
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PAYMENT_WORKFLOW_ERROR: 'PAYMENT_WORKFLOW_ERROR',
+	PAYMENT_GL_ERROR: 'Payment_GL_Error',
+	PAYMENT_VOID_ERROR: 'Payment_Void_Error'
+} as const;
 
 const log = createWorkflowLogger('paymentWorkflow');
 
@@ -79,7 +97,7 @@ async function createPaymentWithApplications(
 				payerPartyId: input.payerPartyId,
 				memo: input.memo,
 				unappliedAmount: input.amount!,
-				status: 'PENDING'
+				status: PaymentStatus.PENDING
 			}
 		});
 
@@ -91,7 +109,7 @@ async function createPaymentWithApplications(
 				where: {
 					unitId: input.unitId,
 					balanceDue: { gt: 0 },
-					status: { in: ['BILLED', 'PARTIALLY_PAID'] }
+					status: { in: [AssessmentChargeStatus.BILLED, AssessmentChargeStatus.PARTIALLY_PAID] }
 				},
 				orderBy: { dueDate: 'asc' }
 			});
@@ -116,7 +134,7 @@ async function createPaymentWithApplications(
 				// Update charge
 				const newPaidAmount = Number(charge.paidAmount) + applyAmount;
 				const newBalanceDue = Number(charge.totalAmount) - newPaidAmount;
-				const newStatus = newBalanceDue <= 0 ? 'PAID' : 'PARTIALLY_PAID';
+				const newStatus = newBalanceDue <= 0 ? AssessmentChargeStatus.PAID : AssessmentChargeStatus.PARTIALLY_PAID;
 
 				await tx.assessmentCharge.update({
 					where: { id: charge.id },
@@ -153,15 +171,15 @@ async function createPaymentWithApplications(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INVOICE',
+		entityType: ActivityEntityType.INVOICE,
 		entityId: result.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Payment created: $${result.amount.toFixed(2)}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'paymentWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: PaymentWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { amount: result.amount, appliedAmount: result.appliedAmount, status: result.status }
 	});
@@ -182,7 +200,7 @@ async function postPaymentToGLStep(
 		log.warn(`Failed to post payment ${paymentId} to GL`, { error: errorObj.message, paymentId });
 		await recordSpanError(errorObj, {
 			errorCode: 'GL_POSTING_FAILED',
-			errorType: 'Payment_GL_Error'
+			errorType: WorkflowErrorType.PAYMENT_GL_ERROR
 		});
 		return { success: false, error: errorObj.message };
 	}
@@ -201,7 +219,7 @@ async function voidPaymentWithReversal(
 			if (charge) {
 				const newPaidAmount = Math.max(0, Number(charge.paidAmount) - app.amount);
 				const newBalanceDue = Number(charge.totalAmount) - newPaidAmount;
-				const newStatus = newPaidAmount === 0 ? 'BILLED' : 'PARTIALLY_PAID';
+				const newStatus = newPaidAmount === 0 ? AssessmentChargeStatus.BILLED : AssessmentChargeStatus.PARTIALLY_PAID;
 
 				await tx.assessmentCharge.update({
 					where: { id: app.chargeId },
@@ -222,7 +240,7 @@ async function voidPaymentWithReversal(
 		await tx.payment.update({
 			where: { id: input.paymentId },
 			data: {
-				status: 'VOIDED',
+				status: PaymentStatus.VOIDED,
 				appliedAmount: 0,
 				unappliedAmount: input.paymentAmount
 			}
@@ -232,17 +250,17 @@ async function voidPaymentWithReversal(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INVOICE',
+		entityType: ActivityEntityType.INVOICE,
 		entityId: input.paymentId!,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Payment voided`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'paymentWorkflow_v1',
-		workflowStep: 'VOID',
+		workflowStep: PaymentWorkflowAction.VOID,
 		workflowVersion: 'v1',
-		newState: { status: 'VOIDED' }
+		newState: { status: PaymentStatus.VOIDED }
 	});
 
 	return { success: true };
@@ -261,7 +279,7 @@ async function reversePaymentGLStep(
 		console.warn(`Failed to reverse GL for payment ${paymentId}:`, error);
 		await recordSpanError(errorObj, {
 			errorCode: 'GL_REVERSAL_FAILED',
-			errorType: 'Payment_Void_Error'
+			errorType: WorkflowErrorType.PAYMENT_VOID_ERROR
 		});
 		return { success: false, error: errorObj.message };
 	}
@@ -282,7 +300,7 @@ async function paymentWorkflow(input: PaymentWorkflowInput): Promise<PaymentWork
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case PaymentWorkflowAction.CREATE: {
 				if (!input.unitId || !input.paymentDate || !input.amount || !input.paymentMethod) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -319,7 +337,7 @@ async function paymentWorkflow(input: PaymentWorkflowInput): Promise<PaymentWork
 				return successResult;
 			}
 
-			case 'VOID': {
+			case PaymentWorkflowAction.VOID: {
 				if (!input.paymentId) {
 					const error = new Error('Missing required field: paymentId for VOID');
 					logStepError(log, 'validation', error, { paymentId: input.paymentId });
@@ -375,8 +393,8 @@ async function paymentWorkflow(input: PaymentWorkflowInput): Promise<PaymentWork
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PAYMENT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PAYMENT_WORKFLOW_ERROR
 		});
 		const errorResult: PaymentWorkflowResult = {
 			success: false,

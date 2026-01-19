@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PillarAccessValues, StaffRoleValues } from '$lib/api/cam';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Loader2, UserPlus, Info } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
@@ -30,14 +31,14 @@
 	let createdStaffId = $state<string | null>(null);
 
 	const allRoles: StaffRole[] = [
-		'CONCIERGE_OPERATOR',
-		'OPERATIONS_COORDINATOR',
-		'CAM_SPECIALIST',
-		'VENDOR_LIAISON',
-		'PLATFORM_ADMIN'
+		StaffRoleValues.CONCIERGE_OPERATOR,
+		StaffRoleValues.OPERATIONS_COORDINATOR,
+		StaffRoleValues.CAM_SPECIALIST,
+		StaffRoleValues.VENDOR_LIAISON,
+		StaffRoleValues.PLATFORM_ADMIN
 	];
 
-	const allPillars: PillarAccess[] = ['CONCIERGE', 'CAM', 'CONTRACTOR', 'VENDOR', 'ADMIN'];
+	const allPillars: PillarAccess[] = [PillarAccessValues.CONCIERGE, PillarAccessValues.CAM, PillarAccessValues.CONTRACTOR, PillarAccessValues.VENDOR, PillarAccessValues.ADMIN];
 
 	function toggleRole(role: StaffRole) {
 		if (selectedRoles.includes(role)) {

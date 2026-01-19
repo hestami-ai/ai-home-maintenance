@@ -20,9 +20,14 @@
 import { DBOS } from '@dbos-inc/dbos-sdk';
 import { prisma } from '../db.js';
 import { orgTransaction } from '../db/rls.js';
-import type { JobStatus } from '../../../../generated/prisma/client.js';
+import { JobStatus, ActivityActionType } from '../../../../generated/prisma/enums.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	JOB_LIFECYCLE_ERROR: 'JOB_LIFECYCLE_ERROR'
+} as const;
 
 const log = createWorkflowLogger('jobLifecycleWorkflow');
 
@@ -31,30 +36,30 @@ const WORKFLOW_ERROR_EVENT = 'job_error';
 
 const validTransitions: Record<JobStatus, JobStatus[]> = {
 	// Initial states
-	LEAD: ['TICKET', 'CANCELLED'],
-	TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
+	[JobStatus.LEAD]: [JobStatus.TICKET, JobStatus.CANCELLED],
+	[JobStatus.TICKET]: [JobStatus.ESTIMATE_REQUIRED, JobStatus.JOB_CREATED, JobStatus.CANCELLED],
 
 	// Estimate workflow
-	ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
-	ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'], // Can revise estimate
-	ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
+	[JobStatus.ESTIMATE_REQUIRED]: [JobStatus.ESTIMATE_SENT, JobStatus.JOB_CREATED, JobStatus.CANCELLED],
+	[JobStatus.ESTIMATE_SENT]: [JobStatus.ESTIMATE_APPROVED, JobStatus.ESTIMATE_REQUIRED, JobStatus.CANCELLED], // Can revise estimate
+	[JobStatus.ESTIMATE_APPROVED]: [JobStatus.JOB_CREATED, JobStatus.CANCELLED],
 
 	// Job execution
-	JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
-	SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
-	DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'], // Can reschedule
-	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-	ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
+	[JobStatus.JOB_CREATED]: [JobStatus.SCHEDULED, JobStatus.CANCELLED],
+	[JobStatus.SCHEDULED]: [JobStatus.DISPATCHED, JobStatus.ON_HOLD, JobStatus.CANCELLED],
+	[JobStatus.DISPATCHED]: [JobStatus.IN_PROGRESS, JobStatus.SCHEDULED, JobStatus.ON_HOLD, JobStatus.CANCELLED], // Can reschedule
+	[JobStatus.IN_PROGRESS]: [JobStatus.ON_HOLD, JobStatus.COMPLETED, JobStatus.CANCELLED],
+	[JobStatus.ON_HOLD]: [JobStatus.SCHEDULED, JobStatus.DISPATCHED, JobStatus.IN_PROGRESS, JobStatus.CANCELLED],
 
 	// Completion & payment
-	COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
-	INVOICED: ['PAID', 'CANCELLED'],
-	PAID: ['WARRANTY', 'CLOSED'],
-	WARRANTY: ['CLOSED', 'IN_PROGRESS'], // Can reopen for warranty work
+	[JobStatus.COMPLETED]: [JobStatus.INVOICED, JobStatus.WARRANTY, JobStatus.CLOSED, JobStatus.CANCELLED],
+	[JobStatus.INVOICED]: [JobStatus.PAID, JobStatus.CANCELLED],
+	[JobStatus.PAID]: [JobStatus.WARRANTY, JobStatus.CLOSED],
+	[JobStatus.WARRANTY]: [JobStatus.CLOSED, JobStatus.IN_PROGRESS], // Can reopen for warranty work
 
 	// Terminal states
-	CLOSED: [],
-	CANCELLED: []
+	[JobStatus.CLOSED]: [],
+	[JobStatus.CANCELLED]: []
 };
 
 const SLA_HOURS: Record<string, number> = {
@@ -99,7 +104,7 @@ async function validateJobTransition(input: JobTransitionInput): Promise<{
 	});
 
 	if (!job) {
-		return { valid: false, currentStatus: 'LEAD', error: 'Job not found' };
+		return { valid: false, currentStatus: JobStatus.LEAD, error: 'Job not found' };
 	}
 
 	const currentStatus = job.status as JobStatus;
@@ -115,7 +120,7 @@ async function validateJobTransition(input: JobTransitionInput): Promise<{
 	}
 
 	// Validation for specific transitions
-	if (input.toStatus === 'SCHEDULED' && !input.technicianId && !job.assignedTechnicianId) {
+	if (input.toStatus === JobStatus.SCHEDULED && !input.technicianId && !job.assignedTechnicianId) {
 		// Technician assignment is recommended but not required
 		console.log(`[JobWorkflow] Warning: Scheduling job ${input.jobId} without technician assignment`);
 	}
@@ -133,19 +138,19 @@ async function updateJobStatus(
 		};
 
 		switch (input.toStatus) {
-			case 'ESTIMATE_SENT':
+			case JobStatus.ESTIMATE_SENT:
 				// Estimate sent to customer - no additional fields needed
 				break;
 
-			case 'ESTIMATE_APPROVED':
+			case JobStatus.ESTIMATE_APPROVED:
 				// Customer approved estimate - no additional fields needed
 				break;
 
-			case 'JOB_CREATED':
+			case JobStatus.JOB_CREATED:
 				// Job created from estimate or ticket
 				break;
 
-			case 'SCHEDULED':
+			case JobStatus.SCHEDULED:
 				if (input.technicianId) {
 					updateData.assignedTechnicianId = input.technicianId;
 					updateData.assignedAt = new Date();
@@ -155,11 +160,11 @@ async function updateJobStatus(
 				if (input.scheduledEnd) updateData.scheduledEnd = input.scheduledEnd;
 				break;
 
-			case 'DISPATCHED':
+			case JobStatus.DISPATCHED:
 				updateData.dispatchedAt = new Date();
 				break;
 
-			case 'IN_PROGRESS':
+			case JobStatus.IN_PROGRESS:
 				if (!input.scheduledStart) {
 					// Only set startedAt if not already set
 					const job = await tx.job.findUnique({ where: { id: input.jobId }, select: { startedAt: true } });
@@ -169,26 +174,26 @@ async function updateJobStatus(
 				}
 				break;
 
-			case 'COMPLETED':
+			case JobStatus.COMPLETED:
 				updateData.completedAt = new Date();
 				if (input.actualCost !== undefined) updateData.actualCost = input.actualCost;
 				if (input.actualHours !== undefined) updateData.actualHours = input.actualHours;
 				break;
 
-			case 'INVOICED':
+			case JobStatus.INVOICED:
 				updateData.invoicedAt = new Date();
 				break;
 
-			case 'PAID':
+			case JobStatus.PAID:
 				updateData.paidAt = new Date();
 				break;
 
-			case 'CLOSED':
+			case JobStatus.CLOSED:
 				updateData.closedAt = new Date();
 				updateData.closedBy = input.userId;
 				break;
 
-			case 'CANCELLED':
+			case JobStatus.CANCELLED:
 				updateData.cancelledAt = new Date();
 				break;
 		}
@@ -368,14 +373,14 @@ async function jobTransitionWorkflow(input: JobTransitionInput): Promise<JobTran
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'JOB_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.JOB_LIFECYCLE_ERROR
 		});
 
 		const errorResult = {
 			success: false,
 			jobId: input.jobId,
-			fromStatus: 'LEAD' as JobStatus,
+			fromStatus: JobStatus.LEAD,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

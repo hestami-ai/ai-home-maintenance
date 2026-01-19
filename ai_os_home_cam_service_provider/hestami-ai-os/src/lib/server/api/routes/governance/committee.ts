@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema, JsonSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, IdempotencyKeySchema, PaginationInputSchema, PaginationOutputSchema } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
+import { startGovernanceWorkflow, GovernanceAction } from '../../../workflows/governanceWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 import { CommitteeTypeSchema, CommitteeRoleSchema } from '../../schemas.js';
 
@@ -94,7 +94,7 @@ export const governanceCommitteeRouter = {
             // Use DBOS workflow for durable execution
             const result = await startGovernanceWorkflow(
                 {
-                    action: 'CREATE_COMMITTEE',
+                    action: GovernanceAction.CREATE_COMMITTEE,
                     organizationId: context.organization.id,
                     userId: context.user!.id,
                     data: rest
@@ -310,7 +310,7 @@ export const governanceCommitteeRouter = {
             // Use DBOS workflow for durable execution
             const result = await startGovernanceWorkflow(
                 {
-                    action: 'UPDATE_COMMITTEE',
+                    action: GovernanceAction.UPDATE_COMMITTEE,
                     organizationId: context.organization.id,
                     userId: context.user.id,
                     entityId: id,
@@ -388,7 +388,7 @@ export const governanceCommitteeRouter = {
             // Use DBOS workflow for durable execution
             const workflowResult = await startGovernanceWorkflow(
                 {
-                    action: 'ADD_COMMITTEE_MEMBER',
+                    action: GovernanceAction.ADD_COMMITTEE_MEMBER,
                     organizationId: context.organization.id,
                     userId: context.user.id,
                     data: {
@@ -477,7 +477,7 @@ export const governanceCommitteeRouter = {
             // Use DBOS workflow for durable execution
             const workflowResult = await startGovernanceWorkflow(
                 {
-                    action: 'REMOVE_COMMITTEE_MEMBER',
+                    action: GovernanceAction.REMOVE_COMMITTEE_MEMBER,
                     organizationId: context.organization.id,
                     userId: context.user.id,
                     data: {

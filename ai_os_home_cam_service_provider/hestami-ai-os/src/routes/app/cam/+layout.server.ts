@@ -2,6 +2,7 @@ import { createDirectClient, buildServerContext } from '$lib/server/api/serverCl
 import { createModuleLogger } from '$lib/server/logger';
 import { prisma } from '$lib/server/db';
 import type { LayoutServerLoad } from './$types';
+import { ARCRequestStatus, ViolationStatus, WorkOrderStatus } from '../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('CamLayout');
 
@@ -88,13 +89,13 @@ export const load: LayoutServerLoad = async ({ parent, locals }) => {
             try {
                 const [violationsRes, arcRes, workOrdersRes] = await Promise.all([
                     assocClient.violation.list({}),
-                    assocClient.arcRequest.list({ status: 'SUBMITTED' }),
-                    assocClient.workOrder.list({ status: 'IN_PROGRESS' })
+                    assocClient.arcRequest.list({ status: ARCRequestStatus.SUBMITTED }),
+                    assocClient.workOrder.list({ status: WorkOrderStatus.IN_PROGRESS })
                 ]);
 
                 if (violationsRes.ok && violationsRes.data?.violations) {
                     // Filter for active violations
-                    const activeStatuses = ['OPEN', 'NOTICE_SENT', 'CURE_PERIOD', 'ESCALATED'];
+                    const activeStatuses = [ViolationStatus.OPEN, ViolationStatus.NOTICE_SENT, ViolationStatus.CURE_PERIOD, ViolationStatus.ESCALATED];
                     badgeCounts.violations = violationsRes.data.violations.filter((v: any) =>
                         activeStatuses.includes(v.status)
                     ).length;

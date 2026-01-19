@@ -12,7 +12,19 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
-import type { StaffStatus, StaffRole, PillarAccess } from '../../../../generated/prisma/client.js';
+import type { StaffRole, PillarAccess } from '../../../../generated/prisma/client.js';
+import {
+	StaffStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	STAFF_WORKFLOW_ERROR: 'STAFF_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'staff_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'staff_workflow_error';
@@ -87,7 +99,7 @@ async function createStaff(
 					roles: data.roles,
 					pillarAccess: data.pillarAccess,
 					canBeAssignedCases: data.canBeAssignedCases,
-					status: 'PENDING',
+					status: StaffStatus.PENDING,
 					activationCodeEncrypted: data.activationCodeEncrypted,
 					activationCodeExpiresAt: data.activationCodeExpiresAt
 				}
@@ -98,15 +110,15 @@ async function createStaff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staff.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" created with roles: ${data.roles.join(', ')}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: StaffWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		newState: {
 			id: staff.id,
@@ -154,15 +166,15 @@ async function updateStaff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" updated`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: StaffWorkflowAction.UPDATE,
 		workflowVersion: 'v1',
 		previousState,
 		newState: {
@@ -189,7 +201,7 @@ async function activateStaff(
 			return tx.staff.update({
 				where: { id: staffId },
 				data: {
-					status: 'ACTIVE',
+					status: StaffStatus.ACTIVE,
 					activatedAt: now
 				}
 			});
@@ -199,18 +211,18 @@ async function activateStaff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" activated`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'ACTIVATE',
+		workflowStep: StaffWorkflowAction.ACTIVATE,
 		workflowVersion: 'v1',
-		previousState: { status: 'PENDING' },
-		newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
+		previousState: { status: StaffStatus.PENDING },
+		newState: { status: StaffStatus.ACTIVE, activatedAt: now.toISOString() }
 	});
 
 	return { id: staff.id, activatedAt: now.toISOString() };
@@ -232,7 +244,7 @@ async function suspendStaff(
 			const staffResult = await tx.staff.update({
 				where: { id: staffId },
 				data: {
-					status: 'SUSPENDED',
+					status: StaffStatus.SUSPENDED,
 					suspendedAt: now,
 					suspensionReason: reason
 				}
@@ -254,19 +266,19 @@ async function suspendStaff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" suspended. Reason: ${reason}. ${escalatedCaseCount} cases escalated.`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'SUSPEND',
+		workflowStep: StaffWorkflowAction.SUSPEND,
 		workflowVersion: 'v1',
 		previousState: { status: previousStatus },
 		newState: {
-			status: 'SUSPENDED',
+			status: StaffStatus.SUSPENDED,
 			suspendedAt: now.toISOString(),
 			suspensionReason: reason,
 			escalatedCaseCount
@@ -302,19 +314,19 @@ async function deactivateStaff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" deactivated. Reason: ${reason}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'DEACTIVATE',
+		workflowStep: StaffWorkflowAction.DEACTIVATE,
 		workflowVersion: 'v1',
 		previousState: { status: previousStatus },
 		newState: {
-			status: 'DEACTIVATED',
+			status: StaffStatus.DEACTIVATED,
 			deactivatedAt: now.toISOString(),
 			deactivationReason: reason
 		}
@@ -335,7 +347,7 @@ async function reactivateStaff(
 			return tx.staff.update({
 				where: { id: staffId },
 				data: {
-					status: 'ACTIVE',
+					status: StaffStatus.ACTIVE,
 					canBeAssignedCases: true
 				}
 			});
@@ -345,18 +357,18 @@ async function reactivateStaff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" reactivated from ${previousStatus}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'REACTIVATE',
+		workflowStep: StaffWorkflowAction.REACTIVATE,
 		workflowVersion: 'v1',
 		previousState: { status: previousStatus },
-		newState: { status: 'ACTIVE' }
+		newState: { status: StaffStatus.ACTIVE }
 	});
 
 	return { id: staff.id };
@@ -382,15 +394,15 @@ async function updateRoles(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'ROLE_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.ROLE_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" roles updated: ${previousRoles.join(', ')} → ${roles.join(', ')}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'UPDATE_ROLES',
+		workflowStep: StaffWorkflowAction.UPDATE_ROLES,
 		workflowVersion: 'v1',
 		previousState: { roles: previousRoles },
 		newState: { roles }
@@ -419,15 +431,15 @@ async function updatePillarAccess(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${staff.displayName}" pillar access updated: ${previousPillarAccess.join(', ')} → ${pillarAccess.join(', ')}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'UPDATE_PILLAR_ACCESS',
+		workflowStep: StaffWorkflowAction.UPDATE_PILLAR_ACCESS,
 		workflowVersion: 'v1',
 		previousState: { pillarAccess: previousPillarAccess },
 		newState: { pillarAccess }
@@ -459,15 +471,15 @@ async function regenerateActivationCode(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Activation code regenerated for "${staff.displayName}"`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'REGENERATE_ACTIVATION_CODE',
+		workflowStep: StaffWorkflowAction.REGENERATE_ACTIVATION_CODE,
 		workflowVersion: 'v1',
 		newState: {
 			activationCodeExpiresAt: activationCodeExpiresAt.toISOString()
@@ -490,7 +502,7 @@ async function activateWithCode(
 			return tx.staff.update({
 				where: { id: staffId },
 				data: {
-					status: 'ACTIVE',
+					status: StaffStatus.ACTIVE,
 					activatedAt: now,
 					activationCodeEncrypted: null,
 					activationCodeExpiresAt: null
@@ -502,18 +514,18 @@ async function activateWithCode(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'STAFF',
+		entityType: ActivityEntityType.STAFF,
 		entityId: staffId,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Staff member "${displayName}" activated via self-service`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'staffWorkflow_v1',
-		workflowStep: 'ACTIVATE_WITH_CODE',
+		workflowStep: StaffWorkflowAction.ACTIVATE_WITH_CODE,
 		workflowVersion: 'v1',
-		previousState: { status: 'PENDING' },
-		newState: { status: 'ACTIVE', activatedAt: now.toISOString() }
+		previousState: { status: StaffStatus.PENDING },
+		newState: { status: StaffStatus.ACTIVE, activatedAt: now.toISOString() }
 	});
 
 	return { id: staffId, activatedAt: now.toISOString() };
@@ -532,7 +544,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case StaffWorkflowAction.CREATE: {
 				if (!input.data?.targetUserId || !input.data?.displayName || !input.data?.roles || !input.data?.pillarAccess || !input.data?.activationCodeEncrypted || !input.data?.activationCodeExpiresAt) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { data: input.data });
@@ -563,7 +575,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case StaffWorkflowAction.UPDATE: {
 				if (!input.staffId) {
 					const error = new Error('Missing required field: staffId for UPDATE');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -597,7 +609,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 				return successResult;
 			}
 
-			case 'ACTIVATE': {
+			case StaffWorkflowAction.ACTIVATE: {
 				if (!input.staffId) {
 					const error = new Error('Missing required field: staffId for ACTIVATE');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -614,14 +626,14 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 					success: true,
 					entityId: result.id,
 					staffId: result.id,
-					status: 'ACTIVE',
+					status: StaffStatus.ACTIVE,
 					activatedAt: result.activatedAt
 				};
 				logWorkflowEnd(log, input.action, true, startTime, successResult);
 				return successResult;
 			}
 
-			case 'SUSPEND': {
+			case StaffWorkflowAction.SUSPEND: {
 				if (!input.staffId || !input.data?.reason) {
 					const error = new Error('Missing required fields: staffId, reason for SUSPEND');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -642,7 +654,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 					success: true,
 					entityId: result.id,
 					staffId: result.id,
-					status: 'SUSPENDED',
+					status: StaffStatus.SUSPENDED,
 					suspendedAt: result.suspendedAt,
 					escalatedCaseCount: result.escalatedCaseCount
 				};
@@ -650,7 +662,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 				return successResult;
 			}
 
-			case 'DEACTIVATE': {
+			case StaffWorkflowAction.DEACTIVATE: {
 				if (!input.staffId || !input.data?.reason) {
 					const error = new Error('Missing required fields: staffId, reason for DEACTIVATE');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -671,14 +683,14 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 					success: true,
 					entityId: result.id,
 					staffId: result.id,
-					status: 'DEACTIVATED',
+					status: StaffStatus.DEACTIVATED,
 					deactivatedAt: result.deactivatedAt
 				};
 				logWorkflowEnd(log, input.action, true, startTime, successResult);
 				return successResult;
 			}
 
-			case 'REACTIVATE': {
+			case StaffWorkflowAction.REACTIVATE: {
 				if (!input.staffId) {
 					const error = new Error('Missing required field: staffId for REACTIVATE');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -699,13 +711,13 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 					success: true,
 					entityId: result.id,
 					staffId: result.id,
-					status: 'ACTIVE'
+					status: StaffStatus.ACTIVE
 				};
 				logWorkflowEnd(log, input.action, true, startTime, successResult);
 				return successResult;
 			}
 
-			case 'UPDATE_ROLES': {
+			case StaffWorkflowAction.UPDATE_ROLES: {
 				if (!input.staffId || !input.data?.roles) {
 					const error = new Error('Missing required fields: staffId, roles for UPDATE_ROLES');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -731,7 +743,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 				return successResult;
 			}
 
-			case 'UPDATE_PILLAR_ACCESS': {
+			case StaffWorkflowAction.UPDATE_PILLAR_ACCESS: {
 				if (!input.staffId || !input.data?.pillarAccess) {
 					const error = new Error('Missing required fields: staffId, pillarAccess for UPDATE_PILLAR_ACCESS');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -757,7 +769,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 				return successResult;
 			}
 
-			case 'REGENERATE_ACTIVATION_CODE': {
+			case StaffWorkflowAction.REGENERATE_ACTIVATION_CODE: {
 				if (!input.staffId || !input.data?.activationCodeEncrypted || !input.data?.activationCodeExpiresAt) {
 					const error = new Error('Missing required fields for REGENERATE_ACTIVATION_CODE');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -780,7 +792,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 				return successResult;
 			}
 
-			case 'ACTIVATE_WITH_CODE': {
+			case StaffWorkflowAction.ACTIVATE_WITH_CODE: {
 				if (!input.staffId || !input.data?.displayName) {
 					const error = new Error('Missing required fields for ACTIVATE_WITH_CODE');
 					logStepError(log, 'validation', error, { staffId: input.staffId });
@@ -797,7 +809,7 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 					success: true,
 					entityId: result.id,
 					staffId: result.id,
-					status: 'ACTIVE',
+					status: StaffStatus.ACTIVE,
 					activatedAt: result.activatedAt
 				};
 				logWorkflowEnd(log, input.action, true, startTime, successResult);
@@ -828,8 +840,8 @@ async function staffWorkflow(input: StaffWorkflowInput): Promise<StaffWorkflowRe
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'STAFF_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.STAFF_WORKFLOW_ERROR
 		});
 		const errorResult: StaffWorkflowResult = {
 			success: false,

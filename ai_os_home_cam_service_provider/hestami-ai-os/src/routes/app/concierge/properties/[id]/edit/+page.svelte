@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ARCCategoryValues, PropertyTypeValues, UnitTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, Loader2, Check, Trash2 } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
@@ -22,14 +23,14 @@
 
 	// Property types for select
 	const propertyTypes = [
-		{ value: 'SINGLE_FAMILY', label: 'Single Family' },
+		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family' },
 		{ value: 'CONDO', label: 'Condominium' },
-		{ value: 'TOWNHOUSE', label: 'Townhouse' },
+		{ value: UnitTypeValues.TOWNHOUSE, label: 'Townhouse' },
 		{ value: 'MULTI_FAMILY', label: 'Multi-Family' },
 		{ value: 'APARTMENT', label: 'Apartment' },
-		{ value: 'COMMERCIAL', label: 'Commercial' },
+		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
 		{ value: 'LAND', label: 'Land' },
-		{ value: 'OTHER', label: 'Other' }
+		{ value: ARCCategoryValues.OTHER, label: 'Other' }
 	];
 
 	// US states for select
@@ -89,7 +90,7 @@
 
 	// Form state
 	let name = $state('');
-	let propertyType = $state('SINGLE_FAMILY');
+	let propertyType = $state(PropertyTypeValues.SINGLE_FAMILY);
 	let addressLine1 = $state('');
 	let addressLine2 = $state('');
 	let city = $state('');
@@ -120,6 +121,7 @@
 
 	// Synchronize server data to local state
 	$effect(() => {
+		if (!data) return;
 		if (data.property) {
 			const p = data.property;
 			name = p.name;

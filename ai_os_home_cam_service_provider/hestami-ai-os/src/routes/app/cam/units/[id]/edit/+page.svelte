@@ -3,7 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
-	import { unitApi, type Unit } from '$lib/api/cam';
+	import { PropertyTypeValues, type Unit, unitApi } from '$lib/api/cam';
 
 	let unit = $state<Unit | null>(null);
 	let isLoading = $state(true);
@@ -22,8 +22,8 @@
 
 	const unitTypeOptions = [
 		{ value: 'RESIDENTIAL', label: 'Residential' },
-		{ value: 'COMMERCIAL', label: 'Commercial' },
-		{ value: 'MIXED_USE', label: 'Mixed Use' }
+		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
+		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' }
 	];
 
 	const statusOptions = [

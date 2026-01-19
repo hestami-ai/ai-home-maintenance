@@ -1,13 +1,14 @@
 <script lang="ts">
+	import { UserRoleValues } from '$lib/api/cam';
 	import { ArrowLeft, ArrowRight, Shield, Users, Award } from 'lucide-svelte';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
 
-	let selectedRole = $state<'ADMIN' | 'MANAGER' | 'BOARD_MEMBER'>($communityOnboarding.userRole);
+	let selectedRole = $state<string>($communityOnboarding.userRole);
 
 	const roles = [
 		{
-			value: 'ADMIN' as const,
+			value: UserRoleValues.ADMIN,
 			label: 'Administrator',
 			description: 'Full access to all features and settings',
 			icon: Shield,
@@ -15,7 +16,7 @@
 			bgColor: 'bg-error-500/10'
 		},
 		{
-			value: 'MANAGER' as const,
+			value: UserRoleValues.MANAGER,
 			label: 'Community Manager',
 			description: 'Manage day-to-day operations, units, and work orders',
 			icon: Users,
@@ -23,7 +24,7 @@
 			bgColor: 'bg-warning-500/10'
 		},
 		{
-			value: 'BOARD_MEMBER' as const,
+			value: UserRoleValues.BOARD_MEMBER,
 			label: 'Board Member',
 			description: 'Review and approve decisions, access reports',
 			icon: Award,
@@ -36,9 +37,9 @@
 		communityOnboarding.setStep(4);
 	});
 
-	function selectRole(role: 'ADMIN' | 'MANAGER' | 'BOARD_MEMBER') {
+	function selectRole(role: string) {
 		selectedRole = role;
-		communityOnboarding.setUserRole(role);
+		communityOnboarding.setUserRole(role as 'ADMIN' | 'MANAGER' | 'BOARD_MEMBER');
 		goto('/onboarding/community/review');
 	}
 </script>

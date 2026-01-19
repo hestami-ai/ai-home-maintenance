@@ -1,27 +1,28 @@
 import { createDirectClient, buildServerContext } from '$lib/server/api/serverClient';
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import type { StaffRole, PillarAccess } from '$lib/schemas';
+import type { StaffRole as StaffRoleType, PillarAccess as PillarAccessType } from '$lib/schemas';
+import { StaffStatus, StaffRole, PillarAccess } from '../../../../../generated/prisma/enums.js';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
     // Get staff and memberships from parent layout (fetched via SECURITY DEFINER)
     const { staff, memberships } = await parent();
 
     // Require staff with appropriate role
-    if (!staff || staff.status !== 'ACTIVE') {
+    if (!staff || staff.status !== StaffStatus.ACTIVE) {
         throw redirect(303, '/app');
     }
 
     // PLATFORM_ADMIN has full access to document processing
-    const staffRoles = staff.roles as StaffRole[];
-    const hasAccess = staffRoles.includes('PLATFORM_ADMIN');
+    const staffRoles = staff.roles as StaffRoleType[];
+    const hasAccess = staffRoles.includes(StaffRole.PLATFORM_ADMIN);
     if (!hasAccess) {
         throw redirect(303, '/app');
     }
 
     // Check pillar access - ADMIN pillar grants access to document processing
-    const staffPillarAccess = staff.pillarAccess as PillarAccess[];
-    const hasPlatformOps = staffPillarAccess.includes('ADMIN');
+    const staffPillarAccess = staff.pillarAccess as PillarAccessType[];
+    const hasPlatformOps = staffPillarAccess.includes(PillarAccess.ADMIN);
     if (!hasPlatformOps) {
         throw redirect(303, '/app');
     }

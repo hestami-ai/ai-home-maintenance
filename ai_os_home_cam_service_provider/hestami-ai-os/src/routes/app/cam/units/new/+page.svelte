@@ -4,7 +4,7 @@
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { unitApi, propertyApi } from '$lib/api/cam';
+	import { PropertyTypeValues, propertyApi, unitApi } from '$lib/api/cam';
 
 	interface Property {
 		id: string;
@@ -33,8 +33,8 @@
 
 	const unitTypeOptions = [
 		{ value: 'RESIDENTIAL', label: 'Residential' },
-		{ value: 'COMMERCIAL', label: 'Commercial' },
-		{ value: 'MIXED_USE', label: 'Mixed Use' }
+		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
+		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' }
 	];
 
 	const statusOptions = [

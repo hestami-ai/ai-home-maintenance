@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema, NoticeTypeSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startNoticeTemplateWorkflow } from '../../../workflows/noticeTemplateWorkflow.js';
+import { startNoticeTemplateWorkflow, NoticeTemplateAction } from '../../../workflows/noticeTemplateWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('NoticeTemplateRoute');
@@ -53,7 +53,7 @@ export const noticeTemplateRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startNoticeTemplateWorkflow(
 				{
-					action: 'CREATE_TEMPLATE',
+					action: NoticeTemplateAction.CREATE_TEMPLATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -219,7 +219,7 @@ export const noticeTemplateRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startNoticeTemplateWorkflow(
 				{
-					action: 'UPDATE_TEMPLATE',
+					action: NoticeTemplateAction.UPDATE_TEMPLATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -274,7 +274,7 @@ export const noticeTemplateRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startNoticeTemplateWorkflow(
 				{
-					action: 'DELETE_TEMPLATE',
+					action: NoticeTemplateAction.DELETE_TEMPLATE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

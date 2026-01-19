@@ -12,6 +12,18 @@ import { type EntityWorkflowResult } from './schemas.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd } from './workflowLogger.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	MediaType as MediaTypeEnum
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	MEDIA_WORKFLOW_ERROR: 'MEDIA_WORKFLOW_ERROR'
+} as const;
 
 // Action types for the unified workflow
 export const MediaAction = {
@@ -100,7 +112,7 @@ async function addVoiceNote(
 				organizationId,
 				jobId: data.jobId as string,
 				jobVisitId: data.jobVisitId as string | undefined,
-				mediaType: 'AUDIO',
+				mediaType: MediaTypeEnum.AUDIO,
 				fileName: data.fileName as string,
 				fileSize: data.fileSize as number,
 				mimeType: data.mimeType as string,
@@ -167,15 +179,15 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'JOB', // Media is attached to jobs
+					entityType: ActivityEntityType.JOB, // Media is attached to jobs
 					entityId: entityId,
-					action: 'CREATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: `Registered media: ${input.data.fileName}`,
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'mediaWorkflow_v1',
-					workflowStep: 'REGISTER_MEDIA',
+					workflowStep: MediaAction.REGISTER_MEDIA,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -187,15 +199,15 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'JOB',
+					entityType: ActivityEntityType.JOB,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'SYSTEM',
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.SYSTEM,
 					summary: 'Media upload confirmed',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'mediaWorkflow_v1',
-					workflowStep: 'MARK_UPLOADED',
+					workflowStep: MediaAction.MARK_UPLOADED,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -207,15 +219,15 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'JOB',
+					entityType: ActivityEntityType.JOB,
 					entityId: entityId,
-					action: 'CREATE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.CREATE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Voice note added',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'mediaWorkflow_v1',
-					workflowStep: 'ADD_VOICE_NOTE',
+					workflowStep: MediaAction.ADD_VOICE_NOTE,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -227,15 +239,15 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'JOB',
+					entityType: ActivityEntityType.JOB,
 					entityId: entityId,
-					action: 'UPDATE',
-					eventCategory: 'SYSTEM', // Usually done by AI/System
+					action: ActivityActionType.UPDATE,
+					eventCategory: ActivityEventCategory.SYSTEM, // Usually done by AI/System
 					summary: 'Voice note transcription updated',
 					performedById: input.userId,
-					performedByType: 'SYSTEM',
+					performedByType: ActivityActorType.SYSTEM,
 					workflowId: 'mediaWorkflow_v1',
-					workflowStep: 'UPDATE_TRANSCRIPTION',
+					workflowStep: MediaAction.UPDATE_TRANSCRIPTION,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -247,15 +259,15 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 				);
 				await recordWorkflowEvent({
 					organizationId: input.organizationId,
-					entityType: 'JOB',
+					entityType: ActivityEntityType.JOB,
 					entityId: input.mediaId!,
-					action: 'DELETE',
-					eventCategory: 'EXECUTION',
+					action: ActivityActionType.DELETE,
+					eventCategory: ActivityEventCategory.EXECUTION,
 					summary: 'Media deleted',
 					performedById: input.userId,
-					performedByType: 'HUMAN',
+					performedByType: ActivityActorType.HUMAN,
 					workflowId: 'mediaWorkflow_v1',
-					workflowStep: 'DELETE_MEDIA',
+					workflowStep: MediaAction.DELETE_MEDIA,
 					workflowVersion: 'v1'
 				});
 				break;
@@ -280,8 +292,8 @@ async function mediaWorkflow(input: MediaWorkflowInput): Promise<MediaWorkflowRe
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'MEDIA_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.MEDIA_WORKFLOW_ERROR
 		});
 
 		const errorResult = { success: false, error: errorMessage };

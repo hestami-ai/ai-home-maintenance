@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { CaseNoteTypeValues, NoticeTypeValues } from '$lib/api/cam';
 	import { X, Loader2, Send } from 'lucide-svelte';
 
 	interface NoticeTemplate {
@@ -25,28 +26,28 @@
 		onCancel
 	}: Props = $props();
 
-	let noticeType = $state('FIRST_NOTICE');
+	let noticeType = $state(NoticeTypeValues.FIRST_NOTICE);
 	let templateId = $state('');
 	let curePeriodDays = $state(14);
 	let notes = $state('');
 	let error = $state('');
 
 	const noticeTypeOptions = [
-		{ value: 'FIRST_NOTICE', label: 'First Notice', defaultDays: 14 },
-		{ value: 'SECOND_NOTICE', label: 'Second Notice', defaultDays: 7 },
-		{ value: 'FINAL_NOTICE', label: 'Final Notice', defaultDays: 3 },
-		{ value: 'HEARING_NOTICE', label: 'Hearing Notice', defaultDays: 14 }
+		{ value: NoticeTypeValues.FIRST_NOTICE, label: 'First Notice', defaultDays: 14 },
+		{ value: NoticeTypeValues.SECOND_NOTICE, label: 'Second Notice', defaultDays: 7 },
+		{ value: NoticeTypeValues.FINAL_NOTICE, label: 'Final Notice', defaultDays: 3 },
+		{ value: NoticeTypeValues.HEARING_NOTICE, label: 'Hearing Notice', defaultDays: 14 }
 	];
 
 	const templates: NoticeTemplate[] = [
-		{ id: 'tpl-1', name: 'Standard First Notice', type: 'FIRST_NOTICE' },
-		{ id: 'tpl-2', name: 'Standard Second Notice', type: 'SECOND_NOTICE' },
-		{ id: 'tpl-3', name: 'Final Warning Notice', type: 'FINAL_NOTICE' },
-		{ id: 'tpl-4', name: 'Hearing Notification', type: 'HEARING_NOTICE' }
+		{ id: 'tpl-1', name: 'Standard First Notice', type: NoticeTypeValues.FIRST_NOTICE },
+		{ id: 'tpl-2', name: 'Standard Second Notice', type: NoticeTypeValues.SECOND_NOTICE },
+		{ id: 'tpl-3', name: 'Final Warning Notice', type: NoticeTypeValues.FINAL_NOTICE },
+		{ id: 'tpl-4', name: 'Hearing Notification', type: NoticeTypeValues.HEARING_NOTICE }
 	];
 
 	const filteredTemplates = $derived(
-		templates.filter(t => t.type === noticeType || t.type === 'GENERAL')
+		templates.filter(t => t.type === noticeType || t.type === CaseNoteTypeValues.GENERAL)
 	);
 
 	function handleNoticeTypeChange() {
@@ -72,7 +73,7 @@
 	}
 
 	function handleCancel() {
-		noticeType = 'FIRST_NOTICE';
+		noticeType = NoticeTypeValues.FIRST_NOTICE;
 		templateId = '';
 		curePeriodDays = 14;
 		notes = '';
@@ -82,7 +83,7 @@
 
 	$effect(() => {
 		if (!open) {
-			noticeType = 'FIRST_NOTICE';
+			noticeType = NoticeTypeValues.FIRST_NOTICE;
 			templateId = '';
 			curePeriodDays = 14;
 			notes = '';

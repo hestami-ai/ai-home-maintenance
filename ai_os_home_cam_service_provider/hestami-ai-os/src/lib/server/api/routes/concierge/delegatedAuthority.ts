@@ -12,7 +12,9 @@ import { DelegatedAuthorityTypeSchema } from '../../../../../../generated/zod/in
 import { DelegatedAuthorityStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/DelegatedAuthorityStatusSchema.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startDelegatedAuthorityWorkflow } from '../../../workflows/index.js';
+import { startDelegatedAuthorityWorkflow, DelegatedAuthorityWorkflowAction as DelegatedAuthorityAction } from '../../../workflows/index.js';
+import { SortOrder } from '../../../workflows/schemas.js';
+import { PropertyOwnershipRole, DelegatedAuthorityStatus, PropertyOwnershipStatus, PartyType } from '../../../../../../generated/prisma/enums.js';
 
 const log = createModuleLogger('DelegatedAuthorityRoute');
 
@@ -80,7 +82,7 @@ export const delegatedAuthorityRouter = {
 			}
 
 			// Only OWNER or CO_OWNER can grant delegated authority
-			if (!['OWNER', 'CO_OWNER'].includes(propertyOwnership.role)) {
+			if (!([PropertyOwnershipRole.OWNER, PropertyOwnershipRole.CO_OWNER] as PropertyOwnershipRole[]).includes(propertyOwnership.role)) {
 				throw errors.FORBIDDEN({ message: 'Only owners or co-owners can grant delegated authority' });
 			}
 
@@ -105,7 +107,7 @@ export const delegatedAuthorityRouter = {
 					propertyOwnershipId: input.propertyOwnershipId,
 					delegatePartyId: input.delegatePartyId,
 					authorityType: input.authorityType,
-					status: { in: ['ACTIVE', 'PENDING_ACCEPTANCE'] },
+					status: { in: [DelegatedAuthorityStatus.ACTIVE, DelegatedAuthorityStatus.PENDING_ACCEPTANCE] },
 					propertyOwnership: {
 						property: { ownerOrgId: context.organization.id }
 					}
@@ -119,7 +121,7 @@ export const delegatedAuthorityRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startDelegatedAuthorityWorkflow(
 				{
-					action: 'GRANT',
+					action: DelegatedAuthorityAction.GRANT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyOwnershipId: input.propertyOwnershipId,
@@ -237,12 +239,12 @@ export const delegatedAuthorityRouter = {
 			});
 
 			const ownerDisplayName =
-				delegatedAuthority.propertyOwnership.party.partyType === 'INDIVIDUAL'
+				delegatedAuthority.propertyOwnership.party.partyType === PartyType.INDIVIDUAL
 					? `${delegatedAuthority.propertyOwnership.party.firstName ?? ''} ${delegatedAuthority.propertyOwnership.party.lastName ?? ''}`.trim()
 					: delegatedAuthority.propertyOwnership.party.entityName ?? '';
 
 			const delegateDisplayName =
-				delegatedAuthority.delegateParty.partyType === 'INDIVIDUAL'
+				delegatedAuthority.delegateParty.partyType === PartyType.INDIVIDUAL
 					? `${delegatedAuthority.delegateParty.firstName ?? ''} ${delegatedAuthority.delegateParty.lastName ?? ''}`.trim()
 					: delegatedAuthority.delegateParty.entityName ?? '';
 
@@ -354,7 +356,7 @@ export const delegatedAuthorityRouter = {
 				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
-				orderBy: [{ status: 'asc' }, { grantedAt: 'desc' }],
+				orderBy: [{ status: SortOrder.ASC }, { grantedAt: 'desc' }],
 				include: { delegateParty: true }
 			});
 
@@ -367,7 +369,7 @@ export const delegatedAuthorityRouter = {
 						id: da.id,
 						delegatePartyId: da.delegatePartyId,
 						delegatePartyName:
-							da.delegateParty.partyType === 'INDIVIDUAL'
+							da.delegateParty.partyType === PartyType.INDIVIDUAL
 								? `${da.delegateParty.firstName ?? ''} ${da.delegateParty.lastName ?? ''}`.trim()
 								: da.delegateParty.entityName ?? '',
 						authorityType: da.authorityType,
@@ -451,7 +453,7 @@ export const delegatedAuthorityRouter = {
 				},
 				take: input.limit + 1,
 				...(input.cursor && { cursor: { id: input.cursor }, skip: 1 }),
-				orderBy: [{ status: 'asc' }, { grantedAt: 'desc' }],
+				orderBy: [{ status: SortOrder.ASC }, { grantedAt: 'desc' }],
 				include: {
 					propertyOwnership: {
 						include: {
@@ -473,7 +475,7 @@ export const delegatedAuthorityRouter = {
 						propertyId: da.propertyOwnership.property.id,
 						propertyName: da.propertyOwnership.property.name,
 						ownerPartyName:
-							da.propertyOwnership.party.partyType === 'INDIVIDUAL'
+							da.propertyOwnership.party.partyType === PartyType.INDIVIDUAL
 								? `${da.propertyOwnership.party.firstName ?? ''} ${da.propertyOwnership.party.lastName ?? ''}`.trim()
 								: da.propertyOwnership.party.entityName ?? '',
 						authorityType: da.authorityType,
@@ -539,7 +541,7 @@ export const delegatedAuthorityRouter = {
 				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
-			if (existing.status !== 'PENDING_ACCEPTANCE') {
+			if (existing.status !== DelegatedAuthorityStatus.PENDING_ACCEPTANCE) {
 				throw errors.BAD_REQUEST({ message: 'Delegated authority is not pending acceptance' });
 			}
 
@@ -551,7 +553,7 @@ export const delegatedAuthorityRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startDelegatedAuthorityWorkflow(
 				{
-					action: 'ACCEPT',
+					action: DelegatedAuthorityAction.ACCEPT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					delegatedAuthorityId: input.id
@@ -623,7 +625,7 @@ export const delegatedAuthorityRouter = {
 				throw errors.NOT_FOUND({ message: 'DelegatedAuthority not found' });
 			}
 
-			if (!['ACTIVE', 'PENDING_ACCEPTANCE'].includes(existing.status)) {
+			if (!([DelegatedAuthorityStatus.ACTIVE, DelegatedAuthorityStatus.PENDING_ACCEPTANCE] as DelegatedAuthorityStatus[]).includes(existing.status)) {
 				throw errors.BAD_REQUEST({ message: 'Delegated authority cannot be revoked' });
 			}
 
@@ -633,7 +635,7 @@ export const delegatedAuthorityRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startDelegatedAuthorityWorkflow(
 				{
-					action: 'REVOKE',
+					action: DelegatedAuthorityAction.REVOKE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					delegatedAuthorityId: input.id,
@@ -707,8 +709,8 @@ export const delegatedAuthorityRouter = {
 				where: {
 					propertyId: input.propertyId,
 					partyId: input.partyId,
-					role: { in: ['OWNER', 'CO_OWNER'] },
-					status: 'ACTIVE',
+					role: { in: [PropertyOwnershipRole.OWNER, PropertyOwnershipRole.CO_OWNER] },
+					status: PropertyOwnershipStatus.ACTIVE,
 					deletedAt: null,
 					property: { ownerOrgId: context.organization.id }
 				}
@@ -733,11 +735,11 @@ export const delegatedAuthorityRouter = {
 				where: {
 					delegatePartyId: input.partyId,
 					authorityType: input.authorityType,
-					status: 'ACTIVE',
+					status: DelegatedAuthorityStatus.ACTIVE,
 					OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
 					propertyOwnership: {
 						propertyId: input.propertyId,
-						status: 'ACTIVE',
+						status: PropertyOwnershipStatus.ACTIVE,
 						deletedAt: null,
 						property: { ownerOrgId: context.organization.id }
 					}

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startServiceAreaWorkflow } from '../../../workflows/serviceAreaWorkflow.js';
+import { startServiceAreaWorkflow, ServiceAreaAction } from '../../../workflows/serviceAreaWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ServiceAreaRoute');
@@ -54,7 +54,7 @@ export const serviceAreaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startServiceAreaWorkflow(
 				{
-					action: 'CREATE_AREA',
+					action: ServiceAreaAction.CREATE_AREA,
 					organizationId: org.id,
 					userId: context.user!.id,
 					data: {
@@ -170,7 +170,7 @@ export const serviceAreaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startServiceAreaWorkflow(
 				{
-					action: 'UPDATE_AREA',
+					action: ServiceAreaAction.UPDATE_AREA,
 					organizationId: org.id,
 					userId: context.user!.id,
 					serviceAreaId: input.id,
@@ -226,7 +226,7 @@ export const serviceAreaRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startServiceAreaWorkflow(
 				{
-					action: 'DELETE_AREA',
+					action: ServiceAreaAction.DELETE_AREA,
 					organizationId: org.id,
 					userId: context.user!.id,
 					serviceAreaId: input.id,

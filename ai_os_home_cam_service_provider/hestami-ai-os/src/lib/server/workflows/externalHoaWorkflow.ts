@@ -11,6 +11,18 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	ExternalApprovalStatus
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	EXTERNAL_HOA_WORKFLOW_ERROR: 'EXTERNAL_HOA_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'external_hoa_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'external_hoa_workflow_error';
@@ -104,15 +116,15 @@ async function createContext(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: hoaContext.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `External HOA context created: ${input.hoaName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalHoaWorkflow_v1',
-		workflowStep: 'CREATE_CONTEXT',
+		workflowStep: ExternalHoaWorkflowAction.CREATE_CONTEXT,
 		workflowVersion: 'v1',
 		newState: { hoaName: input.hoaName, propertyId: input.propertyId }
 	});
@@ -150,15 +162,15 @@ async function updateContext(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: updated.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `External HOA context updated: ${updated.hoaName}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalHoaWorkflow_v1',
-		workflowStep: 'UPDATE_CONTEXT',
+		workflowStep: ExternalHoaWorkflowAction.UPDATE_CONTEXT,
 		workflowVersion: 'v1',
 		newState: updateData
 	});
@@ -182,7 +194,7 @@ async function createApproval(
 					externalHoaContextId: input.externalHoaContextId!,
 					caseId: input.caseId,
 					approvalType: input.approvalType!,
-					status: 'PENDING',
+					status: ExternalApprovalStatus.PENDING,
 					notes: input.notes,
 					relatedDocumentIds: input.relatedDocumentIds ?? []
 				}
@@ -193,17 +205,17 @@ async function createApproval(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: approval.id,
-		action: 'CREATE',
-		eventCategory: 'INTENT',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.INTENT,
 		summary: `HOA approval requested: ${input.approvalType}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalHoaWorkflow_v1',
-		workflowStep: 'CREATE_APPROVAL',
+		workflowStep: ExternalHoaWorkflowAction.CREATE_APPROVAL,
 		workflowVersion: 'v1',
-		newState: { approvalType: input.approvalType, status: 'PENDING' }
+		newState: { approvalType: input.approvalType, status: ExternalApprovalStatus.PENDING }
 	});
 
 	return {
@@ -239,15 +251,15 @@ async function updateApprovalStatus(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: updated.id,
-		action: 'STATUS_CHANGE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.STATUS_CHANGE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `HOA approval status: ${input.status}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalHoaWorkflow_v1',
-		workflowStep: 'UPDATE_APPROVAL_STATUS',
+		workflowStep: ExternalHoaWorkflowAction.UPDATE_APPROVAL_STATUS,
 		workflowVersion: 'v1',
 		previousState: { status: previousStatus },
 		newState: { status: input.status }
@@ -281,15 +293,15 @@ async function addRule(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: rule.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `HOA rule added: ${input.ruleCategory}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalHoaWorkflow_v1',
-		workflowStep: 'ADD_RULE',
+		workflowStep: ExternalHoaWorkflowAction.ADD_RULE,
 		workflowVersion: 'v1',
 		newState: { ruleCategory: input.ruleCategory, ruleDescription: input.ruleDescription }
 	});
@@ -320,15 +332,15 @@ async function deleteRule(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'EXTERNAL_HOA',
+		entityType: ActivityEntityType.EXTERNAL_HOA,
 		entityId: ruleId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `HOA rule deleted`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'externalHoaWorkflow_v1',
-		workflowStep: 'DELETE_RULE',
+		workflowStep: ExternalHoaWorkflowAction.DELETE_RULE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: new Date().toISOString() }
 	});
@@ -350,7 +362,7 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE_CONTEXT': {
+			case ExternalHoaWorkflowAction.CREATE_CONTEXT: {
 				if (!input.propertyId || !input.hoaName) {
 					const error = new Error('Missing required fields: propertyId and hoaName for CREATE_CONTEXT');
 					logStepError(log, 'validation', error, { input });
@@ -374,7 +386,7 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 				return successResult;
 			}
 
-			case 'UPDATE_CONTEXT': {
+			case ExternalHoaWorkflowAction.UPDATE_CONTEXT: {
 				if (!input.contextId) {
 					const error = new Error('Missing required field: contextId for UPDATE_CONTEXT');
 					logStepError(log, 'validation', error, { contextId: input.contextId });
@@ -398,7 +410,7 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 				return successResult;
 			}
 
-			case 'CREATE_APPROVAL': {
+			case ExternalHoaWorkflowAction.CREATE_APPROVAL: {
 				if (!input.externalHoaContextId || !input.approvalType) {
 					const error = new Error('Missing required fields: externalHoaContextId and approvalType for CREATE_APPROVAL');
 					logStepError(log, 'validation', error, { input });
@@ -423,7 +435,7 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 				return successResult;
 			}
 
-			case 'UPDATE_APPROVAL_STATUS': {
+			case ExternalHoaWorkflowAction.UPDATE_APPROVAL_STATUS: {
 				if (!input.approvalId || !input.status) {
 					const error = new Error('Missing required fields: approvalId and status for UPDATE_APPROVAL_STATUS');
 					logStepError(log, 'validation', error, { input });
@@ -449,7 +461,7 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 				return successResult;
 			}
 
-			case 'ADD_RULE': {
+			case ExternalHoaWorkflowAction.ADD_RULE: {
 				if (!input.externalHoaContextId || !input.ruleCategory || !input.ruleDescription) {
 					const error = new Error('Missing required fields: externalHoaContextId, ruleCategory, and ruleDescription for ADD_RULE');
 					logStepError(log, 'validation', error, { input });
@@ -474,7 +486,7 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 				return successResult;
 			}
 
-			case 'DELETE_RULE': {
+			case ExternalHoaWorkflowAction.DELETE_RULE: {
 				if (!input.ruleId) {
 					const error = new Error('Missing required field: ruleId for DELETE_RULE');
 					logStepError(log, 'validation', error, { ruleId: input.ruleId });
@@ -520,8 +532,8 @@ async function externalHoaWorkflow(input: ExternalHoaWorkflowInput): Promise<Ext
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'EXTERNAL_HOA_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.EXTERNAL_HOA_WORKFLOW_ERROR
 		});
 		const errorResult: ExternalHoaWorkflowResult = {
 			success: false,

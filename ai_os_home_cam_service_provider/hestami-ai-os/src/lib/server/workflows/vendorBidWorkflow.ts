@@ -10,6 +10,12 @@ import { orgTransaction } from '../db/rls.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VENDOR_BID_WORKFLOW_ERROR: 'VENDOR_BID_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('VendorBidWorkflow');
 
@@ -207,7 +213,7 @@ async function rejectVendorBid(
 async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorBidWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE': {
+			case VendorBidWorkflowAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createVendorBid(input.organizationId, input.userId, input.data),
 					{ name: 'createVendorBid' }
@@ -220,7 +226,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 				};
 			}
 
-			case 'UPDATE': {
+			case VendorBidWorkflowAction.UPDATE: {
 				const result = await DBOS.runStep(
 					() => updateVendorBid(input.organizationId, input.userId, input.bidId!, input.data),
 					{ name: 'updateVendorBid' }
@@ -228,7 +234,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 				return { success: true, entityId: result.bidId, bidId: result.bidId };
 			}
 
-			case 'ACCEPT': {
+			case VendorBidWorkflowAction.ACCEPT: {
 				const result = await DBOS.runStep(
 					() => acceptVendorBid(input.organizationId, input.userId, input.bidId!, input.data.vendorCandidateId!, input.data.caseId!),
 					{ name: 'acceptVendorBid' }
@@ -236,7 +242,7 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 				return { success: true, entityId: result.bidId, bidId: result.bidId };
 			}
 
-			case 'REJECT': {
+			case VendorBidWorkflowAction.REJECT: {
 				const result = await DBOS.runStep(
 					() => rejectVendorBid(
 						input.organizationId,
@@ -260,8 +266,8 @@ async function vendorBidWorkflow(input: VendorBidWorkflowInput): Promise<VendorB
 		log.error(`Error in ${input.action}`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VENDOR_BID_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VENDOR_BID_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

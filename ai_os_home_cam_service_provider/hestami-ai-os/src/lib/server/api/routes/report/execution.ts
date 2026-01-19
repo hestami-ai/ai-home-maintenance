@@ -3,7 +3,7 @@ import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import { orgProcedure, successResponse, PaginationInputSchema } from '../../router.js';
 import { ReportFormatSchema, ReportExecutionStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startReportExecutionWorkflow } from '../../../workflows/reportExecutionWorkflow.js';
+import { startReportExecutionWorkflow, ReportExecutionAction } from '../../../workflows/reportExecutionWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('ReportExecutionRoute');
@@ -53,7 +53,7 @@ export const reportExecutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportExecutionWorkflow(
 				{
-					action: 'GENERATE_REPORT',
+					action: ReportExecutionAction.GENERATE_REPORT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -248,7 +248,7 @@ export const reportExecutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startReportExecutionWorkflow(
 				{
-					action: 'CANCEL_EXECUTION',
+					action: ReportExecutionAction.CANCEL_EXECUTION,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					associationId: association.id,

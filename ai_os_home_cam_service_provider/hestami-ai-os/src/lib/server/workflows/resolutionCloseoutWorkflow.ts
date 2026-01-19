@@ -11,6 +11,20 @@ import { orgTransaction } from '../db/rls.js';
 import type { DecisionCategory } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import { ActivityActionType, ConciergeCaseStatus, ConciergeActionStatus } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	RESOLUTION_CLOSEOUT_WORKFLOW_ERROR: 'RESOLUTION_CLOSEOUT_WORKFLOW_ERROR'
+} as const;
+
+// Action types for resolution closeout workflow
+export const ResolutionCloseoutAction = {
+	VALIDATE_RESOLUTION: 'VALIDATE_RESOLUTION',
+	RECORD_DECISION: 'RECORD_DECISION',
+	CLOSE_CASE: 'CLOSE_CASE',
+	FULL_CLOSEOUT: 'FULL_CLOSEOUT'
+} as const;
 
 const log = createWorkflowLogger('resolutionCloseoutWorkflow');
 
@@ -62,20 +76,20 @@ async function validateResolution(caseId: string): Promise<ValidationResult> {
 	const issues: string[] = [];
 
 	// Check case is in resolvable state
-	if (!['IN_PROGRESS', 'PENDING_EXTERNAL', 'PENDING_OWNER'].includes(caseRecord.status)) {
+	if (!([ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER] as ConciergeCaseStatus[]).includes(caseRecord.status as ConciergeCaseStatus)) {
 		issues.push(`Case is in status ${caseRecord.status}, cannot resolve`);
 	}
 
 	// Check all actions are completed or cancelled
 	const pendingActions = caseRecord.actions.filter(
-		(a) => !['COMPLETED', 'CANCELLED'].includes(a.status)
+		(a) => !([ConciergeActionStatus.COMPLETED, ConciergeActionStatus.CANCELLED] as ConciergeActionStatus[]).includes(a.status as ConciergeActionStatus)
 	);
 	if (pendingActions.length > 0) {
 		issues.push(`${pendingActions.length} action(s) still pending`);
 	}
 
 	// Check resolution summary exists if already resolved
-	if (caseRecord.status === 'RESOLVED' && !caseRecord.resolutionSummary) {
+	if (caseRecord.status === ConciergeCaseStatus.RESOLVED && !caseRecord.resolutionSummary) {
 		issues.push('Resolution summary is required');
 	}
 
@@ -131,11 +145,11 @@ async function resolveAndCloseCase(
 			}
 
 			// If not already resolved, resolve first
-			if (caseRecord.status !== 'RESOLVED') {
+			if (caseRecord.status !== ConciergeCaseStatus.RESOLVED) {
 				await tx.conciergeCase.update({
 					where: { id: caseId },
 					data: {
-						status: 'RESOLVED',
+						status: ConciergeCaseStatus.RESOLVED,
 						resolutionSummary,
 						resolvedBy: userId,
 						resolvedAt: new Date()
@@ -146,7 +160,7 @@ async function resolveAndCloseCase(
 					data: {
 						caseId,
 						fromStatus: caseRecord.status,
-						toStatus: 'RESOLVED',
+						toStatus: ConciergeCaseStatus.RESOLVED,
 						reason: resolutionSummary,
 						changedBy: userId
 					}
@@ -157,7 +171,7 @@ async function resolveAndCloseCase(
 			await tx.conciergeCase.update({
 				where: { id: caseId },
 				data: {
-					status: 'CLOSED',
+					status: ConciergeCaseStatus.CLOSED,
 					closedAt: new Date()
 				}
 			});
@@ -165,14 +179,14 @@ async function resolveAndCloseCase(
 			await tx.caseStatusHistory.create({
 				data: {
 					caseId,
-					fromStatus: 'RESOLVED',
-					toStatus: 'CLOSED',
+					fromStatus: ConciergeCaseStatus.RESOLVED,
+					toStatus: ConciergeCaseStatus.CLOSED,
 					reason: 'Case closed after resolution',
 					changedBy: userId
 				}
 			});
 
-			return { status: 'CLOSED' };
+			return { status: ConciergeCaseStatus.CLOSED };
 		},
 		{ userId, reason: 'Resolve and close case' }
 	);
@@ -370,8 +384,8 @@ async function resolutionCloseoutWorkflow(
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'RESOLUTION_CLOSEOUT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.RESOLUTION_CLOSEOUT_WORKFLOW_ERROR
 		});
 
 		logStepError(log, input.action, errorObj, { caseId: input.caseId });

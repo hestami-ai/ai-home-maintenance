@@ -12,8 +12,26 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { Prisma } from '../../../../generated/prisma/client.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType,
+	ARCRequestStatus as ARCRequestStatusEnum
+} from '../../../../generated/prisma/enums.js';
 
 const log = createWorkflowLogger('ARCRequestWorkflow');
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	ARC_REQUEST_WORKFLOW_ERROR: 'ARC_REQUEST_WORKFLOW_ERROR'
+} as const;
+
+// Decision action types
+const DecisionAction = {
+	APPROVE: 'APPROVE',
+	DENY: 'DENY'
+} as const;
 
 // Action types for the unified workflow
 export const ARCRequestAction = {
@@ -90,7 +108,7 @@ async function createRequest(
 					proposedStartDate: data.proposedStartDate ? new Date(data.proposedStartDate as string) : undefined,
 					proposedEndDate: data.proposedEndDate ? new Date(data.proposedEndDate as string) : undefined,
 					requestNumber,
-					status: 'DRAFT'
+					status: ARCRequestStatusEnum.DRAFT
 				}
 			});
 		}, { userId, reason: 'Creating ARC request via workflow' });
@@ -164,7 +182,7 @@ async function submitRequest(
 				throw new Error('ARC Request not found');
 			}
 
-			if (request.status !== 'DRAFT') {
+			if (request.status !== ARCRequestStatusEnum.DRAFT) {
 				throw new Error('Only draft requests can be submitted');
 			}
 
@@ -173,7 +191,7 @@ async function submitRequest(
 			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
-					status: 'SUBMITTED',
+					status: ARCRequestStatusEnum.SUBMITTED,
 					submittedAt: new Date()
 				}
 			});
@@ -214,7 +232,7 @@ async function withdrawRequest(
 			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
-					status: 'WITHDRAWN',
+					status: ARCRequestStatusEnum.WITHDRAWN,
 					withdrawnAt: new Date()
 				}
 			});
@@ -277,15 +295,15 @@ async function addDocument(
 		// Record activity event
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'ARC_REQUEST',
+			entityType: ActivityEntityType.ARC_REQUEST,
 			entityId: requestId,
-			action: 'UPDATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.UPDATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: `Document added: ${data.fileName}`,
 			workflowId: 'arcRequestWorkflow_v1',
-			workflowStep: 'ADD_DOCUMENT',
+			workflowStep: ARCRequestAction.ADD_DOCUMENT,
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			arcRequestId: requestId,
 			newState: { documentId: document.id, fileName: data.fileName }
 		});
@@ -313,14 +331,14 @@ async function recordDecision(
 				throw new Error('ARC Request not found');
 			}
 
-			const reviewableStatuses: ARCRequestStatus[] = ['SUBMITTED', 'UNDER_REVIEW'];
+			const reviewableStatuses: ARCRequestStatus[] = [ARCRequestStatus.SUBMITTED, ARCRequestStatus.UNDER_REVIEW];
 			if (!reviewableStatuses.includes(request.status as ARCRequestStatus)) {
 				throw new Error('Request is not in a reviewable status');
 			}
 
 			const previousStatus = request.status;
 			const action = data.action as string;
-			const newStatus = action === 'APPROVE' ? 'APPROVED' : action === 'DENY' ? 'DENIED' : 'UNDER_REVIEW';
+			const newStatus = action === DecisionAction.APPROVE ? ARCRequestStatusEnum.APPROVED : action === DecisionAction.DENY ? ARCRequestStatusEnum.DENIED : ARCRequestStatusEnum.UNDER_REVIEW;
 
 			// Create review record
 			await tx.aRCReview.create({
@@ -378,7 +396,7 @@ async function requestInfo(
 			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
-					status: 'CHANGES_REQUESTED'
+					status: ARCRequestStatusEnum.CHANGES_REQUESTED
 				}
 			});
 
@@ -409,7 +427,7 @@ async function submitInfo(
 				throw new Error('ARC Request not found');
 			}
 
-			if (request.status !== 'CHANGES_REQUESTED') {
+			if (request.status !== ARCRequestStatusEnum.CHANGES_REQUESTED) {
 				throw new Error('No information request pending for this ARC request');
 			}
 
@@ -418,7 +436,7 @@ async function submitInfo(
 			const updated = await tx.aRCRequest.update({
 				where: { id: requestId },
 				data: {
-					status: 'SUBMITTED'
+					status: ARCRequestStatusEnum.SUBMITTED
 				}
 			});
 
@@ -438,56 +456,56 @@ async function arcRequestWorkflow(input: ARCRequestWorkflowInput): Promise<ARCRe
 		let result: { entityId: string; previousStatus?: string; newStatus?: string };
 
 		switch (input.action) {
-			case 'CREATE_REQUEST':
+			case ARCRequestAction.CREATE_REQUEST:
 				result = await DBOS.runStep(
 					() => createRequest(input.organizationId, input.userId, input.data),
 					{ name: 'createRequest' }
 				);
 				break;
 
-			case 'UPDATE_REQUEST':
+			case ARCRequestAction.UPDATE_REQUEST:
 				result = await DBOS.runStep(
 					() => updateRequest(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'updateRequest' }
 				);
 				break;
 
-			case 'SUBMIT_REQUEST':
+			case ARCRequestAction.SUBMIT_REQUEST:
 				result = await DBOS.runStep(
 					() => submitRequest(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'submitRequest' }
 				);
 				break;
 
-			case 'WITHDRAW_REQUEST':
+			case ARCRequestAction.WITHDRAW_REQUEST:
 				result = await DBOS.runStep(
 					() => withdrawRequest(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'withdrawRequest' }
 				);
 				break;
 
-			case 'ADD_DOCUMENT':
+			case ARCRequestAction.ADD_DOCUMENT:
 				result = await DBOS.runStep(
 					() => addDocument(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'addDocument' }
 				);
 				break;
 
-			case 'RECORD_DECISION':
+			case ARCRequestAction.RECORD_DECISION:
 				result = await DBOS.runStep(
 					() => recordDecision(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'recordDecision' }
 				);
 				break;
 
-			case 'REQUEST_INFO':
+			case ARCRequestAction.REQUEST_INFO:
 				result = await DBOS.runStep(
 					() => requestInfo(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'requestInfo' }
 				);
 				break;
 
-			case 'SUBMIT_INFO':
+			case ARCRequestAction.SUBMIT_INFO:
 				result = await DBOS.runStep(
 					() => submitInfo(input.organizationId, input.userId, input.requestId!, input.data),
 					{ name: 'submitInfo' }
@@ -511,8 +529,8 @@ async function arcRequestWorkflow(input: ARCRequestWorkflowInput): Promise<ARCRe
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'ARC_REQUEST_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.ARC_REQUEST_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

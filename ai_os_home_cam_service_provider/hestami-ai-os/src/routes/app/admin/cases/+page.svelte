@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ActivityEntityTypeValues, ConciergeCaseStatusValues, JobStatusValues, ViolationStatusValues } from '$lib/api/cam';
 	import {
 		Briefcase,
 		Search,
@@ -17,7 +18,15 @@
 
 	// Get data from server load function
 	let { data } = $props();
-	const cases = $derived(data.cases);
+	// Use $state with $effect to sync data - track data reference but read properties safely
+	let cases = $state<any[]>([]);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			cases = data.cases ?? [];
+		}
+	});
 
 	let isRefreshing = $state(false);
 	let searchQuery = $state('');
@@ -105,14 +114,14 @@
 
 	const statuses = [
 		{ value: '', label: 'All Statuses' },
-		{ value: 'INTAKE', label: 'Intake' },
-		{ value: 'ASSESSMENT', label: 'Assessment' },
-		{ value: 'IN_PROGRESS', label: 'In Progress' },
-		{ value: 'PENDING_EXTERNAL', label: 'Pending External' },
-		{ value: 'PENDING_OWNER', label: 'Pending Owner' },
-		{ value: 'ON_HOLD', label: 'On Hold' },
-		{ value: 'RESOLVED', label: 'Resolved' },
-		{ value: 'CLOSED', label: 'Closed' }
+		{ value: ConciergeCaseStatusValues.INTAKE, label: 'Intake' },
+		{ value: ActivityEntityTypeValues.ASSESSMENT, label: 'Assessment' },
+		{ value: JobStatusValues.IN_PROGRESS, label: 'In Progress' },
+		{ value: ConciergeCaseStatusValues.PENDING_EXTERNAL, label: 'Pending External' },
+		{ value: ConciergeCaseStatusValues.PENDING_OWNER, label: 'Pending Owner' },
+		{ value: JobStatusValues.ON_HOLD, label: 'On Hold' },
+		{ value: ViolationStatusValues.RESOLVED, label: 'Resolved' },
+		{ value: JobStatusValues.CLOSED, label: 'Closed' }
 	];
 </script>
 

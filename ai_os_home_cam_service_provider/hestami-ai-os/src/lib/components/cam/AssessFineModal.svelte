@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { JobSourceTypeValues, ScheduleFrequencyValues } from '$lib/api/cam';
 	import { X, Loader2, DollarSign } from 'lucide-svelte';
 
 	interface Props {
@@ -27,8 +28,8 @@
 
 	const fineTypeOptions = [
 		{ value: 'STANDARD', label: 'Standard Fine', defaultAmount: 100 },
-		{ value: 'DAILY', label: 'Daily Fine', defaultAmount: 25 },
-		{ value: 'RECURRING', label: 'Recurring Fine', defaultAmount: 50 },
+		{ value: ScheduleFrequencyValues.DAILY, label: 'Daily Fine', defaultAmount: 25 },
+		{ value: JobSourceTypeValues.RECURRING, label: 'Recurring Fine', defaultAmount: 50 },
 		{ value: 'HEARING_ASSESSED', label: 'Hearing-Assessed Fine', defaultAmount: 250 }
 	];
 

@@ -5,7 +5,7 @@ import { orgProcedure, successResponse } from '../../router.js';
 import { prisma } from '../../../db.js';
 import type { Prisma } from '../../../../../../generated/prisma/client.js';
 import { createModuleLogger } from '../../../logger.js';
-import { startBankAccountWorkflow } from '../../../workflows/index.js';
+import { startBankAccountWorkflow, BankAccountWorkflowAction } from '../../../workflows/index.js';
 
 const log = createModuleLogger('BankAccountRoute');
 
@@ -90,7 +90,7 @@ export const bankAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startBankAccountWorkflow(
 				{
-					action: 'CREATE',
+					action: BankAccountWorkflowAction.CREATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -348,7 +348,7 @@ export const bankAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startBankAccountWorkflow(
 				{
-					action: 'UPDATE',
+					action: BankAccountWorkflowAction.UPDATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					associationId: association.id,
@@ -439,7 +439,7 @@ export const bankAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startBankAccountWorkflow(
 				{
-					action: 'DEACTIVATE',
+					action: BankAccountWorkflowAction.DEACTIVATE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					bankAccountId: input.id
@@ -507,7 +507,7 @@ export const bankAccountRouter = {
 			// Use DBOS workflow for durable execution
 			const workflowResult = await startBankAccountWorkflow(
 				{
-					action: 'UPDATE_BALANCE',
+					action: BankAccountWorkflowAction.UPDATE_BALANCE,
 					organizationId: context.organization.id,
 					userId: context.user!.id,
 					bankAccountId: input.id,

@@ -11,6 +11,17 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	MATERIAL_DECISION_WORKFLOW_ERROR: 'MATERIAL_DECISION_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'material_decision_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'material_decision_workflow_error';
@@ -102,15 +113,15 @@ async function createDecision(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'MATERIAL_DECISION',
+		entityType: ActivityEntityType.MATERIAL_DECISION,
 		entityId: decision.id,
-		action: 'CREATE',
-		eventCategory: 'DECISION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.DECISION,
 		summary: `Material decision created: ${input.title}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'materialDecisionWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: MaterialDecisionWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		caseId: input.caseId,
 		newState: { category: input.category, title: input.title, rationale: input.rationale }
@@ -153,15 +164,15 @@ async function recordOutcome(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'MATERIAL_DECISION',
+		entityType: ActivityEntityType.MATERIAL_DECISION,
 		entityId: decisionId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Decision outcome recorded: ${actualOutcome.substring(0, 100)}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'materialDecisionWorkflow_v1',
-		workflowStep: 'RECORD_OUTCOME',
+		workflowStep: MaterialDecisionWorkflowAction.RECORD_OUTCOME,
 		workflowVersion: 'v1',
 		caseId,
 		newState: { actualOutcome }
@@ -202,15 +213,15 @@ async function updateDecision(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'MATERIAL_DECISION',
+		entityType: ActivityEntityType.MATERIAL_DECISION,
 		entityId: updated.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Material decision updated: ${updated.title}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'materialDecisionWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: MaterialDecisionWorkflowAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: updateData
 	});
@@ -240,15 +251,15 @@ async function deleteDecision(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'MATERIAL_DECISION',
+		entityType: ActivityEntityType.MATERIAL_DECISION,
 		entityId: decisionId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Material decision deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'materialDecisionWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: MaterialDecisionWorkflowAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: new Date().toISOString() }
 	});
@@ -271,7 +282,7 @@ async function materialDecisionWorkflow(input: MaterialDecisionWorkflowInput): P
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case MaterialDecisionWorkflowAction.CREATE: {
 				if (!input.title || !input.description || !input.rationale || !input.category) {
 					const error = new Error('Missing required fields for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -297,7 +308,7 @@ async function materialDecisionWorkflow(input: MaterialDecisionWorkflowInput): P
 				return successResult;
 			}
 
-			case 'RECORD_OUTCOME': {
+			case MaterialDecisionWorkflowAction.RECORD_OUTCOME: {
 				if (!input.decisionId || !input.actualOutcome) {
 					const error = new Error('Missing required fields: decisionId and actualOutcome for RECORD_OUTCOME');
 					logStepError(log, 'validation', error, { input });
@@ -321,7 +332,7 @@ async function materialDecisionWorkflow(input: MaterialDecisionWorkflowInput): P
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case MaterialDecisionWorkflowAction.UPDATE: {
 				if (!input.decisionId) {
 					const error = new Error('Missing required field: decisionId for UPDATE');
 					logStepError(log, 'validation', error, { decisionId: input.decisionId });
@@ -345,7 +356,7 @@ async function materialDecisionWorkflow(input: MaterialDecisionWorkflowInput): P
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case MaterialDecisionWorkflowAction.DELETE: {
 				if (!input.decisionId) {
 					const error = new Error('Missing required field: decisionId for DELETE');
 					logStepError(log, 'validation', error, { decisionId: input.decisionId });
@@ -392,8 +403,8 @@ async function materialDecisionWorkflow(input: MaterialDecisionWorkflowInput): P
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'MATERIAL_DECISION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.MATERIAL_DECISION_WORKFLOW_ERROR
 		});
 		const errorResult: MaterialDecisionWorkflowResult = {
 			success: false,

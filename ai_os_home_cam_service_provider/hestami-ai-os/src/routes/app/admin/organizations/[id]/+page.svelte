@@ -35,6 +35,7 @@
 		type OrganizationType,
 		type OrganizationStatus
 	} from '$lib/api/organizationAdmin';
+	import { OrganizationStatusValues } from '$lib/api/cam';
 
 	interface Props {
 		data: {
@@ -47,9 +48,19 @@
 
 	let { data }: Props = $props();
 
-	let organization = $derived(data.organization);
-	let members = $derived(data.members);
-	let isPlatformAdmin = $derived(data.isPlatformAdmin);
+	// Use $state with $effect to avoid proxy errors during navigation
+	let organization = $state<OrganizationDetail | null>(null);
+	let members = $state<OrganizationMember[]>([]);
+	let isPlatformAdmin = $state(false);
+
+	$effect(() => {
+		// Track data to trigger re-runs on navigation, but guard against undefined
+		if (data != null && typeof data === 'object') {
+			organization = data.organization ?? null;
+			members = data.members ?? [];
+			isPlatformAdmin = data.isPlatformAdmin ?? false;
+		}
+	});
 
 	// UI State
 	let activeTab = $state('overview');
@@ -67,12 +78,12 @@
 	let editContactPhone = $state('');
 
 	// Status change state
-	let newStatus = $state<OrganizationStatus>('ACTIVE');
+	let newStatus = $state<OrganizationStatus>(OrganizationStatusValues.ACTIVE);
 	let statusReason = $state('');
 
 	// Get available tabs for this organization type
 	const availableTabs = $derived(
-		ORGANIZATION_TYPE_TABS[organization.type as OrganizationType] || ['overview', 'members', 'activity']
+		organization?.type ? (ORGANIZATION_TYPE_TABS[organization.type as OrganizationType] || ['overview', 'members', 'activity']) : ['overview', 'members', 'activity']
 	);
 
 	function openEditModal() {
@@ -89,7 +100,7 @@
 	}
 
 	function openStatusModal() {
-		newStatus = organization.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+		newStatus = organization.status === OrganizationStatusValues.ACTIVE ? OrganizationStatusValues.SUSPENDED : OrganizationStatusValues.ACTIVE;
 		statusReason = '';
 		updateError = null;
 		showStatusModal = true;
@@ -176,11 +187,11 @@
 
 	function getStatusIcon(status: OrganizationStatus) {
 		switch (status) {
-			case 'ACTIVE':
+			case OrganizationStatusValues.ACTIVE:
 				return CheckCircle;
-			case 'SUSPENDED':
+			case OrganizationStatusValues.SUSPENDED:
 				return XCircle;
-			case 'INACTIVE':
+			case OrganizationStatusValues.INACTIVE:
 				return MinusCircle;
 			default:
 				return MinusCircle;
@@ -189,11 +200,11 @@
 
 	function getStatusIconClass(status: OrganizationStatus): string {
 		switch (status) {
-			case 'ACTIVE':
+			case OrganizationStatusValues.ACTIVE:
 				return 'text-success-500';
-			case 'SUSPENDED':
+			case OrganizationStatusValues.SUSPENDED:
 				return 'text-error-500';
-			case 'INACTIVE':
+			case OrganizationStatusValues.INACTIVE:
 				return 'text-surface-500';
 			default:
 				return 'text-surface-500';
@@ -225,9 +236,9 @@
 				<div>
 					<div class="flex flex-wrap items-center gap-2">
 						<h1 class="text-2xl font-bold">{organization.name}</h1>
-						{#if organization.status === 'ACTIVE'}
+						{#if organization.status === OrganizationStatusValues.ACTIVE}
 							<CheckCircle class="h-5 w-5 text-success-500" />
-						{:else if organization.status === 'SUSPENDED'}
+						{:else if organization.status === OrganizationStatusValues.SUSPENDED}
 							<XCircle class="h-5 w-5 text-error-500" />
 						{:else}
 							<MinusCircle class="h-5 w-5 text-surface-500" />
@@ -251,7 +262,7 @@
 						<Edit class="mr-2 h-4 w-4" />
 						Edit
 					</button>
-					{#if organization.status === 'ACTIVE'}
+					{#if organization.status === OrganizationStatusValues.ACTIVE}
 						<button onclick={openStatusModal} class="btn preset-outlined-error-500">
 							<Ban class="mr-2 h-4 w-4" />
 							Suspend
@@ -352,9 +363,9 @@
 							<div>
 								<dt class="text-sm text-surface-500">Status</dt>
 								<dd class="mt-1 flex items-center gap-2">
-									{#if organization.status === 'ACTIVE'}
+									{#if organization.status === OrganizationStatusValues.ACTIVE}
 										<CheckCircle class="h-4 w-4 text-success-500" />
-									{:else if organization.status === 'SUSPENDED'}
+									{:else if organization.status === OrganizationStatusValues.SUSPENDED}
 										<XCircle class="h-4 w-4 text-error-500" />
 									{:else}
 										<MinusCircle class="h-4 w-4 text-surface-500" />
@@ -514,7 +525,7 @@
 								</tbody>
 							</table>
 						</div>
-						{#if data.membersHasMore}
+						{#if data?.membersHasMore}
 							<div class="p-4 text-center border-t border-surface-300-700">
 								<p class="text-sm text-surface-500">Showing first 20 members. More members exist.</p>
 							</div>
@@ -642,7 +653,7 @@
 		>
 			<div class="p-6">
 				<h2 id="status-modal-title" class="text-xl font-semibold mb-4">
-					{newStatus === 'SUSPENDED' ? 'Suspend Organization' : 'Activate Organization'}
+					{newStatus === OrganizationStatusValues.SUSPENDED ? 'Suspend Organization' : 'Activate Organization'}
 				</h2>
 
 				{#if updateError}
@@ -653,7 +664,7 @@
 				{/if}
 
 				<p class="text-surface-600 mb-4">
-					{#if newStatus === 'SUSPENDED'}
+					{#if newStatus === OrganizationStatusValues.SUSPENDED}
 						Are you sure you want to suspend <strong>{organization.name}</strong>? This will prevent users from accessing the organization.
 					{:else}
 						Are you sure you want to activate <strong>{organization.name}</strong>? This will restore access for all users.
@@ -679,13 +690,13 @@
 					</button>
 					<button
 						onclick={handleStatusChange}
-						class="btn {newStatus === 'SUSPENDED' ? 'preset-filled-error-500' : 'preset-filled-success-500'}"
+						class="btn {newStatus === OrganizationStatusValues.SUSPENDED ? 'preset-filled-error-500' : 'preset-filled-success-500'}"
 						disabled={isUpdating || !statusReason.trim()}
 					>
 						{#if isUpdating}
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 						{/if}
-						{newStatus === 'SUSPENDED' ? 'Suspend' : 'Activate'}
+						{newStatus === OrganizationStatusValues.SUSPENDED ? 'Suspend' : 'Activate'}
 					</button>
 				</div>
 			</div>

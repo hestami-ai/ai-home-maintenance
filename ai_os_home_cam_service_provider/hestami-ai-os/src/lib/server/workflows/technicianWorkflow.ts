@@ -11,19 +11,33 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	TECHNICIAN_WORKFLOW_ERROR: 'TECHNICIAN_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('TechnicianWorkflow');
 
 const WORKFLOW_STATUS_EVENT = 'technician_status';
 const WORKFLOW_ERROR_EVENT = 'technician_error';
 
-type TechnicianAction =
-	| 'UPSERT_TECHNICIAN'
-	| 'ADD_SKILL'
-	| 'ADD_CERTIFICATION'
-	| 'SET_AVAILABILITY'
-	| 'ADD_TIME_OFF'
-	| 'ADD_TERRITORY';
+export const TechnicianActionConst = {
+	UPSERT_TECHNICIAN: 'UPSERT_TECHNICIAN',
+	ADD_SKILL: 'ADD_SKILL',
+	ADD_CERTIFICATION: 'ADD_CERTIFICATION',
+	SET_AVAILABILITY: 'SET_AVAILABILITY',
+	ADD_TIME_OFF: 'ADD_TIME_OFF',
+	ADD_TERRITORY: 'ADD_TERRITORY'
+} as const;
+
+type TechnicianAction = (typeof TechnicianActionConst)[keyof typeof TechnicianActionConst];
 
 interface TechnicianWorkflowInput {
 	action: TechnicianAction;
@@ -81,15 +95,15 @@ async function upsertTechnician(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'TECHNICIAN',
+		entityType: ActivityEntityType.TECHNICIAN,
 		entityId: technician.id,
-		action: technicianId ? 'UPDATE' : 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: technicianId ? ActivityActionType.UPDATE : ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Technician ${technicianId ? 'updated' : 'created'}: ${technician.firstName} ${technician.lastName}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'technicianWorkflow_v1',
-		workflowStep: 'UPSERT_TECHNICIAN',
+		workflowStep: TechnicianActionConst.UPSERT_TECHNICIAN,
 		workflowVersion: 'v1',
 		technicianId: technician.id
 	});
@@ -130,15 +144,15 @@ async function addSkill(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'TECHNICIAN',
+		entityType: ActivityEntityType.TECHNICIAN,
 		entityId: technicianId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Skill added: ${data.trade}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'technicianWorkflow_v1',
-		workflowStep: 'ADD_SKILL',
+		workflowStep: TechnicianActionConst.ADD_SKILL,
 		workflowVersion: 'v1',
 		technicianId
 	});
@@ -172,15 +186,15 @@ async function addCertification(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'TECHNICIAN',
+		entityType: ActivityEntityType.TECHNICIAN,
 		entityId: technicianId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Certification added: ${data.name}`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'technicianWorkflow_v1',
-		workflowStep: 'ADD_CERTIFICATION',
+		workflowStep: TechnicianActionConst.ADD_CERTIFICATION,
 		workflowVersion: 'v1',
 		technicianId
 	});
@@ -208,15 +222,15 @@ async function setAvailability(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'TECHNICIAN',
+		entityType: ActivityEntityType.TECHNICIAN,
 		entityId: technicianId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Availability updated',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'technicianWorkflow_v1',
-		workflowStep: 'SET_AVAILABILITY',
+		workflowStep: TechnicianActionConst.SET_AVAILABILITY,
 		workflowVersion: 'v1',
 		technicianId
 	});
@@ -247,15 +261,15 @@ async function addTimeOff(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'TECHNICIAN',
+		entityType: ActivityEntityType.TECHNICIAN,
 		entityId: technicianId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Time off added',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'technicianWorkflow_v1',
-		workflowStep: 'ADD_TIME_OFF',
+		workflowStep: TechnicianActionConst.ADD_TIME_OFF,
 		workflowVersion: 'v1',
 		technicianId
 	});
@@ -298,15 +312,15 @@ async function addTerritory(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'TECHNICIAN',
+		entityType: ActivityEntityType.TECHNICIAN,
 		entityId: technicianId,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Territory added',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'technicianWorkflow_v1',
-		workflowStep: 'ADD_TERRITORY',
+		workflowStep: TechnicianActionConst.ADD_TERRITORY,
 		workflowVersion: 'v1',
 		technicianId
 	});
@@ -321,7 +335,7 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'UPSERT_TECHNICIAN': {
+			case TechnicianActionConst.UPSERT_TECHNICIAN: {
 				const result = await DBOS.runStep(
 					() => upsertTechnician(input.organizationId, input.userId, input.technicianId, input.data),
 					{ name: 'upsertTechnician' }
@@ -329,7 +343,7 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 				entityId = result.id;
 				break;
 			}
-			case 'ADD_SKILL': {
+			case TechnicianActionConst.ADD_SKILL: {
 				if (!input.technicianId) throw new Error('technicianId required for ADD_SKILL');
 				const result = await DBOS.runStep(
 					() => addSkill(input.organizationId, input.userId, input.technicianId!, input.data),
@@ -338,7 +352,7 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 				entityId = result.id;
 				break;
 			}
-			case 'ADD_CERTIFICATION': {
+			case TechnicianActionConst.ADD_CERTIFICATION: {
 				if (!input.technicianId) throw new Error('technicianId required for ADD_CERTIFICATION');
 				const result = await DBOS.runStep(
 					() => addCertification(input.organizationId, input.userId, input.technicianId!, input.data),
@@ -347,7 +361,7 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 				entityId = result.id;
 				break;
 			}
-			case 'SET_AVAILABILITY': {
+			case TechnicianActionConst.SET_AVAILABILITY: {
 				if (!input.technicianId) throw new Error('technicianId required for SET_AVAILABILITY');
 				const result = await DBOS.runStep(
 					() => setAvailability(input.organizationId, input.userId, input.technicianId!, input.data),
@@ -356,7 +370,7 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 				entityId = result.id;
 				break;
 			}
-			case 'ADD_TIME_OFF': {
+			case TechnicianActionConst.ADD_TIME_OFF: {
 				if (!input.technicianId) throw new Error('technicianId required for ADD_TIME_OFF');
 				const result = await DBOS.runStep(
 					() => addTimeOff(input.organizationId, input.userId, input.technicianId!, input.data),
@@ -365,7 +379,7 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 				entityId = result.id;
 				break;
 			}
-			case 'ADD_TERRITORY': {
+			case TechnicianActionConst.ADD_TERRITORY: {
 				if (!input.technicianId) throw new Error('technicianId required for ADD_TERRITORY');
 				const result = await DBOS.runStep(
 					() => addTerritory(input.organizationId, input.userId, input.technicianId!, input.data),
@@ -393,8 +407,8 @@ async function technicianWorkflow(input: TechnicianWorkflowInput): Promise<Techn
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'TECHNICIAN_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.TECHNICIAN_WORKFLOW_ERROR
 		});
 
 		return {

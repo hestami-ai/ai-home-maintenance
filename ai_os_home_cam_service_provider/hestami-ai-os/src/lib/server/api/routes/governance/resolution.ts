@@ -9,7 +9,7 @@ import {
 } from '../../router.js';
 import { ResolutionStatusSchema, PolicyStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
-import { startGovernanceWorkflow } from '../../../workflows/governanceWorkflow.js';
+import { startGovernanceWorkflow, GovernanceAction } from '../../../workflows/governanceWorkflow.js';
 import type { ResolutionStatus, PolicyStatus } from '../../../../../../generated/prisma/client.js';
 
 const resolutionStatusEnum = ResolutionStatusSchema;
@@ -69,7 +69,7 @@ export const governanceResolutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_RESOLUTION',
+					action: GovernanceAction.CREATE_RESOLUTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -217,7 +217,7 @@ export const governanceResolutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'UPDATE_RESOLUTION_STATUS',
+					action: GovernanceAction.UPDATE_RESOLUTION_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: rest.id,
@@ -280,7 +280,7 @@ export const governanceResolutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_POLICY',
+					action: GovernanceAction.CREATE_POLICY,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -441,7 +441,7 @@ export const governanceResolutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'CREATE_POLICY_VERSION',
+					action: GovernanceAction.CREATE_POLICY_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -513,7 +513,7 @@ export const governanceResolutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'SET_ACTIVE_POLICY_VERSION',
+					action: GovernanceAction.SET_ACTIVE_POLICY_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -593,7 +593,7 @@ export const governanceResolutionRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startGovernanceWorkflow(
 				{
-					action: 'LINK_RESOLUTION_TO_MOTION',
+					action: GovernanceAction.LINK_RESOLUTION_TO_MOTION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: resolutionId,

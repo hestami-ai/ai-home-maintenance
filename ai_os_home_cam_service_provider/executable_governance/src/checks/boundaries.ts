@@ -2,7 +2,7 @@ import { Project, type SourceFile } from 'ts-morph';
 import { type Config, getAbsolutePath } from '../config/index.js';
 import type { Violation } from '../reporting/index.js';
 import { minimatch } from 'minimatch';
-import path from 'path';
+import path from 'node:path';
 
 export async function verifyBoundaries(config: Config): Promise<Violation[]> {
     const project = new Project();
@@ -12,10 +12,10 @@ export async function verifyBoundaries(config: Config): Promise<Violation[]> {
     // Load all relevant files
     for (const ruleId in config.rules) {
         const rule = config.rules[ruleId];
-        if (!rule.boundaries) continue;
+        if (!rule?.boundaries) continue;
 
         for (const boundary of rule.boundaries) {
-            const globPath = path.join(projectRoot, boundary.path).replace(/\\/g, '/');
+            const globPath = path.join(projectRoot, boundary.path).replaceAll('\\', '/');
             const files = project.addSourceFilesAtPaths(globPath);
 
             for (const file of files) {
@@ -34,7 +34,7 @@ function checkFileImports(
     projectRoot: string
 ): Violation[] {
     const violations: Violation[] = [];
-    const relativeFilePath = path.relative(projectRoot, file.getFilePath()).replace(/\\/g, '/');
+    const relativeFilePath = path.relative(projectRoot, file.getFilePath()).replaceAll('\\', '/');
     const imports = file.getImportDeclarations();
 
     for (const imp of imports) {

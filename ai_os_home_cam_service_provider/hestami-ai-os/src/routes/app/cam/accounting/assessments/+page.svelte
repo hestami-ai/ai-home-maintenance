@@ -4,7 +4,7 @@
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
-	import { accountingApi } from '$lib/api/cam';
+	import { JobInvoiceStatusValues, JobStatusValues, accountingApi } from '$lib/api/cam';
 
 	interface Assessment {
 		id: string;
@@ -28,9 +28,9 @@
 	const statusOptions = [
 		{ value: 'all', label: 'All Status' },
 		{ value: 'DUE', label: 'Due' },
-		{ value: 'OVERDUE', label: 'Overdue' },
-		{ value: 'PARTIAL', label: 'Partial' },
-		{ value: 'PAID', label: 'Paid' }
+		{ value: JobInvoiceStatusValues.OVERDUE, label: 'Overdue' },
+		{ value: JobInvoiceStatusValues.PARTIAL, label: 'Partial' },
+		{ value: JobStatusValues.PAID, label: 'Paid' }
 	];
 
 	async function loadAssessments() {
@@ -57,10 +57,10 @@
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'PAID': return 'text-success-500 bg-success-500/10';
+			case JobStatusValues.PAID: return 'text-success-500 bg-success-500/10';
 			case 'DUE': return 'text-warning-500 bg-warning-500/10';
-			case 'OVERDUE': return 'text-error-500 bg-error-500/10';
-			case 'PARTIAL': return 'text-yellow-600 bg-yellow-500/10';
+			case JobInvoiceStatusValues.OVERDUE: return 'text-error-500 bg-error-500/10';
+			case JobInvoiceStatusValues.PARTIAL: return 'text-yellow-600 bg-yellow-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}

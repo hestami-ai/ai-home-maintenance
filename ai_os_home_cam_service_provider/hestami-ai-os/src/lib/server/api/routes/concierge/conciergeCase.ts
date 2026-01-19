@@ -13,10 +13,19 @@ import { ConciergeCaseStatusSchema } from '../../../../../../generated/zod/input
 import { ConciergeCasePrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCasePrioritySchema.js';
 import { CaseNoteTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/CaseNoteTypeSchema.js';
 import { AvailabilityTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/AvailabilityTypeSchema.js';
-import type { ConciergeCaseStatus } from '../../../../../../generated/prisma/client.js';
+import {
+	ConciergeCaseStatus,
+	StaffRole,
+	PillarAccess,
+	CaseNoteType,
+	PartyType,
+	DocumentStatus,
+	UserRole,
+	ActivityEntityType
+} from '../../../../../../generated/prisma/enums.js';
 import { recordIntent, recordExecution, recordDecision } from '../../middleware/activityEvent.js';
 import { DBOS } from '../../../dbos.js';
-import { caseLifecycleWorkflow_v1 } from '../../../workflows/caseLifecycleWorkflow.js';
+import { caseLifecycleWorkflow_v1, CaseLifecycleAction } from '../../../workflows/caseLifecycleWorkflow.js';
 import { recordSpanError } from '../../middleware/tracing.js';
 import { createLogger, createModuleLogger } from '../../../logger.js';
 
@@ -34,11 +43,11 @@ const log = createModuleLogger('ConciergeCaseRoute');
  */
 function hasCrossOrgAccess(staffRoles: string[], pillarAccess: string[]): boolean {
 	// Platform admins have full cross-org access
-	if (staffRoles.includes('PLATFORM_ADMIN')) {
+	if (staffRoles.includes(StaffRole.PLATFORM_ADMIN)) {
 		return true;
 	}
 	// Staff with CONCIERGE pillar access have cross-org access for concierge cases
-	if (staffRoles.length > 0 && pillarAccess.includes('CONCIERGE')) {
+	if (staffRoles.length > 0 && pillarAccess.includes(PillarAccess.CONCIERGE)) {
 		return true;
 	}
 	return false;
@@ -65,16 +74,16 @@ const AvailabilitySlotSchema = z.object({
 });
 
 // Valid status transitions for the case state machine
-const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
-	INTAKE: ['ASSESSMENT', 'CANCELLED'],
-	ASSESSMENT: ['IN_PROGRESS', 'PENDING_EXTERNAL', 'PENDING_OWNER', 'ON_HOLD', 'CANCELLED'],
-	IN_PROGRESS: ['PENDING_EXTERNAL', 'PENDING_OWNER', 'ON_HOLD', 'RESOLVED', 'CANCELLED'],
-	PENDING_EXTERNAL: ['IN_PROGRESS', 'ON_HOLD', 'RESOLVED', 'CANCELLED'],
-	PENDING_OWNER: ['IN_PROGRESS', 'ON_HOLD', 'RESOLVED', 'CANCELLED'],
-	ON_HOLD: ['ASSESSMENT', 'IN_PROGRESS', 'PENDING_EXTERNAL', 'PENDING_OWNER', 'CANCELLED'],
-	RESOLVED: ['CLOSED', 'IN_PROGRESS'], // Can reopen if needed
-	CLOSED: [], // Terminal state
-	CANCELLED: [] // Terminal state
+const VALID_STATUS_TRANSITIONS: Record<ConciergeCaseStatus, ConciergeCaseStatus[]> = {
+	[ConciergeCaseStatus.INTAKE]: [ConciergeCaseStatus.ASSESSMENT, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.ASSESSMENT]: [ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.IN_PROGRESS]: [ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.PENDING_EXTERNAL]: [ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.PENDING_OWNER]: [ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.ON_HOLD, ConciergeCaseStatus.RESOLVED, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.ON_HOLD]: [ConciergeCaseStatus.ASSESSMENT, ConciergeCaseStatus.IN_PROGRESS, ConciergeCaseStatus.PENDING_EXTERNAL, ConciergeCaseStatus.PENDING_OWNER, ConciergeCaseStatus.CANCELLED],
+	[ConciergeCaseStatus.RESOLVED]: [ConciergeCaseStatus.CLOSED, ConciergeCaseStatus.IN_PROGRESS], // Can reopen if needed
+	[ConciergeCaseStatus.CLOSED]: [], // Terminal state
+	[ConciergeCaseStatus.CANCELLED]: [] // Terminal state
 };
 
 /**
@@ -150,7 +159,7 @@ export const conciergeCaseRouter = {
 				const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 					workflowID: input.idempotencyKey
 				})({
-					action: 'CREATE_CASE',
+					action: CaseLifecycleAction.CREATE_CASE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					propertyId: input.propertyId,
@@ -173,7 +182,7 @@ export const conciergeCaseRouter = {
 				}
 
 				// Re-set RLS context since workflow clears it when done
-				await setOrgContextForWorkItem(context.user.id, 'CONCIERGE_CASE', result.caseId!);
+				await setOrgContextForWorkItem(context.user.id, ActivityEntityType.CONCIERGE_CASE, result.caseId!);
 
 				// Fetch the created case for the response
 				const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
@@ -264,7 +273,7 @@ export const conciergeCaseRouter = {
 				if (hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
 					const orgId = await setOrgContextForWorkItem(
 						context.user.id,
-						'CONCIERGE_CASE',
+						ActivityEntityType.CONCIERGE_CASE,
 						input.id
 					);
 					if (!orgId) {
@@ -434,7 +443,7 @@ export const conciergeCaseRouter = {
 					assignedConciergeUserId: input.assignedConciergeUserId
 				}),
 				...(!input.includeClosedCancelled && {
-					status: { notIn: ['CLOSED', 'CANCELLED'] as ConciergeCaseStatus[] }
+					status: { notIn: [ConciergeCaseStatus.CLOSED, ConciergeCaseStatus.CANCELLED] }
 				})
 			};
 
@@ -485,6 +494,129 @@ export const conciergeCaseRouter = {
 					pagination: {
 						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null,
 						hasMore
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Update case details (title, description, priority)
+	 */
+	update: orgProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				id: z.string(),
+				title: z.string().min(1).max(255).optional(),
+				description: z.string().min(1).optional(),
+				priority: ConciergeCasePrioritySchema.optional(),
+				availabilityType: AvailabilityTypeSchema.optional(),
+				availabilityNotes: z.string().optional(),
+				availabilitySlots: z.array(AvailabilitySlotSchema).optional()
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					case: z.object({
+						id: z.string(),
+						title: z.string(),
+						description: z.string(),
+						priority: z.string(),
+						availabilityType: z.string(),
+						availabilityNotes: z.string().nullable(),
+						updatedAt: z.string()
+					})
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			const reqLog = createLogger(context).child({ handler: 'update' });
+
+			// At least one field must be provided
+			if (!input.title && !input.description && !input.priority && 
+			    input.availabilityType === undefined && input.availabilityNotes === undefined && 
+			    input.availabilitySlots === undefined) {
+				throw errors.BAD_REQUEST({ message: 'At least one field must be provided' });
+			}
+
+			const existing = await prisma.conciergeCase.findFirst({
+				where: {
+					id: input.id,
+					organizationId: context.organization.id,
+					deletedAt: null
+				}
+			});
+
+			if (!existing) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Cannot update closed or cancelled cases
+			if (existing.status === ConciergeCaseStatus.CLOSED || existing.status === ConciergeCaseStatus.CANCELLED) {
+				throw errors.BAD_REQUEST({ message: `Cannot update case in ${existing.status} status` });
+			}
+
+			// Cerbos authorization
+			await context.cerbos.authorize('update', 'concierge_case', existing.id);
+
+			reqLog.info('Updating concierge case', {
+				caseId: input.id,
+				title: input.title,
+				priority: input.priority
+			});
+
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: CaseLifecycleAction.UPDATE_CASE,
+				organizationId: context.organization.id,
+				userId: context.user.id,
+				caseId: input.id,
+				title: input.title,
+				description: input.description,
+				priority: input.priority,
+				availabilityType: input.availabilityType,
+				availabilityNotes: input.availabilityNotes,
+				availabilitySlots: input.availabilitySlots
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				reqLog.error('Case update workflow failed', { error: result.error });
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update case' });
+			}
+
+			// Fetch updated case for response
+			const conciergeCase = await prisma.conciergeCase.findFirstOrThrow({
+				where: { id: input.id, organizationId: context.organization.id }
+			});
+
+			reqLog.info('Concierge case updated', {
+				caseId: conciergeCase.id,
+				title: conciergeCase.title
+			});
+
+			return successResponse(
+				{
+					case: {
+						id: conciergeCase.id,
+						title: conciergeCase.title,
+						description: conciergeCase.description,
+						priority: conciergeCase.priority,
+						availabilityType: conciergeCase.availabilityType,
+						availabilityNotes: conciergeCase.availabilityNotes,
+						updatedAt: conciergeCase.updatedAt.toISOString()
 					}
 				},
 				context
@@ -549,7 +681,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'TRANSITION_STATUS',
+				action: CaseLifecycleAction.TRANSITION_STATUS,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.id,
@@ -714,7 +846,7 @@ export const conciergeCaseRouter = {
 
 			// Validate status transition
 			const validTransitions = VALID_STATUS_TRANSITIONS[existing.status] || [];
-			if (!validTransitions.includes('RESOLVED')) {
+			if (!validTransitions.includes(ConciergeCaseStatus.RESOLVED)) {
 				throw errors.BAD_REQUEST({ message: `Cannot resolve case in ${existing.status} status` });
 			}
 
@@ -725,7 +857,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'RESOLVE_CASE',
+				action: CaseLifecycleAction.RESOLVE_CASE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.id,
@@ -797,7 +929,7 @@ export const conciergeCaseRouter = {
 				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
 			}
 
-			if (existing.status !== 'RESOLVED') {
+			if (existing.status !== ConciergeCaseStatus.RESOLVED) {
 				throw errors.BAD_REQUEST({ message: 'Can only close cases in RESOLVED status' });
 			}
 
@@ -808,7 +940,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CLOSE_CASE',
+				action: CaseLifecycleAction.CLOSE_CASE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.id
@@ -880,7 +1012,7 @@ export const conciergeCaseRouter = {
 			}
 
 			// Cannot cancel closed cases
-			if (existing.status === 'CLOSED') {
+			if (existing.status === ConciergeCaseStatus.CLOSED) {
 				throw errors.BAD_REQUEST({ message: 'Cannot cancel a closed case' });
 			}
 
@@ -891,7 +1023,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'CANCEL_CASE',
+				action: CaseLifecycleAction.CANCEL_CASE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.id,
@@ -1039,12 +1171,12 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'ADD_NOTE',
+				action: CaseLifecycleAction.ADD_NOTE,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
 				noteContent: input.content,
-				noteType: input.noteType ?? 'GENERAL',
+				noteType: input.noteType ?? CaseNoteType.GENERAL,
 				isInternal: input.isInternal
 			});
 
@@ -1224,7 +1356,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'ADD_PARTICIPANT',
+				action: CaseLifecycleAction.ADD_PARTICIPANT,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -1325,7 +1457,7 @@ export const conciergeCaseRouter = {
 						id: p.id,
 						partyId: p.partyId,
 						partyName: p.party
-							? p.party.partyType === 'INDIVIDUAL'
+							? p.party.partyType === PartyType.INDIVIDUAL
 								? `${p.party.firstName ?? ''} ${p.party.lastName ?? ''}`.trim()
 								: p.party.entityName ?? ''
 							: null,
@@ -1382,7 +1514,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'REMOVE_PARTICIPANT',
+				action: CaseLifecycleAction.REMOVE_PARTICIPANT,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				participantId: input.participantId
@@ -1451,7 +1583,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'LINK_UNIT',
+				action: CaseLifecycleAction.LINK_UNIT,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -1521,7 +1653,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'LINK_JOB',
+				action: CaseLifecycleAction.LINK_JOB,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -1583,7 +1715,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'UNLINK_CROSS_DOMAIN',
+				action: CaseLifecycleAction.UNLINK_CROSS_DOMAIN,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -1659,7 +1791,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'REQUEST_CLARIFICATION',
+				action: CaseLifecycleAction.REQUEST_CLARIFICATION,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -1748,7 +1880,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'RESPOND_CLARIFICATION',
+				action: CaseLifecycleAction.RESPOND_CLARIFICATION,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -1810,6 +1942,14 @@ export const conciergeCaseRouter = {
 						linkedJobId: z.string().nullable(),
 						linkedArcRequestId: z.string().nullable(),
 						linkedWorkOrderId: z.string().nullable(),
+						availabilityType: z.string(),
+						availabilityNotes: z.string().nullable(),
+						availabilitySlots: z.array(z.object({
+							id: z.string(),
+							startTime: z.string(),
+							endTime: z.string(),
+							notes: z.string().nullable()
+						})),
 						resolvedAt: z.string().nullable(),
 						resolutionSummary: z.string().nullable(),
 						closedAt: z.string().nullable(),
@@ -1911,7 +2051,7 @@ export const conciergeCaseRouter = {
 				if (hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
 					const orgId = await setOrgContextForWorkItem(
 						context.user.id,
-						'CONCIERGE_CASE',
+						ActivityEntityType.CONCIERGE_CASE,
 						input.id
 					);
 					if (!orgId) {
@@ -1944,7 +2084,8 @@ export const conciergeCaseRouter = {
 							where: { deletedAt: null },
 							orderBy: { decidedAt: 'desc' }
 						},
-						attachments: { orderBy: { createdAt: 'desc' } }
+						attachments: { orderBy: { createdAt: 'desc' } },
+						availabilitySlots: { orderBy: { startTime: 'asc' } }
 					}
 				});
 
@@ -1988,7 +2129,7 @@ export const conciergeCaseRouter = {
 
 				// Filter to only show ACTIVE documents
 				const boundDocuments = documentBindings
-					.filter((b) => b.document.status === 'ACTIVE')
+					.filter((b) => b.document.status === DocumentStatus.ACTIVE)
 					.map((b) => ({
 						id: b.document.id,
 						fileName: b.document.fileName,
@@ -2016,6 +2157,14 @@ export const conciergeCaseRouter = {
 							linkedJobId: conciergeCase.linkedJobId,
 							linkedArcRequestId: conciergeCase.linkedArcRequestId ?? null,
 							linkedWorkOrderId: conciergeCase.linkedWorkOrderId ?? null,
+							availabilityType: conciergeCase.availabilityType,
+							availabilityNotes: conciergeCase.availabilityNotes,
+							availabilitySlots: conciergeCase.availabilitySlots.map((s) => ({
+								id: s.id,
+								startTime: s.startTime.toISOString(),
+								endTime: s.endTime.toISOString(),
+								notes: s.notes
+							})),
 							resolvedAt: conciergeCase.resolvedAt?.toISOString() ?? null,
 							resolutionSummary: conciergeCase.resolutionSummary,
 							closedAt: conciergeCase.closedAt?.toISOString() ?? null,
@@ -2053,7 +2202,7 @@ export const conciergeCaseRouter = {
 							id: p.id,
 							partyId: p.partyId,
 							partyName: p.party
-								? p.party.partyType === 'INDIVIDUAL'
+								? p.party.partyType === PartyType.INDIVIDUAL
 									? `${p.party.firstName ?? ''} ${p.party.lastName ?? ''}`.trim()
 									: p.party.entityName ?? ''
 								: null,
@@ -2155,7 +2304,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'LINK_ARC',
+				action: CaseLifecycleAction.LINK_ARC,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -2225,7 +2374,7 @@ export const conciergeCaseRouter = {
 			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
 				workflowID: input.idempotencyKey
 			})({
-				action: 'LINK_WORK_ORDER',
+				action: CaseLifecycleAction.LINK_WORK_ORDER,
 				organizationId: context.organization.id,
 				userId: context.user.id,
 				caseId: input.caseId,
@@ -2278,7 +2427,7 @@ export const conciergeCaseRouter = {
 			const memberships = await prisma.userOrganization.findMany({
 				where: {
 					organizationId: context.organization.id,
-					role: { in: ['ADMIN', 'MANAGER'] }
+					role: { in: [UserRole.ADMIN, UserRole.MANAGER] }
 				}
 			});
 

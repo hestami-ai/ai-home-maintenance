@@ -289,18 +289,18 @@
 										</tr>
 									</thead>
 									<tbody class="divide-y divide-surface-300-700">
-										{#each result.data.slice(0, 50) as row}
+										{#each result?.data?.slice(0, 50) ?? [] as row}
 											<tr class="hover:bg-surface-100-900">
-												{#each result.columns as col}
+												{#each result?.columns ?? [] as col}
 													<td class="px-4 py-2">{row[col.key] ?? '-'}</td>
 												{/each}
 											</tr>
 										{/each}
 									</tbody>
 								</table>
-								{#if result.data.length > 50}
+								{#if (result?.data?.length ?? 0) > 50}
 									<div class="border-t border-surface-300-700 bg-surface-100-900 px-4 py-2 text-center text-sm text-surface-500">
-										Showing first 50 of {result.data.length} rows. Download the full report for all data.
+										Showing first 50 of {result?.data?.length ?? 0} rows. Download the full report for all data.
 									</div>
 								{/if}
 							</div>

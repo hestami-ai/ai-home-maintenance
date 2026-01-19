@@ -11,6 +11,12 @@ import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import type { PropertyType } from '../../../../generated/prisma/client.js';
 import { orgTransaction } from '../db/rls.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PROPERTY_WORKFLOW_ERROR: 'PROPERTY_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('PropertyWorkflow');
 
@@ -137,7 +143,7 @@ async function deletePropertyStep(
 async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE': {
+			case PropertyWorkflowAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createPropertyStep(input.organizationId, input.userId, input.data),
 					{ name: 'createProperty' }
@@ -149,7 +155,7 @@ async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyW
 				};
 			}
 
-			case 'UPDATE': {
+			case PropertyWorkflowAction.UPDATE: {
 				const result = await DBOS.runStep(
 					() => updatePropertyStep(input.organizationId, input.userId, input.propertyId!, input.data),
 					{ name: 'updateProperty' }
@@ -157,7 +163,7 @@ async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyW
 				return { success: true, entityId: result.propertyId, propertyId: result.propertyId };
 			}
 
-			case 'DELETE': {
+			case PropertyWorkflowAction.DELETE: {
 				const result = await DBOS.runStep(
 					() => deletePropertyStep(input.organizationId, input.userId, input.propertyId!),
 					{ name: 'deleteProperty' }
@@ -174,8 +180,8 @@ async function propertyWorkflow(input: PropertyWorkflowInput): Promise<PropertyW
 		console.error(`[PropertyWorkflow] Error in ${input.action}:`, errorMessage);
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PROPERTY_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PROPERTY_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

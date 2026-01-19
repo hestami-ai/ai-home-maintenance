@@ -12,6 +12,12 @@ import type { ReportFormat } from '../../../../generated/prisma/client.js';
 import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType, ReportExecutionStatus } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	REPORT_EXECUTION_WORKFLOW_ERROR: 'REPORT_EXECUTION_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('ReportExecutionWorkflow');
 
@@ -125,7 +131,7 @@ async function cancelExecution(
 	});
 
 	if (!execution) throw new Error('Report execution not found');
-	if (!['PENDING', 'RUNNING'].includes(execution.status)) {
+	if (!([ReportExecutionStatus.PENDING, ReportExecutionStatus.RUNNING] as ReportExecutionStatus[]).includes(execution.status)) {
 		throw new Error('Can only cancel pending or running executions');
 	}
 
@@ -146,14 +152,14 @@ async function reportExecutionWorkflow(input: ReportExecutionWorkflowInput): Pro
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'GENERATE_REPORT':
+			case ReportExecutionAction.GENERATE_REPORT:
 				entityId = await DBOS.runStep(
 					() => generateReport(input.organizationId, input.userId, input.associationId, input.data),
 					{ name: 'generateReport' }
 				);
 				break;
 
-			case 'CANCEL_EXECUTION':
+			case ReportExecutionAction.CANCEL_EXECUTION:
 				entityId = await DBOS.runStep(
 					() => cancelExecution(input.organizationId, input.userId, input.associationId, input.executionId!),
 					{ name: 'cancelExecution' }
@@ -172,8 +178,8 @@ async function reportExecutionWorkflow(input: ReportExecutionWorkflowInput): Pro
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'REPORT_EXECUTION_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.REPORT_EXECUTION_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

@@ -10,6 +10,12 @@ import { type EntityWorkflowResult } from './schemas.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	CASE_REVIEW_WORKFLOW_ERROR: 'CASE_REVIEW_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('CaseReviewWorkflow');
 
@@ -110,7 +116,7 @@ async function updateCaseReview(
 async function caseReviewWorkflow(input: CaseReviewWorkflowInput): Promise<CaseReviewWorkflowResult> {
 	try {
 		switch (input.action) {
-			case 'CREATE': {
+			case CaseReviewAction.CREATE: {
 				const result = await DBOS.runStep(
 					() => createCaseReview(input.organizationId, input.userId, input.caseId, input.data),
 					{ name: 'createCaseReview' }
@@ -122,7 +128,7 @@ async function caseReviewWorkflow(input: CaseReviewWorkflowInput): Promise<CaseR
 				};
 			}
 
-			case 'UPDATE': {
+			case CaseReviewAction.UPDATE: {
 				const result = await DBOS.runStep(
 					() => updateCaseReview(input.organizationId, input.userId, input.caseId, input.data),
 					{ name: 'updateCaseReview' }
@@ -139,8 +145,8 @@ async function caseReviewWorkflow(input: CaseReviewWorkflowInput): Promise<CaseR
 		log.error(`Error in ${input.action}:`, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'CASE_REVIEW_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.CASE_REVIEW_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

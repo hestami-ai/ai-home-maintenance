@@ -1,6 +1,6 @@
 /**
  * SSE Endpoint for Live Vote Updates
- * 
+ *
  * Streams real-time updates for:
  * - Ballot counts (yes/no/abstain)
  * - Quorum status
@@ -10,6 +10,7 @@
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/server/db';
 import { voteSubscribers, type VoteEvent } from '$lib/server/vote-events';
+import { MeetingAttendanceStatus, VoteChoice } from '../../../../../../../../generated/prisma/enums.js';
 
 export const GET: RequestHandler = async ({ params, request }) => {
 	const voteId = params.id;
@@ -19,11 +20,11 @@ export const GET: RequestHandler = async ({ params, request }) => {
 		where: { id: voteId },
 		include: {
 			ballots: { select: { choice: true } },
-			meeting: { 
-				select: { 
+			meeting: {
+				select: {
 					quorumRequired: true,
-					attendance: { where: { status: { not: 'ABSENT' } } }
-				} 
+					attendance: { where: { status: { not: MeetingAttendanceStatus.ABSENT } } }
+				}
 			}
 		}
 	});
@@ -33,9 +34,9 @@ export const GET: RequestHandler = async ({ params, request }) => {
 	}
 
 	// Calculate initial tally
-	const yes = vote.ballots.filter(b => b.choice === 'YES').length;
-	const no = vote.ballots.filter(b => b.choice === 'NO').length;
-	const abstain = vote.ballots.filter(b => b.choice === 'ABSTAIN').length;
+	const yes = vote.ballots.filter(b => b.choice === VoteChoice.YES).length;
+	const no = vote.ballots.filter(b => b.choice === VoteChoice.NO).length;
+	const abstain = vote.ballots.filter(b => b.choice === VoteChoice.ABSTAIN).length;
 	const totalBallots = vote.ballots.length;
 	const presentCount = vote.meeting.attendance.length;
 	const quorumRequired = vote.meeting.quorumRequired;

@@ -10,7 +10,8 @@ import {
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
 import { ChecklistItemStatus } from '../../../../../../generated/prisma/client.js';
-import { startChecklistWorkflow } from '../../../workflows/checklistWorkflow.js';
+import { ChecklistItemStatus as ChecklistItemStatusEnum } from '../../../../../../generated/prisma/enums.js';
+import { startChecklistWorkflow, ChecklistAction } from '../../../workflows/checklistWorkflow.js';
 
 const jobStepOutput = z.object({
 	id: z.string(),
@@ -121,7 +122,7 @@ export const checklistRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startChecklistWorkflow(
 				{
-					action: 'CREATE_CHECKLIST',
+					action: ChecklistAction.CREATE_CHECKLIST,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -243,7 +244,7 @@ export const checklistRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startChecklistWorkflow(
 				{
-					action: 'APPLY_CHECKLIST',
+					action: ChecklistAction.APPLY_CHECKLIST,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					data: {
@@ -358,13 +359,13 @@ export const checklistRouter = {
 			}
 
 			await context.cerbos.authorize(
-				input.status === 'SKIPPED' ? 'skip' : 'complete',
+				input.status === ChecklistItemStatusEnum.SKIPPED ? 'skip' : 'complete',
 				'job_step',
 				input.stepId
 			);
 
 			// Validate requirements if completing
-			if (input.status === 'COMPLETED') {
+			if (input.status === ChecklistItemStatusEnum.COMPLETED) {
 				if (step.requiresNotes && !input.notes && !step.notes) {
 					throw errors.BAD_REQUEST({ message: 'This step requires notes' });
 				}
@@ -373,7 +374,7 @@ export const checklistRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startChecklistWorkflow(
 				{
-					action: 'UPDATE_STEP',
+					action: ChecklistAction.UPDATE_STEP,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					stepId: input.stepId,
@@ -426,7 +427,7 @@ export const checklistRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startChecklistWorkflow(
 				{
-					action: 'DELETE_CHECKLIST',
+					action: ChecklistAction.DELETE_CHECKLIST,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					checklistId: input.id,

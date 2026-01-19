@@ -4,7 +4,7 @@
 	import { ArrowLeft, Wrench, Building2, DollarSign, FileText } from 'lucide-svelte';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation, refreshBadgeCounts } from '$lib/stores';
-	import { violationApi, vendorApi, type Violation, type Vendor } from '$lib/api/cam';
+	import { FundTypeValues, type Vendor, type Violation, vendorApi, violationApi } from '$lib/api/cam';
 
 	let violation = $state<Violation | null>(null);
 	let vendors = $state<Vendor[]>([]);
@@ -14,15 +14,15 @@
 
 	let formData = $state({
 		vendorId: '',
-		budgetSource: 'OPERATING',
+		budgetSource: FundTypeValues.OPERATING,
 		estimatedCost: '',
 		scope: '',
 		notes: ''
 	});
 
 	const budgetSources = [
-		{ value: 'OPERATING', label: 'Operating Budget' },
-		{ value: 'RESERVE', label: 'Reserve Fund' },
+		{ value: FundTypeValues.OPERATING, label: 'Operating Budget' },
+		{ value: FundTypeValues.RESERVE, label: 'Reserve Fund' },
 		{ value: 'SPECIAL_ASSESSMENT', label: 'Special Assessment' },
 		{ value: 'OWNER_CHARGE', label: 'Charge to Owner' }
 	];

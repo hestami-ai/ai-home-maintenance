@@ -9,9 +9,15 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction } from '../db/rls.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger } from './workflowLogger.js';
+import { ActivityActionType } from '../../../../generated/prisma/enums.js';
+import { type EntityWorkflowResult } from './schemas.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	SIGNATURE_WORKFLOW_ERROR: 'SIGNATURE_WORKFLOW_ERROR'
+} as const;
 
 const log = createWorkflowLogger('SignatureWorkflow');
-import { type EntityWorkflowResult } from './schemas.js';
 
 // Action types for the unified workflow
 export const SignatureAction = {
@@ -92,14 +98,14 @@ async function signatureWorkflow(input: SignatureWorkflowInput): Promise<Signatu
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CAPTURE_SIGNATURE':
+			case SignatureAction.CAPTURE_SIGNATURE:
 				entityId = await DBOS.runStep(
 					() => captureSignature(input.organizationId, input.userId, input.data),
 					{ name: 'captureSignature' }
 				);
 				break;
 
-			case 'DELETE_SIGNATURE':
+			case SignatureAction.DELETE_SIGNATURE:
 				entityId = await DBOS.runStep(
 					() => deleteSignature(input.organizationId, input.userId, input.signatureId!),
 					{ name: 'deleteSignature' }
@@ -118,8 +124,8 @@ async function signatureWorkflow(input: SignatureWorkflowInput): Promise<Signatu
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'SIGNATURE_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.SIGNATURE_WORKFLOW_ERROR
 		});
 
 		return { success: false, error: errorMessage };

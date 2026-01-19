@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { propertyOwnerOnboarding } from '$lib/stores';
@@ -20,8 +21,10 @@
 	});
 
 	// Pre-fill with user data if empty (runs once)
+	// Track data to trigger re-runs on navigation, but guard against undefined
 	let hasPreFilled = $state(false);
 	$effect(() => {
+		if (data == null || typeof data !== 'object') return;
 		if (!hasPreFilled && data.user) {
 			if (!name && data.user.name) {
 				name = data.user.name;
@@ -79,7 +82,7 @@
 	<div>
 		<h2 class="text-lg font-semibold">Organization Details</h2>
 		<p class="mt-1 text-sm text-surface-500">
-			{#if $propertyOwnerOnboarding.organizationType === 'TRUST_OR_LLC'}
+			{#if $propertyOwnerOnboarding.organizationType === OrganizationTypeValues.TRUST_OR_LLC}
 				Enter your trust or LLC information
 			{:else}
 				We'll use your name for your property account
@@ -92,7 +95,7 @@
 			<!-- Name -->
 			<div>
 				<label for="name" class="block text-sm font-medium">
-					{#if $propertyOwnerOnboarding.organizationType === 'TRUST_OR_LLC'}
+					{#if $propertyOwnerOnboarding.organizationType === OrganizationTypeValues.TRUST_OR_LLC}
 						Entity Name
 					{:else}
 						Your Name
@@ -105,7 +108,7 @@
 					bind:value={name}
 					oninput={handleNameChange}
 					class="input mt-1 w-full"
-					placeholder={$propertyOwnerOnboarding.organizationType === 'TRUST_OR_LLC'
+					placeholder={$propertyOwnerOnboarding.organizationType === OrganizationTypeValues.TRUST_OR_LLC
 						? 'Smith Family Trust'
 						: 'John Smith'}
 					required

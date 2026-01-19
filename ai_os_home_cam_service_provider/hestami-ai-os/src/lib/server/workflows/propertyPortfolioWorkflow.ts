@@ -11,6 +11,17 @@ import type { EntityWorkflowResult } from './schemas.js';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	PROPERTY_PORTFOLIO_WORKFLOW_ERROR: 'PROPERTY_PORTFOLIO_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'property_portfolio_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'property_portfolio_workflow_error';
@@ -80,15 +91,15 @@ async function createPortfolio(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: portfolio.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property portfolio created: ${input.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyPortfolioWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: PropertyPortfolioWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { name: input.name }
 	});
@@ -137,15 +148,15 @@ async function updatePortfolio(
 
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: portfolio.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Property portfolio updated: ${portfolio.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyPortfolioWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: PropertyPortfolioWorkflowAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: { name: input.name, isActive: input.isActive }
 	});
@@ -179,15 +190,15 @@ async function deletePortfolio(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'INDIVIDUAL_PROPERTY',
+		entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 		entityId: portfolioId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Property portfolio deleted',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'propertyPortfolioWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: PropertyPortfolioWorkflowAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: new Date().toISOString() }
 	});
@@ -254,15 +265,15 @@ async function getOrCreateDefaultPortfolio(
 	if (result.created) {
 		await recordWorkflowEvent({
 			organizationId,
-			entityType: 'INDIVIDUAL_PROPERTY',
+			entityType: ActivityEntityType.INDIVIDUAL_PROPERTY,
 			entityId: result.portfolio.id,
-			action: 'CREATE',
-			eventCategory: 'EXECUTION',
+			action: ActivityActionType.CREATE,
+			eventCategory: ActivityEventCategory.EXECUTION,
 			summary: 'Default property portfolio created',
 			performedById: userId,
-			performedByType: 'HUMAN',
+			performedByType: ActivityActorType.HUMAN,
 			workflowId: 'propertyPortfolioWorkflow_v1',
-			workflowStep: 'GET_OR_CREATE_DEFAULT',
+			workflowStep: PropertyPortfolioWorkflowAction.GET_OR_CREATE_DEFAULT,
 			workflowVersion: 'v1',
 			newState: { name: 'My Properties', isDefault: true }
 		});
@@ -295,7 +306,7 @@ async function propertyPortfolioWorkflow(input: PropertyPortfolioWorkflowInput):
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case PropertyPortfolioWorkflowAction.CREATE: {
 				if (!input.name) {
 					const error = new Error('Missing required field: name for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -323,7 +334,7 @@ async function propertyPortfolioWorkflow(input: PropertyPortfolioWorkflowInput):
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case PropertyPortfolioWorkflowAction.UPDATE: {
 				if (!input.portfolioId) {
 					const error = new Error('Missing required field: portfolioId for UPDATE');
 					logStepError(log, 'validation', error, { portfolioId: input.portfolioId });
@@ -351,7 +362,7 @@ async function propertyPortfolioWorkflow(input: PropertyPortfolioWorkflowInput):
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case PropertyPortfolioWorkflowAction.DELETE: {
 				if (!input.portfolioId) {
 					const error = new Error('Missing required field: portfolioId for DELETE');
 					logStepError(log, 'validation', error, { portfolioId: input.portfolioId });
@@ -374,7 +385,7 @@ async function propertyPortfolioWorkflow(input: PropertyPortfolioWorkflowInput):
 				return successResult;
 			}
 
-			case 'GET_OR_CREATE_DEFAULT': {
+			case PropertyPortfolioWorkflowAction.GET_OR_CREATE_DEFAULT: {
 				log.debug('Step: getOrCreateDefaultPortfolio starting');
 				const result = await DBOS.runStep(
 					() => getOrCreateDefaultPortfolio(input.organizationId, input.userId),
@@ -422,8 +433,8 @@ async function propertyPortfolioWorkflow(input: PropertyPortfolioWorkflowInput):
 		await DBOS.setEvent(WORKFLOW_ERROR_EVENT, { error: errorMessage });
 
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'PROPERTY_PORTFOLIO_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.PROPERTY_PORTFOLIO_WORKFLOW_ERROR
 		});
 		const errorResult: PropertyPortfolioWorkflowResult = {
 			success: false,

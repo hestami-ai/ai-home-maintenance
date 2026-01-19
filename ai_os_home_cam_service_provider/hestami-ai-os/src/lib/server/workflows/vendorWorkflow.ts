@@ -11,6 +11,17 @@ import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { createWorkflowLogger, logWorkflowStart, logWorkflowEnd, logStepError } from './workflowLogger.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VENDOR_WORKFLOW_ERROR: 'VENDOR_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'vendor_workflow_status';
 const WORKFLOW_ERROR_EVENT = 'vendor_workflow_error';
@@ -94,15 +105,15 @@ async function createVendor(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: vendor.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Vendor created: ${vendor.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'vendorWorkflow_v1',
-		workflowStep: 'CREATE',
+		workflowStep: VendorWorkflowAction.CREATE,
 		workflowVersion: 'v1',
 		newState: { name: vendor.name, email: vendor.email }
 	});
@@ -148,15 +159,15 @@ async function updateVendor(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId: input.organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: vendor.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Vendor updated: ${vendor.name}`,
 		performedById: input.userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'vendorWorkflow_v1',
-		workflowStep: 'UPDATE',
+		workflowStep: VendorWorkflowAction.UPDATE,
 		workflowVersion: 'v1',
 		newState: updateData
 	});
@@ -187,15 +198,15 @@ async function deleteVendor(
 	// Record activity event
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'EXTERNAL_VENDOR',
+		entityType: ActivityEntityType.EXTERNAL_VENDOR,
 		entityId: vendorId,
-		action: 'DELETE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.DELETE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: `Vendor deleted`,
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'vendorWorkflow_v1',
-		workflowStep: 'DELETE',
+		workflowStep: VendorWorkflowAction.DELETE,
 		workflowVersion: 'v1',
 		newState: { deletedAt: new Date().toISOString() }
 	});
@@ -218,7 +229,7 @@ async function vendorWorkflow(input: VendorWorkflowInput): Promise<VendorWorkflo
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'started', action: input.action });
 
 		switch (input.action) {
-			case 'CREATE': {
+			case VendorWorkflowAction.CREATE: {
 				if (!input.name) {
 					const error = new Error('Missing required field: name for CREATE');
 					logStepError(log, 'validation', error, { input });
@@ -243,7 +254,7 @@ async function vendorWorkflow(input: VendorWorkflowInput): Promise<VendorWorkflo
 				return successResult;
 			}
 
-			case 'UPDATE': {
+			case VendorWorkflowAction.UPDATE: {
 				if (!input.vendorId) {
 					const error = new Error('Missing required field: vendorId for UPDATE');
 					logStepError(log, 'validation', error, { vendorId: input.vendorId });
@@ -267,7 +278,7 @@ async function vendorWorkflow(input: VendorWorkflowInput): Promise<VendorWorkflo
 				return successResult;
 			}
 
-			case 'DELETE': {
+			case VendorWorkflowAction.DELETE: {
 				if (!input.vendorId) {
 					const error = new Error('Missing required field: vendorId for DELETE');
 					logStepError(log, 'validation', error, { vendorId: input.vendorId });
@@ -314,8 +325,8 @@ async function vendorWorkflow(input: VendorWorkflowInput): Promise<VendorWorkflo
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VENDOR_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VENDOR_WORKFLOW_ERROR
 		});
 		const errorResult: VendorWorkflowResult = {
 			success: false,

@@ -10,41 +10,41 @@ import {
 import { JobPrioritySchema, JobVisitStatusSchema } from '../../schemas.js';
 import { prisma } from '../../../db.js';
 import { assertContractorOrg } from '../contractor/utils.js';
-import { JobStatus, JobSourceType, CheckpointType } from '../../../../../../generated/prisma/client.js';
+import { JobStatus, JobSourceType, CheckpointType, ActivityEntityType, ActivityActionType } from '../../../../../../generated/prisma/enums.js';
 import { recordExecution, recordStatusChange, recordAssignment } from '../../middleware/activityEvent.js';
 import { recordSpanError } from '../../middleware/tracing.js';
 import { startJobCreateWorkflow } from '../../../workflows/jobCreateWorkflow.js';
-import { startJobWorkflow } from '../../../workflows/jobWorkflow.js';
+import { startJobWorkflow, JobAction } from '../../../workflows/jobWorkflow.js';
 
 // Valid state transitions for jobs (Phase 15 - Contractor Job Lifecycle)
 // Note: Linked entity propagation (work orders, concierge cases) is now handled
 // inside the jobWorkflow transitionJobStatus step function
 const JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 	// Initial states
-	LEAD: ['TICKET', 'CANCELLED'],
-	TICKET: ['ESTIMATE_REQUIRED', 'JOB_CREATED', 'CANCELLED'],
+	[JobStatus.LEAD]: [JobStatus.TICKET, JobStatus.CANCELLED],
+	[JobStatus.TICKET]: [JobStatus.ESTIMATE_REQUIRED, JobStatus.JOB_CREATED, JobStatus.CANCELLED],
 
 	// Estimate workflow
-	ESTIMATE_REQUIRED: ['ESTIMATE_SENT', 'JOB_CREATED', 'CANCELLED'],
-	ESTIMATE_SENT: ['ESTIMATE_APPROVED', 'ESTIMATE_REQUIRED', 'CANCELLED'],
-	ESTIMATE_APPROVED: ['JOB_CREATED', 'CANCELLED'],
+	[JobStatus.ESTIMATE_REQUIRED]: [JobStatus.ESTIMATE_SENT, JobStatus.JOB_CREATED, JobStatus.CANCELLED],
+	[JobStatus.ESTIMATE_SENT]: [JobStatus.ESTIMATE_APPROVED, JobStatus.ESTIMATE_REQUIRED, JobStatus.CANCELLED],
+	[JobStatus.ESTIMATE_APPROVED]: [JobStatus.JOB_CREATED, JobStatus.CANCELLED],
 
 	// Job execution
-	JOB_CREATED: ['SCHEDULED', 'CANCELLED'],
-	SCHEDULED: ['DISPATCHED', 'ON_HOLD', 'CANCELLED'],
-	DISPATCHED: ['IN_PROGRESS', 'SCHEDULED', 'ON_HOLD', 'CANCELLED'],
-	IN_PROGRESS: ['ON_HOLD', 'COMPLETED', 'CANCELLED'],
-	ON_HOLD: ['SCHEDULED', 'DISPATCHED', 'IN_PROGRESS', 'CANCELLED'],
+	[JobStatus.JOB_CREATED]: [JobStatus.SCHEDULED, JobStatus.CANCELLED],
+	[JobStatus.SCHEDULED]: [JobStatus.DISPATCHED, JobStatus.ON_HOLD, JobStatus.CANCELLED],
+	[JobStatus.DISPATCHED]: [JobStatus.IN_PROGRESS, JobStatus.SCHEDULED, JobStatus.ON_HOLD, JobStatus.CANCELLED],
+	[JobStatus.IN_PROGRESS]: [JobStatus.ON_HOLD, JobStatus.COMPLETED, JobStatus.CANCELLED],
+	[JobStatus.ON_HOLD]: [JobStatus.SCHEDULED, JobStatus.DISPATCHED, JobStatus.IN_PROGRESS, JobStatus.CANCELLED],
 
 	// Completion & payment
-	COMPLETED: ['INVOICED', 'WARRANTY', 'CLOSED', 'CANCELLED'],
-	INVOICED: ['PAID', 'CANCELLED'],
-	PAID: ['WARRANTY', 'CLOSED'],
-	WARRANTY: ['CLOSED', 'IN_PROGRESS'],
+	[JobStatus.COMPLETED]: [JobStatus.INVOICED, JobStatus.WARRANTY, JobStatus.CLOSED, JobStatus.CANCELLED],
+	[JobStatus.INVOICED]: [JobStatus.PAID, JobStatus.CANCELLED],
+	[JobStatus.PAID]: [JobStatus.WARRANTY, JobStatus.CLOSED],
+	[JobStatus.WARRANTY]: [JobStatus.CLOSED, JobStatus.IN_PROGRESS],
 
 	// Terminal states
-	CLOSED: [],
-	CANCELLED: []
+	[JobStatus.CLOSED]: [],
+	[JobStatus.CANCELLED]: []
 };
 
 const jobOutput = z.object({
@@ -517,7 +517,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'UPDATE_JOB',
+					action: JobAction.UPDATE_JOB,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.id,
@@ -574,7 +574,7 @@ export const jobRouter = {
 			}
 
 			// Phase 15: Additional validation guards for specific transitions
-			if (input.toStatus === 'ESTIMATE_SENT') {
+			if (input.toStatus === JobStatus.ESTIMATE_SENT) {
 				// Validate at least one estimate exists for this job
 				const estimateCount = await prisma.estimate.count({
 					where: { jobId: input.id, organizationId: context.organization.id, status: { in: ['DRAFT', 'SENT', 'VIEWED'] } }
@@ -584,14 +584,14 @@ export const jobRouter = {
 				}
 			}
 
-			if (input.toStatus === 'DISPATCHED') {
+			if (input.toStatus === JobStatus.DISPATCHED) {
 				// Validate technician is assigned
 				if (!job.assignedTechnicianId) {
 					throw errors.BAD_REQUEST({ message: 'Cannot dispatch: no technician assigned to this job' });
 				}
 			}
 
-			if (input.toStatus === 'INVOICED') {
+			if (input.toStatus === JobStatus.INVOICED) {
 				// Validate at least one invoice exists for this job
 				const invoiceCount = await prisma.jobInvoice.count({
 					where: { jobId: input.id, status: { not: 'VOID' } }
@@ -601,7 +601,7 @@ export const jobRouter = {
 				}
 			}
 
-			if (input.toStatus === 'PAID') {
+			if (input.toStatus === JobStatus.PAID) {
 				// Validate all invoices are paid (balance due = 0)
 				const unpaidInvoices = await prisma.jobInvoice.findFirst({
 					where: {
@@ -618,7 +618,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'TRANSITION_STATUS',
+					action: JobAction.TRANSITION_STATUS,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.id,
@@ -634,7 +634,7 @@ export const jobRouter = {
 			const updatedJob = await prisma.job.findFirstOrThrow({ where: { id: result.entityId, organizationId: context.organization.id } });
 
 			// Record activity event
-			await recordStatusChange(context, 'JOB', updatedJob.id, job.status, input.toStatus,
+			await recordStatusChange(context, ActivityEntityType.JOB, updatedJob.id, job.status, input.toStatus,
 				`Job status changed from ${job.status} to ${input.toStatus}${input.notes ? `: ${input.notes}` : ''}`,
 				{ jobId: updatedJob.id }
 			);
@@ -690,7 +690,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'ASSIGN_TECHNICIAN',
+					action: JobAction.ASSIGN_TECHNICIAN,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.id,
@@ -707,15 +707,15 @@ export const jobRouter = {
 
 			// Record activity event
 			if (input.technicianId) {
-				await recordAssignment(context, 'JOB', updatedJob.id, input.technicianId, 'Technician',
+				await recordAssignment(context, ActivityEntityType.JOB, updatedJob.id, input.technicianId, 'Technician',
 					`Technician assigned to job`,
 					{ jobId: updatedJob.id, technicianId: input.technicianId }
 				);
 			} else {
 				await recordExecution(context, {
-					entityType: 'JOB',
+					entityType: ActivityEntityType.JOB,
 					entityId: updatedJob.id,
-					action: 'UNASSIGN',
+					action: ActivityActionType.UNASSIGN,
 					summary: `Technician unassigned from job`,
 					jobId: updatedJob.id
 				});
@@ -757,14 +757,15 @@ export const jobRouter = {
 			const job = await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			// Validate job is in a schedulable state
-			if (!['JOB_CREATED', 'SCHEDULED', 'ON_HOLD'].includes(job.status)) {
+			const schedulableStatuses: JobStatus[] = [JobStatus.JOB_CREATED, JobStatus.SCHEDULED, JobStatus.ON_HOLD];
+			if (!schedulableStatuses.includes(job.status)) {
 				throw errors.BAD_REQUEST({ message: `Cannot schedule job in ${job.status} status` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'SCHEDULE_JOB',
+					action: JobAction.SCHEDULE_JOB,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.id,
@@ -869,7 +870,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'ADD_NOTE',
+					action: JobAction.ADD_NOTE,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.jobId,
@@ -959,7 +960,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'ADD_ATTACHMENT',
+					action: JobAction.ADD_ATTACHMENT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.jobId,
@@ -1046,7 +1047,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'DELETE_ATTACHMENT',
+					action: JobAction.DELETE_ATTACHMENT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					entityId: input.attachmentId,
@@ -1098,7 +1099,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'ADD_CHECKPOINT',
+					action: JobAction.ADD_CHECKPOINT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.jobId,
@@ -1158,7 +1159,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'COMPLETE_CHECKPOINT',
+					action: JobAction.COMPLETE_CHECKPOINT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					entityId: input.checkpointId,
@@ -1263,7 +1264,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'ADD_VISIT',
+					action: JobAction.ADD_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.jobId,
@@ -1331,7 +1332,7 @@ export const jobRouter = {
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'UPDATE_VISIT',
+					action: JobAction.UPDATE_VISIT,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					entityId: input.visitId,
@@ -1411,14 +1412,15 @@ export const jobRouter = {
 			const job = await getJobOrThrow(input.id, context.organization!.id, errors);
 
 			// Only allow deletion of jobs in certain states
-			if (!['LEAD', 'TICKET', 'CANCELLED'].includes(job.status)) {
+			const deletableStatuses: JobStatus[] = [JobStatus.LEAD, JobStatus.TICKET, JobStatus.CANCELLED];
+			if (!deletableStatuses.includes(job.status)) {
 				throw errors.BAD_REQUEST({ message: `Cannot delete job in ${job.status} status` });
 			}
 
 			// Use DBOS workflow for durable execution
 			const result = await startJobWorkflow(
 				{
-					action: 'DELETE_JOB',
+					action: JobAction.DELETE_JOB,
 					organizationId: context.organization!.id,
 					userId: context.user!.id,
 					jobId: input.id,

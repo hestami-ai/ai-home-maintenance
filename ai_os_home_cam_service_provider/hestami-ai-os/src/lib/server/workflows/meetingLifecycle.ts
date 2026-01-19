@@ -9,6 +9,12 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { orgTransaction } from '../db/rls.js';
 import type { MeetingStatus } from '../../../../generated/prisma/client.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
+import { ActivityActionType, MeetingStatus as MeetingStatusEnum } from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	MEETING_LIFECYCLE_ERROR: 'MEETING_LIFECYCLE_ERROR'
+} as const;
 
 // Event keys for workflow status tracking
 const WORKFLOW_STATUS_EVENT = 'meeting_status';
@@ -16,13 +22,13 @@ const WORKFLOW_ERROR_EVENT = 'meeting_error';
 
 // Valid status transitions (Phase 11: Full governance lifecycle)
 const validTransitions: Record<MeetingStatus, MeetingStatus[]> = {
-	SCHEDULED: ['IN_SESSION', 'CANCELLED'],
-	IN_SESSION: ['ADJOURNED', 'CANCELLED'],
-	ADJOURNED: ['MINUTES_DRAFT'],
-	MINUTES_DRAFT: ['MINUTES_APPROVED', 'ADJOURNED'], // Can go back to ADJOURNED for revisions
-	MINUTES_APPROVED: ['ARCHIVED'],
-	ARCHIVED: [],
-	CANCELLED: []
+	[MeetingStatusEnum.SCHEDULED]: [MeetingStatusEnum.IN_SESSION, MeetingStatusEnum.CANCELLED],
+	[MeetingStatusEnum.IN_SESSION]: [MeetingStatusEnum.ADJOURNED, MeetingStatusEnum.CANCELLED],
+	[MeetingStatusEnum.ADJOURNED]: [MeetingStatusEnum.MINUTES_DRAFT],
+	[MeetingStatusEnum.MINUTES_DRAFT]: [MeetingStatusEnum.MINUTES_APPROVED, MeetingStatusEnum.ADJOURNED], // Can go back to ADJOURNED for revisions
+	[MeetingStatusEnum.MINUTES_APPROVED]: [MeetingStatusEnum.ARCHIVED],
+	[MeetingStatusEnum.ARCHIVED]: [],
+	[MeetingStatusEnum.CANCELLED]: []
 };
 
 interface TransitionInput {
@@ -68,7 +74,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 			});
 
 			if (!meeting) {
-				return { valid: false, currentStatus: 'SCHEDULED' as MeetingStatus, error: 'Meeting not found' };
+				return { valid: false, currentStatus: MeetingStatusEnum.SCHEDULED, error: 'Meeting not found' };
 			}
 
 			const currentStatus = meeting.status as MeetingStatus;
@@ -83,7 +89,7 @@ async function validateTransition(input: TransitionInput): Promise<{
 			}
 
 			// Additional validation for IN_SESSION transition
-			if (input.toStatus === 'IN_SESSION') {
+			if (input.toStatus === MeetingStatusEnum.IN_SESSION) {
 				// Check if meeting has agenda items
 				const agendaCount = await tx.meetingAgendaItem.count({
 					where: { meetingId: input.meetingId }
@@ -222,7 +228,7 @@ async function meetingTransitionWorkflow(input: TransitionInput): Promise<Transi
 		await DBOS.setEvent(WORKFLOW_STATUS_EVENT, { step: 'notifications_queued' });
 
 		// Step 4: Create minutes placeholder if meeting was adjourned
-		if (input.toStatus === 'ADJOURNED') {
+		if (input.toStatus === MeetingStatusEnum.ADJOURNED) {
 			await DBOS.runStep(
 				() => createMinutesPlaceholder(input.organizationId, input.meetingId, input.userId),
 				{ name: 'createMinutesPlaceholder' }
@@ -245,14 +251,14 @@ async function meetingTransitionWorkflow(input: TransitionInput): Promise<Transi
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'MEETING_LIFECYCLE_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.MEETING_LIFECYCLE_ERROR
 		});
 
 		return {
 			success: false,
 			meetingId: input.meetingId,
-			fromStatus: 'SCHEDULED',
+			fromStatus: MeetingStatusEnum.SCHEDULED,
 			toStatus: input.toStatus,
 			timestamp: new Date().toISOString(),
 			error: errorMessage

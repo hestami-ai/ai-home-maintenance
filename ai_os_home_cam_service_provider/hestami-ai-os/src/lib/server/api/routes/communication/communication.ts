@@ -8,7 +8,7 @@ import {
 	PaginationOutputSchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { startCommunicationWorkflow } from '../../../workflows/communicationWorkflow.js';
+import { startCommunicationWorkflow, CommunicationAction } from '../../../workflows/communicationWorkflow.js';
 import { createModuleLogger } from '../../../logger.js';
 
 const log = createModuleLogger('CommunicationRoute');
@@ -96,7 +96,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_TEMPLATE',
+					action: CommunicationAction.CREATE_TEMPLATE,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -242,7 +242,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_TEMPLATE_VERSION',
+					action: CommunicationAction.CREATE_TEMPLATE_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -319,7 +319,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'ACTIVATE_TEMPLATE_VERSION',
+					action: CommunicationAction.ACTIVATE_TEMPLATE_VERSION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -394,7 +394,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_MASS_COMMUNICATION',
+					action: CommunicationAction.CREATE_MASS_COMMUNICATION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -549,7 +549,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_DELIVERY_LOG',
+					action: CommunicationAction.CREATE_DELIVERY_LOG,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -626,7 +626,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'UPDATE_DELIVERY_STATUS',
+					action: CommunicationAction.UPDATE_DELIVERY_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.deliveryId,
@@ -689,7 +689,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_ANNOUNCEMENT',
+					action: CommunicationAction.CREATE_ANNOUNCEMENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -826,7 +826,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'MARK_ANNOUNCEMENT_READ',
+					action: CommunicationAction.MARK_ANNOUNCEMENT_READ,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -891,7 +891,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_EVENT',
+					action: CommunicationAction.CREATE_EVENT,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1033,7 +1033,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'CREATE_EVENT_NOTIFICATION',
+					action: CommunicationAction.CREATE_EVENT_NOTIFICATION,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					data: {
@@ -1106,7 +1106,7 @@ export const communicationRouter = {
 
 			const workflowResult = await startCommunicationWorkflow(
 				{
-					action: 'UPDATE_EVENT_NOTIFICATION_STATUS',
+					action: CommunicationAction.UPDATE_EVENT_NOTIFICATION_STATUS,
 					organizationId: context.organization.id,
 					userId: context.user.id,
 					entityId: input.notificationId,

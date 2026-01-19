@@ -4,7 +4,9 @@
  */
 
 import { createRouterClient, type RouterClient } from '@orpc/server';
-import { appRouter, type AppRouter, type RequestContext, createEmptyContext } from './index.js';
+// Import appRouter from dedicated file to avoid circular dependency with index.ts
+import { appRouter, type AppRouter } from './appRouter.js';
+import { createEmptyContext, type RequestContext } from './context.js';
 import type { Organization, Association } from '../../../../generated/prisma/client.js';
 import { nanoid } from 'nanoid';
 import { createModuleLogger } from '../logger.js';

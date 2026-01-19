@@ -5,7 +5,7 @@
 	import { TabbedContent, DecisionButton, RationaleModal, SendNoticeModal, ScheduleHearingModal, AssessFineModal, AppealModal, DocumentPicker } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { refreshBadgeCounts } from '$lib/stores'; // Keeping only refreshBadgeCounts action
-	import { violationApi, documentApi, activityEventApi, type ViolationDetail, type Document } from '$lib/api/cam';
+	import { ActivityEntityTypeValues, NoticeDeliveryMethodValues, ViolationSeverityValues, ViolationStatusValues, activityEventApi, documentApi, type Document, type ViolationDetail, violationApi } from '$lib/api/cam';
 
 	interface PriorViolation {
 		id: string;
@@ -47,12 +47,12 @@
 
     let { data } = $props();
 
-    // Derive state from props - updates when navigating between violations
-	let violation = $derived<ViolationDetail | null>(data.violation);
-	let documents = $derived<Document[]>(data.documents);
-	let history = $derived<ViolationHistoryEvent[]>(data.history);
-	let notices = $derived<ViolationNotice[]>(data.notices);
-	let ownerResponses = $derived<OwnerResponse[]>(data.ownerResponses);
+    // Derive state from props - use null-safe access for navigation transitions
+	let violation = $derived<ViolationDetail | null>(data?.violation ?? null);
+	let documents = $derived<Document[]>(data?.documents ?? []);
+	let history = $derived<ViolationHistoryEvent[]>(data?.history ?? []);
+	let notices = $derived<ViolationNotice[]>(data?.notices ?? []);
+	let ownerResponses = $derived<OwnerResponse[]>(data?.ownerResponses ?? []);
 	
     // Secondary data (client-side fetch for now)
 	let priorUnitViolations = $state<PriorViolation[]>([]);
@@ -75,6 +75,7 @@
 
     // Re-assign if data changes (e.g. navigation)
     $effect(() => {
+        if (!data) return;
         violation = data.violation;
         documents = data.documents;
         history = data.history;
@@ -168,41 +169,43 @@
 
 	function getActionAuditInfo(action: string): { event: string; newStatus: string; requiresRationale: boolean } {
 		const auditMap: Record<string, { event: string; newStatus: string; requiresRationale: boolean }> = {
-			'CONFIRM': { event: 'VIOLATION_CONFIRMED', newStatus: 'UNDER_REVIEW', requiresRationale: true },
-			'MARK_INVALID': { event: 'VIOLATION_MARKED_INVALID', newStatus: 'CLOSED', requiresRationale: true },
-			'SEND_NOTICE': { event: 'NOTICE_SENT', newStatus: 'NOTICE_SENT', requiresRationale: false },
-			'REQUEST_RESPONSE': { event: 'OWNER_RESPONSE_REQUESTED', newStatus: 'OWNER_RESPONSE_PENDING', requiresRationale: true },
-			'ESCALATE': { event: 'VIOLATION_ESCALATED', newStatus: 'ESCALATED', requiresRationale: true },
-			'SCHEDULE_HEARING': { event: 'HEARING_SCHEDULED', newStatus: 'HEARING_SCHEDULED', requiresRationale: false },
-			'ASSESS_FINE': { event: 'FINE_ASSESSED', newStatus: '(unchanged)', requiresRationale: false },
-			'AUTHORIZE_REMEDIATION': { event: 'REMEDIATION_AUTHORIZED', newStatus: 'REMEDIATION_IN_PROGRESS', requiresRationale: false },
-			'RESOLVE': { event: 'VIOLATION_RESOLVED', newStatus: 'RESOLVED', requiresRationale: true }
+			'CONFIRM': { event: 'VIOLATION_CONFIRMED', newStatus: ViolationStatusValues.OPEN, requiresRationale: true },
+			'MARK_INVALID': { event: 'VIOLATION_MARKED_INVALID', newStatus: ViolationStatusValues.CLOSED, requiresRationale: true },
+			'SEND_NOTICE': { event: ViolationStatusValues.NOTICE_SENT, newStatus: ViolationStatusValues.NOTICE_SENT, requiresRationale: false },
+			'REQUEST_RESPONSE': { event: 'OWNER_RESPONSE_REQUESTED', newStatus: ViolationStatusValues.CURE_PERIOD, requiresRationale: true },
+			'ESCALATE': { event: 'VIOLATION_ESCALATED', newStatus: ViolationStatusValues.ESCALATED, requiresRationale: true },
+			'SCHEDULE_HEARING': { event: ViolationStatusValues.HEARING_SCHEDULED, newStatus: ViolationStatusValues.HEARING_SCHEDULED, requiresRationale: false },
+			'ASSESS_FINE': { event: ViolationStatusValues.FINE_ASSESSED, newStatus: '(unchanged)', requiresRationale: false },
+			'AUTHORIZE_REMEDIATION': { event: 'REMEDIATION_AUTHORIZED', newStatus: ViolationStatusValues.CURED, requiresRationale: false },
+			'RESOLVE': { event: 'VIOLATION_RESOLVED', newStatus: ViolationStatusValues.CLOSED, requiresRationale: true }
 		};
 		return auditMap[action] || { event: 'UNKNOWN', newStatus: '(unknown)', requiresRationale: false };
 	}
 
 	function getSeverityColor(severity: string): string {
 		switch (severity) {
-			case 'CRITICAL': return 'bg-error-500 text-white';
-			case 'MAJOR': return 'bg-warning-500 text-white';
-			case 'MODERATE': return 'bg-yellow-500 text-black';
-			case 'MINOR': return 'bg-surface-400 text-white';
+			case ViolationSeverityValues.CRITICAL: return 'bg-error-500 text-white';
+			case ViolationSeverityValues.MAJOR: return 'bg-warning-500 text-white';
+			case ViolationSeverityValues.MODERATE: return 'bg-yellow-500 text-black';
+			case ViolationSeverityValues.MINOR: return 'bg-surface-400 text-white';
 			default: return 'bg-surface-300 text-surface-700';
 		}
 	}
 
 	function getStatusColor(status: string): string {
 		switch (status) {
-			case 'DETECTED': return 'text-blue-500 bg-blue-500/10';
-			case 'UNDER_REVIEW': return 'text-indigo-500 bg-indigo-500/10';
-			case 'NOTICE_SENT': return 'text-warning-500 bg-warning-500/10';
-			case 'OWNER_RESPONSE_PENDING': return 'text-orange-500 bg-orange-500/10';
-			case 'CURE_PERIOD': return 'text-yellow-600 bg-yellow-500/10';
-			case 'ESCALATED': return 'text-error-600 bg-error-500/20';
-			case 'HEARING_SCHEDULED': return 'text-primary-500 bg-primary-500/10';
-			case 'REMEDIATION_IN_PROGRESS': return 'text-cyan-500 bg-cyan-500/10';
-			case 'RESOLVED': return 'text-success-500 bg-success-500/10';
-			case 'CLOSED': return 'text-surface-500 bg-surface-500/10';
+			case ViolationStatusValues.DRAFT: return 'text-blue-500 bg-blue-500/10';
+			case ViolationStatusValues.OPEN: return 'text-indigo-500 bg-indigo-500/10';
+			case ViolationStatusValues.NOTICE_SENT: return 'text-warning-500 bg-warning-500/10';
+			case ViolationStatusValues.CURE_PERIOD: return 'text-yellow-600 bg-yellow-500/10';
+			case ViolationStatusValues.CURED: return 'text-orange-500 bg-orange-500/10';
+			case ViolationStatusValues.ESCALATED: return 'text-error-600 bg-error-500/20';
+			case ViolationStatusValues.HEARING_SCHEDULED: return 'text-primary-500 bg-primary-500/10';
+			case ViolationStatusValues.HEARING_HELD: return 'text-cyan-500 bg-cyan-500/10';
+			case ViolationStatusValues.FINE_ASSESSED: return 'text-error-500 bg-error-500/10';
+			case ViolationStatusValues.APPEALED: return 'text-warning-600 bg-warning-500/10';
+			case ViolationStatusValues.CLOSED: return 'text-success-500 bg-success-500/10';
+			case ViolationStatusValues.DISMISSED: return 'text-surface-500 bg-surface-500/10';
 			default: return 'text-surface-500 bg-surface-500/10';
 		}
 	}
@@ -306,7 +309,7 @@
 				subject: 'Violation Notice',
 				body: data.notes || '',
 				recipientName: '',
-				deliveryMethod: 'EMAIL'
+				deliveryMethod: NoticeDeliveryMethodValues.EMAIL
 			});
 
 			if (response.ok) {
@@ -405,7 +408,7 @@
 			for (const doc of selectedDocs) {
 				const response = await documentApi.linkToContext({
 					documentId: doc.documentId,
-					contextType: 'VIOLATION',
+					contextType: ActivityEntityTypeValues.VIOLATION,
 					contextId: violationId,
 					bindingNotes: `Linked to violation as supporting evidence`,
 					idempotencyKey: crypto.randomUUID()
@@ -480,7 +483,7 @@
 						<Pencil class="mr-1 h-4 w-4" />
 						Edit
 					</a>
-					{#if violation.status === 'DRAFT'}
+					{#if violation.status === ViolationStatusValues.DRAFT}
 						<DecisionButton
 							variant="default"
 							requiresRationale
@@ -498,7 +501,7 @@
 							Invalid
 						</DecisionButton>
 					{/if}
-					{#if ['UNDER_REVIEW', 'NOTICE_SENT', 'OWNER_RESPONSE_PENDING'].includes(violation.status)}
+					{#if ([ViolationStatusValues.OPEN, ViolationStatusValues.NOTICE_SENT, ViolationStatusValues.CURE_PERIOD] as string[]).includes(violation.status)}
 						<DecisionButton
 							variant="default"
 							onclick={() => showSendNoticeModal = true}
@@ -507,7 +510,7 @@
 							Send Notice
 						</DecisionButton>
 					{/if}
-					{#if violation.status === 'NOTICE_SENT'}
+					{#if violation.status === ViolationStatusValues.NOTICE_SENT}
 						<DecisionButton
 							variant="default"
 							requiresRationale
@@ -517,7 +520,7 @@
 							Request Response
 						</DecisionButton>
 					{/if}
-					{#if ['UNDER_REVIEW', 'NOTICE_SENT', 'OWNER_RESPONSE_PENDING', 'CURE_PERIOD'].includes(violation.status)}
+					{#if ([ViolationStatusValues.OPEN, ViolationStatusValues.NOTICE_SENT, ViolationStatusValues.CURE_PERIOD] as string[]).includes(violation.status)}
 						<DecisionButton
 							variant="escalate"
 							requiresRationale
@@ -527,7 +530,7 @@
 							Escalate
 						</DecisionButton>
 					{/if}
-					{#if violation.status === 'ESCALATED'}
+					{#if violation.status === ViolationStatusValues.ESCALATED}
 						<DecisionButton
 							variant="default"
 							onclick={() => showScheduleHearingModal = true}
@@ -543,7 +546,7 @@
 							Authorize Remediation
 						</DecisionButton>
 					{/if}
-					{#if ['ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD'].includes(violation.status)}
+					{#if ([ViolationStatusValues.ESCALATED, ViolationStatusValues.HEARING_SCHEDULED, ViolationStatusValues.HEARING_HELD] as string[]).includes(violation.status)}
 						<DecisionButton
 							variant="deny"
 							onclick={() => showAssessFineModal = true}
@@ -552,7 +555,7 @@
 							Assess Fine
 						</DecisionButton>
 					{/if}
-					{#if !['DETECTED', 'RESOLVED', 'CLOSED'].includes(violation.status)}
+					{#if !([ViolationStatusValues.DRAFT, ViolationStatusValues.CLOSED, ViolationStatusValues.DISMISSED] as string[]).includes(violation.status)}
 						<DecisionButton
 							variant="approve"
 							requiresRationale
@@ -618,7 +621,7 @@
 				</div>
 			{/if}
 
-			{#if slaStatus && !['RESOLVED', 'CLOSED'].includes(violation.status)}
+			{#if slaStatus && !([ViolationStatusValues.CLOSED, ViolationStatusValues.DISMISSED] as string[]).includes(violation.status)}
 				<div class="flex items-center gap-3 rounded-lg border p-4 {getSlaColor(slaStatus.urgency)}">
 					<Timer class="h-5 w-5 flex-shrink-0" />
 					<div class="flex-1">
@@ -807,7 +810,7 @@
 {#snippet actionsTab()}
 	{#if violation}
 		<div class="space-y-6">
-			{#if violation.status === 'DRAFT'}
+			{#if violation.status === ViolationStatusValues.DRAFT}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Review & Confirmation</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -841,7 +844,7 @@
 				</Card>
 			{/if}
 
-			{#if ['UNDER_REVIEW', 'NOTICE_SENT', 'OWNER_RESPONSE_PENDING'].includes(violation.status)}
+			{#if ([ViolationStatusValues.OPEN, ViolationStatusValues.NOTICE_SENT, ViolationStatusValues.CURE_PERIOD] as string[]).includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Notice Actions</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -855,7 +858,7 @@
 							<Send class="mr-2 h-4 w-4" />
 							Send Notice
 						</DecisionButton>
-						{#if violation.status === 'NOTICE_SENT'}
+						{#if violation.status === ViolationStatusValues.NOTICE_SENT}
 							<DecisionButton
 								variant="default"
 								requiresRationale
@@ -876,7 +879,7 @@
 				</Card>
 			{/if}
 
-			{#if ['UNDER_REVIEW', 'NOTICE_SENT', 'OWNER_RESPONSE_PENDING', 'CURE_PERIOD'].includes(violation.status)}
+			{#if ([ViolationStatusValues.OPEN, ViolationStatusValues.NOTICE_SENT, ViolationStatusValues.CURE_PERIOD] as string[]).includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Escalation</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -899,7 +902,7 @@
 				</Card>
 			{/if}
 
-			{#if violation.status === 'ESCALATED'}
+			{#if violation.status === ViolationStatusValues.ESCALATED}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Escalated Actions</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -931,7 +934,7 @@
 				</Card>
 			{/if}
 
-			{#if ['ESCALATED', 'HEARING_SCHEDULED', 'HEARING_HELD'].includes(violation.status)}
+			{#if ([ViolationStatusValues.ESCALATED, ViolationStatusValues.HEARING_SCHEDULED, ViolationStatusValues.HEARING_HELD] as string[]).includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Enforcement</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -953,7 +956,7 @@
 				</Card>
 			{/if}
 
-			{#if !['DETECTED', 'RESOLVED', 'CLOSED'].includes(violation.status)}
+			{#if !([ViolationStatusValues.DRAFT, ViolationStatusValues.CLOSED, ViolationStatusValues.DISMISSED] as string[]).includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold">Resolution</h3>
 					<p class="mb-4 text-sm text-surface-500">
@@ -976,19 +979,19 @@
 				</Card>
 			{/if}
 
-			{#if ['RESOLVED', 'CLOSED'].includes(violation.status)}
+			{#if ([ViolationStatusValues.CLOSED, ViolationStatusValues.DISMISSED] as string[]).includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<div class="flex items-center gap-3 text-success-500">
 						<CheckCircle class="h-6 w-6" />
 						<div>
-							<h3 class="font-semibold">Violation {violation.status === 'CLOSED' ? 'Closed' : 'Resolved'}</h3>
+							<h3 class="font-semibold">Violation {violation.status === ViolationStatusValues.CLOSED ? 'Closed' : 'Dismissed'}</h3>
 							<p class="text-sm text-surface-500">No further actions available.</p>
 						</div>
 					</div>
 				</Card>
 			{/if}
 
-			{#if !['DRAFT', 'CLOSED'].includes(violation.status)}
+			{#if !([ViolationStatusValues.DRAFT, ViolationStatusValues.CLOSED] as string[]).includes(violation.status)}
 				<Card variant="outlined" padding="lg">
 					<h3 class="mb-4 font-semibold flex items-center gap-2">
 						<Scale class="h-5 w-5 text-primary-500" />

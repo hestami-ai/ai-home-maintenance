@@ -29,6 +29,7 @@
 		type VendorCandidate
 	} from '$lib/api/vendorCandidate';
 	import { vendorBidApi, formatCurrency, formatDuration, type VendorBidListItem } from '$lib/api/vendorBid';
+	import { VendorCandidateStatusValues, BidStatusValues } from '$lib/api/cam';
 
 	const caseId = $derived(page.params.id ?? '');
 	const vendorId = $derived(page.params.vendorId ?? '');
@@ -49,6 +50,7 @@
 
 	// Synchronize server data
 	$effect(() => {
+		if (!data) return;
 		if (data.vendorCandidate) vendor = data.vendorCandidate;
 		if (data.bids) bids = data.bids;
 	});
@@ -60,11 +62,11 @@
 
 	function getStatusIcon(status: string) {
 		switch (status) {
-			case 'SELECTED':
+			case VendorCandidateStatusValues.SELECTED:
 				return CheckCircle;
-			case 'REJECTED':
+			case VendorCandidateStatusValues.REJECTED:
 				return XCircle;
-			case 'QUOTED':
+			case VendorCandidateStatusValues.QUOTED:
 				return DollarSign;
 			default:
 				return Building2;
@@ -273,7 +275,7 @@
 														</p>
 													{/if}
 												</div>
-												<span class="badge {bid.status === 'ACCEPTED' ? 'preset-filled-success-500' : bid.status === 'REJECTED' ? 'preset-filled-error-500' : 'preset-outlined-warning-500'}">
+												<span class="badge {bid.status === BidStatusValues.ACCEPTED ? 'preset-filled-success-500' : bid.status === BidStatusValues.REJECTED ? 'preset-filled-error-500' : 'preset-outlined-warning-500'}">
 													{bid.status}
 												</span>
 											</div>
@@ -327,10 +329,10 @@
 					<Card variant="outlined" padding="lg">
 						<h3 class="font-semibold">Vendor Status</h3>
 						<div class="mt-4 flex items-center gap-3">
-							<div class="flex h-12 w-12 items-center justify-center rounded-full {vendor.status === 'SELECTED' ? 'bg-success-500/10' : vendor.status === 'REJECTED' ? 'bg-error-500/10' : 'bg-surface-200-800'}">
-								{#if vendor.status === 'SELECTED'}
+							<div class="flex h-12 w-12 items-center justify-center rounded-full {vendor.status === VendorCandidateStatusValues.SELECTED ? 'bg-success-500/10' : vendor.status === VendorCandidateStatusValues.REJECTED ? 'bg-error-500/10' : 'bg-surface-200-800'}">
+								{#if vendor.status === VendorCandidateStatusValues.SELECTED}
 									<CheckCircle class="h-6 w-6 text-success-500" />
-								{:else if vendor.status === 'REJECTED'}
+								{:else if vendor.status === VendorCandidateStatusValues.REJECTED}
 									<XCircle class="h-6 w-6 text-error-500" />
 								{:else}
 									<Building2 class="h-6 w-6 text-surface-500" />
@@ -387,13 +389,13 @@
 					<Card variant="outlined" padding="lg">
 						<h3 class="font-semibold">Actions</h3>
 						<div class="mt-4 space-y-2">
-							{#if vendor.status === 'IDENTIFIED' || vendor.status === 'CONTACTED'}
+							{#if vendor.status === VendorCandidateStatusValues.IDENTIFIED || vendor.status === VendorCandidateStatusValues.CONTACTED}
 								<button class="btn preset-filled-success-500 w-full justify-start">
 									<CheckCircle class="mr-2 h-4 w-4" />
 									Select Vendor
 								</button>
 							{/if}
-							{#if vendor.status !== 'REJECTED'}
+							{#if vendor.status !== VendorCandidateStatusValues.REJECTED}
 								<button class="btn preset-outlined-error-500 w-full justify-start">
 									<XCircle class="mr-2 h-4 w-4" />
 									Reject Vendor

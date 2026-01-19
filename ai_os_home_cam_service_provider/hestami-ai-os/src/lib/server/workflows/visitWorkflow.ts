@@ -9,18 +9,34 @@ import { DBOS } from '@dbos-inc/dbos-sdk';
 import { recordWorkflowEvent } from '../api/middleware/activityEvent.js';
 import { recordSpanError } from '../api/middleware/tracing.js';
 import { orgTransaction } from '../db/rls.js';
+import {
+	ScheduledVisitStatus,
+	ActivityEntityType,
+	ActivityActionType,
+	ActivityEventCategory,
+	ActivityActorType
+} from '../../../../generated/prisma/enums.js';
+
+// Workflow error types for tracing
+const WorkflowErrorType = {
+	VISIT_WORKFLOW_ERROR: 'VISIT_WORKFLOW_ERROR'
+} as const;
 
 const WORKFLOW_STATUS_EVENT = 'visit_status';
 const WORKFLOW_ERROR_EVENT = 'visit_error';
 
-type VisitAction =
-	| 'CREATE_VISIT'
-	| 'ASSIGN_VISIT'
-	| 'CONFIRM_VISIT'
-	| 'START_VISIT'
-	| 'COMPLETE_VISIT'
-	| 'CANCEL_VISIT'
-	| 'RESCHEDULE_VISIT';
+// Action types for visit operations
+export const VisitActionValues = {
+	CREATE_VISIT: 'CREATE_VISIT',
+	ASSIGN_VISIT: 'ASSIGN_VISIT',
+	CONFIRM_VISIT: 'CONFIRM_VISIT',
+	START_VISIT: 'START_VISIT',
+	COMPLETE_VISIT: 'COMPLETE_VISIT',
+	CANCEL_VISIT: 'CANCEL_VISIT',
+	RESCHEDULE_VISIT: 'RESCHEDULE_VISIT'
+} as const;
+
+export type VisitAction = (typeof VisitActionValues)[keyof typeof VisitActionValues];
 
 interface VisitWorkflowInput {
 	action: VisitAction;
@@ -55,7 +71,7 @@ async function createVisit(
 					scheduledStart: data.scheduledStart ? new Date(data.scheduledStart as string) : undefined,
 					scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd as string) : undefined,
 					technicianId: data.technicianId as string | undefined,
-					status: 'SCHEDULED',
+					status: ScheduledVisitStatus.SCHEDULED,
 					serviceNotes: data.notes as string | undefined
 				}
 			});
@@ -65,15 +81,15 @@ async function createVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: visit.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Scheduled visit created',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'CREATE_VISIT',
+		workflowStep: VisitActionValues.CREATE_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -102,15 +118,15 @@ async function assignVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: visit.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Visit assigned to technician',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'ASSIGN_VISIT',
+		workflowStep: VisitActionValues.ASSIGN_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -128,7 +144,7 @@ async function confirmVisit(
 			return tx.scheduledVisit.update({
 				where: { id: visitId },
 				data: {
-					status: 'CONFIRMED',
+					status: ScheduledVisitStatus.CONFIRMED,
 					confirmedAt: new Date()
 				}
 			});
@@ -138,15 +154,15 @@ async function confirmVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: visit.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Visit confirmed',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'CONFIRM_VISIT',
+		workflowStep: VisitActionValues.CONFIRM_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -164,7 +180,7 @@ async function startVisit(
 			return tx.scheduledVisit.update({
 				where: { id: visitId },
 				data: {
-					status: 'IN_PROGRESS',
+					status: ScheduledVisitStatus.IN_PROGRESS,
 					actualStart: new Date()
 				}
 			});
@@ -174,15 +190,15 @@ async function startVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: visit.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Visit started',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'START_VISIT',
+		workflowStep: VisitActionValues.START_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -201,7 +217,7 @@ async function completeVisit(
 			return tx.scheduledVisit.update({
 				where: { id: visitId },
 				data: {
-					status: 'COMPLETED',
+					status: ScheduledVisitStatus.COMPLETED,
 					actualEnd: new Date(),
 					completedAt: new Date(),
 					completionNotes: data.completionNotes as string | undefined
@@ -213,15 +229,15 @@ async function completeVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: visit.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Visit completed',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'COMPLETE_VISIT',
+		workflowStep: VisitActionValues.COMPLETE_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -240,7 +256,7 @@ async function cancelVisit(
 			return tx.scheduledVisit.update({
 				where: { id: visitId },
 				data: {
-					status: 'CANCELLED'
+					status: ScheduledVisitStatus.CANCELLED
 				}
 			});
 		},
@@ -249,15 +265,15 @@ async function cancelVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: visit.id,
-		action: 'UPDATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.UPDATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Visit cancelled',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'CANCEL_VISIT',
+		workflowStep: VisitActionValues.CANCEL_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -277,7 +293,7 @@ async function rescheduleVisit(
 			await tx.scheduledVisit.update({
 				where: { id: visitId },
 				data: {
-					status: 'RESCHEDULED'
+					status: ScheduledVisitStatus.RESCHEDULED
 				}
 			});
 
@@ -290,7 +306,7 @@ async function rescheduleVisit(
 					scheduledStart: data.newScheduledStart ? new Date(data.newScheduledStart as string) : undefined,
 					scheduledEnd: data.newScheduledEnd ? new Date(data.newScheduledEnd as string) : undefined,
 					technicianId: data.technicianId as string | undefined,
-					status: 'SCHEDULED',
+					status: ScheduledVisitStatus.SCHEDULED,
 					rescheduleReason: data.reason as string | undefined,
 					rescheduledFrom: visitId
 				}
@@ -301,15 +317,15 @@ async function rescheduleVisit(
 
 	await recordWorkflowEvent({
 		organizationId,
-		entityType: 'JOB',
+		entityType: ActivityEntityType.JOB,
 		entityId: newVisit.id,
-		action: 'CREATE',
-		eventCategory: 'EXECUTION',
+		action: ActivityActionType.CREATE,
+		eventCategory: ActivityEventCategory.EXECUTION,
 		summary: 'Visit rescheduled',
 		performedById: userId,
-		performedByType: 'HUMAN',
+		performedByType: ActivityActorType.HUMAN,
 		workflowId: 'visitWorkflow_v1',
-		workflowStep: 'RESCHEDULE_VISIT',
+		workflowStep: VisitActionValues.RESCHEDULE_VISIT,
 		workflowVersion: 'v1'
 	});
 
@@ -323,7 +339,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 		let entityId: string | undefined;
 
 		switch (input.action) {
-			case 'CREATE_VISIT': {
+			case VisitActionValues.CREATE_VISIT: {
 				const result = await DBOS.runStep(
 					() => createVisit(input.organizationId, input.userId, input.data),
 					{ name: 'createVisit' }
@@ -331,7 +347,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 				entityId = result.id;
 				break;
 			}
-			case 'ASSIGN_VISIT': {
+			case VisitActionValues.ASSIGN_VISIT: {
 				if (!input.visitId) throw new Error('visitId required for ASSIGN_VISIT');
 				const result = await DBOS.runStep(
 					() => assignVisit(input.organizationId, input.userId, input.visitId!, input.data),
@@ -340,7 +356,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 				entityId = result.id;
 				break;
 			}
-			case 'CONFIRM_VISIT': {
+			case VisitActionValues.CONFIRM_VISIT: {
 				if (!input.visitId) throw new Error('visitId required for CONFIRM_VISIT');
 				const result = await DBOS.runStep(
 					() => confirmVisit(input.organizationId, input.userId, input.visitId!),
@@ -349,7 +365,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 				entityId = result.id;
 				break;
 			}
-			case 'START_VISIT': {
+			case VisitActionValues.START_VISIT: {
 				if (!input.visitId) throw new Error('visitId required for START_VISIT');
 				const result = await DBOS.runStep(
 					() => startVisit(input.organizationId, input.userId, input.visitId!),
@@ -358,7 +374,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 				entityId = result.id;
 				break;
 			}
-			case 'COMPLETE_VISIT': {
+			case VisitActionValues.COMPLETE_VISIT: {
 				if (!input.visitId) throw new Error('visitId required for COMPLETE_VISIT');
 				const result = await DBOS.runStep(
 					() => completeVisit(input.organizationId, input.userId, input.visitId!, input.data),
@@ -367,7 +383,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 				entityId = result.id;
 				break;
 			}
-			case 'CANCEL_VISIT': {
+			case VisitActionValues.CANCEL_VISIT: {
 				if (!input.visitId) throw new Error('visitId required for CANCEL_VISIT');
 				const result = await DBOS.runStep(
 					() => cancelVisit(input.organizationId, input.userId, input.visitId!, input.data),
@@ -376,7 +392,7 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 				entityId = result.id;
 				break;
 			}
-			case 'RESCHEDULE_VISIT': {
+			case VisitActionValues.RESCHEDULE_VISIT: {
 				if (!input.visitId) throw new Error('visitId required for RESCHEDULE_VISIT');
 				const result = await DBOS.runStep(
 					() => rescheduleVisit(input.organizationId, input.userId, input.visitId!, input.data),
@@ -404,8 +420,8 @@ async function visitWorkflow(input: VisitWorkflowInput): Promise<VisitWorkflowRe
 
 		// Record error on span for trace visibility
 		await recordSpanError(errorObj, {
-			errorCode: 'WORKFLOW_FAILED',
-			errorType: 'VISIT_WORKFLOW_ERROR'
+			errorCode: ActivityActionType.WORKFLOW_FAILED,
+			errorType: WorkflowErrorType.VISIT_WORKFLOW_ERROR
 		});
 
 		return {
@@ -429,4 +445,4 @@ export async function startVisitWorkflow(
 	return handle.getResult();
 }
 
-export type { VisitWorkflowInput, VisitWorkflowResult, VisitAction };
+export type { VisitWorkflowInput, VisitWorkflowResult };
