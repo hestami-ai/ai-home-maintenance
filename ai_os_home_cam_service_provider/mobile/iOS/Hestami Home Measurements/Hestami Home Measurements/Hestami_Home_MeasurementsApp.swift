@@ -10,10 +10,30 @@ import SwiftData
 
 @main
 struct Hestami_Home_MeasurementsApp: App {
+    @State private var showLaunchScreen = true
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            ScanSession.self,
+            Keyframe.self,
+            ReferencePhoto.self,
+            MeasurementResult.self,
+            MeasurementGroup.self,
         ])
+
+        // Ensure Application Support directory exists before creating model container
+        let fileManager = FileManager.default
+        let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+
+        do {
+            // Create directory if it doesn't exist
+            if !fileManager.fileExists(atPath: appSupportURL.path) {
+                try fileManager.createDirectory(at: appSupportURL, withIntermediateDirectories: true, attributes: nil)
+            }
+        } catch {
+            // Silently handle - this is non-critical initialization
+        }
+
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
@@ -25,7 +45,20 @@ struct Hestami_Home_MeasurementsApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ZStack {
+                if showLaunchScreen {
+                    LaunchScreenView()
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                withAnimation {
+                                    showLaunchScreen = false
+                                }
+                            }
+                        }
+                } else {
+                    ContentView()
+                }
+            }
         }
         .modelContainer(sharedModelContainer)
     }

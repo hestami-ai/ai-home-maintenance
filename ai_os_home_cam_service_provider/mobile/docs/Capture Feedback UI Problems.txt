@@ -1,0 +1,44 @@
+ser Experience Comparison
+Element Scan (Door/Window/Frame measurement)
+During Capture:
+
+User stands 1-2m from element
+Walks slow semicircle around target
+HUD shows:
+Wall Plane Locked indicator
+Opening Likely status
+Boundary Coverage % (left jamb, right jamb, header, sill)
+Readiness Score (target ≥0.75)
+Local point cloud/mesh around frame
+Rectangle overlay confirming detected opening
+Stop Condition: Opening detected + boundaries ≥90% covered + readiness ≥0.75
+
+Session Contents:
+
+3 ProRAW reference photos (left/center/right angles)
+ARKit keyframes with RGB + depth + confidence
+Voxel map (2m range, 5cm voxels)
+Wall plane + opening boundary data
+Room Scan (Full room capture)
+During Capture:
+
+User starts in corner, sweeps walls
+Captures each corner (critical)
+Periodically includes floor/ceiling intersections
+HUD shows:
+Coverage Score % (target ≥65%)
+Observability Score % (view angle diversity)
+Walls Detected count (target ≥3-4)
+Corners Detected count (target ≥2)
+Floor Found indicator
+Coverage heatmap (green=good, yellow=marginal, red=missing)
+Voxel visualization spheres
+Stop Condition: Floor found + ≥3 walls + ≥2 corners + coverage ≥65% + readiness ≥0.70
+
+Session Contents:
+
+3 ProRAW reference photos
+ARKit keyframes with RGB + depth + confidence
+Voxel map (5m range, 10cm voxels)
+Detected planes (floor + walls)
+Detected corners (wall-wall intersections)
