@@ -118,6 +118,175 @@ function serializeVendorCandidateListItem(vc: any) {
 }
 
 // =============================================================================
+// Fuzzy Matching Utilities for Duplicate Detection
+// =============================================================================
+
+/**
+ * Normalize a string for comparison:
+ * - Lowercase
+ * - Remove common business suffixes (LLC, Inc, Corp, etc.)
+ * - Remove special characters
+ * - Collapse whitespace
+ */
+function normalizeVendorName(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/\b(llc|inc|incorporated|corp|corporation|co|company|ltd|limited|lp|llp|plc|pllc|pc)\b/gi, '')
+		.replace(/[^a-z0-9\s]/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+/**
+ * Normalize a phone number for comparison (digits only)
+ */
+function normalizePhone(phone: string | null | undefined): string | null {
+	if (!phone) return null;
+	const digits = phone.replace(/\D/g, '');
+	// Return last 10 digits (strip country code if present)
+	return digits.length >= 10 ? digits.slice(-10) : digits;
+}
+
+/**
+ * Normalize email for comparison (lowercase, trim)
+ */
+function normalizeEmail(email: string | null | undefined): string | null {
+	if (!email) return null;
+	return email.toLowerCase().trim();
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ */
+function levenshteinDistance(a: string, b: string): number {
+	const matrix: number[][] = [];
+
+	// Initialize first column
+	for (let i = 0; i <= b.length; i++) {
+		matrix[i] = [i];
+	}
+
+	// Initialize first row
+	for (let j = 0; j <= a.length; j++) {
+		matrix[0][j] = j;
+	}
+
+	// Fill in the rest of the matrix
+	for (let i = 1; i <= b.length; i++) {
+		for (let j = 1; j <= a.length; j++) {
+			if (b[i - 1] === a[j - 1]) {
+				matrix[i][j] = matrix[i - 1][j - 1];
+			} else {
+				matrix[i][j] = Math.min(
+					matrix[i - 1][j - 1] + 1, // substitution
+					matrix[i][j - 1] + 1, // insertion
+					matrix[i - 1][j] + 1 // deletion
+				);
+			}
+		}
+	}
+
+	return matrix[b.length][a.length];
+}
+
+/**
+ * Calculate similarity score (0-1) based on Levenshtein distance
+ */
+function stringSimilarity(a: string, b: string): number {
+	if (a === b) return 1;
+	if (a.length === 0 || b.length === 0) return 0;
+
+	const distance = levenshteinDistance(a, b);
+	const maxLength = Math.max(a.length, b.length);
+	return 1 - distance / maxLength;
+}
+
+/**
+ * Calculate token-based similarity (Jaccard index of word tokens)
+ */
+function tokenSimilarity(a: string, b: string): number {
+	const tokensA = new Set(a.split(/\s+/).filter(t => t.length > 1));
+	const tokensB = new Set(b.split(/\s+/).filter(t => t.length > 1));
+
+	if (tokensA.size === 0 || tokensB.size === 0) return 0;
+
+	const intersection = new Set([...tokensA].filter(t => tokensB.has(t)));
+	const union = new Set([...tokensA, ...tokensB]);
+
+	return intersection.size / union.size;
+}
+
+/**
+ * Calculate overall similarity score between two vendor names
+ * Returns a score from 0-1
+ */
+function calculateVendorSimilarity(
+	newVendor: { name: string; email?: string | null; phone?: string | null },
+	existingVendor: { name: string; email?: string | null; phone?: string | null }
+): { score: number; reasons: string[] } {
+	const reasons: string[] = [];
+	let score = 0;
+
+	// Normalize names
+	const normalizedNew = normalizeVendorName(newVendor.name);
+	const normalizedExisting = normalizeVendorName(existingVendor.name);
+
+	// Exact match (after normalization)
+	if (normalizedNew === normalizedExisting) {
+		score = 0.95;
+		reasons.push('Exact name match (normalized)');
+	} else {
+		// String similarity (Levenshtein-based)
+		const stringSim = stringSimilarity(normalizedNew, normalizedExisting);
+		// Token similarity (word overlap)
+		const tokenSim = tokenSimilarity(normalizedNew, normalizedExisting);
+
+		// Combined score (weighted average)
+		const nameSim = stringSim * 0.6 + tokenSim * 0.4;
+		score = nameSim;
+
+		if (stringSim > 0.7) {
+			reasons.push(`High string similarity (${Math.round(stringSim * 100)}%)`);
+		}
+		if (tokenSim > 0.5) {
+			reasons.push(`Common words in name (${Math.round(tokenSim * 100)}%)`);
+		}
+	}
+
+	// Email match (boost score significantly)
+	const normalizedNewEmail = normalizeEmail(newVendor.email);
+	const normalizedExistingEmail = normalizeEmail(existingVendor.email);
+	if (normalizedNewEmail && normalizedExistingEmail && normalizedNewEmail === normalizedExistingEmail) {
+		score = Math.max(score, 0.9);
+		score = Math.min(score + 0.3, 1);
+		reasons.push('Matching email address');
+	}
+
+	// Phone match (boost score significantly)
+	const normalizedNewPhone = normalizePhone(newVendor.phone);
+	const normalizedExistingPhone = normalizePhone(existingVendor.phone);
+	if (normalizedNewPhone && normalizedExistingPhone && normalizedNewPhone === normalizedExistingPhone) {
+		score = Math.max(score, 0.85);
+		score = Math.min(score + 0.25, 1);
+		reasons.push('Matching phone number');
+	}
+
+	return { score, reasons };
+}
+
+interface DuplicateMatch {
+	vendorCandidateId: string;
+	vendorName: string;
+	caseId: string;
+	caseSummary: string | null;
+	status: string;
+	similarityScore: number;
+	matchReasons: string[];
+	email: string | null;
+	phone: string | null;
+}
+
+// =============================================================================
 // Router
 // =============================================================================
 
@@ -677,6 +846,315 @@ export const vendorCandidateRouter = {
 					extracted,
 					multipleVendorsDetected: false,
 					rawSource: input.sourcePlainText || input.sourceHtml || null
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Annotate/correct a specific field on a vendor candidate
+	 * Records the original value and the correction for audit purposes
+	 */
+	annotateField: orgProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				id: z.string(),
+				fieldName: z.enum([
+					'vendorName',
+					'vendorContactName',
+					'vendorContactEmail',
+					'vendorContactPhone',
+					'vendorAddress',
+					'vendorWebsite',
+					'coverageArea'
+				]),
+				newValue: z.string(),
+				reason: z.string().optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					vendorCandidate: VendorCandidateOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Vendor candidate not found' },
+			BAD_REQUEST: { message: 'Invalid field' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const existing = await prisma.vendorCandidate.findFirst({
+				where: {
+					id: input.id,
+					organizationId: context.organization.id,
+					deletedAt: null
+				}
+			});
+
+			if (!existing) {
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
+			}
+
+			await context.cerbos.authorize('update', 'vendor_candidate', existing.id);
+
+			// Get the old value
+			const oldValue = (existing as any)[input.fieldName];
+
+			// Build the update data
+			const updateData: Record<string, any> = {
+				[input.fieldName]: input.newValue
+			};
+
+			// Store annotation in extractionMetadata
+			const currentMetadata = (existing.extractionMetadata as Record<string, any>) || {};
+			const fieldAnnotations = currentMetadata.fieldAnnotations || {};
+			fieldAnnotations[input.fieldName] = {
+				originalValue: oldValue,
+				annotatedValue: input.newValue,
+				annotatedAt: new Date().toISOString(),
+				annotatedBy: context.user?.id,
+				reason: input.reason
+			};
+			updateData.extractionMetadata = {
+				...currentMetadata,
+				fieldAnnotations
+			};
+
+			// Update the vendor candidate
+			const vendorCandidate = await prisma.vendorCandidate.update({
+				where: { id: input.id },
+				data: updateData
+			});
+
+			await recordExecution(context, {
+				entityType: ActivityEntityType.VENDOR_CANDIDATE,
+				entityId: vendorCandidate.id,
+				action: ActivityActionType.UPDATE,
+				summary: `Field ${input.fieldName} annotated: "${oldValue || '(empty)'}" → "${input.newValue}"${input.reason ? ` (${input.reason})` : ''}`,
+				caseId: existing.caseId,
+				previousState: { [input.fieldName]: oldValue },
+				newState: { [input.fieldName]: input.newValue },
+				metadata: {
+					authoritySource: {
+						type: 'MANUAL' as const,
+						description: input.reason || 'Manual field correction'
+					}
+				}
+			});
+
+			return successResponse(
+				{ vendorCandidate: serializeVendorCandidate(vendorCandidate) },
+				context
+			);
+		}),
+
+	/**
+	 * Remove/clear a specific field from a vendor candidate
+	 * Useful for removing incorrectly extracted data
+	 */
+	removeField: orgProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				id: z.string(),
+				fieldName: z.enum([
+					'vendorContactName',
+					'vendorContactEmail',
+					'vendorContactPhone',
+					'vendorAddress',
+					'vendorWebsite',
+					'coverageArea'
+				]),
+				reason: z.string().optional()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					vendorCandidate: VendorCandidateOutputSchema
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Vendor candidate not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			const existing = await prisma.vendorCandidate.findFirst({
+				where: {
+					id: input.id,
+					organizationId: context.organization.id,
+					deletedAt: null
+				}
+			});
+
+			if (!existing) {
+				throw errors.NOT_FOUND({ message: 'VendorCandidate' });
+			}
+
+			await context.cerbos.authorize('update', 'vendor_candidate', existing.id);
+
+			// Get the old value
+			const oldValue = (existing as any)[input.fieldName];
+
+			// Build the update data
+			const updateData: Record<string, any> = {
+				[input.fieldName]: null
+			};
+
+			// Store removal in extractionMetadata
+			const currentMetadata = (existing.extractionMetadata as Record<string, any>) || {};
+			const fieldRemovals = currentMetadata.fieldRemovals || [];
+			fieldRemovals.push({
+				fieldName: input.fieldName,
+				removedValue: oldValue,
+				removedAt: new Date().toISOString(),
+				removedBy: context.user?.id,
+				reason: input.reason
+			});
+			updateData.extractionMetadata = {
+				...currentMetadata,
+				fieldRemovals
+			};
+
+			// Update the vendor candidate
+			const vendorCandidate = await prisma.vendorCandidate.update({
+				where: { id: input.id },
+				data: updateData
+			});
+
+			await recordExecution(context, {
+				entityType: ActivityEntityType.VENDOR_CANDIDATE,
+				entityId: vendorCandidate.id,
+				action: ActivityActionType.UPDATE,
+				summary: `Field ${input.fieldName} removed: "${oldValue || '(empty)'}"${input.reason ? ` (${input.reason})` : ''}`,
+				caseId: existing.caseId,
+				previousState: { [input.fieldName]: oldValue },
+				newState: { [input.fieldName]: null },
+				metadata: {
+					authoritySource: {
+						type: 'MANUAL' as const,
+						description: input.reason || 'Manual field removal'
+					}
+				}
+			});
+
+			return successResponse(
+				{ vendorCandidate: serializeVendorCandidate(vendorCandidate) },
+				context
+			);
+		}),
+
+	/**
+	 * Check for potential duplicate vendors before creating
+	 * Uses fuzzy matching on name, email, and phone
+	 */
+	checkDuplicates: orgProcedure
+		.input(
+			z.object({
+				vendorName: z.string().min(1),
+				vendorEmail: z.string().email().optional(),
+				vendorPhone: z.string().optional(),
+				excludeCaseId: z.string().optional(), // Optionally exclude vendors from a specific case
+				threshold: z.number().min(0).max(1).default(0.5) // Minimum similarity to be considered a match
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					potentialDuplicates: z.array(
+						z.object({
+							vendorCandidateId: z.string(),
+							vendorName: z.string(),
+							caseId: z.string(),
+							caseSummary: z.string().nullable(),
+							status: z.string(),
+							similarityScore: z.number(),
+							matchReasons: z.array(z.string()),
+							email: z.string().nullable(),
+							phone: z.string().nullable()
+						})
+					),
+					hasHighConfidenceMatch: z.boolean()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' }
+		})
+		.handler(async ({ input, context }) => {
+			await context.cerbos.authorize('view', 'vendor_candidate', 'list');
+
+			// Fetch all non-archived vendor candidates in the organization
+			const existingVendors = await prisma.vendorCandidate.findMany({
+				where: {
+					organizationId: context.organization.id,
+					deletedAt: null,
+					status: {
+						not: VendorCandidateStatus.ARCHIVED
+					},
+					...(input.excludeCaseId && { caseId: { not: input.excludeCaseId } })
+				},
+				include: {
+					case: {
+						select: {
+							id: true,
+							title: true
+						}
+					}
+				}
+			});
+
+			// Calculate similarity for each existing vendor
+			const matches: DuplicateMatch[] = [];
+			const newVendor = {
+				name: input.vendorName,
+				email: input.vendorEmail,
+				phone: input.vendorPhone
+			};
+
+			for (const vendor of existingVendors) {
+				const existingVendor = {
+					name: vendor.vendorName,
+					email: vendor.vendorContactEmail,
+					phone: vendor.vendorContactPhone
+				};
+
+				const { score, reasons } = calculateVendorSimilarity(newVendor, existingVendor);
+
+				if (score >= input.threshold) {
+					matches.push({
+						vendorCandidateId: vendor.id,
+						vendorName: vendor.vendorName,
+						caseId: vendor.caseId,
+						caseSummary: vendor.case?.title ?? null,
+						status: vendor.status,
+						similarityScore: Math.round(score * 100) / 100,
+						matchReasons: reasons,
+						email: vendor.vendorContactEmail,
+						phone: vendor.vendorContactPhone
+					});
+				}
+			}
+
+			// Sort by similarity score (highest first)
+			matches.sort((a, b) => b.similarityScore - a.similarityScore);
+
+			// Limit to top 10 matches
+			const topMatches = matches.slice(0, 10);
+
+			// Check if there's a high confidence match (>= 0.8)
+			const hasHighConfidenceMatch = topMatches.some(m => m.similarityScore >= 0.8);
+
+			return successResponse(
+				{
+					potentialDuplicates: topMatches,
+					hasHighConfidenceMatch
 				},
 				context
 			);

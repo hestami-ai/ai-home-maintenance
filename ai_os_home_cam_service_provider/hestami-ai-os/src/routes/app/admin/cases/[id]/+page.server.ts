@@ -92,7 +92,15 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                 },
                 notes: {
                     orderBy: { createdAt: 'desc' },
-                    take: 50
+                    take: 50,
+                    include: {
+                        creator: {
+                            select: {
+                                id: true,
+                                name: true
+                            }
+                        }
+                    }
                 },
                 actions: {
                     orderBy: { createdAt: 'desc' },
@@ -218,6 +226,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                     closedAt: conciergeCase.closedAt?.toISOString() ?? null,
                     cancelledAt: conciergeCase.cancelledAt?.toISOString() ?? null,
                     cancelReason: conciergeCase.cancelReason,
+                    availabilityType: conciergeCase.availabilityType,
+                    availabilityNotes: conciergeCase.availabilityNotes,
+                    linkedUnitId: conciergeCase.linkedUnitId,
+                    linkedArcRequestId: conciergeCase.linkedArcRequestId,
                     createdAt: conciergeCase.createdAt.toISOString(),
                     updatedAt: conciergeCase.updatedAt.toISOString()
                 },
@@ -244,6 +256,8 @@ export const load: PageServerLoad = async ({ params, parent }) => {
                     content: n.content,
                     noteType: n.noteType,
                     isInternal: n.isInternal,
+                    createdBy: n.createdBy,
+                    createdByName: n.creator?.name ?? 'Unknown',
                     createdAt: n.createdAt.toISOString()
                 })),
                 actions: conciergeCase.actions.map(a => ({

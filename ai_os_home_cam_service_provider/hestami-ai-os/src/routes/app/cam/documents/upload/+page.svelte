@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { ArrowLeft, Upload, FileText, X, AlertTriangle, Calendar, ChevronDown, ChevronUp, Clock } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
 	import { orpc } from '$lib/api';
@@ -38,15 +39,15 @@
 
 	const categoryOptions = CAM_DOCUMENT_CATEGORIES.map((cat) => ({
 		value: cat,
-		label: CAM_CATEGORY_LABELS[cat]
+		name: CAM_CATEGORY_LABELS[cat]
 	}));
 
 	const visibilityOptions = [
-		{ value: DocumentVisibilityValues.PUBLIC, label: 'Public (All Members)' },
-		{ value: DocumentVisibilityValues.OWNERS_ONLY, label: 'Owners Only' },
-		{ value: DocumentVisibilityValues.BOARD_ONLY, label: 'Board Only' },
-		{ value: DocumentVisibilityValues.STAFF_ONLY, label: 'Staff Only' },
-		{ value: DocumentVisibilityValues.PRIVATE, label: 'Private' }
+		{ value: DocumentVisibilityValues.PUBLIC, name: 'Public (All Members)' },
+		{ value: DocumentVisibilityValues.OWNERS_ONLY, name: 'Owners Only' },
+		{ value: DocumentVisibilityValues.BOARD_ONLY, name: 'Board Only' },
+		{ value: DocumentVisibilityValues.STAFF_ONLY, name: 'Staff Only' },
+		{ value: DocumentVisibilityValues.PRIVATE, name: 'Private' }
 	];
 
 	const contextTypeLabels: Record<string, string> = {
@@ -399,15 +400,11 @@
 								<label for="category" class="mb-1 block text-sm font-medium">
 									Category *
 								</label>
-								<select
+								<Select
 									id="category"
 									bind:value={sharedMetadata.category}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each categoryOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+									items={categoryOptions}
+								/>
 								{#if isOtherCategory}
 									<div class="mt-2 flex items-start gap-2 rounded-lg bg-warning-500/10 p-2 text-warning-600">
 										<AlertTriangle class="h-4 w-4 mt-0.5 flex-shrink-0" />
@@ -420,15 +417,11 @@
 								<label for="visibility" class="mb-1 block text-sm font-medium">
 									Visibility *
 								</label>
-								<select
+								<Select
 									id="visibility"
 									bind:value={sharedMetadata.visibility}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each visibilityOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+									items={visibilityOptions}
+								/>
 							</div>
 						</div>
 

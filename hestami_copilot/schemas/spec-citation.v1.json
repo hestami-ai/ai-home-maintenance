@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hestami.ai/schemas/spec-citation.v1.json",
+  "title": "SpecCitation",
+  "description": "Stable reference format for citing specific locations in specification or guideline documents",
+  "type": "object",
+  "properties": {
+    "doc_id": {
+      "type": "string",
+      "description": "Identifier for the document (e.g., 'SPEC-ARCH-v3', 'GUIDELINE_SECURITY')",
+      "minLength": 1
+    },
+    "sec_id": {
+      "type": "string",
+      "description": "Section identifier within the document (e.g., '4.1.2', heading slug)",
+      "minLength": 1
+    },
+    "stable_id": {
+      "type": "string",
+      "description": "Concatenation of doc and section as unique identifier (e.g., 'SPEC-API-v2#3.2')",
+      "pattern": "^[A-Z0-9_-]+#.+$",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "description": "The exact text or concise summary of the cited section/clause",
+      "minLength": 1
+    }
+  },
+  "required": ["doc_id", "sec_id", "stable_id", "text"],
+  "additionalProperties": false
+}

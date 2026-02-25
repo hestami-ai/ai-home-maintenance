@@ -1,0 +1,41 @@
+# Docker Compose override for training mode
+#
+# GPU Mutex Model: Training and inference never share GPU simultaneously.
+# When training is active, inference service should be stopped.
+#
+# Usage:
+#   # Stop inference, start training
+#   docker compose stop historian-infer
+#   docker compose -f docker-compose.yml -f docker-compose.training.yml up training
+#
+#   # After training, restart inference
+#   docker compose stop training
+#   docker compose up historian-infer -d
+
+version: '3.9'
+
+services:
+  # Override historian-infer to not start automatically
+  historian-infer:
+    deploy:
+      replicas: 0
+
+  # Training with all resources
+  training:
+    profiles: []  # Remove profile restriction - always start
+    environment:
+      # Training-specific environment
+      WANDB_PROJECT: hestami-historian
+      WANDB_MODE: ${WANDB_MODE:-disabled}
+      # Increase batch size for RTX 4090
+      BATCH_SIZE: "4"
+      GRADIENT_ACCUMULATION_STEPS: "4"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 24G  # RTX 4090 has 24GB VRAM

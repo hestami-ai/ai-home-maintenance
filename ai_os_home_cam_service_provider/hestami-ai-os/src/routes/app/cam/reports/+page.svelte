@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { BarChart3, Plus, Search, Play, Calendar } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -22,11 +23,11 @@
 	let categoryFilter = $state<string>('');
 
 	const categoryOptions = [
-		{ value: '', label: 'All Categories' },
-		{ value: ReportCategoryValues.FINANCIAL, label: 'Financial' },
-		{ value: ReportCategoryValues.OPERATIONAL, label: 'Operational' },
-		{ value: ReportCategoryValues.COMPLIANCE, label: 'Compliance' },
-		{ value: CommitteeTypeValues.CUSTOM, label: 'Custom' }
+		{ value: '', name: 'All Categories' },
+		{ value: ReportCategoryValues.FINANCIAL, name: 'Financial' },
+		{ value: ReportCategoryValues.OPERATIONAL, name: 'Operational' },
+		{ value: ReportCategoryValues.COMPLIANCE, name: 'Compliance' },
+		{ value: CommitteeTypeValues.CUSTOM, name: 'Custom' }
 	];
 
 	async function loadReports() {
@@ -104,14 +105,11 @@
 						/>
 					</div>
 
-					<select
+					<Select
 						bind:value={categoryFilter}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each categoryOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={categoryOptions}
+						size="sm"
+					/>
 				</div>
 			{/snippet}
 

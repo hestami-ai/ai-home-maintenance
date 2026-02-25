@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { AlertTriangle, Plus, Search, Filter, X, TrendingUp } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent, DecisionButton, RationaleModal } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -30,25 +31,30 @@
 	let bulkAction = $state<string | null>(null);
 
 	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: 'DETECTED', label: 'Detected' },
-		{ value: ViolationStatusValues.UNDER_REVIEW, label: 'Under Review' },
-		{ value: ViolationStatusValues.NOTICE_SENT, label: 'Notice Sent' },
-		{ value: 'OWNER_RESPONSE_PENDING', label: 'Response Pending' },
-		{ value: ViolationStatusValues.CURE_PERIOD, label: 'Cure Period' },
-		{ value: ViolationStatusValues.ESCALATED, label: 'Escalated' },
-		{ value: ViolationStatusValues.HEARING_SCHEDULED, label: 'Hearing Scheduled' },
-		{ value: 'REMEDIATION_IN_PROGRESS', label: 'Remediation' },
-		{ value: ViolationStatusValues.RESOLVED, label: 'Resolved' },
-		{ value: ViolationStatusValues.CLOSED, label: 'Closed' }
+		{ value: '', name: 'All Statuses' },
+		{ value: 'DETECTED', name: 'Detected' },
+		{ value: ViolationStatusValues.UNDER_REVIEW, name: 'Under Review' },
+		{ value: ViolationStatusValues.NOTICE_SENT, name: 'Notice Sent' },
+		{ value: 'OWNER_RESPONSE_PENDING', name: 'Response Pending' },
+		{ value: ViolationStatusValues.CURE_PERIOD, name: 'Cure Period' },
+		{ value: ViolationStatusValues.ESCALATED, name: 'Escalated' },
+		{ value: ViolationStatusValues.HEARING_SCHEDULED, name: 'Hearing Scheduled' },
+		{ value: 'REMEDIATION_IN_PROGRESS', name: 'Remediation' },
+		{ value: ViolationStatusValues.RESOLVED, name: 'Resolved' },
+		{ value: ViolationStatusValues.CLOSED, name: 'Closed' }
 	];
 
 	const severityOptions = [
-		{ value: '', label: 'All Severities' },
-		{ value: ViolationSeverityValues.CRITICAL, label: 'Critical' },
-		{ value: ViolationSeverityValues.MAJOR, label: 'Major' },
-		{ value: ViolationSeverityValues.MODERATE, label: 'Moderate' },
-		{ value: ViolationSeverityValues.MINOR, label: 'Minor' }
+		{ value: '', name: 'All Severities' },
+		{ value: ViolationSeverityValues.CRITICAL, name: 'Critical' },
+		{ value: ViolationSeverityValues.MAJOR, name: 'Major' },
+		{ value: ViolationSeverityValues.MODERATE, name: 'Moderate' },
+		{ value: ViolationSeverityValues.MINOR, name: 'Minor' }
+	];
+
+	const sortOptions = [
+		{ value: 'date', name: 'Sort: Recent' },
+		{ value: 'daysOpen', name: 'Sort: Days Open' }
 	];
 
 	async function loadViolations() {
@@ -265,22 +271,8 @@
 					</div>
 
 					<div class="flex gap-2">
-						<select
-							bind:value={statusFilter}
-							class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							{#each statusOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
-						<select
-							bind:value={severityFilter}
-							class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							{#each severityOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
+						<Select bind:value={statusFilter} items={statusOptions} size="sm" class="flex-1" />
+						<Select bind:value={severityFilter} items={severityOptions} size="sm" class="flex-1" />
 					</div>
 
 					<div class="flex items-center justify-between gap-2">
@@ -295,13 +287,7 @@
 								Escalated only
 							</span>
 						</label>
-						<select
-							bind:value={sortBy}
-							class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-2 py-1 text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							<option value="date">Sort: Recent</option>
-							<option value="daysOpen">Sort: Days Open</option>
-						</select>
+						<Select bind:value={sortBy} items={sortOptions} size="sm" />
 					</div>
 
 					{#if selectedIds.size > 0}

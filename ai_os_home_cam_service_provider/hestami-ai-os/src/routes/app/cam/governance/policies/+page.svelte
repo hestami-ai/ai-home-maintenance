@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, BookOpen, Plus, Search, Download } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -26,13 +27,13 @@
 	let categoryFilter = $state('all');
 
 	const categoryOptions = [
-		{ value: 'all', label: 'All Categories' },
-		{ value: DocumentCategoryValues.ARCHITECTURAL, label: 'Architectural' },
-		{ value: ReportCategoryValues.FINANCIAL, label: 'Financial' },
-		{ value: BoardMotionCategoryValues.ENFORCEMENT, label: 'Enforcement' },
-		{ value: ReportCategoryValues.OPERATIONAL, label: 'Operational' },
-		{ value: ReportCategoryValues.GOVERNANCE, label: 'Governance' },
-		{ value: ARCCategoryValues.OTHER, label: 'Other' }
+		{ value: 'all', name: 'All Categories' },
+		{ value: DocumentCategoryValues.ARCHITECTURAL, name: 'Architectural' },
+		{ value: ReportCategoryValues.FINANCIAL, name: 'Financial' },
+		{ value: BoardMotionCategoryValues.ENFORCEMENT, name: 'Enforcement' },
+		{ value: ReportCategoryValues.OPERATIONAL, name: 'Operational' },
+		{ value: ReportCategoryValues.GOVERNANCE, name: 'Governance' },
+		{ value: ARCCategoryValues.OTHER, name: 'Other' }
 	];
 
 	async function loadPolicies() {
@@ -132,14 +133,7 @@
 									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
 								/>
 							</div>
-							<select
-								bind:value={categoryFilter}
-								class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-							>
-								{#each categoryOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+							<Select bind:value={categoryFilter} items={categoryOptions} size="sm" />
 						</div>
 					{/snippet}
 

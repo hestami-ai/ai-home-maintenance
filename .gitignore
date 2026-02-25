@@ -284,3 +284,12 @@ docs/LibreChat-main
 tmpclaude*
 
 ai_os_home_cam_service_provider/hestami-ai-os/.scannerwork
+
+hestami_copilot/models/adapters
+hestami_copilot/models/base
+hestami_copilot/models/merged
+hestami_copilot/training-data
+hestami_copilot/docs/specs/hestami-ai-os-specs/
+hestami_deep_historian/docs/specs/hestami-ai-os-specs
+JanumiCode/janumicode/specs/hestami-ai-os-specs/
+JanumiCode/janumicode/docs/debug/

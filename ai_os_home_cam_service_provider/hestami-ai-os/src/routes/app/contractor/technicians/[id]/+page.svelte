@@ -16,6 +16,7 @@
 		Plus,
 		Trash2
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
 	import { v4 as uuidv4 } from 'uuid';
@@ -101,14 +102,14 @@
 	let activeSection = $state<'profile' | 'skills' | 'certifications' | 'availability'>('profile');
 
 	// Data for form selects
-	const timezones = [
-		'America/New_York',
-		'America/Chicago',
-		'America/Denver',
-		'America/Los_Angeles',
-		'America/Phoenix',
-		'America/Anchorage',
-		'Pacific/Honolulu'
+	const timezoneOptions = [
+		{ value: 'America/New_York', name: 'America/New York' },
+		{ value: 'America/Chicago', name: 'America/Chicago' },
+		{ value: 'America/Denver', name: 'America/Denver' },
+		{ value: 'America/Los_Angeles', name: 'America/Los Angeles' },
+		{ value: 'America/Phoenix', name: 'America/Phoenix' },
+		{ value: 'America/Anchorage', name: 'America/Anchorage' },
+		{ value: 'Pacific/Honolulu', name: 'Pacific/Honolulu' }
 	];
 
 	const tradeOptions = [
@@ -506,16 +507,13 @@
 								</div>
 								<div>
 									<label for="timezone" class="block text-sm font-medium">Timezone</label>
-									<select
-										id="timezone"
+									<Select
 										bind:value={timezone}
-										class="select mt-1 w-full"
+										items={timezoneOptions}
+										size="sm"
 										disabled={isSaving}
-									>
-										{#each timezones as tz}
-											<option value={tz}>{tz.replace(/_/g, ' ')}</option>
-										{/each}
-									</select>
+										class="mt-1"
+									/>
 								</div>
 							</div>
 
@@ -579,17 +577,17 @@
 						<div class="mt-4 grid gap-4 sm:grid-cols-4">
 							<div>
 								<label for="newSkillTrade" class="block text-sm font-medium">Trade</label>
-								<select
-									id="newSkillTrade"
+								<Select
 									bind:value={newSkillTrade}
-									class="select mt-1 w-full"
+									size="sm"
 									disabled={isAddingSkill}
+									class="mt-1"
 								>
 									<option value="">Select trade...</option>
 									{#each tradeOptions as trade}
 										<option value={trade}>{formatTrade(trade)}</option>
 									{/each}
-								</select>
+								</Select>
 							</div>
 							<div>
 								<label for="newSkillLevel" class="block text-sm font-medium">Level (1-5)</label>

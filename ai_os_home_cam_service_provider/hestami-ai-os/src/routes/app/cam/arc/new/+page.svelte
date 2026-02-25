@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, ClipboardCheck, Upload } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
 	import { ARCCategoryValues, AssetCategoryValues, arcRequestApi, type Unit, unitApi } from '$lib/api/cam';
@@ -22,16 +23,16 @@
 	});
 
 	const categoryOptions = [
-		{ value: 'EXTERIOR_MODIFICATION', label: 'Exterior Modification' },
-		{ value: ARCCategoryValues.LANDSCAPING, label: 'Landscaping' },
-		{ value: 'FENCE_WALL', label: 'Fence / Wall' },
-		{ value: ARCCategoryValues.ROOF, label: 'Roof' },
-		{ value: 'PAINT_COLOR', label: 'Paint / Color Change' },
-		{ value: 'WINDOW_DOOR', label: 'Window / Door' },
-		{ value: ARCCategoryValues.SOLAR, label: 'Solar Installation' },
-		{ value: AssetCategoryValues.POOL_SPA, label: 'Pool / Spa' },
-		{ value: 'PATIO_DECK', label: 'Patio / Deck' },
-		{ value: ARCCategoryValues.OTHER, label: 'Other' }
+		{ value: 'EXTERIOR_MODIFICATION', name: 'Exterior Modification' },
+		{ value: ARCCategoryValues.LANDSCAPING, name: 'Landscaping' },
+		{ value: 'FENCE_WALL', name: 'Fence / Wall' },
+		{ value: ARCCategoryValues.ROOF, name: 'Roof' },
+		{ value: 'PAINT_COLOR', name: 'Paint / Color Change' },
+		{ value: 'WINDOW_DOOR', name: 'Window / Door' },
+		{ value: ARCCategoryValues.SOLAR, name: 'Solar Installation' },
+		{ value: AssetCategoryValues.POOL_SPA, name: 'Pool / Spa' },
+		{ value: 'PATIO_DECK', name: 'Patio / Deck' },
+		{ value: ARCCategoryValues.OTHER, name: 'Other' }
 	];
 
 	async function loadFormData() {
@@ -142,19 +143,14 @@
 							<label for="unitId" class="mb-1 block text-sm font-medium">
 								Unit <span class="text-error-500">*</span>
 							</label>
-							<select
-								id="unitId"
-								bind:value={formData.unitId}
-								required
-								class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-							>
+							<Select id="unitId" bind:value={formData.unitId} required>
 								<option value="">Select your unit</option>
 								{#each units as unit}
 									<option value={unit.id}>
 										Unit {unit.unitNumber} - {unit.propertyName}
 									</option>
 								{/each}
-							</select>
+							</Select>
 						</div>
 					</Card>
 
@@ -165,16 +161,7 @@
 								<label for="category" class="mb-1 block text-sm font-medium">
 									Category <span class="text-error-500">*</span>
 								</label>
-								<select
-									id="category"
-									bind:value={formData.category}
-									required
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each categoryOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+								<Select id="category" bind:value={formData.category} items={categoryOptions} required />
 							</div>
 
 							<div>

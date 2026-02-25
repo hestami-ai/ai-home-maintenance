@@ -1,0 +1,67 @@
+# Historian Agent Platform - Configuration File
+# This file provides default configuration values.
+# Environment variables take precedence over these values.
+
+# =============================================================================
+# Orchestrator Settings
+# =============================================================================
+orchestrator:
+  # Minimum coverage ratio required for verification (0.0-1.0)
+  coverage_threshold: 0.9
+
+  # If true, allow REVISE verdict on coverage gaps instead of FAIL
+  allow_degraded_mode: false
+
+  # Maximum allowed entropy/variance in retrieval results
+  retrieval_instability_threshold: 0.3
+
+  # Maximum retry attempts for failed steps
+  max_retries: 3
+
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  log_level: INFO
+
+  # Directory for audit bundle output
+  audit_bundle_dir: /logs/audit_bundles
+
+# =============================================================================
+# vLLM Settings
+# =============================================================================
+vllm:
+  url: http://vllm:8000/v1
+  model: qwen3-14b
+  temperature: 0.0  # Deterministic by default
+  max_tokens: 8192
+  timeout: 180  # seconds
+
+# =============================================================================
+# PageIndex Settings
+# =============================================================================
+pageindex:
+  url: http://pageindex:8080
+  docs_dir: /data/specs
+  index_dir: /data/index
+  timeout: 60  # seconds
+
+# =============================================================================
+# Dolt Settings
+# =============================================================================
+dolt:
+  host: dolt
+  port: 3306
+  user: root
+  password: ""
+  database: historian
+
+# =============================================================================
+# Evaluation Settings (Phase 5)
+# =============================================================================
+evaluation:
+  # Groundedness threshold (0.0-1.0)
+  groundedness_threshold: 0.95
+
+  # Minimum correctness score for acceptance
+  correctness_threshold: 0.90
+
+  # Test cases directory
+  test_cases_dir: /app/tests/cases

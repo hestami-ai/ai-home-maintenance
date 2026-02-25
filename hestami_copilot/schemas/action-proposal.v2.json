@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hestami.ai/schemas/action-proposal.v2.json",
+  "title": "ActionProposal",
+  "description": "Self-contained proposal with evidence bundles, produced by Executor Agent",
+  "type": "object",
+  "properties": {
+    "action_id": {
+      "type": "string",
+      "description": "Unique identifier for this proposed action",
+      "pattern": "^AP-[A-Z0-9-]+$",
+      "minLength": 1
+    },
+    "feature": {
+      "type": "string",
+      "description": "Name or ID of the feature/requirement this action addresses",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "description": "Natural language summary of the proposed implementation step",
+      "minLength": 1
+    },
+    "steps": {
+      "type": "array",
+      "description": "Sequential plan items or sub-steps",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "preconditions": {
+      "type": "array",
+      "description": "Assumptions or preconditions for this action to succeed",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Other features or tasks that this action depends on",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "expected_outcome": {
+      "type": "string",
+      "description": "The expected result or goal when this action is completed",
+      "minLength": 1
+    },
+    "risks": {
+      "type": "array",
+      "description": "Known risks or potential issues with this approach",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Explicit assumptions made by the Executor",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "invariants": {
+      "type": "array",
+      "description": "Invariants that this action maintains or depends upon",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "spec_refs": {
+      "type": "array",
+      "description": "Stable IDs of spec sections the Executor believes are relevant",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z0-9_-]+#.+$",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "evidence_bundle": {
+      "type": "array",
+      "description": "Self-contained evidence excerpts supporting the proposal",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["spec", "guideline", "decision", "discussion"],
+            "description": "Type of source document"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier of the cited source",
+            "minLength": 1
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Short quote from the source (max 1200 chars)",
+            "maxLength": 1200
+          },
+          "claim": {
+            "type": "string",
+            "description": "The claim this excerpt supports",
+            "minLength": 1
+          }
+        },
+        "required": ["source", "id", "excerpt"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "references": {
+      "type": "array",
+      "description": "Legacy reference format (deprecated, use evidence_bundle)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "Source type (e.g., 'spec', 'guideline')"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier of the referenced section"
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Optional short quote from the source"
+          }
+        },
+        "required": ["source", "id"],
+        "additionalProperties": false
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "action_id",
+    "feature",
+    "description",
+    "steps",
+    "expected_outcome"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,201 @@
+# Historian Agent Platform - Docker Compose Configuration
+#
+# Local-first, auditable AI system for verifying proposals
+# against authoritative specifications.
+#
+# Services:
+# - orchestrator: Historian orchestrator with DBOS workflow engine
+# - vllm: Qwen3-4B-Thinking inference server (GPU)
+# - pageindex: Self-hosted document retrieval service
+# - dolt: Git-for-data versioned SQL database
+#
+# Usage:
+#   docker compose up -d                    # Start all services
+#   docker compose logs -f orchestrator     # Follow orchestrator logs
+#   docker compose exec orchestrator historian health  # Check health
+#
+# GPU Note: vLLM requires NVIDIA GPU with ~24GB VRAM
+
+services:
+  # ==========================================================================
+  # Orchestrator - Historian workflow engine with DBOS
+  # ==========================================================================
+  orchestrator:
+    build:
+      context: .
+      dockerfile: services/orchestrator/Dockerfile
+    container_name: historian-orchestrator
+    environment:
+      # vLLM connection
+      VLLM_URL: http://vllm:8000/v1
+      VLLM_API_KEY: ${VLLM_API_KEY:-local-historian-key}
+      VLLM_MODEL: qwen3-4b-thinking
+      VLLM_TEMPERATURE: "0.0"
+      VLLM_MAX_TOKENS: "8192"
+      VLLM_TIMEOUT: "180"
+      # PageIndex connection
+      PAGEINDEX_URL: http://pageindex:8080
+      PAGEINDEX_DOCS_DIR: /data/specs
+      PAGEINDEX_INDEX_DIR: /data/index
+      PAGEINDEX_TIMEOUT: "60"
+      # Dolt connection
+      DOLT_HOST: dolt
+      DOLT_PORT: "3306"
+      DOLT_USER: root
+      DOLT_PASSWORD: ${DOLT_PASSWORD:-}
+      DOLT_DATABASE: historian
+      # Orchestrator settings
+      HISTORIAN_COVERAGE_THRESHOLD: "0.9"
+      HISTORIAN_ALLOW_DEGRADED_MODE: "false"
+      HISTORIAN_LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      HISTORIAN_AUDIT_BUNDLE_DIR: /logs/audit_bundles
+    volumes:
+      - ./docs/specs:/data/specs:ro
+      - ./volumes/logs:/logs
+      - ./config:/config:ro
+    depends_on:
+      vllm:
+        condition: service_healthy
+      pageindex:
+        condition: service_healthy
+      dolt:
+        condition: service_healthy
+    networks:
+      - historian-net
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================================================
+  # vLLM - Qwen3-4B-Thinking inference server
+  # ==========================================================================
+  vllm:
+    build:
+      context: .
+      dockerfile: services/vllm/Dockerfile
+    container_name: historian-vllm
+    environment:
+      - VLLM_LOGGING_LEVEL=${VLLM_LOG_LEVEL:-INFO}
+    volumes:
+      - ./models:/models:ro
+    ipc: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      /models/qwen3-4b-thinking
+      --served-model-name qwen3-4b-thinking
+      --max-model-len auto
+      --gpu-memory-utilization .93
+      --dtype bfloat16
+      --api-key ${VLLM_API_KEY:-local-historian-key}
+      --host 0.0.0.0
+      --port 8000
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - historian-net
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ==========================================================================
+  # PageIndex - Self-hosted document retrieval service
+  # ==========================================================================
+  pageindex:
+    build:
+      context: .
+      dockerfile: services/pageindex/Dockerfile
+    container_name: historian-pageindex
+    environment:
+      # Use local vLLM for PageIndex's internal LLM calls
+      # OpenAI SDK environment variables (used by both our code and PageIndex package)
+      OPENAI_API_KEY: ${VLLM_API_KEY:-local-historian-key}
+      OPENAI_BASE_URL: http://vllm:8000/v1
+      # PageIndex package uses CHATGPT_API_KEY
+      CHATGPT_API_KEY: ${VLLM_API_KEY:-local-historian-key}
+      # Model to use
+      OPENAI_MODEL: qwen3-4b-thinking
+      # PageIndex configuration
+      PAGEINDEX_DOCS_DIR: /data/specs
+      PAGEINDEX_INDEX_DIR: /data/index
+      PAGEINDEX_HOST: 0.0.0.0
+      PAGEINDEX_PORT: "8080"
+      PAGEINDEX_AUTO_INDEX: "false"
+    volumes:
+      - ./docs/specs:/data/specs:ro
+      - ./volumes/pageindex-index:/data/index
+    depends_on:
+      vllm:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - historian-net
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # Dolt - Git-for-data versioned SQL database
+  # ==========================================================================
+  dolt:
+    build:
+      context: .
+      dockerfile: services/dolt/Dockerfile
+    container_name: historian-dolt
+    environment:
+      DOLT_ROOT_USER: root
+      DOLT_ROOT_PASSWORD: ${DOLT_PASSWORD:-}
+    volumes:
+      - ./volumes/dolt-data:/var/lib/dolt
+      - ./services/dolt/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "dolt", "sql", "-q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - historian-net
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  dolt-data:
+    name: historian-dolt-data
+
+networks:
+  historian-net:
+    name: historian-network
+    driver: bridge

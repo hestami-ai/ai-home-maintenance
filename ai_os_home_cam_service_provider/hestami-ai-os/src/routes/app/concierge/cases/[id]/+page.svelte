@@ -17,6 +17,7 @@
 		Link
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import {
 		CaseStatusBadge,
 		CasePriorityBadge,
@@ -448,14 +449,14 @@
 			<div class="mt-4 space-y-4">
 				<div>
 					<label for="newStatus" class="block text-sm font-medium">New Status</label>
-					<select id="newStatus" bind:value={newStatus} class="select mt-1 w-full">
+					<Select id="newStatus" bind:value={newStatus} size="sm" class="mt-1 w-full">
 						<option value="">Select a status</option>
 						{#each statusOptions as status}
 							{#if status !== caseDetail.case.status}
 								<option value={status}>{getStatusLabel(status)}</option>
 							{/if}
 						{/each}
-					</select>
+					</Select>
 				</div>
 
 				<div>

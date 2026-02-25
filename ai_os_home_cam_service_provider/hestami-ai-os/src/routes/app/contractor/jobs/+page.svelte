@@ -22,6 +22,7 @@
 		FileText,
 		Truck
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { ActivityEntityTypeValues, JobSourceTypeValues, JobStatusValues, jobApi, type Job, type JobSourceType, type JobStatus } from '$lib/api/cam';
 
@@ -200,34 +201,34 @@
 
 	const selectedJob = $derived(jobs.find((j) => j.id === selectedJobId));
 
-	const statuses: Array<{ value: JobStatus | ''; label: string }> = [
-		{ value: '', label: 'All Statuses' },
-		{ value: JobStatusValues.LEAD, label: 'Lead' },
-		{ value: JobStatusValues.TICKET, label: 'Ticket' },
-		{ value: JobStatusValues.ESTIMATE_REQUIRED, label: 'Estimate Required' },
-		{ value: JobStatusValues.ESTIMATE_SENT, label: 'Estimate Sent' },
-		{ value: JobStatusValues.ESTIMATE_APPROVED, label: 'Estimate Approved' },
-		{ value: JobStatusValues.JOB_CREATED, label: 'Job Created' },
-		{ value: JobStatusValues.SCHEDULED, label: 'Scheduled' },
-		{ value: JobStatusValues.DISPATCHED, label: 'Dispatched' },
-		{ value: JobStatusValues.IN_PROGRESS, label: 'In Progress' },
-		{ value: JobStatusValues.ON_HOLD, label: 'On Hold' },
-		{ value: JobStatusValues.COMPLETED, label: 'Completed' },
-		{ value: JobStatusValues.INVOICED, label: 'Invoiced' },
-		{ value: JobStatusValues.PAID, label: 'Paid' },
-		{ value: JobStatusValues.WARRANTY, label: 'Warranty' },
-		{ value: JobStatusValues.CLOSED, label: 'Closed' },
-		{ value: JobStatusValues.CANCELLED, label: 'Cancelled' }
+	const statuses: Array<{ value: JobStatus | ''; name: string }> = [
+		{ value: '', name: 'All Statuses' },
+		{ value: JobStatusValues.LEAD, name: 'Lead' },
+		{ value: JobStatusValues.TICKET, name: 'Ticket' },
+		{ value: JobStatusValues.ESTIMATE_REQUIRED, name: 'Estimate Required' },
+		{ value: JobStatusValues.ESTIMATE_SENT, name: 'Estimate Sent' },
+		{ value: JobStatusValues.ESTIMATE_APPROVED, name: 'Estimate Approved' },
+		{ value: JobStatusValues.JOB_CREATED, name: 'Job Created' },
+		{ value: JobStatusValues.SCHEDULED, name: 'Scheduled' },
+		{ value: JobStatusValues.DISPATCHED, name: 'Dispatched' },
+		{ value: JobStatusValues.IN_PROGRESS, name: 'In Progress' },
+		{ value: JobStatusValues.ON_HOLD, name: 'On Hold' },
+		{ value: JobStatusValues.COMPLETED, name: 'Completed' },
+		{ value: JobStatusValues.INVOICED, name: 'Invoiced' },
+		{ value: JobStatusValues.PAID, name: 'Paid' },
+		{ value: JobStatusValues.WARRANTY, name: 'Warranty' },
+		{ value: JobStatusValues.CLOSED, name: 'Closed' },
+		{ value: JobStatusValues.CANCELLED, name: 'Cancelled' }
 	];
 
-	const sources: Array<{ value: JobSourceType | ''; label: string }> = [
-		{ value: '', label: 'All Sources' },
-		{ value: ActivityEntityTypeValues.WORK_ORDER, label: 'Work Order' },
-		{ value: ActivityEntityTypeValues.VIOLATION, label: 'Violation' },
-		{ value: ActivityEntityTypeValues.ARC_REQUEST, label: 'ARC Request' },
-		{ value: JobSourceTypeValues.DIRECT_CUSTOMER, label: 'Direct Customer' },
-		{ value: JobStatusValues.LEAD, label: 'Lead' },
-		{ value: JobSourceTypeValues.RECURRING, label: 'Recurring' }
+	const sources: Array<{ value: JobSourceType | ''; name: string }> = [
+		{ value: '', name: 'All Sources' },
+		{ value: ActivityEntityTypeValues.WORK_ORDER, name: 'Work Order' },
+		{ value: ActivityEntityTypeValues.VIOLATION, name: 'Violation' },
+		{ value: ActivityEntityTypeValues.ARC_REQUEST, name: 'ARC Request' },
+		{ value: JobSourceTypeValues.DIRECT_CUSTOMER, name: 'Direct Customer' },
+		{ value: JobStatusValues.LEAD, name: 'Lead' },
+		{ value: JobSourceTypeValues.RECURRING, name: 'Recurring' }
 	];
 </script>
 
@@ -273,18 +274,10 @@
 				</div>
 			</div>
 			<div>
-				<select bind:value={statusFilter} onchange={loadJobs} class="select">
-					{#each statuses as status}
-						<option value={status.value}>{status.label}</option>
-					{/each}
-				</select>
+				<Select bind:value={statusFilter} items={statuses} size="sm" onchange={loadJobs} />
 			</div>
 			<div>
-				<select bind:value={sourceFilter} onchange={loadJobs} class="select">
-					{#each sources as source}
-						<option value={source.value}>{source.label}</option>
-					{/each}
-				</select>
+				<Select bind:value={sourceFilter} items={sources} size="sm" onchange={loadJobs} />
 			</div>
 		</div>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, ArrowRight, Shield, AlertCircle } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { serviceProviderOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
 
@@ -72,12 +73,12 @@
 							</div>
 							<div>
 								<label for="licenseState" class="block text-sm font-medium">State</label>
-								<select id="licenseState" bind:value={licenseState} class="select mt-1 w-full">
+								<Select id="licenseState" bind:value={licenseState} size="sm" class="mt-1">
 									<option value="">Select state...</option>
 									{#each usStates as st}
 										<option value={st}>{st}</option>
 									{/each}
-								</select>
+								</Select>
 							</div>
 						</div>
 					{/if}

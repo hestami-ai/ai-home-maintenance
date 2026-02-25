@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hestami.ai/schemas/adjudication-response.v2.json",
+  "title": "AdjudicationResponse",
+  "description": "Verdict with anchor sufficiency, produced by Historian Agent",
+  "type": "object",
+  "properties": {
+    "action_id": {
+      "type": ["string", "null"],
+      "description": "Echoes the ActionProposal's id for traceability"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["CONSISTENT", "INCONSISTENT", "CONDITIONAL", "UNKNOWN"],
+      "description": "The adjudication verdict"
+    },
+    "anchor_sufficiency": {
+      "type": "object",
+      "description": "Assessment of whether the proposal's evidence bundle is sufficient for adjudication",
+      "properties": {
+        "sufficient": {
+          "type": "boolean",
+          "description": "Whether the anchors provided are adequate for judgment"
+        },
+        "missing_anchors": {
+          "type": "array",
+          "description": "List of spec sections or evidence types that are missing",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "reason": {
+          "type": "string",
+          "description": "Explanation of sufficiency assessment"
+        }
+      },
+      "required": ["sufficient"],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Authoritative snippets backing the verdict",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["spec", "guideline", "decision", "discussion"],
+            "description": "Type of source document"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier of the cited source",
+            "minLength": 1
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Short quote or summary from the source",
+            "minLength": 1
+          }
+        },
+        "required": ["source", "id", "excerpt"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "conflicts": {
+      "type": "array",
+      "description": "Descriptions of any conflicts or inconsistencies found",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "conditions": {
+      "type": "array",
+      "description": "For CONDITIONAL status: what conditions or additional info is needed",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "verification_queries": {
+      "type": "array",
+      "description": "Questions or checks to resolve UNKNOWNs or clarify ambiguous points",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "supersession_notes": {
+      "type": "array",
+      "description": "Notes about any superseded decisions or specs detected",
+      "items": {
+        "type": "object",
+        "properties": {
+          "old_id": {
+            "type": "string",
+            "description": "ID of the superseded decision or spec"
+          },
+          "new_id": {
+            "type": "string",
+            "description": "ID of the superseding decision or spec"
+          },
+          "note": {
+            "type": "string",
+            "description": "Explanation of the supersession"
+          }
+        },
+        "required": ["old_id", "new_id", "note"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "comments": {
+      "type": "string",
+      "description": "Optional additional commentary or analysis (objective and evidence-driven)",
+      "default": ""
+    }
+  },
+  "required": ["action_id", "status", "evidence"],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "INCONSISTENT" }
+        }
+      },
+      "then": {
+        "properties": {
+          "conflicts": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "CONDITIONAL" }
+        }
+      },
+      "then": {
+        "properties": {
+          "conditions": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "UNKNOWN" }
+        }
+      },
+      "then": {
+        "properties": {
+          "verification_queries": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

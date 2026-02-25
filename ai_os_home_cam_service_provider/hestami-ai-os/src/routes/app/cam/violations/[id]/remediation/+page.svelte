@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Wrench, Building2, DollarSign, FileText } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation, refreshBadgeCounts } from '$lib/stores';
 	import { FundTypeValues, type Vendor, type Violation, vendorApi, violationApi } from '$lib/api/cam';
@@ -21,10 +22,10 @@
 	});
 
 	const budgetSources = [
-		{ value: FundTypeValues.OPERATING, label: 'Operating Budget' },
-		{ value: FundTypeValues.RESERVE, label: 'Reserve Fund' },
-		{ value: 'SPECIAL_ASSESSMENT', label: 'Special Assessment' },
-		{ value: 'OWNER_CHARGE', label: 'Charge to Owner' }
+		{ value: FundTypeValues.OPERATING, name: 'Operating Budget' },
+		{ value: FundTypeValues.RESERVE, name: 'Reserve Fund' },
+		{ value: 'SPECIAL_ASSESSMENT', name: 'Special Assessment' },
+		{ value: 'OWNER_CHARGE', name: 'Charge to Owner' }
 	];
 
 	const violationId = $derived(($page.params as Record<string, string>).id);
@@ -166,19 +167,14 @@
 								<label for="vendorId" class="mb-1 block text-sm font-medium">
 									Select Vendor <span class="text-error-500">*</span>
 								</label>
-								<select
-									id="vendorId"
-									bind:value={formData.vendorId}
-									required
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2"
-								>
+								<Select id="vendorId" bind:value={formData.vendorId} required>
 									<option value="">Choose a vendor...</option>
 									{#each vendors as vendor}
 										<option value={vendor.id}>
 											{vendor.name} ({(vendor as any).trades?.join(', ') || ''})
 										</option>
 									{/each}
-								</select>
+								</Select>
 								{#if vendors.length === 0}
 									<p class="mt-1 text-xs text-surface-500">
 										No approved vendors available. <a href="/app/cam/vendors" class="text-primary-500 hover:underline">Manage vendors</a>
@@ -199,16 +195,7 @@
 								<label for="budgetSource" class="mb-1 block text-sm font-medium">
 									Budget Source <span class="text-error-500">*</span>
 								</label>
-								<select
-									id="budgetSource"
-									bind:value={formData.budgetSource}
-									required
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2"
-								>
-									{#each budgetSources as source}
-										<option value={source.value}>{source.label}</option>
-									{/each}
-								</select>
+								<Select id="budgetSource" bind:value={formData.budgetSource} items={budgetSources} required />
 							</div>
 
 							<div>

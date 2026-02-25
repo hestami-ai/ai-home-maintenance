@@ -1,0 +1,11 @@
+{
+  "model": "qwen3-4b-thinking",
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are analyzing a section from a technical specification document.\n\nSection Title: Feature Detection System\nSection Text:\n**Purpose**: Detect and match distinctive features across multiple images\n\n**Key Features**:\n- Deep learning-based feature detection (SuperPoint)\n- Neural network feature matching (SuperGlue)\n- RANSAC-based outlier rejection\n- Sub-pixel refinement\n\n**Technical Specifications**:\n```swift\nclass FeatureDetectionSystem {\n    struct Configuration {\n        let maxFeaturesPerImage: Int = 2000\n        let minFeatureQuality: Float = 0.7\n        let ransacThreshold: Float = 3.0\n        let enableSubPixelRefinement: Bool = true\n    }\n    \n    func detectFeatures(in image: UIImage) async throws -> [FeaturePoint]\n    func matchFeatures(between image1: UIImage, image2: UIImage) async throws -> [FeatureMatch]\n    func filterMatches(_ matches: [FeatureMatch]) -> [FeatureMatch]\n}\n```\n\n**ML Models**:\n- **SuperPoint**: Feature detection and description (2.5MB)\n- **SuperGlue**: Feature matching (4.2MB)\n- Both models run on-device using Core ML\n\n**Performance Requirements**:\n- Feature detection: < 200ms per image (1920x1080)\n- Feature matching: < 300ms per image pair\n- Memory usage: < 150MB\n\nProvide a structured analysis in JSON format:\n\n{\n  \"summary\": \"<2-3 sentence summary of main points>\",\n  \"primary_topic\": \"<database|architecture|security|api|ui|workflow|infrastructure>\",\n  \"key_entities\": {\n    \"tables\": [\"list of database tables mentioned\"],\n    \"functions\": [\"list of functions/methods mentioned\"],\n    \"endpoints\": [\"list of API endpoints mentioned\"],\n    \"files\": [\"list of config files or code files mentioned\"]\n  },\n  \"technical_terms\": [\"list of 3-5 most important technical terms\"],\n  \"dependencies\": [\"list of systems, services, or components this section depends on\"]\n}\n\nReturn only valid JSON."
+    }
+  ],
+  "temperature": 0.0,
+  "stream": false
+}

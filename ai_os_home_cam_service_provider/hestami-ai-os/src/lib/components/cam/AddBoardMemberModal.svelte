@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { X, Loader2 } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 
 	interface Props {
 		open: boolean;
@@ -30,13 +31,14 @@
 	let termEnd = $state('');
 	let error = $state('');
 
-	const positions = [
-		'President',
-		'Vice President',
-		'Secretary',
-		'Treasurer',
-		'Director',
-		'Member at Large'
+	const positionItems = [
+		{ value: '', name: 'Select a position' },
+		{ value: 'President', name: 'President' },
+		{ value: 'Vice President', name: 'Vice President' },
+		{ value: 'Secretary', name: 'Secretary' },
+		{ value: 'Treasurer', name: 'Treasurer' },
+		{ value: 'Director', name: 'Director' },
+		{ value: 'Member at Large', name: 'Member at Large' }
 	];
 
 	function handleConfirm() {
@@ -124,20 +126,15 @@
 				</div>
 
 				<div>
-					<label for="position" class="block text-sm font-medium">
+					<Label for="position" class="mb-2">
 						Position <span class="text-error-500">*</span>
-					</label>
-					<select
+					</Label>
+					<Select
 						id="position"
 						bind:value={position}
-						class="mt-2 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						class:border-error-500={error && !position}
-					>
-						<option value="">Select a position</option>
-						{#each positions as pos}
-							<option value={pos}>{pos}</option>
-						{/each}
-					</select>
+						items={positionItems}
+						class={error && !position ? 'border-error-500' : ''}
+					/>
 				</div>
 
 				<div class="grid grid-cols-2 gap-4">

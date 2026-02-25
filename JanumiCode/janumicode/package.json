@@ -1,0 +1,237 @@
+{
+  "name": "janumicode",
+  "displayName": "JanumiCode",
+  "description": "True spec driven development with automated spec assumptions elicitation, error correction, human-agent memories, integrated with Claude Code.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "janumicode.helloWorld",
+        "title": "JanumiCode: Hello World"
+      },
+      {
+        "command": "janumicode.startDialogue",
+        "title": "JanumiCode: Start New Dialogue"
+      },
+      {
+        "command": "janumicode.showWorkflowStatus",
+        "title": "JanumiCode: Show Workflow Status"
+      },
+      {
+        "command": "janumicode.viewClaims",
+        "title": "JanumiCode: View Active Claims"
+      },
+      {
+        "command": "janumicode.exportHistory",
+        "title": "JanumiCode: Export History"
+      },
+      {
+        "command": "janumicode.clearHistory",
+        "title": "JanumiCode: Clear History"
+      },
+      {
+        "command": "janumicode.validateConfig",
+        "title": "JanumiCode: Validate Configuration"
+      },
+      {
+        "command": "janumicode.openGovernedStream",
+        "title": "Open Governed Stream",
+        "category": "JanumiCode"
+      },
+      {
+        "command": "janumicode.openSettings",
+        "title": "Open Settings",
+        "category": "JanumiCode",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "janumicode.setApiKey",
+        "title": "Set API Key",
+        "category": "JanumiCode"
+      },
+      {
+        "command": "janumicode.clearApiKey",
+        "title": "Clear API Key",
+        "category": "JanumiCode"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "janumicode.openSettings",
+          "when": "view == janumicode.governedStream",
+          "group": "navigation"
+        }
+      ]
+    },
+    "views": {
+      "janumicode-sidebar": [
+        {
+          "id": "janumicode.governedStream",
+          "name": "Governed Stream",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "janumicode-sidebar",
+          "title": "JanumiCode",
+          "icon": "./resources/JanumiCodeIconConversion.svg"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "JanumiCode",
+      "properties": {
+        "janumicode.tokenBudget": {
+          "type": "number",
+          "default": 10000,
+          "description": "Token budget for context packs (per role invocation)",
+          "minimum": 1000,
+          "maximum": 100000
+        },
+        "janumicode.databasePath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to SQLite database (leave empty for default workspace location)"
+        },
+        "janumicode.llm.executor.provider": {
+          "type": "string",
+          "enum": [
+            "CLAUDE",
+            "OPENAI",
+            "GEMINI"
+          ],
+          "default": "CLAUDE",
+          "description": "LLM provider for Executor role"
+        },
+        "janumicode.llm.executor.model": {
+          "type": "string",
+          "default": "claude-sonnet-4",
+          "description": "Model name for Executor role (e.g., claude-sonnet-4, gpt-4)"
+        },
+        "janumicode.llm.technicalExpert.provider": {
+          "type": "string",
+          "enum": [
+            "CLAUDE",
+            "OPENAI",
+            "GEMINI"
+          ],
+          "default": "OPENAI",
+          "description": "LLM provider for Technical Expert role"
+        },
+        "janumicode.llm.technicalExpert.model": {
+          "type": "string",
+          "default": "gpt-5.2",
+          "description": "Model name for Technical Expert role"
+        },
+        "janumicode.llm.verifier.provider": {
+          "type": "string",
+          "enum": [
+            "CLAUDE",
+            "OPENAI",
+            "GEMINI"
+          ],
+          "default": "OPENAI",
+          "description": "LLM provider for Verifier role"
+        },
+        "janumicode.llm.verifier.model": {
+          "type": "string",
+          "default": "gemini-3.0-flash",
+          "description": "Model name for Verifier role"
+        },
+        "janumicode.llm.historianInterpreter.provider": {
+          "type": "string",
+          "enum": [
+            "CLAUDE",
+            "OPENAI",
+            "GEMINI"
+          ],
+          "default": "GEMINI",
+          "description": "LLM provider for Historian-Interpreter role"
+        },
+        "janumicode.llm.historianInterpreter.model": {
+          "type": "string",
+          "default": "gemini-3.0-flash",
+          "description": "Model name for Historian-Interpreter role"
+        },
+        "janumicode.evaluator.provider": {
+          "type": "string",
+          "enum": [
+            "GEMINI",
+            "CLAUDE",
+            "OPENAI"
+          ],
+          "default": "GEMINI",
+          "description": "LLM provider for the Response Evaluator (classifies executor output quality before proceeding)"
+        },
+        "janumicode.evaluator.model": {
+          "type": "string",
+          "default": "gemini-3-flash-preview",
+          "description": "Model for the Response Evaluator (lightweight, fast model recommended)"
+        },
+        "janumicode.logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "none"
+          ],
+          "default": "info",
+          "description": "Log level for the JanumiCode output channel"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "pnpm run check-types && pnpm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "rebuild:native": "electron-rebuild -f -w better-sqlite3 -v 39.3.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/uuid": "^11.0.0",
+    "@types/vscode": "^1.109.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.27.2",
+    "eslint": "^9.39.2",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.73.0",
+    "better-sqlite3": "^12.6.2",
+    "nanoid": "^3.3.11",
+    "openai": "^6.18.0",
+    "uuid": "^13.0.0"
+  }
+}

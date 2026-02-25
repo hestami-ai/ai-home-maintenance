@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card } from '$lib/components/ui';
 	import { AssetStatusValues, PropertyTypeValues, StaffStatusValues, propertyApi } from '$lib/api/cam';
 
@@ -36,18 +37,18 @@
 	let newAmenity = $state('');
 
 	const propertyTypeOptions = [
-		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family' },
-		{ value: 'TOWNHOME', label: 'Townhome' },
-		{ value: 'CONDO', label: 'Condominium' },
-		{ value: 'APARTMENT', label: 'Apartment' },
-		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
-		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' }
+		{ value: PropertyTypeValues.SINGLE_FAMILY, name: 'Single Family' },
+		{ value: 'TOWNHOME', name: 'Townhome' },
+		{ value: 'CONDO', name: 'Condominium' },
+		{ value: 'APARTMENT', name: 'Apartment' },
+		{ value: PropertyTypeValues.COMMERCIAL, name: 'Commercial' },
+		{ value: PropertyTypeValues.MIXED_USE, name: 'Mixed Use' }
 	];
 
 	const statusOptions = [
-		{ value: StaffStatusValues.ACTIVE, label: 'Active' },
-		{ value: AssetStatusValues.INACTIVE, label: 'Inactive' },
-		{ value: 'UNDER_CONSTRUCTION', label: 'Under Construction' }
+		{ value: StaffStatusValues.ACTIVE, name: 'Active' },
+		{ value: AssetStatusValues.INACTIVE, name: 'Inactive' },
+		{ value: 'UNDER_CONSTRUCTION', name: 'Under Construction' }
 	];
 
 	const commonAmenities = [
@@ -225,30 +226,22 @@
 									<label for="propertyType" class="mb-1 block text-sm font-medium">
 										Property Type
 									</label>
-									<select
+									<Select
 										id="propertyType"
 										bind:value={formData.propertyType}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each propertyTypeOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+										items={propertyTypeOptions}
+									/>
 								</div>
 
 								<div>
 									<label for="status" class="mb-1 block text-sm font-medium">
 										Status
 									</label>
-									<select
+									<Select
 										id="status"
 										bind:value={formData.status}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each statusOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+										items={statusOptions}
+									/>
 								</div>
 							</div>
 						</div>
@@ -303,15 +296,12 @@
 						<h3 class="mb-4 font-semibold">Amenities</h3>
 						<div class="space-y-4">
 							<div class="flex gap-2">
-								<select
-									bind:value={newAmenity}
-									class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
+								<Select bind:value={newAmenity} class="flex-1">
 									<option value="">Select an amenity</option>
 									{#each commonAmenities.filter(a => !formData.amenities.includes(a)) as amenity}
 										<option value={amenity}>{amenity}</option>
 									{/each}
-								</select>
+								</Select>
 								<button
 									type="button"
 									onclick={addAmenity}

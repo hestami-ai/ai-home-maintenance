@@ -17,6 +17,7 @@ import { encrypt, decrypt, generateActivationCode } from '../../security/encrypt
 import { recordSpanError } from '../middleware/tracing.js';
 import { staffWorkflow_v1, StaffWorkflowAction } from '../../workflows/staffWorkflow.js';
 import { SpanErrorType } from '../../workflows/schemas.js';
+import { sendStaffInvitationEmail } from '../../email/sender.js';
 
 const log = createModuleLogger('StaffRoute');
 
@@ -156,6 +157,32 @@ export const staffRouter = {
 						}
 					}
 				}
+			});
+
+			// Get inviter name for the email
+			const inviter = await prisma.user.findUnique({
+				where: { id: context.user!.id },
+				select: { name: true, email: true }
+			});
+
+			// Send invitation email (non-blocking - don't fail if email fails)
+			sendStaffInvitationEmail({
+				recipientEmail: input.email,
+				recipientName: user.name ?? undefined,
+				staffDisplayName: input.displayName,
+				activationCode,
+				expiresAt: activationCodeExpiresAt,
+				inviterName: inviter?.name || inviter?.email || 'Hestami Admin',
+				roles: input.roles,
+				pillars: input.pillarAccess
+			}).then((emailResult) => {
+				if (emailResult.success) {
+					log.info('Staff invitation email sent', { staffId: staff.id, email: input.email, messageId: emailResult.messageId });
+				} else {
+					log.error('Failed to send staff invitation email', { staffId: staff.id, email: input.email, error: emailResult.error });
+				}
+			}).catch((err) => {
+				log.error('Staff invitation email error', { staffId: staff.id, email: input.email, error: err });
 			});
 
 			return successResponse(
@@ -1045,7 +1072,7 @@ export const staffRouter = {
 		}),
 
 	/**
-	 * Get active case assignments for a staff member
+	 * Get case assignments for a staff member with case details
 	 */
 	getAssignments: authedProcedure
 		.input(
@@ -1065,7 +1092,14 @@ export const staffRouter = {
 							isPrimary: z.boolean(),
 							assignedAt: z.string(),
 							unassignedAt: z.string().nullable(),
-							justification: z.string().nullable()
+							justification: z.string().nullable(),
+							case: z.object({
+								caseNumber: z.string(),
+								title: z.string(),
+								status: z.string(),
+								priority: z.string(),
+								createdAt: z.string()
+							})
 						})
 					)
 				}),
@@ -1091,6 +1125,17 @@ export const staffRouter = {
 
 			const assignments = await prisma.staffCaseAssignment.findMany({
 				where,
+				include: {
+					case: {
+						select: {
+							caseNumber: true,
+							title: true,
+							status: true,
+							priority: true,
+							createdAt: true
+						}
+					}
+				},
 				orderBy: { assignedAt: 'desc' }
 			});
 
@@ -1102,7 +1147,14 @@ export const staffRouter = {
 						isPrimary: a.isPrimary,
 						assignedAt: a.assignedAt.toISOString(),
 						unassignedAt: a.unassignedAt?.toISOString() ?? null,
-						justification: a.justification
+						justification: a.justification,
+						case: {
+							caseNumber: a.case.caseNumber,
+							title: a.case.title,
+							status: a.case.status,
+							priority: a.case.priority,
+							createdAt: a.case.createdAt.toISOString()
+						}
 					}))
 				},
 				context
@@ -1606,11 +1658,30 @@ export const orgStaffRouter = {
 				}
 			});
 
-			// TODO: Send invitation email when email system is integrated
-			log.info('Staff invitation created', {
-				staffId: staff.id,
-				email: input.email,
-				organizationId: context.organization.id
+			// Get inviter name for the email
+			const inviter = await prisma.user.findUnique({
+				where: { id: context.user!.id },
+				select: { name: true, email: true }
+			});
+
+			// Send invitation email (non-blocking - don't fail if email fails)
+			sendStaffInvitationEmail({
+				recipientEmail: input.email,
+				recipientName: user.name ?? undefined,
+				staffDisplayName: input.displayName,
+				activationCode,
+				expiresAt: activationCodeExpiresAt,
+				inviterName: inviter?.name || inviter?.email || 'Organization Admin',
+				roles: input.roles,
+				pillars: input.pillarAccess
+			}).then((emailResult) => {
+				if (emailResult.success) {
+					log.info('Staff invitation email sent', { staffId: staff.id, email: input.email, messageId: emailResult.messageId });
+				} else {
+					log.error('Failed to send staff invitation email', { staffId: staff.id, email: input.email, error: emailResult.error });
+				}
+			}).catch((err) => {
+				log.error('Staff invitation email error', { staffId: staff.id, email: input.email, error: err });
 			});
 
 			return successResponse(

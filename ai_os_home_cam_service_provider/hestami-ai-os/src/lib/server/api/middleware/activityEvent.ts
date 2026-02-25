@@ -59,6 +59,25 @@ export const WorkflowContextSchema = z.object({
 });
 
 /**
+ * Actor context for capturing role information at time of action
+ */
+export const ActorContextSchema = z.object({
+	orgRole: z.string().nullable().optional(),
+	isStaff: z.boolean().optional(),
+	staffRoles: z.array(z.string()).optional(),
+	pillarAccess: z.array(z.string()).optional()
+});
+
+/**
+ * Authority source for audit trail
+ */
+export const AuthoritySourceSchema = z.object({
+	type: z.enum(['POLICY', 'RESOLUTION', 'DELEGATION', 'SYSTEM', 'MANUAL']),
+	reference: z.string().optional(),
+	description: z.string().optional()
+});
+
+/**
  * Base metadata schema with common optional fields
  * Uses passthrough() to allow additional fields
  */
@@ -87,7 +106,16 @@ export const ActivityMetadataSchema = z
 				message: z.string(),
 				stack: z.string().optional()
 			})
-			.optional()
+			.optional(),
+
+		// Actor context - captures role at time of action (Phase 16+14)
+		actorContext: ActorContextSchema.optional(),
+
+		// Authority source for audit trail (Phase 16+14)
+		authoritySource: AuthoritySourceSchema.optional(),
+
+		// Whether action was taken by external party (Phase 16+14)
+		isExternalAction: z.boolean().optional()
 	})
 	.passthrough();
 
@@ -212,7 +240,7 @@ export async function recordActivityEvent(input: ActivityEventInput): Promise<st
 
 /**
  * Create an activity event from request context
- * Automatically extracts actor info, IP, user agent, and trace ID
+ * Automatically extracts actor info, IP, user agent, trace ID, and actor context
  */
 export async function recordActivityFromContext(
 	context: RequestContext,
@@ -243,6 +271,20 @@ export async function recordActivityFromContext(
 		// OpenTelemetry not available, skip trace ID
 	}
 
+	// Capture actor context - role at time of action (Phase 16+14)
+	const actorContext = {
+		orgRole: context.role ?? null,
+		isStaff: context.isStaff,
+		staffRoles: context.staffRoles?.length > 0 ? context.staffRoles : undefined,
+		pillarAccess: context.pillarAccess?.length > 0 ? context.pillarAccess : undefined
+	};
+
+	// Merge actor context into metadata
+	const enhancedMetadata: ActivityMetadata = {
+		...(input.metadata || {}),
+		actorContext
+	};
+
 	return recordActivityEvent({
 		...input,
 		organizationId,
@@ -250,7 +292,8 @@ export async function recordActivityFromContext(
 		performedByType,
 		ipAddress,
 		userAgent,
-		traceId
+		traceId,
+		metadata: enhancedMetadata
 	});
 }
 

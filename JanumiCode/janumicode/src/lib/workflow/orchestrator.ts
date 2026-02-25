@@ -1,0 +1,1718 @@
+/**
+ * Workflow Orchestrator
+ * Implements Phase 7.2: Complete workflow orchestration with all phases
+ * DBOS-compatible orchestration of governed multi-role dialogue
+ */
+
+import type {
+	Result,
+	Phase,
+	Claim,
+	LLMProviderInterface,
+	RoleLLMConfig,
+} from '../types';
+import { Role } from '../types';
+import {
+	emitDialogueTurnAdded,
+	emitWorkflowPhaseChanged,
+	emitWorkflowGateTriggered,
+	emitClaimCreated,
+	emitCLIActivity,
+	emitWorkflowCommand,
+	emitWorkflowPhaseFailed,
+} from '../integration/eventBus';
+import { randomUUID } from 'node:crypto';
+import {
+	initializeWorkflowState,
+	getWorkflowState,
+	transitionWorkflow,
+	updateWorkflowMetadata,
+	TransitionTrigger,
+} from './stateMachine';
+import { triggerGateIfNeeded, hasOpenGates, createReviewGate } from './gates';
+import {
+	executeIntakeConversationTurn,
+	executeIntakePlanFinalization,
+	executeIntakePlanApproval,
+} from './intakePhase';
+import { IntakeSubState } from '../types';
+import { getOrCreateIntakeConversation } from '../events/reader';
+import { executeVerification } from './verification';
+import {
+	invokeExecutor,
+	reparseExecutorResponse,
+	assumptionsToClaims,
+	type ExecutorResponse,
+} from '../roles/executor';
+import {
+	invokeHistorianInterpreter,
+} from '../roles/historianInterpreter';
+import { HistorianQueryType } from '../context';
+import { getDatabase } from '../database';
+import { resolveProviderForRole } from '../cli/providerResolver';
+import { buildStdinContent } from '../cli/types';
+import {
+	evaluateExecutorResponse,
+	EvaluationVerdict,
+	createProposalBranches,
+	type ProposalBranch,
+} from './responseEvaluator';
+import { getLogger, isLoggerInitialized } from '../logging';
+
+/**
+ * Provider instances for workflow execution (actual LLM providers, not config)
+ */
+export interface WorkflowProviders {
+	executor: LLMProviderInterface;
+	verifier: LLMProviderInterface;
+	historianInterpreter: LLMProviderInterface;
+}
+
+/**
+ * Workflow execution options
+ */
+export interface WorkflowExecutionOptions {
+	dialogueId: string;
+	goal: string; // User's goal/request
+	llmConfig: RoleLLMConfig;
+	tokenBudget?: number;
+	autoAdvance?: boolean; // Auto-advance through phases
+}
+
+/**
+ * Phase execution result
+ */
+export interface PhaseExecutionResult {
+	phase: Phase;
+	success: boolean;
+	nextPhase?: Phase;
+	gateTriggered?: boolean;
+	/** When true, the phase is waiting for the next human message.
+	 *  The cycle loop should break and re-enable the webview input.
+	 *  Used by the INTAKE conversational planning phase. */
+	awaitingInput?: boolean;
+	metadata: Record<string, unknown>;
+	timestamp: string;
+}
+
+/**
+ * Workflow execution result
+ */
+export interface WorkflowExecutionResult {
+	dialogueId: string;
+	currentPhase: Phase;
+	phaseResults: PhaseExecutionResult[];
+	isComplete: boolean;
+	hasOpenGates: boolean;
+}
+
+/**
+ * Start workflow
+ * Initializes a new dialogue workflow
+ *
+ * @param options Workflow execution options
+ * @returns Result containing workflow state
+ */
+export function startWorkflow(
+	options: WorkflowExecutionOptions
+): Result<{ dialogueId: string }> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return {
+				success: false,
+				error: new Error('Database not initialized'),
+			};
+		}
+
+		// Create dialogue record
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS dialogues (
+				dialogue_id TEXT PRIMARY KEY,
+				goal TEXT NOT NULL,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)
+		`);
+
+		const now = new Date().toISOString();
+
+		db.prepare(
+			`
+			INSERT INTO dialogues (dialogue_id, goal, created_at, updated_at)
+			VALUES (?, ?, ?, ?)
+		`
+		).run(options.dialogueId, options.goal, now, now);
+
+		// Initialize workflow state
+		const stateResult = initializeWorkflowState(options.dialogueId, {
+			goal: options.goal,
+		});
+
+		if (!stateResult.success) {
+			return stateResult as Result<{ dialogueId: string }>;
+		}
+
+		return { success: true, value: { dialogueId: options.dialogueId } };
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to start workflow'),
+		};
+	}
+}
+
+/**
+ * Execute INTAKE phase
+ * Conversational planning phase: Human discusses requirements with Technical Expert.
+ * Dispatches to sub-state handlers based on the current IntakeSubState.
+ *
+ * Sub-states:
+ *   DISCUSSING         → executeIntakeConversationTurn() → awaitingInput: true
+ *   SYNTHESIZING       → executeIntakePlanFinalization() → gateTriggered: true
+ *   AWAITING_APPROVAL  → executeIntakePlanApproval()     → nextPhase: PROPOSE
+ *
+ * @param dialogueId Dialogue ID
+ * @param humanInput The human's latest message (or initial goal for first turn)
+ * @returns Result containing phase execution result
+ */
+export async function executeIntakePhase(
+	dialogueId: string,
+	humanInput: string
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const convResult = getOrCreateIntakeConversation(dialogueId);
+		if (!convResult.success) {
+			return convResult as unknown as Result<PhaseExecutionResult>;
+		}
+
+		const conv = convResult.value;
+
+		switch (conv.subState) {
+			case IntakeSubState.DISCUSSING:
+				// Cache the goal on first turn for later use by PROPOSE
+				if (conv.turnCount === 0) {
+					updateWorkflowMetadata(dialogueId, {
+						lastIntakeGoal: humanInput,
+					});
+				}
+				return await executeIntakeConversationTurn(
+					dialogueId,
+					humanInput
+				);
+
+			case IntakeSubState.SYNTHESIZING:
+				return await executeIntakePlanFinalization(dialogueId);
+
+			case IntakeSubState.AWAITING_APPROVAL:
+				return executeIntakePlanApproval(dialogueId);
+
+			default:
+				return {
+					success: false,
+					error: new Error(
+						`Unknown intake sub-state: ${conv.subState}`
+					),
+				};
+		}
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute INTAKE phase'),
+		};
+	}
+}
+
+/**
+ * Execute PROPOSE phase
+ * Executor generates proposal and surfaces assumptions
+ *
+ * @param dialogueId Dialogue ID
+ * @param provider LLM provider for Executor
+ * @param tokenBudget Token budget
+ * @returns Result containing phase execution result
+ */
+export async function executeProposePhase(
+	dialogueId: string,
+	tokenBudget: number
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return {
+				success: false,
+				error: new Error('Database not initialized'),
+			};
+		}
+
+		// Resolve CLI provider for Executor role
+		const providerResult = await resolveProviderForRole(Role.EXECUTOR);
+		if (!providerResult.success) {
+			return providerResult as Result<PhaseExecutionResult>;
+		}
+
+		// Get goal from workflow metadata
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) {
+			return stateResult as Result<PhaseExecutionResult>;
+		}
+
+		const metadata = JSON.parse(stateResult.value.metadata);
+		const rawGoal = metadata.lastIntakeGoal ?? metadata.goal ?? '';
+
+		// If an approved INTAKE plan exists, build a rich structured prompt for the Executor
+		const goal = metadata.approvedIntakePlan
+			? formatApprovedPlanForExecutor(rawGoal, metadata.approvedIntakePlan)
+			: rawGoal;
+
+		// Shared command ID for proposal command block
+		const proposeCommandId = randomUUID();
+
+		// ── Retry cache check ──
+		// If previous invocation failed and raw output was cached, try re-parsing first
+		let response: ExecutorResponse | undefined;
+		if (metadata.cachedRawCliOutput && metadata.lastFailedPhase === 'PROPOSE') {
+			const reparseResult = reparseExecutorResponse(metadata.cachedRawCliOutput);
+			if (reparseResult.success) {
+				response = reparseResult.value;
+				// Clear cache flags — re-parse succeeded
+				updateWorkflowMetadata(dialogueId, {
+					cachedRawCliOutput: undefined,
+					lastFailedPhase: undefined,
+				});
+
+				// Emit a command block for the successful re-parse
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: proposeCommandId,
+					action: 'start',
+					commandType: 'role_invocation',
+					label: 'Executor — Re-parsed Cached Response',
+					summary: 'Successfully re-parsed cached CLI output (no LLM re-invocation)',
+					status: 'running',
+					timestamp: new Date().toISOString(),
+				});
+			}
+			// If re-parse fails, fall through to fresh CLI invocation below
+		}
+
+		// ── Fresh CLI invocation (skipped if cache re-parse succeeded) ──
+		if (!response) {
+			const proposeProvider = providerResult.value;
+			const proposeCmdPreview = proposeProvider.getCommandPreview({ stdinContent: '<goal + context>', outputFormat: 'json' });
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: proposeCommandId,
+				action: 'start',
+				commandType: 'role_invocation',
+				label: `Executor — Generating Proposal [${proposeProvider.name}]`,
+				summary: `Goal: ${goal.substring(0, 120)}${goal.length > 120 ? '...' : ''}`,
+				status: 'running',
+				timestamp: new Date().toISOString(),
+			});
+			if (proposeCmdPreview.success) {
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: proposeCommandId,
+					action: 'output',
+					commandType: 'role_invocation',
+					label: 'Executor',
+					summary: `$ ${proposeCmdPreview.value}`,
+					timestamp: new Date().toISOString(),
+				});
+			}
+
+			const executorResult = await invokeExecutor({
+				dialogueId,
+				goal,
+				tokenBudget,
+				provider: providerResult.value,
+				includeHistoricalFindings: true,
+				commandId: proposeCommandId,
+			});
+
+			if (!executorResult.success) {
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: proposeCommandId,
+					action: 'error',
+					commandType: 'role_invocation',
+					label: 'Executor — Generating Proposal',
+					summary: `Failed: ${executorResult.error.message}`,
+					status: 'error',
+					timestamp: new Date().toISOString(),
+				});
+				updateWorkflowMetadata(dialogueId, {
+					lastFailedPhase: 'PROPOSE',
+				});
+				emitWorkflowPhaseFailed(dialogueId, 'PROPOSE', executorResult.error.message);
+				return executorResult as Result<PhaseExecutionResult>;
+			}
+
+			response = executorResult.value;
+		}
+		const now = new Date().toISOString();
+
+		// Emit full input
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: proposeCommandId,
+			action: 'output',
+			commandType: 'role_invocation',
+			label: 'Executor',
+			summary: '── Input ──',
+			detail: goal,
+			timestamp: now,
+		});
+
+		// Emit full output: proposal
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: proposeCommandId,
+			action: 'output',
+			commandType: 'role_invocation',
+			label: 'Executor',
+			summary: '── Proposal ──',
+			detail: response.proposal,
+			timestamp: now,
+		});
+
+		// Emit assumptions
+		if (response.assumptions.length > 0) {
+			const assumptionLines = response.assumptions
+				.map((a, i) => `${i + 1}. [${a.criticality}] ${a.statement}`)
+				.join('\n');
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: proposeCommandId,
+				action: 'output',
+				commandType: 'role_invocation',
+				label: 'Executor',
+				summary: `── Assumptions (${response.assumptions.length}) ──`,
+				detail: assumptionLines,
+				timestamp: now,
+			});
+		}
+
+		// Emit constraint adherence notes
+		if (response.constraint_adherence_notes.length > 0) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: proposeCommandId,
+				action: 'output',
+				commandType: 'role_invocation',
+				label: 'Executor',
+				summary: `── Constraint Notes (${response.constraint_adherence_notes.length}) ──`,
+				detail: response.constraint_adherence_notes.join('\n'),
+				timestamp: now,
+			});
+		}
+
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: proposeCommandId,
+			action: 'complete',
+			commandType: 'role_invocation',
+			label: 'Executor — Proposal Complete',
+			summary: `Proposal generated with ${response.assumptions.length} assumption(s), ${response.artifacts.length} artifact(s)`,
+			status: 'success',
+			timestamp: now,
+		});
+		const turnId = await getNextTurnId(dialogueId);
+
+		// Store proposal as dialogue turn
+		db.prepare(
+			`
+			INSERT INTO dialogue_turns (
+				turn_id, dialogue_id, role, phase, speech_act,
+				content_ref, timestamp
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`
+		).run(
+			turnId,
+			dialogueId,
+			Role.EXECUTOR,
+			'PROPOSE',
+			'CLAIM',
+			JSON.stringify(response.proposal),
+			now
+		);
+		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
+
+		// Cache executor response in workflow metadata for ASSUMPTION_SURFACING
+		updateWorkflowMetadata(dialogueId, {
+			turnCount: turnId,
+			cachedExecutorResponse: {
+				proposal: response.proposal,
+				assumptions: response.assumptions,
+				artifacts: response.artifacts,
+				constraint_adherence_notes: response.constraint_adherence_notes,
+			},
+		});
+
+		// ── Response Evaluator sub-step ──
+		// Classify the executor's response before proceeding
+		const evaluation = await evaluateExecutorResponse(goal, response.proposal, dialogueId);
+
+		const evalLogger = isLoggerInitialized()
+			? getLogger().child({ component: 'evaluator', dialogueId })
+			: undefined;
+
+		switch (evaluation.verdict) {
+			case EvaluationVerdict.ESCALATE_CONFUSED: {
+				evalLogger?.warn('Executor response classified as confused — escalating to human', {
+					summary: evaluation.summary,
+				});
+				const gateResult = createReviewGate(
+					dialogueId,
+					`Executor response appears confused or incoherent: ${evaluation.summary ?? evaluation.reasoning}. Please provide clarification.`
+				);
+				if (gateResult.success && gateResult.value) {
+					emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+				}
+				return {
+					success: true,
+					value: {
+						phase: 'PROPOSE' as Phase,
+						success: true,
+						gateTriggered: true,
+						metadata: {
+							proposal: response.proposal,
+							evaluationVerdict: evaluation.verdict,
+							evaluationReasoning: evaluation.reasoning,
+						},
+						timestamp: now,
+					},
+				};
+			}
+
+			case EvaluationVerdict.ESCALATE_QUESTIONS: {
+				const questionList = evaluation.questions?.join('\n• ') ?? 'No specific questions extracted';
+				evalLogger?.warn('Executor has questions — escalating to human', {
+					questionCount: evaluation.questions?.length,
+				});
+				const gateResult = createReviewGate(
+					dialogueId,
+					`Executor needs clarification before proposing:\n• ${questionList}`
+				);
+				if (gateResult.success && gateResult.value) {
+					emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+				}
+				return {
+					success: true,
+					value: {
+						phase: 'PROPOSE' as Phase,
+						success: true,
+						gateTriggered: true,
+						metadata: {
+							proposal: response.proposal,
+							evaluationVerdict: evaluation.verdict,
+							questions: evaluation.questions,
+						},
+						timestamp: now,
+					},
+				};
+			}
+
+			case EvaluationVerdict.ESCALATE_OPTIONS: {
+				const options = evaluation.options ?? [];
+				if (options.length < 2) {
+					evalLogger?.info('ESCALATE_OPTIONS with <2 options — treating as PROCEED');
+					break; // Fall through to normal PROCEED path
+				}
+				evalLogger?.info('Executor presented multiple options — setting up branch analysis', {
+					optionCount: options.length,
+					labels: options.map((o) => o.label),
+				});
+
+				const branches = createProposalBranches(options);
+
+				// Mark first branch as analyzing, override cached response with first branch.
+				// Store original assumptions separately so they can be reused per-branch.
+				branches[0].status = 'analyzing';
+				updateWorkflowMetadata(dialogueId, {
+					proposalBranches: branches,
+					currentBranchIndex: 0,
+					originalAssumptions: response.assumptions,
+					originalArtifacts: response.artifacts,
+					originalConstraintNotes: response.constraint_adherence_notes,
+					cachedExecutorResponse: {
+						proposal: branches[0].proposal,
+						assumptions: response.assumptions,
+						artifacts: response.artifacts,
+						constraint_adherence_notes: response.constraint_adherence_notes,
+					},
+				});
+
+				return {
+					success: true,
+					value: {
+						phase: 'PROPOSE' as Phase,
+						success: true,
+						nextPhase: 'ASSUMPTION_SURFACING' as Phase,
+						metadata: {
+							proposal: response.proposal,
+							evaluationVerdict: evaluation.verdict,
+							branchCount: branches.length,
+						},
+						timestamp: now,
+					},
+				};
+			}
+
+			case EvaluationVerdict.PROCEED:
+			default:
+				evalLogger?.info('Executor response classified as PROCEED');
+				break;
+		}
+
+		// Normal PROCEED path
+		return {
+			success: true,
+			value: {
+				phase: 'PROPOSE' as Phase,
+				success: true,
+				nextPhase: 'ASSUMPTION_SURFACING' as Phase,
+				metadata: {
+					proposal: response.proposal,
+					assumptionCount: response.assumptions.length,
+					evaluationVerdict: evaluation.verdict,
+				},
+				timestamp: now,
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute PROPOSE phase'),
+		};
+	}
+}
+
+/**
+ * Execute ASSUMPTION_SURFACING phase
+ * Converts executor assumptions (cached from PROPOSE) to claims
+ *
+ * @param dialogueId Dialogue ID
+ * @param provider LLM provider (fallback if no cached response)
+ * @param tokenBudget Token budget
+ * @returns Result containing phase execution result
+ */
+export async function executeAssumptionSurfacingPhase(
+	dialogueId: string,
+	tokenBudget: number
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return {
+				success: false,
+				error: new Error('Database not initialized'),
+			};
+		}
+
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) {
+			return stateResult as Result<PhaseExecutionResult>;
+		}
+
+		const metadata = JSON.parse(stateResult.value.metadata);
+
+		// Use cached executor response from PROPOSE phase if available
+		let response: ExecutorResponse;
+		if (metadata.cachedExecutorResponse) {
+			response = {
+				...metadata.cachedExecutorResponse,
+				raw_response: '(cached from PROPOSE phase)',
+			};
+		} else {
+			// Fallback: re-invoke Executor if no cached response
+			const executorProviderResult = await resolveProviderForRole(Role.EXECUTOR);
+			if (!executorProviderResult.success) {
+				return executorProviderResult as Result<PhaseExecutionResult>;
+			}
+			const goal = metadata.lastIntakeGoal ?? metadata.goal ?? '';
+			const executorResult = await invokeExecutor({
+				dialogueId,
+				goal,
+				tokenBudget,
+				provider: executorProviderResult.value,
+			});
+
+			if (!executorResult.success) {
+				return executorResult as Result<PhaseExecutionResult>;
+			}
+			response = executorResult.value;
+		}
+
+		const turnId = await getNextTurnId(dialogueId);
+		const now = new Date().toISOString();
+
+		// Store dialogue turn FIRST (claims reference it via FK)
+		db.prepare(
+			`
+			INSERT INTO dialogue_turns (
+				turn_id, dialogue_id, role, phase, speech_act,
+				content_ref, timestamp
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`
+		).run(
+			turnId,
+			dialogueId,
+			Role.EXECUTOR,
+			'ASSUMPTION_SURFACING',
+			'ASSUMPTION',
+			JSON.stringify(response.assumptions),
+			now
+		);
+		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
+
+		// Convert assumptions to claims
+		const claims = assumptionsToClaims(
+			response.assumptions,
+			dialogueId,
+			turnId
+		);
+
+		// Store claims (after turn exists for FK)
+		for (const claim of claims) {
+			db.prepare(
+				`
+				INSERT INTO claims (
+					claim_id, statement, introduced_by, criticality,
+					status, dialogue_id, turn_id, created_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`
+			).run(
+				claim.claim_id,
+				claim.statement,
+				claim.introduced_by,
+				claim.criticality,
+				claim.status,
+				claim.dialogue_id,
+				claim.turn_id,
+				claim.created_at
+			);
+			emitClaimCreated(dialogueId, claim.claim_id, claim.statement);
+		}
+
+		// ── Branch tracking ──
+		// If in multi-option mode, store this branch's claim IDs
+		const claimIds = claims.map((c) => c.claim_id);
+		const branches: ProposalBranch[] | undefined = metadata.proposalBranches;
+		const branchIdx: number | undefined = metadata.currentBranchIndex;
+		if (branches && branchIdx !== undefined && branches[branchIdx]) {
+			branches[branchIdx].assumptions = response.assumptions;
+			branches[branchIdx].claim_ids = claimIds;
+			updateWorkflowMetadata(dialogueId, { proposalBranches: branches });
+		}
+
+		return {
+			success: true,
+			value: {
+				phase: 'ASSUMPTION_SURFACING' as Phase,
+				success: true,
+				nextPhase: 'VERIFY' as Phase,
+				metadata: {
+					claimCount: claims.length,
+					claimIds,
+				},
+				timestamp: now,
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute ASSUMPTION_SURFACING phase'),
+		};
+	}
+}
+
+/**
+ * Execute VERIFY phase
+ * Verifies all open claims
+ *
+ * @param dialogueId Dialogue ID
+ * @param provider LLM provider for Verifier
+ * @param tokenBudget Token budget
+ * @returns Result containing phase execution result
+ */
+export async function executeVerifyPhase(
+	dialogueId: string,
+	tokenBudget: number
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return {
+				success: false,
+				error: new Error('Database not initialized'),
+			};
+		}
+
+		// Resolve CLI provider for Verifier role
+		const verifierProviderResult = await resolveProviderForRole(Role.VERIFIER);
+		if (!verifierProviderResult.success) {
+			return verifierProviderResult as Result<PhaseExecutionResult>;
+		}
+
+		// Get all open claims
+		const openClaims = db
+			.prepare(
+				`
+			SELECT claim_id, statement, introduced_by, criticality,
+			       status, dialogue_id, turn_id, created_at
+			FROM claims
+			WHERE dialogue_id = ? AND status = 'OPEN'
+		`
+			)
+			.all(dialogueId) as Claim[];
+
+		if (openClaims.length === 0) {
+			return {
+				success: true,
+				value: {
+					phase: 'VERIFY' as Phase,
+					success: true,
+					nextPhase: 'HISTORICAL_CHECK' as Phase,
+					metadata: { claimCount: 0 },
+					timestamp: new Date().toISOString(),
+				},
+			};
+		}
+
+		// Verify each claim using resolved CLI provider
+		const verifyCommandId = randomUUID();
+		const verifyProvider = verifierProviderResult.value;
+		const verifyCmdPreview = verifyProvider.getCommandPreview({ stdinContent: '<claim + context>', outputFormat: 'json' });
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: verifyCommandId,
+			action: 'start',
+			commandType: 'role_invocation',
+			label: `Verifier — Checking ${openClaims.length} claims [${verifyProvider.name}]`,
+			summary: `Verifying ${openClaims.length} open claim(s)`,
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+		if (verifyCmdPreview.success) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: verifyCommandId,
+				action: 'output',
+				commandType: 'role_invocation',
+				label: 'Verifier',
+				summary: `$ ${verifyCmdPreview.value}`,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		const verificationResults = [];
+		for (const claim of openClaims) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: verifyCommandId,
+				action: 'output',
+				commandType: 'role_invocation',
+				label: 'Verifier',
+				summary: `Verifying: ${claim.statement.substring(0, 100)}`,
+				timestamp: new Date().toISOString(),
+			});
+
+			const result = await executeVerification({
+				dialogueId,
+				claim,
+				provider: verifierProviderResult.value,
+				tokenBudget: Math.floor(tokenBudget / openClaims.length),
+				includeHistoricalVerdicts: true,
+				checkForContradictions: true,
+				commandId: verifyCommandId,
+			});
+
+			if (result.success) {
+				verificationResults.push(result.value);
+				// Emit verdict output for this claim
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: verifyCommandId,
+					action: 'output',
+					commandType: 'role_invocation',
+					label: 'Verifier',
+					summary: `→ ${result.value.verdict.verdict}: ${claim.statement.substring(0, 80)}`,
+					detail: result.value.verdict.rationale,
+					timestamp: new Date().toISOString(),
+				});
+			} else {
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: verifyCommandId,
+					action: 'output',
+					commandType: 'role_invocation',
+					label: 'Verifier',
+					summary: `→ FAILED: ${claim.statement.substring(0, 80)}`,
+					timestamp: new Date().toISOString(),
+				});
+			}
+		}
+
+		// Emit summary of all verdicts
+		const verdictSummary = verificationResults
+			.map((r) => `• [${r.verdict.verdict}] ${r.claim.statement.substring(0, 80)}`)
+			.join('\n');
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: verifyCommandId,
+			action: 'output',
+			commandType: 'role_invocation',
+			label: 'Verifier',
+			summary: `── Results (${verificationResults.length}/${openClaims.length}) ──`,
+			detail: verdictSummary,
+			timestamp: new Date().toISOString(),
+		});
+
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: verifyCommandId,
+			action: 'complete',
+			commandType: 'role_invocation',
+			label: `Verifier — ${verificationResults.length} verified`,
+			summary: `Verified ${verificationResults.length}/${openClaims.length} claims`,
+			status: 'success',
+			timestamp: new Date().toISOString(),
+		});
+
+		// Check for gate triggers after verification
+		const gateResult = triggerGateIfNeeded(dialogueId);
+		const gateTriggered = gateResult.success && gateResult.value !== null;
+
+		if (gateTriggered && gateResult.value) {
+			emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+		}
+
+		return {
+			success: true,
+			value: {
+				phase: 'VERIFY' as Phase,
+				success: true,
+				nextPhase: gateTriggered ? undefined : ('HISTORICAL_CHECK' as Phase),
+				gateTriggered,
+				metadata: {
+					verifiedCount: verificationResults.length,
+					blockingCount: verificationResults.filter((r) => r.isBlocking).length,
+				},
+				timestamp: new Date().toISOString(),
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute VERIFY phase'),
+		};
+	}
+}
+
+/**
+ * Execute HISTORICAL_CHECK phase
+ * Checks for contradictions and precedents
+ *
+ * @param dialogueId Dialogue ID
+ * @param provider LLM provider for Historian-Interpreter
+ * @param tokenBudget Token budget
+ * @returns Result containing phase execution result
+ */
+export async function executeHistoricalCheckPhase(
+	dialogueId: string,
+	tokenBudget: number
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		// Resolve CLI provider for Historian-Interpreter role
+		const historianProviderResult = await resolveProviderForRole(Role.HISTORIAN);
+		if (!historianProviderResult.success) {
+			return historianProviderResult as Result<PhaseExecutionResult>;
+		}
+
+		// Invoke Historian-Interpreter for contradiction check
+		const histCheckCommandId = randomUUID();
+		const historianProvider = historianProviderResult.value;
+		const histCmdPreview = historianProvider.getCommandPreview({ stdinContent: '<query + context>', outputFormat: 'json' });
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: histCheckCommandId,
+			action: 'start',
+			commandType: 'role_invocation',
+			label: `Historian — Checking Precedents [${historianProvider.name}]`,
+			summary: 'Searching for contradictions and relevant precedents',
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+		if (histCmdPreview.success) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: histCheckCommandId,
+				action: 'output',
+				commandType: 'role_invocation',
+				label: 'Historian',
+				summary: `$ ${histCmdPreview.value}`,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		const historianResult = await invokeHistorianInterpreter({
+			dialogueId,
+			query: 'Check for contradictions and relevant precedents',
+			queryType: HistorianQueryType.GENERAL_HISTORY,
+			tokenBudget,
+			provider: historianProviderResult.value,
+			commandId: histCheckCommandId,
+		});
+
+		if (!historianResult.success) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: histCheckCommandId,
+				action: 'error',
+				commandType: 'role_invocation',
+				label: 'Historian — Checking Precedents',
+				summary: `Failed: ${historianResult.error.message}`,
+				status: 'error',
+				timestamp: new Date().toISOString(),
+			});
+			return historianResult as Result<PhaseExecutionResult>;
+		}
+
+		// Emit findings as output
+		const findings = historianResult.value.findings ?? [];
+		if (findings.length > 0) {
+			const findingsText = findings
+				.map((f: any, i: number) => `${i + 1}. ${typeof f === 'string' ? f : JSON.stringify(f)}`)
+				.join('\n');
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: histCheckCommandId,
+				action: 'output',
+				commandType: 'role_invocation',
+				label: 'Historian',
+				summary: `── Findings (${findings.length}) ──`,
+				detail: findingsText,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: histCheckCommandId,
+			action: 'complete',
+			commandType: 'role_invocation',
+			label: 'Historian — Checking Precedents',
+			summary: `Found ${findings.length} finding(s)`,
+			status: 'success',
+			timestamp: new Date().toISOString(),
+		});
+
+		// ── Branch loop check ──
+		// If we're in multi-option mode, store findings for the current branch
+		// and loop back to ASSUMPTION_SURFACING for the next branch if any remain.
+		const stateResult = getWorkflowState(dialogueId);
+		if (stateResult.success) {
+			const metadata = JSON.parse(stateResult.value.metadata);
+			const branches: ProposalBranch[] | undefined = metadata.proposalBranches;
+			const currentIdx: number | undefined = metadata.currentBranchIndex;
+
+			if (branches && currentIdx !== undefined && branches.length > 1) {
+				const branchLogger = isLoggerInitialized()
+					? getLogger().child({ component: 'evaluator', dialogueId })
+					: undefined;
+
+				// Mark current branch as analyzed and store its findings
+				branches[currentIdx].status = 'analyzed';
+				branches[currentIdx].historical_findings = historianResult.value.findings;
+
+				const nextIdx = currentIdx + 1;
+
+				if (nextIdx < branches.length) {
+					// More branches — advance to next and loop back
+					branches[nextIdx].status = 'analyzing';
+					branchLogger?.info('Branch analysis complete, advancing to next branch', {
+						completedBranch: branches[currentIdx].label,
+						nextBranch: branches[nextIdx].label,
+						progress: `${nextIdx + 1}/${branches.length}`,
+					});
+
+					updateWorkflowMetadata(dialogueId, {
+						proposalBranches: branches,
+						currentBranchIndex: nextIdx,
+						cachedExecutorResponse: {
+							proposal: branches[nextIdx].proposal,
+							assumptions: metadata.originalAssumptions ?? [],
+							artifacts: metadata.originalArtifacts ?? [],
+							constraint_adherence_notes: metadata.originalConstraintNotes ?? [],
+						},
+					});
+
+					return {
+						success: true,
+						value: {
+							phase: 'HISTORICAL_CHECK' as Phase,
+							success: true,
+							nextPhase: 'ASSUMPTION_SURFACING' as Phase,
+							metadata: {
+								findings: historianResult.value.findings,
+								branchCompleted: branches[currentIdx].label,
+								branchesRemaining: branches.length - nextIdx,
+							},
+							timestamp: new Date().toISOString(),
+						},
+					};
+				}
+
+				// All branches analyzed — proceed to REVIEW
+				branchLogger?.info('All branches analyzed — proceeding to REVIEW', {
+					branchCount: branches.length,
+					labels: branches.map((b) => b.label),
+				});
+				updateWorkflowMetadata(dialogueId, {
+					proposalBranches: branches,
+				});
+			}
+		}
+
+		return {
+			success: true,
+			value: {
+				phase: 'HISTORICAL_CHECK' as Phase,
+				success: true,
+				nextPhase: 'REVIEW' as Phase,
+				metadata: {
+					findings: historianResult.value.findings,
+				},
+				timestamp: new Date().toISOString(),
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute HISTORICAL_CHECK phase'),
+		};
+	}
+}
+
+/**
+ * Execute REVIEW phase
+ * Triggers a human gate so the user can review before execution proceeds
+ *
+ * @param dialogueId Dialogue ID
+ * @returns Result containing phase execution result
+ */
+export async function executeReviewPhase(
+	dialogueId: string
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		// Check for multi-option branches — include branch context in review gate
+		let reviewReason = 'Human review required before execution proceeds';
+		const stateResult = getWorkflowState(dialogueId);
+		if (stateResult.success) {
+			const metadata = JSON.parse(stateResult.value.metadata);
+			const branches: ProposalBranch[] | undefined = metadata.proposalBranches;
+			if (branches && branches.length > 1) {
+				const branchSummary = branches
+					.map((b, i) => `${i + 1}. ${b.label}: ${b.summary}`)
+					.join('\n');
+				reviewReason =
+					`Multiple implementation options have been fully analyzed. ` +
+					`Please review all ${branches.length} options and choose one to proceed with:\n${branchSummary}`;
+			}
+		}
+
+		// Trigger a human review gate — workflow pauses until resolved
+		const gateResult = createReviewGate(dialogueId, reviewReason);
+
+		if (gateResult.success && gateResult.value) {
+			emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+
+			return {
+				success: true,
+				value: {
+					phase: 'REVIEW' as Phase,
+					success: true,
+					// No nextPhase — gate blocks advancement until resolved
+					gateTriggered: true,
+					metadata: { gateId: gateResult.value.gate_id },
+					timestamp: new Date().toISOString(),
+				},
+			};
+		}
+
+		// If gate creation failed, still pause (fail-safe)
+		return {
+			success: true,
+			value: {
+				phase: 'REVIEW' as Phase,
+				success: true,
+				gateTriggered: true,
+				metadata: { warning: 'Review gate creation failed, workflow paused as fail-safe' },
+				timestamp: new Date().toISOString(),
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute REVIEW phase'),
+		};
+	}
+}
+
+/**
+ * Execute EXECUTE phase
+ * Invokes the configured CLI provider for the Executor role to execute the verified proposal.
+ * Uses resolveProviderForRole() to dispatch to Claude Code CLI, Gemini CLI, Codex CLI, or API fallback.
+ * Streams CLI activity events to the governed stream UI via emitCLIActivity().
+ *
+ * @param dialogueId Dialogue ID
+ * @returns Result containing phase execution result
+ */
+export async function executeExecutePhase(
+	dialogueId: string
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return {
+				success: false,
+				error: new Error('Database not initialized'),
+			};
+		}
+
+		// Retrieve the cached proposal from workflow metadata
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) {
+			return stateResult as Result<PhaseExecutionResult>;
+		}
+
+		const metadata = JSON.parse(stateResult.value.metadata);
+		const proposal = metadata.cachedExecutorResponse?.proposal ?? '';
+
+		if (!proposal) {
+			return {
+				success: false,
+				error: new Error('No proposal found in workflow metadata for execution'),
+			};
+		}
+
+		// Resolve the CLI provider for the Executor role
+		const providerResult = await resolveProviderForRole(Role.EXECUTOR);
+		if (!providerResult.success) {
+			return providerResult as Result<PhaseExecutionResult>;
+		}
+
+		const provider = providerResult.value;
+		const goal = metadata.lastIntakeGoal ?? metadata.goal ?? '';
+
+		// Build stdin content: execution prompt + verified proposal
+		const stdinContent = buildStdinContent(
+			'Execute the following verified proposal. Apply all changes to the workspace.',
+			`Dialogue: ${dialogueId}\nGoal: ${goal}\n\n---\n\nProposal:\n${proposal}`
+		);
+
+		// Emit command block start for the CLI execution
+		const executeCommandId = randomUUID();
+		const execCmdPreview = provider.getCommandPreview({ stdinContent, outputFormat: 'stream-json' });
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: executeCommandId,
+			action: 'start',
+			commandType: 'cli_invocation',
+			label: `Executor CLI — Executing Proposal [${provider.name}]`,
+			summary: `Goal: ${goal.substring(0, 120)}${goal.length > 120 ? '...' : ''}`,
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+		if (execCmdPreview.success) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: executeCommandId,
+				action: 'output',
+				commandType: 'cli_invocation',
+				label: 'Executor CLI',
+				summary: `$ ${execCmdPreview.value}`,
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		// Emit full stdin content for observability (expandable in command block UI)
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: executeCommandId,
+			action: 'output',
+			commandType: 'cli_invocation',
+			label: 'Executor CLI',
+			summary: '── stdin ──',
+			detail: stdinContent,
+			lineType: 'stdin',
+			timestamp: new Date().toISOString(),
+		});
+
+		// Invoke with streaming for real-time progress in governed stream UI
+		const executionResult = await provider.invokeStreaming(
+			{
+				stdinContent,
+				outputFormat: 'stream-json',
+			},
+			(event) => {
+				emitCLIActivity(dialogueId, {
+					...event,
+					role: Role.EXECUTOR,
+					phase: 'EXECUTE' as Phase,
+				});
+			}
+		);
+
+		const turnId = await getNextTurnId(dialogueId);
+		const now = new Date().toISOString();
+
+		let executionSummary: string;
+		if (executionResult.success) {
+			executionSummary = JSON.stringify({
+				status: 'completed',
+				exitCode: executionResult.value.exitCode,
+				executionTime: executionResult.value.executionTime,
+				response: executionResult.value.response?.substring(0, 2000),
+			});
+			// Emit execution result output
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: executeCommandId,
+				action: 'output',
+				commandType: 'cli_invocation',
+				label: 'Executor CLI',
+				summary: `── Result: exit ${executionResult.value.exitCode} (${executionResult.value.executionTime}ms) ──`,
+				detail: executionResult.value.response?.substring(0, 3000) || '(no response text)',
+				timestamp: now,
+			});
+		} else {
+			executionSummary = JSON.stringify({
+				status: 'failed',
+				error: executionResult.error.message,
+			});
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: executeCommandId,
+				action: 'output',
+				commandType: 'cli_invocation',
+				label: 'Executor CLI',
+				summary: `── Error ──`,
+				detail: executionResult.error.message,
+				timestamp: now,
+			});
+		}
+
+		db.prepare(
+			`
+			INSERT INTO dialogue_turns (
+				turn_id, dialogue_id, role, phase, speech_act,
+				content_ref, timestamp
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`
+		).run(
+			turnId,
+			dialogueId,
+			Role.EXECUTOR,
+			'EXECUTE',
+			'DECISION',
+			executionSummary,
+			now
+		);
+		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
+
+		// Store execution result in metadata for VALIDATE phase
+		updateWorkflowMetadata(dialogueId, {
+			executionResult: executionResult.success
+				? { success: true, exitCode: executionResult.value.exitCode }
+				: { success: false, error: executionResult.error.message },
+		});
+
+		return {
+			success: true,
+			value: {
+				phase: 'EXECUTE' as Phase,
+				success: true,
+				nextPhase: 'VALIDATE' as Phase,
+				metadata: {
+					executionSuccess: executionResult.success,
+				},
+				timestamp: now,
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute EXECUTE phase'),
+		};
+	}
+}
+
+/**
+ * Execute VALIDATE phase
+ * Validates execution results — checks whether execution succeeded
+ *
+ * @param dialogueId Dialogue ID
+ * @returns Result containing phase execution result
+ */
+export async function executeValidatePhase(
+	dialogueId: string
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) {
+			return stateResult as Result<PhaseExecutionResult>;
+		}
+
+		const metadata = JSON.parse(stateResult.value.metadata);
+		const execResult = metadata.executionResult;
+
+		const now = new Date().toISOString();
+
+		if (execResult && !execResult.success) {
+			// Execution failed — trigger a gate for human decision on how to proceed
+			const gateResult = createReviewGate(
+				dialogueId,
+				`Execution failed: ${execResult.error ?? 'unknown error'}. Human decision required.`
+			);
+
+			if (gateResult.success && gateResult.value) {
+				emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+			}
+
+			return {
+				success: true,
+				value: {
+					phase: 'VALIDATE' as Phase,
+					success: true,
+					gateTriggered: true,
+					metadata: { validationPassed: false, reason: execResult.error },
+					timestamp: now,
+				},
+			};
+		}
+
+		// Execution succeeded (or no result recorded) — proceed to COMMIT
+		return {
+			success: true,
+			value: {
+				phase: 'VALIDATE' as Phase,
+				success: true,
+				nextPhase: 'COMMIT' as Phase,
+				metadata: { validationPassed: true },
+				timestamp: now,
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute VALIDATE phase'),
+		};
+	}
+}
+
+/**
+ * Execute COMMIT phase
+ * Commits the work and records completion
+ *
+ * @param dialogueId Dialogue ID
+ * @returns Result containing phase execution result
+ */
+export async function executeCommitPhase(
+	dialogueId: string
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		const db = getDatabase();
+		if (!db) {
+			return {
+				success: false,
+				error: new Error('Database not initialized'),
+			};
+		}
+
+		const turnId = await getNextTurnId(dialogueId);
+		const now = new Date().toISOString();
+
+		db.prepare(
+			`
+			INSERT INTO dialogue_turns (
+				turn_id, dialogue_id, role, phase, speech_act,
+				content_ref, timestamp
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+		`
+		).run(
+			turnId,
+			dialogueId,
+			'SYSTEM' as any,
+			'COMMIT',
+			'DECISION',
+			'Workflow completed',
+			now
+		);
+		emitDialogueTurnAdded(dialogueId, turnId, 'SYSTEM');
+
+		return {
+			success: true,
+			value: {
+				phase: 'COMMIT' as Phase,
+				success: true,
+				nextPhase: 'INTAKE' as Phase, // Loop back for next task
+				metadata: { completed: true },
+				timestamp: now,
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to execute COMMIT phase'),
+		};
+	}
+}
+
+/**
+ * Get next turn ID
+ * Generates the next turn ID for a dialogue
+ */
+async function getNextTurnId(dialogueId: string): Promise<number> {
+	const db = getDatabase();
+	if (!db) {
+		throw new Error('Database not initialized');
+	}
+
+	const result = db
+		.prepare(
+			`
+		SELECT MAX(turn_id) as maxTurnId
+		FROM dialogue_turns
+		WHERE dialogue_id = ?
+	`
+		)
+		.get(dialogueId) as { maxTurnId: number | null };
+
+	return (result.maxTurnId ?? 0) + 1;
+}
+
+/**
+ * Format an approved INTAKE plan as a rich structured prompt for the Executor.
+ * Replaces the raw goal string with a comprehensive plan document.
+ */
+function formatApprovedPlanForExecutor(
+	originalGoal: string,
+	plan: Record<string, unknown>
+): string {
+	const sections: string[] = [];
+
+	sections.push('# Approved Implementation Plan');
+	sections.push(`## Original Goal\n\n${originalGoal}`);
+
+	if (plan.title) {
+		sections.push(`## Plan: ${plan.title}`);
+	}
+	if (plan.summary) {
+		sections.push(`## Summary\n\n${plan.summary}`);
+	}
+
+	const requirements = plan.requirements as Array<{ id: string; text: string }> | undefined;
+	if (requirements && requirements.length > 0) {
+		sections.push(
+			'## Requirements\n\n' +
+				requirements.map((r) => `- [${r.id}] ${r.text}`).join('\n')
+		);
+	}
+
+	const decisions = plan.decisions as Array<{ id: string; text: string }> | undefined;
+	if (decisions && decisions.length > 0) {
+		sections.push(
+			'## Decisions Made\n\n' +
+				decisions.map((d) => `- [${d.id}] ${d.text}`).join('\n')
+		);
+	}
+
+	const constraints = plan.constraints as Array<{ id: string; text: string }> | undefined;
+	if (constraints && constraints.length > 0) {
+		sections.push(
+			'## Constraints\n\n' +
+				constraints.map((c) => `- [${c.id}] ${c.text}`).join('\n')
+		);
+	}
+
+	const technicalNotes = plan.technicalNotes as string[] | undefined;
+	if (technicalNotes && technicalNotes.length > 0) {
+		sections.push(
+			'## Technical Notes\n\n' +
+				technicalNotes.map((n) => `- ${n}`).join('\n')
+		);
+	}
+
+	if (plan.proposedApproach) {
+		sections.push(`## Proposed Approach\n\n${plan.proposedApproach}`);
+	}
+
+	sections.push(
+		'\n---\n\nImplement this plan. Generate a concrete proposal with assumptions.'
+	);
+
+	return sections.join('\n\n');
+}
+
+/**
+ * Advance workflow to next phase
+ * Orchestrates automatic phase advancement
+ *
+ * @param dialogueId Dialogue ID
+ * @param llmConfig LLM configuration
+ * @param tokenBudget Token budget
+ * @returns Result containing phase execution result
+ */
+export async function advanceWorkflow(
+	dialogueId: string,
+	providers?: WorkflowProviders,
+	tokenBudget: number = 10000
+): Promise<Result<PhaseExecutionResult>> {
+	try {
+		// Get current workflow state
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) {
+			return stateResult as Result<PhaseExecutionResult>;
+		}
+
+		const currentPhase = stateResult.value.current_phase as Phase;
+
+		// Check for open gates
+		const gatesResult = hasOpenGates(dialogueId);
+		if (gatesResult.success && gatesResult.value) {
+			return {
+				success: false,
+				error: new Error('Cannot advance: workflow has open gates'),
+			};
+		}
+
+		// Execute current phase
+		let phaseResult: Result<PhaseExecutionResult>;
+
+		switch (currentPhase) {
+			case 'INTAKE': {
+				const metadata = JSON.parse(stateResult.value.metadata);
+				const humanInput =
+					metadata.pendingIntakeInput ?? metadata.goal ?? '';
+				phaseResult = await executeIntakePhase(
+					dialogueId,
+					humanInput
+				);
+				// Clear pendingIntakeInput after consumption
+				if (metadata.pendingIntakeInput) {
+					updateWorkflowMetadata(dialogueId, {
+						pendingIntakeInput: undefined,
+					});
+				}
+				break;
+			}
+			case 'PROPOSE':
+				phaseResult = await executeProposePhase(
+					dialogueId,
+					tokenBudget
+				);
+				break;
+			case 'ASSUMPTION_SURFACING':
+				phaseResult = await executeAssumptionSurfacingPhase(
+					dialogueId,
+					tokenBudget
+				);
+				break;
+			case 'VERIFY':
+				phaseResult = await executeVerifyPhase(
+					dialogueId,
+					tokenBudget
+				);
+				break;
+			case 'HISTORICAL_CHECK':
+				phaseResult = await executeHistoricalCheckPhase(
+					dialogueId,
+					tokenBudget
+				);
+				break;
+			case 'REVIEW':
+				phaseResult = await executeReviewPhase(dialogueId);
+				break;
+			case 'EXECUTE':
+				phaseResult = await executeExecutePhase(dialogueId);
+				break;
+			case 'VALIDATE':
+				phaseResult = await executeValidatePhase(dialogueId);
+				break;
+			case 'COMMIT':
+				phaseResult = await executeCommitPhase(dialogueId);
+				break;
+			default:
+				return {
+					success: false,
+					error: new Error(`Unknown phase: ${currentPhase}`),
+				};
+		}
+
+		if (!phaseResult.success) {
+			return phaseResult;
+		}
+
+		// Transition to next phase if specified
+		if (
+			phaseResult.value.nextPhase &&
+			!phaseResult.value.gateTriggered &&
+			!phaseResult.value.awaitingInput
+		) {
+			const transitionResult = transitionWorkflow(
+				dialogueId,
+				phaseResult.value.nextPhase,
+				TransitionTrigger.PHASE_COMPLETE
+			);
+
+			if (!transitionResult.success) {
+				return transitionResult as Result<PhaseExecutionResult>;
+			}
+
+			emitWorkflowPhaseChanged(dialogueId, currentPhase, phaseResult.value.nextPhase);
+		}
+
+		return phaseResult;
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to advance workflow'),
+		};
+	}
+}

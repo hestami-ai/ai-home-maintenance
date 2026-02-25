@@ -1,0 +1,33 @@
+{
+  "name": "hestami-copilot",
+  "version": "0.1.0",
+  "description": "Historian-based Narrative Memory system for AI-assisted software development governance",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean",
+    "schema:validate": "pnpm --filter @hestami/contracts run validate-schemas",
+    "schema:generate": "pnpm --filter @hestami/contracts run generate-types"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "keywords": [
+    "ai-governance",
+    "narrative-memory",
+    "historian",
+    "llm",
+    "fine-tuning"
+  ],
+  "author": "Hestami",
+  "license": "UNLICENSED"
+}

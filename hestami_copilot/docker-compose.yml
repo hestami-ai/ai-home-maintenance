@@ -1,0 +1,236 @@
+# Hestami Copilot - Docker Compose Configuration
+# Historian-based Narrative Memory System
+#
+# Services:
+# - registry-db: PostgreSQL for model registry, decisions, and specs
+# - indexer: Builds spec/decision indices
+# - bundle-builder: Creates evidence bundles for proposals
+# - historian-infer: Serves Historian model for adjudication
+# - bench: Runs benchmark/regression suite
+#
+# GPU Services (separate profile):
+# - training: LoRA training jobs (uses training profile)
+#
+# Usage:
+#   docker compose up -d                     # Start core services
+#   docker compose --profile training up     # Start with training service
+
+services:
+  # PostgreSQL database for registry
+  registry-db:
+    build:
+      context: .
+      dockerfile: services/registry-db/Dockerfile
+    container_name: hestami-registry-db
+    environment:
+      POSTGRES_USER: hestami
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hestami_dev}
+      POSTGRES_DB: historian_registry
+    volumes:
+      - registry-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hestami -d historian_registry"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hestami-net
+
+  # Spec/Decision indexer
+  indexer:
+    build:
+      context: .
+      dockerfile: services/indexer/Dockerfile
+    container_name: hestami-indexer
+    environment:
+      DATABASE_URL: postgresql://hestami:${POSTGRES_PASSWORD:-hestami_dev}@registry-db:5432/historian_registry
+      SPECS_DIR: /specs
+      POLL_INTERVAL_MS: "30000"
+    volumes:
+      - ./docs/specs:/specs:ro
+      - ./docs/decisions:/decisions:ro
+    depends_on:
+      registry-db:
+        condition: service_healthy
+    networks:
+      - hestami-net
+
+  # Evidence bundle builder API
+  bundle-builder:
+    build:
+      context: .
+      dockerfile: services/bundle-builder/Dockerfile
+    container_name: hestami-bundle-builder
+    environment:
+      DATABASE_URL: postgresql://hestami:${POSTGRES_PASSWORD:-hestami_dev}@registry-db:5432/historian_registry
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      registry-db:
+        condition: service_healthy
+    networks:
+      - hestami-net
+
+  # vLLM backend for Historian model inference (GPU)
+  historian-vllm:
+    build:
+      context: .
+      dockerfile: services/historian-vllm/Dockerfile
+    container_name: hestami-historian-vllm
+    environment:
+      - VLLM_LOGGING_LEVEL=INFO
+    volumes:
+      - ./models/base:/models/base:ro
+      - ./models/adapters:/models/adapters:ro
+    ipc: "host"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      /models/base
+      --enable-lora
+      --lora-modules historian=/models/adapters/historian_v20260130_180915
+      --max-model-len 32768
+      --max-loras 1
+      --gpu-memory-utilization 0.9
+      --dtype bfloat16
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - hestami-net
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Historian API service (pre/post-inference validation, calls vLLM)
+  historian-infer:
+    build:
+      context: .
+      dockerfile: services/historian-infer/Dockerfile
+    container_name: hestami-historian
+    environment:
+      VLLM_URL: http://historian-vllm:8000
+      VLLM_MODEL_NAME: historian
+      PORT: "8000"
+      MAX_TOKENS: "8192"  # Increased to accommodate thinking + JSON output
+      VLLM_TIMEOUT: "180"  # 3 minutes for complex adjudications
+      # Structured outputs: Use vLLM's JSON schema enforcement for guaranteed valid JSON
+      VLLM_USE_STRUCTURED_OUTPUTS: "true"
+      # Disable Qwen3 thinking mode: Prevents <think> tags in output
+      DISABLE_THINKING_MODE: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      historian-vllm:
+        condition: service_healthy
+    networks:
+      - hestami-net
+
+  # Benchmark runner
+  bench:
+    build:
+      context: .
+      dockerfile: services/bench/Dockerfile
+    container_name: hestami-bench
+    environment:
+      HISTORIAN_URL: http://historian-infer:8000
+      DATABASE_URL: postgresql://hestami:${POSTGRES_PASSWORD:-hestami_dev}@registry-db:5432/historian_registry
+      OUTPUT_DIR: /app/results
+    volumes:
+      - ./services/bench/cases:/app/cases:ro
+      - ./services/bench/results:/app/results
+    depends_on:
+      - historian-infer
+      - registry-db
+    networks:
+      - hestami-net
+
+  # Training service (GPU exclusive - use training profile)
+  training:
+    build:
+      context: .
+      dockerfile: services/training/Dockerfile
+    container_name: hestami-training
+    profiles:
+      - training
+    environment:
+      MODEL_PATH: /models/base
+      ADAPTERS_PATH: /models/adapters
+      TRAINING_DATA_PATH: /training-data
+      CONFIG_PATH: /app/configs/default.yaml
+      DATABASE_URL: postgresql://hestami:${POSTGRES_PASSWORD:-hestami_dev}@registry-db:5432/historian_registry
+    volumes:
+      - ./models:/models
+      - ./training-data:/training-data:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      registry-db:
+        condition: service_healthy
+    networks:
+      - hestami-net
+
+  ollama:
+    build:
+      context: ./docker/ollama
+      dockerfile: Dockerfile
+    #container_name: ollama-dev
+    environment:
+      - OLLAMA_DEFAULT_MODEL=qwen3:14b-q8_0
+      - OLLAMA_CONTEXT_LENGTH=122880
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_INTEL_GPU=true
+      - OLLAMA_NEW_ENGINE=true
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MULTIUSER_CACHE=false
+      #- OLLAMA_DEBUG=2
+      #- OLLAMA_LOG_LEVEL=trace
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models_dev:/root/.ollama
+      - "./volumes/dev/ollama/models/config:/root/ollama/models/config:rw"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - hestami-net
+    logging:
+      driver: "local"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  registry-data:
+    name: hestami-registry-data
+  ollama_models_dev:
+    driver: local
+
+networks:
+  hestami-net:
+    name: hestami-network
+    driver: bridge

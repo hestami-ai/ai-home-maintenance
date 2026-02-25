@@ -13,6 +13,7 @@
 		X
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { orpc } from '$lib/api';
 	import { createOrgClient } from '$lib/api/orpc';
 	import { invalidateAll } from '$app/navigation';
@@ -61,15 +62,15 @@
 	});
 
 	const categories = [
-		{ value: '', label: 'All Categories' },
-		{ value: 'PROPERTY_DEED', label: 'Property Deed' },
-		{ value: DocumentCategoryValues.INSURANCE, label: 'Insurance' },
-		{ value: JobStatusValues.WARRANTY, label: 'Warranty' },
-		{ value: DocumentCategoryValues.INSPECTION, label: 'Inspection' },
-		{ value: 'RECEIPT', label: 'Receipt' },
-		{ value: DocumentCategoryValues.CONTRACT, label: 'Contract' },
-		{ value: MediaTypeValues.PHOTO, label: 'Photo' },
-		{ value: ARCCategoryValues.OTHER, label: 'Other' }
+		{ value: '', name: 'All Categories' },
+		{ value: 'PROPERTY_DEED', name: 'Property Deed' },
+		{ value: DocumentCategoryValues.INSURANCE, name: 'Insurance' },
+		{ value: JobStatusValues.WARRANTY, name: 'Warranty' },
+		{ value: DocumentCategoryValues.INSPECTION, name: 'Inspection' },
+		{ value: 'RECEIPT', name: 'Receipt' },
+		{ value: DocumentCategoryValues.CONTRACT, name: 'Contract' },
+		{ value: MediaTypeValues.PHOTO, name: 'Photo' },
+		{ value: ARCCategoryValues.OTHER, name: 'Other' }
 	];
 
 	const categoryLabels: Record<string, string> = {
@@ -169,11 +170,7 @@
 					class="input w-full pl-10"
 				/>
 			</div>
-			<select bind:value={selectedCategory} class="select w-full sm:w-48">
-				{#each categories as cat}
-					<option value={cat.value}>{cat.label}</option>
-				{/each}
-			</select>
+			<Select bind:value={selectedCategory} items={categories} size="sm" class="w-full sm:w-48" />
 		</div>
 
 		<!-- Documents List -->

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ARCCategoryValues, DocumentCategoryValues } from '$lib/api/cam';
 	import { X, Loader2, Upload, FileText } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 
 	interface Props {
 		open: boolean;
@@ -25,16 +26,17 @@
 	let error = $state('');
 	let dragOver = $state(false);
 
-	const documentTypes = [
-		{ value: 'INSURANCE_COI', label: 'Certificate of Insurance (COI)' },
-		{ value: 'INSURANCE_GL', label: 'General Liability Insurance' },
-		{ value: 'INSURANCE_WC', label: "Workers' Compensation Insurance" },
-		{ value: DocumentCategoryValues.LICENSE, label: 'Business License' },
-		{ value: 'LICENSE_CONTRACTOR', label: 'Contractor License' },
-		{ value: 'W9', label: 'W-9 Form' },
-		{ value: DocumentCategoryValues.CONTRACT, label: 'Service Contract' },
-		{ value: DocumentCategoryValues.BOND, label: 'Surety Bond' },
-		{ value: ARCCategoryValues.OTHER, label: 'Other Compliance Document' }
+	const documentTypeItems = [
+		{ value: '', name: 'Select document type' },
+		{ value: 'INSURANCE_COI', name: 'Certificate of Insurance (COI)' },
+		{ value: 'INSURANCE_GL', name: 'General Liability Insurance' },
+		{ value: 'INSURANCE_WC', name: "Workers' Compensation Insurance" },
+		{ value: DocumentCategoryValues.LICENSE, name: 'Business License' },
+		{ value: 'LICENSE_CONTRACTOR', name: 'Contractor License' },
+		{ value: 'W9', name: 'W-9 Form' },
+		{ value: DocumentCategoryValues.CONTRACT, name: 'Service Contract' },
+		{ value: DocumentCategoryValues.BOND, name: 'Surety Bond' },
+		{ value: ARCCategoryValues.OTHER, name: 'Other Compliance Document' }
 	];
 
 	function handleFileSelect(event: Event) {
@@ -135,20 +137,15 @@
 				{/if}
 
 				<div>
-					<label for="document-type" class="block text-sm font-medium">
+					<Label for="document-type" class="mb-2">
 						Document Type <span class="text-error-500">*</span>
-					</label>
-					<select
+					</Label>
+					<Select
 						id="document-type"
 						bind:value={documentType}
-						class="mt-2 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						class:border-error-500={error && !documentType}
-					>
-						<option value="">Select document type</option>
-						{#each documentTypes as type}
-							<option value={type.value}>{type.label}</option>
-						{/each}
-					</select>
+						items={documentTypeItems}
+						class={error && !documentType ? 'border-error-500' : ''}
+					/>
 				</div>
 
 				<div>

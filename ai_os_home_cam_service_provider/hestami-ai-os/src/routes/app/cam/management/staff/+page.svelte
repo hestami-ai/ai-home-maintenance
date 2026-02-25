@@ -15,6 +15,7 @@
 		Briefcase,
 		Check
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import {
 		SplitView,
 		ListPanel,
@@ -208,26 +209,28 @@
 			/>
 		</div>
 		<div class="flex gap-2">
-			<select
+			<Select
 				bind:value={statusFilter}
 				onchange={handleSearch}
-				class="flex-1 rounded-lg border border-surface-300-700 bg-surface-100-900 py-1.5 px-3 text-xs focus:ring-primary-500"
+				size="sm"
+				class="flex-1"
 			>
 				<option value="">All Statuses</option>
-				<option value=StaffStatusValues.ACTIVE>Active</option>
-				<option value=StaffStatusValues.PENDING>Pending</option>
-				<option value=StaffStatusValues.DEACTIVATED>Deactivated</option>
-			</select>
-			<select
+				<option value={StaffStatusValues.ACTIVE}>Active</option>
+				<option value={StaffStatusValues.PENDING}>Pending</option>
+				<option value={StaffStatusValues.DEACTIVATED}>Deactivated</option>
+			</Select>
+			<Select
 				bind:value={roleFilter}
 				onchange={handleSearch}
-				class="flex-1 rounded-lg border border-surface-300-700 bg-surface-100-900 py-1.5 px-3 text-xs focus:ring-primary-500"
+				size="sm"
+				class="flex-1"
 			>
 				<option value="">All Roles</option>
 				<option value="ADMIN">Admin</option>
 				<option value="MANAGER">Manager</option>
 				<option value="COORDINATOR">Coordinator</option>
-			</select>
+			</Select>
 		</div>
 	</div>
 {/snippet}

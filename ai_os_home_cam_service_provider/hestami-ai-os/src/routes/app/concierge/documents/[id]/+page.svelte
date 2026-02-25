@@ -101,7 +101,7 @@
 	const PROCESSING_STATUSES = [DocumentStatusValues.PENDING_UPLOAD, DocumentStatusValues.PROCESSING];
 
 	// Check if document is in a processing state that requires polling
-	const isProcessing = $derived((PROCESSING_STATUSES as string[]).includes(documentData.status));
+	const isProcessing = $derived(documentData ? (PROCESSING_STATUSES as string[]).includes(documentData.status) : false);
 
 	// Start/stop polling based on processing status
 	$effect(() => {
@@ -117,7 +117,7 @@
 
 		pollIntervalId = setInterval(async () => {
 			try {
-				if (!orgClient) return;
+				if (!orgClient || !documentData) return;
 				const result = await orgClient.document.getDocument({ id: documentData.id });
 				if (result.ok) {
 					const newDoc = result.data.document as Document;

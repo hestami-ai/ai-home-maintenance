@@ -984,6 +984,7 @@ model User {
   assignedConciergeCases ConciergeCase[]    @relation("AssignedConciergeCases")
   performedActions       ConciergeAction[]  @relation("ActionPerformer")
   materialDecisions      MaterialDecision[] @relation("DecisionMaker")
+  createdCaseNotes       CaseNote[]         @relation("CaseNoteCreator")
 
   // Phase 16: Staff Management
   staffProfile Staff?
@@ -8316,9 +8317,11 @@ model CaseNote {
   createdAt DateTime  @db.Timestamptz(3) @default(now()) @map("created_at")
 
   // Relations
-  case ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case    ConciergeCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  creator User          @relation("CaseNoteCreator", fields: [createdBy], references: [id])
 
   @@index([caseId])
+  @@index([createdBy])
   @@map("case_notes")
 }
 

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidencePacket",
+  "description": "Structured output schema for the Technical Expert role. Used with Codex CLI --output-schema for validated responses.",
+  "type": "object",
+  "required": ["answer", "evidence_references", "confidence_level", "caveats"],
+  "properties": {
+    "answer": {
+      "type": "string",
+      "description": "The Technical Expert's answer to the question, grounded in workspace evidence."
+    },
+    "evidence_references": {
+      "type": "array",
+      "description": "References to evidence found in the workspace.",
+      "items": {
+        "type": "object",
+        "required": ["type", "description", "relevance_score"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["FILE", "DOCUMENTATION", "API", "CODE", "CONFIGURATION", "OTHER"],
+            "description": "Type of evidence source."
+          },
+          "url": {
+            "type": "string",
+            "description": "File path or URL of the evidence source."
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what was found."
+          },
+          "relevance_score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Relevance score (0-1) of this evidence to the question."
+          }
+        }
+      }
+    },
+    "confidence_level": {
+      "type": "string",
+      "enum": ["HIGH", "MEDIUM", "LOW"],
+      "description": "Confidence level of the answer based on evidence quality."
+    },
+    "caveats": {
+      "type": "array",
+      "description": "Caveats or limitations of the answer.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

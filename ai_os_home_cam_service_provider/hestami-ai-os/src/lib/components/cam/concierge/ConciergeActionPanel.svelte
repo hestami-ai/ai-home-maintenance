@@ -11,6 +11,7 @@
 		FileText,
 		Wrench
 	} from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 	import { conciergeCaseApi, ConciergeCaseStatusValues, type ConciergeCaseDetail, type ConciergeCaseStatus } from '$lib/api/cam';
 
 	interface Props {
@@ -161,7 +162,7 @@
 		}
 	}
 
-	const statusOptions: ConciergeCaseStatus[] = [
+	const statusOptionsArray: ConciergeCaseStatus[] = [
 		ConciergeCaseStatusValues.INTAKE,
 		ConciergeCaseStatusValues.ASSESSMENT,
 		ConciergeCaseStatusValues.IN_PROGRESS,
@@ -172,6 +173,18 @@
 		ConciergeCaseStatusValues.CLOSED,
 		ConciergeCaseStatusValues.CANCELLED
 	];
+
+	const statusItems = $derived([
+		{ value: '', name: 'Select a status' },
+		...statusOptionsArray
+			.filter(status => status !== caseDetail.case.status)
+			.map(status => ({ value: status, name: status.replace(/_/g, ' ') }))
+	]);
+
+	const conciergeItems = $derived([
+		{ value: '', name: 'Select a concierge' },
+		...concierges.map(c => ({ value: c.id, name: `${c.name} (${c.email})` }))
+	]);
 
 	function getActions() {
 		const status = caseDetail.case.status;
@@ -406,18 +419,11 @@
 		<div class="rounded-lg border border-surface-300-700 p-4 space-y-4">
 			<h4 class="font-medium">Change Status</h4>
 			<div>
-				<label for="newStatus" class="block text-sm font-medium">New Status</label>
-				<select id="newStatus" bind:value={newStatus} class="select mt-1 w-full">
-					<option value="">Select a status</option>
-					{#each statusOptions as status}
-						{#if status !== caseDetail.case.status}
-							<option value={status}>{status.replace(/_/g, ' ')}</option>
-						{/if}
-					{/each}
-				</select>
+				<Label for="newStatus" class="mb-1">New Status</Label>
+				<Select id="newStatus" bind:value={newStatus} items={statusItems} />
 			</div>
 			<div>
-				<label for="statusReason" class="block text-sm font-medium">Reason (optional)</label>
+				<Label for="statusReason" class="mb-1">Reason (optional)</Label>
 				<textarea
 					id="statusReason"
 					bind:value={statusReason}
@@ -490,19 +496,14 @@
 				</p>
 			{/if}
 			<div>
-				<label for="conciergeSelect" class="block text-sm font-medium">Select Concierge</label>
+				<Label for="conciergeSelect" class="mb-1">Select Concierge</Label>
 				{#if isLoadingConcierges}
 					<div class="mt-2 flex items-center gap-2 text-sm text-surface-500">
 						<span class="h-4 w-4 animate-spin rounded-full border-2 border-primary-500 border-t-transparent"></span>
 						Loading concierges...
 					</div>
 				{:else}
-					<select id="conciergeSelect" bind:value={selectedConciergeId} class="select mt-1 w-full">
-						<option value="">Select a concierge</option>
-						{#each concierges as concierge}
-							<option value={concierge.id}>{concierge.name} ({concierge.email})</option>
-						{/each}
-					</select>
+					<Select id="conciergeSelect" bind:value={selectedConciergeId} items={conciergeItems} />
 				{/if}
 			</div>
 			<div class="flex justify-end gap-2">

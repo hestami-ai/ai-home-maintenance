@@ -14,6 +14,7 @@
 		ChevronRight
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { goto } from '$app/navigation';
 	import {
 		ORGANIZATION_TYPE_LABELS,
@@ -237,18 +238,18 @@
 				/>
 			</form>
 			<div class="flex gap-2">
-				<select bind:value={typeFilter} onchange={handleFilterChange} class="select w-48">
+				<Select bind:value={typeFilter} onchange={handleFilterChange} size="sm" class="w-48">
 					<option value="">All Types</option>
 					{#each ORGANIZATION_TYPES as orgType}
 						<option value={orgType}>{ORGANIZATION_TYPE_LABELS[orgType]}</option>
 					{/each}
-				</select>
-				<select bind:value={statusFilter} onchange={handleFilterChange} class="select w-36">
+				</Select>
+				<Select bind:value={statusFilter} onchange={handleFilterChange} size="sm" class="w-36">
 					<option value="">All Status</option>
 					{#each ORGANIZATION_STATUSES as orgStatus}
 						<option value={orgStatus}>{ORGANIZATION_STATUS_LABELS[orgStatus]}</option>
 					{/each}
-				</select>
+				</Select>
 				{#if typeFilter || statusFilter || searchQuery}
 					<button onclick={clearFilters} class="btn preset-ghost text-sm">Clear</button>
 				{/if}

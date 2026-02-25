@@ -11,6 +11,7 @@
 		Loader2
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import {
 		staffApi,
 		STAFF_ROLE_LABELS,
@@ -123,21 +124,21 @@
 				/>
 			</div>
 			<div class="flex gap-2">
-				<select bind:value={statusFilter} class="select w-40">
+				<Select bind:value={statusFilter} size="sm" class="w-40">
 					<option value="">All Status</option>
 					<option value={StaffStatusValues.PENDING}>Pending</option>
 					<option value={StaffStatusValues.ACTIVE}>Active</option>
 					<option value={StaffStatusValues.SUSPENDED}>Suspended</option>
 					<option value={StaffStatusValues.DEACTIVATED}>Deactivated</option>
-				</select>
-				<select bind:value={roleFilter} class="select w-48">
+				</Select>
+				<Select bind:value={roleFilter} size="sm" class="w-48">
 					<option value="">All Roles</option>
 					<option value={StaffRoleValues.CONCIERGE_OPERATOR}>Concierge Operator</option>
 					<option value={StaffRoleValues.OPERATIONS_COORDINATOR}>Operations Coordinator</option>
 					<option value={StaffRoleValues.CAM_SPECIALIST}>CAM Specialist</option>
 					<option value={StaffRoleValues.VENDOR_LIAISON}>Vendor Liaison</option>
 					<option value={StaffRoleValues.PLATFORM_ADMIN}>Platform Admin</option>
-				</select>
+				</Select>
 			</div>
 		</div>
 

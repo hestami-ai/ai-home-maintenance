@@ -2,6 +2,7 @@
 	import { DocumentCategoryValues, DocumentContextTypeValues, DocumentVisibilityValues } from '$lib/api/cam';
 	import { ArrowLeft, Upload, Loader2, Check, X, FileText, Image, File } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { orpc } from '$lib/api';
 	import * as tus from 'tus-js-client';
 	import { goto } from '$app/navigation';
@@ -35,7 +36,7 @@
 	// Category options for select
 	const categories = CONCIERGE_DOCUMENT_CATEGORIES.map(cat => ({
 		value: cat,
-		label: CONCIERGE_CATEGORY_LABELS[cat]
+		name: CONCIERGE_CATEGORY_LABELS[cat]
 	}));
 
 	import type { operations } from '$lib/api/types.generated';
@@ -350,11 +351,7 @@
 							<label for="category" class="label mb-1 block">
 								Category <span class="text-error-500">*</span>
 							</label>
-							<select id="category" bind:value={category} class="select w-full">
-								{#each categories as cat}
-									<option value={cat.value}>{cat.label}</option>
-								{/each}
-							</select>
+							<Select id="category" bind:value={category} items={categories} size="sm" class="w-full" />
 						</div>
 					</div>
 				</Card>
@@ -378,19 +375,14 @@
 							</a>
 						</div>
 					{:else}
-						<select
-							id="property"
-							bind:value={selectedPropertyId}
-							class="select w-full"
-							required
-						>
+						<Select id="property" bind:value={selectedPropertyId} size="sm" class="w-full">
 							<option value="">Select a property</option>
 							{#each properties as prop}
 								<option value={prop.id}>
 									{prop.name} - {prop.addressLine1}
 								</option>
 							{/each}
-						</select>
+						</Select>
 					{/if}
 				</Card>
 

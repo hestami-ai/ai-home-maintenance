@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, DollarSign, Search, Filter } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -26,11 +27,11 @@
 	let statusFilter = $state('all');
 
 	const statusOptions = [
-		{ value: 'all', label: 'All Status' },
-		{ value: 'DUE', label: 'Due' },
-		{ value: JobInvoiceStatusValues.OVERDUE, label: 'Overdue' },
-		{ value: JobInvoiceStatusValues.PARTIAL, label: 'Partial' },
-		{ value: JobStatusValues.PAID, label: 'Paid' }
+		{ value: 'all', name: 'All Status' },
+		{ value: 'DUE', name: 'Due' },
+		{ value: JobInvoiceStatusValues.OVERDUE, name: 'Overdue' },
+		{ value: JobInvoiceStatusValues.PARTIAL, name: 'Partial' },
+		{ value: JobStatusValues.PAID, name: 'Paid' }
 	];
 
 	async function loadAssessments() {
@@ -130,14 +131,7 @@
 									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
 								/>
 							</div>
-							<select
-								bind:value={statusFilter}
-								class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-							>
-								{#each statusOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+							<Select bind:value={statusFilter} items={statusOptions} size="sm" />
 						</div>
 					{/snippet}
 

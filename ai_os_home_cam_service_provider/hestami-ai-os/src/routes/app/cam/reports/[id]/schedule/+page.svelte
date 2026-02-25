@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Calendar, Clock, Mail, Loader2 } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
 	import { ReportFormatValues, ScheduleFrequencyValues, reportApi } from '$lib/api/cam';
@@ -31,26 +32,26 @@
 	const reportId = $derived(($page.params as Record<string, string>).id);
 
 	const frequencyOptions = [
-		{ value: ScheduleFrequencyValues.DAILY, label: 'Daily' },
-		{ value: ScheduleFrequencyValues.WEEKLY, label: 'Weekly' },
-		{ value: ScheduleFrequencyValues.MONTHLY, label: 'Monthly' },
-		{ value: ScheduleFrequencyValues.QUARTERLY, label: 'Quarterly' }
+		{ value: ScheduleFrequencyValues.DAILY, name: 'Daily' },
+		{ value: ScheduleFrequencyValues.WEEKLY, name: 'Weekly' },
+		{ value: ScheduleFrequencyValues.MONTHLY, name: 'Monthly' },
+		{ value: ScheduleFrequencyValues.QUARTERLY, name: 'Quarterly' }
 	];
 
 	const dayOfWeekOptions = [
-		{ value: '0', label: 'Sunday' },
-		{ value: '1', label: 'Monday' },
-		{ value: '2', label: 'Tuesday' },
-		{ value: '3', label: 'Wednesday' },
-		{ value: '4', label: 'Thursday' },
-		{ value: '5', label: 'Friday' },
-		{ value: '6', label: 'Saturday' }
+		{ value: '0', name: 'Sunday' },
+		{ value: '1', name: 'Monday' },
+		{ value: '2', name: 'Tuesday' },
+		{ value: '3', name: 'Wednesday' },
+		{ value: '4', name: 'Thursday' },
+		{ value: '5', name: 'Friday' },
+		{ value: '6', name: 'Saturday' }
 	];
 
 	const formatOptions = [
-		{ value: ReportFormatValues.PDF, label: ReportFormatValues.PDF },
-		{ value: ReportFormatValues.EXCEL, label: 'Excel' },
-		{ value: ReportFormatValues.CSV, label: ReportFormatValues.CSV }
+		{ value: ReportFormatValues.PDF, name: ReportFormatValues.PDF },
+		{ value: ReportFormatValues.EXCEL, name: 'Excel' },
+		{ value: ReportFormatValues.CSV, name: ReportFormatValues.CSV }
 	];
 
 	async function loadReport() {
@@ -171,15 +172,12 @@
 							<label for="frequency" class="block text-sm font-medium">
 								Frequency <span class="text-error-500">*</span>
 							</label>
-							<select
+							<Select
 								id="frequency"
 								bind:value={frequency}
-								class="mt-1 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-							>
-								{#each frequencyOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+								items={frequencyOptions}
+								class="mt-1"
+							/>
 						</div>
 
 						{#if frequency === ScheduleFrequencyValues.WEEKLY}
@@ -187,15 +185,12 @@
 								<label for="dayOfWeek" class="block text-sm font-medium">
 									Day of Week <span class="text-error-500">*</span>
 								</label>
-								<select
+								<Select
 									id="dayOfWeek"
 									bind:value={dayOfWeek}
-									class="mt-1 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each dayOfWeekOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+									items={dayOfWeekOptions}
+									class="mt-1"
+								/>
 							</div>
 						{/if}
 
@@ -204,15 +199,15 @@
 								<label for="dayOfMonth" class="block text-sm font-medium">
 									Day of Month <span class="text-error-500">*</span>
 								</label>
-								<select
+								<Select
 									id="dayOfMonth"
 									bind:value={dayOfMonth}
-									class="mt-1 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+									class="mt-1"
 								>
 									{#each Array.from({ length: 28 }, (_, i) => i + 1) as day}
 										<option value={day.toString()}>{day}</option>
 									{/each}
-								</select>
+								</Select>
 							</div>
 						{/if}
 
@@ -235,15 +230,12 @@
 							<label for="outputFormat" class="block text-sm font-medium">
 								Output Format <span class="text-error-500">*</span>
 							</label>
-							<select
+							<Select
 								id="outputFormat"
 								bind:value={outputFormat}
-								class="mt-1 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-							>
-								{#each formatOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+								items={formatOptions}
+								class="mt-1"
+							/>
 						</div>
 					</div>
 				</Card>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { ARCCategoryValues, CaseNoteTypeValues, vendorApi } from '$lib/api/cam';
@@ -190,15 +191,12 @@
 					<h3 class="mb-4 font-semibold">Trades & Services <span class="text-error-500">*</span></h3>
 					<div class="space-y-4">
 						<div class="flex gap-2">
-							<select
-								bind:value={newTrade}
-								class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-							>
+							<Select bind:value={newTrade} class="flex-1">
 								<option value="">Select a trade</option>
 								{#each tradeOptions.filter(t => !formData.trades.includes(t)) as trade}
 									<option value={trade}>{trade}</option>
 								{/each}
-							</select>
+							</Select>
 							<button
 								type="button"
 								onclick={addTrade}

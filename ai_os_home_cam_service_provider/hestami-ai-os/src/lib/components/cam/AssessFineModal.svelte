@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { JobSourceTypeValues, ScheduleFrequencyValues } from '$lib/api/cam';
 	import { X, Loader2, DollarSign } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 
 	interface Props {
 		open: boolean;
@@ -26,15 +27,17 @@
 	let notes = $state('');
 	let error = $state('');
 
-	const fineTypeOptions = [
-		{ value: 'STANDARD', label: 'Standard Fine', defaultAmount: 100 },
-		{ value: ScheduleFrequencyValues.DAILY, label: 'Daily Fine', defaultAmount: 25 },
-		{ value: JobSourceTypeValues.RECURRING, label: 'Recurring Fine', defaultAmount: 50 },
-		{ value: 'HEARING_ASSESSED', label: 'Hearing-Assessed Fine', defaultAmount: 250 }
+	const fineTypeOptionsData = [
+		{ value: 'STANDARD', name: 'Standard Fine', defaultAmount: 100 },
+		{ value: ScheduleFrequencyValues.DAILY, name: 'Daily Fine', defaultAmount: 25 },
+		{ value: JobSourceTypeValues.RECURRING, name: 'Recurring Fine', defaultAmount: 50 },
+		{ value: 'HEARING_ASSESSED', name: 'Hearing-Assessed Fine', defaultAmount: 250 }
 	];
 
+	const fineTypeItems = fineTypeOptionsData.map(opt => ({ value: opt.value, name: opt.name }));
+
 	function handleFineTypeChange() {
-		const option = fineTypeOptions.find(o => o.value === fineType);
+		const option = fineTypeOptionsData.find(o => o.value === fineType);
 		if (option) {
 			amount = option.defaultAmount.toString();
 		}
@@ -125,19 +128,15 @@
 				{/if}
 
 				<div>
-					<label for="fineType" class="mb-1 block text-sm font-medium">
+					<Label for="fineType" class="mb-1">
 						Fine Type <span class="text-error-500">*</span>
-					</label>
-					<select
+					</Label>
+					<Select
 						id="fineType"
 						bind:value={fineType}
+						items={fineTypeItems}
 						onchange={handleFineTypeChange}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each fineTypeOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+					/>
 				</div>
 
 				<div class="grid gap-4 sm:grid-cols-2">

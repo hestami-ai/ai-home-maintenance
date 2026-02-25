@@ -29,6 +29,7 @@
 		Package,
 		ExternalLink
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { jobApi, estimateApi, invoiceApi, technicianApi, type Job, type JobStatus, type JobNote, type JobStatusHistoryItem, type Estimate, type JobInvoice, type Technician, JobStatusValues, EstimateStatusValues, JobInvoiceStatusValues, JobPriorityValues } from '$lib/api/cam';
 
@@ -1040,15 +1041,16 @@
 							</div>
 							{#if technicians.length > 0}
 								<div class="mt-4 flex items-center gap-2">
-									<select
+									<Select
 										bind:value={selectedTechnicianId}
-										class="select flex-1"
+										size="sm"
+										class="flex-1"
 									>
 										<option value="">-- Select Technician --</option>
 										{#each technicians as tech}
 											<option value={tech.id}>{tech.firstName} {tech.lastName}</option>
 										{/each}
-									</select>
+									</Select>
 									<button
 										onclick={assignTechnician}
 										disabled={isAssigningTechnician || selectedTechnicianId === (job.assignedTechnicianId || '')}

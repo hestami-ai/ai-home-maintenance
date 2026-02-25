@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ClipboardCheck, Plus, Search } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent, DecisionButton, RationaleModal } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -21,15 +22,15 @@
 	let rationaleAction = $state<{ type: string; label: string; variant: 'approve' | 'deny' | 'escalate' | 'default' } | null>(null);
 	let isActionLoading = $state(false);
 
-	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: ARCRequestStatusValues.SUBMITTED, label: 'Submitted' },
-		{ value: ARCRequestStatusValues.UNDER_REVIEW, label: 'Under Review' },
-		{ value: ARCRequestStatusValues.APPROVED, label: 'Approved' },
-		{ value: 'APPROVED_WITH_CONDITIONS', label: 'Approved w/ Conditions' },
-		{ value: ARCRequestStatusValues.DENIED, label: 'Denied' },
-		{ value: ARCRequestStatusValues.TABLED, label: 'Tabled' },
-		{ value: ARCRequestStatusValues.WITHDRAWN, label: 'Withdrawn' }
+	const statusItems = [
+		{ value: '', name: 'All Statuses' },
+		{ value: ARCRequestStatusValues.SUBMITTED, name: 'Submitted' },
+		{ value: ARCRequestStatusValues.UNDER_REVIEW, name: 'Under Review' },
+		{ value: ARCRequestStatusValues.APPROVED, name: 'Approved' },
+		{ value: 'APPROVED_WITH_CONDITIONS', name: 'Approved w/ Conditions' },
+		{ value: ARCRequestStatusValues.DENIED, name: 'Denied' },
+		{ value: ARCRequestStatusValues.TABLED, name: 'Tabled' },
+		{ value: ARCRequestStatusValues.WITHDRAWN, name: 'Withdrawn' }
 	];
 
 	async function loadRequests() {
@@ -162,14 +163,11 @@
 						/>
 					</div>
 
-					<select
+					<Select
 						bind:value={statusFilter}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each statusOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={statusItems}
+						size="sm"
+					/>
 				</div>
 			{/snippet}
 

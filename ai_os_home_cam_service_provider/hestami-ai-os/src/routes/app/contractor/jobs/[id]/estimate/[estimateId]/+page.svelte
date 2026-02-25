@@ -16,6 +16,7 @@
 		Search,
 		X
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { estimateApi, jobApi, EstimateStatusValues, type Estimate, type EstimateLine, type Job } from '$lib/api/cam';
 
@@ -615,11 +616,11 @@
 							class="input w-full pl-10"
 						/>
 					</div>
-					<select bind:value={pricebookCategory} class="select w-40">
+					<Select bind:value={pricebookCategory} size="sm" class="w-40">
 						{#each pricebookCategories as cat}
 							<option value={cat}>{cat}</option>
 						{/each}
-					</select>
+					</Select>
 				</div>
 			</div>
 

@@ -13,6 +13,7 @@
 		RefreshCw
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import {
 		permissionsAdminApi,
 		ORGANIZATION_TYPE_LABELS,
@@ -323,18 +324,18 @@
 							/>
 						</div>
 						<div class="flex gap-2">
-							<select bind:value={orgTypeFilter} onchange={loadOrganizations} class="select w-48">
+							<Select bind:value={orgTypeFilter} onchange={loadOrganizations} size="sm" class="w-48">
 								<option value="">All Types</option>
 								{#each Object.entries(ORGANIZATION_TYPE_LABELS) as [value, label]}
 									<option {value}>{label}</option>
 								{/each}
-							</select>
-							<select bind:value={orgStatusFilter} onchange={loadOrganizations} class="select w-32">
+							</Select>
+							<Select bind:value={orgStatusFilter} onchange={loadOrganizations} size="sm" class="w-32">
 								<option value="">All Status</option>
 								<option value="ACTIVE">Active</option>
 								<option value="SUSPENDED">Suspended</option>
 								<option value="INACTIVE">Inactive</option>
-							</select>
+							</Select>
 						</div>
 					</div>
 

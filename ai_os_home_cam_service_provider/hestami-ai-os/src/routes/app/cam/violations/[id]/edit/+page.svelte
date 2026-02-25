@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
 	import { ViolationSeverityValues, type Unit, type ViolationDetail, type ViolationType, unitApi, violationApi, violationTypeApi } from '$lib/api/cam';
@@ -32,10 +33,10 @@
 	});
 
 	const severityOptions = [
-		{ value: ViolationSeverityValues.CRITICAL, label: 'Critical' },
-		{ value: ViolationSeverityValues.MAJOR, label: 'Major' },
-		{ value: ViolationSeverityValues.MODERATE, label: 'Moderate' },
-		{ value: ViolationSeverityValues.MINOR, label: 'Minor' }
+		{ value: ViolationSeverityValues.CRITICAL, name: 'Critical' },
+		{ value: ViolationSeverityValues.MAJOR, name: 'Major' },
+		{ value: ViolationSeverityValues.MODERATE, name: 'Moderate' },
+		{ value: ViolationSeverityValues.MINOR, name: 'Minor' }
 	];
 
 	const violationId = $derived(($page.params as Record<string, string>).id);
@@ -172,19 +173,14 @@
 							<label for="unitId" class="mb-1 block text-sm font-medium">
 								Unit <span class="text-error-500">*</span>
 							</label>
-							<select
-								id="unitId"
-								bind:value={formData.unitId}
-								required
-								class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-							>
+							<Select id="unitId" bind:value={formData.unitId} required>
 								<option value="">Select a unit</option>
 								{#each units as unit}
 									<option value={unit.id}>
 										Unit {unit.unitNumber}{(unit as any).ownerName ? ` - ${(unit as any).ownerName}` : ''}
 									</option>
 								{/each}
-							</select>
+							</Select>
 						</div>
 					</Card>
 
@@ -195,16 +191,12 @@
 								<label for="violationTypeId" class="mb-1 block text-sm font-medium">
 									Violation Type
 								</label>
-								<select
-									id="violationTypeId"
-									bind:value={formData.violationTypeId}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
+								<Select id="violationTypeId" bind:value={formData.violationTypeId}>
 									<option value="">Select a type (optional)</option>
 									{#each violationTypes as type}
 										<option value={type.id}>{type.name}</option>
 									{/each}
-								</select>
+								</Select>
 							</div>
 
 							<div>
@@ -237,16 +229,7 @@
 									<label for="severity" class="mb-1 block text-sm font-medium">
 										Severity <span class="text-error-500">*</span>
 									</label>
-									<select
-										id="severity"
-										bind:value={formData.severity}
-										required
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each severityOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+									<Select id="severity" bind:value={formData.severity} items={severityOptions} required />
 								</div>
 
 								<div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Wrench, Plus, Search } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent, DecisionButton } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
     import { goto } from '$app/navigation';
@@ -25,40 +26,40 @@
 	let priorityFilter = $state('');
 
 	// Phase 9: Updated status options with AUTHORIZED and REVIEW_REQUIRED
-	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: WorkOrderStatusValues.DRAFT, label: 'Draft' },
-		{ value: WorkOrderStatusValues.SUBMITTED, label: 'Submitted' },
-		{ value: WorkOrderStatusValues.TRIAGED, label: 'Triaged' },
-		{ value: WorkOrderStatusValues.AUTHORIZED, label: 'Authorized' },
-		{ value: WorkOrderStatusValues.ASSIGNED, label: 'Assigned' },
-		{ value: WorkOrderStatusValues.SCHEDULED, label: 'Scheduled' },
-		{ value: WorkOrderStatusValues.IN_PROGRESS, label: 'In Progress' },
-		{ value: WorkOrderStatusValues.ON_HOLD, label: 'On Hold' },
-		{ value: WorkOrderStatusValues.COMPLETED, label: 'Completed' },
-		{ value: WorkOrderStatusValues.REVIEW_REQUIRED, label: 'Review Required' },
-		{ value: WorkOrderStatusValues.INVOICED, label: 'Invoiced' },
-		{ value: WorkOrderStatusValues.CLOSED, label: 'Closed' },
-		{ value: WorkOrderStatusValues.CANCELLED, label: 'Cancelled' }
+	const statusItems = [
+		{ value: '', name: 'All Statuses' },
+		{ value: WorkOrderStatusValues.DRAFT, name: 'Draft' },
+		{ value: WorkOrderStatusValues.SUBMITTED, name: 'Submitted' },
+		{ value: WorkOrderStatusValues.TRIAGED, name: 'Triaged' },
+		{ value: WorkOrderStatusValues.AUTHORIZED, name: 'Authorized' },
+		{ value: WorkOrderStatusValues.ASSIGNED, name: 'Assigned' },
+		{ value: WorkOrderStatusValues.SCHEDULED, name: 'Scheduled' },
+		{ value: WorkOrderStatusValues.IN_PROGRESS, name: 'In Progress' },
+		{ value: WorkOrderStatusValues.ON_HOLD, name: 'On Hold' },
+		{ value: WorkOrderStatusValues.COMPLETED, name: 'Completed' },
+		{ value: WorkOrderStatusValues.REVIEW_REQUIRED, name: 'Review Required' },
+		{ value: WorkOrderStatusValues.INVOICED, name: 'Invoiced' },
+		{ value: WorkOrderStatusValues.CLOSED, name: 'Closed' },
+		{ value: WorkOrderStatusValues.CANCELLED, name: 'Cancelled' }
 	];
 
 	// Phase 9: Origin type filter options
-	const originTypeOptions = [
-		{ value: '', label: 'All Origins' },
-		{ value: WorkOrderOriginTypeValues.VIOLATION_REMEDIATION, label: 'Violation' },
-		{ value: WorkOrderOriginTypeValues.ARC_APPROVAL, label: 'ARC Approval' },
-		{ value: WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE, label: 'Preventive' },
-		{ value: WorkOrderOriginTypeValues.BOARD_DIRECTIVE, label: 'Board Directive' },
-		{ value: WorkOrderOriginTypeValues.EMERGENCY_ACTION, label: 'Emergency' },
-		{ value: WorkOrderOriginTypeValues.MANUAL, label: 'Manual' }
+	const originTypeItems = [
+		{ value: '', name: 'All Origins' },
+		{ value: WorkOrderOriginTypeValues.VIOLATION_REMEDIATION, name: 'Violation' },
+		{ value: WorkOrderOriginTypeValues.ARC_APPROVAL, name: 'ARC Approval' },
+		{ value: WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE, name: 'Preventive' },
+		{ value: WorkOrderOriginTypeValues.BOARD_DIRECTIVE, name: 'Board Directive' },
+		{ value: WorkOrderOriginTypeValues.EMERGENCY_ACTION, name: 'Emergency' },
+		{ value: WorkOrderOriginTypeValues.MANUAL, name: 'Manual' }
 	];
 
-	const priorityOptions = [
-		{ value: '', label: 'All Priorities' },
-		{ value: WorkOrderPriorityValues.EMERGENCY, label: 'Emergency' },
-		{ value: WorkOrderPriorityValues.HIGH, label: 'High' },
-		{ value: WorkOrderPriorityValues.MEDIUM, label: 'Medium' },
-		{ value: WorkOrderPriorityValues.LOW, label: 'Low' }
+	const priorityItems = [
+		{ value: '', name: 'All Priorities' },
+		{ value: WorkOrderPriorityValues.EMERGENCY, name: 'Emergency' },
+		{ value: WorkOrderPriorityValues.HIGH, name: 'High' },
+		{ value: WorkOrderPriorityValues.MEDIUM, name: 'Medium' },
+		{ value: WorkOrderPriorityValues.LOW, name: 'Low' }
 	];
 
     // Debounce search update
@@ -213,24 +214,20 @@
 					</div>
 
 					<div class="flex gap-2">
-						<select
+						<Select
 							bind:value={statusFilter}
-                            onchange={handleFilterChange}
-							class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							{#each statusOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
-						<select
+							items={statusItems}
+							size="sm"
+							class="flex-1"
+							onchange={handleFilterChange}
+						/>
+						<Select
 							bind:value={priorityFilter}
-                            onchange={handleFilterChange}
-							class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							{#each priorityOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
+							items={priorityItems}
+							size="sm"
+							class="flex-1"
+							onchange={handleFilterChange}
+						/>
 					</div>
 				</div>
 			{/snippet}

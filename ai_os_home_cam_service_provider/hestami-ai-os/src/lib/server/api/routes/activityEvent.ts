@@ -561,6 +561,7 @@ export const activityEventRouter = {
 				entityType: activityEntityTypeEnum.optional(),
 				action: activityActionTypeEnum.optional(),
 				eventCategory: activityEventCategoryEnum.optional(),
+				performedById: z.string().optional(),
 				performedByType: activityActorTypeEnum.optional(),
 				organizationId: z.string().uuid().optional(),
 				startDate: z.string().datetime().optional(),
@@ -605,6 +606,7 @@ export const activityEventRouter = {
 				...(input.entityType && { entityType: input.entityType as ActivityEntityType }),
 				...(input.action && { action: input.action as ActivityActionType }),
 				...(input.eventCategory && { eventCategory: input.eventCategory as ActivityEventCategory }),
+				...(input.performedById && { performedById: input.performedById }),
 				...(input.performedByType && { performedByType: input.performedByType as ActivityActorType }),
 				...(input.startDate || input.endDate
 					? {
@@ -722,6 +724,232 @@ export const activityEventRouter = {
 					pagination: {
 						hasMore,
 						nextCursor: hasMore ? items[items.length - 1]?.id ?? null : null
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Export activity events for staff (cross-org access)
+	 * Supports JSON and CSV formats with comprehensive filtering
+	 */
+	staffExport: authedProcedure
+		.errors({
+			FORBIDDEN: { message: 'Staff access required' },
+			BAD_REQUEST: { message: 'Invalid parameters' },
+			INTERNAL_SERVER_ERROR: { message: 'Export failed' }
+		})
+		.input(
+			z.object({
+				format: z.enum(['json', 'csv']).default('json'),
+				entityType: activityEntityTypeEnum.optional(),
+				entityId: z.string().optional(),
+				action: activityActionTypeEnum.optional(),
+				eventCategory: activityEventCategoryEnum.optional(),
+				performedByType: activityActorTypeEnum.optional(),
+				organizationId: z.string().uuid().optional(),
+				startDate: z.string().datetime(),
+				endDate: z.string().datetime(),
+				maxRecords: z.number().int().min(1).max(10000).default(1000),
+				includeMetadata: z.boolean().default(false),
+				includeStateChanges: z.boolean().default(false)
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					content: z.string(), // JSON string or CSV string
+					format: z.string(),
+					filename: z.string(),
+					recordCount: z.number(),
+					exportedAt: z.string(),
+					filters: z.object({
+						startDate: z.string(),
+						endDate: z.string(),
+						entityType: z.string().nullable(),
+						entityId: z.string().nullable(),
+						organizationId: z.string().nullable()
+					})
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Cerbos authorization - verify user is staff with export access
+			const principal = buildPrincipal(
+				context.user!,
+				context.orgRoles ?? {},
+				undefined,
+				undefined,
+				undefined,
+				context.staffRoles,
+				context.pillarAccess
+			);
+			const resource = createResource('activity_event', 'staff-export', 'global');
+			try {
+				await requireAuthorization(principal, resource, 'export');
+			} catch (error) {
+				throw errors.FORBIDDEN({
+					message: error instanceof Error ? error.message : 'Staff export access required'
+				});
+			}
+
+			const where: Prisma.ActivityEventWhereInput = {
+				performedAt: {
+					gte: new Date(input.startDate),
+					lte: new Date(input.endDate)
+				},
+				...(input.organizationId && { organizationId: input.organizationId }),
+				...(input.entityType && { entityType: input.entityType as ActivityEntityType }),
+				...(input.entityId && { entityId: input.entityId }),
+				...(input.action && { action: input.action as ActivityActionType }),
+				...(input.eventCategory && { eventCategory: input.eventCategory as ActivityEventCategory }),
+				...(input.performedByType && { performedByType: input.performedByType as ActivityActorType })
+			};
+
+			const events = await prisma.activityEvent.findMany({
+				where,
+				include: {
+					organization: {
+						select: { name: true }
+					}
+				},
+				orderBy: { performedAt: 'asc' },
+				take: input.maxRecords
+			});
+
+			// Fetch performer names for events that have performedById
+			const performerIds = [...new Set(events.filter(e => e.performedById).map(e => e.performedById!))];
+			const performers = performerIds.length > 0
+				? await prisma.user.findMany({
+						where: { id: { in: performerIds } },
+						select: { id: true, name: true, email: true }
+					})
+				: [];
+			const performerMap = new Map(performers.map(p => [p.id, p]));
+
+			const exportedAt = new Date().toISOString();
+			const dateRange = `${input.startDate.split('T')[0]}_${input.endDate.split('T')[0]}`;
+			let content: string;
+			let filename: string;
+
+			if (input.format === 'csv') {
+				// Generate CSV content
+				const headers = [
+					'id',
+					'performedAt',
+					'entityType',
+					'entityId',
+					'action',
+					'eventCategory',
+					'summary',
+					'performedById',
+					'performedByName',
+					'performedByType',
+					'organizationId',
+					'organizationName',
+					'caseId',
+					'propertyId',
+					'associationId'
+				];
+				if (input.includeMetadata) {
+					headers.push('metadata');
+				}
+				if (input.includeStateChanges) {
+					headers.push('previousState', 'newState');
+				}
+
+				const rows = events.map(e => {
+					const performer = e.performedById ? performerMap.get(e.performedById) : null;
+					const row: string[] = [
+						e.id,
+						e.performedAt.toISOString(),
+						e.entityType,
+						e.entityId,
+						e.action,
+						e.eventCategory,
+						`"${(e.summary || '').replace(/"/g, '""')}"`,
+						e.performedById || '',
+						performer?.name || performer?.email || '',
+						e.performedByType,
+						e.organizationId || '',
+						e.organization?.name || '',
+						e.caseId || '',
+						e.propertyId || '',
+						e.associationId || ''
+					];
+					if (input.includeMetadata) {
+						row.push(`"${JSON.stringify(e.metadata || {}).replace(/"/g, '""')}"`);
+					}
+					if (input.includeStateChanges) {
+						row.push(
+							`"${JSON.stringify(e.previousState || {}).replace(/"/g, '""')}"`,
+							`"${JSON.stringify(e.newState || {}).replace(/"/g, '""')}"`
+						);
+					}
+					return row.join(',');
+				});
+
+				content = [headers.join(','), ...rows].join('\n');
+				filename = `audit_export_${dateRange}.csv`;
+			} else {
+				// Generate JSON content
+				const exportData = {
+					exportedAt,
+					exportedBy: context.user?.email,
+					filters: {
+						startDate: input.startDate,
+						endDate: input.endDate,
+						entityType: input.entityType || null,
+						entityId: input.entityId || null,
+						organizationId: input.organizationId || null
+					},
+					recordCount: events.length,
+					events: events.map(e => {
+						const performer = e.performedById ? performerMap.get(e.performedById) : null;
+						return {
+							id: e.id,
+							performedAt: e.performedAt.toISOString(),
+							entityType: e.entityType,
+							entityId: e.entityId,
+							action: e.action,
+							eventCategory: e.eventCategory,
+							summary: e.summary,
+							performedById: e.performedById,
+							performedByName: performer?.name || performer?.email || null,
+							performedByType: e.performedByType,
+							organizationId: e.organizationId,
+							organizationName: e.organization?.name || null,
+							caseId: e.caseId,
+							propertyId: e.propertyId,
+							associationId: e.associationId,
+							...(input.includeMetadata && { metadata: e.metadata }),
+							...(input.includeStateChanges && {
+								previousState: e.previousState,
+								newState: e.newState
+							})
+						};
+					})
+				};
+				content = JSON.stringify(exportData, null, 2);
+				filename = `audit_export_${dateRange}.json`;
+			}
+
+			return successResponse(
+				{
+					content,
+					format: input.format,
+					filename,
+					recordCount: events.length,
+					exportedAt,
+					filters: {
+						startDate: input.startDate,
+						endDate: input.endDate,
+						entityType: input.entityType || null,
+						entityId: input.entityId || null,
+						organizationId: input.organizationId || null
 					}
 				},
 				context

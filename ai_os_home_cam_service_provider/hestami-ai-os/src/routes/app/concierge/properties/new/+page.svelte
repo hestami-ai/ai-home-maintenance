@@ -2,6 +2,7 @@
 	import { PropertyTypeValues, UnitTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, Home, Loader2, Check } from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 
@@ -29,66 +30,66 @@
 	let hoaContactPhone = $state('');
 
 	const propertyTypes = [
-		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family Home' },
-		{ value: PropertyTypeValues.CONDOMINIUM, label: 'Condominium' },
-		{ value: UnitTypeValues.TOWNHOUSE, label: 'Townhouse' },
-		{ value: PropertyTypeValues.COOPERATIVE, label: 'Cooperative' },
-		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' },
-		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' }
+		{ value: PropertyTypeValues.SINGLE_FAMILY, name: 'Single Family Home' },
+		{ value: PropertyTypeValues.CONDOMINIUM, name: 'Condominium' },
+		{ value: UnitTypeValues.TOWNHOUSE, name: 'Townhouse' },
+		{ value: PropertyTypeValues.COOPERATIVE, name: 'Cooperative' },
+		{ value: PropertyTypeValues.MIXED_USE, name: 'Mixed Use' },
+		{ value: PropertyTypeValues.COMMERCIAL, name: 'Commercial' }
 	];
 
 	const usStates = [
-		{ value: 'AL', label: 'Alabama' },
-		{ value: 'AK', label: 'Alaska' },
-		{ value: 'AZ', label: 'Arizona' },
-		{ value: 'AR', label: 'Arkansas' },
-		{ value: 'CA', label: 'California' },
-		{ value: 'CO', label: 'Colorado' },
-		{ value: 'CT', label: 'Connecticut' },
-		{ value: 'DE', label: 'Delaware' },
-		{ value: 'FL', label: 'Florida' },
-		{ value: 'GA', label: 'Georgia' },
-		{ value: 'HI', label: 'Hawaii' },
-		{ value: 'ID', label: 'Idaho' },
-		{ value: 'IL', label: 'Illinois' },
-		{ value: 'IN', label: 'Indiana' },
-		{ value: 'IA', label: 'Iowa' },
-		{ value: 'KS', label: 'Kansas' },
-		{ value: 'KY', label: 'Kentucky' },
-		{ value: 'LA', label: 'Louisiana' },
-		{ value: 'ME', label: 'Maine' },
-		{ value: 'MD', label: 'Maryland' },
-		{ value: 'MA', label: 'Massachusetts' },
-		{ value: 'MI', label: 'Michigan' },
-		{ value: 'MN', label: 'Minnesota' },
-		{ value: 'MS', label: 'Mississippi' },
-		{ value: 'MO', label: 'Missouri' },
-		{ value: 'MT', label: 'Montana' },
-		{ value: 'NE', label: 'Nebraska' },
-		{ value: 'NV', label: 'Nevada' },
-		{ value: 'NH', label: 'New Hampshire' },
-		{ value: 'NJ', label: 'New Jersey' },
-		{ value: 'NM', label: 'New Mexico' },
-		{ value: 'NY', label: 'New York' },
-		{ value: 'NC', label: 'North Carolina' },
-		{ value: 'ND', label: 'North Dakota' },
-		{ value: 'OH', label: 'Ohio' },
-		{ value: 'OK', label: 'Oklahoma' },
-		{ value: 'OR', label: 'Oregon' },
-		{ value: 'PA', label: 'Pennsylvania' },
-		{ value: 'RI', label: 'Rhode Island' },
-		{ value: 'SC', label: 'South Carolina' },
-		{ value: 'SD', label: 'South Dakota' },
-		{ value: 'TN', label: 'Tennessee' },
-		{ value: 'TX', label: 'Texas' },
-		{ value: 'UT', label: 'Utah' },
-		{ value: 'VT', label: 'Vermont' },
-		{ value: 'VA', label: 'Virginia' },
-		{ value: 'WA', label: 'Washington' },
-		{ value: 'WV', label: 'West Virginia' },
-		{ value: 'WI', label: 'Wisconsin' },
-		{ value: 'WY', label: 'Wyoming' },
-		{ value: 'DC', label: 'District of Columbia' }
+		{ value: 'AL', name: 'Alabama' },
+		{ value: 'AK', name: 'Alaska' },
+		{ value: 'AZ', name: 'Arizona' },
+		{ value: 'AR', name: 'Arkansas' },
+		{ value: 'CA', name: 'California' },
+		{ value: 'CO', name: 'Colorado' },
+		{ value: 'CT', name: 'Connecticut' },
+		{ value: 'DE', name: 'Delaware' },
+		{ value: 'FL', name: 'Florida' },
+		{ value: 'GA', name: 'Georgia' },
+		{ value: 'HI', name: 'Hawaii' },
+		{ value: 'ID', name: 'Idaho' },
+		{ value: 'IL', name: 'Illinois' },
+		{ value: 'IN', name: 'Indiana' },
+		{ value: 'IA', name: 'Iowa' },
+		{ value: 'KS', name: 'Kansas' },
+		{ value: 'KY', name: 'Kentucky' },
+		{ value: 'LA', name: 'Louisiana' },
+		{ value: 'ME', name: 'Maine' },
+		{ value: 'MD', name: 'Maryland' },
+		{ value: 'MA', name: 'Massachusetts' },
+		{ value: 'MI', name: 'Michigan' },
+		{ value: 'MN', name: 'Minnesota' },
+		{ value: 'MS', name: 'Mississippi' },
+		{ value: 'MO', name: 'Missouri' },
+		{ value: 'MT', name: 'Montana' },
+		{ value: 'NE', name: 'Nebraska' },
+		{ value: 'NV', name: 'Nevada' },
+		{ value: 'NH', name: 'New Hampshire' },
+		{ value: 'NJ', name: 'New Jersey' },
+		{ value: 'NM', name: 'New Mexico' },
+		{ value: 'NY', name: 'New York' },
+		{ value: 'NC', name: 'North Carolina' },
+		{ value: 'ND', name: 'North Dakota' },
+		{ value: 'OH', name: 'Ohio' },
+		{ value: 'OK', name: 'Oklahoma' },
+		{ value: 'OR', name: 'Oregon' },
+		{ value: 'PA', name: 'Pennsylvania' },
+		{ value: 'RI', name: 'Rhode Island' },
+		{ value: 'SC', name: 'South Carolina' },
+		{ value: 'SD', name: 'South Dakota' },
+		{ value: 'TN', name: 'Tennessee' },
+		{ value: 'TX', name: 'Texas' },
+		{ value: 'UT', name: 'Utah' },
+		{ value: 'VT', name: 'Vermont' },
+		{ value: 'VA', name: 'Virginia' },
+		{ value: 'WA', name: 'Washington' },
+		{ value: 'WV', name: 'West Virginia' },
+		{ value: 'WI', name: 'Wisconsin' },
+		{ value: 'WY', name: 'Wyoming' },
+		{ value: 'DC', name: 'District of Columbia' }
 	];
 
 	const isValid = $derived(
@@ -200,11 +201,7 @@
 							<label for="propertyType" class="label mb-1 block">
 								Property Type <span class="text-error-500">*</span>
 							</label>
-							<select id="propertyType" bind:value={propertyType} class="select w-full">
-								{#each propertyTypes as type}
-									<option value={type.value}>{type.label}</option>
-								{/each}
-							</select>
+							<Select id="propertyType" bind:value={propertyType} items={propertyTypes} size="sm" class="w-full" />
 						</div>
 					</div>
 				</Card>
@@ -258,12 +255,12 @@
 							<label for="state" class="label mb-1 block">
 								State <span class="text-error-500">*</span>
 							</label>
-							<select id="state" bind:value={usState} class="select w-full" required>
+							<Select id="state" bind:value={usState} size="sm" class="w-full">
 								<option value="">Select State</option>
 								{#each usStates as st}
-									<option value={st.value}>{st.label}</option>
+									<option value={st.value}>{st.name}</option>
 								{/each}
-							</select>
+							</Select>
 						</div>
 
 						<div>

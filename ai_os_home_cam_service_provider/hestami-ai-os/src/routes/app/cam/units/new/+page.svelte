@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { Select } from 'flowbite-svelte';
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -32,15 +33,15 @@
 	});
 
 	const unitTypeOptions = [
-		{ value: 'RESIDENTIAL', label: 'Residential' },
-		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
-		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' }
+		{ value: 'RESIDENTIAL', name: 'Residential' },
+		{ value: PropertyTypeValues.COMMERCIAL, name: 'Commercial' },
+		{ value: PropertyTypeValues.MIXED_USE, name: 'Mixed Use' }
 	];
 
 	const statusOptions = [
-		{ value: 'VACANT', label: 'Vacant' },
-		{ value: 'OCCUPIED', label: 'Occupied' },
-		{ value: 'UNDER_RENOVATION', label: 'Under Renovation' }
+		{ value: 'VACANT', name: 'Vacant' },
+		{ value: 'OCCUPIED', name: 'Occupied' },
+		{ value: 'UNDER_RENOVATION', name: 'Under Renovation' }
 	];
 
 	async function loadFormData() {
@@ -149,17 +150,12 @@
 								<label for="propertyId" class="mb-1 block text-sm font-medium">
 									Property <span class="text-error-500">*</span>
 								</label>
-								<select
-									id="propertyId"
-									bind:value={formData.propertyId}
-									required
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
+								<Select id="propertyId" bind:value={formData.propertyId}>
 									<option value="">Select a property</option>
 									{#each properties as property}
 										<option value={property.id}>{property.name}</option>
 									{/each}
-								</select>
+								</Select>
 							</div>
 
 							<div class="grid gap-4 sm:grid-cols-2">
@@ -196,30 +192,14 @@
 									<label for="unitType" class="mb-1 block text-sm font-medium">
 										Unit Type
 									</label>
-									<select
-										id="unitType"
-										bind:value={formData.unitType}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each unitTypeOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+									<Select id="unitType" bind:value={formData.unitType} items={unitTypeOptions} />
 								</div>
 
 								<div>
 									<label for="status" class="mb-1 block text-sm font-medium">
 										Status
 									</label>
-									<select
-										id="status"
-										bind:value={formData.status}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each statusOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+									<Select id="status" bind:value={formData.status} items={statusOptions} />
 								</div>
 							</div>
 						</div>

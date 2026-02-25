@@ -16,7 +16,8 @@
 		XCircle,
 		MinusCircle,
 		Loader2,
-		AlertTriangle
+		AlertTriangle,
+		Activity
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { invalidateAll } from '$app/navigation';
@@ -87,6 +88,7 @@
 	);
 
 	function openEditModal() {
+		if (!organization) return;
 		editName = organization.name;
 		editContactName = organization.externalContactName || '';
 		editContactEmail = organization.externalContactEmail || '';
@@ -100,6 +102,7 @@
 	}
 
 	function openStatusModal() {
+		if (!organization) return;
 		newStatus = organization.status === OrganizationStatusValues.ACTIVE ? OrganizationStatusValues.SUSPENDED : OrganizationStatusValues.ACTIVE;
 		statusReason = '';
 		updateError = null;
@@ -111,6 +114,7 @@
 	}
 
 	async function handleSaveEdit() {
+		if (!organization) return;
 		isUpdating = true;
 		updateError = null;
 
@@ -143,6 +147,7 @@
 			return;
 		}
 
+		if (!organization) return;
 		isUpdating = true;
 		updateError = null;
 
@@ -213,7 +218,7 @@
 </script>
 
 <svelte:head>
-	<title>{organization.name} | Organizations | Staff Portal | Hestami AI</title>
+	<title>{organization?.name ?? 'Organization'} | Organizations | Staff Portal | Hestami AI</title>
 </svelte:head>
 
 <PageContainer>
@@ -227,6 +232,7 @@
 			Back to Organizations
 		</a>
 
+		{#if organization}
 		<!-- Header -->
 		<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
 			<div class="flex items-start gap-4">
@@ -258,6 +264,13 @@
 
 			{#if isPlatformAdmin}
 				<div class="flex gap-2">
+					<a
+						href="/app/admin/activity?entityType=ORGANIZATION&entityId={organization.id}"
+						class="btn preset-outlined-surface-500"
+					>
+						<Activity class="mr-2 h-4 w-4" />
+						Audit
+					</a>
 					<button onclick={openEditModal} class="btn preset-outlined-primary-500">
 						<Edit class="mr-2 h-4 w-4" />
 						Edit
@@ -543,6 +556,7 @@
 				</Card>
 			{/if}
 		</div>
+		{/if}
 	</div>
 </PageContainer>
 
@@ -665,9 +679,9 @@
 
 				<p class="text-surface-600 mb-4">
 					{#if newStatus === OrganizationStatusValues.SUSPENDED}
-						Are you sure you want to suspend <strong>{organization.name}</strong>? This will prevent users from accessing the organization.
+						Are you sure you want to suspend <strong>{organization?.name}</strong>? This will prevent users from accessing the organization.
 					{:else}
-						Are you sure you want to activate <strong>{organization.name}</strong>? This will restore access for all users.
+						Are you sure you want to activate <strong>{organization?.name}</strong>? This will restore access for all users.
 					{/if}
 				</p>
 

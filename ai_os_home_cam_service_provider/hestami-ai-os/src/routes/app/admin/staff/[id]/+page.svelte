@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { page } from '$app/stores';
 	import {
 		ArrowLeft,
 		Loader2,
@@ -14,11 +13,13 @@
 		UserX,
 		RefreshCw,
 		Edit,
-		Briefcase
+		Briefcase,
+		FolderOpen,
+		Activity
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { orpc } from '$lib/api/orpc';
-	import { StaffStatusValues } from '$lib/api/cam';
+	import { StaffStatusValues, ConciergeCaseStatusValues, ConciergeCasePriorityValues } from '$lib/api/cam';
 
 	interface Staff {
 		id: string;
@@ -94,11 +95,51 @@
 	let actionLoading = $state<string | null>(null);
 	let actionError = $state<string | null>(null);
 
+	// Tab state
+	let activeTab = $state<'profile' | 'assignments' | 'activity'>('profile');
+
+	// Assignments state
+	interface Assignment {
+		id: string;
+		caseId: string;
+		isPrimary: boolean;
+		assignedAt: string;
+		unassignedAt: string | null;
+		justification: string | null;
+		case: {
+			caseNumber: string;
+			title: string;
+			status: string;
+			priority: string;
+			createdAt: string;
+		};
+	}
+	let assignments = $state<Assignment[]>([]);
+	let assignmentsLoading = $state(false);
+	let assignmentsError = $state<string | null>(null);
+	let showAllAssignments = $state(false);
+
+	// Activity state
+	interface ActivityEvent {
+		id: string;
+		entityType: string;
+		entityId: string;
+		action: string;
+		eventCategory: string;
+		summary: string;
+		performedAt: string;
+	}
+	let activityEvents = $state<ActivityEvent[]>([]);
+	let activityLoading = $state(false);
+	let activityError = $state<string | null>(null);
+
 	// Modal state
 	let showSuspendModal = $state(false);
 	let suspendReason = $state('');
 	let showDeactivateModal = $state(false);
 	let deactivateReason = $state('');
+	let deactivateActiveCount = $state(0);
+	let deactivateLoadingCount = $state(false);
 	let showCodeModal = $state(false);
 	let generatedCode = $state('');
 
@@ -115,6 +156,61 @@
 		// or better, just use invalidateAll()
 		window.location.reload();
 	}
+
+	async function loadAssignments() {
+		if (!staff) return;
+		assignmentsLoading = true;
+		assignmentsError = null;
+		try {
+			const response = await orpc.staff.getAssignments({
+				staffId: staff.id,
+				includeUnassigned: showAllAssignments
+			});
+			if (response.ok) {
+				assignments = response.data.assignments as Assignment[];
+			}
+		} catch (e) {
+			assignmentsError = e instanceof Error ? e.message : 'Failed to load assignments';
+		} finally {
+			assignmentsLoading = false;
+		}
+	}
+
+	async function loadActivity() {
+		if (!staff) return;
+		activityLoading = true;
+		activityError = null;
+		try {
+			const response = await orpc.activityEvent.staffList({
+				performedById: staff.userId,
+				limit: 50
+			});
+			if (response.ok) {
+				activityEvents = response.data.events as ActivityEvent[];
+			}
+		} catch (e) {
+			activityError = e instanceof Error ? e.message : 'Failed to load activity';
+		} finally {
+			activityLoading = false;
+		}
+	}
+
+	// Load data when tab changes
+	$effect(() => {
+		if (activeTab === 'assignments' && assignments.length === 0 && !assignmentsLoading) {
+			loadAssignments();
+		}
+		if (activeTab === 'activity' && activityEvents.length === 0 && !activityLoading) {
+			loadActivity();
+		}
+	});
+
+	// Reload assignments when toggle changes
+	$effect(() => {
+		if (activeTab === 'assignments' && staff) {
+			loadAssignments();
+		}
+	});
 
 	async function handleActivate() {
 		if (!staff) return;
@@ -147,6 +243,26 @@
 			actionError = e instanceof Error ? e.message : 'Failed to suspend staff member';
 		} finally {
 			actionLoading = null;
+		}
+	}
+
+	async function openDeactivateModal() {
+		if (!staff) return;
+		showDeactivateModal = true;
+		deactivateLoadingCount = true;
+		deactivateActiveCount = 0;
+		try {
+			const response = await orpc.staff.getAssignments({
+				staffId: staff.id,
+				includeUnassigned: false
+			});
+			if (response.ok) {
+				deactivateActiveCount = response.data.assignments.length;
+			}
+		} catch (e) {
+			console.error('Failed to fetch active assignments:', e);
+		} finally {
+			deactivateLoadingCount = false;
 		}
 	}
 
@@ -201,21 +317,6 @@
 		}
 	}
 
-	function getStatusIcon(status: string) {
-		switch (status) {
-			case StaffStatusValues.ACTIVE:
-				return CheckCircle;
-			case StaffStatusValues.PENDING:
-				return Clock;
-			case StaffStatusValues.SUSPENDED:
-				return AlertTriangle;
-			case StaffStatusValues.DEACTIVATED:
-				return XCircle;
-			default:
-				return Clock;
-		}
-	}
-
 	function getStatusColor(status: string) {
 		switch (status) {
 			case StaffStatusValues.ACTIVE:
@@ -229,6 +330,60 @@
 			default:
 				return 'text-surface-500';
 		}
+	}
+
+	function getCaseStatusColor(status: string) {
+		const colors: Record<string, string> = {
+			[ConciergeCaseStatusValues.INTAKE]: 'preset-filled-secondary-500',
+			[ConciergeCaseStatusValues.ASSESSMENT]: 'preset-filled-tertiary-500',
+			[ConciergeCaseStatusValues.IN_PROGRESS]: 'preset-filled-warning-500',
+			[ConciergeCaseStatusValues.PENDING_EXTERNAL]: 'preset-filled-surface-500',
+			[ConciergeCaseStatusValues.PENDING_OWNER]: 'preset-filled-surface-500',
+			[ConciergeCaseStatusValues.ON_HOLD]: 'preset-outlined-surface-500',
+			[ConciergeCaseStatusValues.RESOLVED]: 'preset-filled-success-500',
+			[ConciergeCaseStatusValues.CLOSED]: 'preset-filled-surface-500',
+			[ConciergeCaseStatusValues.CANCELLED]: 'preset-outlined-error-500'
+		};
+		return colors[status] || 'preset-filled-surface-500';
+	}
+
+	function getCasePriorityColor(priority: string) {
+		const colors: Record<string, string> = {
+			[ConciergeCasePriorityValues.LOW]: 'preset-outlined-surface-500',
+			[ConciergeCasePriorityValues.NORMAL]: 'preset-filled-secondary-500',
+			[ConciergeCasePriorityValues.HIGH]: 'preset-filled-warning-500',
+			[ConciergeCasePriorityValues.URGENT]: 'preset-filled-error-500',
+			[ConciergeCasePriorityValues.EMERGENCY]: 'preset-filled-error-500'
+		};
+		return colors[priority] || 'preset-filled-surface-500';
+	}
+
+	function formatDate(dateString: string) {
+		return new Date(dateString).toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	}
+
+	function formatDateTime(dateString: string) {
+		return new Date(dateString).toLocaleString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	function getEventCategoryColor(category: string) {
+		const colors: Record<string, string> = {
+			INTENT: 'preset-filled-tertiary-500',
+			DECISION: 'preset-filled-primary-500',
+			EXECUTION: 'preset-filled-success-500',
+			SYSTEM: 'preset-outlined-surface-500'
+		};
+		return colors[category] || 'preset-filled-surface-500';
 	}
 </script>
 
@@ -293,6 +448,13 @@
 
 				<!-- Action Buttons -->
 				<div class="flex flex-wrap gap-2">
+					<a
+						href="/app/admin/activity?entityType=STAFF&entityId={staff.id}"
+						class="btn preset-outlined-primary-500"
+					>
+						<Activity class="mr-2 h-4 w-4" />
+						View Audit Trail
+					</a>
 					{#if staff.status === StaffStatusValues.PENDING}
 						<button
 							onclick={handleActivate}
@@ -330,7 +492,7 @@
 							Suspend
 						</button>
 						<button
-							onclick={() => (showDeactivateModal = true)}
+							onclick={openDeactivateModal}
 							disabled={actionLoading !== null}
 							class="btn preset-outlined-surface-500"
 						>
@@ -367,13 +529,53 @@
 				</div>
 			{/if}
 
-			<!-- Profile Content -->
-			<div class="mt-8 grid gap-6 lg:grid-cols-3">
-				<!-- Main Info -->
-				<div class="lg:col-span-2 space-y-6">
-					<!-- Contact Info -->
-					<Card variant="outlined" padding="lg">
-						<h2 class="text-lg font-semibold">Contact Information</h2>
+			<!-- Tab Navigation -->
+			<div class="mt-6 border-b border-surface-300-700">
+				<nav class="-mb-px flex space-x-6">
+					<button
+						onclick={() => (activeTab = 'profile')}
+						class="flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors {activeTab === 'profile'
+							? 'border-primary-500 text-primary-500'
+							: 'border-transparent text-surface-500 hover:border-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}"
+					>
+						<User class="h-4 w-4" />
+						Profile
+					</button>
+					<button
+						onclick={() => (activeTab = 'assignments')}
+						class="flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors {activeTab === 'assignments'
+							? 'border-primary-500 text-primary-500'
+							: 'border-transparent text-surface-500 hover:border-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}"
+					>
+						<FolderOpen class="h-4 w-4" />
+						Assignments
+						{#if assignments.filter(a => !a.unassignedAt).length > 0}
+							<span class="ml-1 rounded-full bg-primary-500/10 px-2 py-0.5 text-xs text-primary-500">
+								{assignments.filter(a => !a.unassignedAt).length}
+							</span>
+						{/if}
+					</button>
+					<button
+						onclick={() => (activeTab = 'activity')}
+						class="flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors {activeTab === 'activity'
+							? 'border-primary-500 text-primary-500'
+							: 'border-transparent text-surface-500 hover:border-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}"
+					>
+						<Activity class="h-4 w-4" />
+						Activity
+					</button>
+				</nav>
+			</div>
+
+			<!-- Tab Content -->
+			{#if activeTab === 'profile'}
+				<!-- Profile Content -->
+				<div class="mt-8 grid gap-6 lg:grid-cols-3">
+					<!-- Main Info -->
+					<div class="lg:col-span-2 space-y-6">
+						<!-- Contact Info -->
+						<Card variant="outlined" padding="lg">
+							<h2 class="text-lg font-semibold">Contact Information</h2>
 						<div class="mt-4 space-y-4">
 							<div class="flex items-center gap-3">
 								<Mail class="h-5 w-5 text-surface-400" />
@@ -505,6 +707,146 @@
 					</Card>
 				</div>
 			</div>
+
+			{:else if activeTab === 'assignments'}
+				<!-- Assignments Content -->
+				<div class="mt-8">
+					<Card variant="outlined" padding="lg">
+						<div class="flex items-center justify-between">
+							<h2 class="text-lg font-semibold">Case Assignments</h2>
+							<label class="flex items-center gap-2 text-sm">
+								<input
+									type="checkbox"
+									bind:checked={showAllAssignments}
+									class="checkbox"
+								/>
+								Show past assignments
+							</label>
+						</div>
+
+						{#if assignmentsLoading}
+							<div class="mt-6 flex items-center justify-center py-8">
+								<Loader2 class="h-6 w-6 animate-spin text-primary-500" />
+							</div>
+						{:else if assignmentsError}
+							<div class="mt-4 rounded-lg bg-error-500/10 p-4 text-sm text-error-500">
+								{assignmentsError}
+							</div>
+						{:else if assignments.length === 0}
+							<div class="mt-6 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-surface-300-700 p-8">
+								<FolderOpen class="h-12 w-12 text-surface-400" />
+								<p class="mt-2 text-sm text-surface-500">No case assignments found</p>
+								<p class="text-xs text-surface-400">
+									{showAllAssignments ? 'This staff member has never been assigned any cases' : 'This staff member has no active case assignments'}
+								</p>
+							</div>
+						{:else}
+							<div class="mt-4 space-y-3">
+								{#each assignments as assignment}
+									<a
+										href="/app/admin/cases/{assignment.caseId}"
+										class="block rounded-lg border border-surface-300-700 p-4 transition-colors hover:bg-surface-100 dark:hover:bg-surface-800"
+									>
+										<div class="flex items-start justify-between gap-4">
+											<div class="flex-1 min-w-0">
+												<div class="flex items-center gap-2 flex-wrap">
+													<span class="font-mono text-sm text-surface-500">{assignment.case.caseNumber}</span>
+													{#if assignment.isPrimary}
+														<span class="badge preset-filled-primary-500 text-xs">Primary</span>
+													{/if}
+													{#if assignment.unassignedAt}
+														<span class="badge preset-outlined-surface-500 text-xs">Past</span>
+													{/if}
+												</div>
+												<p class="mt-1 font-medium truncate">{assignment.case.title}</p>
+												<div class="mt-2 flex items-center gap-3 text-xs">
+													<span class="badge {getCaseStatusColor(assignment.case.status)}">
+														{assignment.case.status}
+													</span>
+													<span class="badge {getCasePriorityColor(assignment.case.priority)}">
+														{assignment.case.priority}
+													</span>
+												</div>
+											</div>
+											<div class="text-right text-xs text-surface-500">
+												<p>Assigned: {formatDate(assignment.assignedAt)}</p>
+												{#if assignment.unassignedAt}
+													<p class="mt-1">Unassigned: {formatDate(assignment.unassignedAt)}</p>
+												{/if}
+											</div>
+										</div>
+										{#if assignment.justification}
+											<p class="mt-2 text-sm text-surface-500 italic">{assignment.justification}</p>
+										{/if}
+									</a>
+								{/each}
+							</div>
+						{/if}
+					</Card>
+				</div>
+
+			{:else if activeTab === 'activity'}
+				<!-- Activity Content -->
+				<div class="mt-8">
+					<Card variant="outlined" padding="lg">
+						<div class="flex items-center justify-between">
+							<h2 class="text-lg font-semibold">Recent Activity</h2>
+							<button
+								onclick={loadActivity}
+								disabled={activityLoading}
+								class="btn preset-outlined-surface-500 btn-sm"
+							>
+								{#if activityLoading}
+									<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								{:else}
+									<RefreshCw class="mr-2 h-4 w-4" />
+								{/if}
+								Refresh
+							</button>
+						</div>
+
+						{#if activityLoading && activityEvents.length === 0}
+							<div class="mt-6 flex items-center justify-center py-8">
+								<Loader2 class="h-6 w-6 animate-spin text-primary-500" />
+							</div>
+						{:else if activityError}
+							<div class="mt-4 rounded-lg bg-error-500/10 p-4 text-sm text-error-500">
+								{activityError}
+							</div>
+						{:else if activityEvents.length === 0}
+							<div class="mt-6 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-surface-300-700 p-8">
+								<Activity class="h-12 w-12 text-surface-400" />
+								<p class="mt-2 text-sm text-surface-500">No activity recorded</p>
+								<p class="text-xs text-surface-400">Activity will appear here as this staff member performs actions</p>
+							</div>
+						{:else}
+							<div class="mt-4 space-y-3">
+								{#each activityEvents as event}
+									<div class="rounded-lg border border-surface-300-700 p-4">
+										<div class="flex items-start justify-between gap-4">
+											<div class="flex-1 min-w-0">
+												<div class="flex items-center gap-2 flex-wrap">
+													<span class="badge {getEventCategoryColor(event.eventCategory)} text-xs">
+														{event.eventCategory}
+													</span>
+													<span class="font-mono text-xs text-surface-500">{event.action}</span>
+												</div>
+												<p class="mt-1 text-sm">{event.summary}</p>
+												<p class="mt-1 text-xs text-surface-400">
+													{event.entityType} • {event.entityId.slice(0, 8)}...
+												</p>
+											</div>
+											<div class="text-right text-xs text-surface-500 whitespace-nowrap">
+												{formatDateTime(event.performedAt)}
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</Card>
+				</div>
+			{/if}
 		{/if}
 	</div>
 </PageContainer>
@@ -517,6 +859,21 @@
 			<p class="mt-2 text-sm text-surface-500">
 				This will immediately revoke access and escalate any assigned cases.
 			</p>
+
+			<!-- SLA Warning (Phase 16+14 Wave 7.2) -->
+			<div class="mt-4 rounded-lg border border-warning-300-700 bg-warning-50-950 p-3">
+				<div class="flex items-start gap-2">
+					<Clock class="h-4 w-4 text-warning-500 flex-shrink-0 mt-0.5" />
+					<div class="text-sm">
+						<p class="font-medium text-warning-700 dark:text-warning-300">24-Hour Admin Review Required</p>
+						<p class="mt-0.5 text-warning-600 dark:text-warning-400">
+							Suspensions must be reviewed by a senior administrator within 24 hours.
+							An escalation notification will be sent if not reviewed.
+						</p>
+					</div>
+				</div>
+			</div>
+
 			<div class="mt-4">
 				<label for="suspendReason" class="label">Reason for suspension *</label>
 				<textarea
@@ -561,6 +918,47 @@
 			<p class="mt-2 text-sm text-surface-500">
 				This staff member must have no active case assignments before deactivation.
 			</p>
+
+			<!-- Active Case Count Warning -->
+			{#if deactivateLoadingCount}
+				<div class="mt-4 flex items-center gap-2 rounded-lg bg-surface-100 dark:bg-surface-800 p-3">
+					<Loader2 class="h-4 w-4 animate-spin text-surface-500" />
+					<span class="text-sm text-surface-500">Checking active assignments...</span>
+				</div>
+			{:else if deactivateActiveCount > 0}
+				<div class="mt-4 rounded-lg bg-error-500/10 border border-error-500/20 p-4">
+					<div class="flex items-start gap-3">
+						<AlertTriangle class="h-5 w-5 text-error-500 flex-shrink-0 mt-0.5" />
+						<div>
+							<p class="font-medium text-error-600 dark:text-error-400">
+								Cannot Deactivate
+							</p>
+							<p class="mt-1 text-sm text-error-500">
+								This staff member has <strong>{deactivateActiveCount}</strong> active case {deactivateActiveCount === 1 ? 'assignment' : 'assignments'}.
+								Please reassign these cases before deactivating.
+							</p>
+							<a
+								href="/app/admin/staff/{staff?.id}"
+								onclick={() => {
+									showDeactivateModal = false;
+									activeTab = 'assignments';
+								}}
+								class="mt-2 inline-block text-sm text-primary-500 hover:underline"
+							>
+								View assignments →
+							</a>
+						</div>
+					</div>
+				</div>
+			{:else}
+				<div class="mt-4 rounded-lg bg-success-500/10 border border-success-500/20 p-3">
+					<div class="flex items-center gap-2">
+						<CheckCircle class="h-4 w-4 text-success-500" />
+						<span class="text-sm text-success-600 dark:text-success-400">No active case assignments</span>
+					</div>
+				</div>
+			{/if}
+
 			<div class="mt-4">
 				<label for="deactivateReason" class="label">Reason for deactivation *</label>
 				<textarea
@@ -570,6 +968,7 @@
 					rows="3"
 					class="textarea w-full"
 					required
+					disabled={deactivateActiveCount > 0}
 				></textarea>
 			</div>
 			<div class="mt-6 flex justify-end gap-3">
@@ -577,6 +976,7 @@
 					onclick={() => {
 						showDeactivateModal = false;
 						deactivateReason = '';
+						deactivateActiveCount = 0;
 					}}
 					class="btn preset-outlined-surface-500"
 				>
@@ -584,7 +984,7 @@
 				</button>
 				<button
 					onclick={handleDeactivate}
-					disabled={!deactivateReason.trim() || actionLoading === 'deactivate'}
+					disabled={!deactivateReason.trim() || actionLoading === 'deactivate' || deactivateActiveCount > 0 || deactivateLoadingCount}
 					class="btn preset-filled-surface-500"
 				>
 					{#if actionLoading === 'deactivate'}

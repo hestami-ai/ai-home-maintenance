@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, FileCheck, Plus, Search } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -32,12 +33,12 @@
 	let statusFilter = $state('all');
 
 	const statusOptions = [
-		{ value: 'all', label: 'All Status' },
-		{ value: PolicyStatusValues.DRAFT, label: 'Draft' },
-		{ value: BoardMotionStatusValues.PROPOSED, label: 'Proposed' },
-		{ value: 'PASSED', label: 'Passed' },
-		{ value: JobPaymentStatusValues.FAILED, label: 'Failed' },
-		{ value: BoardMotionStatusValues.TABLED, label: 'Tabled' }
+		{ value: 'all', name: 'All Status' },
+		{ value: PolicyStatusValues.DRAFT, name: 'Draft' },
+		{ value: BoardMotionStatusValues.PROPOSED, name: 'Proposed' },
+		{ value: 'PASSED', name: 'Passed' },
+		{ value: JobPaymentStatusValues.FAILED, name: 'Failed' },
+		{ value: BoardMotionStatusValues.TABLED, name: 'Tabled' }
 	];
 
 	async function loadResolutions() {
@@ -144,14 +145,7 @@
 									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
 								/>
 							</div>
-							<select
-								bind:value={statusFilter}
-								class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-							>
-								{#each statusOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+							<Select bind:value={statusFilter} items={statusOptions} size="sm" />
 						</div>
 					{/snippet}
 

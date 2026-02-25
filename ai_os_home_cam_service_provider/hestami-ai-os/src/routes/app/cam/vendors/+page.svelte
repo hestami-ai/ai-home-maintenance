@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Select } from 'flowbite-svelte';
 	import { Users, Plus, Search } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
@@ -17,10 +18,10 @@
 	let statusFilter = $state<string>('');
 
 	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: VendorApprovalStatusValues.APPROVED, label: 'Approved' },
-		{ value: VendorApprovalStatusValues.PENDING, label: 'Pending' },
-		{ value: VendorApprovalStatusValues.SUSPENDED, label: 'Suspended' }
+		{ value: '', name: 'All Statuses' },
+		{ value: VendorApprovalStatusValues.APPROVED, name: 'Approved' },
+		{ value: VendorApprovalStatusValues.PENDING, name: 'Pending' },
+		{ value: VendorApprovalStatusValues.SUSPENDED, name: 'Suspended' }
 	];
 
 	async function loadVendors() {
@@ -109,14 +110,7 @@
 						/>
 					</div>
 
-					<select
-						bind:value={statusFilter}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each statusOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+					<Select bind:value={statusFilter} items={statusOptions} size="sm" />
 				</div>
 			{/snippet}
 

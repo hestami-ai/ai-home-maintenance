@@ -20,6 +20,7 @@
 		X
 	} from 'lucide-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { orpc } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -288,19 +289,14 @@
 							</a>
 						</div>
 					{:else}
-						<select
-							id="property"
-							bind:value={selectedPropertyId}
-							class="select w-full"
-							required
-						>
+						<Select id="property" bind:value={selectedPropertyId} size="sm" class="w-full">
 							<option value="">Select a property</option>
 							{#each properties as prop}
 								<option value={prop.id}>
 									{prop.name} - {prop.addressLine1}, {prop.city}, {prop.state}
 								</option>
 							{/each}
-						</select>
+						</Select>
 						{#if selectedProperty}
 							<p class="mt-2 text-sm text-surface-500">
 								{selectedProperty.addressLine1}, {selectedProperty.city}, {selectedProperty.state}{' '}

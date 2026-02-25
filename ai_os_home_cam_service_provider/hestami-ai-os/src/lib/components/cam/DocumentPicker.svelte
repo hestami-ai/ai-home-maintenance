@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { X, Search, FileText, Check, Filter } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { currentAssociation } from '$lib/stores';
 	import {
 		CAM_DOCUMENT_CATEGORIES,
@@ -53,18 +54,18 @@
 	let localCategoryFilter = $state<string>('');
 	let localSelected = $state<SelectedDocument[]>([]);
 
-	const categoryOptions = [
-		{ value: '', label: 'All Categories' },
+	const categoryItems = [
+		{ value: '', name: 'All Categories' },
 		...CAM_DOCUMENT_CATEGORIES.map((cat) => ({
 			value: cat,
-			label: CAM_CATEGORY_LABELS[cat]
+			name: CAM_CATEGORY_LABELS[cat]
 		}))
 	];
 
-	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: DocumentStatusValues.ACTIVE, label: 'Active' },
-		{ value: PolicyStatusValues.DRAFT, label: 'Draft' }
+	const statusItems = [
+		{ value: '', name: 'All Statuses' },
+		{ value: DocumentStatusValues.ACTIVE, name: 'Active' },
+		{ value: PolicyStatusValues.DRAFT, name: 'Draft' }
 	];
 
 	$effect(() => {
@@ -194,23 +195,17 @@
 				</div>
 
 				<div class="flex gap-2">
-					<select
+					<Select
 						bind:value={localCategoryFilter}
-						class="flex-1 rounded-lg border border-surface-300-700 bg-surface-100-900 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each categoryOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
-
-					<select
+						items={categoryItems}
+						size="sm"
+						class="flex-1"
+					/>
+					<Select
 						bind:value={statusFilter}
-						class="rounded-lg border border-surface-300-700 bg-surface-100-900 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each statusOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={statusItems}
+						size="sm"
+					/>
 				</div>
 			</div>
 

@@ -112,7 +112,25 @@ export const activityEventApi = {
 		entityId: string;
 		limit?: number;
 		cursor?: string;
-	}) => orpc.activityEvent.staffGetByEntity(params)
+	}) => orpc.activityEvent.staffGetByEntity(params),
+
+	/**
+	 * Export activity events (staff only)
+	 */
+	staffExport: (params: {
+		format?: 'json' | 'csv';
+		entityType?: ActivityEntityType;
+		entityId?: string;
+		action?: ActivityActionType;
+		eventCategory?: ActivityEventCategory;
+		performedByType?: ActivityActorType;
+		organizationId?: string;
+		startDate: string;
+		endDate: string;
+		maxRecords?: number;
+		includeMetadata?: boolean;
+		includeStateChanges?: boolean;
+	}) => orpc.activityEvent.staffExport(params)
 };
 
 // =============================================================================

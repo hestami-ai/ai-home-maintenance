@@ -13,6 +13,7 @@
 		AlertCircle,
 		Clock
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -58,25 +59,25 @@
 	let referencedFilter = $state<string>('');
 
 	const categoryOptions = [
-		{ value: '', label: 'All Categories' },
+		{ value: '', name: 'All Categories' },
 		...CAM_DOCUMENT_CATEGORIES.map((cat) => ({
 			value: cat,
-			label: CAM_CATEGORY_LABELS[cat]
+			name: CAM_CATEGORY_LABELS[cat]
 		}))
 	];
 
 	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: PolicyStatusValues.DRAFT, label: 'Draft' },
-		{ value: DocumentStatusValues.ACTIVE, label: 'Active' },
-		{ value: DocumentStatusValues.SUPERSEDED, label: 'Superseded' },
-		{ value: MeetingStatusValues.ARCHIVED, label: 'Archived' }
+		{ value: '', name: 'All Statuses' },
+		{ value: PolicyStatusValues.DRAFT, name: 'Draft' },
+		{ value: DocumentStatusValues.ACTIVE, name: 'Active' },
+		{ value: DocumentStatusValues.SUPERSEDED, name: 'Superseded' },
+		{ value: MeetingStatusValues.ARCHIVED, name: 'Archived' }
 	];
 
 	const referencedOptions = [
-		{ value: '', label: 'All Documents' },
-		{ value: 'referenced', label: 'Referenced' },
-		{ value: 'unreferenced', label: 'Not Referenced' }
+		{ value: '', name: 'All Documents' },
+		{ value: 'referenced', name: 'Referenced' },
+		{ value: 'unreferenced', name: 'Not Referenced' }
 	];
 
 	async function loadDocuments() {
@@ -301,33 +302,24 @@
 					</div>
 
 					<div class="grid grid-cols-2 gap-2">
-						<select
+						<Select
 							bind:value={categoryFilter}
-							class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							{#each categoryOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
+							items={categoryOptions}
+							size="sm"
+						/>
 
-						<select
+						<Select
 							bind:value={statusFilter}
-							class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-						>
-							{#each statusOptions as option}
-								<option value={option.value}>{option.label}</option>
-							{/each}
-						</select>
+							items={statusOptions}
+							size="sm"
+						/>
 					</div>
 
-					<select
+					<Select
 						bind:value={referencedFilter}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each referencedOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={referencedOptions}
+						size="sm"
+					/>
 				</div>
 			{/snippet}
 

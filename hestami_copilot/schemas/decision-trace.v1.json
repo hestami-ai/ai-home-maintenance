@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hestami.ai/schemas/decision-trace.v1.json",
+  "title": "DecisionTrace",
+  "description": "Human-approved truth record for significant decisions",
+  "type": "object",
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "description": "Unique ID for this decision event",
+      "pattern": "^DT-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+$",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO datetime of when decision was made"
+    },
+    "actors": {
+      "type": "array",
+      "description": "Who was involved in making this decision",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "summary": {
+      "type": "string",
+      "description": "Short description of the decision made",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "details": {
+      "type": "string",
+      "description": "Longer rationale or discussion of why the decision was made",
+      "minLength": 1
+    },
+    "references": {
+      "type": "array",
+      "description": "Sources that influenced this decision",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["spec", "guideline", "decision", "discussion", "external"],
+            "description": "Type of source"
+          },
+          "id": {
+            "type": "string",
+            "description": "Stable identifier of the reference",
+            "minLength": 1
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Optional quote from the reference"
+          }
+        },
+        "required": ["source", "id"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "Decision ID of an earlier decision that this one supersedes"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ACTIVE", "SUPERSEDED", "RETIRED"],
+      "description": "Lifecycle status of this decision"
+    },
+    "trust_tier": {
+      "type": "string",
+      "enum": ["HUMAN_APPROVED", "HUMAN_NOTED", "MODEL_DRAFT"],
+      "description": "Authority level of this decision",
+      "default": "MODEL_DRAFT"
+    },
+    "related_action": {
+      "type": ["string", "null"],
+      "description": "Action ID if this decision is linked to a specific ActionProposal outcome"
+    },
+    "scope": {
+      "type": "string",
+      "description": "The scope or context to which this decision applies (e.g., 'internal-tool', 'all-features')",
+      "default": "global"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Categorization tags for indexing and retrieval",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "decision_id",
+    "timestamp",
+    "actors",
+    "summary",
+    "details",
+    "status",
+    "trust_tier"
+  ],
+  "additionalProperties": false
+}

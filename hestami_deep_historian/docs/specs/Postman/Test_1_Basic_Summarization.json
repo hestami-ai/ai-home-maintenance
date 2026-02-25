@@ -1,0 +1,11 @@
+{
+  "model": "qwen3-4b-thinking",
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are summarizing a section from a technical specification document.\n\nSection Title: Approach 1: Medida-Style CV/AI (Recommended)\nSection Text:\n**Description**: Pure computer vision and AI approach using only RGB camera\n\n**Pros**:\n- Universal device compatibility (all iOS devices)\n- No hardware dependency\n- Lower cost to deploy\n- Broader market reach\n- Proven technology (photogrammetry)\n\n**Cons**:\n- More complex development\n- Higher computational requirements\n- Sensitive to lighting conditions\n- Longer processing time\n\n**Accuracy**: ±2mm achievable with proper implementation\n\n**Development Time**: 16-20 weeks\n\nGenerate a concise summary (2-3 sentences) that:\n1. Captures the main technical requirement or concept\n2. Identifies key entities (tables, functions, APIs, files)\n3. Notes any constraints or dependencies mentioned\n\nReturn only the summary."
+    }
+  ],
+  "temperature": 0.0,
+  "stream": false
+}

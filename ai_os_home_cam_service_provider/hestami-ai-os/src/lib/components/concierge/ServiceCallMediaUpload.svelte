@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { DocumentContextTypeValues, DocumentVisibilityValues } from '$lib/api/cam';
 	import { Upload, X, FileText, Image, Video, File, Loader2, AlertTriangle, Check } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import * as tus from 'tus-js-client';
 	import { createOrgClient } from '$lib/api/orpc';
 	import {
@@ -343,9 +344,9 @@
 	}
 
 	// Category options for dropdown
-	const categoryOptions = CONCIERGE_DOCUMENT_CATEGORIES.map((cat) => ({
+	const categoryItems = CONCIERGE_DOCUMENT_CATEGORIES.map((cat) => ({
 		value: cat,
-		label: CONCIERGE_CATEGORY_LABELS[cat]
+		name: CONCIERGE_CATEGORY_LABELS[cat]
 	}));
 </script>
 
@@ -441,16 +442,14 @@
 
 					<!-- Category selector (only for pending files) -->
 					{#if trackedFile.status === 'pending'}
-						<select
-							class="select w-32 text-xs"
+						<Select
+							size="sm"
+							class="w-32"
 							value={trackedFile.category}
-							onchange={(e) => updateFileCategory(trackedFile.id, (e.target as HTMLSelectElement).value as ConciergeDocumentCategory)}
+							items={categoryItems}
 							{disabled}
-						>
-							{#each categoryOptions as opt}
-								<option value={opt.value}>{opt.label}</option>
-							{/each}
-						</select>
+							onchange={(e) => updateFileCategory(trackedFile.id, (e.target as HTMLSelectElement).value as ConciergeDocumentCategory)}
+						/>
 					{/if}
 
 					<!-- Status indicator or remove button -->

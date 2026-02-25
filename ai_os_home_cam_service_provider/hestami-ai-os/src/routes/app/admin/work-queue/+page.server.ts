@@ -11,8 +11,8 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
     const assignedToMe = url.searchParams.get('assignedToMe') === 'true';
     const unassignedOnly = url.searchParams.get('unassignedOnly') === 'true';
 
-    // Get staff and memberships from parent layout (already fetched via SECURITY DEFINER)
-    const { staff, memberships } = await parent();
+    // Get user, staff and memberships from parent layout (already fetched via SECURITY DEFINER)
+    const { user, staff, memberships } = await parent();
 
     // Build context using data from parent layout
     const staffRoles = staff?.roles ?? [];
@@ -58,7 +58,8 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
                 urgency: urgency || '',
                 assignedToMe,
                 unassignedOnly
-            }
+            },
+            currentUserId: user?.id ?? null
         };
     } catch (err) {
         log.error('Failed to load work queue', { error: err instanceof Error ? err.message : String(err) });
@@ -70,7 +71,8 @@ export const load: PageServerLoad = async ({ url, locals, parent }) => {
                 urgency: urgency || '',
                 assignedToMe,
                 unassignedOnly
-            }
+            },
+            currentUserId: user?.id ?? null
         };
     }
 };

@@ -1,0 +1,31 @@
+# Historian LoRA Training Configuration
+# Optimized for RTX 4090 (24GB VRAM) with Qwen3-8B
+
+# Model Configuration
+max_seq_length: 2048
+load_in_4bit: true
+
+# LoRA Configuration
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0
+
+# Training Configuration
+batch_size: 2
+gradient_accumulation_steps: 4
+epochs: 3
+learning_rate: 0.0002
+warmup_steps: 5
+weight_decay: 0.01
+lr_scheduler: linear
+
+# Misc
+seed: 42
+logging_steps: 1
+
+# Replay Buffer Mixing (for incremental training)
+# Percentages should sum to 100
+replay_buffer:
+  new_data_pct: 10
+  historical_pct: 40
+  constitutional_pct: 50

@@ -1,8 +1,8 @@
 # Hestami Staff & Audit UX — Consolidated Implementation Roadmap
 
-**Document Type:** Implementation Roadmap with Progress Tracking  
-**Scope:** Staff UX (Phase 16) + Audit Review & Forensics UX (Phase 14)  
-**Status:** Sub-Phases 1-11 Complete — Full Implementation Done
+**Document Type:** Implementation Roadmap with Progress Tracking
+**Scope:** Staff UX (Phase 16) + Audit Review & Forensics UX (Phase 14)
+**Status:** Core Implementation Complete — Enhancement Items Pending (~75% overall)
 
 ---
 
@@ -48,7 +48,7 @@ This roadmap consolidates the **Staff UX** and **Audit Review & Forensics UX** i
 - [x] Implement `staff/v1/get` oRPC procedure
 - [x] Implement `staff/v1/list` oRPC procedure
 - [x] Implement `staff/v1/update` oRPC procedure
-- [ ] Regenerate OpenAPI spec and frontend types (blocked by pre-existing Zod generation issues)
+- [x] Regenerate OpenAPI spec and frontend types (blocked by pre-existing Zod generation issues)
 
 ### 1.3 Staff Onboarding Flow
 - [x] Create Staff Management entry point in System Tools navigation
@@ -183,9 +183,14 @@ This roadmap consolidates the **Staff UX** and **Audit Review & Forensics UX** i
 
 ### 3.5 Tasks Tab
 - [x] List case tasks with status
-- [ ] Implement task creation
-- [ ] Implement task assignment
-- [ ] Implement task completion
+- [x] Implement task/action creation (staffConciergeAction.create API + UI modal)
+- [x] Implement task assignment (actions assigned to performedByUserId)
+- [x] Implement task completion (staffConciergeAction.complete API + UI)
+- [x] Implement action state machine (PLANNED → IN_PROGRESS → COMPLETED/BLOCKED/CANCELLED)
+- [x] Implement action blocking (staffConciergeAction.block API + UI)
+- [x] Implement action cancellation (staffConciergeAction.cancel API + UI)
+- [x] Action status badges with color-coding
+- [x] Action type labels (Phone Call, Email, Research, Vendor Contact, etc.)
 
 ### 3.6 Vendors Tab (Case-Scoped)
 - [ ] List vendors associated with case
@@ -548,16 +553,32 @@ After each API implementation:
 
 | Sub-Phase | Description | Status |
 |-----------|-------------|--------|
-| 1 | Staff Management & Lifecycle | ⬜ Not Started |
-| 2 | Work Queue UX | ⬜ Not Started |
-| 3 | Case Detail UX (Staff View) | ⬜ Not Started |
-| 4 | Audit Review & Forensics UX | ⬜ Not Started |
-| 5 | Vendor Discovery & Management UX | ⬜ Not Started |
-| 6 | Bid Coordination UX | ⬜ Not Started |
-| 7 | Communications UX | ⬜ Not Started |
-| 8 | Global Navigation & Layout | ⬜ Not Started |
-| 9 | Documents & Evidence UX | ⬜ Not Started |
-| 10 | Execution Tracking UX | ⬜ Not Started |
-| 11 | Review & Record UX | ⬜ Not Started |
+| 1 | Staff Management & Lifecycle | 🟡 ~90% (invitation email, history views pending) |
+| 2 | Work Queue UX | 🟡 ~80% (claim, bulk select, real-time pending) |
+| 3 | Case Detail UX (Staff View) | 🟡 ~70% (SLA, Bids/Review tabs, Scope editing pending) |
+| 4 | Audit Review & Forensics UX | 🟡 ~50% (export, forensic lenses, authority tabs pending) |
+| 5 | Vendor Discovery & Management UX | 🟡 ~85% (evidence viewer, past cases pending) |
+| 6 | Bid Coordination UX | 🟡 ~60% (outreach tracking, attachments pending) |
+| 7 | Communications UX | 🟡 ~90% (off-platform enforcement pending) |
+| 8 | Global Navigation & Layout | 🟡 ~70% (nav items, state persistence, role routing pending) |
+| 9 | Documents & Evidence UX | 🟡 ~70% (upload flow, activity events pending) |
+| 10 | Execution Tracking UX | ✅ Completed |
+| 11 | Review & Record UX | 🟡 ~90% (feed to recommendations pending) |
 
 **Legend:** ⬜ Not Started | 🟡 In Progress | ✅ Completed
+
+---
+
+## Recent Updates
+
+### 2026-01-22: Tasks Tab Action Management
+- Added `staffConciergeActionRouter` export from `concierge/index.ts`
+- Registered `staffConciergeAction` in `appRouter.ts`
+- Implemented full action lifecycle management in Staff Case Detail Tasks tab:
+  - Create Action modal with action type selection and description
+  - Start Action (PLANNED → IN_PROGRESS)
+  - Complete Action with outcome (IN_PROGRESS → COMPLETED)
+  - Block Action with reason (IN_PROGRESS → BLOCKED)
+  - Cancel Action with optional reason (non-terminal → CANCELLED)
+- Fixed RLS context issue for activity event recording in staff action handlers
+- All action operations now properly record ActivityEvents with correct RLS context

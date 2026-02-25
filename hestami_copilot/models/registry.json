@@ -1,0 +1,17 @@
+{
+  "$schema": "./registry.schema.json",
+  "version": "1.0.0",
+  "base_models": [
+    {
+      "id": "qwen3-8b",
+      "name": "Qwen3-8B",
+      "path": "Qwen/Qwen2.5-7B-Instruct",
+      "description": "Base model for Historian (placeholder for Qwen3-8B when available)",
+      "quantization": "4bit",
+      "added_at": "2025-01-28T00:00:00Z"
+    }
+  ],
+  "adapters": [],
+  "current_adapter": null,
+  "training_history": []
+}

@@ -26,6 +26,13 @@ import { ActivityEntityType, ActivityActionType, BidStatus } from '../../../../.
 
 const BidStatusSchema = z.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'EXPIRED']);
 
+// Bid completeness schema for flagging incomplete bids
+const BidCompletenessSchema = z.object({
+	isComplete: z.boolean(),
+	missingFields: z.array(z.string()),
+	warnings: z.array(z.string())
+});
+
 const VendorBidOutputSchema = z.object({
 	id: z.string(),
 	vendorCandidateId: z.string(),
@@ -46,7 +53,9 @@ const VendorBidOutputSchema = z.object({
 	respondedAt: z.string().nullable(),
 	notes: z.string().nullable(),
 	createdAt: z.string(),
-	updatedAt: z.string()
+	updatedAt: z.string(),
+	// Completeness flags (Phase 16+14 Wave 5.7)
+	completeness: BidCompletenessSchema
 });
 
 const VendorBidListItemSchema = z.object({
@@ -58,7 +67,10 @@ const VendorBidListItemSchema = z.object({
 	status: BidStatusSchema,
 	validUntil: z.string().nullable(),
 	estimatedDuration: z.number().nullable(),
-	receivedAt: z.string()
+	receivedAt: z.string(),
+	// Completeness summary (Phase 16+14 Wave 5.7)
+	isComplete: z.boolean(),
+	warningCount: z.number()
 });
 
 // =============================================================================
@@ -69,9 +81,59 @@ function serializeDecimal(d: Decimal | null | undefined): string | null {
 	return d ? d.toString() : null;
 }
 
+/**
+ * Calculate bid completeness - flags missing required fields and warnings
+ * Required fields: amount, validUntil, estimatedStartDate, estimatedDuration
+ * Warning fields: laborCost, materialsCost (for detailed breakdown)
+ */
+function calculateBidCompleteness(bid: VendorBid): {
+	isComplete: boolean;
+	missingFields: string[];
+	warnings: string[];
+} {
+	const missingFields: string[] = [];
+	const warnings: string[] = [];
+
+	// Required fields for a complete bid
+	if (!bid.amount) {
+		missingFields.push('amount');
+	}
+	if (!bid.validUntil) {
+		missingFields.push('validUntil');
+	}
+	if (!bid.estimatedStartDate) {
+		missingFields.push('estimatedStartDate');
+	}
+	if (!bid.estimatedDuration && !bid.estimatedEndDate) {
+		missingFields.push('estimatedDuration or estimatedEndDate');
+	}
+
+	// Warning fields - nice to have for detailed comparison
+	if (!bid.laborCost && !bid.materialsCost) {
+		warnings.push('No cost breakdown provided (labor/materials)');
+	}
+
+	// Check if bid is expired
+	if (bid.validUntil && new Date(bid.validUntil) < new Date()) {
+		warnings.push('Bid has expired');
+	}
+
+	// Check if estimated start date is in the past
+	if (bid.estimatedStartDate && new Date(bid.estimatedStartDate) < new Date()) {
+		warnings.push('Estimated start date is in the past');
+	}
+
+	return {
+		isComplete: missingFields.length === 0,
+		missingFields,
+		warnings
+	};
+}
+
 type VendorBidWithCandidate = VendorBid & { vendorCandidate?: Pick<VendorCandidate, 'vendorName'> | null };
 
 function serializeVendorBid(bid: VendorBidWithCandidate) {
+	const completeness = calculateBidCompleteness(bid);
 	return {
 		id: bid.id,
 		vendorCandidateId: bid.vendorCandidateId,
@@ -92,11 +154,13 @@ function serializeVendorBid(bid: VendorBidWithCandidate) {
 		respondedAt: bid.respondedAt?.toISOString() ?? null,
 		notes: bid.notes,
 		createdAt: bid.createdAt.toISOString(),
-		updatedAt: bid.updatedAt.toISOString()
+		updatedAt: bid.updatedAt.toISOString(),
+		completeness
 	};
 }
 
 function serializeVendorBidListItem(bid: VendorBidWithCandidate) {
+	const completeness = calculateBidCompleteness(bid);
 	return {
 		id: bid.id,
 		vendorCandidateId: bid.vendorCandidateId,
@@ -106,7 +170,9 @@ function serializeVendorBidListItem(bid: VendorBidWithCandidate) {
 		status: bid.status as 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED',
 		validUntil: bid.validUntil?.toISOString() ?? null,
 		estimatedDuration: bid.estimatedDuration,
-		receivedAt: bid.receivedAt.toISOString()
+		receivedAt: bid.receivedAt.toISOString(),
+		isComplete: completeness.isComplete,
+		warningCount: completeness.warnings.length
 	};
 }
 

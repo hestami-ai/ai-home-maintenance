@@ -9,9 +9,11 @@
 		Clock,
 		User,
 		AlertTriangle,
-		ChevronRight
+		ChevronRight,
+		Activity
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { invalidate } from '$app/navigation';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -113,15 +115,15 @@
 	);
 
 	const statuses = [
-		{ value: '', label: 'All Statuses' },
-		{ value: ConciergeCaseStatusValues.INTAKE, label: 'Intake' },
-		{ value: ActivityEntityTypeValues.ASSESSMENT, label: 'Assessment' },
-		{ value: JobStatusValues.IN_PROGRESS, label: 'In Progress' },
-		{ value: ConciergeCaseStatusValues.PENDING_EXTERNAL, label: 'Pending External' },
-		{ value: ConciergeCaseStatusValues.PENDING_OWNER, label: 'Pending Owner' },
-		{ value: JobStatusValues.ON_HOLD, label: 'On Hold' },
-		{ value: ViolationStatusValues.RESOLVED, label: 'Resolved' },
-		{ value: JobStatusValues.CLOSED, label: 'Closed' }
+		{ value: '', name: 'All Statuses' },
+		{ value: ConciergeCaseStatusValues.INTAKE, name: 'Intake' },
+		{ value: ActivityEntityTypeValues.ASSESSMENT, name: 'Assessment' },
+		{ value: JobStatusValues.IN_PROGRESS, name: 'In Progress' },
+		{ value: ConciergeCaseStatusValues.PENDING_EXTERNAL, name: 'Pending External' },
+		{ value: ConciergeCaseStatusValues.PENDING_OWNER, name: 'Pending Owner' },
+		{ value: JobStatusValues.ON_HOLD, name: 'On Hold' },
+		{ value: ViolationStatusValues.RESOLVED, name: 'Resolved' },
+		{ value: JobStatusValues.CLOSED, name: 'Closed' }
 	];
 </script>
 
@@ -137,14 +139,23 @@
 				<h1 class="text-2xl font-bold">Cases</h1>
 				<p class="mt-1 text-surface-500">All concierge cases across the platform</p>
 			</div>
-			<button onclick={refresh} class="btn preset-outlined-primary-500" disabled={isRefreshing}>
-				{#if isRefreshing}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}
-					<RefreshCw class="mr-2 h-4 w-4" />
-				{/if}
-				Refresh
-			</button>
+			<div class="flex gap-2">
+				<a
+					href="/app/admin/activity?entityType=CONCIERGE_CASE"
+					class="btn preset-outlined-surface-500"
+				>
+					<Activity class="mr-2 h-4 w-4" />
+					View All Case Activity
+				</a>
+				<button onclick={refresh} class="btn preset-outlined-primary-500" disabled={isRefreshing}>
+					{#if isRefreshing}
+						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					{:else}
+						<RefreshCw class="mr-2 h-4 w-4" />
+					{/if}
+					Refresh
+				</button>
+			</div>
 		</div>
 
 		<!-- Filters -->
@@ -161,11 +172,7 @@
 				</div>
 			</div>
 			<div>
-				<select bind:value={statusFilter} onchange={onStatusChange} class="select">
-					{#each statuses as status}
-						<option value={status.value}>{status.label}</option>
-					{/each}
-				</select>
+				<Select bind:value={statusFilter} items={statuses} size="sm" onchange={onStatusChange} />
 			</div>
 		</div>
 

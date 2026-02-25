@@ -12,6 +12,7 @@
 		CreditCard,
 		Plus
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import { ARCCategoryValues, JobInvoiceStatusValues, PaymentMethodValues, invoiceApi, jobApi, type Job, type JobInvoice } from '$lib/api/cam';
 
@@ -137,12 +138,12 @@
 	}
 
 	const paymentMethods = [
-		{ value: PaymentMethodValues.CASH, label: 'Cash' },
-		{ value: PaymentMethodValues.CHECK, label: 'Check' },
-		{ value: PaymentMethodValues.CREDIT_CARD, label: 'Credit Card' },
-		{ value: 'DEBIT_CARD', label: 'Debit Card' },
-		{ value: 'BANK_TRANSFER', label: 'Bank Transfer' },
-		{ value: ARCCategoryValues.OTHER, label: 'Other' }
+		{ value: PaymentMethodValues.CASH, name: 'Cash' },
+		{ value: PaymentMethodValues.CHECK, name: 'Check' },
+		{ value: PaymentMethodValues.CREDIT_CARD, name: 'Credit Card' },
+		{ value: 'DEBIT_CARD', name: 'Debit Card' },
+		{ value: 'BANK_TRANSFER', name: 'Bank Transfer' },
+		{ value: ARCCategoryValues.OTHER, name: 'Other' }
 	];
 </script>
 
@@ -236,12 +237,12 @@
 						</div>
 						<div>
 							<label for="paymentMethod" class="label mb-1 text-sm">Payment Method</label>
-							<select id="paymentMethod" bind:value={paymentMethod} class="select w-full">
+							<Select bind:value={paymentMethod} size="sm">
 								<option value="">Select method...</option>
 								{#each paymentMethods as method}
-									<option value={method.value}>{method.label}</option>
+									<option value={method.value}>{method.name}</option>
 								{/each}
-							</select>
+							</Select>
 						</div>
 						<div>
 							<label for="paymentReference" class="label mb-1 text-sm">Reference Number</label>

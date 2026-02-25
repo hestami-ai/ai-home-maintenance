@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { UserRoleValues } from '$lib/api/cam';
 	import { Plus, Mail, Copy, RefreshCw, XCircle, Clock, CheckCircle, Users } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import {
 		invitationApi,
@@ -26,10 +27,10 @@
 	let createError = $state<string | null>(null);
 
 	const roleOptions = [
-		{ value: UserRoleValues.OWNER, label: 'Owner/Homeowner' },
-		{ value: UserRoleValues.TENANT, label: 'Tenant/Renter' },
-		{ value: UserRoleValues.BOARD_MEMBER, label: 'Board Member' },
-		{ value: UserRoleValues.MANAGER, label: 'Manager' }
+		{ value: UserRoleValues.OWNER, name: 'Owner/Homeowner' },
+		{ value: UserRoleValues.TENANT, name: 'Tenant/Renter' },
+		{ value: UserRoleValues.BOARD_MEMBER, name: 'Board Member' },
+		{ value: UserRoleValues.MANAGER, name: 'Manager' }
 	];
 
 	async function loadInvitations() {
@@ -255,15 +256,13 @@
 
 				<div>
 					<label for="role" class="block text-sm font-medium">Role</label>
-					<select
+					<Select
 						id="role"
 						bind:value={newRole}
-						class="select mt-1 w-full"
-					>
-						{#each roleOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={roleOptions}
+						size="sm"
+						class="mt-1"
+					/>
 				</div>
 
 				{#if createError}

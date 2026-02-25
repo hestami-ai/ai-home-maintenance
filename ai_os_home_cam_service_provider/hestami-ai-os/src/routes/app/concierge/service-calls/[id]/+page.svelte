@@ -92,6 +92,7 @@
 		noteType: string;
 		isInternal: boolean;
 		createdBy: string;
+		createdByName?: string;
 		createdAt: string;
 	}
 
@@ -1108,9 +1109,7 @@
 										<div class="flex-1">
 											<div class="flex items-center gap-2">
 												<span class="text-sm font-medium">
-													{note.noteType === 'CLARIFICATION_REQUEST'
-														? 'Hestami Team'
-														: 'You'}
+													{note.createdByName ?? (note.noteType === 'CLARIFICATION_REQUEST' ? 'Hestami Team' : 'You')}
 												</span>
 												<span class="text-xs text-surface-500">
 													{formatRelativeTime(note.createdAt)}

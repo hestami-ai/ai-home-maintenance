@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CaseNoteTypeValues, NoticeTypeValues } from '$lib/api/cam';
 	import { X, Loader2, Send } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 
 	interface NoticeTemplate {
 		id: string;
@@ -32,12 +33,14 @@
 	let notes = $state('');
 	let error = $state('');
 
-	const noticeTypeOptions = [
-		{ value: NoticeTypeValues.FIRST_NOTICE, label: 'First Notice', defaultDays: 14 },
-		{ value: NoticeTypeValues.SECOND_NOTICE, label: 'Second Notice', defaultDays: 7 },
-		{ value: NoticeTypeValues.FINAL_NOTICE, label: 'Final Notice', defaultDays: 3 },
-		{ value: NoticeTypeValues.HEARING_NOTICE, label: 'Hearing Notice', defaultDays: 14 }
+	const noticeTypeOptionsData = [
+		{ value: NoticeTypeValues.FIRST_NOTICE, name: 'First Notice', defaultDays: 14 },
+		{ value: NoticeTypeValues.SECOND_NOTICE, name: 'Second Notice', defaultDays: 7 },
+		{ value: NoticeTypeValues.FINAL_NOTICE, name: 'Final Notice', defaultDays: 3 },
+		{ value: NoticeTypeValues.HEARING_NOTICE, name: 'Hearing Notice', defaultDays: 14 }
 	];
+
+	const noticeTypeItems = noticeTypeOptionsData.map(opt => ({ value: opt.value, name: opt.name }));
 
 	const templates: NoticeTemplate[] = [
 		{ id: 'tpl-1', name: 'Standard First Notice', type: NoticeTypeValues.FIRST_NOTICE },
@@ -51,7 +54,7 @@
 	);
 
 	function handleNoticeTypeChange() {
-		const option = noticeTypeOptions.find(o => o.value === noticeType);
+		const option = noticeTypeOptionsData.find(o => o.value === noticeType);
 		if (option) {
 			curePeriodDays = option.defaultDays;
 		}
@@ -124,35 +127,27 @@
 				{/if}
 
 				<div>
-					<label for="noticeType" class="mb-1 block text-sm font-medium">
+					<Label for="noticeType" class="mb-1">
 						Notice Type <span class="text-error-500">*</span>
-					</label>
-					<select
+					</Label>
+					<Select
 						id="noticeType"
 						bind:value={noticeType}
+						items={noticeTypeItems}
 						onchange={handleNoticeTypeChange}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each noticeTypeOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+					/>
 				</div>
 
 				<div>
-					<label for="templateId" class="mb-1 block text-sm font-medium">
+					<Label for="templateId" class="mb-1">
 						Notice Template <span class="text-error-500">*</span>
-					</label>
-					<select
-						id="templateId"
-						bind:value={templateId}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
+					</Label>
+					<Select id="templateId" bind:value={templateId} placeholder="Select a template">
 						<option value="">Select a template</option>
 						{#each filteredTemplates as template}
 							<option value={template.id}>{template.name}</option>
 						{/each}
-					</select>
+					</Select>
 				</div>
 
 				<div>

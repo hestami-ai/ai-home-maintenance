@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { X, Loader2, Calendar } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 
 	interface Props {
 		open: boolean;
@@ -25,11 +26,12 @@
 	let notes = $state('');
 	let error = $state('');
 
-	const locationOptions = [
-		'Community Clubhouse',
-		'Association Office',
-		'Virtual Meeting (Zoom)',
-		'Other'
+	const locationItems = [
+		{ value: '', name: 'Select a location' },
+		{ value: 'Community Clubhouse', name: 'Community Clubhouse' },
+		{ value: 'Association Office', name: 'Association Office' },
+		{ value: 'Virtual Meeting (Zoom)', name: 'Virtual Meeting (Zoom)' },
+		{ value: 'Other', name: 'Other' }
 	];
 
 	function handleConfirm() {
@@ -145,19 +147,14 @@
 				</div>
 
 				<div>
-					<label for="location" class="mb-1 block text-sm font-medium">
+					<Label for="location" class="mb-1">
 						Location <span class="text-error-500">*</span>
-					</label>
-					<select
+					</Label>
+					<Select
 						id="location"
 						bind:value={location}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						<option value="">Select a location</option>
-						{#each locationOptions as loc}
-							<option value={loc}>{loc}</option>
-						{/each}
-					</select>
+						items={locationItems}
+					/>
 				</div>
 
 				<div>

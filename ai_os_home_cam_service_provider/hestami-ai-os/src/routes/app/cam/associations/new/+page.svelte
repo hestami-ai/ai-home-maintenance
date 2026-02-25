@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ArrowLeft, Building2, Calculator, FileText, Save, Info } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 	import { associationApi, type AssociationCreateInput } from '$lib/api/cam';
 
 	let { data } = $props();
@@ -151,24 +152,28 @@
 						{#if fieldErrors.taxId}<span class="text-xs text-error-500">{fieldErrors.taxId}</span>{/if}
 					</label>
 
-					<label class="label">
-						<span>Fiscal Year End Month</span>
-						<select name="fiscalYearEnd" class="select" bind:value={formData.fiscalYearEnd}>
-							<option value={1}>January</option>
-							<option value={2}>February</option>
-							<option value={3}>March</option>
-							<option value={4}>April</option>
-							<option value={5}>May</option>
-							<option value={6}>June</option>
-							<option value={7}>July</option>
-							<option value={8}>August</option>
-							<option value={9}>September</option>
-							<option value={10}>October</option>
-							<option value={11}>November</option>
-							<option value={12}>December</option>
-						</select>
+					<div class="label">
+						<Label for="fiscalYearEnd" class="mb-2">Fiscal Year End Month</Label>
+						<Select
+							id="fiscalYearEnd"
+							bind:value={formData.fiscalYearEnd}
+							items={[
+								{ value: 1, name: 'January' },
+								{ value: 2, name: 'February' },
+								{ value: 3, name: 'March' },
+								{ value: 4, name: 'April' },
+								{ value: 5, name: 'May' },
+								{ value: 6, name: 'June' },
+								{ value: 7, name: 'July' },
+								{ value: 8, name: 'August' },
+								{ value: 9, name: 'September' },
+								{ value: 10, name: 'October' },
+								{ value: 11, name: 'November' },
+								{ value: 12, name: 'December' }
+							]}
+						/>
 						{#if fieldErrors.fiscalYearEnd}<span class="text-xs text-error-500">{fieldErrors.fiscalYearEnd}</span>{/if}
-					</label>
+					</div>
 				</div>
 			</div>
 		</section>

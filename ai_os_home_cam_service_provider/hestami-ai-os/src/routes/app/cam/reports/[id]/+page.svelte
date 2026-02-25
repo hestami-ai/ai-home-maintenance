@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Play, Download, FileText, Table, FileSpreadsheet, Loader2 } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
 	import { reportApi } from '$lib/api/cam';
@@ -180,16 +181,16 @@
 											class="mt-1 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 										/>
 									{:else if param.type === 'select' && param.options}
-										<select
+										<Select
 											id={param.name}
 											bind:value={parameterValues[param.name]}
-											class="mt-1 w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+											class="mt-1"
 										>
 											<option value="">Select...</option>
 											{#each param.options as option}
 												<option value={option.value}>{option.label}</option>
 											{/each}
-										</select>
+										</Select>
 									{:else if param.type === 'number'}
 										<input
 											id={param.name}

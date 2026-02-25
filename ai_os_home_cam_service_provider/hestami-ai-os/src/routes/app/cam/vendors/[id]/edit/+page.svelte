@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { ArrowLeft, Save, Plus, X } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { ARCCategoryValues, AssetStatusValues, VendorApprovalStatusValues, type Vendor, vendorApi } from '$lib/api/cam';
@@ -42,10 +43,10 @@
 	];
 
 	const statusOptions = [
-		{ value: VendorApprovalStatusValues.PENDING, label: 'Pending Approval' },
-		{ value: VendorApprovalStatusValues.APPROVED, label: 'Approved' },
-		{ value: VendorApprovalStatusValues.SUSPENDED, label: 'Suspended' },
-		{ value: AssetStatusValues.INACTIVE, label: 'Inactive' }
+		{ value: VendorApprovalStatusValues.PENDING, name: 'Pending Approval' },
+		{ value: VendorApprovalStatusValues.APPROVED, name: 'Approved' },
+		{ value: VendorApprovalStatusValues.SUSPENDED, name: 'Suspended' },
+		{ value: AssetStatusValues.INACTIVE, name: 'Inactive' }
 	];
 
 	const vendorId = $derived(($page.params as Record<string, string>).id);
@@ -203,15 +204,7 @@
 									<label for="status" class="mb-1 block text-sm font-medium">
 										{m.label_status()}
 									</label>
-									<select
-										id="status"
-										bind:value={formData.status}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each statusOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+									<Select id="status" bind:value={formData.status} items={statusOptions} />
 								</div>
 							</div>
 
@@ -271,15 +264,12 @@
 						<h3 class="mb-4 font-semibold">Trades & Services <span class="text-error-500">*</span></h3>
 						<div class="space-y-4">
 							<div class="flex gap-2">
-								<select
-									bind:value={newTrade}
-									class="flex-1 rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
+								<Select bind:value={newTrade} class="flex-1">
 									<option value="">Select a trade</option>
 									{#each tradeOptions.filter(t => !formData.trades.includes(t)) as trade}
 										<option value={trade}>{trade}</option>
 									{/each}
-								</select>
+								</Select>
 								<button
 									type="button"
 									onclick={addTrade}

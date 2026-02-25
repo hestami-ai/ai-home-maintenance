@@ -1,0 +1,11 @@
+{
+  "model": "qwen3-4b-thinking",
+  "messages": [
+    {
+      "role": "user",
+      "content": "You are summarizing a parent section and its subsections from a technical specification.\n\nParent Section: Performance Requirements\nParent Content:\nThis section defines the performance targets for the Photorealistic 3D Scanning SDK across processing time, memory usage, and accuracy dimensions.\n\nSubsections:\n1. Processing Time Targets\n   | Operation | Target | Maximum |\n   |-----------|--------|---------|  \n   | Image Capture | < 0.5s | 1s |\n   | Feature Detection | < 200ms | 500ms |\n   | Feature Matching | < 300ms | 1s |\n   | SfM Reconstruction | < 5s | 10s |\n   | Dense Reconstruction | < 30s | 60s |\n   | AI Enhancement | < 5s | 10s |\n   | Texture Mapping | < 5s | 10s |\n   | Measurement Extraction | < 2s | 5s |\n   | **Total Processing** | **< 2 min** | **< 5 min** |\n\n2. Memory Usage Targets\n   | Component | Target | Maximum |\n   |-----------|--------|---------|  \n   | Image Capture | 200MB | 500MB |\n   | Feature Detection | 150MB | 300MB |\n   | SfM Reconstruction | 500MB | 1GB |\n   | Dense Reconstruction | 1GB | 2GB |\n   | AI Enhancement | 300MB | 500MB |\n   | Texture Mapping | 400MB | 800MB |\n   | **Peak Memory** | **1.5GB** | **2GB** |\n\n3. Accuracy Targets\n   | Measurement Type | Target | Maximum Error |\n   |-----------------|--------|---------------|\n   | Door Width | ±1mm | ±2mm |\n   | Door Height | ±1mm | ±2mm |\n   | Window Width | ±1mm | ±2mm |\n   | Window Height | ±1mm | ±2mm |\n   | Room Length | ±2mm | ±5mm |\n   | Room Width | ±2mm | ±5mm |\n   | Room Height | ±2mm | ±5mm |\n\nGenerate two types of summaries:\n\n{\n  \"prefix_summary\": \"<Summary of ONLY the parent section's direct content, before subsections>\",\n  \"full_summary\": \"<Comprehensive summary covering parent AND all subsections>\",\n  \"subsection_topics\": [\"brief topic for subsection 1\", \"brief topic for subsection 2\", \"brief topic for subsection 3\"]\n}\n\nReturn only valid JSON."
+    }
+  ],
+  "temperature": 0.0,
+  "stream": false
+}

@@ -1,0 +1,16 @@
+Janus + Takumi
+
+Janus and Takumi actually complement each other conceptually:
+
+Janus → dual-perspective, past ↔ future, spec ↔ implementation
+
+Takumi → disciplined craftsmanship and correctness
+
+
+
+Open vsc-extension-quickstart.md inside the new extension for further instructions
+on how to modify, test and publish your extension.
+
+To run the extension you need to install the recommended extension 'connor4312.esbuild-problem-matchers'. (https://github.com/connor4312/esbuild-problem-matchers)
+
+For more information, also visit http://code.visualstudio.com and follow us @code.

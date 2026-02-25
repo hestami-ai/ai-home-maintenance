@@ -13,7 +13,7 @@
 
 import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
-import { authedProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema } from '../router.js';
+import { authedProcedure, successResponse, PaginationInputSchema, PaginationOutputSchema, IdempotencyKeySchema } from '../router.js';
 import { prisma } from '../../db.js';
 import { createModuleLogger } from '../../logger.js';
 import { buildPrincipal, requireAuthorization, createResource } from '../../cerbos/index.js';
@@ -27,6 +27,8 @@ import {
 	ActivityEntityType,
 	PillarAccess
 } from '../../../../../generated/prisma/enums.js';
+import { orgTransaction, lookupWorkItemOrgId } from '../../db/rls.js';
+import { recordExecution } from '../middleware/activityEvent.js';
 
 const log = createModuleLogger('WorkQueueRoute');
 
@@ -564,6 +566,157 @@ export const workQueueRouter = {
 
 			return successResponse(
 				{ organizationId: orgId },
+				context
+			);
+		}),
+
+	/**
+	 * Bulk reassign work queue items
+	 *
+	 * Reassigns multiple concierge cases to a specified staff member.
+	 * Currently only supports CONCIERGE_CASE items.
+	 */
+	bulkReassign: authedProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				items: z.array(
+					z.object({
+						itemType: z.string(),
+						itemId: z.string()
+					})
+				).min(1).max(50),
+				assignToUserId: z.string()
+			})
+		)
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					results: z.array(
+						z.object({
+							itemId: z.string(),
+							itemType: z.string(),
+							success: z.boolean(),
+							error: z.string().optional()
+						})
+					),
+					successCount: z.number(),
+					failureCount: z.number()
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.errors({
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			NOT_FOUND: { message: 'Resource not found' }
+		})
+		.handler(async ({ input, context, errors }) => {
+			log.info('Bulk reassign request', {
+				userId: context.user.id,
+				itemCount: input.items.length,
+				assignToUserId: input.assignToUserId
+			});
+
+			// Verify assignee exists
+			const assignee = await prisma.user.findUnique({
+				where: { id: input.assignToUserId }
+			});
+			if (!assignee) {
+				throw errors.NOT_FOUND({ message: 'Assignee user not found' });
+			}
+
+			const results: Array<{ itemId: string; itemType: string; success: boolean; error?: string }> = [];
+
+			// Process each item
+			for (const item of input.items) {
+				try {
+					// Only support CONCIERGE_CASE for now
+					if (item.itemType !== ActivityEntityType.CONCIERGE_CASE) {
+						results.push({
+							itemId: item.itemId,
+							itemType: item.itemType,
+							success: false,
+							error: 'Only concierge cases can be reassigned via this endpoint'
+						});
+						continue;
+					}
+
+					// Look up the organization for this case
+					const orgId = await lookupWorkItemOrgId(item.itemType as ActivityEntityType, item.itemId);
+					if (!orgId) {
+						results.push({
+							itemId: item.itemId,
+							itemType: item.itemType,
+							success: false,
+							error: 'Case not found'
+						});
+						continue;
+					}
+
+					// Perform the reassignment within RLS context
+					await orgTransaction(orgId, async (tx) => {
+						await tx.conciergeCase.update({
+							where: { id: item.itemId },
+							data: { assignedConciergeUserId: input.assignToUserId }
+						});
+					}, {
+						userId: context.user.id,
+						isStaff: true,
+						reason: 'Bulk reassign work queue items',
+						itemType: ActivityEntityType.CONCIERGE_CASE,
+						itemId: item.itemId
+					});
+
+					// Record activity event
+					await orgTransaction(orgId, async () => {
+						await recordExecution(context, {
+							entityType: ActivityEntityType.CONCIERGE_CASE,
+							entityId: item.itemId,
+							action: 'ASSIGN',
+							summary: `Case reassigned to ${assignee.name || assignee.email} via bulk reassignment`,
+							caseId: item.itemId,
+							newState: { assignedConciergeUserId: input.assignToUserId }
+						});
+					}, {
+						userId: context.user.id,
+						isStaff: true,
+						reason: 'Recording bulk reassign activity',
+						itemType: ActivityEntityType.CONCIERGE_CASE,
+						itemId: item.itemId
+					});
+
+					results.push({
+						itemId: item.itemId,
+						itemType: item.itemType,
+						success: true
+					});
+				} catch (err) {
+					log.error('Failed to reassign item', {
+						itemId: item.itemId,
+						itemType: item.itemType,
+						error: err instanceof Error ? err.message : String(err)
+					});
+					results.push({
+						itemId: item.itemId,
+						itemType: item.itemType,
+						success: false,
+						error: err instanceof Error ? err.message : 'Unknown error'
+					});
+				}
+			}
+
+			const successCount = results.filter(r => r.success).length;
+			const failureCount = results.filter(r => !r.success).length;
+
+			log.info('Bulk reassign completed', { successCount, failureCount });
+
+			return successResponse(
+				{
+					results,
+					successCount,
+					failureCount
+				},
 				context
 			);
 		})

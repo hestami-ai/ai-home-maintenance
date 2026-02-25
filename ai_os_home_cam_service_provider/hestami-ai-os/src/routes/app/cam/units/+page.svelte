@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Select } from 'flowbite-svelte';
 	import { Home, Plus, Search } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
@@ -12,12 +13,12 @@
 	let typeFilter = $state<string>('');
 
 	const typeOptions = [
-		{ value: '', label: 'All Types' },
-		{ value: PropertyTypeValues.SINGLE_FAMILY, label: 'Single Family' },
-		{ value: UnitTypeValues.TOWNHOUSE, label: 'Townhouse' },
-		{ value: 'CONDO', label: 'Condo' },
-		{ value: 'APARTMENT', label: 'Apartment' },
-		{ value: UnitTypeValues.LOT, label: 'Lot' }
+		{ value: '', name: 'All Types' },
+		{ value: PropertyTypeValues.SINGLE_FAMILY, name: 'Single Family' },
+		{ value: UnitTypeValues.TOWNHOUSE, name: 'Townhouse' },
+		{ value: 'CONDO', name: 'Condo' },
+		{ value: 'APARTMENT', name: 'Apartment' },
+		{ value: UnitTypeValues.LOT, name: 'Lot' }
 	];
 
 	async function loadUnits() {
@@ -98,14 +99,7 @@
 						/>
 					</div>
 
-					<select
-						bind:value={typeFilter}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each typeOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+					<Select bind:value={typeFilter} items={typeOptions} size="sm" />
 				</div>
 			{/snippet}
 

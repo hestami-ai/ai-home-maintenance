@@ -2,6 +2,7 @@
 	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
 
@@ -13,10 +14,10 @@
 	let hasRules = $state($communityOnboarding.governance.hasRules);
 
 	const months = [
-		{ value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
-		{ value: 4, label: 'April' }, { value: 5, label: 'May' }, { value: 6, label: 'June' },
-		{ value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
-		{ value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' }
+		{ value: 1, name: 'January' }, { value: 2, name: 'February' }, { value: 3, name: 'March' },
+		{ value: 4, name: 'April' }, { value: 5, name: 'May' }, { value: 6, name: 'June' },
+		{ value: 7, name: 'July' }, { value: 8, name: 'August' }, { value: 9, name: 'September' },
+		{ value: 10, name: 'October' }, { value: 11, name: 'November' }, { value: 12, name: 'December' }
 	];
 
 	$effect.pre(() => {
@@ -73,19 +74,11 @@
 					</div>
 					<div>
 						<label for="fiscalYearStart" class="block text-sm font-medium">Fiscal Year Starts</label>
-						<select id="fiscalYearStart" bind:value={fiscalYearStart} class="select mt-1 w-full">
-							{#each months as month}
-								<option value={month.value}>{month.label}</option>
-							{/each}
-						</select>
+						<Select id="fiscalYearStart" bind:value={fiscalYearStart} items={months} size="sm" class="mt-1" />
 					</div>
 					<div>
 						<label for="annualMeetingMonth" class="block text-sm font-medium">Annual Meeting</label>
-						<select id="annualMeetingMonth" bind:value={annualMeetingMonth} class="select mt-1 w-full">
-							{#each months as month}
-								<option value={month.value}>{month.label}</option>
-							{/each}
-						</select>
+						<Select id="annualMeetingMonth" bind:value={annualMeetingMonth} items={months} size="sm" class="mt-1" />
 					</div>
 				</div>
 

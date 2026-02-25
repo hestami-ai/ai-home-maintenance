@@ -2,6 +2,7 @@
 	import { OrganizationTypeValues } from '$lib/api/cam';
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { communityOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
 
@@ -159,12 +160,12 @@
 				</div>
 				<div class="sm:col-span-1">
 					<label for="stateCode" class="block text-sm font-medium">State</label>
-					<select id="stateCode" bind:value={stateCode} class="select mt-1 w-full">
+					<Select id="stateCode" bind:value={stateCode} size="sm" class="mt-1">
 						<option value="">--</option>
 						{#each usStates as st}
 							<option value={st}>{st}</option>
 						{/each}
-					</select>
+					</Select>
 				</div>
 				<div class="sm:col-span-2">
 					<label for="zipCode" class="block text-sm font-medium">ZIP</label>

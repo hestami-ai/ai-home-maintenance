@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ActivityEntityTypeValues, ServiceProviderRoleValues, UserRoleValues } from '$lib/api/cam';
 	import { Plus, Mail, Copy, RefreshCw, XCircle, CheckCircle, Users } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import {
 		invitationApi,
@@ -25,13 +26,13 @@
 	let createError = $state<string | null>(null);
 
 	const roleOptions = [
-		{ value: UserRoleValues.OWNER, label: 'Owner' },
-		{ value: UserRoleValues.ADMIN, label: 'Administrator' },
-		{ value: ServiceProviderRoleValues.OFFICE_MANAGER, label: 'Office Manager' },
-		{ value: ServiceProviderRoleValues.DISPATCHER, label: 'Dispatcher' },
-		{ value: ServiceProviderRoleValues.ESTIMATOR, label: 'Estimator' },
-		{ value: ServiceProviderRoleValues.BOOKKEEPER, label: 'Bookkeeper' },
-		{ value: ActivityEntityTypeValues.TECHNICIAN, label: 'Technician' }
+		{ value: UserRoleValues.OWNER, name: 'Owner' },
+		{ value: UserRoleValues.ADMIN, name: 'Administrator' },
+		{ value: ServiceProviderRoleValues.OFFICE_MANAGER, name: 'Office Manager' },
+		{ value: ServiceProviderRoleValues.DISPATCHER, name: 'Dispatcher' },
+		{ value: ServiceProviderRoleValues.ESTIMATOR, name: 'Estimator' },
+		{ value: ServiceProviderRoleValues.BOOKKEEPER, name: 'Bookkeeper' },
+		{ value: ActivityEntityTypeValues.TECHNICIAN, name: 'Technician' }
 	];
 
 	async function loadInvitations() {
@@ -257,15 +258,12 @@
 
 				<div>
 					<label for="role" class="block text-sm font-medium">Role</label>
-					<select
-						id="role"
+					<Select
 						bind:value={newRole}
-						class="select mt-1 w-full"
-					>
-						{#each roleOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={roleOptions}
+						size="sm"
+						class="mt-1"
+					/>
 				</div>
 
 				{#if createError}

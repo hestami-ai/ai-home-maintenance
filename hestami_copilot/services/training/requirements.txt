@@ -1,0 +1,22 @@
+# Training Service Dependencies
+
+# Core ML
+torch>=2.2.0
+transformers>=4.40.0
+accelerate>=0.30.0
+bitsandbytes>=0.43.0
+peft>=0.11.0
+trl>=0.9.0  # For DPO training
+
+# Dataset handling
+datasets>=2.19.0
+
+# Utilities
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+httpx>=0.27.0
+psycopg2-binary>=2.9.0
+
+# Monitoring
+wandb>=0.17.0
+tensorboard>=2.16.0

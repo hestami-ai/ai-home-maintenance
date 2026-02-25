@@ -1,0 +1,130 @@
+{
+  "name": "hestami-court",
+  "displayName": "Hestami Court",
+  "description": "AI-assisted software development with Historian-based governance",
+  "version": "0.1.0",
+  "publisher": "hestami",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "historian",
+    "governance",
+    "specifications",
+    "code-review"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "hestami-court.startSession",
+        "title": "Start Session",
+        "category": "Hestami Court"
+      },
+      {
+        "command": "hestami-court.submitProposal",
+        "title": "Submit Proposal for Adjudication",
+        "category": "Hestami Court"
+      },
+      {
+        "command": "hestami-court.showVerdicts",
+        "title": "Show Recent Verdicts",
+        "category": "Hestami Court"
+      },
+      {
+        "command": "hestami-court.linkSpec",
+        "title": "Link Specification",
+        "category": "Hestami Court"
+      },
+      {
+        "command": "hestami-court.recordDecision",
+        "title": "Record Decision",
+        "category": "Hestami Court"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hestami-court",
+          "title": "Hestami Court",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "hestami-court": [
+        {
+          "id": "hestami-court.conversation",
+          "name": "Conversation",
+          "type": "webview"
+        },
+        {
+          "id": "hestami-court.feature",
+          "name": "Feature",
+          "type": "tree"
+        },
+        {
+          "id": "hestami-court.verdicts",
+          "name": "Court",
+          "type": "tree"
+        },
+        {
+          "id": "hestami-court.steps",
+          "name": "Steps",
+          "type": "tree"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Hestami Court",
+      "properties": {
+        "hestami-court.historianUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "URL of the Historian inference service"
+        },
+        "hestami-court.bundleBuilderUrl": {
+          "type": "string",
+          "default": "http://localhost:3001",
+          "description": "URL of the bundle builder service"
+        },
+        "hestami-court.specsDirectory": {
+          "type": "string",
+          "default": "./docs/specs",
+          "description": "Directory containing specification documents"
+        },
+        "hestami-court.autoAdjudicate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically adjudicate proposals before execution"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
+    "lint": "eslint src --ext ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@hestami/contracts": "workspace:*"
+  }
+}

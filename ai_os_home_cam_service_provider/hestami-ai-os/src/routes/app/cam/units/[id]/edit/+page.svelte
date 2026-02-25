@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { ArrowLeft, Save } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
 	import { PropertyTypeValues, type Unit, unitApi } from '$lib/api/cam';
@@ -21,15 +22,15 @@
 	});
 
 	const unitTypeOptions = [
-		{ value: 'RESIDENTIAL', label: 'Residential' },
-		{ value: PropertyTypeValues.COMMERCIAL, label: 'Commercial' },
-		{ value: PropertyTypeValues.MIXED_USE, label: 'Mixed Use' }
+		{ value: 'RESIDENTIAL', name: 'Residential' },
+		{ value: PropertyTypeValues.COMMERCIAL, name: 'Commercial' },
+		{ value: PropertyTypeValues.MIXED_USE, name: 'Mixed Use' }
 	];
 
 	const statusOptions = [
-		{ value: 'OCCUPIED', label: 'Occupied' },
-		{ value: 'VACANT', label: 'Vacant' },
-		{ value: 'UNDER_RENOVATION', label: 'Under Renovation' }
+		{ value: 'OCCUPIED', name: 'Occupied' },
+		{ value: 'VACANT', name: 'Vacant' },
+		{ value: 'UNDER_RENOVATION', name: 'Under Renovation' }
 	];
 
 	const unitId = $derived(($page.params as Record<string, string>).id);
@@ -170,15 +171,7 @@
 									<label for="unitType" class="mb-1 block text-sm font-medium">
 										Unit Type
 									</label>
-									<select
-										id="unitType"
-										bind:value={formData.unitType}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each unitTypeOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+									<Select id="unitType" bind:value={formData.unitType} items={unitTypeOptions} />
 								</div>
 							</div>
 
@@ -186,15 +179,7 @@
 								<label for="status" class="mb-1 block text-sm font-medium">
 									Status
 								</label>
-								<select
-									id="status"
-									bind:value={formData.status}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each statusOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+								<Select id="status" bind:value={formData.status} items={statusOptions} />
 							</div>
 
 							<div>

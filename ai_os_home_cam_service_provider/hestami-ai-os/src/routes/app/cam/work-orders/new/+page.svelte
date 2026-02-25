@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Wrench, Upload } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { currentAssociation } from '$lib/stores';
 	import { ARCCategoryValues, AssetCategoryValues, FundTypeValues, WorkOrderCategoryValues, WorkOrderOriginTypeValues, WorkOrderPriorityValues, type Unit, type Vendor, unitApi, vendorApi, workOrderApi } from '$lib/api/cam';
 
@@ -36,39 +37,39 @@
 
 	// Phase 9: Origin type options
 	const originTypeOptions = [
-		{ value: WorkOrderOriginTypeValues.MANUAL, label: 'Manual Entry' },
-		{ value: WorkOrderOriginTypeValues.VIOLATION_REMEDIATION, label: 'Violation Remediation' },
-		{ value: WorkOrderOriginTypeValues.ARC_APPROVAL, label: 'ARC Approval' },
-		{ value: WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE, label: 'Preventive Maintenance' },
-		{ value: WorkOrderOriginTypeValues.BOARD_DIRECTIVE, label: 'Board Directive' },
-		{ value: WorkOrderOriginTypeValues.EMERGENCY_ACTION, label: 'Emergency Action' }
+		{ value: WorkOrderOriginTypeValues.MANUAL, name: 'Manual Entry' },
+		{ value: WorkOrderOriginTypeValues.VIOLATION_REMEDIATION, name: 'Violation Remediation' },
+		{ value: WorkOrderOriginTypeValues.ARC_APPROVAL, name: 'ARC Approval' },
+		{ value: WorkOrderOriginTypeValues.PREVENTIVE_MAINTENANCE, name: 'Preventive Maintenance' },
+		{ value: WorkOrderOriginTypeValues.BOARD_DIRECTIVE, name: 'Board Directive' },
+		{ value: WorkOrderOriginTypeValues.EMERGENCY_ACTION, name: 'Emergency Action' }
 	];
 
 	// Phase 9: Budget source options
 	const budgetSourceOptions = [
-		{ value: '', label: 'Select budget source' },
-		{ value: FundTypeValues.OPERATING, label: 'Operating Fund' },
-		{ value: FundTypeValues.RESERVE, label: 'Reserve Fund' },
-		{ value: FundTypeValues.SPECIAL, label: 'Special Assessment' }
+		{ value: '', name: 'Select budget source' },
+		{ value: FundTypeValues.OPERATING, name: 'Operating Fund' },
+		{ value: FundTypeValues.RESERVE, name: 'Reserve Fund' },
+		{ value: FundTypeValues.SPECIAL, name: 'Special Assessment' }
 	];
 
 	const categoryOptions = [
-		{ value: WorkOrderCategoryValues.MAINTENANCE, label: 'Maintenance' },
-		{ value: WorkOrderCategoryValues.REPAIR, label: 'Repair' },
-		{ value: WorkOrderCategoryValues.LANDSCAPING, label: 'Landscaping' },
-		{ value: WorkOrderCategoryValues.CLEANING, label: 'Cleaning' },
-		{ value: AssetCategoryValues.ELECTRICAL, label: 'Electrical' },
-		{ value: AssetCategoryValues.PLUMBING, label: 'Plumbing' },
-		{ value: ARCCategoryValues.HVAC, label: ARCCategoryValues.HVAC },
-		{ value: WorkOrderCategoryValues.OTHER, label: 'Other' }
+		{ value: WorkOrderCategoryValues.MAINTENANCE, name: 'Maintenance' },
+		{ value: WorkOrderCategoryValues.REPAIR, name: 'Repair' },
+		{ value: WorkOrderCategoryValues.LANDSCAPING, name: 'Landscaping' },
+		{ value: WorkOrderCategoryValues.CLEANING, name: 'Cleaning' },
+		{ value: AssetCategoryValues.ELECTRICAL, name: 'Electrical' },
+		{ value: AssetCategoryValues.PLUMBING, name: 'Plumbing' },
+		{ value: ARCCategoryValues.HVAC, name: ARCCategoryValues.HVAC },
+		{ value: WorkOrderCategoryValues.OTHER, name: 'Other' }
 	];
 
 	const priorityOptions = [
-		{ value: WorkOrderPriorityValues.EMERGENCY, label: 'Emergency' },
-		{ value: WorkOrderPriorityValues.HIGH, label: 'High' },
-		{ value: WorkOrderPriorityValues.MEDIUM, label: 'Medium' },
-		{ value: WorkOrderPriorityValues.LOW, label: 'Low' },
-		{ value: WorkOrderPriorityValues.SCHEDULED, label: 'Scheduled' }
+		{ value: WorkOrderPriorityValues.EMERGENCY, name: 'Emergency' },
+		{ value: WorkOrderPriorityValues.HIGH, name: 'High' },
+		{ value: WorkOrderPriorityValues.MEDIUM, name: 'Medium' },
+		{ value: WorkOrderPriorityValues.LOW, name: 'Low' },
+		{ value: WorkOrderPriorityValues.SCHEDULED, name: 'Scheduled' }
 	];
 
 	async function loadFormData() {
@@ -199,15 +200,11 @@
 								<label for="originType" class="mb-1 block text-sm font-medium">
 									Origin Type <span class="text-error-500">*</span>
 								</label>
-								<select
+								<Select
 									id="originType"
 									bind:value={formData.originType}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each originTypeOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+									items={originTypeOptions}
+								/>
 								<p class="mt-1 text-xs text-surface-400">
 									Select how this work order originated
 								</p>
@@ -264,16 +261,15 @@
 									<label for="unitId" class="mb-1 block text-sm font-medium">
 										Unit <span class="text-error-500">*</span>
 									</label>
-									<select
+									<Select
 										id="unitId"
 										bind:value={formData.unitId}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 									>
 										<option value="">Select a unit</option>
 										{#each units as unit}
 											<option value={unit.id}>Unit {unit.unitNumber}</option>
 										{/each}
-									</select>
+									</Select>
 								</div>
 							{:else}
 								<div>
@@ -327,32 +323,22 @@
 									<label for="category" class="mb-1 block text-sm font-medium">
 										Category <span class="text-error-500">*</span>
 									</label>
-									<select
+									<Select
 										id="category"
 										bind:value={formData.category}
-										required
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each categoryOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+										items={categoryOptions}
+									/>
 								</div>
 
 								<div>
 									<label for="priority" class="mb-1 block text-sm font-medium">
 										Priority <span class="text-error-500">*</span>
 									</label>
-									<select
+									<Select
 										id="priority"
 										bind:value={formData.priority}
-										required
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each priorityOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+										items={priorityOptions}
+									/>
 								</div>
 							</div>
 
@@ -379,15 +365,11 @@
 									<label for="budgetSource" class="mb-1 block text-sm font-medium">
 										Budget Source
 									</label>
-									<select
+									<Select
 										id="budgetSource"
 										bind:value={formData.budgetSource}
-										class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-									>
-										{#each budgetSourceOptions as option}
-											<option value={option.value}>{option.label}</option>
-										{/each}
-									</select>
+										items={budgetSourceOptions}
+									/>
 								</div>
 
 								<div>
@@ -433,10 +415,9 @@
 							<label for="vendorId" class="mb-1 block text-sm font-medium">
 								Assign Vendor
 							</label>
-							<select
+							<Select
 								id="vendorId"
 								bind:value={formData.vendorId}
-								class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
 							>
 								<option value="">Assign later</option>
 								{#each vendors as vendor}
@@ -444,7 +425,7 @@
 										{vendor.name}
 									</option>
 								{/each}
-							</select>
+							</Select>
 							<p class="mt-1 text-xs text-surface-400">
 								You can assign a vendor now or later from the work order detail page.
 							</p>

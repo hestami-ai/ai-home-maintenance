@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ArrowLeft, Loader2 } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { goto } from '$app/navigation';
 	import { orpc } from '$lib/api';
@@ -16,14 +17,14 @@
 	let isSubmitting = $state(false);
 	let error = $state<string | null>(null);
 
-	const timezones = [
-		'America/New_York',
-		'America/Chicago',
-		'America/Denver',
-		'America/Los_Angeles',
-		'America/Phoenix',
-		'America/Anchorage',
-		'Pacific/Honolulu'
+	const timezoneOptions = [
+		{ value: 'America/New_York', name: 'America/New York' },
+		{ value: 'America/Chicago', name: 'America/Chicago' },
+		{ value: 'America/Denver', name: 'America/Denver' },
+		{ value: 'America/Los_Angeles', name: 'America/Los Angeles' },
+		{ value: 'America/Phoenix', name: 'America/Phoenix' },
+		{ value: 'America/Anchorage', name: 'America/Anchorage' },
+		{ value: 'Pacific/Honolulu', name: 'Pacific/Honolulu' }
 	];
 
 	async function handleSubmit(e: SubmitEvent) {
@@ -173,16 +174,13 @@
 
 					<div>
 						<label for="timezone" class="block text-sm font-medium">Timezone</label>
-						<select
-							id="timezone"
+						<Select
 							bind:value={timezone}
-							class="select mt-1 w-full"
+							items={timezoneOptions}
+							size="sm"
 							disabled={isSubmitting}
-						>
-							{#each timezones as tz}
-								<option value={tz}>{tz.replace(/_/g, ' ')}</option>
-							{/each}
-						</select>
+							class="mt-1"
+						/>
 					</div>
 				</div>
 

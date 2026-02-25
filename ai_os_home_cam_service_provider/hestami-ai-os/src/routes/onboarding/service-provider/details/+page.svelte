@@ -11,14 +11,15 @@
 
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { serviceProviderOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
 
 	const businessTypes = [
-		{ value: 'sole_proprietor', label: 'Sole Proprietor' },
-		{ value: 'llc', label: PartyTypeValues.LLC },
-		{ value: 'corporation', label: 'Corporation' },
-		{ value: 'partnership', label: 'Partnership' }
+		{ value: 'sole_proprietor', name: 'Sole Proprietor' },
+		{ value: 'llc', name: PartyTypeValues.LLC },
+		{ value: 'corporation', name: 'Corporation' },
+		{ value: 'partnership', name: 'Partnership' }
 	];
 
 	const serviceCategoryOptions = [
@@ -156,12 +157,12 @@
 
 			<div>
 				<label for="businessType" class="block text-sm font-medium">Business Type</label>
-				<select id="businessType" bind:value={businessType} class="select mt-1 w-full">
+				<Select id="businessType" bind:value={businessType} size="sm" class="mt-1">
 					<option value="">Select type...</option>
 					{#each businessTypes as type}
-						<option value={type.value}>{type.label}</option>
+						<option value={type.value}>{type.name}</option>
 					{/each}
-				</select>
+				</Select>
 			</div>
 
 			<div class="grid gap-4 sm:grid-cols-2">

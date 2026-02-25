@@ -13,6 +13,7 @@
 		Filter
 	} from 'lucide-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { orpc } from '$lib/api';
 	import { invalidateAll } from '$app/navigation';
 
@@ -49,11 +50,11 @@
 	});
 
 	const notificationTypes = [
-		{ value: 'all', label: 'All Notifications' },
-		{ value: 'service_call', label: 'Service Calls' },
-		{ value: 'quote', label: 'Quotes' },
-		{ value: 'message', label: 'Messages' },
-		{ value: 'document', label: 'Documents' }
+		{ value: 'all', name: 'All Notifications' },
+		{ value: 'service_call', name: 'Service Calls' },
+		{ value: 'quote', name: 'Quotes' },
+		{ value: 'message', name: 'Messages' },
+		{ value: 'document', name: 'Documents' }
 	];
 
 	const filteredNotifications = $derived(
@@ -178,11 +179,7 @@
 
 		<!-- Filter -->
 		<div class="mt-6">
-			<select bind:value={filterType} class="select w-full sm:w-48">
-				{#each notificationTypes as type}
-					<option value={type.value}>{type.label}</option>
-				{/each}
-			</select>
+			<Select bind:value={filterType} items={notificationTypes} size="sm" class="w-full sm:w-48" />
 		</div>
 
 		<!-- Notifications List -->

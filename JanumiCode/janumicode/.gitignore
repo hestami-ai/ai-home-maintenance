@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.janumicode/
+test-workspace/
+*.vsix
+.env

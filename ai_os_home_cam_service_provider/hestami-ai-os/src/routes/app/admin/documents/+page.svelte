@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { ARCCategoryValues, DocumentCategoryValues, MediaTypeValues } from '$lib/api/cam';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
-	import { FileText, Search, Filter, Upload, Loader2, Calendar, User, Tag } from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
+	import { FileText, Search, Filter, Upload, Loader2, Calendar, User, Tag, Activity } from 'lucide-svelte';
 
 	interface Props {
 		data: {
@@ -32,13 +33,13 @@
 
 
 	const documentTypes = [
-		{ value: '', label: 'All Types' },
-		{ value: DocumentCategoryValues.CONTRACT, label: 'Contracts' },
-		{ value: DocumentCategoryValues.INVOICE, label: 'Invoices' },
-		{ value: DocumentCategoryValues.ESTIMATE, label: 'Estimates' },
-		{ value: MediaTypeValues.PHOTO, label: 'Photos' },
-		{ value: 'REPORT', label: 'Reports' },
-		{ value: ARCCategoryValues.OTHER, label: 'Other' }
+		{ value: '', name: 'All Types' },
+		{ value: DocumentCategoryValues.CONTRACT, name: 'Contracts' },
+		{ value: DocumentCategoryValues.INVOICE, name: 'Invoices' },
+		{ value: DocumentCategoryValues.ESTIMATE, name: 'Estimates' },
+		{ value: MediaTypeValues.PHOTO, name: 'Photos' },
+		{ value: 'REPORT', name: 'Reports' },
+		{ value: ARCCategoryValues.OTHER, name: 'Other' }
 	];
 </script>
 
@@ -54,10 +55,19 @@
 				<h1 class="text-2xl font-bold">Documents & Evidence</h1>
 				<p class="mt-1 text-surface-500">Browse and manage case-related documents</p>
 			</div>
-			<button class="btn preset-filled-primary-500" disabled>
-				<Upload class="mr-2 h-4 w-4" />
-				Upload Document
-			</button>
+			<div class="flex gap-2">
+				<a
+					href="/app/admin/activity?entityType=DOCUMENT"
+					class="btn preset-outlined-surface-500"
+				>
+					<Activity class="mr-2 h-4 w-4" />
+					Document Activity
+				</a>
+				<button class="btn preset-filled-primary-500" disabled>
+					<Upload class="mr-2 h-4 w-4" />
+					Upload Document
+				</button>
+			</div>
 		</div>
 
 		<!-- Filters -->
@@ -74,11 +84,7 @@
 				</div>
 			</div>
 			<div>
-				<select bind:value={filterType} class="select">
-					{#each documentTypes as type}
-						<option value={type.value}>{type.label}</option>
-					{/each}
-				</select>
+				<Select bind:value={filterType} items={documentTypes} size="sm" />
 			</div>
 		</div>
 

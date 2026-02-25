@@ -110,7 +110,9 @@ import {
 	portfolioRouter,
 	ownerIntentRouter,
 	conciergeCaseRouter,
+	staffConciergeCaseRouter,
 	conciergeActionRouter,
+	staffConciergeActionRouter,
 	externalHoaRouter,
 	externalVendorRouter,
 	materialDecisionRouter,
@@ -146,6 +148,9 @@ import { serviceProviderTeamRouter } from './routes/serviceProviderTeam.js';
 
 // Phase 38: Organization Invitations & Join Requests
 import { invitationRouter, joinRequestRouter } from './routes/invitation.js';
+
+// ML Recommendations
+import { recommendationsRouter } from './routes/recommendations.js';
 
 // Phase 15: Reporting & Analytics
 import {
@@ -266,7 +271,9 @@ export const appRouter = {
 	portfolio: portfolioRouter,
 	ownerIntent: ownerIntentRouter,
 	conciergeCase: conciergeCaseRouter,
+	staffConciergeCase: staffConciergeCaseRouter,
 	conciergeAction: conciergeActionRouter,
+	staffConciergeAction: staffConciergeActionRouter,
 	externalHoa: externalHoaRouter,
 	externalVendor: externalVendorRouter,
 	materialDecision: materialDecisionRouter,
@@ -304,7 +311,10 @@ export const appRouter = {
 
 	// Phase 38: Organization Invitations & Join Requests
 	invitation: invitationRouter,
-	joinRequest: joinRequestRouter
+	joinRequest: joinRequestRouter,
+
+	// ML Recommendations
+	recommendations: recommendationsRouter
 };
 
 export type AppRouter = typeof appRouter;

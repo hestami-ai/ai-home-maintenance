@@ -6,6 +6,7 @@
 		Save,
 		Wrench
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card } from '$lib/components/ui';
 	import { ARCCategoryValues, ActivityEntityTypeValues, JobPriorityValues, JobSourceTypeValues, JobStatusValues, jobApi, type JobSourceType } from '$lib/api/cam';
 
@@ -27,13 +28,13 @@
 	let estimatedHours = $state<number | undefined>(undefined);
 	let estimatedCost = $state<number | undefined>(undefined);
 
-	const sourceTypes: Array<{ value: JobSourceType; label: string }> = [
-		{ value: JobSourceTypeValues.DIRECT_CUSTOMER, label: 'Direct Customer' },
-		{ value: JobStatusValues.LEAD, label: 'Lead' },
-		{ value: ActivityEntityTypeValues.WORK_ORDER, label: 'Work Order' },
-		{ value: ActivityEntityTypeValues.VIOLATION, label: 'Violation' },
-		{ value: ActivityEntityTypeValues.ARC_REQUEST, label: 'ARC Request' },
-		{ value: JobSourceTypeValues.RECURRING, label: 'Recurring' }
+	const sourceTypes: Array<{ value: JobSourceType; name: string }> = [
+		{ value: JobSourceTypeValues.DIRECT_CUSTOMER, name: 'Direct Customer' },
+		{ value: JobStatusValues.LEAD, name: 'Lead' },
+		{ value: ActivityEntityTypeValues.WORK_ORDER, name: 'Work Order' },
+		{ value: ActivityEntityTypeValues.VIOLATION, name: 'Violation' },
+		{ value: ActivityEntityTypeValues.ARC_REQUEST, name: 'ARC Request' },
+		{ value: JobSourceTypeValues.RECURRING, name: 'Recurring' }
 	];
 
 	const priorities = [
@@ -153,21 +154,17 @@
 						<div class="grid gap-4 sm:grid-cols-2">
 							<div>
 								<label for="sourceType" class="label mb-1">Source Type</label>
-								<select id="sourceType" bind:value={sourceType} class="select w-full">
-									{#each sourceTypes as source}
-										<option value={source.value}>{source.label}</option>
-									{/each}
-								</select>
+								<Select bind:value={sourceType} items={sourceTypes} size="sm" />
 							</div>
 
 							<div>
 								<label for="category" class="label mb-1">Category</label>
-								<select id="category" bind:value={category} class="select w-full">
+								<Select bind:value={category} size="sm">
 									<option value="">Select category...</option>
 									{#each categories as cat}
 										<option value={cat}>{cat}</option>
 									{/each}
-								</select>
+								</Select>
 							</div>
 						</div>
 

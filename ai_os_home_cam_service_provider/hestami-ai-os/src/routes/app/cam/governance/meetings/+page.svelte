@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, Calendar, Plus, Search, MapPin, Clock, Users, FileText, Gavel, ScrollText, History, CheckCircle, Video } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, ScheduleMeetingModal } from '$lib/components/cam';
 	import { 
 		QuorumIndicator, 
@@ -88,21 +89,21 @@
 	let isLoadingDetail = $state(false);
 
 	const typeOptions = [
-		{ value: 'all', label: 'All Types' },
-		{ value: MeetingTypeValues.BOARD, label: 'Board' },
-		{ value: MeetingTypeValues.ANNUAL, label: 'Annual' },
-		{ value: MeetingTypeValues.SPECIAL, label: 'Special' },
-		{ value: 'COMMITTEE', label: 'Committee' }
+		{ value: 'all', name: 'All Types' },
+		{ value: MeetingTypeValues.BOARD, name: 'Board' },
+		{ value: MeetingTypeValues.ANNUAL, name: 'Annual' },
+		{ value: MeetingTypeValues.SPECIAL, name: 'Special' },
+		{ value: 'COMMITTEE', name: 'Committee' }
 	];
 
 	const statusOptions = [
-		{ value: 'all', label: 'All Status' },
-		{ value: MeetingStatusValues.SCHEDULED, label: 'Scheduled' },
-		{ value: MeetingStatusValues.IN_SESSION, label: 'In Session' },
-		{ value: MeetingStatusValues.ADJOURNED, label: 'Adjourned' },
-		{ value: MeetingStatusValues.MINUTES_DRAFT, label: 'Minutes Draft' },
-		{ value: MeetingStatusValues.MINUTES_APPROVED, label: 'Approved' },
-		{ value: MeetingStatusValues.ARCHIVED, label: 'Archived' }
+		{ value: 'all', name: 'All Status' },
+		{ value: MeetingStatusValues.SCHEDULED, name: 'Scheduled' },
+		{ value: MeetingStatusValues.IN_SESSION, name: 'In Session' },
+		{ value: MeetingStatusValues.ADJOURNED, name: 'Adjourned' },
+		{ value: MeetingStatusValues.MINUTES_DRAFT, name: 'Minutes Draft' },
+		{ value: MeetingStatusValues.MINUTES_APPROVED, name: 'Approved' },
+		{ value: MeetingStatusValues.ARCHIVED, name: 'Archived' }
 	];
 
 	const detailTabs = [
@@ -391,14 +392,7 @@
 									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
 								/>
 							</div>
-							<select
-								bind:value={typeFilter}
-								class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-							>
-								{#each typeOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+							<Select bind:value={typeFilter} items={typeOptions} size="sm" />
 						</div>
 					{/snippet}
 

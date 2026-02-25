@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, ArrowRight } from 'lucide-svelte';
 	import { Card } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { propertyOwnerOnboarding } from '$lib/stores';
 	import { goto } from '$app/navigation';
 
@@ -15,13 +16,13 @@
 	let squareFootage = $state($propertyOwnerOnboarding.property.squareFootage);
 
 	const propertyTypes = [
-		{ value: 'single_family', label: 'Single Family Home' },
-		{ value: 'condo', label: 'Condominium' },
-		{ value: 'townhouse', label: 'Townhouse' },
-		{ value: 'multi_family', label: 'Multi-Family' },
-		{ value: 'vacation', label: 'Vacation Home' },
-		{ value: 'investment', label: 'Investment Property' },
-		{ value: 'other', label: 'Other' }
+		{ value: 'single_family', name: 'Single Family Home' },
+		{ value: 'condo', name: 'Condominium' },
+		{ value: 'townhouse', name: 'Townhouse' },
+		{ value: 'multi_family', name: 'Multi-Family' },
+		{ value: 'vacation', name: 'Vacation Home' },
+		{ value: 'investment', name: 'Investment Property' },
+		{ value: 'other', name: 'Other' }
 	];
 
 	const usStates = [
@@ -131,17 +132,12 @@
 						State
 						<span class="text-error-500">*</span>
 					</label>
-					<select
-						id="stateCode"
-						bind:value={stateCode}
-						class="select mt-1 w-full"
-						required
-					>
+					<Select id="stateCode" bind:value={stateCode} size="sm" class="mt-1">
 						<option value="">--</option>
 						{#each usStates as st}
 							<option value={st}>{st}</option>
 						{/each}
-					</select>
+					</Select>
 				</div>
 				<div class="sm:col-span-2">
 					<label for="zipCode" class="block text-sm font-medium">
@@ -162,16 +158,12 @@
 			<!-- Property Type -->
 			<div>
 				<label for="propertyType" class="block text-sm font-medium">Property Type</label>
-				<select
-					id="propertyType"
-					bind:value={propertyType}
-					class="select mt-1 w-full"
-				>
+				<Select id="propertyType" bind:value={propertyType} size="sm" class="mt-1">
 					<option value="">Select type...</option>
 					{#each propertyTypes as type}
-						<option value={type.value}>{type.label}</option>
+						<option value={type.value}>{type.name}</option>
 					{/each}
-				</select>
+				</Select>
 			</div>
 
 			<!-- Year Built & Square Footage -->

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowLeft, TrendingUp, Search, Plus } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
 	import { currentAssociation } from '$lib/stores';
@@ -25,11 +26,11 @@
 	let statusFilter = $state('all');
 
 	const statusOptions = [
-		{ value: 'all', label: 'All Status' },
-		{ value: InvoiceStatusValues.PENDING_APPROVAL, label: 'Pending Approval' },
-		{ value: InvoiceStatusValues.APPROVED, label: 'Approved' },
-		{ value: InvoiceStatusValues.PARTIALLY_PAID, label: 'Partially Paid' },
-		{ value: InvoiceStatusValues.PAID, label: 'Paid' }
+		{ value: 'all', name: 'All Status' },
+		{ value: InvoiceStatusValues.PENDING_APPROVAL, name: 'Pending Approval' },
+		{ value: InvoiceStatusValues.APPROVED, name: 'Approved' },
+		{ value: InvoiceStatusValues.PARTIALLY_PAID, name: 'Partially Paid' },
+		{ value: InvoiceStatusValues.PAID, name: 'Paid' }
 	];
 
 	async function loadPayables() {
@@ -134,14 +135,7 @@
 									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
 								/>
 							</div>
-							<select
-								bind:value={statusFilter}
-								class="rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-							>
-								{#each statusOptions as option}
-									<option value={option.value}>{option.label}</option>
-								{/each}
-							</select>
+							<Select bind:value={statusFilter} items={statusOptions} size="sm" />
 						</div>
 					{/snippet}
 

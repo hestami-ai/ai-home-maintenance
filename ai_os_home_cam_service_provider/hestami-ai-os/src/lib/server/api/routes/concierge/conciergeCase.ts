@@ -2,13 +2,14 @@ import { z } from 'zod';
 import { ResponseMetaSchema } from '$lib/schemas/index.js';
 import {
 	orgProcedure,
+	authedProcedure,
 	successResponse,
 	PaginationInputSchema,
 	PaginationOutputSchema,
 	IdempotencyKeySchema
 } from '../../router.js';
 import { prisma } from '../../../db.js';
-import { setOrgContextForWorkItem, clearOrgContext } from '../../../db/rls.js';
+import { setOrgContextForWorkItem, clearOrgContext, lookupWorkItemOrgId, orgTransaction } from '../../../db/rls.js';
 import { ConciergeCaseStatusSchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCaseStatusSchema.js';
 import { ConciergeCasePrioritySchema } from '../../../../../../generated/zod/inputTypeSchemas/ConciergeCasePrioritySchema.js';
 import { CaseNoteTypeSchema } from '../../../../../../generated/zod/inputTypeSchemas/CaseNoteTypeSchema.js';
@@ -2070,7 +2071,17 @@ export const conciergeCaseRouter = {
 						property: true,
 						assignedConcierge: true,
 						statusHistory: { orderBy: { createdAt: 'desc' } },
-						notes: { orderBy: { createdAt: 'desc' } },
+						notes: { 
+						orderBy: { createdAt: 'desc' },
+						include: {
+							creator: {
+								select: {
+									id: true,
+									name: true
+								}
+							}
+						}
+					},
 						participants: {
 							where: { removedAt: null },
 							include: { party: true },
@@ -2196,6 +2207,7 @@ export const conciergeCaseRouter = {
 							noteType: n.noteType,
 							isInternal: n.isInternal,
 							createdBy: n.createdBy,
+							createdByName: n.creator?.name ?? 'Unknown',
 							createdAt: n.createdAt.toISOString()
 						})),
 						participants: conciergeCase.participants.map((p) => ({
@@ -2445,6 +2457,318 @@ export const conciergeCaseRouter = {
 						name: u.name ?? u.email,
 						email: u.email
 					}))
+				},
+				context
+			);
+		})
+};
+
+/**
+ * Staff-specific router for cross-org case operations.
+ * These procedures use authedProcedure and look up the case's organization
+ * to set RLS context, allowing staff with CONCIERGE pillar access to
+ * manage cases across all organizations.
+ */
+export const staffConciergeCaseRouter = {
+	/**
+	 * Staff: Assign concierge to case (cross-org)
+	 */
+	assign: authedProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				id: z.string(),
+				assignedConciergeUserId: z.string().nullable()
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					case: z.object({
+						id: z.string(),
+						assignedConciergeUserId: z.string().nullable(),
+						updatedAt: z.string()
+					})
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Verify staff has cross-org access
+			if (!hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
+				throw errors.FORBIDDEN({ message: 'Staff cross-org access required' });
+			}
+
+			// Step 1: Look up the case's organization ID using SECURITY DEFINER function
+			const orgId = await lookupWorkItemOrgId(ActivityEntityType.CONCIERGE_CASE, input.id);
+			if (!orgId) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Step 2: Use orgTransaction to run queries with correct RLS context
+			const existing = await orgTransaction(orgId, async (tx) => {
+				return tx.conciergeCase.findFirst({
+					where: {
+						id: input.id,
+						deletedAt: null
+					}
+				});
+			}, { userId: context.user.id, isStaff: true, reason: 'Staff assign case', itemType: 'CONCIERGE_CASE', itemId: input.id });
+
+			if (!existing) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Verify assignee exists if provided (users table doesn't need org context)
+			if (input.assignedConciergeUserId) {
+				const user = await prisma.user.findUnique({
+					where: { id: input.assignedConciergeUserId }
+				});
+				if (!user) {
+					throw errors.NOT_FOUND({ message: 'User not found' });
+				}
+			}
+
+			// Use DBOS workflow for durable execution
+			const workflowAction = input.assignedConciergeUserId ? 'ASSIGN_CONCIERGE' : 'UNASSIGN_CONCIERGE';
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: workflowAction,
+				organizationId: orgId,
+				userId: context.user.id,
+				caseId: input.id,
+				assigneeUserId: input.assignedConciergeUserId ?? undefined
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to assign concierge' });
+			}
+
+			// Fetch updated case for response with RLS context
+			const conciergeCase = await orgTransaction(orgId, async (tx) => {
+				return tx.conciergeCase.findFirstOrThrow({
+					where: { id: input.id }
+				});
+			}, { userId: context.user.id, isStaff: true });
+
+			return successResponse(
+				{
+					case: {
+						id: conciergeCase.id,
+						assignedConciergeUserId: conciergeCase.assignedConciergeUserId,
+						updatedAt: conciergeCase.updatedAt.toISOString()
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Staff: Update case status (cross-org)
+	 */
+	updateStatus: authedProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				id: z.string(),
+				status: ConciergeCaseStatusSchema,
+				reason: z.string().optional()
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			BAD_REQUEST: { message: 'Invalid request' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					case: z.object({
+						id: z.string(),
+						status: z.string(),
+						updatedAt: z.string()
+					})
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Verify staff has cross-org access
+			if (!hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
+				throw errors.FORBIDDEN({ message: 'Staff cross-org access required' });
+			}
+
+			// Step 1: Look up the case's organization ID using SECURITY DEFINER function
+			const orgId = await lookupWorkItemOrgId(ActivityEntityType.CONCIERGE_CASE, input.id);
+			if (!orgId) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Step 2: Use orgTransaction to run queries with correct RLS context
+			const existing = await orgTransaction(orgId, async (tx) => {
+				return tx.conciergeCase.findFirst({
+					where: {
+						id: input.id,
+						deletedAt: null
+					}
+				});
+			}, { userId: context.user.id, isStaff: true, reason: 'Staff update status', itemType: 'CONCIERGE_CASE', itemId: input.id });
+
+			if (!existing) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Validate status transition
+			const validTransitions = VALID_STATUS_TRANSITIONS[existing.status] || [];
+			if (!validTransitions.includes(input.status)) {
+				throw errors.BAD_REQUEST({
+					message: `Invalid status transition from ${existing.status} to ${input.status}`
+				});
+			}
+
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: CaseLifecycleAction.TRANSITION_STATUS,
+				organizationId: orgId,
+				userId: context.user.id,
+				caseId: input.id,
+				targetStatus: input.status,
+				statusChangeReason: input.reason
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to update status' });
+			}
+
+			// Fetch updated case for response with RLS context
+			const conciergeCase = await orgTransaction(orgId, async (tx) => {
+				return tx.conciergeCase.findFirstOrThrow({
+					where: { id: input.id }
+				});
+			}, { userId: context.user.id, isStaff: true });
+
+			return successResponse(
+				{
+					case: {
+						id: conciergeCase.id,
+						status: conciergeCase.status,
+						updatedAt: conciergeCase.updatedAt.toISOString()
+					}
+				},
+				context
+			);
+		}),
+
+	/**
+	 * Staff: Add note to case (cross-org)
+	 */
+	addNote: authedProcedure
+		.input(
+			IdempotencyKeySchema.extend({
+				caseId: z.string(),
+				content: z.string().min(1),
+				noteType: CaseNoteTypeSchema.optional(),
+				isInternal: z.boolean().default(true)
+			})
+		)
+		.errors({
+			NOT_FOUND: { message: 'Resource not found' },
+			FORBIDDEN: { message: 'Access denied' },
+			INTERNAL_SERVER_ERROR: { message: 'Internal error' }
+		})
+		.output(
+			z.object({
+				ok: z.literal(true),
+				data: z.object({
+					note: z.object({
+						id: z.string(),
+						caseId: z.string(),
+						content: z.string(),
+						noteType: z.string(),
+						isInternal: z.boolean(),
+						createdBy: z.string(),
+						createdAt: z.string()
+					})
+				}),
+				meta: ResponseMetaSchema
+			})
+		)
+		.handler(async ({ input, context, errors }) => {
+			// Verify staff has cross-org access
+			if (!hasCrossOrgAccess(context.staffRoles, context.pillarAccess)) {
+				throw errors.FORBIDDEN({ message: 'Staff cross-org access required' });
+			}
+
+			// Step 1: Look up the case's organization ID using SECURITY DEFINER function
+			const orgId = await lookupWorkItemOrgId(ActivityEntityType.CONCIERGE_CASE, input.caseId);
+			if (!orgId) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Step 2: Use orgTransaction to verify case exists with correct RLS context
+			const conciergeCase = await orgTransaction(orgId, async (tx) => {
+				return tx.conciergeCase.findFirst({
+					where: {
+						id: input.caseId,
+						deletedAt: null
+					}
+				});
+			}, { userId: context.user.id, isStaff: true, reason: 'Staff add note', itemType: 'CONCIERGE_CASE', itemId: input.caseId });
+
+			if (!conciergeCase) {
+				throw errors.NOT_FOUND({ message: 'ConciergeCase not found' });
+			}
+
+			// Use DBOS workflow for durable execution
+			const handle = await DBOS.startWorkflow(caseLifecycleWorkflow_v1, {
+				workflowID: input.idempotencyKey
+			})({
+				action: CaseLifecycleAction.ADD_NOTE,
+				organizationId: orgId,
+				userId: context.user.id,
+				caseId: input.caseId,
+				noteContent: input.content,
+				noteType: input.noteType ?? CaseNoteType.GENERAL,
+				isInternal: input.isInternal
+			});
+
+			const result = await handle.getResult();
+
+			if (!result.success) {
+				throw errors.INTERNAL_SERVER_ERROR({ message: result.error || 'Failed to add note' });
+			}
+
+			// Fetch created note for response with RLS context
+			const note = await orgTransaction(orgId, async (tx) => {
+				return tx.caseNote.findFirstOrThrow({
+					where: { id: result.noteId, caseId: input.caseId }
+				});
+			}, { userId: context.user.id, isStaff: true });
+
+			return successResponse(
+				{
+					note: {
+						id: note.id,
+						caseId: note.caseId,
+						content: note.content,
+						noteType: note.noteType,
+						isInternal: note.isInternal,
+						createdBy: note.createdBy,
+						createdAt: note.createdAt.toISOString()
+					}
 				},
 				context
 			);

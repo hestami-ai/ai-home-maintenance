@@ -4,6 +4,7 @@
 	import { Plus, Search, Filter, Briefcase, User, AlertCircle } from 'lucide-svelte';
 	import { SplitView, ListPanel, DetailPanel } from '$lib/components/cam';
 	import { Card, EmptyState } from '$lib/components/ui';
+	import { Select } from 'flowbite-svelte';
 	import { ActivityEntityTypeValues, ConciergeCaseStatusValues, JobStatusValues, ViolationStatusValues, conciergeCaseApi, type ConciergeCase, type ConciergeCaseDetail, type ConciergeCaseStatus } from '$lib/api/cam';
 
 	let cases = $state<ConciergeCase[]>([]);
@@ -18,16 +19,16 @@
 	let pageSize = $state(20);
 
 	const statusOptions = [
-		{ value: '', label: 'All Statuses' },
-		{ value: ConciergeCaseStatusValues.INTAKE, label: 'Intake' },
-		{ value: ActivityEntityTypeValues.ASSESSMENT, label: 'Assessment' },
-		{ value: JobStatusValues.IN_PROGRESS, label: 'In Progress' },
-		{ value: ConciergeCaseStatusValues.PENDING_EXTERNAL, label: 'Pending External' },
-		{ value: ConciergeCaseStatusValues.PENDING_OWNER, label: 'Pending Owner' },
-		{ value: JobStatusValues.ON_HOLD, label: 'On Hold' },
-		{ value: ViolationStatusValues.RESOLVED, label: 'Resolved' },
-		{ value: JobStatusValues.CLOSED, label: 'Closed' },
-		{ value: JobStatusValues.CANCELLED, label: 'Cancelled' }
+		{ value: '', name: 'All Statuses' },
+		{ value: ConciergeCaseStatusValues.INTAKE, name: 'Intake' },
+		{ value: ActivityEntityTypeValues.ASSESSMENT, name: 'Assessment' },
+		{ value: JobStatusValues.IN_PROGRESS, name: 'In Progress' },
+		{ value: ConciergeCaseStatusValues.PENDING_EXTERNAL, name: 'Pending External' },
+		{ value: ConciergeCaseStatusValues.PENDING_OWNER, name: 'Pending Owner' },
+		{ value: JobStatusValues.ON_HOLD, name: 'On Hold' },
+		{ value: ViolationStatusValues.RESOLVED, name: 'Resolved' },
+		{ value: JobStatusValues.CLOSED, name: 'Closed' },
+		{ value: JobStatusValues.CANCELLED, name: 'Cancelled' }
 	];
 
 	async function loadCases() {
@@ -82,7 +83,7 @@
 
 	function getStatusLabel(status: string): string {
 		const option = statusOptions.find((o) => o.value === status);
-		return option?.label || status;
+		return option?.name || status;
 	}
 
 	function getStatusColor(status: string): string {
@@ -155,15 +156,13 @@
 						/>
 					</div>
 
-					<select
+					<Select
 						bind:value={statusFilter}
 						onchange={handleStatusChange}
-						class="select w-full text-sm"
-					>
-						{#each statusOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+						items={statusOptions}
+						size="sm"
+						class="w-full text-sm"
+					/>
 				</div>
 			{/snippet}
 

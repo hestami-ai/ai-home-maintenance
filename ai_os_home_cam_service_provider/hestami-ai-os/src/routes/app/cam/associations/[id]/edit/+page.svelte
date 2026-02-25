@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { ArrowLeft, Save } from 'lucide-svelte';
+	import { Select, Label } from 'flowbite-svelte';
 	import { Card } from '$lib/components/ui';
 	import { associationApi, type AssociationDetail } from '$lib/api/cam';
 
@@ -19,18 +20,18 @@
 
 	
 	const monthOptions = [
-		{ value: '1', label: 'January' },
-		{ value: '2', label: 'February' },
-		{ value: '3', label: 'March' },
-		{ value: '4', label: 'April' },
-		{ value: '5', label: 'May' },
-		{ value: '6', label: 'June' },
-		{ value: '7', label: 'July' },
-		{ value: '8', label: 'August' },
-		{ value: '9', label: 'September' },
-		{ value: '10', label: 'October' },
-		{ value: '11', label: 'November' },
-		{ value: '12', label: 'December' }
+		{ value: '1', name: 'January' },
+		{ value: '2', name: 'February' },
+		{ value: '3', name: 'March' },
+		{ value: '4', name: 'April' },
+		{ value: '5', name: 'May' },
+		{ value: '6', name: 'June' },
+		{ value: '7', name: 'July' },
+		{ value: '8', name: 'August' },
+		{ value: '9', name: 'September' },
+		{ value: '10', name: 'October' },
+		{ value: '11', name: 'November' },
+		{ value: '12', name: 'December' }
 	];
 
 	const associationId = $derived(($page.params as Record<string, string>).id);
@@ -176,18 +177,15 @@
 							</div>
 
 							<div>
-								<label for="fiscalYearEnd" class="mb-1 block text-sm font-medium">
+								<Label for="fiscalYearEnd" class="mb-1 block text-sm font-medium">
 									Fiscal Year End
-								</label>
-								<select
+								</Label>
+								<Select
 									id="fiscalYearEnd"
 									bind:value={formData.fiscalYearEnd}
-									class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-								>
-									{#each monthOptions as option}
-										<option value={option.value}>{option.label}</option>
-									{/each}
-								</select>
+									items={monthOptions}
+									size="sm"
+								/>
 							</div>
 
 							<div>

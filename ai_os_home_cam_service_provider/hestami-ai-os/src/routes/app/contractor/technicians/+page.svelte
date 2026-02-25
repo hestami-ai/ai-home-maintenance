@@ -14,6 +14,7 @@
 		UserCheck,
 		UserX
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { SplitView, ListPanel, DetailPanel, TabbedContent } from '$lib/components/cam';
 	import { EmptyState } from '$lib/components/ui';
 	import { orpc } from '$lib/api';
@@ -139,9 +140,9 @@
 	] as const;
 
 	const statusOptions = [
-		{ value: 'all', label: 'All Technicians' },
-		{ value: 'active', label: 'Active Only' },
-		{ value: 'inactive', label: 'Inactive Only' }
+		{ value: 'all', name: 'All Technicians' },
+		{ value: 'active', name: 'Active Only' },
+		{ value: 'inactive', name: 'Inactive Only' }
 	];
 
 	async function loadTechnicians() {
@@ -251,14 +252,7 @@
 						/>
 					</div>
 
-					<select
-						bind:value={statusFilter}
-						class="w-full rounded-lg border border-surface-300-700 bg-surface-50-950 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-					>
-						{#each statusOptions as option}
-							<option value={option.value}>{option.label}</option>
-						{/each}
-					</select>
+					<Select bind:value={statusFilter} items={statusOptions} size="sm" />
 				</div>
 			{/snippet}
 

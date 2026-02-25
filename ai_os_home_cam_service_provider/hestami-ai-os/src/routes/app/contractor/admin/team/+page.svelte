@@ -10,6 +10,7 @@
 		Loader2,
 		Wrench
 	} from 'lucide-svelte';
+	import { Select } from 'flowbite-svelte';
 	import { PageContainer, Card, EmptyState } from '$lib/components/ui';
 	import {
 		SERVICE_PROVIDER_ROLE_LABELS,
@@ -124,14 +125,14 @@
 				/>
 			</div>
 			<div class="flex gap-2">
-				<select bind:value={statusFilter} onchange={handleFilterChange} class="select w-40">
+				<Select bind:value={statusFilter} size="sm" onchange={handleFilterChange} class="w-40">
 					<option value="">All Status</option>
 					<option value={StaffStatusValues.PENDING}>Pending</option>
 					<option value={StaffStatusValues.ACTIVE}>Active</option>
 					<option value={StaffStatusValues.SUSPENDED}>Suspended</option>
 					<option value={StaffStatusValues.DEACTIVATED}>Deactivated</option>
-				</select>
-				<select bind:value={roleFilter} onchange={handleFilterChange} class="select w-48">
+				</Select>
+				<Select bind:value={roleFilter} size="sm" onchange={handleFilterChange} class="w-48">
 					<option value="">All Roles</option>
 					<option value={ServiceProviderRoleValues.OWNER}>Owner</option>
 					<option value={ServiceProviderRoleValues.ADMIN}>Administrator</option>
@@ -140,7 +141,7 @@
 					<option value={ServiceProviderRoleValues.ESTIMATOR}>Estimator</option>
 					<option value={ServiceProviderRoleValues.BOOKKEEPER}>Bookkeeper</option>
 					<option value={ServiceProviderRoleValues.TECHNICIAN}>Technician</option>
-				</select>
+				</Select>
 			</div>
 		</div>
 
