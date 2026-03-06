@@ -19,6 +19,16 @@ import { randomUUID } from 'node:crypto';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { emitWorkflowCommand } from '../integration/eventBus';
 import { updateWorkflowMetadata } from '../workflow/stateMachine';
+import { analyzeGoalForMobile } from '../mcp/goalDetector';
+import {
+	buildMobileSpecialistMCPConfig,
+	createMCPConfigFile,
+	cleanupMCPConfigFile,
+} from '../mcp/mcpConfigManager';
+import {
+	isMobileSpecialistEnabled,
+	getMobileSpecialistConfig,
+} from '../config/manager';
 
 /**
  * Executor invocation options
@@ -71,7 +81,7 @@ const EXECUTOR_SYSTEM_PROMPT = `You are the EXECUTOR role in the JanumiCode auto
 
 # Your Responsibilities
 
-1. **Propose Solutions**: Generate concrete proposals for achieving the stated goal
+1. **Propose Solutions**: Generate concrete, actionable proposals with specific implementation steps
 2. **Surface Assumptions**: Identify and articulate all assumptions in your proposal as claims
 3. **Generate Artifacts**: Create code, designs, documentation, or specifications as needed
 4. **Adhere to Constraints**: Strictly follow all constraints in the constraint manifest
@@ -100,7 +110,7 @@ Your response MUST be valid JSON with this exact structure:
 
 \`\`\`json
 {
-  "proposal": "Detailed proposal for achieving the goal...",
+  "proposal": "A concrete, step-by-step implementation plan. Include specific file paths, function signatures, data structures, architectural decisions, and code patterns. Do NOT write a high-level summary or phase overview — write the actual technical blueprint that a developer could follow to implement the solution.",
   "assumptions": [
     {
       "statement": "Assumption statement",
@@ -122,6 +132,14 @@ Your response MUST be valid JSON with this exact structure:
 }
 \`\`\`
 
+IMPORTANT: The "proposal" field is the PRIMARY deliverable. It must contain the full, concrete technical plan — not a summary, not a description of phases, not meta-commentary about what you will do. Write the actual implementation steps with specifics.
+
+## NEVER Use Temporal References
+- This plan will be executed by AI agents, not humans. Do NOT express milestones, roadmaps, or sequencing in temporal terms (e.g., "Week 1", "Day 3", "Sprint 2", "Phase 1 (2 weeks)")
+- Instead, express implementation sequences as logical execution steps ordered by dependency and optimal build order
+- Use labels like "Step 1", "Stage A", or descriptive names (e.g., "Foundation", "Core API", "Integration Layer") — never time-based labels
+- Do NOT estimate durations, timelines, or delivery dates
+
 # Context
 
 You will receive:
@@ -133,6 +151,26 @@ You will receive:
 - **Historical Findings**: Relevant past decisions and precedents
 
 Process this context carefully and generate your response in the required JSON format.`;
+
+/**
+ * System prompt supplement appended when mobile-specialist MCP tools are injected.
+ */
+const MOBILE_SPECIALIST_PROMPT_SUPPLEMENT = `
+
+# Mobile Development Specialist Tools Available
+
+You have access to a mobile development specialist LLM via the \`query_mobile_specialist\` tool.
+Use it when you need:
+- iOS/Android platform-specific code generation
+- Mobile architecture diagnosis or debugging
+- ARKit, SwiftUI, Jetpack Compose, or other framework-specific guidance
+- Platform constraint validation
+
+You also have access to:
+- \`get_mobile_guidelines\` — curated iOS/Android best practices and code patterns
+- \`analyze_mobile_project\` — detect mobile project type from workspace structure
+
+ALWAYS use the specialist tool for mobile-specific code rather than generating it from general knowledge alone.`;
 
 /**
  * Invoke Executor agent
@@ -173,8 +211,30 @@ export async function invokeExecutor(
 		// Format context for CLI invocation
 		const formattedContext = formatExecutorContext(context);
 
+		// ── Mobile specialist MCP injection ──
+		// Detect whether the goal involves mobile development and inject MCP tools
+		const goalAnalysis = analyzeGoalForMobile(options.goal);
+		const useMobileSpecialist = goalAnalysis.isMobileRelated && isMobileSpecialistEnabled();
+		let mcpConfigPath: string | undefined;
+
+		let systemPrompt = EXECUTOR_SYSTEM_PROMPT;
+		if (useMobileSpecialist) {
+			systemPrompt += MOBILE_SPECIALIST_PROMPT_SUPPLEMENT;
+
+			const specialistConfig = getMobileSpecialistConfig();
+			if (specialistConfig.baseUrl && specialistConfig.serverPath) {
+				const mcpConfig = buildMobileSpecialistMCPConfig(
+					specialistConfig.serverPath,
+					specialistConfig.baseUrl,
+					specialistConfig.apiKey,
+					specialistConfig.model,
+				);
+				mcpConfigPath = createMCPConfigFile(mcpConfig);
+			}
+		}
+
 		// Build stdin content: system prompt + formatted context
-		const stdinContent = buildStdinContent(EXECUTOR_SYSTEM_PROMPT, formattedContext);
+		const stdinContent = buildStdinContent(systemPrompt, formattedContext);
 
 		// Emit full stdin content for observability (expandable in command block UI)
 		if (options.commandId) {
@@ -192,10 +252,19 @@ export async function invokeExecutor(
 		}
 
 		// Invoke via RoleCLIProvider (CLI tool or API adapter)
-		const cliResult = await options.provider.invoke({
-			stdinContent,
-			outputFormat: 'json',
-		});
+		let cliResult;
+		try {
+			cliResult = await options.provider.invoke({
+				stdinContent,
+				outputFormat: 'json',
+				mcpConfigPaths: mcpConfigPath ? [mcpConfigPath] : undefined,
+			});
+		} finally {
+			// Clean up temp MCP config file regardless of outcome
+			if (mcpConfigPath) {
+				cleanupMCPConfigFile(mcpConfigPath);
+			}
+		}
 
 		if (!cliResult.success) {
 			return cliResult;

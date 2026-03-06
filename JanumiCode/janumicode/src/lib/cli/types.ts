@@ -54,6 +54,9 @@ export interface RoleCLIInvocationOptions {
 
 	/** Whether to auto-approve tool use (for read-only roles) */
 	autoApprove?: boolean;
+
+	/** Paths to MCP config JSON files to pass via --mcp-config (Claude Code only) */
+	mcpConfigPaths?: string[];
 }
 
 /**

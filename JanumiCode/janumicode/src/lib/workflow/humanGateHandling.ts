@@ -198,6 +198,21 @@ export function resumeWorkflowAfterGate(
 			};
 		}
 
+		// Ensure suspensions table exists (it is created inline by suspendWorkflowAtGate
+		// which may never have been called for this dialogue)
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS workflow_suspensions (
+				suspension_id TEXT PRIMARY KEY,
+				dialogue_id TEXT NOT NULL,
+				gate_id TEXT NOT NULL,
+				suspended_phase TEXT NOT NULL,
+				suspended_at TEXT NOT NULL,
+				resumed_at TEXT,
+				timeout_at TEXT,
+				FOREIGN KEY (gate_id) REFERENCES gates(gate_id)
+			)
+		`);
+
 		// Get suspension record
 		const suspension = db
 			.prepare(
@@ -211,10 +226,9 @@ export function resumeWorkflowAfterGate(
 			.get(dialogueId, gateId) as WorkflowSuspension | undefined;
 
 		if (!suspension) {
-			return {
-				success: false,
-				error: new Error('Suspension record not found'),
-			};
+			// No suspension record — the gate was likely created without suspendWorkflowAtGate.
+			// This is fine; the gate resolution is the authoritative signal.
+			return { success: true, value: {} as WorkflowSuspension };
 		}
 
 		if (suspension.resumed_at) {

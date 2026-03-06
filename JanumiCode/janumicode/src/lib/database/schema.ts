@@ -366,6 +366,77 @@ CREATE INDEX IF NOT EXISTS idx_wf_cmd_outputs_command_id ON workflow_command_out
 CREATE INDEX IF NOT EXISTS idx_wf_cmd_outputs_timestamp ON workflow_command_outputs(timestamp);
 `;
 
+/**
+ * Migration V9: Narrative Curator artifact tables
+ * Stores structured memory artifacts produced by the Narrative Curator:
+ * narrative memories, decision traces, and open loops.
+ */
+export const SCHEMA_V9 = `
+CREATE TABLE IF NOT EXISTS narrative_memories (
+    memory_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    curation_mode TEXT NOT NULL CHECK(curation_mode IN ('INTENT', 'OUTCOME', 'FAILURE')),
+    agent_frame TEXT NOT NULL,
+    goal TEXT NOT NULL,
+    causal_sequence TEXT NOT NULL,
+    conflicts TEXT NOT NULL DEFAULT '[]',
+    resolution_status TEXT NOT NULL,
+    lessons TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_narrative_memories_dialogue_id ON narrative_memories(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_narrative_memories_mode ON narrative_memories(curation_mode);
+
+CREATE TABLE IF NOT EXISTS decision_traces (
+    trace_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    curation_mode TEXT NOT NULL CHECK(curation_mode IN ('INTENT', 'OUTCOME', 'FAILURE')),
+    decision_points TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_decision_traces_dialogue_id ON decision_traces(dialogue_id);
+
+CREATE TABLE IF NOT EXISTS open_loops (
+    loop_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    curation_mode TEXT NOT NULL CHECK(curation_mode IN ('INTENT', 'OUTCOME', 'FAILURE')),
+    category TEXT NOT NULL CHECK(category IN ('blocker', 'deferred_decision', 'missing_info', 'risk', 'follow_up')),
+    description TEXT NOT NULL,
+    related_claim_ids TEXT NOT NULL DEFAULT '[]',
+    priority TEXT NOT NULL CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_open_loops_dialogue_id ON open_loops(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_open_loops_category ON open_loops(category);
+CREATE INDEX IF NOT EXISTS idx_open_loops_priority ON open_loops(priority);
+`;
+
+/**
+ * Migration V10: Embeddings table for vector search
+ * Stores vector embeddings for semantic retrieval across all queryable artifacts.
+ * Used with sqlite-vector extension for KNN cosine similarity search.
+ */
+export const SCHEMA_V10 = `
+CREATE TABLE IF NOT EXISTS embeddings (
+    embedding_id TEXT PRIMARY KEY,
+    source_type TEXT NOT NULL CHECK(source_type IN (
+        'narrative_memory', 'decision_trace', 'open_loop',
+        'dialogue_turn', 'claim', 'verdict'
+    )),
+    source_id TEXT NOT NULL,
+    dialogue_id TEXT NOT NULL,
+    content_text TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    embedding BLOB NOT NULL,
+    model TEXT NOT NULL,
+    dimensions INTEGER NOT NULL DEFAULT 1024,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_embeddings_source ON embeddings(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_dialogue ON embeddings(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
+`;
+
 export const MIGRATIONS: Migration[] = [
 	{
 		version: 1,
@@ -406,5 +477,15 @@ export const MIGRATIONS: Migration[] = [
 		version: 8,
 		description: 'Widen command output line_type for tool cards; add tool_name column',
 		sql: SCHEMA_V8,
+	},
+	{
+		version: 9,
+		description: 'Add Narrative Curator artifact tables (narrative_memories, decision_traces, open_loops)',
+		sql: SCHEMA_V9,
+	},
+	{
+		version: 10,
+		description: 'Add embeddings table for vector semantic search',
+		sql: SCHEMA_V10,
 	},
 ];

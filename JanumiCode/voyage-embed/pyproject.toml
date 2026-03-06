@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "voyage-embed"
+version = "0.1.0"
+description = "Local ONNX inference CLI for Voyage embedding models with stdio RPC"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "onnxruntime>=1.17",
+    "tokenizers>=0.20",
+    "typer>=0.12",
+    "numpy>=1.26",
+    "huggingface_hub>=0.25",
+]
+
+[project.optional-dependencies]
+gpu = ["onnxruntime-gpu>=1.17"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[project.scripts]
+voyage-embed = "voyage_embed.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/voyage_embed"]

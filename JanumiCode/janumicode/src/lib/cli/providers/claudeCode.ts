@@ -179,10 +179,23 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 				status: raw.exitCode === 0 ? 'success' : 'error',
 			});
 
+			// Surface stderr as a diagnostic event when the CLI fails
+			if (raw.exitCode !== 0 && raw.stderr) {
+				onEvent({
+					timestamp: new Date().toISOString(),
+					eventType: 'error',
+					summary: 'CLI stderr output',
+					detail: raw.stderr,
+				});
+			}
+
+			// Use stderr as the response text when stdout is empty and CLI failed
+			const responseText = raw.stdout || (raw.exitCode !== 0 ? raw.stderr : '');
+
 			return {
 				success: true,
 				value: {
-					response: raw.stdout,
+					response: responseText,
 					exitCode: raw.exitCode,
 					executionTime,
 					rawOutput: raw.stdout,
@@ -217,10 +230,21 @@ function buildArgs(outputFormat: string, options: RoleCLIInvocationOptions): str
 	const args = [
 		'-p', '-',
 		'--output-format', outputFormat,
+		'--no-session-persistence',
 	];
+
+	// stream-json requires --verbose when used with -p (print mode)
+	if (outputFormat === 'stream-json') {
+		args.push('--verbose');
+	}
 
 	if (options.model) {
 		args.push('--model', options.model);
+	}
+
+	// MCP server configuration — pass config file paths to Claude Code CLI
+	if (options.mcpConfigPaths && options.mcpConfigPaths.length > 0) {
+		args.push('--mcp-config', ...options.mcpConfigPaths);
 	}
 
 	return args;
@@ -330,7 +354,7 @@ function normalizeClaudeCodeStreamEvent(line: string): CLIActivityEvent | null {
 				summary: `Tool result: ${event.status || 'completed'}`,
 				detail: JSON.stringify(event),
 				status: event.error ? 'error' : 'success',
-				output: output?.substring(0, 2000),
+				output,
 				toolUseId: event.tool_use_id,
 			};
 		}

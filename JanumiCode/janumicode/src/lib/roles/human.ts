@@ -7,7 +7,7 @@
 import type { Result, HumanDecision, Claim, Verdict } from '../types';
 import { HumanAction } from '../types';
 import { getDatabase } from '../database';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'node:crypto';
 import { getLogger, isLoggerInitialized } from '../logging';
 
 /**
@@ -90,7 +90,7 @@ export function captureHumanDecision(
 			};
 		}
 
-		const decisionId = nanoid();
+		const decisionId = randomUUID();
 		const timestamp = new Date().toISOString();
 
 		// Store decision
@@ -291,7 +291,7 @@ function trackOverride(
 			)
 		`);
 
-		const overrideId = nanoid();
+		const overrideId = randomUUID();
 		const timestamp = new Date().toISOString();
 
 		db.prepare(
@@ -354,7 +354,7 @@ function storeConstraintWaiver(
 		`);
 
 		const waiverRecord: ConstraintWaiver = {
-			waiver_id: nanoid(),
+			waiver_id: randomUUID(),
 			constraint_ref: waiver.constraint_ref,
 			justification: waiver.justification,
 			granted_by: grantedBy,

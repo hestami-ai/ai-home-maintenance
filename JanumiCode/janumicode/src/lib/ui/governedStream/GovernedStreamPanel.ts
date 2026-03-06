@@ -8,12 +8,11 @@ import * as vscode from 'vscode';
 import { getEventBus, emitDialogueResumed } from '../../integration/eventBus';
 import { aggregateStreamState, type GovernedStreamState } from './dataAggregator';
 import { processHumanGateDecision, type HumanGateDecisionInput } from '../../workflow/humanGateHandling';
-import { HumanAction, Role } from '../../types';
+import { HumanAction, Role, ClaimEventType, Phase, ClaimStatus } from '../../types';
 import { getStyles } from './html/styles';
 import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderRichCard, renderSettingsPanel } from './html/components';
 import { getClientScript } from './html/script';
-import { getDialogueTurnById } from '../../events/reader';
-import { getClaims } from '../../events/reader';
+import { getDialogueTurnById, getClaims } from '../../events/reader';
 import { getSecretKeyManager } from '../../config/secretKeyManager';
 import { getProviderForRole } from '../../config/manager';
 import { clearRoleProviderCache } from '../../llm/roleManager';
@@ -28,8 +27,10 @@ import { generateDialogueTitle } from '../../llm/titleGenerator';
 import { getConfig } from '../../config';
 import { subscribeCommandPersistence, completeCommand, appendCommandOutput as appendCommandOutputToDB } from '../../workflow/commandStore';
 import { IntakeSubState } from '../../types/intake';
-import { updateIntakeConversation } from '../../events/writer';
-import { getWorkflowState, updateWorkflowMetadata } from '../../workflow/stateMachine';
+import { updateIntakeConversation, writeClaimEvent } from '../../events/writer';
+import { getWorkflowState, updateWorkflowMetadata, transitionWorkflow, TransitionTrigger } from '../../workflow/stateMachine';
+import { resolveGate, getGate } from '../../workflow/gates';
+import { getDatabase } from '../../database';
 
 /**
  * WebviewViewProvider for the Governed Stream sidebar view.
@@ -206,6 +207,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		this._eventUnsubscribers.push(
 			bus.on('workflow:gate_triggered', (payload) => {
+				// Clear stale processing indicator — the phase is done, gate is now active
+				this._isProcessing = false;
+				this._postProcessing(false);
+				this._postInputEnabled(true);
+
 				this._view?.webview.postMessage({
 					type: 'gateTriggered',
 					data: payload,
@@ -611,6 +617,31 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			case 'clearDatabase':
 				this._handleClearDatabase();
 				break;
+
+			case 'exportStream':
+				this._handleExportStream();
+				break;
+
+			case 'settingsVisibilityChanged':
+				this._settingsPanelVisible = message.visible as boolean;
+				break;
+
+			case 'verificationGateDecision':
+				this._handleVerificationGateDecision(
+					message.gateId as string,
+					message.action as string,
+					message.claimRationales as Record<string, string> | undefined
+				);
+				break;
+
+			case 'reviewGateDecision':
+				this._handleReviewGateDecision(
+					message.gateId as string,
+					message.action as string,
+					message.itemRationales as Record<string, string> | undefined,
+					message.overallFeedback as string | undefined
+				);
+				break;
 		}
 	}
 
@@ -706,14 +737,19 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		if (!result.success) {
 			vscode.window.showErrorMessage(`Workflow error: ${result.error.message}`);
+			this._update();
 			return;
 		}
 
 		if (result.value.completed) {
 			this._activeDialogueId = null;
 			vscode.window.showInformationMessage('Workflow completed successfully.');
-			this._update();
 		}
+
+		// Always refresh the view after a workflow cycle completes — ensures
+		// gate cards (review, verification) appear even if the event-based
+		// _update() fired too early or the gate creation event wasn't emitted.
+		this._update();
 	}
 
 	/**
@@ -873,6 +909,45 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Export the governed stream to a markdown file for debugging
+	 */
+	private async _handleExportStream(): Promise<void> {
+		const { exportDialogueMarkdown } = await import('../../export/streamExporter.js');
+		const { aggregateStreamState } = await import('./dataAggregator.js');
+
+		const state = aggregateStreamState(this._activeDialogueId ?? undefined);
+		const dialogueId = this._activeDialogueId ?? 'all';
+
+		const markdown = exportDialogueMarkdown(dialogueId, state, {
+			scope: this._activeDialogueId ? 'current_dialogue' : 'all_dialogues',
+			includeStdin: true,
+			includeCommandOutput: true,
+		});
+
+		const timestamp = new Date().toISOString().replaceAll(/[:.]/g, '-').substring(0, 19);
+		const filename = `governed-stream-${dialogueId.substring(0, 8)}-${timestamp}.md`;
+
+		// Write to docs/exports directory
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (!workspaceFolders || workspaceFolders.length === 0) {
+			vscode.window.showErrorMessage('No workspace folder open. Cannot export stream.');
+			return;
+		}
+
+		const exportDir = vscode.Uri.joinPath(workspaceFolders[0].uri, 'docs', 'exports');
+		await vscode.workspace.fs.createDirectory(exportDir);
+
+		const filePath = vscode.Uri.joinPath(exportDir, filename);
+		await vscode.workspace.fs.writeFile(filePath, Buffer.from(markdown, 'utf-8'));
+
+		// Open the file
+		const doc = await vscode.workspace.openTextDocument(filePath);
+		await vscode.window.showTextDocument(doc);
+
+		vscode.window.showInformationMessage(`Exported governed stream to ${filename}`);
+	}
+
+	/**
 	 * Handle a gate decision from the webview
 	 */
 	private _handleGateDecision(gateId: string, action: string, rationale: string): void {
@@ -901,6 +976,283 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			this._update();
 		} else {
 			vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
+		}
+	}
+
+	/**
+	 * Handle a verification gate decision from the webview
+	 */
+	private async _handleVerificationGateDecision(
+		gateId: string,
+		action: string,
+		claimRationales?: Record<string, string>
+	): Promise<void> {
+		if (!this._activeDialogueId) {
+			return;
+		}
+
+		switch (action) {
+			case 'OVERRIDE': {
+				// Store per-claim override events for audit trail
+				if (claimRationales) {
+					for (const [claimId, rationale] of Object.entries(claimRationales)) {
+						if (rationale && rationale.trim().length > 0) {
+							writeClaimEvent({
+								claim_id: claimId,
+								event_type: ClaimEventType.OVERRIDDEN,
+								source: Role.HUMAN,
+								evidence_ref: rationale.trim(),
+							});
+						}
+					}
+				}
+
+				// Build combined rationale from per-claim responses
+				const combinedRationale = Object.entries(claimRationales ?? {})
+					.filter(([, r]) => r.trim().length > 0)
+					.map(([id, r]) => `[${id}]: ${r.trim()}`)
+					.join('\n');
+
+				// Resolve gate via existing infrastructure
+				const input: HumanGateDecisionInput = {
+					gateId,
+					action: HumanAction.OVERRIDE,
+					rationale: combinedRationale || 'Risk accepted by human',
+					decisionMaker: 'human-user',
+				};
+				const result = processHumanGateDecision(input);
+
+				if (result.success) {
+					vscode.window.showInformationMessage('Verification risks accepted. Continuing workflow.');
+					await this._resumeAfterGate();
+				} else {
+					vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
+				}
+				break;
+			}
+
+			case 'RETRY_VERIFY': {
+				// Resolve the gate so workflow can re-enter VERIFY
+				const gateResult = getGate(gateId);
+				if (!gateResult.success) {
+					vscode.window.showErrorMessage(`Failed to get gate: ${gateResult.error.message}`);
+					return;
+				}
+
+				// Capture decision for audit
+				const retryInput: HumanGateDecisionInput = {
+					gateId,
+					action: HumanAction.REJECT,
+					rationale: 'Retrying verification — claims reset to OPEN',
+					decisionMaker: 'human-user',
+				};
+				const decisionResult = processHumanGateDecision(retryInput);
+
+				// REJECT doesn't auto-resolve, so resolve manually
+				if (decisionResult.success) {
+					resolveGate({
+						gateId,
+						decisionId: decisionResult.value.decision_id,
+						resolution: 'Retrying verification',
+					});
+				}
+
+				// Reset blocking claims back to OPEN and delete old verdicts
+				const db = getDatabase();
+				if (db) {
+					for (const claimId of gateResult.value.blocking_claims) {
+						db.prepare('UPDATE claims SET status = ? WHERE claim_id = ?')
+							.run(ClaimStatus.OPEN, claimId);
+						db.prepare('DELETE FROM verdicts WHERE claim_id = ?')
+							.run(claimId);
+					}
+				}
+
+				// Re-run workflow cycle (stays in VERIFY since claims are OPEN again)
+				this._isProcessing = true;
+				this._postInputEnabled(false);
+				this._postProcessing(true, 'Retrying verification', 'Re-verifying claims');
+				try {
+					await this._runWorkflowCycle();
+				} finally {
+					this._isProcessing = false;
+					this._postProcessing(false);
+					this._postInputEnabled(true);
+				}
+				break;
+			}
+
+			case 'REFRAME': {
+				// Capture decision for audit
+				const reframeInput: HumanGateDecisionInput = {
+					gateId,
+					action: HumanAction.REFRAME,
+					rationale: 'User requested replanning after verification',
+					decisionMaker: 'human-user',
+				};
+				const reframeResult = processHumanGateDecision(reframeInput);
+
+				// REFRAME doesn't auto-resolve, so resolve manually
+				if (reframeResult.success) {
+					resolveGate({
+						gateId,
+						decisionId: reframeResult.value.decision_id,
+						resolution: 'Replanning after verification failure',
+					});
+				}
+
+				// Transition workflow to REPLAN
+				transitionWorkflow(
+					this._activeDialogueId,
+					Phase.REPLAN,
+					TransitionTrigger.REPLAN_REQUIRED,
+					{ reason: 'Verification gate reframe' }
+				);
+
+				this._update();
+				vscode.window.showInformationMessage('Workflow returned to replanning.');
+				break;
+			}
+		}
+	}
+
+	/**
+	 * Handle review gate decisions: APPROVE or REFRAME (request changes)
+	 */
+	private async _handleReviewGateDecision(
+		gateId: string,
+		action: string,
+		itemRationales?: Record<string, string>,
+		overallFeedback?: string
+	): Promise<void> {
+		if (!this._activeDialogueId) {
+			return;
+		}
+
+		switch (action) {
+			case 'APPROVE': {
+				// Build combined rationale from per-item responses + overall
+				const parts: string[] = [];
+				if (itemRationales) {
+					for (const [key, rationale] of Object.entries(itemRationales)) {
+						if (rationale && rationale.trim().length > 0) {
+							parts.push(`[${key}]: ${rationale.trim()}`);
+
+							// Write claim override events for claim-type keys (contain hyphens like UUIDs)
+							if (!key.startsWith('finding-')) {
+								writeClaimEvent({
+									claim_id: key,
+									event_type: ClaimEventType.OVERRIDDEN,
+									source: Role.HUMAN,
+									evidence_ref: rationale.trim(),
+								});
+							}
+						}
+					}
+				}
+				if (overallFeedback && overallFeedback.trim()) {
+					parts.push(`[Overall]: ${overallFeedback.trim()}`);
+				}
+
+				const combinedRationale = parts.join('\n') || 'Approved after review';
+
+				// Resolve gate via existing infrastructure
+				const input: HumanGateDecisionInput = {
+					gateId,
+					action: HumanAction.APPROVE,
+					rationale: combinedRationale,
+					decisionMaker: 'human-user',
+				};
+				const result = processHumanGateDecision(input);
+
+				if (result.success) {
+					// Transition from REVIEW → EXECUTE so the next workflow cycle
+					// runs executeExecutePhase instead of re-entering executeReviewPhase.
+					transitionWorkflow(
+						this._activeDialogueId!,
+						Phase.EXECUTE,
+						TransitionTrigger.PHASE_COMPLETE
+					);
+					vscode.window.showInformationMessage('Review approved. Continuing to execution.');
+					await this._resumeAfterGate();
+				} else {
+					vscode.window.showErrorMessage(`Review decision failed: ${result.error.message}`);
+				}
+				break;
+			}
+
+			case 'REFRAME': {
+				// Build combined rationale from per-item responses + overall feedback
+				const reframeParts: string[] = [];
+				if (itemRationales) {
+					for (const [key, rat] of Object.entries(itemRationales)) {
+						if (rat && rat.trim().length > 0) {
+							reframeParts.push(`[${key}]: ${rat.trim()}`);
+						}
+					}
+				}
+				if (overallFeedback && overallFeedback.trim()) {
+					reframeParts.push(overallFeedback.trim());
+				}
+				const rationale = reframeParts.length > 0
+					? reframeParts.join('\n')
+					: 'Changes requested after review';
+
+				const reframeInput: HumanGateDecisionInput = {
+					gateId,
+					action: HumanAction.REFRAME,
+					rationale,
+					decisionMaker: 'human-user',
+				};
+				const reframeResult = processHumanGateDecision(reframeInput);
+
+				// REFRAME doesn't auto-resolve, so resolve manually
+				if (reframeResult.success) {
+					resolveGate({
+						gateId,
+						decisionId: reframeResult.value.decision_id,
+						resolution: 'Changes requested after review',
+					});
+				}
+
+				// Store review feedback so the REPLAN → PROPOSE cycle can use it
+				updateWorkflowMetadata(this._activeDialogueId, {
+					replanRationale: rationale,
+				});
+
+				// Transition workflow to REPLAN
+				transitionWorkflow(
+					this._activeDialogueId,
+					Phase.REPLAN,
+					TransitionTrigger.REPLAN_REQUIRED,
+					{ reason: 'Review gate: changes requested' }
+				);
+
+				vscode.window.showInformationMessage('Changes requested — replanning proposal.');
+				await this._resumeAfterGate();
+				break;
+			}
+		}
+	}
+
+	/**
+	 * Resume the workflow cycle after a gate has been resolved
+	 */
+	private async _resumeAfterGate(): Promise<void> {
+		if (!this._activeDialogueId) {
+			return;
+		}
+
+		this._isProcessing = true;
+		this._postInputEnabled(false);
+		this._postProcessing(true, 'Resuming', 'Continuing workflow after gate resolution');
+
+		try {
+			await this._runWorkflowCycle();
+		} finally {
+			this._isProcessing = false;
+			this._postProcessing(false);
+			this._postInputEnabled(true);
 		}
 	}
 
@@ -1099,10 +1451,16 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		const nonce = getNonce();
 
 		const headerHtml = renderStickyHeader(state);
+
 		const streamHtml = state.streamItems.length > 0
 			? renderStream(state.streamItems, state.intakeState)
 			: renderEmptyState();
-		const inputHtml = renderInputArea(state.currentPhase, state.openGates.length > 0);
+		const gateContext = state.currentPhase === 'VERIFY' && state.openGates.length > 0
+			? 'Review verification results above and choose an action'
+			: state.currentPhase === 'REVIEW' && state.openGates.length > 0
+			? 'Review the summary above and approve or request changes'
+			: undefined;
+		const inputHtml = renderInputArea(state.currentPhase, state.openGates.length > 0, gateContext);
 
 		const settingsPanelHtml = renderSettingsPanel();
 

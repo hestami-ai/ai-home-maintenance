@@ -1,0 +1,26 @@
+{
+  "name": "@janumicode/mcp-mobile-specialist",
+  "version": "0.1.0",
+  "description": "MCP server that bridges mobile-specialist LLMs (e.g., Z.ai GLM) for iOS/Android development expertise",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-mobile-specialist": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

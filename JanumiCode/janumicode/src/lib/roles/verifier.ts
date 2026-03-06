@@ -15,6 +15,7 @@ import { buildVerifierContext, formatVerifierContext } from '../context';
 import { getDatabase } from '../database';
 import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
+import { randomUUID } from 'node:crypto';
 import { nanoid } from 'nanoid';
 import { getLogger, isLoggerInitialized } from '../logging';
 import { emitWorkflowCommand } from '../integration/eventBus';
@@ -511,7 +512,7 @@ export function storeVerdict(
 		}
 
 		const verdict: Verdict = {
-			verdict_id: nanoid(),
+			verdict_id: randomUUID(),
 			claim_id: claimId,
 			verdict: response.verdict,
 			constraints_ref: response.constraints_ref ?? null,

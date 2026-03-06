@@ -13,6 +13,8 @@ import type {
 } from '../types';
 import { getDatabase } from '../database/init';
 import { countTokens } from '../llm/tokenCounter';
+import { isEmbeddingAvailable, searchSimilar } from '../embedding/service';
+import type { SearchResult } from '../embedding/service';
 
 /**
  * Historical context query options
@@ -423,8 +425,9 @@ export function searchForPrecedents(
 }
 
 /**
- * Calculate text similarity using simple word overlap
- * This is a basic implementation - could be enhanced with embeddings
+ * Calculate text similarity using simple word overlap (Jaccard).
+ * Used as fallback when vector embeddings are not available.
+ * For semantic search, use searchSemanticSimilar() instead.
  * @param text1 First text
  * @param text2 Second text
  * @returns Similarity score (0-1)
@@ -567,4 +570,36 @@ export function retrieveHistoricalContext(
 					: new Error('Failed to retrieve historical context'),
 		};
 	}
+}
+
+// ==================== SEMANTIC SEARCH ====================
+
+/**
+ * Search for semantically similar content using vector embeddings.
+ * Returns empty array if embeddings are not available (graceful degradation).
+ *
+ * @param queryText Text to search for
+ * @param sourceTypes Source types to search across
+ * @param excludeDialogueId Exclude results from this dialogue (for cross-dialogue search)
+ * @param limit Max results
+ * @returns Array of search results with similarity scores
+ */
+export async function searchSemanticSimilar(
+	queryText: string,
+	sourceTypes?: SearchResult['sourceType'][],
+	excludeDialogueId?: string,
+	limit?: number
+): Promise<SearchResult[]> {
+	if (!isEmbeddingAvailable()) {
+		return [];
+	}
+
+	const result = await searchSimilar(queryText, {
+		sourceTypes,
+		excludeDialogueId,
+		limit: limit ?? 10,
+		minScore: 0.3,
+	});
+
+	return result.success ? result.value : [];
 }

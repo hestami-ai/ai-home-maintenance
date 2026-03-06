@@ -317,14 +317,24 @@ export function evaluateTransitionGuards(
 			.all(dialogueId) as Array<{ claim_id: string }>;
 
 		if (blockingClaims.length > 0) {
-			return {
-				success: true,
-				value: {
-					canTransition: false,
-					reason: 'Blocking critical claims exist',
-					blockingClaims: blockingClaims.map((c) => c.claim_id),
-				},
-			};
+			// Check if all gates have been resolved (human accepted risk via OVERRIDE)
+			const openGatesCount = db
+				.prepare(
+					`SELECT COUNT(*) as count FROM gates WHERE dialogue_id = ? AND status = 'OPEN'`
+				)
+				.get(dialogueId) as { count: number };
+
+			if (openGatesCount.count > 0) {
+				return {
+					success: true,
+					value: {
+						canTransition: false,
+						reason: 'Blocking critical claims exist',
+						blockingClaims: blockingClaims.map((c) => c.claim_id),
+					},
+				};
+			}
+			// All gates resolved — human has accepted the risk, allow transition
 		}
 
 		// Check for open gates

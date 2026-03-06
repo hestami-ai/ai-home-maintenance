@@ -29,7 +29,7 @@ import {
 	updateWorkflowMetadata,
 	TransitionTrigger,
 } from './stateMachine';
-import { triggerGateIfNeeded, hasOpenGates, createReviewGate } from './gates';
+import { hasOpenGates, createReviewGate } from './gates';
 import {
 	executeIntakeConversationTurn,
 	executeIntakePlanFinalization,
@@ -58,6 +58,9 @@ import {
 	type ProposalBranch,
 } from './responseEvaluator';
 import { getLogger, isLoggerInitialized } from '../logging';
+import { runNarrativeCuration } from '../curation/narrativeCurator';
+import { CurationMode } from '../types/narrativeCurator';
+import { embedAndStore, isEmbeddingAvailable } from '../embedding/service';
 
 /**
  * Provider instances for workflow execution (actual LLM providers, not config)
@@ -207,8 +210,24 @@ export async function executeIntakePhase(
 			case IntakeSubState.SYNTHESIZING:
 				return await executeIntakePlanFinalization(dialogueId);
 
-			case IntakeSubState.AWAITING_APPROVAL:
-				return executeIntakePlanApproval(dialogueId);
+			case IntakeSubState.AWAITING_APPROVAL: {
+				const approvalResult = executeIntakePlanApproval(dialogueId);
+				// Narrative Curator: intent snapshot after plan approval
+				if (approvalResult.success && approvalResult.value.nextPhase) {
+					runNarrativeCuration(dialogueId, CurationMode.INTENT).catch(
+						(err) => {
+							if (isLoggerInitialized()) {
+								getLogger()
+									.child({ component: 'curator' })
+									.warn('Curator INTENT snapshot failed', {
+										error: err instanceof Error ? err.message : String(err),
+									});
+							}
+						}
+					);
+				}
+				return approvalResult;
+			}
 
 			default:
 				return {
@@ -445,6 +464,11 @@ export async function executeProposePhase(
 		);
 		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
 
+		// Fire-and-forget: embed proposal for semantic search
+		if (isEmbeddingAvailable()) {
+			embedAndStore('dialogue_turn', String(turnId), dialogueId, JSON.stringify(response.proposal)).catch(() => {});
+		}
+
 		// Cache executor response in workflow metadata for ASSUMPTION_SURFACING
 		updateWorkflowMetadata(dialogueId, {
 			turnCount: turnId,
@@ -457,8 +481,16 @@ export async function executeProposePhase(
 		});
 
 		// ── Response Evaluator sub-step ──
-		// Classify the executor's response before proceeding
-		const evaluation = await evaluateExecutorResponse(goal, response.proposal, dialogueId);
+		// Classify the executor's response before proceeding.
+		// Build enriched context so the evaluator sees proposal + structured metadata.
+		const assumptionSummary = response.assumptions.length > 0
+			? `\n\nAssumptions surfaced (${response.assumptions.length}):\n${response.assumptions.map((a, i) => `${i + 1}. [${a.criticality}] ${a.statement}`).join('\n')}`
+			: '';
+		const artifactSummary = response.artifacts.length > 0
+			? `\n\nArtifacts generated (${response.artifacts.length}):\n${response.artifacts.map((a, i) => `${i + 1}. [${a.type}] ${a.description}`).join('\n')}`
+			: '';
+		const enrichedResponse = response.proposal + assumptionSummary + artifactSummary;
+		const evaluation = await evaluateExecutorResponse(goal, enrichedResponse, dialogueId);
 
 		const evalLogger = isLoggerInitialized()
 			? getLogger().child({ component: 'evaluator', dialogueId })
@@ -476,6 +508,8 @@ export async function executeProposePhase(
 				if (gateResult.success && gateResult.value) {
 					emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
 				}
+				// Narrative Curator: lightweight failure trace
+				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch(() => {});
 				return {
 					success: true,
 					value: {
@@ -504,6 +538,8 @@ export async function executeProposePhase(
 				if (gateResult.success && gateResult.value) {
 					emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
 				}
+				// Narrative Curator: lightweight failure trace
+				runNarrativeCuration(dialogueId, CurationMode.FAILURE).catch(() => {});
 				return {
 					success: true,
 					value: {
@@ -703,6 +739,11 @@ export async function executeAssumptionSurfacingPhase(
 				claim.created_at
 			);
 			emitClaimCreated(dialogueId, claim.claim_id, claim.statement);
+
+			// Fire-and-forget: embed claim for semantic search
+			if (isEmbeddingAvailable()) {
+				embedAndStore('claim', claim.claim_id, dialogueId, claim.statement).catch(() => {});
+			}
 		}
 
 		// ── Branch tracking ──
@@ -821,13 +862,17 @@ export async function executeVerifyPhase(
 
 		const verificationResults = [];
 		for (const claim of openClaims) {
+			const claimPreview = claim.statement.length > 120
+				? claim.statement.substring(0, 120) + '…'
+				: claim.statement;
+
 			emitWorkflowCommand({
 				dialogueId,
 				commandId: verifyCommandId,
 				action: 'output',
 				commandType: 'role_invocation',
 				label: 'Verifier',
-				summary: `Verifying: ${claim.statement.substring(0, 100)}`,
+				summary: `Verifying: ${claimPreview}`,
 				timestamp: new Date().toISOString(),
 			});
 
@@ -843,25 +888,29 @@ export async function executeVerifyPhase(
 
 			if (result.success) {
 				verificationResults.push(result.value);
-				// Emit verdict output for this claim
+				const verdictPreview = claim.statement.length > 100
+					? claim.statement.substring(0, 100) + '…'
+					: claim.statement;
 				emitWorkflowCommand({
 					dialogueId,
 					commandId: verifyCommandId,
 					action: 'output',
 					commandType: 'role_invocation',
 					label: 'Verifier',
-					summary: `→ ${result.value.verdict.verdict}: ${claim.statement.substring(0, 80)}`,
+					summary: `→ ${result.value.verdict.verdict}: ${verdictPreview}`,
 					detail: result.value.verdict.rationale,
 					timestamp: new Date().toISOString(),
 				});
 			} else {
+				const errorMsg = result.error?.message ?? 'Unknown error';
 				emitWorkflowCommand({
 					dialogueId,
 					commandId: verifyCommandId,
 					action: 'output',
 					commandType: 'role_invocation',
 					label: 'Verifier',
-					summary: `→ FAILED: ${claim.statement.substring(0, 80)}`,
+					summary: `→ ERROR (invocation failed): ${claimPreview}`,
+					detail: errorMsg,
 					timestamp: new Date().toISOString(),
 				});
 			}
@@ -869,7 +918,12 @@ export async function executeVerifyPhase(
 
 		// Emit summary of all verdicts
 		const verdictSummary = verificationResults
-			.map((r) => `• [${r.verdict.verdict}] ${r.claim.statement.substring(0, 80)}`)
+			.map((r) => {
+				const stmt = r.claim.statement.length > 100
+					? r.claim.statement.substring(0, 100) + '…'
+					: r.claim.statement;
+				return `• [${r.verdict.verdict}] ${stmt}`;
+			})
 			.join('\n');
 		emitWorkflowCommand({
 			dialogueId,
@@ -893,23 +947,51 @@ export async function executeVerifyPhase(
 			timestamp: new Date().toISOString(),
 		});
 
-		// Check for gate triggers after verification
-		const gateResult = triggerGateIfNeeded(dialogueId);
-		const gateTriggered = gateResult.success && gateResult.value !== null;
-
-		if (gateTriggered && gateResult.value) {
-			emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+		// ── Verification failure gate ──
+		// If ALL verification invocations failed (0 out of N verified),
+		// the claims remain OPEN — which wouldn't trigger the standard
+		// DISPROVED/UNKNOWN gate check. This is a governance gap: we must
+		// not proceed to EXECUTE with entirely unverified assumptions.
+		const failedCount = openClaims.length - verificationResults.length;
+		if (verificationResults.length === 0 && openClaims.length > 0) {
+			const failGateResult = createReviewGate(
+				dialogueId,
+				`Verification failed for all ${openClaims.length} claim(s). ` +
+				`No assumptions were verified — the verifier invocations returned errors. ` +
+				`Review the errors above and resolve before proceeding to EXECUTE.`
+			);
+			if (failGateResult.success && failGateResult.value) {
+				emitWorkflowGateTriggered(dialogueId, failGateResult.value.gate_id, failGateResult.value.reason);
+			}
+			return {
+				success: true,
+				value: {
+					phase: 'VERIFY' as Phase,
+					success: true,
+					gateTriggered: true,
+					metadata: {
+						verifiedCount: 0,
+						failedCount,
+						reason: 'All verification invocations failed',
+					},
+					timestamp: new Date().toISOString(),
+				},
+			};
 		}
 
+		// Verification results are surfaced at the REVIEW phase where the human
+		// can see full context (verification + historian findings) before deciding.
+		// No gate is created here — the workflow flows through HISTORICAL_CHECK to REVIEW.
 		return {
 			success: true,
 			value: {
 				phase: 'VERIFY' as Phase,
 				success: true,
-				nextPhase: gateTriggered ? undefined : ('HISTORICAL_CHECK' as Phase),
-				gateTriggered,
+				nextPhase: 'HISTORICAL_CHECK' as Phase,
+				gateTriggered: false,
 				metadata: {
 					verifiedCount: verificationResults.length,
+					failedCount,
 					blockingCount: verificationResults.filter((r) => r.isBlocking).length,
 				},
 				timestamp: new Date().toISOString(),
@@ -1091,6 +1173,11 @@ export async function executeHistoricalCheckPhase(
 			}
 		}
 
+		// Persist findings to workflow metadata so the review gate card can access them
+		updateWorkflowMetadata(dialogueId, {
+			historical_findings: historianResult.value.findings,
+		});
+
 		return {
 			success: true,
 			value: {
@@ -1228,6 +1315,11 @@ export async function executeExecutePhase(
 		const provider = providerResult.value;
 		const goal = metadata.lastIntakeGoal ?? metadata.goal ?? '';
 
+		// Capture phase-start timestamp BEFORE emitting any command events.
+		// The dialogue turn uses this timestamp so that its phase milestone
+		// sorts before the CLI command block items in the stream.
+		const phaseStartTimestamp = new Date().toISOString();
+
 		// Build stdin content: execution prompt + verified proposal
 		const stdinContent = buildStdinContent(
 			'Execute the following verified proposal. Apply all changes to the workspace.',
@@ -1288,16 +1380,15 @@ export async function executeExecutePhase(
 		);
 
 		const turnId = await getNextTurnId(dialogueId);
-		const now = new Date().toISOString();
+		const completionTimestamp = new Date().toISOString();
 
 		let executionSummary: string;
 		if (executionResult.success) {
-			executionSummary = JSON.stringify({
-				status: 'completed',
-				exitCode: executionResult.value.exitCode,
-				executionTime: executionResult.value.executionTime,
-				response: executionResult.value.response?.substring(0, 2000),
-			});
+			const exitCode = executionResult.value.exitCode;
+			const timeSeconds = (executionResult.value.executionTime / 1000).toFixed(1);
+			executionSummary = exitCode === 0
+				? `Execution completed successfully (exit code 0, ${timeSeconds}s).`
+				: `Execution completed with non-zero exit code ${exitCode} (${timeSeconds}s).`;
 			// Emit execution result output
 			emitWorkflowCommand({
 				dialogueId,
@@ -1305,15 +1396,12 @@ export async function executeExecutePhase(
 				action: 'output',
 				commandType: 'cli_invocation',
 				label: 'Executor CLI',
-				summary: `── Result: exit ${executionResult.value.exitCode} (${executionResult.value.executionTime}ms) ──`,
+				summary: `── Result: exit ${exitCode} (${executionResult.value.executionTime}ms) ──`,
 				detail: executionResult.value.response?.substring(0, 3000) || '(no response text)',
-				timestamp: now,
+				timestamp: completionTimestamp,
 			});
 		} else {
-			executionSummary = JSON.stringify({
-				status: 'failed',
-				error: executionResult.error.message,
-			});
+			executionSummary = `Execution failed: ${executionResult.error.message}`;
 			emitWorkflowCommand({
 				dialogueId,
 				commandId: executeCommandId,
@@ -1322,10 +1410,30 @@ export async function executeExecutePhase(
 				label: 'Executor CLI',
 				summary: `── Error ──`,
 				detail: executionResult.error.message,
-				timestamp: now,
+				timestamp: completionTimestamp,
 			});
 		}
 
+		// Determine if execution actually succeeded (process ran AND exit code 0)
+		const cliExitCode = executionResult.success ? executionResult.value.exitCode : -1;
+		const executionSucceeded = executionResult.success && cliExitCode === 0;
+
+		// Emit final command block status so the UI shows Retry button on failure
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: executeCommandId,
+			action: executionSucceeded ? 'complete' : 'error',
+			commandType: 'cli_invocation',
+			label: `Executor CLI — ${executionSucceeded ? 'Execution Complete' : 'Execution Failed'}`,
+			summary: executionSucceeded
+				? `Execution completed successfully`
+				: `Execution failed (exit code ${cliExitCode}). Use the Retry button or send a message to retry.`,
+			status: executionSucceeded ? 'success' : 'error',
+			timestamp: completionTimestamp,
+		});
+
+		// Use phaseStartTimestamp for the dialogue turn so the milestone divider
+		// (derived from the first turn in this phase) sorts before command blocks.
 		db.prepare(
 			`
 			INSERT INTO dialogue_turns (
@@ -1340,27 +1448,43 @@ export async function executeExecutePhase(
 			'EXECUTE',
 			'DECISION',
 			executionSummary,
-			now
+			phaseStartTimestamp
 		);
 		emitDialogueTurnAdded(dialogueId, turnId, Role.EXECUTOR);
 
 		// Store execution result in metadata for VALIDATE phase
 		updateWorkflowMetadata(dialogueId, {
 			executionResult: executionResult.success
-				? { success: true, exitCode: executionResult.value.exitCode }
+				? { success: executionSucceeded, exitCode: cliExitCode }
 				: { success: false, error: executionResult.error.message },
 		});
 
+		// Narrative Curator: outcome snapshot after execution
+		runNarrativeCuration(dialogueId, CurationMode.OUTCOME).catch((err) => {
+			if (isLoggerInitialized()) {
+				getLogger()
+					.child({ component: 'curator' })
+					.warn('Curator OUTCOME snapshot failed', {
+						error: err instanceof Error ? err.message : String(err),
+					});
+			}
+		});
+
+		// Only advance to VALIDATE if execution succeeded.
+		// On failure (non-zero exit code), stay in EXECUTE so the user can retry.
+		// Set awaitingInput on failure to stop the workflow cycle loop.
 		return {
 			success: true,
 			value: {
 				phase: 'EXECUTE' as Phase,
-				success: true,
-				nextPhase: 'VALIDATE' as Phase,
+				success: executionSucceeded,
+				nextPhase: executionSucceeded ? ('VALIDATE' as Phase) : undefined,
+				awaitingInput: !executionSucceeded,
 				metadata: {
-					executionSuccess: executionResult.success,
+					executionSuccess: executionSucceeded,
+					exitCode: cliExitCode,
 				},
-				timestamp: now,
+				timestamp: completionTimestamp,
 			},
 		};
 	} catch (error) {
@@ -1485,7 +1609,8 @@ export async function executeCommitPhase(
 			value: {
 				phase: 'COMMIT' as Phase,
 				success: true,
-				nextPhase: 'INTAKE' as Phase, // Loop back for next task
+				// No nextPhase — workflow is complete. The cycle loop detects
+				// completion via phase === COMMIT and calls completeDialogue().
 				metadata: { completed: true },
 				timestamp: now,
 			},
@@ -1675,6 +1800,31 @@ export async function advanceWorkflow(
 			case 'COMMIT':
 				phaseResult = await executeCommitPhase(dialogueId);
 				break;
+			case 'REPLAN': {
+				// REPLAN is a pass-through phase: the human's review feedback
+				// is already stored in metadata.replanRationale.  Append it to
+				// the goal so the next PROPOSE cycle can incorporate it.
+				const replanMeta = JSON.parse(stateResult.value.metadata);
+				const replanFeedback = replanMeta.replanRationale;
+				if (replanFeedback) {
+					const existingGoal = replanMeta.lastIntakeGoal ?? replanMeta.goal ?? '';
+					updateWorkflowMetadata(dialogueId, {
+						lastIntakeGoal: `${existingGoal}\n\n---\n\n## Replanning Feedback (from Review)\n\n${replanFeedback}`,
+						replanRationale: undefined, // consumed
+					});
+				}
+				phaseResult = {
+					success: true,
+					value: {
+						phase: 'REPLAN' as Phase,
+						nextPhase: 'PROPOSE' as Phase,
+						success: true,
+						metadata: { replan: true },
+						timestamp: new Date().toISOString(),
+					},
+				};
+				break;
+			}
 			default:
 				return {
 					success: false,

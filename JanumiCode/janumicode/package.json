@@ -88,7 +88,7 @@
         {
           "id": "janumicode-sidebar",
           "title": "JanumiCode",
-          "icon": "./resources/JanumiCodeIconConversion.svg"
+          "icon": "./resources/JanumiCodeActivityBarIcon.svg"
         }
       ]
     },
@@ -193,6 +193,66 @@
           ],
           "default": "info",
           "description": "Log level for the JanumiCode output channel"
+        },
+        "janumicode.mcp.mobileSpecialist.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable mobile specialist LLM routing for iOS/Android goals. When enabled, the Executor can delegate to a specialized mobile LLM via MCP."
+        },
+        "janumicode.mcp.mobileSpecialist.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the mobile-specialist MCP server entry point (e.g., /path/to/mcp-servers/mobile-specialist/dist/index.js)"
+        },
+        "janumicode.mcp.mobileSpecialist.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL for the specialist LLM API (e.g., https://api.z.ai/api/coding/paas/v4)"
+        },
+        "janumicode.mcp.mobileSpecialist.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the specialist LLM service"
+        },
+        "janumicode.mcp.mobileSpecialist.model": {
+          "type": "string",
+          "default": "glm-4.6",
+          "description": "Model name for the specialist LLM (e.g., glm-4.6)"
+        },
+        "janumicode.embedding.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable vector embeddings for semantic search across dialogue artifacts (requires Voyage API key or local voyage-embed CLI)"
+        },
+        "janumicode.embedding.provider": {
+          "type": "string",
+          "enum": [
+            "voyage-api",
+            "voyage-local"
+          ],
+          "default": "voyage-api",
+          "description": "Embedding provider: 'voyage-api' (cloud, voyage-4-lite) or 'voyage-local' (local ONNX, voyage-4-nano)"
+        },
+        "janumicode.embedding.model": {
+          "type": "string",
+          "default": "voyage-4-lite",
+          "description": "Embedding model name (API: 'voyage-4-lite', local: auto-detected from ONNX)"
+        },
+        "janumicode.embedding.dimensions": {
+          "type": "number",
+          "default": 1024,
+          "enum": [
+            256,
+            512,
+            1024,
+            2048
+          ],
+          "description": "Embedding dimensions (Matryoshka — lower = faster, higher = more accurate)"
+        },
+        "janumicode.embedding.localCliPath": {
+          "type": "string",
+          "default": "voyage-embed",
+          "description": "Path to the voyage-embed CLI for local ONNX inference (default: 'voyage-embed' on PATH)"
         }
       }
     }
@@ -229,6 +289,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.73.0",
+    "@sqliteai/sqlite-vector": "^0.9.92",
     "better-sqlite3": "^12.6.2",
     "nanoid": "^3.3.11",
     "openai": "^6.18.0",

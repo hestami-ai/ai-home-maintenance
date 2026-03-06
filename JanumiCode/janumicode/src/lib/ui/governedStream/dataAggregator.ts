@@ -10,7 +10,7 @@
 
 import type { DialogueTurn, Claim, Verdict, Gate } from '../../types';
 import { ClaimStatus, GateStatus, Phase } from '../../types';
-import { getDialogueTurns, getClaims, getVerdicts, getGates, getIntakeConversation, getIntakeTurns } from '../../events/reader';
+import { getDialogueTurns, getClaims, getVerdicts, getGates, getHumanDecisions, getIntakeConversation, getIntakeTurns } from '../../events/reader';
 import { getWorkflowState, type WorkflowState } from '../../workflow/stateMachine';
 import { getAllDialogues, type DialogueRecord } from '../../dialogue/lifecycle';
 import {
@@ -44,18 +44,50 @@ export interface PhaseMilestone {
 }
 
 /**
+ * A single item in the review card requiring human attention.
+ * Pre-categorized during data aggregation for rendering.
+ */
+export interface ReviewItem {
+	kind: 'claim' | 'finding';
+	claim?: Claim;
+	verdict?: Verdict;
+	findingText?: string;
+	findingIndex?: number;
+	category: 'needs_decision' | 'awareness' | 'all_clear';
+	categoryReason: string;
+}
+
+/**
+ * Summary counts for the review dashboard
+ */
+export interface ReviewSummary {
+	verified: number;
+	disproved: number;
+	unknown: number;
+	conditional: number;
+	open: number;
+	historianFindings: number;
+	needsDecisionCount: number;
+	awarenessCount: number;
+	allClearCount: number;
+}
+
+/**
  * A stream item: dialogue turn, gate, milestone, or dialogue boundary marker
  */
 export type StreamItem =
 	| { type: 'turn'; turn: DialogueTurn; claims: Claim[]; verdict?: Verdict }
-	| { type: 'gate'; gate: Gate; blockingClaims: Claim[] }
+	| { type: 'gate'; gate: Gate; blockingClaims: Claim[]; resolvedAction?: string }
+	| { type: 'verification_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[]; blockingClaims: Claim[]; resolvedAction?: string }
+	| { type: 'review_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[];
+		historianFindings: string[]; reviewItems: ReviewItem[]; summary: ReviewSummary; resolvedAction?: string; resolvedRationale?: string }
 	| PhaseMilestone
 	| { type: 'dialogue_start'; dialogueId: string; goal: string; title: string | null; timestamp: string }
 	| { type: 'dialogue_end'; dialogueId: string; status: string; timestamp: string }
 	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }
-	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string }
+	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
 	| { type: 'intake_plan_preview'; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
-	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string };
+	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string };
 
 /**
  * Summary of a dialogue for the switcher dropdown
@@ -151,9 +183,11 @@ function buildStreamItems(
 	turns: DialogueTurn[],
 	claims: Claim[],
 	verdicts: Verdict[],
-	gates: Gate[]
+	gates: Gate[],
+	dialogueId?: string
 ): StreamItem[] {
 	const items: StreamItem[] = [];
+
 	let lastPhase: Phase | null = null;
 
 	// Create lookup maps
@@ -169,10 +203,26 @@ function buildStreamItems(
 		verdictByClaim.set(verdict.claim_id, verdict);
 	}
 
-	// Build a timeline of gates by created_at for interleaving
+	// Build a timeline of gates by created_at for interleaving (include resolved gates as history)
+	// Note: getGates() returns DESC order; sort ASC for correct chronological interleaving
 	const gateTimeline = gates
-		.filter((g) => g.status === GateStatus.OPEN)
-		.map((g) => ({ gate: g, timestamp: g.created_at }));
+		.map((g) => ({ gate: g, timestamp: g.created_at }))
+		.sort((a, b) => a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0);
+
+	// Pre-compute resolved actions and rationales for resolved gates
+	const resolvedActions = new Map<string, string>();
+	const resolvedRationales = new Map<string, string>();
+	for (const g of gates) {
+		if (g.status === GateStatus.RESOLVED) {
+			const decResult = getHumanDecisions({ gate_id: g.gate_id, limit: 1 });
+			if (decResult.success && decResult.value.length > 0) {
+				resolvedActions.set(g.gate_id, decResult.value[0].action);
+				if (decResult.value[0].rationale) {
+					resolvedRationales.set(g.gate_id, decResult.value[0].rationale);
+				}
+			}
+		}
+	}
 
 	let gateIdx = 0;
 
@@ -196,7 +246,12 @@ function buildStreamItems(
 			const blockingClaims = claims.filter((c) =>
 				gate.blocking_claims.includes(c.claim_id)
 			);
-			items.push({ type: 'gate', gate, blockingClaims });
+			const resolvedAction = resolvedActions.get(gate.gate_id);
+			if (gate.blocking_claims.length > 0) {
+				items.push({ type: 'verification_gate', gate, allClaims: claims, verdicts, blockingClaims, resolvedAction });
+			} else {
+				pushGateOrReviewGate(items, gate, blockingClaims, claims, verdicts, dialogueId, resolvedAction, resolvedRationales.get(gate.gate_id));
+			}
 			gateIdx++;
 		}
 
@@ -219,11 +274,160 @@ function buildStreamItems(
 		const blockingClaims = claims.filter((c) =>
 			gate.blocking_claims.includes(c.claim_id)
 		);
-		items.push({ type: 'gate', gate, blockingClaims });
+		const resolvedAction = resolvedActions.get(gate.gate_id);
+		if (gate.blocking_claims.length > 0) {
+			items.push({ type: 'verification_gate', gate, allClaims: claims, verdicts, blockingClaims, resolvedAction });
+		} else {
+			pushGateOrReviewGate(items, gate, blockingClaims, claims, verdicts, dialogueId, resolvedAction, resolvedRationales.get(gate.gate_id));
+		}
 		gateIdx++;
 	}
 
 	return items;
+}
+
+/**
+ * Push a gate as either a review_gate (if current phase is REVIEW) or a plain gate.
+ */
+function pushGateOrReviewGate(
+	items: StreamItem[],
+	gate: Gate,
+	blockingClaims: Claim[],
+	allClaims: Claim[],
+	verdicts: Verdict[],
+	dialogueId?: string,
+	resolvedAction?: string,
+	resolvedRationale?: string
+): void {
+	if (dialogueId) {
+		const wsResult = getWorkflowState(dialogueId);
+		// Show review_gate when phase is REVIEW, or when a resolved gate with no blocking
+		// claims exists in a dialogue that has passed through verification (has verdicts).
+		// This preserves the rich review display for resolved review gates.
+		const isReviewPhase = wsResult.success && wsResult.value.current_phase === Phase.REVIEW;
+		const isResolvedReviewGate = gate.status === GateStatus.RESOLVED &&
+			gate.blocking_claims.length === 0 && verdicts.length > 0;
+		if (isReviewPhase || isResolvedReviewGate) {
+			const { reviewItems, summary, historianFindings } = buildReviewGateData(
+				allClaims, verdicts, dialogueId
+			);
+			items.push({
+				type: 'review_gate',
+				gate,
+				allClaims,
+				verdicts,
+				historianFindings,
+				reviewItems,
+				summary,
+				resolvedAction,
+				resolvedRationale,
+			});
+			return;
+		}
+	}
+	items.push({ type: 'gate', gate, blockingClaims, resolvedAction });
+}
+
+/**
+ * Build enriched data for the interactive review gate card.
+ * Categorizes claims and historian findings into actionable groups.
+ */
+function buildReviewGateData(
+	claims: Claim[],
+	verdicts: Verdict[],
+	dialogueId: string
+): { reviewItems: ReviewItem[]; summary: ReviewSummary; historianFindings: string[] } {
+	// Build verdict lookup
+	const verdictByClaim = new Map<string, Verdict>();
+	for (const v of verdicts) {
+		verdictByClaim.set(v.claim_id, v);
+	}
+
+	// Get historian findings from workflow metadata
+	let historianFindings: string[] = [];
+	const wsResult = getWorkflowState(dialogueId);
+	if (wsResult.success) {
+		try {
+			const metadata = JSON.parse(wsResult.value.metadata);
+			if (Array.isArray(metadata.historical_findings)) {
+				historianFindings = metadata.historical_findings;
+			} else if (Array.isArray(metadata.proposalBranches)) {
+				for (const branch of metadata.proposalBranches) {
+					if (Array.isArray(branch.historical_findings)) {
+						historianFindings.push(...branch.historical_findings);
+					}
+				}
+			}
+		} catch { /* metadata parse failure — skip findings */ }
+	}
+
+	// Categorize claims
+	const reviewItems: ReviewItem[] = [];
+	const summary: ReviewSummary = {
+		verified: 0, disproved: 0, unknown: 0, conditional: 0, open: 0,
+		historianFindings: historianFindings.length,
+		needsDecisionCount: 0, awarenessCount: 0, allClearCount: 0,
+	};
+
+	for (const claim of claims) {
+		const verdict = verdictByClaim.get(claim.claim_id);
+		const status = claim.status;
+
+		// Count by status
+		if (status === ClaimStatus.VERIFIED) { summary.verified++; }
+		else if (status === ClaimStatus.DISPROVED) { summary.disproved++; }
+		else if (status === ClaimStatus.UNKNOWN) { summary.unknown++; }
+		else if (status === ClaimStatus.CONDITIONAL) { summary.conditional++; }
+		else { summary.open++; }
+
+		// Categorize
+		let category: ReviewItem['category'];
+		let categoryReason: string;
+
+		if (claim.criticality === 'CRITICAL' &&
+			(status === ClaimStatus.DISPROVED || status === ClaimStatus.UNKNOWN)) {
+			category = 'needs_decision';
+			categoryReason = `CRITICAL claim with ${status} verdict`;
+		} else if (status === ClaimStatus.CONDITIONAL) {
+			category = 'awareness';
+			categoryReason = 'Conditional verdict — review conditions';
+		} else if (status === ClaimStatus.DISPROVED || status === ClaimStatus.UNKNOWN) {
+			category = 'awareness';
+			categoryReason = `NON_CRITICAL claim with ${status} verdict`;
+		} else if (status === ClaimStatus.VERIFIED) {
+			category = 'all_clear';
+			categoryReason = 'Verified successfully';
+		} else {
+			category = 'awareness';
+			categoryReason = `${claim.criticality} claim — ${status}`;
+		}
+
+		reviewItems.push({ kind: 'claim', claim, verdict, category, categoryReason });
+	}
+
+	// Categorize historian findings
+	for (let i = 0; i < historianFindings.length; i++) {
+		const finding = historianFindings[i];
+		const lower = typeof finding === 'string' ? finding.toLowerCase() : '';
+		const isHighSeverity = /critical|risk|warning|violation|contradict|disproved|incorrect/.test(lower);
+
+		reviewItems.push({
+			kind: 'finding',
+			findingText: typeof finding === 'string' ? finding : JSON.stringify(finding),
+			findingIndex: i,
+			category: isHighSeverity ? 'needs_decision' : 'awareness',
+			categoryReason: isHighSeverity
+				? 'High-severity historical finding'
+				: 'Informational historical finding',
+		});
+	}
+
+	// Compute group counts
+	summary.needsDecisionCount = reviewItems.filter((i) => i.category === 'needs_decision').length;
+	summary.awarenessCount = reviewItems.filter((i) => i.category === 'awareness').length;
+	summary.allClearCount = reviewItems.filter((i) => i.category === 'all_clear').length;
+
+	return { reviewItems, summary, historianFindings };
 }
 
 /**
@@ -258,7 +462,7 @@ function buildDialogueStreamItems(record: DialogueRecord): StreamItem[] {
 	const gates = gatesResult.success ? gatesResult.value : [];
 
 	// Build the inner stream items (turns, milestones, gates)
-	const turnItems = buildStreamItems(turns, claims, verdicts, gates);
+	const turnItems = buildStreamItems(turns, claims, verdicts, gates, record.dialogue_id);
 
 	// Fetch persisted command blocks for this dialogue
 	const commandItems = buildCommandBlockItems(record.dialogue_id);
@@ -329,6 +533,8 @@ function getStreamItemTimestamp(item: StreamItem): string {
 	switch (item.type) {
 		case 'turn': raw = item.turn.timestamp; break;
 		case 'gate': raw = item.gate.created_at; break;
+		case 'verification_gate': raw = item.gate.created_at; break;
+		case 'review_gate': raw = item.gate.created_at; break;
 		case 'milestone': raw = item.timestamp; break;
 		case 'dialogue_start': raw = item.timestamp; break;
 		case 'dialogue_end': raw = item.timestamp; break;
@@ -371,20 +577,23 @@ function mergeStreamItemsByTimestamp(a: StreamItem[], b: StreamItem[]): StreamIt
 /**
  * Sort priority for tiebreaking items at the same timestamp.
  * Lower number = earlier in the stream.
- * Milestones and intake_turns should appear before command_blocks at the same time.
+ * Command blocks (actions) sort before turns (results) at the same time,
+ * so the execution detail precedes the status summary in the UI.
  */
 function getStreamItemSortPriority(item: StreamItem): number {
 	switch (item.type) {
 		case 'milestone': return 0;
 		case 'dialogue_start': return 1;
 		case 'intake_turn': return 2;
-		case 'turn': return 3;
+		case 'command_block': return 3;
 		case 'intake_plan_preview': return 4;
-		case 'command_block': return 5;
+		case 'turn': return 5;
 		case 'gate': return 6;
-		case 'intake_approval_gate': return 7;
-		case 'dialogue_end': return 8;
-		default: return 9;
+		case 'verification_gate': return 6;
+		case 'review_gate': return 7;
+		case 'intake_approval_gate': return 8;
+		case 'dialogue_end': return 9;
+		default: return 10;
 	}
 }
 
@@ -613,19 +822,60 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 		}
 	}
 
-	// Inject intake turn cards with plan previews at each version change
+	// Inject intake turn cards with associated command blocks embedded inside.
+	// Each intake turn is persisted AFTER its CLI command completes, so its
+	// createdAt is later than the command_block started_at. We:
+	//   1. Associate command_blocks with the intake turn they belong to
+	//   2. Embed them in the intake_turn StreamItem (rendered between human/expert)
+	//   3. Remove them from the main stream to avoid duplication
+	//   4. Adjust the intake_turn timestamp to the earliest associated command_block
 	const turnsResult = getIntakeTurns(dialogueId);
 	let lastPlanVersion = 0;
 	let firstIntakeTurnTimestamp: string | null = null;
 	if (turnsResult.success) {
+		// Collect command_block items sorted chronologically
+		const cmdBlockItems = streamItems
+			.filter((item): item is Extract<StreamItem, { type: 'command_block' }> => item.type === 'command_block')
+			.sort((a, b) => normalizeTimestamp(a.command.started_at).localeCompare(normalizeTimestamp(b.command.started_at)));
+
+		// Track which command_block IDs are consumed by intake turns
+		const consumedCommandIds = new Set<string>();
+
+		let previousTurnNormalized = '';
 		for (const turn of turnsResult.value) {
-			if (!firstIntakeTurnTimestamp) {
-				firstIntakeTurnTimestamp = turn.createdAt;
+			const normalizedTurnTs = normalizeTimestamp(turn.createdAt);
+
+			// Find command_blocks between the previous turn and this turn
+			const associatedCmds = cmdBlockItems.filter((cmd) => {
+				const cmdTs = normalizeTimestamp(cmd.command.started_at);
+				return cmdTs < normalizedTurnTs &&
+					(!previousTurnNormalized || cmdTs > previousTurnNormalized) &&
+					!consumedCommandIds.has(cmd.command.command_id);
+			});
+			for (const cmd of associatedCmds) {
+				consumedCommandIds.add(cmd.command.command_id);
 			}
+
+			// Use the earliest associated command_block timestamp for ordering
+			const effectiveTimestamp = associatedCmds.length > 0
+				? associatedCmds[0].command.started_at
+				: turn.createdAt;
+
+			if (!firstIntakeTurnTimestamp) {
+				firstIntakeTurnTimestamp = effectiveTimestamp;
+			}
+
+			// Build the embedded command block data
+			const embeddedBlocks = associatedCmds.map((cmd) => ({
+				command: cmd.command,
+				outputs: cmd.outputs,
+			}));
+
 			streamItems.push({
 				type: 'intake_turn',
 				turn,
-				timestamp: turn.createdAt,
+				timestamp: effectiveTimestamp,
+				commandBlocks: embeddedBlocks.length > 0 ? embeddedBlocks : undefined,
 			});
 
 			const turnPlanVersion = turn.planSnapshot?.version ?? 0;
@@ -638,12 +888,22 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 				});
 				lastPlanVersion = turnPlanVersion;
 			}
+
+			previousTurnNormalized = normalizedTurnTs;
+		}
+
+		// Remove consumed command_blocks from the main stream
+		if (consumedCommandIds.size > 0) {
+			for (let i = streamItems.length - 1; i >= 0; i--) {
+				const item = streamItems[i];
+				if (item.type === 'command_block' && consumedCommandIds.has(item.command.command_id)) {
+					streamItems.splice(i, 1);
+				}
+			}
 		}
 	}
 
-	// Fix INTAKE milestone timestamps: audit dialogue_turns are written AFTER the
-	// command block completes, so the milestone inherits a late timestamp. Reset it
-	// to match the first intake_turn so the milestone sorts before command blocks.
+	// Fix INTAKE milestone timestamp to sort before all INTAKE content.
 	if (firstIntakeTurnTimestamp) {
 		for (const item of streamItems) {
 			if (item.type === 'milestone' && item.phase === Phase.INTAKE) {
@@ -660,6 +920,45 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 			isFinal: true,
 			timestamp: conv.updatedAt,
 		});
+	}
+
+	// Inject approval gate as a persistent stream artifact:
+	// - AWAITING_APPROVAL: active card with approve/continue buttons
+	// - DISCUSSING with finalized plan: user chose "Continue Discussing" → resolved
+	// - Phase past INTAKE: plan was approved → resolved
+	if (conv.finalizedPlan) {
+		const wsResult = getWorkflowState(dialogueId);
+		const currentPhase = wsResult.success ? wsResult.value.current_phase : Phase.INTAKE;
+
+		if (conv.subState === IntakeSubState.AWAITING_APPROVAL) {
+			// Active: awaiting user decision
+			streamItems.push({
+				type: 'intake_approval_gate',
+				plan: conv.finalizedPlan,
+				dialogueId,
+				timestamp: conv.updatedAt,
+			});
+		} else if (currentPhase !== Phase.INTAKE) {
+			// Phase has moved past INTAKE → plan was approved
+			streamItems.push({
+				type: 'intake_approval_gate',
+				plan: conv.finalizedPlan,
+				dialogueId,
+				timestamp: conv.updatedAt,
+				resolved: true,
+				resolvedAction: 'Approved',
+			});
+		} else if (conv.subState === IntakeSubState.DISCUSSING) {
+			// Back to discussing after seeing the finalized plan → user chose to continue
+			streamItems.push({
+				type: 'intake_approval_gate',
+				plan: conv.finalizedPlan,
+				dialogueId,
+				timestamp: conv.updatedAt,
+				resolved: true,
+				resolvedAction: 'Continued Discussing',
+			});
+		}
 	}
 }
 
@@ -683,16 +982,6 @@ function buildIntakeState(
 	}
 
 	const conv = convResult.value;
-
-	// Inject approval gate if awaiting approval (active dialogue only)
-	if (conv.subState === IntakeSubState.AWAITING_APPROVAL && conv.finalizedPlan) {
-		streamItems.push({
-			type: 'intake_approval_gate',
-			plan: conv.finalizedPlan,
-			dialogueId,
-			timestamp: conv.updatedAt,
-		});
-	}
 
 	return {
 		subState: conv.subState,

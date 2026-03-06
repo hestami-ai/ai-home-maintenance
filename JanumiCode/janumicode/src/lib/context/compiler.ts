@@ -14,6 +14,7 @@ import type {
 	ConstraintManifest,
 } from '../types';
 import { countTokens } from '../llm/tokenCounter';
+import type Database from 'better-sqlite3';
 import { getDatabase } from '../database/init';
 
 /**
@@ -397,11 +398,13 @@ function retrieveHistoricalFindings(
 			};
 		}
 
-		// Retrieve Historian-Interpreter turns with content
+		const findings: string[] = [];
+
+		// 1. Retrieve Historian-Interpreter turns with actual content
 		const turns = db
 			.prepare(
 				`
-				SELECT dt.content_ref
+				SELECT dt.content_ref, dt.speech_act, dt.phase
 				FROM dialogue_turns dt
 				WHERE dt.dialogue_id = ?
 				  AND dt.role = 'HISTORIAN'
@@ -409,12 +412,62 @@ function retrieveHistoricalFindings(
 				LIMIT ?
 			`
 			)
-			.all(dialogueId, limit) as { content_ref: string }[];
+			.all(dialogueId, limit) as { content_ref: string; speech_act: string; phase: string }[];
 
-		// Extract findings from content references
-		// This would need to retrieve actual content from artifacts
-		// For now, return content references
-		const findings = turns.map((t) => t.content_ref);
+		for (const turn of turns) {
+			// Try to parse JSON content into readable text
+			let readable = turn.content_ref;
+			try {
+				const parsed = JSON.parse(turn.content_ref);
+				if (typeof parsed === 'string') {
+					readable = parsed;
+				} else if (typeof parsed === 'object' && parsed !== null) {
+					// Extract meaningful fields from structured responses
+					readable = parsed.summary ?? parsed.finding ?? JSON.stringify(parsed);
+				}
+			} catch { /* use raw content */ }
+			findings.push(`[${turn.phase}/${turn.speech_act}] ${readable}`);
+		}
+
+		// 2. Include recent verdicts with rationale (actual substance)
+		const verdicts = db
+			.prepare(
+				`
+				SELECT v.verdict, v.rationale, c.statement
+				FROM verdicts v
+				JOIN claims c ON v.claim_id = c.claim_id
+				WHERE c.dialogue_id = ?
+				ORDER BY v.timestamp DESC
+				LIMIT ?
+			`
+			)
+			.all(dialogueId, limit) as { verdict: string; rationale: string; statement: string }[];
+
+		for (const v of verdicts) {
+			const preview = v.rationale.length > 150 ? v.rationale.substring(0, 150) + '…' : v.rationale;
+			findings.push(`Verdict [${v.verdict}] on "${v.statement}": ${preview}`);
+		}
+
+		// 3. Include human decisions with rationale
+		const decisions = db
+			.prepare(
+				`
+				SELECT hd.action, hd.rationale
+				FROM human_decisions hd
+				JOIN gates g ON hd.gate_id = g.gate_id
+				WHERE g.dialogue_id = ?
+				ORDER BY hd.timestamp DESC
+				LIMIT ?
+			`
+			)
+			.all(dialogueId, Math.min(limit, 5)) as { action: string; rationale: string }[];
+
+		for (const d of decisions) {
+			findings.push(`Human decision [${d.action}]: ${d.rationale}`);
+		}
+
+		// 4. Include Narrative Curator artifacts (cross-dialogue lessons)
+		retrieveCuratorLessons(db, dialogueId, limit, findings);
 
 		return { success: true, value: findings };
 	} catch (error) {
@@ -425,6 +478,46 @@ function retrieveHistoricalFindings(
 					? error
 					: new Error('Failed to retrieve historical findings'),
 		};
+	}
+}
+
+/**
+ * Retrieve Narrative Curator lessons from prior dialogues.
+ * Appends findings in-place. Silently skips if the table doesn't exist (pre-V9).
+ */
+function retrieveCuratorLessons(
+	db: Database.Database,
+	dialogueId: string,
+	limit: number,
+	findings: string[]
+): void {
+	try {
+		const narratives = db
+			.prepare(
+				`
+				SELECT goal, resolution_status, lessons
+				FROM narrative_memories
+				WHERE dialogue_id != ?
+				ORDER BY created_at DESC
+				LIMIT ?
+			`
+			)
+			.all(dialogueId, Math.min(limit, 3)) as {
+			goal: string;
+			resolution_status: string;
+			lessons: string;
+		}[];
+
+		for (const n of narratives) {
+			const lessons: string[] = JSON.parse(n.lessons);
+			if (lessons.length > 0) {
+				findings.push(
+					`Prior narrative [${n.resolution_status}]: ${n.goal} — Lessons: ${lessons.join('; ')}`
+				);
+			}
+		}
+	} catch {
+		// narrative_memories table may not exist yet (pre-V9) — skip silently
 	}
 }
 

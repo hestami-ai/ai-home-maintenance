@@ -432,6 +432,16 @@ export async function executeWorkflowCycle(
 			phasesExecuted++;
 			finalPhase = (result.value.nextPhase ?? result.value.phase) as string;
 
+			// Check if workflow completed (reached COMMIT).
+			// Use result.value.phase (the actual executed phase) rather than
+			// finalPhase (which prefers nextPhase and could be something else).
+			if ((result.value.phase as string) === Phase.COMMIT) {
+				completed = true;
+				finalPhase = Phase.COMMIT;
+				completeDialogue(dialogueId);
+				break;
+			}
+
 			// Check if a gate was triggered during this phase
 			if (result.value.gateTriggered) {
 				gateTriggered = true;
@@ -441,18 +451,6 @@ export async function executeWorkflowCycle(
 			// Check if phase is awaiting human input (INTAKE conversation)
 			if (result.value.awaitingInput) {
 				awaitingInput = true;
-				break;
-			}
-
-			// Check if workflow completed (reached COMMIT)
-			if (finalPhase === Phase.COMMIT) {
-				completed = true;
-				completeDialogue(dialogueId);
-				break;
-			}
-
-			// Pause at REVIEW phase — human input needed
-			if (finalPhase === Phase.REVIEW) {
 				break;
 			}
 		}

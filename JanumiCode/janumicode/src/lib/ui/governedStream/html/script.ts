@@ -199,6 +199,217 @@ export function getClientScript(): string {
 				});
 			}
 
+			// ===== VERIFICATION GATE =====
+
+			var verificationClaimRationales = {};
+
+			function handleClaimRationaleInput(claimId, text) {
+				verificationClaimRationales[claimId] = text;
+				var charCount = document.getElementById('vg-charcount-' + claimId);
+				if (charCount) {
+					charCount.textContent = text.length + ' / 10 min';
+				}
+				// Check if all blocking claims have rationale >= 10 chars to enable "Accept Risks" button
+				updateAcceptRisksButton();
+			}
+
+			function updateAcceptRisksButton() {
+				var acceptBtn = document.querySelector('.verification-btn.accept-risks');
+				if (!acceptBtn) return;
+				var blockingCount = parseInt(acceptBtn.dataset.blockingCount || '0', 10);
+				if (blockingCount === 0) {
+					acceptBtn.disabled = false;
+					return;
+				}
+				// Find all blocking claim textareas
+				var textareas = document.querySelectorAll('.verification-claim-response textarea[data-claim-rationale]');
+				var allHaveRationale = true;
+				textareas.forEach(function (ta) {
+					var claimId = ta.dataset.claimRationale;
+					var text = verificationClaimRationales[claimId] || '';
+					if (text.length < 10) {
+						allHaveRationale = false;
+					}
+				});
+				acceptBtn.disabled = !allHaveRationale;
+			}
+
+			function handleVerificationGateDecision(gateId, action) {
+				if (action === 'OVERRIDE') {
+					// Collect all per-claim rationales
+					vscode.postMessage({
+						type: 'verificationGateDecision',
+						gateId: gateId,
+						action: 'OVERRIDE',
+						claimRationales: verificationClaimRationales,
+					});
+				} else {
+					vscode.postMessage({
+						type: 'verificationGateDecision',
+						gateId: gateId,
+						action: action,
+					});
+				}
+			}
+
+			// ===== REVIEW GATE =====
+
+			var reviewItemRationales = {};
+			var reviewOverallRationale = '';
+
+			function handleReviewItemRationaleInput(itemKey, text) {
+				reviewItemRationales[itemKey] = text;
+				var charCount = document.getElementById('review-charcount-' + itemKey);
+				if (charCount) {
+					charCount.textContent = text.length + ' / 10 min';
+				}
+				updateReviewApproveButton();
+			}
+
+			function handleReviewOverallInput(gateId, text) {
+				reviewOverallRationale = text;
+				var charCount = document.getElementById('review-overall-charcount-' + gateId);
+				if (charCount) {
+					charCount.textContent = text.length + ' characters';
+				}
+				updateReviewApproveButton();
+			}
+
+			function updateReviewApproveButton() {
+				var approveBtn = document.querySelector('.review-btn.approve-execute');
+				if (!approveBtn) return;
+				var disabledTip = 'Provide overall feedback or respond to at least one item above (min 10 characters) to enable this button.';
+				var enabledTip = 'Accept all findings and proceed to execution.';
+				var needsCount = parseInt(approveBtn.dataset.needsDecisionCount || '0', 10);
+				if (needsCount === 0) {
+					approveBtn.disabled = false;
+					approveBtn.title = enabledTip;
+					return;
+				}
+				// Enable when user provides overall feedback (>= 10 chars)
+				// OR has responded to at least one needs-decision item (>= 10 chars).
+				// Per-item textareas are optional detail, not mandatory gatekeeping.
+				var enabled = false;
+				if (reviewOverallRationale.length >= 10) {
+					enabled = true;
+				} else {
+					var textareas = document.querySelectorAll('.review-item-response textarea[data-review-item-rationale]');
+					textareas.forEach(function (ta) {
+						var key = ta.dataset.reviewItemRationale;
+						var text = reviewItemRationales[key] || '';
+						if (text.length >= 10) {
+							enabled = true;
+						}
+					});
+				}
+				approveBtn.disabled = !enabled;
+				approveBtn.title = enabled ? enabledTip : disabledTip;
+			}
+
+			function handleReviewGateDecision(gateId, action) {
+				if (action === 'APPROVE') {
+					vscode.postMessage({
+						type: 'reviewGateDecision',
+						gateId: gateId,
+						action: 'APPROVE',
+						itemRationales: reviewItemRationales,
+						overallFeedback: reviewOverallRationale,
+					});
+				} else {
+					vscode.postMessage({
+						type: 'reviewGateDecision',
+						gateId: gateId,
+						action: action,
+						overallFeedback: reviewOverallRationale,
+					});
+				}
+			}
+
+			// ===== INTAKE QUESTION RESPONSES =====
+
+			var intakeQuestionResponses = {};
+
+			function handleIntakeQuestionInput(questionId, text) {
+				intakeQuestionResponses[questionId] = text;
+				var charCount = document.querySelector('[data-charcount-for="' + questionId + '"]');
+				if (charCount) {
+					charCount.textContent = text.length + ' chars';
+				}
+				updateIntakeSubmitBar();
+			}
+
+			function updateIntakeSubmitBar() {
+				var bar = document.getElementById('intake-questions-submit-bar');
+				var btn = document.getElementById('intake-submit-btn');
+				var countEl = document.getElementById('intake-submit-count');
+				if (!bar) return;
+
+				var count = 0;
+				var keys = Object.keys(intakeQuestionResponses);
+				for (var k = 0; k < keys.length; k++) {
+					if (intakeQuestionResponses[keys[k]].trim().length > 0) {
+						count++;
+					}
+				}
+
+				if (count > 0) {
+					bar.style.display = 'flex';
+					if (btn) btn.disabled = false;
+					if (countEl) countEl.textContent = count + (count === 1 ? ' response' : ' responses');
+				} else {
+					bar.style.display = 'none';
+					if (btn) btn.disabled = true;
+					if (countEl) countEl.textContent = '0 responses';
+				}
+			}
+
+			function handleIntakeSubmitResponses() {
+				var parts = [];
+				var keys = Object.keys(intakeQuestionResponses);
+				for (var k = 0; k < keys.length; k++) {
+					var id = keys[k];
+					var text = intakeQuestionResponses[id].trim();
+					if (text) {
+						// Look up the original question text from the textarea data attribute
+						var textarea = document.querySelector('.intake-question-textarea[data-intake-question-id="' + id + '"]');
+						var questionText = textarea ? (textarea.dataset.intakeQuestionText || '') : '';
+						if (questionText) {
+							parts.push('[Re: ' + id + ': "' + questionText + '"] ' + text);
+						} else {
+							parts.push('[Re: ' + id + '] ' + text);
+						}
+					}
+				}
+				if (parts.length === 0) return;
+
+				var finalText = parts.join('\\n');
+				vscode.postMessage({
+					type: 'submitInput',
+					text: finalText,
+					attachments: [],
+				});
+
+				// Clear state
+				intakeQuestionResponses = {};
+				var textareas = document.querySelectorAll('.intake-question-textarea');
+				textareas.forEach(function (ta) {
+					ta.value = '';
+				});
+				var charcounts = document.querySelectorAll('.intake-question-charcount');
+				charcounts.forEach(function (el) {
+					el.textContent = '0 chars';
+				});
+				updateIntakeSubmitBar();
+			}
+
+			function disableIntakeApprovalButtons(clickedBtn) {
+				var container = clickedBtn.closest('.intake-approval-actions');
+				if (!container) return;
+				var buttons = container.querySelectorAll('button');
+				buttons.forEach(function (btn) { btn.disabled = true; });
+				clickedBtn.classList.add('was-selected');
+			}
+
 			// ===== INPUT AREA =====
 
 			var attachedFiles = [];
@@ -266,29 +477,63 @@ export function getClientScript(): string {
 				return 20;
 			}
 
+			// --- Serialize contenteditable composer to text ---
+			function serializeComposer() {
+				var composer = document.getElementById('user-input');
+				if (!composer) return { text: '' };
+
+				var text = '';
+
+				composer.childNodes.forEach(function (node) {
+					if (node.nodeType === Node.TEXT_NODE) {
+						text += node.textContent;
+					} else if (node.nodeType === Node.ELEMENT_NODE) {
+						if (node.nodeName === 'BR') {
+							text += '\\n';
+						} else {
+							text += node.textContent;
+						}
+					}
+				});
+
+				return { text: text.trim() };
+			}
+
+			function clearComposer() {
+				var composer = document.getElementById('user-input');
+				if (composer) {
+					composer.innerHTML = '';
+					updateComposerEmpty(composer);
+				}
+			}
+
+			function composerIsEmpty() {
+				var composer = document.getElementById('user-input');
+				if (!composer) return true;
+				return composer.textContent.trim() === '';
+			}
+
+			function updateComposerEmpty(composer) {
+				if (!composer) return;
+				var isEmpty = composer.textContent.trim() === '';
+				composer.dataset.empty = isEmpty ? 'true' : 'false';
+			}
+
 			// --- Submit ---
 			function submitInput() {
-				var input = document.getElementById('user-input');
-				if (!input) return;
-				var text = input.value.trim();
-				if (!text && attachedFiles.length === 0) return;
+				var result = serializeComposer();
+				if (!result.text && attachedFiles.length === 0) return;
 
 				vscode.postMessage({
 					type: 'submitInput',
-					text: text,
+					text: result.text,
 					attachments: attachedFiles.slice(),
 				});
 
-				input.value = '';
+				clearComposer();
 				attachedFiles = [];
 				updateAttachmentsDisplay();
-				autoResizeTextarea(input);
 				hideMentionDropdown();
-			}
-
-			function autoResizeTextarea(el) {
-				el.style.height = 'auto';
-				el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 			}
 
 			// --- Unified Attachment/Mention Model ---
@@ -314,20 +559,22 @@ export function getClientScript(): string {
 			}
 
 			function removeMentionTextForFile(filePath) {
-				var input = document.getElementById('user-input');
-				if (!input) return;
+				var composer = document.getElementById('user-input');
+				if (!composer) return;
 				var name = getFileName(filePath);
 				var needle = '@' + name;
-				var text = input.value;
-				var idx = text.indexOf(needle);
-				while (idx >= 0) {
-					var end = idx + needle.length;
-					// Also remove trailing space if present
-					if (end < text.length && text[end] === ' ') { end++; }
-					text = text.substring(0, idx) + text.substring(end);
-					idx = text.indexOf(needle);
-				}
-				input.value = text;
+				// Walk text nodes and remove the mention text
+				composer.childNodes.forEach(function (node) {
+					if (node.nodeType === Node.TEXT_NODE) {
+						var idx = node.textContent.indexOf(needle);
+						if (idx >= 0) {
+							var end = idx + needle.length;
+							if (end < node.textContent.length && node.textContent[end] === ' ') { end++; }
+							node.textContent = node.textContent.substring(0, idx) + node.textContent.substring(end);
+						}
+					}
+				});
+				updateComposerEmpty(composer);
 			}
 
 			function updateAttachmentsDisplay() {
@@ -358,24 +605,40 @@ export function getClientScript(): string {
 			// --- @-Mention Dropdown ---
 
 			function insertMention(filePath) {
-				var input = document.getElementById('user-input');
-				if (!input) return;
+				var composer = document.getElementById('user-input');
+				if (!composer) return;
 
-				var cursorPos = input.selectionStart || 0;
-				var text = input.value;
+				var fileName = getFileName(filePath);
 
-				// Replace the @query with @filename
+				// Replace the @query text in the contenteditable with @filename
 				if (mentionAtIndex >= 0) {
-					var fileName = getFileName(filePath);
-					var newText = text.substring(0, mentionAtIndex) + '@' + fileName + ' ' + text.substring(cursorPos);
-					input.value = newText;
-					var newCursor = mentionAtIndex + fileName.length + 2;
-					input.selectionStart = input.selectionEnd = newCursor;
+					var sel = window.getSelection();
+					if (sel && sel.rangeCount > 0) {
+						var range = sel.getRangeAt(0);
+						// Find and replace the @query in the anchor text node
+						var anchorNode = sel.anchorNode;
+						if (anchorNode && anchorNode.nodeType === Node.TEXT_NODE) {
+							var fullText = anchorNode.textContent;
+						var atIdx = fullText.lastIndexOf('@', sel.anchorOffset);
+						if (atIdx >= 0) {
+							anchorNode.textContent =
+								fullText.substring(0, atIdx) + '@' + fileName + ' ' +
+								fullText.substring(sel.anchorOffset);
+							// Move cursor after inserted mention
+							var newRange = document.createRange();
+							newRange.setStart(anchorNode, atIdx + fileName.length + 2);
+							newRange.collapse(true);
+							sel.removeAllRanges();
+							sel.addRange(newRange);
+						}
+						}
+					}
 				}
 
 				addAttachment(filePath);
 				hideMentionDropdown();
-				input.focus();
+				updateComposerEmpty(composer);
+				composer.focus();
 			}
 
 			function hideMentionDropdown() {
@@ -647,9 +910,17 @@ export function getClientScript(): string {
 			}
 
 			function handleSetInputEnabled(data) {
-				var input = document.getElementById('user-input');
+				var composer = document.getElementById('user-input');
 				var btn = document.getElementById('submit-btn');
-				if (input) { input.disabled = !data.enabled; }
+				var wrapper = document.querySelector('.composer-wrapper');
+				if (composer) {
+					composer.contentEditable = data.enabled ? 'true' : 'false';
+					composer.style.opacity = data.enabled ? '' : '0.4';
+					composer.style.pointerEvents = data.enabled ? '' : 'none';
+				}
+				if (wrapper) {
+					wrapper.style.opacity = data.enabled ? '' : '0.4';
+				}
 				if (btn) { btn.disabled = !data.enabled; }
 			}
 
@@ -792,7 +1063,7 @@ export function getClientScript(): string {
 			function appendCommandOutput(blockId, data) {
 				var block = document.getElementById(blockId);
 				if (!block) {
-					// Block not yet created — auto-create it
+					// Block not yet created - auto-create it
 					createCommandBlock(blockId, data);
 					return;
 				}
@@ -949,7 +1220,7 @@ export function getClientScript(): string {
 			function showMoreCommandOutput(blockId) {
 				var block = document.getElementById(blockId);
 				if (!block) return;
-				// Remove the truncation limit — allow unlimited lines
+				// Remove the truncation limit - allow unlimited lines
 				cmdBlockLineCounts[blockId] = 0;
 				CMD_MAX_LINES = 99999;
 				var truncEl = block.querySelector('.command-block-truncated');
@@ -1005,7 +1276,7 @@ export function getClientScript(): string {
 				var card = cardId ? document.getElementById(cardId) : null;
 
 				if (!card) {
-					// No matching pending card — create a standalone completed card
+					// No matching pending card - create a standalone completed card
 					var block = document.getElementById(blockId);
 					if (!block) return;
 					var output = block.querySelector('.command-block-output');
@@ -1123,6 +1394,8 @@ export function getClientScript(): string {
 			function toggleSettingsPanel() {
 				settingsPanelVisible = !settingsPanelVisible;
 				handleShowSettings({ visible: settingsPanelVisible });
+				// Notify extension host so _settingsPanelVisible stays in sync
+				vscode.postMessage({ type: 'settingsVisibilityChanged', visible: settingsPanelVisible });
 			}
 
 			function requestSetKey(role) {
@@ -1141,14 +1414,15 @@ export function getClientScript(): string {
 
 			// ===== EVENT DELEGATION (replaces all inline handlers) =====
 
-			// Click delegation — handles all data-action clicks
+			// Click delegation - handles all data-action clicks
 			document.addEventListener('click', function (event) {
 				var target = event.target;
 				// Walk up to find the nearest element with data-action
-				while (target && target !== document && !target.dataset.action) {
+				// Guard against text nodes and SVG nodes that have no dataset
+				while (target && target !== document && !(target.dataset && target.dataset.action)) {
 					target = target.parentElement;
 				}
-				if (!target || !target.dataset) return;
+				if (!target || !target.dataset || !target.dataset.action) return;
 
 				var action = target.dataset.action;
 				switch (action) {
@@ -1160,6 +1434,20 @@ export function getClientScript(): string {
 						break;
 					case 'gate-decision':
 						submitGateDecision(target.dataset.gateId, target.dataset.gateAction);
+						break;
+					case 'verification-gate-decision':
+						handleVerificationGateDecision(target.dataset.gateId, target.dataset.gateAction);
+						break;
+					case 'review-gate-decision':
+						handleReviewGateDecision(target.dataset.gateId, target.dataset.gateAction);
+						break;
+					case 'toggle-review-group':
+						var reviewGroup = target.closest('.review-group');
+						if (reviewGroup) { reviewGroup.classList.toggle('collapsed'); }
+						break;
+					case 'toggle-verification-nonblocking':
+						var nbContainer = target.closest('.verification-nonblocking');
+						if (nbContainer) { nbContainer.classList.toggle('expanded'); }
 						break;
 					case 'toggle-settings':
 						toggleSettingsPanel();
@@ -1192,13 +1480,18 @@ export function getClientScript(): string {
 							showMoreCommandOutput(target.dataset.blockId);
 						}
 						break;
+					case 'intake-submit-responses':
+						handleIntakeSubmitResponses();
+						break;
 					case 'intake-finalize-plan':
 						vscode.postMessage({ type: 'intakeFinalizePlan' });
 						break;
 					case 'intake-approve-plan':
+						disableIntakeApprovalButtons(target);
 						vscode.postMessage({ type: 'intakeApprovePlan' });
 						break;
 					case 'intake-continue-discussing':
+						disableIntakeApprovalButtons(target);
 						vscode.postMessage({ type: 'intakeContinueDiscussing' });
 						break;
 					case 'toggle-intake-plan':
@@ -1213,12 +1506,14 @@ export function getClientScript(): string {
 						break;
 					case 'retry-phase':
 						vscode.postMessage({ type: 'retryPhase' });
-						// Disable button to prevent double-click
 						target.disabled = true;
 						target.textContent = 'Retrying...';
 						break;
 					case 'clear-database':
 						vscode.postMessage({ type: 'clearDatabase' });
+						break;
+					case 'export-stream':
+						vscode.postMessage({ type: 'exportStream' });
 						break;
 					case 'resume-dialogue':
 						if (target.dataset.dialogueId) {
@@ -1258,7 +1553,7 @@ export function getClientScript(): string {
 				}
 			}, true);
 
-			// Attach file button — asks extension host to show file picker
+			// Attach file button - asks extension host to show file picker
 			var attachBtn = document.getElementById('attach-file-btn');
 			if (attachBtn) {
 				attachBtn.addEventListener('click', function () {
@@ -1270,17 +1565,9 @@ export function getClientScript(): string {
 			window.addEventListener('message', function (event) {
 				var msg = event.data;
 				if (msg.type === 'mentionSuggestions') {
-					// Cache the full file list for client-side filtering
 					cachedFileList = msg.files || [];
-					// Show filtered results based on current mention query
-					var input = document.getElementById('user-input');
-					if (input && mentionActive) {
-						var cursorPos = input.selectionStart || 0;
-						var beforeCursor = input.value.substring(0, cursorPos);
-						var atMatch = beforeCursor.match(/@([^\\s]*)$/);
-						filterAndShowMentions(atMatch ? atMatch[1] : '');
-					} else if (cachedFileList.length > 0 && mentionAtIndex >= 0) {
-						filterAndShowMentions('');
+					if (mentionActive && mentionAtIndex >= 0) {
+						filterAndShowMentions(getMentionQueryAtCursor());
 					}
 				}
 				if (msg.type === 'fileAttached') {
@@ -1288,33 +1575,76 @@ export function getClientScript(): string {
 				}
 			});
 
-			// Input delegation — handles gate rationale textareas and @-mention detection
+			// Get the current @-mention query from cursor position in contenteditable
+			function getMentionQueryAtCursor() {
+				var sel = window.getSelection();
+				if (!sel || sel.rangeCount === 0) return '';
+				var node = sel.anchorNode;
+				if (!node || node.nodeType !== Node.TEXT_NODE) return '';
+				var textBefore = node.textContent.substring(0, sel.anchorOffset);
+				var atMatch = textBefore.match(/@([^\\s]*)$/);
+				return atMatch ? atMatch[1] : '';
+			}
+
+			// Input delegation - handles gate rationale textareas and composer @-mention
 			document.addEventListener('input', function (event) {
 				var target = event.target;
 				if (target.dataset && target.dataset.gateRationale) {
 					handleRationaleInput(target.dataset.gateRationale, target.value);
 				}
-				// Auto-resize for user input textarea
+				if (target.dataset && target.dataset.claimRationale) {
+					handleClaimRationaleInput(target.dataset.claimRationale, target.value);
+				}
+				if (target.dataset && target.dataset.reviewItemRationale) {
+					handleReviewItemRationaleInput(target.dataset.reviewItemRationale, target.value);
+				}
+				if (target.dataset && target.dataset.reviewOverallRationale) {
+					handleReviewOverallInput(target.dataset.reviewOverallRationale, target.value);
+				}
+				if (target.dataset && target.dataset.intakeQuestionId && target.classList.contains('intake-question-textarea')) {
+					handleIntakeQuestionInput(target.dataset.intakeQuestionId, target.value);
+				}
 				if (target.id === 'user-input') {
-					autoResizeTextarea(target);
-
+					updateComposerEmpty(target);
 					// Detect @ trigger for mentions
-					var text = target.value;
-					var cursorPos = target.selectionStart || 0;
-					var beforeCursor = text.substring(0, cursorPos);
-					var atMatch = beforeCursor.match(/@([^\\s]*)$/);
-					if (atMatch) {
-						mentionAtIndex = beforeCursor.lastIndexOf('@');
-						debouncedMentionQuery(atMatch[1]);
-					} else {
-						hideMentionDropdown();
+					var query = getMentionQueryAtCursor();
+					var sel = window.getSelection();
+					if (sel && sel.rangeCount > 0) {
+						var node = sel.anchorNode;
+						if (node && node.nodeType === Node.TEXT_NODE) {
+							var textBefore = node.textContent.substring(0, sel.anchorOffset);
+							if (textBefore.match(/@([^\\s]*)$/)) {
+								mentionAtIndex = textBefore.lastIndexOf('@');
+								debouncedMentionQuery(query);
+								return;
+							}
+						}
 					}
+					hideMentionDropdown();
 				}
 			});
 
-			// Direct listeners for the known input elements
+			// Direct listeners for the composer contenteditable
 			var userInput = document.getElementById('user-input');
 			if (userInput) {
+				// Paste: strip HTML, insert plain text only via Selection API
+				userInput.addEventListener('paste', function (event) {
+					event.preventDefault();
+					var text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+					if (!text) return;
+					var sel = window.getSelection();
+					if (!sel || sel.rangeCount === 0) return;
+					var range = sel.getRangeAt(0);
+					range.deleteContents();
+					var node = document.createTextNode(text);
+					range.insertNode(node);
+					range.setStartAfter(node);
+					range.collapse(true);
+					sel.removeAllRanges();
+					sel.addRange(range);
+					updateComposerEmpty(userInput);
+				});
+
 				userInput.addEventListener('keydown', function (event) {
 					// Keyboard navigation when mention dropdown is active
 					if (mentionActive) {
@@ -1344,24 +1674,32 @@ export function getClientScript(): string {
 							return;
 						}
 					}
-					// Normal Enter to submit
+					// Enter = submit, Shift+Enter = newline
 					if (event.key === 'Enter' && !event.shiftKey) {
 						event.preventDefault();
 						submitInput();
+						return;
 					}
-				});
-
-				// Request file list on first focus (pre-cache)
-				userInput.addEventListener('focus', function () {
-					if (cachedFileList.length === 0) {
-						vscode.postMessage({ type: 'requestMentionSuggestions', query: '' });
+					if (event.key === 'Enter' && event.shiftKey) {
+						event.preventDefault();
+						var sel2 = window.getSelection();
+						if (sel2 && sel2.rangeCount > 0) {
+							var range2 = sel2.getRangeAt(0);
+							range2.deleteContents();
+							var br = document.createElement('br');
+							range2.insertNode(br);
+							range2.setStartAfter(br);
+							range2.collapse(true);
+							sel2.removeAllRanges();
+							sel2.addRange(range2);
+							updateComposerEmpty(userInput);
+						}
 					}
 				});
 
 				// Dismiss mention dropdown on blur (with delay for click handling)
 				userInput.addEventListener('blur', function () {
 					setTimeout(function () {
-						// Only hide if focus didn't move to the dropdown
 						var active = document.activeElement;
 						var dropdown = document.getElementById('mention-dropdown');
 						if (dropdown && dropdown.contains(active)) return;

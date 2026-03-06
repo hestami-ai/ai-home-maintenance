@@ -7,7 +7,7 @@
 import type { Result, Gate, HumanDecision, Claim } from '../types';
 import { GateStatus, ClaimStatus } from '../types';
 import { getDatabase } from '../database';
-import { nanoid } from 'nanoid';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Gate creation options
@@ -58,7 +58,7 @@ export function createGate(options: CreateGateOptions): Result<Gate> {
 			};
 		}
 
-		const gateId = nanoid();
+		const gateId = randomUUID();
 		const now = new Date().toISOString();
 
 		const gate: Gate = {

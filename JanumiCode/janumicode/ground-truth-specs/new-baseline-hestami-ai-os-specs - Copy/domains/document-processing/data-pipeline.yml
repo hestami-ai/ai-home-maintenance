@@ -1,0 +1,89 @@
+```yaml
+# Document Processing Data Pipeline & State Machine
+
+pipeline:
+  name: "Document Ingestion and Processing"
+  orchestrator: "DBOS Workflows"
+  
+  states:
+    PENDING_UPLOAD:
+      description: "Document record created. Awaiting client upload."
+      transitions:
+        - target: PROCESSING
+          trigger: "TUS Upload Complete Webhook"
+          
+    PROCESSING:
+      description: "File is fully uploaded. Background workers executing."
+      steps:
+        - name: "ClamAV Scan"
+          action: "Stream file from S3 -> ClamAV"
+          on_success: "proceed_next"
+          on_failure: "goto:INFECTED"
+          
+        - name: "Metadata Extraction"
+          action: "Extract EXIF/Metadata via ExifTool"
+          on_success: "store_metadata && proceed_next"
+          on_error: "goto:PROCESSING_FAILED (Transient/Permanent)"
+          
+        - name: "Derivative Generation"
+          action: "Generate Thumbnails/Previews (ffmpeg/libcvids)"
+          on_success: "store_derivatives_s3 && proceed_next"
+          on_error: "goto:PROCESSING_FAILED (Transient/Permanent)"
+          
+      on_all_success:
+        target: ACTIVE
+        
+    PROCESSING_FAILED:
+      description: "An error occurred during processing steps."
+      metadata:
+        - errorType: "TRANSIENT | PERMANENT | INFECTED" # INFECTED technically maps to status INFECTED
+        - errorCode: string
+        - errorMessage: string
+        - attemptCount: number
+        - nextRetryAt: datetime?
+      transitions:
+        - target: PROCESSING
+          trigger: "Scheduled Auto-Retry (if TRANSIENT and attemptCount < Max)"
+        - target: PROCESSING
+          trigger: "Manual Admin Action: Retry"
+        - target: ARCHIVED
+          trigger: "Manual Admin Action: Marked Resolved/Deleted"
+          
+    INFECTED:
+      description: "Malware detected by ClamAV."
+      metadata:
+        - signature: string
+        - detectedAt: datetime
+      transitions:
+        - target: DELETED (Hard)
+          trigger: "Expiration (30 days) OR Manual Admin Action: Delete"
+        - target: PROCESSING
+          trigger: "Manual Admin Action: Override False Positive"
+
+    ACTIVE:
+      description: "Document is ready and accessible."
+      transitions:
+        - target: SUPERSEDED
+          trigger: "User uploads new version"
+        - target: ARCHIVED
+          trigger: "User soft-deletes document"
+
+database_schema_extensions:
+  DocumentStatus:
+    type: "Enum"
+    values: ["DRAFT", "PENDING_UPLOAD", "PROCESSING", "PROCESSING_FAILED", "INFECTED", "ACTIVE", "SUPERSEDED", "ARCHIVED"]
+    
+  Document:
+    processingStartedAt: "DateTime?"
+    processingCompletedAt: "DateTime?"
+    processingAttemptCount: "Int @default(0)"
+    processingNextRetryAt: "DateTime?"
+    processingErrorType: "String? // 'TRANSIENT' | 'PERMANENT'"
+    processingErrorMessage: "String?"
+    processingErrorDetails: "Json?"
+    
+security_definer_functions:
+  - "update_document_processing_status"
+  - "list_documents_by_processing_status"
+  - "get_processing_queue_stats"
+```

@@ -514,7 +514,7 @@ function normalizeCodexItemCompleted(event: Record<string, unknown>): CLIActivit
 			summary: isError ? `Command failed (exit ${exitCode})` : 'Command completed',
 			detail: JSON.stringify(event),
 			status: isError ? 'error' : 'success',
-			output: output ? output.substring(0, 2000) : undefined,
+			output: output || undefined,
 			toolName: 'shell',
 			input: command || undefined,
 			toolUseId: (item.call_id as string) || (item.id as string),
@@ -530,7 +530,7 @@ function normalizeCodexItemCompleted(event: Record<string, unknown>): CLIActivit
 			summary: 'Tool completed',
 			detail: JSON.stringify(event),
 			status: 'success',
-			output: output ? output.substring(0, 2000) : undefined,
+			output: output || undefined,
 			toolName: (item.name as string) || undefined,
 			toolUseId: (item.call_id as string) || (item.id as string),
 		};
@@ -616,7 +616,7 @@ function normalizeLegacyToolResult(event: Record<string, unknown>): CLIActivityE
 		summary: errorMsg ? `Tool error: ${errorMsg}` : 'Tool completed',
 		detail: JSON.stringify(event),
 		status: errorMsg ? 'error' : 'success',
-		output: output ? String(output).substring(0, 2000) : undefined,
+		output: output ? String(output) : undefined,
 		toolUseId: (event.tool_use_id as string) || (event.call_id as string),
 	};
 }

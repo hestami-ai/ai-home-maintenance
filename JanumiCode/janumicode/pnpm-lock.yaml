@@ -11,6 +11,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.73.0
         version: 0.73.0
+      '@sqliteai/sqlite-vector':
+        specifier: ^0.9.92
+        version: 0.9.92
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -345,6 +348,52 @@ packages:
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
     engines: {node: '>=10'}
+
+  '@sqliteai/sqlite-vector-darwin-arm64@0.9.92':
+    resolution: {integrity: sha512-g0W2XBcXZ23FV9bFGHTIPeeQV8oZuVE1Ji+VOPb/2ImZsA0Qd+a0hEPN6k9NVBeD6ca8ymu4NpJfr68Tt9gHcg==}
+    engines: {node: '>=16.0.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@sqliteai/sqlite-vector-darwin-x86_64@0.9.92':
+    resolution: {integrity: sha512-AUGSEpqzpSzU2SZzPquYne3YrVXTfEVbp0kqHC0imDS8D0rJ9y5ddFY9szmbpTy8rf4nqzqkZTaAA9Jx+pzWtA==}
+    engines: {node: '>=16.0.0'}
+    cpu: [x64, ia32]
+    os: [darwin]
+
+  '@sqliteai/sqlite-vector-linux-arm64-musl@0.9.92':
+    resolution: {integrity: sha512-jbxZpj9+trNmQTIxnSravpIpvQZE5kkFzmRdJUeUbYwAt9ZWPBHSvqV90ApIOMwrTkQSQgtIIFNAsqxnd7akbg==}
+    engines: {node: '>=16.0.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@sqliteai/sqlite-vector-linux-arm64@0.9.92':
+    resolution: {integrity: sha512-pjus+JAq3cb99AQsnNBQ+g4ZgxJck5nIN8+o2Vswd0GCsGlK0QqZ/hQqKR5Z6jdu496ccEGf05prodR6wgqiKA==}
+    engines: {node: '>=16.0.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@sqliteai/sqlite-vector-linux-x86_64-musl@0.9.92':
+    resolution: {integrity: sha512-UR7xQ6nlxTaiRFpv3QY9UB7E55ueMUaDjpNnpMoTkpRfooEENheOw/TK+OPlRvdNhDv8V+xPCfKJAL+S2vNfZg==}
+    engines: {node: '>=16.0.0'}
+    cpu: [x64, ia32]
+    os: [linux]
+
+  '@sqliteai/sqlite-vector-linux-x86_64@0.9.92':
+    resolution: {integrity: sha512-MNCPDaFK4kpUGObmd8dF6Fmo3ZlJyECUJtghct4rhBHP0hJ8meyMcrtzecmcE+++YZ3pqJjgzhXXgQoiVRY03g==}
+    engines: {node: '>=16.0.0'}
+    cpu: [x64, ia32]
+    os: [linux]
+
+  '@sqliteai/sqlite-vector-win32-x86_64@0.9.92':
+    resolution: {integrity: sha512-xPkY2FpxP2dUmes49b+HL2zo4THjFoxHqNVPbkk6K05xmVlO/NCqgmpj6gEMAOqCpvjNcnhb5jI7j84+QbrRHg==}
+    engines: {node: '>=16.0.0'}
+    cpu: [x64, ia32]
+    os: [win32]
+
+  '@sqliteai/sqlite-vector@0.9.92':
+    resolution: {integrity: sha512-7XFKf7b5gjT3FyKBnFRwLpkWO4e54eioKOrO3pLxlrKA1cSwOfddotYZRwaq1YAWYycnghZQBqxSElZ49x3tmA==}
+    engines: {node: '>=16.0.0'}
 
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
@@ -2375,6 +2424,37 @@ snapshots:
     optional: true
 
   '@sindresorhus/is@4.6.0': {}
+
+  '@sqliteai/sqlite-vector-darwin-arm64@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector-darwin-x86_64@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector-linux-arm64-musl@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector-linux-arm64@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector-linux-x86_64-musl@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector-linux-x86_64@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector-win32-x86_64@0.9.92':
+    optional: true
+
+  '@sqliteai/sqlite-vector@0.9.92':
+    optionalDependencies:
+      '@sqliteai/sqlite-vector-darwin-arm64': 0.9.92
+      '@sqliteai/sqlite-vector-darwin-x86_64': 0.9.92
+      '@sqliteai/sqlite-vector-linux-arm64': 0.9.92
+      '@sqliteai/sqlite-vector-linux-arm64-musl': 0.9.92
+      '@sqliteai/sqlite-vector-linux-x86_64': 0.9.92
+      '@sqliteai/sqlite-vector-linux-x86_64-musl': 0.9.92
+      '@sqliteai/sqlite-vector-win32-x86_64': 0.9.92
 
   '@szmarczak/http-timer@4.0.6':
     dependencies:

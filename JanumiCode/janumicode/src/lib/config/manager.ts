@@ -114,6 +114,33 @@ export function getCLIProviderSettings(providerId: string): CLIProviderSettings 
 	};
 }
 
+// ==================== MOBILE SPECIALIST MCP CONFIGURATION ====================
+
+/**
+ * Whether the mobile-specialist MCP server is enabled for Executor invocations.
+ */
+export function isMobileSpecialistEnabled(): boolean {
+	return getWorkspaceConfig().get<boolean>('mcp.mobileSpecialist.enabled', false);
+}
+
+/**
+ * Get mobile-specialist MCP server configuration.
+ */
+export function getMobileSpecialistConfig(): {
+	serverPath: string;
+	baseUrl: string;
+	apiKey: string;
+	model: string;
+} {
+	const config = getWorkspaceConfig();
+	return {
+		serverPath: config.get<string>('mcp.mobileSpecialist.serverPath', ''),
+		baseUrl: config.get<string>('mcp.mobileSpecialist.baseUrl', ''),
+		apiKey: config.get<string>('mcp.mobileSpecialist.apiKey', ''),
+		model: config.get<string>('mcp.mobileSpecialist.model', 'glm-4.6'),
+	};
+}
+
 /**
  * Get CLI configuration for all roles.
  * Returns mapping of role → CLI provider ID.

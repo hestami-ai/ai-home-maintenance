@@ -156,10 +156,18 @@ Your response MUST be valid JSON with this exact structure:
     "version": <number>,
     "title": "Final plan title",
     "summary": "Comprehensive summary of what will be built",
-    "requirements": [...],
-    "decisions": [...],
-    "constraints": [...],
-    "openQuestions": [...],
+    "requirements": [
+      { "id": "REQ-1", "type": "REQUIREMENT", "text": "Full requirement description...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+    ],
+    "decisions": [
+      { "id": "DEC-1", "type": "DECISION", "text": "Decision description with rationale...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+    ],
+    "constraints": [
+      { "id": "CON-1", "type": "CONSTRAINT", "text": "Constraint description...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+    ],
+    "openQuestions": [
+      { "id": "Q-1", "type": "OPEN_QUESTION", "text": "Unresolved question...", "extractedFromTurnId": 1, "timestamp": "<ISO-8601>" }
+    ],
     "technicalNotes": [...],
     "proposedApproach": "Detailed implementation approach",
     "lastUpdatedAt": "<ISO-8601>"
@@ -172,6 +180,9 @@ Your response MUST be valid JSON with this exact structure:
 # Synthesis Rules
 
 - The finalized plan should be **self-contained** — readable without the conversation
+- **Every item MUST be an object** with id, type, text, extractedFromTurnId, and timestamp fields — NOT a plain string
+- The "text" field MUST contain the **full human-readable description** — never omit it
+- Preserve the REQ-/DEC-/CON-/Q- ID prefixes from the draft plan; do NOT renumber to R-/D-/C-
 - Requirements should be specific and testable where possible
 - Decisions should include the rationale (or reference the turn where it was discussed)
 - Constraints should distinguish between technical and business constraints
@@ -212,10 +223,12 @@ export async function invokeIntakeTechnicalExpert(
 		);
 
 		// CLI invocation — streaming when onEvent callback provided, one-shot otherwise
+		// autoApprove: true enables --full-auto so the model can execute read operations
+		// without interactive approval prompts (safe because --sandbox read-only prevents writes)
 		let cliResult: Result<RoleCLIResult>;
 		if (options.onEvent) {
 			cliResult = await options.provider.invokeStreaming(
-				{ stdinContent, outputFormat: 'stream-json' },
+				{ stdinContent, outputFormat: 'stream-json', autoApprove: true },
 				options.onEvent
 			);
 			// Extract final model response from JSONL stream output
@@ -226,6 +239,7 @@ export async function invokeIntakeTechnicalExpert(
 			cliResult = await options.provider.invoke({
 				stdinContent,
 				outputFormat: 'json',
+				autoApprove: true,
 			});
 		}
 
@@ -302,10 +316,11 @@ export async function invokeIntakePlanSynthesis(
 		);
 
 		// CLI invocation — streaming when onEvent callback provided, one-shot otherwise
+		// autoApprove for synthesis too (same read-only sandbox safety)
 		let cliResult: Result<RoleCLIResult>;
 		if (options.onEvent) {
 			cliResult = await options.provider.invokeStreaming(
-				{ stdinContent, outputFormat: 'stream-json' },
+				{ stdinContent, outputFormat: 'stream-json', autoApprove: true },
 				options.onEvent
 			);
 			if (cliResult.success) {
@@ -315,6 +330,7 @@ export async function invokeIntakePlanSynthesis(
 			cliResult = await options.provider.invoke({
 				stdinContent,
 				outputFormat: 'json',
+				autoApprove: true,
 			});
 		}
 
@@ -601,6 +617,7 @@ function findMatchingBraceIntake(text: string, start: number): number {
 /**
  * Normalize extracted items from parsed JSON.
  * Ensures each item has required fields and correct types.
+ * Handles both object items ({id, text, ...}) and string items ("[ID] text...").
  */
 function normalizeExtractedItems(
 	items: unknown,
@@ -611,16 +628,62 @@ function normalizeExtractedItems(
 		return [];
 	}
 
-	return items.map((item: Record<string, unknown>, index: number) => ({
-		id: (item.id as string) ?? `${defaultType.charAt(0)}-${index + 1}`,
-		type: ((item.type as string) ?? defaultType) as IntakeExtractedItemType,
-		text: (item.text as string) ?? '',
-		extractedFromTurnId:
-			typeof item.extractedFromTurnId === 'number'
-				? item.extractedFromTurnId
-				: turnNumber,
-		timestamp: (item.timestamp as string) ?? new Date().toISOString(),
-	}));
+	return items.map((rawItem: unknown, index: number) => {
+		// Handle string items: "[REQ-1] Full description..." or plain "Description..."
+		if (typeof rawItem === 'string') {
+			const parsed = parseStringItem(rawItem, defaultType, index);
+			return {
+				id: parsed.id,
+				type: defaultType as IntakeExtractedItemType,
+				text: parsed.text,
+				extractedFromTurnId: turnNumber,
+				timestamp: new Date().toISOString(),
+			};
+		}
+
+		// Handle object items: {id, type, text, ...}
+		const item = rawItem as Record<string, unknown>;
+		return {
+			id: (item.id as string) ?? `${defaultType.charAt(0)}-${index + 1}`,
+			type: ((item.type as string) ?? defaultType) as IntakeExtractedItemType,
+			text: (item.text as string) ?? '',
+			extractedFromTurnId:
+				typeof item.extractedFromTurnId === 'number'
+					? item.extractedFromTurnId
+					: turnNumber,
+			timestamp: (item.timestamp as string) ?? new Date().toISOString(),
+		};
+	});
+}
+
+/**
+ * Parse a string item into id + text.
+ * Handles formats like:
+ *   "[REQ-1] Full description..."
+ *   "[R-1] Description..."
+ *   "Just plain text without an ID prefix"
+ */
+function parseStringItem(
+	str: string,
+	defaultType: string,
+	index: number
+): { id: string; text: string } {
+	const trimmed = str.trim();
+
+	// Try to extract [ID] prefix: matches [REQ-1], [R-1], [DEC-2], [Q-3], etc.
+	const match = /^\[([A-Z][\w-]*)\]\s*(.*)$/s.exec(trimmed);
+	if (match) {
+		return {
+			id: match[1],
+			text: match[2].trim(),
+		};
+	}
+
+	// No ID prefix — generate one and use the whole string as text
+	return {
+		id: `${defaultType.charAt(0)}-${index + 1}`,
+		text: trimmed,
+	};
 }
 
 /**

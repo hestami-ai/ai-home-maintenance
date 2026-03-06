@@ -64,6 +64,15 @@ const copyNativeModulesPlugin = {
 				copyRecursiveSync(fileUriSrc, fileUriDest);
 				console.log('[copy] Copied file-uri-to-path to dist/node_modules');
 			}
+
+			// Copy @sqliteai/sqlite-vector (optional: vector embedding support)
+			const sqliteVectorSrc = path.join(__dirname, 'node_modules', '@sqliteai', 'sqlite-vector');
+			const sqliteVectorDest = path.join(distModules, '@sqliteai', 'sqlite-vector');
+
+			if (fs.existsSync(sqliteVectorSrc)) {
+				copyRecursiveSync(sqliteVectorSrc, sqliteVectorDest);
+				console.log('[copy] Copied @sqliteai/sqlite-vector to dist/node_modules');
+			}
 		});
 	},
 };
@@ -105,7 +114,7 @@ async function main() {
 		sourcesContent: false,
 		platform: 'node',
 		outfile: 'dist/extension.js',
-		external: ['vscode', 'better-sqlite3'],
+		external: ['vscode', 'better-sqlite3', '@sqliteai/sqlite-vector'],
 		logLevel: 'silent',
 		plugins: [
 			copyNativeModulesPlugin,

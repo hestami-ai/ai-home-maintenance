@@ -366,9 +366,9 @@ function normalizeGeminiStreamEvent(line: string): CLIActivityEvent | null {
 					timestamp: event.timestamp || new Date().toISOString(),
 					eventType: 'tool_result',
 					summary: `Tool ${event.tool_id || ''}: ${event.status || 'completed'}`,
-					detail: event.output ? String(event.output).substring(0, 500) : JSON.stringify(event),
+					detail: JSON.stringify(event),
 					status: event.status === 'success' ? 'success' : 'error',
-					output: event.output ? String(event.output).substring(0, 2000) : undefined,
+					output: event.output ? String(event.output) : undefined,
 					toolUseId: event.tool_id,
 				};
 

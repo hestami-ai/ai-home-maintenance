@@ -191,6 +191,10 @@ export function validateSchema(db: Database.Database): Result<boolean> {
 			'artifacts',
 			'artifact_references',
 			'schema_metadata',
+			'narrative_memories',
+			'decision_traces',
+			'open_loops',
+			'embeddings',
 		];
 
 		const existingTablesResult = db

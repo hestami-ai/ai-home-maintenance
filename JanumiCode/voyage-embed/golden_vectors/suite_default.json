@@ -1,0 +1,6 @@
+{
+  "description": "Golden reference vectors from Voyage API (voyage-4-lite) for validating local ONNX output",
+  "model": "voyage-4-lite",
+  "dimensions": 1024,
+  "vectors": []
+}

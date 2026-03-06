@@ -262,7 +262,9 @@ async function enhanceForInvariantCheck(
 }
 
 /**
- * Enhance context for general history queries
+ * Enhance context for general history queries.
+ * Includes turn metadata AND content summaries so the historian
+ * can perform meaningful contradiction/precedent analysis.
  */
 async function enhanceForGeneralHistory(
 	context: CompiledContextPack,
@@ -277,10 +279,24 @@ async function enhanceForGeneralHistory(
 	});
 
 	if (turnsResult.success && turnsResult.value.length > 0) {
-		const turnNotes = turnsResult.value.map(
-			(t) =>
-				`Turn ${t.item.turn_id}: ${t.item.role} - ${t.item.phase} - ${t.item.speech_act}`
-		);
+		const turnNotes = turnsResult.value.map((t) => {
+			const meta = `Turn ${t.item.turn_id}: ${t.item.role} - ${t.item.phase} - ${t.item.speech_act}`;
+			// Include content summary (truncated) so the historian has actual substance
+			const content = t.item.content_ref;
+			if (!content) { return meta; }
+			// Try to extract readable text from JSON-stringified content
+			let readable = content;
+			try {
+				const parsed = JSON.parse(content);
+				if (typeof parsed === 'string') {
+					readable = parsed;
+				} else if (Array.isArray(parsed)) {
+					readable = parsed.map((item: any) => item.statement ?? JSON.stringify(item)).join('; ');
+				}
+			} catch { /* use raw content */ }
+			const preview = readable.length > 200 ? readable.substring(0, 200) + '…' : readable;
+			return `${meta}\n  Content: ${preview}`;
+		});
 		context.historical_findings = [
 			...turnNotes,
 			...context.historical_findings,

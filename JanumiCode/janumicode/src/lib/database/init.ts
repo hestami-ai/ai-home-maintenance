@@ -14,6 +14,11 @@ import type { Result } from '../types';
 let dbInstance: Database.Database | null = null;
 
 /**
+ * Whether sqlite-vector extension was successfully loaded
+ */
+let sqliteVectorLoaded = false;
+
+/**
  * Database configuration
  */
 export interface DatabaseConfig {
@@ -53,6 +58,15 @@ export function initializeDatabase(
 			verbose: config.verbose,
 		});
 
+		// Load sqlite-vector extension (optional — embedding features unavailable if missing)
+		try {
+			const { getExtensionPath } = require('@sqliteai/sqlite-vector');
+			dbInstance.loadExtension(getExtensionPath());
+			sqliteVectorLoaded = true;
+		} catch {
+			sqliteVectorLoaded = false;
+		}
+
 		// Enable foreign keys
 		dbInstance.pragma('foreign_keys = ON');
 
@@ -74,6 +88,28 @@ export function initializeDatabase(
 					? error
 					: new Error('Unknown database initialization error'),
 		};
+	}
+}
+
+/**
+ * Check if sqlite-vector extension is loaded
+ */
+export function isSqliteVectorLoaded(): boolean {
+	return sqliteVectorLoaded;
+}
+
+/**
+ * Initialize the vector index on the embeddings table.
+ * Must be called per-connection after sqlite-vector is loaded and the embeddings table exists.
+ */
+export function initializeVectorIndex(db: Database.Database): void {
+	if (!sqliteVectorLoaded) {
+		return;
+	}
+	try {
+		db.prepare("SELECT vector_init('embeddings', 'embedding', 'dimension=1024,type=FLOAT32,distance=COSINE')").get();
+	} catch {
+		// embeddings table may not exist yet (pre-V10) or vector_init already called
 	}
 }
 
@@ -241,8 +277,25 @@ export function clearAllData(): Result<void> {
 
 	try {
 		const txn = dbInstance.transaction((db: Database.Database) => {
-			// Order matters: delete child tables before parents to respect FK constraints
+			// Order matters: delete child tables before parents to respect FK constraints.
+			// Includes both schema-managed and self-created inline tables.
+			// Use "IF EXISTS" check since inline tables are only created on first use.
 			const tables = [
+				// Self-created tables that FK-reference schema tables (must go first)
+				'gate_metadata',         // FK → gates
+				'gate_resolutions',      // FK → gates, human_decisions
+				'workflow_suspensions',  // FK → gates
+				'gate_notifications',    // FK → gates
+				'state_transitions',     // FK → workflow_states
+				// Self-created tables without FK to schema tables
+				'workflow_states',
+				'overrides',
+				'constraint_waivers',
+				// Schema-managed tables (children before parents)
+				'embeddings',
+				'narrative_memories',
+				'decision_traces',
+				'open_loops',
 				'intake_turns',
 				'intake_conversations',
 				'workflow_command_outputs',
@@ -261,7 +314,14 @@ export function clearAllData(): Result<void> {
 			];
 
 			for (const table of tables) {
-				db.prepare(`DELETE FROM ${table}`).run();
+				// Check table exists before deleting — inline tables are only
+				// created on first use and may not be present in every database.
+				const exists = db
+					.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?")
+					.get(table);
+				if (exists) {
+					db.prepare(`DELETE FROM ${table}`).run();
+				}
 			}
 		});
 		txn(dbInstance);
