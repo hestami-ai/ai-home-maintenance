@@ -114,6 +114,34 @@ export function getCLIProviderSettings(providerId: string): CLIProviderSettings 
 	};
 }
 
+// ==================== PROVIDER CAPABILITY OVERRIDES ====================
+
+/**
+ * Get user-supplied capability overrides for a CLI provider from VS Code settings.
+ * Returns null for any field that the user hasn't set (keeping the hardcoded default).
+ */
+export function getProviderCapabilityOverrides(providerId: string): {
+	capabilities?: string[];
+	costTier?: string;
+	strengths?: string[];
+} | null {
+	const config = getWorkspaceConfig();
+	const capabilities = config.get<string[] | null>(`providers.${providerId}.capabilities`, null);
+	const costTier = config.get<string | null>(`providers.${providerId}.costTier`, null);
+	const strengths = config.get<string[] | null>(`providers.${providerId}.strengths`, null);
+
+	// If nothing is overridden, return null so the caller uses pure defaults
+	if (!capabilities && !costTier && !strengths) {
+		return null;
+	}
+
+	const overrides: Record<string, unknown> = {};
+	if (capabilities) { overrides.capabilities = capabilities; }
+	if (costTier) { overrides.costTier = costTier; }
+	if (strengths) { overrides.strengths = strengths; }
+	return overrides as { capabilities?: string[]; costTier?: string; strengths?: string[] };
+}
+
 // ==================== MOBILE SPECIALIST MCP CONFIGURATION ====================
 
 /**

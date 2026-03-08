@@ -36,6 +36,16 @@ export enum EvaluationVerdict {
 	ESCALATE_QUESTIONS = 'ESCALATE_QUESTIONS',
 	/** Response presents multiple options — branch analysis per option */
 	ESCALATE_OPTIONS = 'ESCALATE_OPTIONS',
+	/** Decomposition quality: task graph needs further breakdown */
+	DECOMPOSE_REQUIRED = 'DECOMPOSE_REQUIRED',
+	/** Decomposition quality: units are too coarse-grained */
+	TOO_COARSE = 'TOO_COARSE',
+	/** Decomposition quality: units lack verifiable observables */
+	NOT_VERIFIABLE = 'NOT_VERIFIABLE',
+	/** Decomposition quality: units missing required observables */
+	MISSING_OBSERVABLES = 'MISSING_OBSERVABLES',
+	/** Workflow: no acceptance contract defined for validation */
+	MISSING_ACCEPTANCE_CONTRACT = 'MISSING_ACCEPTANCE_CONTRACT',
 }
 
 /**
@@ -105,7 +115,23 @@ For ESCALATE_QUESTIONS:
 {"verdict": "ESCALATE_QUESTIONS", "reasoning": "Why questions block progress", "questions": ["Question 1", "Question 2"]}
 
 For ESCALATE_OPTIONS:
-{"verdict": "ESCALATE_OPTIONS", "reasoning": "Why these are distinct options requiring separate analysis", "options": [{"label": "Short label", "summary": "Brief description", "proposal": "Full proposal text for this option"}]}`;
+{"verdict": "ESCALATE_OPTIONS", "reasoning": "Why these are distinct options requiring separate analysis", "options": [{"label": "Short label", "summary": "Brief description", "proposal": "Full proposal text for this option"}]}
+
+When evaluating a task graph decomposition (if present in the response), also consider:
+
+5. DECOMPOSE_REQUIRED — The response contains a task graph but individual units need further breakdown to be executable.
+
+6. TOO_COARSE — Task units are too large and bundle multiple objectives. Each unit should have a single primary objective.
+
+7. NOT_VERIFIABLE — Task units lack falsifiers or verification methods. Each unit must be verifiable.
+
+8. MISSING_OBSERVABLES — Task units are missing concrete observables that prove success.
+
+For decomposition verdicts:
+{"verdict": "DECOMPOSE_REQUIRED", "reasoning": "Why further decomposition is needed"}
+{"verdict": "TOO_COARSE", "reasoning": "Which units are too large and why"}
+{"verdict": "NOT_VERIFIABLE", "reasoning": "Which units lack verification criteria"}
+{"verdict": "MISSING_OBSERVABLES", "reasoning": "Which units are missing observables"}`;
 
 // ==================== EVALUATOR ====================
 
@@ -356,6 +382,9 @@ function parseEvaluatorResponse(content: string): EvaluationResult {
 				  }))
 				: [];
 		}
+
+		// Decomposition quality verdicts use the same base structure (verdict + reasoning)
+		// No additional fields needed — the reasoning contains the specifics.
 
 		return result;
 	} catch {

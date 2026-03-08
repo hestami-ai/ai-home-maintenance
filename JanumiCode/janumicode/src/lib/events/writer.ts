@@ -98,8 +98,8 @@ export function writeClaim(
 		const claimId = claim.claim_id || randomUUID();
 
 		const stmt = db.prepare(`
-            INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            INSERT INTO claims (claim_id, statement, introduced_by, criticality, status, dialogue_id, turn_id, created_at, assumption_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
         `);
 
 		stmt.run(
@@ -109,7 +109,8 @@ export function writeClaim(
 			claim.criticality,
 			claim.status,
 			claim.dialogue_id,
-			claim.turn_id
+			claim.turn_id,
+			(claim as Claim).assumption_type ?? null
 		);
 
 		// Create corresponding claim event

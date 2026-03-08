@@ -114,6 +114,37 @@ export async function resolveProviderForRole(role: Role): Promise<Result<RoleCLI
 }
 
 /**
+ * Resolve a provider for a specific task unit based on capability matching.
+ * Falls back to the default executor provider if routing fails.
+ *
+ * MAKER integration: delegates to taskRouter.routeTaskToProvider() which
+ * ranks providers by capability match + cost tier for the unit's category.
+ *
+ * @param unit Task unit to route
+ * @param profiles Provider capability profiles
+ * @returns Result containing the resolved RoleCLIProvider
+ */
+export async function resolveProviderForUnit(
+	unit: import('../types/maker').TaskUnit,
+	profiles: import('../types/maker').ProviderCapabilityProfile[]
+): Promise<Result<RoleCLIProvider>> {
+	try {
+		// Import routeTaskToProvider to avoid circular dependency at module level
+		const { routeTaskToProvider } = await import('../workflow/taskRouter');
+		const routeResult = await routeTaskToProvider(unit, profiles);
+
+		if (routeResult.success) {
+			return routeResult;
+		}
+
+		// Fallback to default executor provider
+		return resolveProviderForRole(Role.EXECUTOR);
+	} catch {
+		return resolveProviderForRole(Role.EXECUTOR);
+	}
+}
+
+/**
  * Build a human-readable reason for CLI unavailability.
  */
 function buildUnavailableReason(info: import('./types').CLIProviderInfo): string {

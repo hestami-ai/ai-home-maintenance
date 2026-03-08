@@ -1,0 +1,185 @@
+Yes. You should define explicit constraints, or the Executor will drift to one of the two bad extremes.
+
+“Smallest execution-planning unit worth tracking” is directionally right, but too vague to govern behavior on its own.
+
+Practical definition
+
+A task_unit should be:
+
+small enough that failure is local
+large enough that tracking it adds value
+concrete enough that it can be verified independently
+bounded enough that a provider/tool choice can be assigned to it
+A good mental model is:
+
+not “write the whole Concierge slice”
+not “rename one variable”
+but “introduce canonical association entity schema and regenerate dependent backend/frontend types”
+That is usually the right scale.
+
+What to constrain explicitly
+
+Yes, I would define all three categories you listed.
+
+1. Cap the number of task units per planning cycle
+
+Do not use a single universal hard cap forever, but do use a default operating range.
+
+Good starting rule:
+
+target 5-15 task units for a normal goal
+soft warning above 20
+require hierarchical grouping above 25
+reject below 3 for any non-trivial feature request
+That keeps the system from collapsing into either one giant plan or 80 microscopic steps.
+
+For larger work:
+
+allow nested decomposition
+top-level graph: 5-12 units
+each unit can later expand into child units only if needed
+That is better than allowing one flat graph with 100 nodes.
+
+2. Bound the scope of each unit
+
+Yes, define practical scope boundaries, but avoid crude file-count-only rules.
+
+A better constraint is a mix of change scope and semantic scope:
+
+A task_unit should usually satisfy:
+
+one primary objective
+one dominant failure mode
+one main validation pattern
+one clear dependency boundary
+Helpful soft heuristics:
+
+usually touches 1-3 primary files or one coherent slice across layers
+usually introduces 1-3 atomic claims
+usually has 1 clear completion check
+usually maps to one provider/tool configuration
+File count alone is too brittle because some valid units span schema, API, and UI types by design.
+
+So instead of “1-3 files touched” as a hard rule, I’d use:
+
+“one coherent change boundary”
+“one validation story”
+“one main reason it could fail”
+3. Require fields that force meaningful granularity
+
+Yes. This is the most important control.
+
+A task_unit should be invalid unless it has:
+
+goal
+inputs
+outputs
+preconditions
+postconditions
+observables
+falsifiers
+verification_method
+max_change_scope
+Those fields force the unit to be real rather than rhetorical.
+
+If the Executor cannot fill those fields cleanly, the unit is probably too vague or too broad.
+
+Best anti-under-decomposition rule
+
+Reject a unit if:
+
+it has more than one independent objective
+it requires unrelated validations
+it introduces too many claims
+its falsifiers are heterogeneous
+its output is “implement feature X” or similarly broad
+A useful policy:
+
+max 3 introduced claims per unit
+max 2 validation methods per unit
+max 1 dominant dependency bottleneck per unit
+If it exceeds those, split it.
+
+Best anti-over-decomposition rule
+
+Reject a unit if:
+
+it has no meaningful standalone observable
+it cannot fail independently
+it exists only because of a sequencing detail
+it is too small to justify its own provider/validation cycle
+Examples of over-decomposition:
+
+“open file A”
+“add import line”
+“rename local variable”
+“create interface and then separately export interface” as separate units
+If a step is only a mechanical substep inside a coherent bounded change, it should not be a tracked task_unit.
+
+Recommended decomposition rubric
+
+A task_unit is well-formed if all are true:
+
+It has one clear objective.
+It can be described in 1-2 sentences.
+It has a concrete observable output.
+It has at least one concrete falsifier.
+It can be validated without executing the whole project plan.
+If it fails, the repair strategy is local.
+A human reviewer could understand why it exists.
+If any of those fail, the unit is wrong-sized.
+
+Good examples
+
+Good:
+
+“Add organizationId and associationId constraints to document persistence schema and verify generated types remain aligned.”
+“Implement RLS context setup/cleanup helper for DBOS workflow transactions and validate no context leakage in tests.”
+“Introduce Concierge route shell with SSR data contract and validate route-level type generation.”
+Too broad:
+
+“Implement tenant isolation.”
+“Build Concierge MVP.”
+“Set up all schema/backend/frontend plumbing.”
+Too narrow:
+
+“Add organizationId field to one type definition.”
+“Write one migration file.”
+“Export the helper.”
+Concrete policy you can encode
+
+I would define:
+
+Top-level graph target: 5-15 units
+Soft max top-level units: 20
+If >20: regroup into parent units or phases
+Claims per unit: 1-3
+Primary objective per unit: exactly 1
+Validation methods per unit: 1-2
+Observables: at least 1
+Falsifiers: at least 1
+Human-readable label: required
+Max change scope: required, but semantic not numeric-only
+And I would add Evaluator checks for:
+
+TOO_COARSE
+TOO_FRAGMENTED
+MISSING_OBSERVABLES
+MISSING_FALSIFIERS
+MULTI_OBJECTIVE_UNIT
+Best implementation detail
+
+Do not rely on the Executor alone to self-police granularity.
+
+Use the Evaluator and Verifier together:
+
+Evaluator checks decomposition quality
+Verifier checks whether claims are atomic/verifiable
+if either complains, JanumiCode loops back internally before the human ever sees it
+So the answer is: yes, define explicit constraints, especially around:
+
+target unit count
+one-objective-per-unit
+required observables/falsifiers/validation fields
+max claims per unit
+That is the cleanest way to prevent both prose-monoliths and useless microsteps.

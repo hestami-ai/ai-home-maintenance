@@ -21,6 +21,10 @@ import {
 } from '../../workflow/commandStore';
 import type { IntakePlanDocument, IntakeConversationTurn } from '../../types/intake';
 import { IntakeSubState } from '../../types/intake';
+import type { HumanFacingStatus } from '../../types/maker';
+import { resolveHumanFacingState } from '../../workflow/humanFacingState';
+import { getTaskGraphForDialogue, getTaskUnitsForGraph } from '../../database/makerStore';
+import { getGraphProgress } from '../../workflow/taskGraph';
 
 /**
  * Summary counts of claim statuses for the health bar
@@ -122,6 +126,17 @@ export interface GovernedStreamState {
 		turnCount: number;
 		currentPlan: IntakePlanDocument | null;
 		finalizedPlan: IntakePlanDocument | null;
+	} | null;
+	/** MAKER human-facing state for the active dialogue */
+	humanFacingState: HumanFacingStatus | null;
+	/** MAKER task graph progress for the active dialogue */
+	taskGraphProgress: {
+		total: number;
+		completed: number;
+		failed: number;
+		in_progress: number;
+		pending: number;
+		currentUnitLabel?: string;
 	} | null;
 }
 
@@ -637,6 +652,8 @@ export function aggregateStreamState(activeDialogueId?: string): GovernedStreamS
 		phases: WORKFLOW_PHASES,
 		dialogueList: [],
 		intakeState: null,
+		humanFacingState: null,
+		taskGraphProgress: null,
 	};
 
 	// Try multi-dialogue path: query the dialogues table
@@ -722,6 +739,11 @@ function aggregateFromDialogueRecords(
 		intakeState = buildIntakeState(effectiveActiveId, currentPhase, allStreamItems);
 	}
 
+	// Build MAKER state for the active dialogue
+	const makerState = effectiveActiveId
+		? buildMakerState(effectiveActiveId, currentPhase, openGates.length > 0, intakeState?.subState)
+		: null;
+
 	return {
 		activeDialogueId: effectiveActiveId,
 		sessionId: effectiveActiveId,
@@ -734,6 +756,8 @@ function aggregateFromDialogueRecords(
 		phases: WORKFLOW_PHASES,
 		dialogueList,
 		intakeState,
+		humanFacingState: makerState?.humanFacingState ?? null,
+		taskGraphProgress: makerState?.taskGraphProgress ?? null,
 	};
 }
 
@@ -781,6 +805,9 @@ function aggregateLegacySingleDialogue(
 	applyIntakeStreamProcessing(effectiveDialogueId, streamItems);
 	const intakeState = buildIntakeState(effectiveDialogueId, currentPhase, streamItems);
 
+	// Build MAKER state
+	const makerState = buildMakerState(effectiveDialogueId, currentPhase, openGates.length > 0, intakeState?.subState);
+
 	return {
 		activeDialogueId: effectiveDialogueId,
 		sessionId: effectiveDialogueId,
@@ -793,6 +820,8 @@ function aggregateLegacySingleDialogue(
 		phases: WORKFLOW_PHASES,
 		dialogueList: [],
 		intakeState,
+		humanFacingState: makerState.humanFacingState,
+		taskGraphProgress: makerState.taskGraphProgress,
 	};
 }
 
@@ -989,4 +1018,59 @@ function buildIntakeState(
 		currentPlan: conv.draftPlan,
 		finalizedPlan: conv.finalizedPlan,
 	};
+}
+
+/**
+ * Build MAKER-specific state: human-facing state label + task graph progress.
+ * Returns null fields if no task graph exists (non-MAKER workflow).
+ */
+function buildMakerState(
+	dialogueId: string,
+	currentPhase: Phase,
+	hasOpenGates: boolean,
+	intakeSubState?: string
+): { humanFacingState: HumanFacingStatus; taskGraphProgress: GovernedStreamState['taskGraphProgress'] } {
+	// Try to get task graph progress
+	let taskGraphProgress: GovernedStreamState['taskGraphProgress'] = null;
+	let currentUnitLabel: string | undefined;
+	let isRepairing = false;
+	let unitsCompleted: number | undefined;
+	let unitsTotal: number | undefined;
+
+	const graphResult = getTaskGraphForDialogue(dialogueId);
+	if (graphResult.success && graphResult.value) {
+		const progress = getGraphProgress(graphResult.value.graph_id);
+		if (progress.success) {
+			taskGraphProgress = progress.value;
+			unitsCompleted = progress.value.completed;
+			unitsTotal = progress.value.total;
+
+			// Find current unit label
+			const unitsResult = getTaskUnitsForGraph(graphResult.value.graph_id);
+			if (unitsResult.success) {
+				const inProgressUnit = unitsResult.value.find((u) => u.status === 'IN_PROGRESS');
+				const repairingUnit = unitsResult.value.find((u) => u.status === 'REPAIRING');
+				if (repairingUnit) {
+					currentUnitLabel = repairingUnit.label;
+					isRepairing = true;
+				} else if (inProgressUnit) {
+					currentUnitLabel = inProgressUnit.label;
+				}
+				if (currentUnitLabel) {
+					taskGraphProgress.currentUnitLabel = currentUnitLabel;
+				}
+			}
+		}
+	}
+
+	const humanFacingState = resolveHumanFacingState(currentPhase, {
+		hasOpenGates,
+		isRepairing,
+		intakeSubState,
+		unitsCompleted,
+		unitsTotal,
+		currentUnitLabel,
+	});
+
+	return { humanFacingState, taskGraphProgress };
 }

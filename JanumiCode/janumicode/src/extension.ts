@@ -203,7 +203,8 @@ function registerWebviewProviders(context: vscode.ExtensionContext): GovernedStr
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			GovernedStreamViewProvider.viewType,
-			governedStreamProvider
+			governedStreamProvider,
+			{ webviewOptions: { retainContextWhenHidden: true } }
 		)
 	);
 

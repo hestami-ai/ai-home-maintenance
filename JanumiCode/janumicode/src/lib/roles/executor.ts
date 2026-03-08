@@ -10,6 +10,7 @@ import type {
 	Claim,
 	ClaimCriticality,
 } from '../types';
+import type { TaskUnit } from '../types/maker';
 import { ClaimStatus } from '../types';
 import { buildExecutorContext, formatExecutorContext } from '../context';
 import type { CompiledContextPack } from '../context/compiler';
@@ -17,7 +18,7 @@ import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
 import { randomUUID } from 'node:crypto';
 import { getLogger, isLoggerInitialized } from '../logging';
-import { emitWorkflowCommand } from '../integration/eventBus';
+import { emitWorkflowCommand, emitCLIActivity } from '../integration/eventBus';
 import { updateWorkflowMetadata } from '../workflow/stateMachine';
 import { analyzeGoalForMobile } from '../mcp/goalDetector';
 import {
@@ -51,6 +52,7 @@ export interface Assumption {
 	statement: string;
 	criticality: ClaimCriticality;
 	rationale: string;
+	assumption_type?: string;
 }
 
 /**
@@ -102,6 +104,12 @@ const EXECUTOR_SYSTEM_PROMPT = `You are the EXECUTOR role in the JanumiCode auto
 ## ALWAYS Surface Assumptions
 - Every assumption in your proposal MUST be surfaced as an explicit claim
 - Mark assumptions with appropriate criticality (CRITICAL or NON_CRITICAL)
+- Classify each assumption by type:
+  - "architectural" — Design or technology choices (e.g., "Use Better Auth for sessions")
+  - "compatibility" — Runtime or library compatibility (e.g., "DBOS works with Bun")
+  - "structural" — Workspace or file structure (e.g., "specs directory contains 3 files")
+  - "scoping" — Deferral or phasing decisions (e.g., "Defer email integration")
+  - "intent" — Interpretation of user intent (e.g., "This is a greenfield build")
 - Provide clear rationale for why each assumption matters
 
 # Response Format
@@ -115,6 +123,7 @@ Your response MUST be valid JSON with this exact structure:
     {
       "statement": "Assumption statement",
       "criticality": "CRITICAL" | "NON_CRITICAL",
+      "assumption_type": "architectural" | "compatibility" | "structural" | "scoping" | "intent",
       "rationale": "Why this assumption matters"
     }
   ],
@@ -139,6 +148,13 @@ IMPORTANT: The "proposal" field is the PRIMARY deliverable. It must contain the 
 - Instead, express implementation sequences as logical execution steps ordered by dependency and optimal build order
 - Use labels like "Step 1", "Stage A", or descriptive names (e.g., "Foundation", "Core API", "Integration Layer") — never time-based labels
 - Do NOT estimate durations, timelines, or delivery dates
+
+## Implementation Completeness
+- Implement features as specified in the requirements and constraints. Do NOT defer specified features to "later milestones" or "future phases."
+- The ONLY acceptable deferrals are for external integrations (email providers, SMS gateways, third-party APIs) that lack detailed specifications in the provided documentation. When deferring, surface this as an explicit assumption explaining what specification is missing.
+- For all features with clear specifications, implement them fully. If implementation is complex, decompose into smaller steps but still implement each step completely.
+- Do NOT stub, mock, or placeholder features that have detailed specifications — implement them.
+- Surface complexity concerns as assumptions rather than silently deferring.
 
 # Context
 
@@ -631,14 +647,218 @@ export function assumptionsToClaims(
 	dialogueId: string,
 	turnId: number
 ): Claim[] {
-	return assumptions.map((assumption) => ({
-		claim_id: assumption.assumption_id,
-		statement: assumption.statement,
-		introduced_by: 'EXECUTOR' as Role,
-		criticality: assumption.criticality,
-		status: ClaimStatus.OPEN,
-		dialogue_id: dialogueId,
-		turn_id: turnId,
-		created_at: new Date().toISOString(),
-	}));
+	return assumptions.map((assumption) => {
+		const claim: Claim = {
+			claim_id: assumption.assumption_id,
+			statement: assumption.statement,
+			introduced_by: 'EXECUTOR' as Role,
+			criticality: assumption.criticality,
+			status: ClaimStatus.OPEN,
+			dialogue_id: dialogueId,
+			turn_id: turnId,
+			created_at: new Date().toISOString(),
+		};
+		if (assumption.assumption_type) {
+			claim.assumption_type = assumption.assumption_type as Claim['assumption_type'];
+		}
+		return claim;
+	});
+}
+
+// ==================== UNIT-SCOPED EXECUTION (MAKER) ====================
+
+/**
+ * System prompt for per-unit execution within a task graph.
+ * Constrains the executor to a single task unit's goal, inputs, outputs,
+ * and change scope — preventing scope creep beyond the unit boundary.
+ */
+const EXECUTOR_UNIT_SYSTEM_PROMPT = `You are the EXECUTOR role in the JanumiCode autonomous system, executing a SINGLE TASK UNIT from a decomposed task graph.
+
+# Scope Constraint
+
+You are executing ONE unit of work. You MUST:
+- Focus ONLY on the goal described for this unit
+- Only modify files within the specified change scope
+- Produce ONLY the outputs listed for this unit
+- Satisfy ALL postconditions before considering the unit complete
+- Do NOT work on tasks belonging to other units in the graph
+
+# Unit Execution Protocol
+
+1. Read the unit goal, inputs, and preconditions carefully
+2. Verify preconditions are met before starting
+3. Execute the work to achieve the unit goal
+4. Verify postconditions are satisfied
+5. Ensure all specified observables are present in the result
+
+# Critical Guardrails
+
+## NEVER Exceed Change Scope
+- You MUST NOT modify files outside the unit's max_change_scope directory
+- You MUST NOT create new files outside the change scope unless explicitly required by the unit goal
+- If you discover work needed outside your scope, note it but do NOT execute it
+
+## ALWAYS Satisfy Postconditions
+- Every postcondition listed for this unit MUST be true when you finish
+- If a postcondition cannot be satisfied, stop and report the issue
+
+## RESPECT Observables and Falsifiers
+- Observables are concrete things that should be true after execution
+- Falsifiers are conditions that would prove the unit was NOT correctly executed
+- Ensure observables are present and falsifiers are absent
+
+Apply all changes to the workspace. Execute the unit goal completely.`;
+
+/**
+ * Unit-scoped executor invocation options
+ */
+export interface UnitExecutorInvocationOptions {
+	dialogueId: string;
+	unit: TaskUnit;
+	context: string; // Pre-built context from makerPlanner builder
+	provider: RoleCLIProvider;
+	commandId?: string;
+}
+
+/**
+ * Unit-scoped executor result
+ */
+export interface UnitExecutorResult {
+	success: boolean;
+	exitCode: number;
+	response: string;
+	executionTimeMs: number;
+}
+
+/**
+ * Invoke Executor for a single task unit within a MAKER task graph.
+ * Uses a unit-scoped system prompt that constrains execution to the unit's
+ * goal, change scope, and postconditions.
+ *
+ * @param options Unit executor invocation options
+ * @returns Result containing unit execution outcome
+ */
+export async function invokeExecutorForUnit(
+	options: UnitExecutorInvocationOptions
+): Promise<Result<UnitExecutorResult>> {
+	try {
+		const { unit, provider, dialogueId, commandId } = options;
+
+		// Build unit-scoped user prompt with structured unit metadata
+		const userPrompt = formatUnitPrompt(unit, options.context);
+
+		// Build stdin content: unit system prompt + unit-specific context
+		const stdinContent = buildStdinContent(EXECUTOR_UNIT_SYSTEM_PROMPT, userPrompt);
+
+		// Emit stdin for observability
+		if (commandId) {
+			emitWorkflowCommand({
+				dialogueId,
+				commandId,
+				action: 'output',
+				commandType: 'cli_invocation',
+				label: `Executor — Unit: ${unit.label}`,
+				summary: '── stdin ──',
+				detail: stdinContent,
+				lineType: 'stdin',
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		const startMs = Date.now();
+
+		// Invoke with streaming for real-time progress
+		const executionResult = await provider.invokeStreaming(
+			{
+				stdinContent,
+				outputFormat: 'stream-json',
+			},
+			(event) => {
+				emitCLIActivity(dialogueId, {
+					...event,
+					role: 'EXECUTOR' as Role,
+					phase: 'EXECUTE' as import('../types').Phase,
+				});
+			}
+		);
+
+		const elapsedMs = Date.now() - startMs;
+
+		if (!executionResult.success) {
+			return {
+				success: false,
+				error: executionResult.error,
+			};
+		}
+
+		return {
+			success: true,
+			value: {
+				success: executionResult.value.exitCode === 0,
+				exitCode: executionResult.value.exitCode,
+				response: executionResult.value.response ?? '',
+				executionTimeMs: elapsedMs,
+			},
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to invoke executor for unit'),
+		};
+	}
+}
+
+/**
+ * Format the unit-scoped user prompt with structured metadata.
+ */
+function formatUnitPrompt(unit: TaskUnit, plannerContext: string): string {
+	const sections: string[] = [];
+
+	sections.push(`# Task Unit: ${unit.label}`);
+	sections.push(`## Goal\n\n${unit.goal}`);
+
+	if (unit.category) {
+		sections.push(`## Category\n\n${unit.category}`);
+	}
+
+	if (unit.max_change_scope) {
+		sections.push(`## Change Scope\n\nYou may ONLY modify files within: \`${unit.max_change_scope}\``);
+	}
+
+	if (unit.inputs.length > 0) {
+		sections.push(`## Inputs\n\n${unit.inputs.map((i) => `- ${i}`).join('\n')}`);
+	}
+
+	if (unit.outputs.length > 0) {
+		sections.push(`## Expected Outputs\n\n${unit.outputs.map((o) => `- ${o}`).join('\n')}`);
+	}
+
+	if (unit.preconditions.length > 0) {
+		sections.push(`## Preconditions (must be true before you start)\n\n${unit.preconditions.map((p) => `- ${p}`).join('\n')}`);
+	}
+
+	if (unit.postconditions.length > 0) {
+		sections.push(`## Postconditions (must be true when you finish)\n\n${unit.postconditions.map((p) => `- ${p}`).join('\n')}`);
+	}
+
+	if (unit.observables.length > 0) {
+		sections.push(`## Observables (concrete evidence of success)\n\n${unit.observables.map((o) => `- ${o}`).join('\n')}`);
+	}
+
+	if (unit.falsifiers.length > 0) {
+		sections.push(`## Falsifiers (if any of these are true, the unit FAILED)\n\n${unit.falsifiers.map((f) => `- ${f}`).join('\n')}`);
+	}
+
+	if (unit.allowed_tools && unit.allowed_tools.length > 0) {
+		sections.push(`## Allowed Tools\n\n${unit.allowed_tools.map((t) => `- ${t}`).join('\n')}`);
+	}
+
+	if (plannerContext) {
+		sections.push(`## Additional Context\n\n${plannerContext}`);
+	}
+
+	return sections.join('\n\n');
 }

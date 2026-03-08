@@ -12,10 +12,11 @@ import {
 	updateWorkflowMetadata,
 	TransitionTrigger,
 } from './stateMachine';
-import { getGate, resolveGate, getGatesForDialogue } from './gates';
+import { getGate, resolveGate } from './gates';
 import { captureHumanDecision } from '../roles/human';
 import { getDatabase } from '../database';
 import { getLogger, isLoggerInitialized } from '../logging';
+import { updateTaskUnitStatus } from '../database/makerStore';
 
 /**
  * Workflow suspension record
@@ -350,6 +351,12 @@ export function processHumanGateDecision(
 				resolution = 'Decision recorded';
 		}
 
+		// ── MAKER: Handle REPAIR_ESCALATION gate decisions ──
+		const gateMetadata = parseGateMetadata(gate);
+		if (gateMetadata?.condition === 'REPAIR_ESCALATION') {
+			return handleRepairEscalationDecision(gate, decision, input, gateMetadata);
+		}
+
 		// Resolve gate (only if approved or overridden)
 		if (
 			input.action === HumanAction.APPROVE ||
@@ -633,6 +640,130 @@ export function handleGateTimeouts(
 					: new Error('Failed to handle gate timeouts'),
 		};
 	}
+}
+
+// ==================== MAKER: REPAIR ESCALATION HANDLING ====================
+
+/**
+ * Read gate metadata from the gate_metadata table.
+ * Metadata is stored separately from the gate record itself.
+ */
+function parseGateMetadata(gate: Gate): Record<string, unknown> | null {
+	try {
+		const db = getDatabase();
+		if (!db) { return null; }
+
+		const row = db.prepare(
+			'SELECT metadata FROM gate_metadata WHERE gate_id = ?'
+		).get(gate.gate_id) as { metadata: string } | undefined;
+
+		if (!row) { return null; }
+		return JSON.parse(row.metadata) as Record<string, unknown>;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Handle human decisions on REPAIR_ESCALATION gates.
+ *
+ * Actions:
+ * - APPROVE → skip the failed unit, mark as SKIPPED, continue with next ready unit
+ * - OVERRIDE → allow one more repair attempt (reset unit to READY)
+ * - REFRAME → trigger REPLAN with unit-specific feedback
+ */
+function handleRepairEscalationDecision(
+	gate: Gate,
+	decision: HumanDecision,
+	input: HumanGateDecisionInput,
+	gateMetadata: Record<string, unknown>
+): Result<HumanDecision> {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'workflow:repair-gate', dialogueId: gate.dialogue_id })
+		: undefined;
+
+	const unitId = gateMetadata.unit_id as string | undefined;
+	const failureType = gateMetadata.failure_type as string | undefined;
+
+	switch (input.action) {
+		case HumanAction.APPROVE: {
+			// Skip the failed unit and continue
+			if (unitId) {
+				updateTaskUnitStatus(unitId, 'SKIPPED');
+				logger?.info('Repair escalation: skipping failed unit', { unitId, failureType });
+			}
+
+			// Resolve gate and resume workflow
+			resolveGate({
+				gateId: input.gateId,
+				decisionId: decision.decision_id,
+				resolution: `Skipped failed unit (${failureType ?? 'unknown failure'})`,
+			});
+			resumeWorkflowAfterGate(gate.dialogue_id, input.gateId);
+			break;
+		}
+
+		case HumanAction.OVERRIDE: {
+			// Allow one more repair attempt — reset unit to READY
+			if (unitId) {
+				updateTaskUnitStatus(unitId, 'READY');
+				logger?.info('Repair escalation: retrying unit', { unitId, failureType });
+			}
+
+			// Resolve gate and resume — the execute loop will pick up the READY unit
+			resolveGate({
+				gateId: input.gateId,
+				decisionId: decision.decision_id,
+				resolution: `Retry repair for unit (${failureType ?? 'unknown failure'})`,
+			});
+			resumeWorkflowAfterGate(gate.dialogue_id, input.gateId);
+			break;
+		}
+
+		case HumanAction.REFRAME: {
+			// Trigger REPLAN with unit-specific feedback
+			if (unitId) {
+				updateTaskUnitStatus(unitId, 'FAILED');
+			}
+
+			// Store replan rationale in metadata
+			updateWorkflowMetadata(gate.dialogue_id, {
+				replanRationale: input.rationale || `Repair escalation reframe for failure type: ${failureType}`,
+				replanTriggeredByUnit: unitId,
+			});
+
+			// Resolve gate
+			resolveGate({
+				gateId: input.gateId,
+				decisionId: decision.decision_id,
+				resolution: `Reframing after repair failure (${failureType ?? 'unknown'})`,
+			});
+
+			// Transition to REPLAN phase
+			transitionWorkflow(
+				gate.dialogue_id,
+				'REPLAN' as any,
+				TransitionTrigger.REPAIR_ESCALATED,
+				{ unitId, failureType }
+			);
+
+			logger?.info('Repair escalation: reframing via REPLAN', { unitId, failureType });
+			break;
+		}
+
+		default: {
+			// For REJECT, DELEGATE, ESCALATE — just resolve the gate without special handling
+			logger?.info('Repair escalation: non-standard action', { action: input.action, unitId });
+			resolveGate({
+				gateId: input.gateId,
+				decisionId: decision.decision_id,
+				resolution: `Repair escalation resolved with action: ${input.action}`,
+			});
+			break;
+		}
+	}
+
+	return { success: true, value: decision };
 }
 
 /**

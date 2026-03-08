@@ -89,6 +89,8 @@ const MODE_INSTRUCTIONS: Record<CurationMode, string> = {
 		'Curate the full lifecycle — from intent through execution results. Include what was planned vs. what actually happened, and what was learned.',
 	[CurationMode.FAILURE]:
 		'Curate a lightweight failure trace — what went wrong and why. Focus on the causal chain leading to failure and what open loops remain.',
+	[CurationMode.FEEDBACK]:
+		'Curate the human feedback at a workflow gate — what was decided, why, what corrections or clarifications the human provided, and how this changes the prior understanding. Pay special attention to human overrides of verification verdicts and any new context the human introduced.',
 };
 
 // ==================== MAIN ENTRY POINT ====================
@@ -495,8 +497,8 @@ function gatherCurationContext(
 			sections.push(decisionsSection);
 		}
 
-		// 7. INTAKE conversation turns (for INTENT mode — rich deliberation detail)
-		if (mode === CurationMode.INTENT) {
+		// 7. INTAKE conversation turns (for INTENT and FEEDBACK modes — rich deliberation detail)
+		if (mode === CurationMode.INTENT || mode === CurationMode.FEEDBACK) {
 			const intakeTurns = db
 				.prepare(
 					`

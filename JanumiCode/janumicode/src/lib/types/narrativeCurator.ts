@@ -15,6 +15,8 @@ export enum CurationMode {
 	OUTCOME = 'OUTCOME',
 	/** Lightweight failure trace on ESCALATE_* verdicts */
 	FAILURE = 'FAILURE',
+	/** Human feedback at a workflow gate — captures decisions, corrections, clarifications */
+	FEEDBACK = 'FEEDBACK',
 }
 
 /**

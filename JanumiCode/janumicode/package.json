@@ -219,6 +219,120 @@
           "default": "glm-4.6",
           "description": "Model name for the specialist LLM (e.g., glm-4.6)"
         },
+        "janumicode.providers.claude-code.capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CODE_GENERATION",
+              "CODE_REVIEW",
+              "REFACTORING",
+              "TEST_GENERATION",
+              "DOCUMENTATION",
+              "ARCHITECTURE",
+              "FILE_MANIPULATION",
+              "VERIFICATION",
+              "REASONING"
+            ]
+          },
+          "default": null,
+          "markdownDescription": "Override capability list for Claude Code provider. Leave empty to use defaults."
+        },
+        "janumicode.providers.claude-code.costTier": {
+          "type": "string",
+          "enum": [
+            "FREE",
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "default": null,
+          "description": "Override cost tier for Claude Code provider"
+        },
+        "janumicode.providers.claude-code.strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": null,
+          "description": "Override strengths list for Claude Code provider"
+        },
+        "janumicode.providers.codex-cli.capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CODE_GENERATION",
+              "CODE_REVIEW",
+              "REFACTORING",
+              "TEST_GENERATION",
+              "DOCUMENTATION",
+              "ARCHITECTURE",
+              "FILE_MANIPULATION",
+              "VERIFICATION",
+              "REASONING"
+            ]
+          },
+          "default": null,
+          "markdownDescription": "Override capability list for Codex CLI provider. Leave empty to use defaults."
+        },
+        "janumicode.providers.codex-cli.costTier": {
+          "type": "string",
+          "enum": [
+            "FREE",
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "default": null,
+          "description": "Override cost tier for Codex CLI provider"
+        },
+        "janumicode.providers.codex-cli.strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": null,
+          "description": "Override strengths list for Codex CLI provider"
+        },
+        "janumicode.providers.gemini-cli.capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "CODE_GENERATION",
+              "CODE_REVIEW",
+              "REFACTORING",
+              "TEST_GENERATION",
+              "DOCUMENTATION",
+              "ARCHITECTURE",
+              "FILE_MANIPULATION",
+              "VERIFICATION",
+              "REASONING"
+            ]
+          },
+          "default": null,
+          "markdownDescription": "Override capability list for Gemini CLI provider. Leave empty to use defaults."
+        },
+        "janumicode.providers.gemini-cli.costTier": {
+          "type": "string",
+          "enum": [
+            "FREE",
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "default": null,
+          "description": "Override cost tier for Gemini CLI provider"
+        },
+        "janumicode.providers.gemini-cli.strengths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": null,
+          "description": "Override strengths list for Gemini CLI provider"
+        },
         "janumicode.embedding.enabled": {
           "type": "boolean",
           "default": false,

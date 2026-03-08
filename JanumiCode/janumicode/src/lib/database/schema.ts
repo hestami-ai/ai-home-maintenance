@@ -437,6 +437,294 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_dialogue ON embeddings(dialogue_id);
 CREATE INDEX IF NOT EXISTS idx_embeddings_hash ON embeddings(content_hash);
 `;
 
+/**
+ * Migration V12: Add FEEDBACK curation mode + assumption_type on claims.
+ *
+ * - Recreates narrative_memories, decision_traces, open_loops WITHOUT the
+ *   CHECK(curation_mode IN (...)) constraint so the TypeScript CurationMode
+ *   enum is the single source of truth for valid modes. This enables the new
+ *   FEEDBACK mode (and any future modes) without further migrations.
+ * - Adds optional assumption_type column to claims for categorising assumptions
+ *   as architectural, compatibility, structural, scoping, or intent.
+ */
+export const SCHEMA_V12 = `
+-- Recreate narrative_memories without CHECK constraint on curation_mode
+CREATE TABLE IF NOT EXISTS narrative_memories_v2 (
+    memory_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    curation_mode TEXT NOT NULL,
+    agent_frame TEXT NOT NULL,
+    goal TEXT NOT NULL,
+    causal_sequence TEXT NOT NULL,
+    conflicts TEXT NOT NULL DEFAULT '[]',
+    resolution_status TEXT NOT NULL,
+    lessons TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO narrative_memories_v2 SELECT * FROM narrative_memories;
+DROP TABLE IF EXISTS narrative_memories;
+ALTER TABLE narrative_memories_v2 RENAME TO narrative_memories;
+CREATE INDEX IF NOT EXISTS idx_narrative_memories_dialogue_id ON narrative_memories(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_narrative_memories_mode ON narrative_memories(curation_mode);
+
+-- Recreate decision_traces without CHECK constraint on curation_mode
+CREATE TABLE IF NOT EXISTS decision_traces_v2 (
+    trace_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    curation_mode TEXT NOT NULL,
+    decision_points TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO decision_traces_v2 SELECT * FROM decision_traces;
+DROP TABLE IF EXISTS decision_traces;
+ALTER TABLE decision_traces_v2 RENAME TO decision_traces;
+CREATE INDEX IF NOT EXISTS idx_decision_traces_dialogue_id ON decision_traces(dialogue_id);
+
+-- Recreate open_loops without CHECK constraint on curation_mode
+CREATE TABLE IF NOT EXISTS open_loops_v2 (
+    loop_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    curation_mode TEXT NOT NULL,
+    category TEXT NOT NULL CHECK(category IN ('blocker', 'deferred_decision', 'missing_info', 'risk', 'follow_up')),
+    description TEXT NOT NULL,
+    related_claim_ids TEXT NOT NULL DEFAULT '[]',
+    priority TEXT NOT NULL CHECK(priority IN ('high', 'medium', 'low')) DEFAULT 'medium',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+INSERT OR IGNORE INTO open_loops_v2 SELECT * FROM open_loops;
+DROP TABLE IF EXISTS open_loops;
+ALTER TABLE open_loops_v2 RENAME TO open_loops;
+CREATE INDEX IF NOT EXISTS idx_open_loops_dialogue_id ON open_loops(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_open_loops_category ON open_loops(category);
+CREATE INDEX IF NOT EXISTS idx_open_loops_priority ON open_loops(priority);
+
+-- Add assumption_type to claims (nullable — only set for Executor-surfaced assumptions)
+ALTER TABLE claims ADD COLUMN assumption_type TEXT;
+`;
+
+/**
+ * Migration V11: MAKER Agent Integration Control Plane tables
+ * Adds structured internal objects for intent capture, task graph decomposition,
+ * per-unit execution, bounded repair, and outcome tracking.
+ */
+export const SCHEMA_V11 = `
+-- ==================== INTENT & CONTRACT ====================
+
+CREATE TABLE IF NOT EXISTS intent_records (
+    intent_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    human_goal TEXT NOT NULL,
+    scope_in TEXT NOT NULL DEFAULT '[]',
+    scope_out TEXT NOT NULL DEFAULT '[]',
+    priority_axes TEXT NOT NULL DEFAULT '[]',
+    risk_posture TEXT NOT NULL CHECK(risk_posture IN ('CONSERVATIVE', 'BALANCED', 'AGGRESSIVE')) DEFAULT 'BALANCED',
+    clarifications_resolved TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_intent_records_dialogue ON intent_records(dialogue_id);
+
+CREATE TABLE IF NOT EXISTS acceptance_contracts (
+    contract_id TEXT PRIMARY KEY,
+    intent_id TEXT NOT NULL,
+    dialogue_id TEXT NOT NULL,
+    success_conditions TEXT NOT NULL DEFAULT '[]',
+    required_validations TEXT NOT NULL DEFAULT '[]',
+    non_goals TEXT NOT NULL DEFAULT '[]',
+    human_judgment_required TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (intent_id) REFERENCES intent_records(intent_id)
+);
+CREATE INDEX IF NOT EXISTS idx_acceptance_contracts_dialogue ON acceptance_contracts(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_acceptance_contracts_intent ON acceptance_contracts(intent_id);
+
+-- ==================== TASK GRAPH ====================
+
+CREATE TABLE IF NOT EXISTS task_graphs (
+    graph_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    intent_id TEXT NOT NULL,
+    root_goal TEXT NOT NULL,
+    graph_status TEXT NOT NULL CHECK(graph_status IN ('DRAFT', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'ABANDONED')) DEFAULT 'DRAFT',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (intent_id) REFERENCES intent_records(intent_id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_graphs_dialogue ON task_graphs(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_task_graphs_intent ON task_graphs(intent_id);
+
+CREATE TABLE IF NOT EXISTS task_units (
+    unit_id TEXT PRIMARY KEY,
+    graph_id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    goal TEXT NOT NULL,
+    category TEXT NOT NULL CHECK(category IN ('SCAFFOLD', 'IMPLEMENTATION', 'REFACTOR', 'TEST', 'DOCUMENTATION', 'CONFIGURATION', 'MIGRATION')),
+    inputs TEXT NOT NULL DEFAULT '[]',
+    outputs TEXT NOT NULL DEFAULT '[]',
+    preconditions TEXT NOT NULL DEFAULT '[]',
+    postconditions TEXT NOT NULL DEFAULT '[]',
+    allowed_tools TEXT NOT NULL DEFAULT '[]',
+    preferred_provider TEXT,
+    max_change_scope TEXT NOT NULL DEFAULT '*',
+    observables TEXT NOT NULL DEFAULT '[]',
+    falsifiers TEXT NOT NULL DEFAULT '[]',
+    verification_method TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL CHECK(status IN ('PENDING', 'READY', 'IN_PROGRESS', 'VALIDATING', 'REPAIRING', 'COMPLETED', 'FAILED', 'SKIPPED')) DEFAULT 'PENDING',
+    parent_unit_id TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (graph_id) REFERENCES task_graphs(graph_id),
+    FOREIGN KEY (parent_unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_units_graph ON task_units(graph_id);
+CREATE INDEX IF NOT EXISTS idx_task_units_status ON task_units(status);
+CREATE INDEX IF NOT EXISTS idx_task_units_parent ON task_units(parent_unit_id);
+
+CREATE TABLE IF NOT EXISTS task_edges (
+    edge_id TEXT PRIMARY KEY,
+    graph_id TEXT NOT NULL,
+    from_unit_id TEXT NOT NULL,
+    to_unit_id TEXT NOT NULL,
+    edge_type TEXT NOT NULL CHECK(edge_type IN ('DEPENDS_ON', 'BLOCKS', 'RELATED')),
+    FOREIGN KEY (graph_id) REFERENCES task_graphs(graph_id),
+    FOREIGN KEY (from_unit_id) REFERENCES task_units(unit_id),
+    FOREIGN KEY (to_unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_edges_graph ON task_edges(graph_id);
+CREATE INDEX IF NOT EXISTS idx_task_edges_from ON task_edges(from_unit_id);
+CREATE INDEX IF NOT EXISTS idx_task_edges_to ON task_edges(to_unit_id);
+
+-- ==================== CLAIMS & EVIDENCE ====================
+
+CREATE TABLE IF NOT EXISTS claim_units (
+    claim_id TEXT PRIMARY KEY,
+    unit_id TEXT NOT NULL,
+    statement TEXT NOT NULL,
+    claim_scope TEXT NOT NULL CHECK(claim_scope IN ('ATOMIC', 'COMPOSITE', 'VAGUE')),
+    falsifiers TEXT NOT NULL DEFAULT '[]',
+    required_evidence TEXT NOT NULL DEFAULT '[]',
+    FOREIGN KEY (unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_claim_units_unit ON claim_units(unit_id);
+
+CREATE TABLE IF NOT EXISTS evidence_packets (
+    packet_id TEXT PRIMARY KEY,
+    unit_id TEXT NOT NULL,
+    sources TEXT NOT NULL DEFAULT '[]',
+    supported_statements TEXT NOT NULL DEFAULT '[]',
+    unsupported_statements TEXT NOT NULL DEFAULT '[]',
+    confidence REAL NOT NULL DEFAULT 0.0,
+    gaps TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_evidence_packets_unit ON evidence_packets(unit_id);
+
+-- ==================== VALIDATION & REPAIR ====================
+
+CREATE TABLE IF NOT EXISTS validation_packets (
+    validation_id TEXT PRIMARY KEY,
+    unit_id TEXT NOT NULL,
+    checks TEXT NOT NULL DEFAULT '[]',
+    expected_observables TEXT NOT NULL DEFAULT '[]',
+    actual_observables TEXT NOT NULL DEFAULT '[]',
+    pass_fail TEXT NOT NULL CHECK(pass_fail IN ('PASS', 'FAIL')),
+    failure_type TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_validation_packets_unit ON validation_packets(unit_id);
+
+CREATE TABLE IF NOT EXISTS repair_packets (
+    repair_id TEXT PRIMARY KEY,
+    unit_id TEXT NOT NULL,
+    suspected_cause TEXT NOT NULL,
+    repair_strategy TEXT NOT NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 1,
+    max_attempts INTEGER NOT NULL DEFAULT 2,
+    escalation_threshold TEXT NOT NULL CHECK(escalation_threshold IN ('AUTO_REPAIR_SAFE', 'CONDITIONAL', 'ESCALATE_REQUIRED')),
+    diff_before TEXT NOT NULL DEFAULT '',
+    diff_after TEXT NOT NULL DEFAULT '',
+    result TEXT NOT NULL CHECK(result IN ('FIXED', 'PARTIALLY_FIXED', 'FAILED', 'ESCALATED', 'TIMED_OUT')),
+    wall_clock_ms INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_repair_packets_unit ON repair_packets(unit_id);
+
+-- ==================== HISTORICAL INVARIANTS ====================
+
+CREATE TABLE IF NOT EXISTS historical_invariant_packets (
+    packet_id TEXT PRIMARY KEY,
+    unit_id TEXT,
+    dialogue_id TEXT NOT NULL,
+    relevant_invariants TEXT NOT NULL DEFAULT '[]',
+    prior_failure_motifs TEXT NOT NULL DEFAULT '[]',
+    precedent_patterns TEXT NOT NULL DEFAULT '[]',
+    reusable_subplans TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (unit_id) REFERENCES task_units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_hist_invariant_dialogue ON historical_invariant_packets(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_hist_invariant_unit ON historical_invariant_packets(unit_id);
+
+-- ==================== OUTCOME TRACKING ====================
+
+CREATE TABLE IF NOT EXISTS outcome_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    dialogue_id TEXT NOT NULL,
+    graph_id TEXT NOT NULL,
+    providers_used TEXT NOT NULL DEFAULT '[]',
+    augmentations_used TEXT NOT NULL DEFAULT '[]',
+    success INTEGER NOT NULL DEFAULT 0,
+    failure_modes TEXT NOT NULL DEFAULT '[]',
+    useful_invariants TEXT NOT NULL DEFAULT '[]',
+    units_completed INTEGER NOT NULL DEFAULT 0,
+    units_total INTEGER NOT NULL DEFAULT 0,
+    total_wall_clock_ms INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (graph_id) REFERENCES task_graphs(graph_id)
+);
+CREATE INDEX IF NOT EXISTS idx_outcome_snapshots_dialogue ON outcome_snapshots(dialogue_id);
+CREATE INDEX IF NOT EXISTS idx_outcome_snapshots_graph ON outcome_snapshots(graph_id);
+
+-- ==================== TOOLCHAIN DETECTION ====================
+
+CREATE TABLE IF NOT EXISTS toolchain_detections (
+    detection_id TEXT PRIMARY KEY,
+    workspace_root TEXT NOT NULL,
+    project_type TEXT NOT NULL,
+    package_manager TEXT NOT NULL DEFAULT '',
+    lint_command TEXT,
+    type_check_command TEXT,
+    test_command TEXT,
+    build_command TEXT,
+    detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+    confidence REAL NOT NULL DEFAULT 0.0
+);
+CREATE INDEX IF NOT EXISTS idx_toolchain_workspace ON toolchain_detections(workspace_root);
+`;
+
+/**
+ * Migration V13: Clarification threads table
+ * Persists inline "Ask More" conversations so they survive re-renders
+ * and are available as context for future agents and human review.
+ */
+export const SCHEMA_V13 = `
+CREATE TABLE IF NOT EXISTS clarification_threads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    item_context TEXT NOT NULL,
+    messages TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_clarification_dialogue ON clarification_threads(dialogue_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clarification_item ON clarification_threads(dialogue_id, item_id);
+`;
+
 export const MIGRATIONS: Migration[] = [
 	{
 		version: 1,
@@ -487,5 +775,20 @@ export const MIGRATIONS: Migration[] = [
 		version: 10,
 		description: 'Add embeddings table for vector semantic search',
 		sql: SCHEMA_V10,
+	},
+	{
+		version: 11,
+		description: 'MAKER Agent Integration Control Plane — intent, task graph, claims, validation, repair, outcome tables',
+		sql: SCHEMA_V11,
+	},
+	{
+		version: 12,
+		description: 'Add FEEDBACK curation mode, assumption_type on claims',
+		sql: SCHEMA_V12,
+	},
+	{
+		version: 13,
+		description: 'Add clarification threads table for Ask More conversations',
+		sql: SCHEMA_V13,
 	},
 ];

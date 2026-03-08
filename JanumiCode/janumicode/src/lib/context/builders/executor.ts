@@ -197,104 +197,116 @@ function enhanceExecutorContext(
 export function formatExecutorContext(context: CompiledContextPack): string {
 	const sections: string[] = [];
 
-	// Goal section
 	if (context.goal) {
 		sections.push(`# Goal\n\n${context.goal}`);
 	}
 
-	// Constraint manifest section
 	if (context.constraint_manifest) {
 		sections.push(
 			`# Constraint Manifest\n\nVersion: ${context.constraint_manifest.version}\nReference: ${context.constraint_manifest.constraints_ref}`
 		);
 	}
 
-	// Active claims section (grouped by criticality)
-	if (context.active_claims.length > 0) {
-		const criticalClaims = context.active_claims.filter(
-			(c) => c.criticality === 'CRITICAL'
-		);
-		const nonCriticalClaims = context.active_claims.filter(
-			(c) => c.criticality === 'NON_CRITICAL'
-		);
+	formatClaimsSection(context, sections);
+	formatVerdictsSection(context, sections);
+	formatDecisionsSection(context, sections);
+	formatHistoricalAndNarrativeSection(context, sections);
+	formatArtifactRefsSection(context, sections);
 
-		let claimsSection = '# Active Claims\n\n';
-
-		if (criticalClaims.length > 0) {
-			claimsSection += '## Critical Claims\n\n';
-			for (const claim of criticalClaims) {
-				claimsSection += `- [${claim.status}] ${claim.statement}\n`;
-				claimsSection += `  Introduced by: ${claim.introduced_by}\n`;
-				claimsSection += `  ID: ${claim.claim_id}\n\n`;
-			}
-		}
-
-		if (nonCriticalClaims.length > 0) {
-			claimsSection += '## Non-Critical Claims\n\n';
-			for (const claim of nonCriticalClaims) {
-				claimsSection += `- [${claim.status}] ${claim.statement}\n`;
-			}
-		}
-
-		sections.push(claimsSection);
-	}
-
-	// Verdicts section
-	if (context.verdicts.length > 0) {
-		let verdictsSection = '# Verifier Verdicts\n\n';
-		for (const verdict of context.verdicts) {
-			verdictsSection += `## Claim: ${verdict.claim_id}\n\n`;
-			verdictsSection += `**Verdict:** ${verdict.verdict}\n\n`;
-			verdictsSection += `**Rationale:** ${verdict.rationale}\n\n`;
-			if (verdict.evidence_ref) {
-				verdictsSection += `**Evidence:** ${verdict.evidence_ref}\n\n`;
-			}
-			verdictsSection += '---\n\n';
-		}
-		sections.push(verdictsSection);
-	}
-
-	// Human decisions section
-	if (context.human_decisions.length > 0) {
-		let decisionsSection = '# Human Decisions\n\n';
-		for (const decision of context.human_decisions) {
-			decisionsSection += `## ${decision.action}\n\n`;
-			decisionsSection += `**Rationale:** ${decision.rationale}\n\n`;
-			decisionsSection += `**Gate:** ${decision.gate_id}\n\n`;
-			decisionsSection += '---\n\n';
-		}
-		sections.push(decisionsSection);
-	}
-
-	// Historical findings section
-	if (context.historical_findings.length > 0) {
-		let historicalSection = '# Historical Findings\n\n';
-		for (const finding of context.historical_findings) {
-			historicalSection += `- ${finding}\n`;
-		}
-		sections.push(historicalSection);
-	}
-
-	// Artifact references section
-	if (context.artifact_refs.length > 0) {
-		let artifactsSection = '# Artifact References\n\n';
-		for (const ref of context.artifact_refs) {
-			artifactsSection += `- ${ref}\n`;
-		}
-		sections.push(artifactsSection);
-	}
-
-	// Workspace context section
 	if (context.workspaceContext) {
 		sections.push(`# Workspace Specifications\n\n${context.workspaceContext}`);
 	}
 
-	// Token usage footer
 	sections.push(
 		`---\n\nToken Budget: ${context.token_budget}\nToken Usage: ${context.tokenUsage.total} / ${context.token_budget} (${Math.round((context.tokenUsage.total / context.token_budget) * 100)}%)`
 	);
 
 	return sections.join('\n\n');
+}
+
+function formatClaimsSection(context: CompiledContextPack, sections: string[]): void {
+	if (context.active_claims.length === 0) { return; }
+
+	const critical = context.active_claims.filter((c) => c.criticality === 'CRITICAL');
+	const nonCritical = context.active_claims.filter((c) => c.criticality === 'NON_CRITICAL');
+
+	let text = '# Active Claims\n\n';
+
+	if (critical.length > 0) {
+		text += '## Critical Claims\n\n';
+		for (const claim of critical) {
+			text += `- [${claim.status}] ${claim.statement}\n`;
+			text += `  Introduced by: ${claim.introduced_by}\n`;
+			text += `  ID: ${claim.claim_id}\n\n`;
+		}
+	}
+
+	if (nonCritical.length > 0) {
+		text += '## Non-Critical Claims\n\n';
+		for (const claim of nonCritical) {
+			text += `- [${claim.status}] ${claim.statement}\n`;
+		}
+	}
+
+	sections.push(text);
+}
+
+function formatVerdictsSection(context: CompiledContextPack, sections: string[]): void {
+	if (context.verdicts.length === 0) { return; }
+
+	let text = '# Verifier Verdicts\n\n';
+	for (const verdict of context.verdicts) {
+		text += `## Claim: ${verdict.claim_id}\n\n`;
+		text += `**Verdict:** ${verdict.verdict}\n\n`;
+		text += `**Rationale:** ${verdict.rationale}\n\n`;
+		if (verdict.evidence_ref) {
+			text += `**Evidence:** ${verdict.evidence_ref}\n\n`;
+		}
+		text += '---\n\n';
+	}
+	sections.push(text);
+}
+
+function formatDecisionsSection(context: CompiledContextPack, sections: string[]): void {
+	if (context.human_decisions.length === 0) { return; }
+
+	let text = '# Human Decisions\n\n';
+	for (const decision of context.human_decisions) {
+		text += `## ${decision.action}\n\n`;
+		text += `**Rationale:** ${decision.rationale}\n\n`;
+		text += `**Gate:** ${decision.gate_id}\n\n`;
+		text += '---\n\n';
+	}
+	sections.push(text);
+}
+
+const NARRATIVE_PREFIXES = ['[Invariant]', '[Failure Motif]', '[Precedent]', '[Prior Outcome]', '  →'];
+
+function isNarrativeEntry(entry: string): boolean {
+	return NARRATIVE_PREFIXES.some((p) => entry.startsWith(p));
+}
+
+function formatHistoricalAndNarrativeSection(context: CompiledContextPack, sections: string[]): void {
+	if (context.historical_findings.length === 0) { return; }
+
+	const narrativeEntries = context.historical_findings.filter(isNarrativeEntry);
+	const generalFindings = context.historical_findings.filter((f) => !isNarrativeEntry(f));
+
+	if (narrativeEntries.length > 0) {
+		const lines = narrativeEntries.map((e) => `- ${e}`).join('\n');
+		sections.push(`# Narrative Memory\n\nLessons, failure motifs, and invariants from prior dialogues:\n\n${lines}`);
+	}
+
+	if (generalFindings.length > 0) {
+		const lines = generalFindings.map((f) => `- ${f}`).join('\n');
+		sections.push(`# Historical Findings\n\n${lines}`);
+	}
+}
+
+function formatArtifactRefsSection(context: CompiledContextPack, sections: string[]): void {
+	if (context.artifact_refs.length === 0) { return; }
+	const lines = context.artifact_refs.map((ref) => `- ${ref}`).join('\n');
+	sections.push(`# Artifact References\n\n${lines}`);
 }
 
 /**

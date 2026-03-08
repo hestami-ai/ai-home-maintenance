@@ -39,6 +39,12 @@ export enum GateTriggerCondition {
 	RISK_ACCEPTANCE_REQUIRED = 'RISK_ACCEPTANCE_REQUIRED',
 	CONSTRAINT_VIOLATION = 'CONSTRAINT_VIOLATION',
 	MANUAL_GATE = 'MANUAL_GATE',
+	// MAKER gate triggers
+	REPAIR_ESCALATION = 'REPAIR_ESCALATION',
+	SCOPE_VIOLATION = 'SCOPE_VIOLATION',
+	ACCEPTANCE_CONTRACT_FAILURE = 'ACCEPTANCE_CONTRACT_FAILURE',
+	DECOMPOSITION_REJECTED = 'DECOMPOSITION_REJECTED',
+	VERIFICATION_FAILURE = 'VERIFICATION_FAILURE',
 }
 
 /**
@@ -620,4 +626,32 @@ export function getGateResolution(
 					: new Error('Failed to get gate resolution'),
 		};
 	}
+}
+
+/**
+ * Create a repair escalation gate.
+ * Convenience wrapper for when the bounded repair engine needs human intervention.
+ *
+ * @param dialogueId Dialogue ID
+ * @param unitId Task unit that failed repair
+ * @param failureType Classified failure type
+ * @param reason Human-readable reason for escalation
+ * @returns Result containing created gate
+ */
+export function createRepairEscalationGate(
+	dialogueId: string,
+	unitId: string,
+	failureType: string,
+	reason: string
+): Result<Gate> {
+	return createGate({
+		dialogueId,
+		reason,
+		blockingClaims: [],
+		metadata: {
+			condition: GateTriggerCondition.REPAIR_ESCALATION,
+			unit_id: unitId,
+			failure_type: failureType,
+		},
+	});
 }

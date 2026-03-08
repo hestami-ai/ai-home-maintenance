@@ -142,6 +142,12 @@ export interface DialogueTurn {
 }
 
 /**
+ * Assumption type — categorizes the kind of assumption an Executor surfaced.
+ * Used for visual tagging in Review UI and Verifier strategy routing.
+ */
+export type AssumptionType = 'architectural' | 'compatibility' | 'structural' | 'scoping' | 'intent';
+
+/**
  * Claim record (Section 5.1)
  */
 export interface Claim {
@@ -153,6 +159,7 @@ export interface Claim {
 	dialogue_id: string;
 	turn_id: number;
 	created_at: string; // ISO-8601
+	assumption_type?: AssumptionType;
 }
 
 /**
@@ -382,3 +389,11 @@ export {
 	type IntakeConversationTurn,
 	createEmptyPlanDocument,
 } from './intake';
+
+// ==================== MAKER / AGENT INTEGRATION CONTROL PLANE TYPES ====================
+
+/**
+ * Re-export MAKER types for structured intent capture, task graph decomposition,
+ * per-unit execution, bounded repair, multi-provider routing, and active memory injection.
+ */
+export * from './maker';

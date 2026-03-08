@@ -62,6 +62,18 @@ export function getClientScript(): string {
 					case 'dialogueTitleUpdated':
 						handleDialogueTitleUpdated(msg.data);
 						break;
+					case 'systemMessage':
+						handleSystemMessage(msg.data);
+						break;
+					case 'commandOptions':
+						handleCommandOptions(msg.data);
+						break;
+					case 'clarificationResponse':
+						handleClarificationResponse(msg.itemId, msg.response, msg.error);
+						break;
+					case 'clarificationThreadsLoaded':
+						restoreClarificationThreads(msg.threads);
+						break;
 				}
 			});
 
@@ -142,6 +154,44 @@ export function getClientScript(): string {
 				var markerTitle = document.querySelector('#dialogue-' + data.dialogueId + ' .dialogue-marker-title');
 				if (markerTitle) {
 					markerTitle.textContent = data.title.length > 60 ? data.title.substring(0, 60) : data.title;
+				}
+			}
+
+			// ===== TEXT COMMAND HANDLERS =====
+
+			function handleSystemMessage(data) {
+				var streamArea = document.getElementById('stream-content');
+				if (streamArea && data.message) {
+					var html = '<div class="system-message">' +
+						'<span class="system-message-icon">&#x2139;&#xFE0E;</span> ' +
+						escapeHtmlClient(data.message) +
+					'</div>';
+					streamArea.insertAdjacentHTML('beforeend', html);
+					scrollToBottom();
+				}
+			}
+
+			function handleCommandOptions(data) {
+				var streamArea = document.getElementById('stream-content');
+				if (streamArea && data.options) {
+					var html = '<div class="command-options-card">' +
+						'<div class="command-options-prompt">' + escapeHtmlClient(data.prompt) + '</div>' +
+						'<div class="command-options-chips">';
+
+					for (var i = 0; i < data.options.length; i++) {
+						var opt = data.options[i];
+						html += '<button class="command-option-chip" ' +
+							'data-action="execute-command-option" ' +
+							'data-option-kind="' + escapeHtmlClient(opt.kind) + '" ' +
+							(opt.gateId ? 'data-gate-id="' + escapeHtmlClient(opt.gateId) + '" ' : '') +
+							'title="' + escapeHtmlClient(opt.description) + '">' +
+							escapeHtmlClient(opt.label) +
+						'</button>';
+					}
+
+					html += '</div></div>';
+					streamArea.insertAdjacentHTML('beforeend', html);
+					scrollToBottom();
 				}
 			}
 
@@ -276,7 +326,9 @@ export function getClientScript(): string {
 			}
 
 			function updateReviewApproveButton() {
-				var approveBtn = document.querySelector('.review-btn.approve-execute');
+				// Target only the active (non-resolved) review card's approve button.
+				// Resolved cards wrap buttons in .review-actions.resolved — skip those.
+				var approveBtn = document.querySelector('.review-actions:not(.resolved) .review-btn.approve-execute');
 				if (!approveBtn) return;
 				var disabledTip = 'Provide overall feedback or respond to at least one item above (min 10 characters) to enable this button.';
 				var enabledTip = 'Accept all findings and proceed to execution.';
@@ -410,12 +462,218 @@ export function getClientScript(): string {
 				clickedBtn.classList.add('was-selected');
 			}
 
+			// ===== ASK MORE — MODE TOGGLE ON RESPONSE TEXTAREAS =====
+
+			// State: saved response text per item (preserved while in Ask More mode)
+			var savedResponseText = {};
+			// State: current mode per item ('respond' or 'askmore')
+			var clarificationMode = {};
+
+			function handleToggleAskMore(itemId) {
+				var responseArea = document.querySelector('[data-clarification-item="' + itemId + '"]');
+				if (!responseArea) return;
+				var textarea = responseArea.querySelector('textarea');
+				if (!textarea) return;
+				var toolbar = responseArea.querySelector('.response-toolbar');
+				if (!toolbar) return;
+				var toggleBtn = toolbar.querySelector('.ask-more-toggle');
+				var messagesEl = document.getElementById('clarification-messages-' + itemId);
+
+				var currentMode = clarificationMode[itemId] || 'respond';
+				if (currentMode === 'respond') {
+					// Switch to Ask More mode
+					clarificationMode[itemId] = 'askmore';
+					savedResponseText[itemId] = textarea.value;
+					textarea.value = '';
+					textarea.placeholder = 'Ask a follow-up question...';
+					responseArea.classList.add('askmore-mode');
+					if (toggleBtn) {
+						toggleBtn.textContent = 'Back to Response';
+						toggleBtn.classList.add('active');
+					}
+
+					// Replace charcount with Send button
+					var charcount = toolbar.querySelector('[class*="charcount"]');
+					if (charcount) { charcount.style.display = 'none'; }
+					var sendBtn = toolbar.querySelector('.clarification-send-btn');
+					if (!sendBtn) {
+						sendBtn = document.createElement('button');
+						sendBtn.className = 'clarification-send-btn';
+						sendBtn.setAttribute('data-action', 'clarification-send');
+						sendBtn.setAttribute('data-clarification-item', itemId);
+						sendBtn.textContent = 'Send';
+						toolbar.insertBefore(sendBtn, toggleBtn);
+					} else {
+						sendBtn.style.display = '';
+					}
+
+					// Show conversation messages if any exist
+					if (messagesEl && messagesEl.children.length > 0) {
+						messagesEl.style.display = 'block';
+					}
+
+					// Initialize conversation array if needed
+					if (!clarificationConversations[itemId]) {
+						clarificationConversations[itemId] = [];
+					}
+
+					textarea.focus();
+				} else {
+					// Switch back to Respond mode
+					clarificationMode[itemId] = 'respond';
+					textarea.value = savedResponseText[itemId] || '';
+					textarea.placeholder = textarea.getAttribute('data-original-placeholder') || 'Type your response...';
+					responseArea.classList.remove('askmore-mode');
+					if (toggleBtn) {
+						toggleBtn.textContent = 'Ask More';
+						toggleBtn.classList.remove('active');
+					}
+
+					// Restore charcount, hide Send button
+					var charcount2 = toolbar.querySelector('[class*="charcount"]');
+					if (charcount2) { charcount2.style.display = ''; }
+					var sendBtn2 = toolbar.querySelector('.clarification-send-btn');
+					if (sendBtn2) { sendBtn2.style.display = 'none'; }
+
+					// Hide conversation messages
+					if (messagesEl) { messagesEl.style.display = 'none'; }
+
+					// Trigger charcount update for the restored text
+					textarea.dispatchEvent(new Event('input', { bubbles: true }));
+				}
+			}
+
+			function handleClarificationSend(itemId) {
+				var responseArea = document.querySelector('[data-clarification-item="' + itemId + '"]');
+				if (!responseArea) return;
+				var textarea = responseArea.querySelector('textarea');
+				if (!textarea) return;
+				var text = textarea.value.trim();
+				if (!text || clarificationPending[itemId]) return;
+
+				var history = clarificationConversations[itemId] || [];
+				history.push({ role: 'user', content: text });
+				clarificationConversations[itemId] = history;
+				appendClarificationMessage(itemId, 'human', text);
+				textarea.value = '';
+
+				clarificationPending[itemId] = true;
+				appendClarificationMessage(itemId, 'loading', '');
+
+				// Show messages container
+				var messagesEl = document.getElementById('clarification-messages-' + itemId);
+				if (messagesEl) { messagesEl.style.display = 'block'; }
+
+				var toggleBtn = document.querySelector('.ask-more-toggle[data-clarification-item="' + itemId + '"]');
+				var context = toggleBtn ? toggleBtn.dataset.clarificationContext : '';
+
+				vscode.postMessage({
+					type: 'clarificationMessage',
+					itemId: itemId,
+					itemContext: context,
+					history: history,
+				});
+			}
+
+			function handleClarificationResponse(itemId, response, error) {
+				clarificationPending[itemId] = false;
+				var loading = document.getElementById('clarification-loading-' + itemId);
+				if (loading) { loading.parentNode.removeChild(loading); }
+
+				if (error) {
+					appendClarificationMessage(itemId, 'error', error);
+				} else if (response) {
+					if (!clarificationConversations[itemId]) {
+						clarificationConversations[itemId] = [];
+					}
+					clarificationConversations[itemId].push({ role: 'assistant', content: response });
+					appendClarificationMessage(itemId, 'assistant', response);
+				}
+			}
+
+			function simpleMd(text) {
+				var s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+				var lines = s.split('\\n');
+				var out = [];
+				var inList = false;
+				for (var i = 0; i < lines.length; i++) {
+					var line = lines[i];
+					if (line.trim() === '') {
+						if (inList) { out.push('</ul>'); inList = false; }
+						continue;
+					}
+					var hm = line.match(/^(#{1,4})\\s+(.*)$/);
+					if (hm) {
+						if (inList) { out.push('</ul>'); inList = false; }
+						out.push('<strong>' + hm[2] + '</strong>');
+						continue;
+					}
+					var lm = line.match(/^\\s*[-*]\\s+(.*)$/);
+					if (lm) {
+						if (!inList) { out.push('<ul>'); inList = true; }
+						out.push('<li>' + inlineFmt(lm[1]) + '</li>');
+						continue;
+					}
+					if (inList) { out.push('</ul>'); inList = false; }
+					out.push('<p style="margin:2px 0;">' + inlineFmt(line) + '</p>');
+				}
+				if (inList) { out.push('</ul>'); }
+				return out.join('');
+			}
+			function inlineFmt(t) {
+				return t
+					.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')
+					.replace(/\\*(.+?)\\*/g, '<em>$1</em>')
+					.replace(new RegExp('\\x60([^\\x60]+)\\x60', 'g'), '<code>$1</code>');
+			}
+
+			function appendClarificationMessage(itemId, role, content) {
+				var container = document.getElementById('clarification-messages-' + itemId);
+				if (!container) return;
+				var div = document.createElement('div');
+				div.className = 'clarification-msg clarification-msg-' + role;
+				if (role === 'loading') {
+					div.id = 'clarification-loading-' + itemId;
+					div.innerHTML = '<span class="clarification-loading-dots">Thinking...</span>';
+				} else if (role === 'assistant') {
+					div.innerHTML = simpleMd(content);
+				} else {
+					div.textContent = content;
+				}
+				container.appendChild(div);
+				container.scrollTop = container.scrollHeight;
+			}
+
+			// Restore clarification threads loaded from the database
+			function restoreClarificationThreads(threads) {
+				if (!threads || !Array.isArray(threads)) return;
+				for (var i = 0; i < threads.length; i++) {
+					var thread = threads[i];
+					clarificationConversations[thread.itemId] = thread.messages.map(function (m) {
+						return { role: m.role, content: m.content };
+					});
+					// Render the messages into the DOM
+					var container = document.getElementById('clarification-messages-' + thread.itemId);
+					if (container && thread.messages.length > 0) {
+						for (var j = 0; j < thread.messages.length; j++) {
+							var msg = thread.messages[j];
+							var cssRole = msg.role === 'user' ? 'human' : msg.role;
+							appendClarificationMessage(thread.itemId, cssRole, msg.content);
+						}
+					}
+				}
+			}
+
 			// ===== INPUT AREA =====
 
 			var attachedFiles = [];
 			var recentMentions = [];
 			var RECENT_MENTIONS_MAX = 5;
 			var cachedFileList = [];
+
+			// --- Inline clarification thread state ---
+			var clarificationConversations = {};
+			var clarificationPending = {};
 			var mentionSelectedIndex = -1;
 			var mentionDebounceTimer = null;
 			var MENTION_DEBOUNCE_MS = 150;
@@ -1541,6 +1799,31 @@ export function getClientScript(): string {
 						var dd = document.getElementById('switcher-dropdown');
 						if (dd) { dd.classList.toggle('visible'); }
 						break;
+					case 'toggle-askmore':
+						if (target.dataset.clarificationItem) {
+							handleToggleAskMore(target.dataset.clarificationItem);
+						}
+						break;
+					case 'clarification-send':
+						if (target.dataset.clarificationItem) {
+							handleClarificationSend(target.dataset.clarificationItem);
+						}
+						break;
+					case 'execute-command-option':
+						vscode.postMessage({
+							type: 'executeRetryAction',
+							kind: target.dataset.optionKind,
+							gateId: target.dataset.gateId || null,
+						});
+						// Disable all chips in the group and highlight the selected one
+						var chipsCard = target.closest('.command-options-card');
+						if (chipsCard) {
+							chipsCard.querySelectorAll('.command-option-chip').forEach(function (btn) {
+								btn.disabled = true;
+							});
+							target.classList.add('was-selected');
+						}
+						break;
 				}
 			});
 
@@ -1621,6 +1904,23 @@ export function getClientScript(): string {
 						}
 					}
 					hideMentionDropdown();
+				}
+			});
+
+			// Keydown delegation — Enter to send clarification in Ask More mode
+			document.addEventListener('keydown', function (event) {
+				var target = event.target;
+				if (!target || !target.tagName) return;
+				// In Ask More mode, Enter (without Shift) in the textarea sends the question
+				if (target.tagName === 'TEXTAREA' && event.key === 'Enter' && !event.shiftKey) {
+					var responseArea = target.closest('[data-clarification-item]');
+					if (responseArea) {
+						var itemId = responseArea.dataset.clarificationItem;
+						if (itemId && clarificationMode[itemId] === 'askmore') {
+							event.preventDefault();
+							handleClarificationSend(itemId);
+						}
+					}
 				}
 			});
 

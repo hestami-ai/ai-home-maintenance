@@ -195,6 +195,21 @@ export function validateSchema(db: Database.Database): Result<boolean> {
 			'decision_traces',
 			'open_loops',
 			'embeddings',
+			// V11: MAKER Agent Integration Control Plane
+			'intent_records',
+			'acceptance_contracts',
+			'task_graphs',
+			'task_units',
+			'task_edges',
+			'claim_units',
+			'evidence_packets',
+			'validation_packets',
+			'repair_packets',
+			'historical_invariant_packets',
+			'outcome_snapshots',
+			'toolchain_detections',
+			// V13: Clarification threads
+			'clarification_threads',
 		];
 
 		const existingTablesResult = db

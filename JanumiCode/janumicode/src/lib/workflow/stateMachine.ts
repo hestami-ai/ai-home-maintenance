@@ -50,6 +50,15 @@ export enum TransitionTrigger {
 	INTAKE_TURN_COMPLETE = 'INTAKE_TURN_COMPLETE', // INTAKE conversation turn completed
 	INTAKE_PLAN_FINALIZED = 'INTAKE_PLAN_FINALIZED', // Plan synthesis completed
 	INTAKE_PLAN_APPROVED = 'INTAKE_PLAN_APPROVED', // Human approved the plan
+	// MAKER triggers
+	INTENT_CAPTURED = 'INTENT_CAPTURED', // IntentRecord + AcceptanceContract created
+	CONTRACT_APPROVED = 'CONTRACT_APPROVED', // Acceptance contract approved
+	DECOMPOSITION_COMPLETE = 'DECOMPOSITION_COMPLETE', // Task graph decomposition done
+	UNIT_COMPLETE = 'UNIT_COMPLETE', // Single task unit completed
+	UNIT_FAILED = 'UNIT_FAILED', // Single task unit failed
+	REPAIR_ATTEMPT = 'REPAIR_ATTEMPT', // Bounded repair attempted
+	REPAIR_ESCALATED = 'REPAIR_ESCALATED', // Repair escalated to human
+	GRAPH_COMPLETE = 'GRAPH_COMPLETE', // All task units complete
 }
 
 /**
@@ -74,6 +83,12 @@ export interface StateMetadata {
 	cachedRawCliOutput?: string;
 	/** Which phase last failed — signals retry should attempt cache re-parse first */
 	lastFailedPhase?: string;
+	// MAKER metadata
+	graph_id?: string;
+	current_unit_id?: string;
+	intent_id?: string;
+	contract_id?: string;
+	repair_active?: boolean;
 	[key: string]: unknown;
 }
 

@@ -29,8 +29,14 @@ import { subscribeCommandPersistence, completeCommand, appendCommandOutput as ap
 import { IntakeSubState } from '../../types/intake';
 import { updateIntakeConversation, writeClaimEvent } from '../../events/writer';
 import { getWorkflowState, updateWorkflowMetadata, transitionWorkflow, TransitionTrigger } from '../../workflow/stateMachine';
-import { resolveGate, getGate } from '../../workflow/gates';
+import { resolveGate, getGate, getGatesForDialogue } from '../../workflow/gates';
+import { GateStatus } from '../../types';
 import { getDatabase } from '../../database';
+import { parseTextCommand, assessRetryableActions, type ParsedCommand, type RetryableAction } from './textCommands';
+import { runNarrativeCuration } from '../../curation/narrativeCurator';
+import { CurationMode } from '../../types/narrativeCurator';
+import { askClarification } from '../../clarification/clarificationExpert';
+import { saveClarificationThread, getClarificationThreads } from '../../clarification/clarificationStore';
 
 /**
  * WebviewViewProvider for the Governed Stream sidebar view.
@@ -77,11 +83,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._update();
 
 		// Handle visibility changes
-		webviewView.onDidChangeVisibility(() => {
-			if (webviewView.visible) {
-				this._update();
-			}
-		});
+		// Note: with retainContextWhenHidden, the DOM stays alive — no need to re-render.
+		// Re-rendering would destroy input state (typed text, attached files, etc.).
 
 		// Handle messages from the webview
 		webviewView.webview.onDidReceiveMessage(
@@ -642,6 +645,19 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					message.overallFeedback as string | undefined
 				);
 				break;
+
+			case 'executeRetryAction':
+				this._executeRetryAction({
+					kind: message.kind as RetryableAction['kind'],
+					label: message.kind as string,
+					description: '',
+					gateId: (message.gateId as string) || undefined,
+				});
+				break;
+
+			case 'clarificationMessage':
+				this._handleClarificationMessage(message);
+				break;
 		}
 	}
 
@@ -651,6 +667,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	private async _handleSubmitInput(text: string): Promise<void> {
 		if (!text.trim() || this._isProcessing) {
 			return;
+		}
+
+		// Smart text command parsing — intercept before normal routing
+		const parsed = parseTextCommand(text);
+		if (parsed && this._activeDialogueId) {
+			const handled = await this._handleTextCommand(parsed);
+			if (handled) { return; }
+			// Not handled (e.g., no open gate for "approve") — fall through to normal input
 		}
 
 		this._isProcessing = true;
@@ -974,6 +998,10 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		if (result.success) {
 			vscode.window.showInformationMessage(`Gate ${action.toLowerCase()}d successfully.`);
 			this._update();
+			// Fire-and-forget: curate human feedback for future agent context
+			if (this._activeDialogueId) {
+				runNarrativeCuration(this._activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
+			}
 		} else {
 			vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
 		}
@@ -1114,6 +1142,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				break;
 			}
 		}
+
+		// Fire-and-forget: curate human feedback for future agent context
+		runNarrativeCuration(this._activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
 	}
 
 	/**
@@ -1188,6 +1219,16 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					for (const [key, rat] of Object.entries(itemRationales)) {
 						if (rat && rat.trim().length > 0) {
 							reframeParts.push(`[${key}]: ${rat.trim()}`);
+
+							// Record human feedback as claim events for audit trail
+							if (!key.startsWith('finding-')) {
+								writeClaimEvent({
+									claim_id: key,
+									event_type: ClaimEventType.OVERRIDDEN,
+									source: Role.HUMAN,
+									evidence_ref: `Review feedback (reframe): ${rat.trim()}`,
+								});
+							}
 						}
 					}
 				}
@@ -1215,6 +1256,26 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 					});
 				}
 
+				// Reset blocking CRITICAL claims to OPEN so the REPLAN → PROPOSE
+				// cycle can proceed. The new proposal will surface fresh assumptions
+				// that get re-verified, incorporating the human's review feedback.
+				const reframeDb = getDatabase();
+				if (reframeDb) {
+					const blockingClaims = reframeDb.prepare(
+						`SELECT claim_id FROM claims
+						 WHERE dialogue_id = ?
+						   AND criticality = 'CRITICAL'
+						   AND (status = 'DISPROVED' OR status = 'UNKNOWN')`
+					).all(this._activeDialogueId) as Array<{ claim_id: string }>;
+
+					for (const { claim_id } of blockingClaims) {
+						reframeDb.prepare('UPDATE claims SET status = ? WHERE claim_id = ?')
+							.run(ClaimStatus.OPEN, claim_id);
+						reframeDb.prepare('DELETE FROM verdicts WHERE claim_id = ?')
+							.run(claim_id);
+					}
+				}
+
 				// Store review feedback so the REPLAN → PROPOSE cycle can use it
 				updateWorkflowMetadata(this._activeDialogueId, {
 					replanRationale: rationale,
@@ -1233,6 +1294,49 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				break;
 			}
 		}
+
+		// Fire-and-forget: curate human feedback for future agent context
+		if (this._activeDialogueId) {
+			runNarrativeCuration(this._activeDialogueId, CurationMode.FEEDBACK).catch(() => {});
+		}
+	}
+
+	/**
+	 * Handle an inline clarification message from the webview.
+	 * Makes a lightweight LLM call, persists the thread, and posts the response back.
+	 */
+	private async _handleClarificationMessage(message: { [key: string]: unknown }): Promise<void> {
+		const itemId = message.itemId as string;
+		const itemContext = message.itemContext as string;
+		const history = message.history as Array<{ role: 'user' | 'assistant'; content: string }>;
+
+		if (!this._activeDialogueId) {
+			this._view?.webview.postMessage({
+				type: 'clarificationResponse',
+				itemId,
+				error: 'No active dialogue',
+			});
+			return;
+		}
+
+		const result = await askClarification(this._activeDialogueId, itemContext, history);
+
+		if (result.success) {
+			// Persist the full conversation (including the new assistant response) to DB
+			const now = new Date().toISOString();
+			const fullHistory = [
+				...history.map((m) => ({ ...m, timestamp: now })),
+				{ role: 'assistant' as const, content: result.value, timestamp: now },
+			];
+			saveClarificationThread(this._activeDialogueId, itemId, itemContext, fullHistory);
+		}
+
+		this._view?.webview.postMessage({
+			type: 'clarificationResponse',
+			itemId,
+			response: result.success ? result.value : undefined,
+			error: result.success ? undefined : result.error.message,
+		});
 	}
 
 	/**
@@ -1254,6 +1358,215 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			this._postProcessing(false);
 			this._postInputEnabled(true);
 		}
+	}
+
+	// ==================== SMART TEXT COMMANDS ====================
+
+	/**
+	 * Handle a parsed text command. Returns true if handled, false to fall through.
+	 */
+	private async _handleTextCommand(parsed: ParsedCommand): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		switch (parsed.command) {
+			case 'retry':
+				return this._handleRetryCommand();
+			case 'approve':
+				return this._handleApproveCommand(parsed.args);
+			case 'reframe':
+				return this._handleReframeCommand(parsed.args);
+			case 'override':
+				return this._handleOverrideCommand(parsed.args);
+			default:
+				return false;
+		}
+	}
+
+	/**
+	 * Handle the "retry" command — assess retryable actions and execute or offer choices.
+	 */
+	private async _handleRetryCommand(): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const actions = assessRetryableActions(this._activeDialogueId);
+
+		if (actions.length === 0) {
+			this._postSystemMessage('Nothing to retry. No failed phases or open gates that support retry.');
+			return true;
+		}
+
+		if (actions.length === 1) {
+			await this._executeRetryAction(actions[0]);
+			return true;
+		}
+
+		// Multiple retry options — show clickable chips
+		this._postCommandOptions('retry', 'Multiple retry options available:', actions);
+		return true;
+	}
+
+	/**
+	 * Handle the "approve" command — approve the current open gate or INTAKE plan.
+	 */
+	private async _handleApproveCommand(argsText: string): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const wsResult = getWorkflowState(this._activeDialogueId);
+		if (!wsResult.success) { return false; }
+
+		const currentPhase = wsResult.value.current_phase;
+
+		// Check for open gates
+		const gatesResult = getGatesForDialogue(this._activeDialogueId, GateStatus.OPEN);
+		const openGates = gatesResult.success ? gatesResult.value : [];
+
+		if (openGates.length === 0) {
+			if (currentPhase === Phase.INTAKE) {
+				await this._handleIntakeApprove();
+				return true;
+			}
+			this._postSystemMessage('No open gates to approve.');
+			return true;
+		}
+
+		const rationale = argsText.length >= 10
+			? argsText
+			: 'Approved via text command';
+
+		const gate = openGates[0];
+
+		if (currentPhase === Phase.REVIEW) {
+			await this._handleReviewGateDecision(gate.gate_id, 'APPROVE', undefined, rationale);
+		} else {
+			this._handleGateDecision(gate.gate_id, 'APPROVE', rationale);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Handle the "reframe" command — reframe the current open gate.
+	 */
+	private async _handleReframeCommand(argsText: string): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const gatesResult = getGatesForDialogue(this._activeDialogueId, GateStatus.OPEN);
+		const openGates = gatesResult.success ? gatesResult.value : [];
+
+		if (openGates.length === 0) {
+			this._postSystemMessage('No open gates to reframe.');
+			return true;
+		}
+
+		const rationale = argsText.length >= 10
+			? argsText
+			: 'Reframe requested via text command';
+
+		const gate = openGates[0];
+		const wsResult = getWorkflowState(this._activeDialogueId);
+		const currentPhase = wsResult.success ? wsResult.value.current_phase : '';
+
+		if (currentPhase === Phase.REVIEW) {
+			await this._handleReviewGateDecision(gate.gate_id, 'REFRAME', undefined, rationale);
+		} else if (currentPhase === Phase.VERIFY) {
+			await this._handleVerificationGateDecision(gate.gate_id, 'REFRAME');
+		} else {
+			this._handleGateDecision(gate.gate_id, 'REFRAME', rationale);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Handle the "override" command — override the current open gate.
+	 */
+	private async _handleOverrideCommand(argsText: string): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const gatesResult = getGatesForDialogue(this._activeDialogueId, GateStatus.OPEN);
+		const openGates = gatesResult.success ? gatesResult.value : [];
+
+		if (openGates.length === 0) {
+			this._postSystemMessage('No open gates to override.');
+			return true;
+		}
+
+		const rationale = argsText.length >= 10
+			? argsText
+			: 'Override via text command (risk accepted)';
+
+		const gate = openGates[0];
+		const wsResult = getWorkflowState(this._activeDialogueId);
+		const currentPhase = wsResult.success ? wsResult.value.current_phase : '';
+
+		if (currentPhase === Phase.VERIFY) {
+			await this._handleVerificationGateDecision(gate.gate_id, 'OVERRIDE');
+		} else {
+			this._handleGateDecision(gate.gate_id, 'OVERRIDE', rationale);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Execute a specific retry action by dispatching to existing handler methods.
+	 */
+	private async _executeRetryAction(action: RetryableAction): Promise<void> {
+		switch (action.kind) {
+			case 'retry_verification':
+				if (action.gateId) {
+					await this._handleVerificationGateDecision(action.gateId, 'RETRY_VERIFY');
+				}
+				break;
+
+			case 'retry_repair':
+				if (action.gateId) {
+					this._handleGateDecision(
+						action.gateId,
+						'OVERRIDE',
+						'Retry repair via text command'
+					);
+					await this._resumeAfterGate();
+				}
+				break;
+
+			case 'retry_phase':
+				await this._handleRetryPhase();
+				break;
+		}
+	}
+
+	/**
+	 * Post a system information message to the webview stream.
+	 */
+	private _postSystemMessage(message: string): void {
+		this._view?.webview.postMessage({
+			type: 'systemMessage',
+			data: { message },
+		});
+	}
+
+	/**
+	 * Post clickable option chips to the webview for multi-choice commands.
+	 */
+	private _postCommandOptions(
+		command: string,
+		prompt: string,
+		actions: RetryableAction[]
+	): void {
+		this._view?.webview.postMessage({
+			type: 'commandOptions',
+			data: {
+				command,
+				prompt,
+				options: actions.map((a) => ({
+					kind: a.kind,
+					label: a.label,
+					description: a.description,
+					gateId: a.gateId,
+				})),
+			},
+		});
 	}
 
 	private static readonly ROLE_DISPLAY_NAMES: Record<string, string> = {
@@ -1423,6 +1736,27 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		// Restore processing indicator if workflow is actively running
 		if (this._isProcessing) {
 			this._postProcessing(true, this._processingPhase, this._processingDetail);
+		}
+
+		// Restore persisted clarification threads
+		this._postClarificationThreads();
+	}
+
+	/**
+	 * Load clarification threads from DB and send to the webview for restoration.
+	 */
+	private _postClarificationThreads(): void {
+		if (!this._activeDialogueId || !this._view) return;
+		try {
+			const threads = getClarificationThreads(this._activeDialogueId);
+			if (threads.length > 0) {
+				this._view.webview.postMessage({
+					type: 'clarificationThreadsLoaded',
+					threads,
+				});
+			}
+		} catch {
+			// Table may not exist if V13 migration hasn't been applied yet
 		}
 	}
 

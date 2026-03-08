@@ -16,6 +16,8 @@ import type { GovernedStreamState, ClaimHealthSummary, StreamItem, DialogueSumma
 
 import { WORKFLOW_PHASES } from '../dataAggregator';
 
+import { getHumanFacingStateClass } from '../../../workflow/humanFacingState';
+
 import type { WorkflowCommandRecord, WorkflowCommandOutput } from '../../../workflow/commandStore';
 
 import type { IntakePlanDocument, IntakeConversationTurn } from '../../../types/intake';
@@ -43,6 +45,18 @@ function escapeHtml(str: string): string {
 }
 
 
+
+/**
+ * Render the "Ask More" toggle button for a response toolbar.
+ * Clicking switches the textarea between "Respond" and "Ask More" modes.
+ */
+function renderAskMoreToggle(itemId: string, itemContext: string): string {
+	const escaped = escapeHtml(itemId);
+	const escapedCtx = escapeHtml(itemContext);
+	return `<button class="ask-more-toggle" data-action="toggle-askmore"
+		data-clarification-item="${escaped}"
+		data-clarification-context="${escapedCtx}">Ask More</button>`;
+}
 
 /**
  * Lightweight markdown-to-HTML converter for turn content.
@@ -264,7 +278,9 @@ export function renderStickyHeader(state: GovernedStreamState): string {
 
 		: '';
 
+	const humanStateHtml = renderHumanFacingStateBadge(state);
 
+	const taskProgressHtml = renderTaskGraphProgressBar(state);
 
 	return `
 
@@ -274,11 +290,15 @@ export function renderStickyHeader(state: GovernedStreamState): string {
 
 				<span class="header-title">Governed Stream</span>
 
+				${humanStateHtml}
+
 				${switcherHtml}
 
 			</div>
 
 			<div class="phase-stepper">${phaseSteps}</div>
+
+			${taskProgressHtml}
 
 			<div class="claim-health-bar">${healthBar}</div>
 
@@ -467,6 +487,51 @@ function renderClaimHealthBar(health: ClaimHealthSummary): string {
 }
 
 
+
+// ==================== HUMAN-FACING STATE BADGE ====================
+
+function renderHumanFacingStateBadge(state: GovernedStreamState): string {
+	if (!state.humanFacingState) {
+		return '';
+	}
+
+	const hfs = state.humanFacingState;
+	const stateClass = getHumanFacingStateClass(hfs.state);
+
+	return `
+		<div class="human-facing-state-badge hfs-${stateClass}" title="${escapeHtml(hfs.detail)}">
+			<span class="hfs-label">${escapeHtml(hfs.state)}</span>
+			${hfs.currentUnit ? `<span class="hfs-unit">${escapeHtml(hfs.currentUnit)}</span>` : ''}
+		</div>
+	`;
+}
+
+// ==================== TASK GRAPH PROGRESS BAR ====================
+
+function renderTaskGraphProgressBar(state: GovernedStreamState): string {
+	if (!state.taskGraphProgress || state.taskGraphProgress.total === 0) {
+		return '';
+	}
+
+	const p = state.taskGraphProgress;
+	const percent = Math.round((p.completed / p.total) * 100);
+	const failedPercent = Math.round((p.failed / p.total) * 100);
+	const inProgressPercent = Math.round((p.in_progress / p.total) * 100);
+
+	return `
+		<div class="task-graph-progress">
+			<div class="task-graph-progress-header">
+				<span class="task-graph-progress-label">Task Units</span>
+				<span class="task-graph-progress-count">${p.completed}/${p.total} complete${p.failed > 0 ? `, ${p.failed} failed` : ''}</span>
+			</div>
+			<div class="task-graph-progress-bar">
+				<div class="task-graph-bar-fill completed" style="width: ${percent}%"></div>
+				<div class="task-graph-bar-fill in-progress" style="width: ${inProgressPercent}%"></div>
+				<div class="task-graph-bar-fill failed" style="width: ${failedPercent}%"></div>
+			</div>
+		</div>
+	`;
+}
 
 // ==================== MILESTONE DIVIDER ====================
 
@@ -902,14 +967,18 @@ export function renderVerificationGateCard(
 
 		if (showResponse && !isResolved) {
 			html += `
-				<div class="verification-claim-response">
+				<div class="verification-claim-response" data-clarification-item="${escapeHtml(claim.claim_id)}">
 					<label>Your response (min 10 characters)</label>
+					<div class="clarification-messages" id="clarification-messages-${escapeHtml(claim.claim_id)}" style="display:none;"></div>
 					<textarea
 						placeholder="Explain why you accept this risk or disagree with the finding..."
 						data-claim-rationale="${escapeHtml(claim.claim_id)}"
 						data-gate-id="${escapeHtml(gate.gate_id)}"
 					></textarea>
-					<div class="verification-claim-charcount" id="vg-charcount-${escapeHtml(claim.claim_id)}">0 / 10 min</div>
+					<div class="response-toolbar">
+						<div class="verification-claim-charcount" id="vg-charcount-${escapeHtml(claim.claim_id)}">0 / 10 min</div>
+						${renderAskMoreToggle(claim.claim_id, claim.statement)}
+					</div>
 				</div>
 			`;
 		}
@@ -1062,11 +1131,16 @@ export function renderReviewGateCard(
 		const critClass = claim.criticality === 'CRITICAL' ? 'critical' : 'non-critical';
 		const rationale = verdict?.rationale;
 
+		const typeBadge = claim.assumption_type
+			? `<span class="assumption-type-badge">${escapeHtml(claim.assumption_type)}</span>`
+			: '';
+
 		let html = `
 			<div class="review-item-row" data-claim-id="${escapeHtml(claim.claim_id)}">
 				<div class="review-item-header">
 					<span class="verdict-badge ${verdictClass(claim.status)}">${verdictIcon(claim.status)} ${escapeHtml(claim.status)}</span>
 					<span class="verification-claim-criticality ${critClass}">${escapeHtml(claim.criticality)}</span>
+					${typeBadge}
 				</div>
 				<div class="review-item-statement">${escapeHtml(claim.statement)}</div>
 		`;
@@ -1077,13 +1151,17 @@ export function renderReviewGateCard(
 
 		if (showResponse && !isResolved) {
 			html += `
-				<div class="review-item-response">
+				<div class="review-item-response" data-clarification-item="${escapeHtml(claim.claim_id)}">
+					<div class="clarification-messages" id="clarification-messages-${escapeHtml(claim.claim_id)}" style="display:none;"></div>
 					<textarea
 						placeholder="Explain your decision on this claim..."
 						data-review-item-rationale="${escapeHtml(claim.claim_id)}"
 						data-gate-id="${gateId}"
 					></textarea>
-					<div class="review-item-charcount" id="review-charcount-${escapeHtml(claim.claim_id)}">0 / 10 min</div>
+					<div class="response-toolbar">
+						<div class="review-item-charcount" id="review-charcount-${escapeHtml(claim.claim_id)}">0 / 10 min</div>
+						${renderAskMoreToggle(claim.claim_id, claim.statement)}
+					</div>
 				</div>
 			`;
 		}
@@ -1106,13 +1184,17 @@ export function renderReviewGateCard(
 
 		if (showResponse && !isResolved) {
 			html += `
-				<div class="review-item-response">
+				<div class="review-item-response" data-clarification-item="${escapeHtml(findingKey)}">
+					<div class="clarification-messages" id="clarification-messages-${escapeHtml(findingKey)}" style="display:none;"></div>
 					<textarea
 						placeholder="Your response to this finding..."
 						data-review-item-rationale="${escapeHtml(findingKey)}"
 						data-gate-id="${gateId}"
 					></textarea>
-					<div class="review-item-charcount" id="review-charcount-${escapeHtml(findingKey)}">0 / 10 min</div>
+					<div class="response-toolbar">
+						<div class="review-item-charcount" id="review-charcount-${escapeHtml(findingKey)}">0 / 10 min</div>
+						${renderAskMoreToggle(findingKey, text)}
+					</div>
 				</div>
 			`;
 		}
@@ -1150,7 +1232,7 @@ export function renderReviewGateCard(
 					&#x2139; FOR YOUR AWARENESS (${awareness.length} item${awareness.length !== 1 ? 's' : ''})
 				</div>
 				<div class="review-group-body">
-					${awareness.map((item) => renderReviewItemRow(item, false)).join('')}
+					${awareness.map((item) => renderReviewItemRow(item, true)).join('')}
 				</div>
 			</div>
 		`
@@ -1395,7 +1477,7 @@ export function renderInputArea(currentPhase: Phase, hasOpenGates: boolean, gate
 
 						</button>
 
-						<span class="input-toolbar-hint">Type <kbd>@</kbd> to mention files &middot; <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline</span>
+						<span class="input-toolbar-hint">Type <kbd>@</kbd> to mention files &middot; <kbd>/retry</kbd> to retry &middot; <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline</span>
 
 					</div>
 
@@ -2177,13 +2259,17 @@ export function renderIntakeTurnCard(
 					if (isLatest) {
 						return `<li class="question-item">
 							<span class="question-item-text">${escapeHtml(q)}</span>
-							<div class="intake-question-response">
+							<div class="intake-question-response" data-clarification-item="${qId}">
+								<div class="clarification-messages" id="clarification-messages-${qId}" style="display:none;"></div>
 								<textarea class="intake-question-textarea"
 									data-intake-question-id="${qId}"
 									data-intake-question-text="${escapeHtml(q)}"
 									placeholder="Type your response..."
 									rows="2"></textarea>
-								<span class="intake-question-charcount" data-charcount-for="${qId}">0 chars</span>
+								<div class="response-toolbar">
+									<span class="intake-question-charcount" data-charcount-for="${qId}">0 chars</span>
+									${renderAskMoreToggle(qId, q)}
+								</div>
 							</div>
 						</li>`;
 					} else {
@@ -2349,13 +2435,17 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 					if (isLatest) {
 						return `<li class="question-item">
 							<span class="question-item-text"><strong>[${escapeHtml(q.id)}]</strong> ${escapeHtml(q.text)}</span>
-							<div class="intake-question-response">
+							<div class="intake-question-response" data-clarification-item="${escapeHtml(q.id)}">
+								<div class="clarification-messages" id="clarification-messages-${escapeHtml(q.id)}" style="display:none;"></div>
 								<textarea class="intake-question-textarea"
 									data-intake-question-id="${escapeHtml(q.id)}"
 									data-intake-question-text="${escapeHtml(q.text)}"
 									placeholder="Type your answer..."
 									rows="2"></textarea>
-								<span class="intake-question-charcount" data-charcount-for="${escapeHtml(q.id)}">0 chars</span>
+								<div class="response-toolbar">
+									<span class="intake-question-charcount" data-charcount-for="${escapeHtml(q.id)}">0 chars</span>
+									${renderAskMoreToggle(q.id, q.text)}
+								</div>
 							</div>
 						</li>`;
 					} else {

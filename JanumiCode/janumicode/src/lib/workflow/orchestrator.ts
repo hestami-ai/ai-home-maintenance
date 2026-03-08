@@ -29,7 +29,7 @@ import {
 	updateWorkflowMetadata,
 	TransitionTrigger,
 } from './stateMachine';
-import { hasOpenGates, createReviewGate } from './gates';
+import { hasOpenGates, createReviewGate, createGate, GateTriggerCondition } from './gates';
 import {
 	executeIntakeConversationTurn,
 	executeIntakePlanFinalization,
@@ -61,6 +61,35 @@ import { getLogger, isLoggerInitialized } from '../logging';
 import { runNarrativeCuration } from '../curation/narrativeCurator';
 import { CurationMode } from '../types/narrativeCurator';
 import { embedAndStore, isEmbeddingAvailable } from '../embedding/service';
+
+// ── MAKER imports ──
+import type { TaskUnit, IntentRecord, AcceptanceContract, ValidationPacket, ToolchainDetection, RepairPacket } from '../types/maker';
+import { RepairClassification } from '../types/maker';
+import {
+	createIntentRecord,
+	createAcceptanceContract,
+	getTaskGraphForDialogue,
+	getIntentRecordForDialogue,
+	getAcceptanceContractForDialogue,
+	getTaskUnitsForGraph,
+	createClaimUnit,
+	createHistoricalInvariantPacket,
+	createOutcomeSnapshot,
+	updateTaskUnitStatus,
+	updateTaskGraphStatus,
+	getRepairPacketsForUnit,
+} from '../database/makerStore';
+import { decomposeGoalIntoTaskGraph } from './taskDecomposer';
+import { checkDecompositionQuality, getNextReadyUnits, completeUnitAndPropagate, isGraphComplete, getGraphProgress } from './taskGraph';
+import { detectToolchains, runUnitValidation, classifyFailureType } from './validationPipeline';
+import { classifyRepairability, canAttemptRepair, attemptRepair } from './repairEngine';
+import { routeTaskToProvider } from './taskRouter';
+import { getAllProviderProfiles } from '../cli/providerCapabilities';
+import { getProviderCapabilityOverrides } from '../config/manager';
+import { buildMakerPlannerContext } from '../context/builders/makerPlanner';
+import { invokeExecutorForUnit } from '../roles/executor';
+import { createRepairEscalationGate } from './gates';
+import { getWorkspaceRoot } from '../context/workspaceReader';
 
 /**
  * Provider instances for workflow execution (actual LLM providers, not config)
@@ -225,6 +254,9 @@ export async function executeIntakePhase(
 							}
 						}
 					);
+
+					// ── MAKER: Create IntentRecord + AcceptanceContract from approved plan ──
+					createMakerIntentAndContract(dialogueId);
 				}
 				return approvalResult;
 			}
@@ -609,6 +641,25 @@ export async function executeProposePhase(
 		}
 
 		// Normal PROCEED path
+		// ── MAKER: Task graph decomposition (if intent record exists) ──
+		const decompositionResult = await attemptMakerDecomposition(dialogueId, goal, providerResult.value);
+		if (decompositionResult.gateTriggered) {
+			return {
+				success: true,
+				value: {
+					phase: 'PROPOSE' as Phase,
+					success: true,
+					gateTriggered: true,
+					metadata: {
+						proposal: response.proposal,
+						evaluationVerdict: evaluation.verdict,
+						decompositionIssue: decompositionResult.issue,
+					},
+					timestamp: now,
+				},
+			};
+		}
+
 		return {
 			success: true,
 			value: {
@@ -619,6 +670,7 @@ export async function executeProposePhase(
 					proposal: response.proposal,
 					assumptionCount: response.assumptions.length,
 					evaluationVerdict: evaluation.verdict,
+					graphId: decompositionResult.graphId,
 				},
 				timestamp: now,
 			},
@@ -725,8 +777,8 @@ export async function executeAssumptionSurfacingPhase(
 				`
 				INSERT INTO claims (
 					claim_id, statement, introduced_by, criticality,
-					status, dialogue_id, turn_id, created_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+					status, dialogue_id, turn_id, created_at, assumption_type
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			`
 			).run(
 				claim.claim_id,
@@ -736,7 +788,8 @@ export async function executeAssumptionSurfacingPhase(
 				claim.status,
 				claim.dialogue_id,
 				claim.turn_id,
-				claim.created_at
+				claim.created_at,
+				claim.assumption_type ?? null
 			);
 			emitClaimCreated(dialogueId, claim.claim_id, claim.statement);
 
@@ -756,6 +809,9 @@ export async function executeAssumptionSurfacingPhase(
 			branches[branchIdx].claim_ids = claimIds;
 			updateWorkflowMetadata(dialogueId, { proposalBranches: branches });
 		}
+
+		// ── MAKER: Extract ClaimUnits from task graph units ──
+		extractMakerClaimUnits(dialogueId);
 
 		return {
 			success: true,
@@ -880,7 +936,7 @@ export async function executeVerifyPhase(
 				dialogueId,
 				claim,
 				provider: verifierProviderResult.value,
-				tokenBudget: Math.floor(tokenBudget / openClaims.length),
+				tokenBudget: Math.max(2000, Math.floor(tokenBudget / openClaims.length)),
 				includeHistoricalVerdicts: true,
 				checkForContradictions: true,
 				commandId: verifyCommandId,
@@ -954,12 +1010,18 @@ export async function executeVerifyPhase(
 		// not proceed to EXECUTE with entirely unverified assumptions.
 		const failedCount = openClaims.length - verificationResults.length;
 		if (verificationResults.length === 0 && openClaims.length > 0) {
-			const failGateResult = createReviewGate(
+			const failGateResult = createGate({
 				dialogueId,
-				`Verification failed for all ${openClaims.length} claim(s). ` +
-				`No assumptions were verified — the verifier invocations returned errors. ` +
-				`Review the errors above and resolve before proceeding to EXECUTE.`
-			);
+				reason:
+					`Verification failed for all ${openClaims.length} claim(s). ` +
+					`No assumptions were verified — the verifier invocations returned errors. ` +
+					`Review the errors above and resolve before proceeding to EXECUTE.`,
+				blockingClaims: openClaims.map(c => c.claim_id),
+				metadata: {
+					condition: GateTriggerCondition.VERIFICATION_FAILURE,
+					failedClaimCount: openClaims.length,
+				},
+			});
 			if (failGateResult.success && failGateResult.value) {
 				emitWorkflowGateTriggered(dialogueId, failGateResult.value.gate_id, failGateResult.value.reason);
 			}
@@ -1178,6 +1240,9 @@ export async function executeHistoricalCheckPhase(
 			historical_findings: historianResult.value.findings,
 		});
 
+		// ── MAKER: Create HistoricalInvariantPacket from findings ──
+		createMakerHistoricalPacket(dialogueId, historianResult.value.findings);
+
 		return {
 			success: true,
 			value: {
@@ -1275,6 +1340,9 @@ export async function executeReviewPhase(
  * Uses resolveProviderForRole() to dispatch to Claude Code CLI, Gemini CLI, Codex CLI, or API fallback.
  * Streams CLI activity events to the governed stream UI via emitCLIActivity().
  *
+ * MAKER path: If a task graph exists for this dialogue, uses per-unit execution with
+ * validation and bounded repair instead of monolithic execution.
+ *
  * @param dialogueId Dialogue ID
  * @returns Result containing phase execution result
  */
@@ -1290,6 +1358,13 @@ export async function executeExecutePhase(
 			};
 		}
 
+		// ── MAKER: Check if task graph exists → per-unit execution path ──
+		const graphResult = getTaskGraphForDialogue(dialogueId);
+		if (graphResult.success && graphResult.value) {
+			return executeMakerExecutePhase(dialogueId, graphResult.value.graph_id);
+		}
+
+		// ── Legacy monolithic execution path ──
 		// Retrieve the cached proposal from workflow metadata
 		const stateResult = getWorkflowState(dialogueId);
 		if (!stateResult.success) {
@@ -1500,7 +1575,8 @@ export async function executeExecutePhase(
 
 /**
  * Execute VALIDATE phase
- * Validates execution results — checks whether execution succeeded
+ * Validates execution results — checks whether execution succeeded.
+ * MAKER path: runs acceptance contract validation (lint, type-check, test suite).
  *
  * @param dialogueId Dialogue ID
  * @returns Result containing phase execution result
@@ -1537,6 +1613,21 @@ export async function executeValidatePhase(
 					success: true,
 					gateTriggered: true,
 					metadata: { validationPassed: false, reason: execResult.error },
+					timestamp: now,
+				},
+			};
+		}
+
+		// ── MAKER: Acceptance contract validation ──
+		const contractValidation = await runMakerContractValidation(dialogueId);
+		if (contractValidation.gateTriggered) {
+			return {
+				success: true,
+				value: {
+					phase: 'VALIDATE' as Phase,
+					success: true,
+					gateTriggered: true,
+					metadata: { validationPassed: false, reason: contractValidation.reason },
 					timestamp: now,
 				},
 			};
@@ -1603,6 +1694,9 @@ export async function executeCommitPhase(
 			now
 		);
 		emitDialogueTurnAdded(dialogueId, turnId, 'SYSTEM');
+
+		// ── MAKER: Record OutcomeSnapshot ──
+		recordMakerOutcomeSnapshot(dialogueId);
 
 		return {
 			success: true,
@@ -1710,6 +1804,662 @@ function formatApprovedPlanForExecutor(
 	);
 
 	return sections.join('\n\n');
+}
+
+// ==================== MAKER HELPER FUNCTIONS ====================
+// These functions are called from the main phase functions above.
+// They encapsulate MAKER-specific logic to keep the phase functions clean.
+
+/**
+ * Create IntentRecord + AcceptanceContract from approved INTAKE plan.
+ * Called at the end of plan approval in INTAKE phase.
+ */
+function createMakerIntentAndContract(dialogueId: string): void {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:intake', dialogueId })
+		: undefined;
+
+	try {
+		const stateResult = getWorkflowState(dialogueId);
+		if (!stateResult.success) { return; }
+
+		const metadata = JSON.parse(stateResult.value.metadata);
+		const plan = metadata.approvedIntakePlan;
+		const goal = metadata.lastIntakeGoal ?? metadata.goal ?? '';
+
+		if (!plan) { return; }
+
+		// Extract structured data from the approved plan
+		const requirements = (plan.requirements as Array<{ id: string; text: string }>) ?? [];
+		const constraints = (plan.constraints as Array<{ id: string; text: string }>) ?? [];
+
+		// Create IntentRecord
+		const scopeIn = requirements.map((r: { id: string; text: string }) => r.text);
+		const scopeOut = constraints
+			.filter((c: { id: string; text: string }) => c.text.toLowerCase().includes('out of scope'))
+			.map((c: { id: string; text: string }) => c.text);
+
+		const intentResult = createIntentRecord(dialogueId, goal, {
+			scope_in: scopeIn,
+			scope_out: scopeOut,
+			priority_axes: [],
+			risk_posture: 'BALANCED',
+		});
+
+		if (!intentResult.success) {
+			logger?.warn('Failed to create IntentRecord', { error: intentResult.error.message });
+			return;
+		}
+
+		// Detect toolchains for validation requirements
+		const workspaceRoot = getWorkspaceRoot();
+		let validationReqs: Array<{ type: string; command?: string; description: string }> = [];
+		if (workspaceRoot) {
+			// Fire-and-forget: detect toolchains async (don't block plan approval)
+			detectToolchains(workspaceRoot).then((tcResult) => {
+				if (tcResult.success) {
+					logger?.info('Toolchains detected', { count: tcResult.value.length });
+				}
+			}).catch(() => {});
+
+			// Build basic validation requirements from common commands
+			validationReqs = [
+				{ type: 'TYPE_CHECK', description: 'Type checking passes' },
+				{ type: 'BUILD', description: 'Build succeeds' },
+			];
+		}
+
+		// Create AcceptanceContract
+		const successConditions = requirements.map((r: { id: string; text: string }) => r.text);
+		const nonGoals = scopeOut;
+
+		const contractResult = createAcceptanceContract(
+			intentResult.value.intent_id,
+			dialogueId,
+			{
+				success_conditions: successConditions,
+				required_validations: validationReqs,
+				non_goals: nonGoals,
+				human_judgment_required: [],
+			}
+		);
+
+		if (!contractResult.success) {
+			logger?.warn('Failed to create AcceptanceContract', { error: contractResult.error.message });
+			return;
+		}
+
+		// Store IDs in workflow metadata
+		updateWorkflowMetadata(dialogueId, {
+			intent_id: intentResult.value.intent_id,
+			contract_id: contractResult.value.contract_id,
+		});
+
+		logger?.info('MAKER IntentRecord + AcceptanceContract created', {
+			intentId: intentResult.value.intent_id,
+			contractId: contractResult.value.contract_id,
+		});
+	} catch (err) {
+		logger?.warn('MAKER intent/contract creation failed', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+/**
+ * Attempt task graph decomposition after PROPOSE evaluator returns PROCEED.
+ * Returns decomposition result — no-op if no intent record exists.
+ */
+async function attemptMakerDecomposition(
+	dialogueId: string,
+	goal: string,
+	provider: import('../cli/roleCLIProvider').RoleCLIProvider
+): Promise<{ graphId?: string; gateTriggered?: boolean; issue?: string }> {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:decompose', dialogueId })
+		: undefined;
+
+	try {
+		// Check if intent record exists (MAKER path is active)
+		const intentResult = getIntentRecordForDialogue(dialogueId);
+		if (!intentResult.success || !intentResult.value) {
+			return {}; // No intent record — non-MAKER path
+		}
+
+		const contractResult = getAcceptanceContractForDialogue(dialogueId);
+		if (!contractResult.success || !contractResult.value) {
+			return {}; // No contract — non-MAKER path
+		}
+
+		const intent = intentResult.value;
+		const contract = contractResult.value;
+
+		// Build historical context for decomposition
+		const historicalCtx = await buildMakerPlannerContext({
+			dialogueId,
+			intentRecord: intent,
+			contract,
+			tokenBudget: 4000,
+		});
+		const historicalContext = historicalCtx.success ? historicalCtx.value : '';
+
+		const workspaceRoot = getWorkspaceRoot() ?? '.';
+
+		// Invoke decomposer
+		const decompResult = await decomposeGoalIntoTaskGraph(
+			intent,
+			contract,
+			historicalContext,
+			dialogueId,
+			provider,
+			workspaceRoot
+		);
+
+		if (!decompResult.success) {
+			logger?.warn('Decomposition failed', { error: decompResult.error.message });
+			// Non-fatal — workflow continues on monolithic path
+			return {};
+		}
+
+		const { graph, units, edges } = decompResult.value;
+
+		// Quality check
+		const qualityReport = checkDecompositionQuality(units, edges);
+		if (!qualityReport.is_acceptable) {
+			logger?.warn('Decomposition quality failed', {
+				issues: qualityReport.issues,
+				unitCount: qualityReport.unit_count,
+			});
+			// Create gate for human review of decomposition
+			const gateResult = createReviewGate(
+				dialogueId,
+				`Task graph decomposition quality issues:\n${qualityReport.issues.map((i) => `• ${i}`).join('\n')}\n\nPlease review and approve or request re-decomposition.`
+			);
+			if (gateResult.success && gateResult.value) {
+				emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+			}
+			return { gateTriggered: true, issue: qualityReport.issues.join('; ') };
+		}
+
+		// Store graph_id in metadata
+		updateWorkflowMetadata(dialogueId, {
+			graph_id: graph.graph_id,
+		});
+
+		logger?.info('Task graph decomposition complete', {
+			graphId: graph.graph_id,
+			unitCount: units.length,
+			edgeCount: edges.length,
+		});
+
+		return { graphId: graph.graph_id };
+	} catch (err) {
+		logger?.warn('MAKER decomposition failed', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return {};
+	}
+}
+
+/**
+ * Extract ClaimUnits from task graph units during ASSUMPTION_SURFACING.
+ * Each unit's observables + falsifiers become claim_units in the DB.
+ */
+function extractMakerClaimUnits(dialogueId: string): void {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:claims', dialogueId })
+		: undefined;
+
+	try {
+		const graphResult = getTaskGraphForDialogue(dialogueId);
+		if (!graphResult.success || !graphResult.value) { return; }
+
+		const taskUnitsResult = getTaskUnitsForGraph(graphResult.value.graph_id);
+		if (!taskUnitsResult.success) { return; }
+
+		let claimCount = 0;
+		for (const unit of taskUnitsResult.value) {
+			// Observables → ATOMIC claims
+			for (const observable of unit.observables) {
+				createClaimUnit(unit.unit_id, observable, 'ATOMIC', unit.falsifiers, []);
+				claimCount++;
+			}
+		}
+
+		logger?.info('MAKER claim units extracted from task graph', { claimCount });
+	} catch (err) {
+		logger?.warn('MAKER claim extraction failed', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+/**
+ * Create HistoricalInvariantPacket from historian findings.
+ * Called at the end of HISTORICAL_CHECK phase.
+ */
+function createMakerHistoricalPacket(dialogueId: string, findings: unknown[]): void {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:historical', dialogueId })
+		: undefined;
+
+	try {
+		if (!findings || findings.length === 0) { return; }
+
+		// Classify findings into invariants, failure motifs, and patterns
+		const invariants: string[] = [];
+		const failureMotifs: string[] = [];
+		const patterns: string[] = [];
+
+		for (const finding of findings) {
+			const text = typeof finding === 'string' ? finding : JSON.stringify(finding);
+			const lower = text.toLowerCase();
+
+			if (lower.includes('must') || lower.includes('always') || lower.includes('never') || lower.includes('invariant')) {
+				invariants.push(text);
+			} else if (lower.includes('fail') || lower.includes('error') || lower.includes('broke') || lower.includes('issue')) {
+				failureMotifs.push(text);
+			} else {
+				patterns.push(text);
+			}
+		}
+
+		createHistoricalInvariantPacket(dialogueId, {
+			relevant_invariants: invariants,
+			prior_failure_motifs: failureMotifs,
+			precedent_patterns: patterns,
+			reusable_subplans: [],
+		});
+
+		logger?.info('MAKER historical invariant packet created', {
+			invariants: invariants.length,
+			failureMotifs: failureMotifs.length,
+			patterns: patterns.length,
+		});
+	} catch (err) {
+		logger?.warn('MAKER historical packet creation failed', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
+}
+
+/**
+ * MAKER per-unit execution loop.
+ * Executes task units in dependency order with validation and bounded repair.
+ */
+async function executeMakerExecutePhase(
+	dialogueId: string,
+	graphId: string
+): Promise<Result<PhaseExecutionResult>> {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:execute', dialogueId, graphId })
+		: undefined;
+
+	const phaseStartTimestamp = new Date().toISOString();
+	const workspaceRoot = getWorkspaceRoot() ?? '.';
+	const overridesMap: Record<string, import('../cli/providerCapabilities').ProviderCapabilityOverrides | null> = {};
+	for (const pid of ['claude-code', 'codex-cli', 'gemini-cli']) {
+		overridesMap[pid] = getProviderCapabilityOverrides(pid);
+	}
+	const profiles = getAllProviderProfiles(overridesMap);
+
+	// Load toolchains for validation
+	const toolchainsResult = await detectToolchains(workspaceRoot);
+	const toolchains: ToolchainDetection[] = toolchainsResult.success ? toolchainsResult.value : [];
+
+	// Load acceptance contract (if any)
+	const contractResult = getAcceptanceContractForDialogue(dialogueId);
+	const contract: AcceptanceContract | null = contractResult.success ? contractResult.value : null;
+
+	// Update graph status
+	updateTaskGraphStatus(graphId, 'IN_PROGRESS');
+
+	// Get ready units and process them
+	const readyResult = getNextReadyUnits(graphId);
+	if (!readyResult.success || readyResult.value.length === 0) {
+		// Check if graph is already complete
+		const completeResult = isGraphComplete(graphId);
+		if (completeResult.success && completeResult.value) {
+			updateTaskGraphStatus(graphId, 'COMPLETED');
+			return {
+				success: true,
+				value: {
+					phase: 'EXECUTE' as Phase,
+					success: true,
+					nextPhase: 'VALIDATE' as Phase,
+					metadata: { makerPath: true, graphComplete: true },
+					timestamp: new Date().toISOString(),
+				},
+			};
+		}
+		return {
+			success: false,
+			error: new Error('No ready units available and graph is not complete'),
+		};
+	}
+
+	let gateTriggered = false;
+	let unitsCompleted = 0;
+
+	for (const unit of readyResult.value) {
+		if (gateTriggered) { break; }
+
+		const unitCommandId = randomUUID();
+		emitWorkflowCommand({
+			dialogueId,
+			commandId: unitCommandId,
+			action: 'start',
+			commandType: 'cli_invocation',
+			label: `Unit: ${unit.label}`,
+			summary: unit.goal.substring(0, 120),
+			status: 'running',
+			timestamp: new Date().toISOString(),
+		});
+
+		// Mark unit as IN_PROGRESS
+		updateTaskUnitStatus(unit.unit_id, 'IN_PROGRESS');
+		updateWorkflowMetadata(dialogueId, { current_unit_id: unit.unit_id });
+
+		// Route to best provider
+		let unitProvider: import('../cli/roleCLIProvider').RoleCLIProvider;
+		const routeResult = await routeTaskToProvider(unit, profiles);
+		if (routeResult.success) {
+			unitProvider = routeResult.value;
+		} else {
+			// Fallback to default executor provider
+			const fallbackProvider = await resolveProviderForRole(Role.EXECUTOR);
+			if (!fallbackProvider.success) {
+				updateTaskUnitStatus(unit.unit_id, 'FAILED');
+				continue;
+			}
+			unitProvider = fallbackProvider.value;
+		}
+
+		// Build unit context
+		const intentResult = getIntentRecordForDialogue(dialogueId);
+		let unitContext = '';
+		if (intentResult.success && intentResult.value && contract) {
+			const ctxResult = await buildMakerPlannerContext({
+				dialogueId,
+				intentRecord: intentResult.value,
+				contract,
+				tokenBudget: 3000,
+			});
+			unitContext = ctxResult.success ? ctxResult.value : '';
+		}
+
+		// Execute unit
+		const execResult = await invokeExecutorForUnit({
+			dialogueId,
+			unit,
+			context: unitContext,
+			provider: unitProvider,
+			commandId: unitCommandId,
+		});
+
+		if (!execResult.success || !execResult.value.success) {
+			const errorMsg = execResult.success
+				? `Exit code ${execResult.value.exitCode}`
+				: execResult.error.message;
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: unitCommandId,
+				action: 'error',
+				commandType: 'cli_invocation',
+				label: `Unit: ${unit.label}`,
+				summary: `Execution failed: ${errorMsg}`,
+				status: 'error',
+				timestamp: new Date().toISOString(),
+			});
+			updateTaskUnitStatus(unit.unit_id, 'FAILED');
+			gateTriggered = true;
+			createRepairEscalationGate(dialogueId, unit.unit_id, 'runtime_error', `Unit execution failed: ${errorMsg}`);
+			break;
+		}
+
+		// Validate unit output
+		updateTaskUnitStatus(unit.unit_id, 'VALIDATING');
+		const validationResult = await runUnitValidation(unit, toolchains, contract, workspaceRoot);
+
+		if (validationResult.success && validationResult.value.pass_fail) {
+			// Validation passed
+			updateTaskUnitStatus(unit.unit_id, 'COMPLETED');
+			completeUnitAndPropagate(graphId, unit.unit_id);
+			unitsCompleted++;
+
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: unitCommandId,
+				action: 'complete',
+				commandType: 'cli_invocation',
+				label: `Unit: ${unit.label}`,
+				summary: `Completed and validated`,
+				status: 'success',
+				timestamp: new Date().toISOString(),
+			});
+		} else {
+			// Validation failed — attempt bounded repair
+			const failureType = validationResult.success
+				? classifyFailureType(validationResult.value.checks)
+				: 'unknown' as import('../types/maker').FailureType;
+
+			const existingRepairsResult = getRepairPacketsForUnit(unit.unit_id);
+			const existingRepairs: RepairPacket[] = existingRepairsResult.success ? existingRepairsResult.value : [];
+
+			const classification = classifyRepairability(failureType, unit, existingRepairs);
+			const canRepair = canAttemptRepair(unit, existingRepairs, Date.parse(phaseStartTimestamp));
+
+			if (classification === RepairClassification.AUTO_REPAIR_SAFE && canRepair.allowed) {
+				updateTaskUnitStatus(unit.unit_id, 'REPAIRING');
+				updateWorkflowMetadata(dialogueId, { repair_active: true });
+
+				const repairResult = await attemptRepair(
+					unit,
+					validationResult.success ? validationResult.value : { validation_id: '', unit_id: unit.unit_id, checks: [], expected_observables: [], actual_observables: [], pass_fail: false, created_at: '' } as ValidationPacket,
+					classification,
+					unitProvider,
+					workspaceRoot
+				);
+
+				updateWorkflowMetadata(dialogueId, { repair_active: false });
+
+				if (repairResult.success && repairResult.value.result === 'FIXED') {
+					// Re-validate after repair
+					const revalidation = await runUnitValidation(unit, toolchains, contract, workspaceRoot);
+					if (revalidation.success && revalidation.value.pass_fail) {
+						updateTaskUnitStatus(unit.unit_id, 'COMPLETED');
+						completeUnitAndPropagate(graphId, unit.unit_id);
+						unitsCompleted++;
+						emitWorkflowCommand({
+							dialogueId,
+							commandId: unitCommandId,
+							action: 'complete',
+							commandType: 'cli_invocation',
+							label: `Unit: ${unit.label}`,
+							summary: `Repaired and validated`,
+							status: 'success',
+							timestamp: new Date().toISOString(),
+						});
+						continue;
+					}
+				}
+				// Repair failed or re-validation failed — escalate
+				updateTaskUnitStatus(unit.unit_id, 'FAILED');
+				gateTriggered = true;
+				createRepairEscalationGate(dialogueId, unit.unit_id, failureType, `Auto-repair failed for unit "${unit.label}"`);
+			} else {
+				// Cannot auto-repair — escalate immediately
+				updateTaskUnitStatus(unit.unit_id, 'FAILED');
+				gateTriggered = true;
+				const reason = classification === RepairClassification.ESCALATE_REQUIRED
+					? `Failure type "${failureType}" requires human intervention`
+					: canRepair.reason ?? 'Repair budget exhausted';
+				createRepairEscalationGate(dialogueId, unit.unit_id, failureType, `${reason} (unit: "${unit.label}")`);
+			}
+
+			emitWorkflowCommand({
+				dialogueId,
+				commandId: unitCommandId,
+				action: 'error',
+				commandType: 'cli_invocation',
+				label: `Unit: ${unit.label}`,
+				summary: `Validation failed: ${failureType}`,
+				status: 'error',
+				timestamp: new Date().toISOString(),
+			});
+		}
+	}
+
+	// Check if entire graph is complete
+	const graphComplete = isGraphComplete(graphId);
+	if (graphComplete.success && graphComplete.value) {
+		updateTaskGraphStatus(graphId, 'COMPLETED');
+	}
+
+	const progress = getGraphProgress(graphId);
+
+	// Store execution result in metadata
+	updateWorkflowMetadata(dialogueId, {
+		current_unit_id: undefined,
+		executionResult: { success: !gateTriggered, makerPath: true },
+	});
+
+	return {
+		success: true,
+		value: {
+			phase: 'EXECUTE' as Phase,
+			success: !gateTriggered,
+			nextPhase: (!gateTriggered && graphComplete.success && graphComplete.value)
+				? 'VALIDATE' as Phase
+				: undefined,
+			gateTriggered,
+			awaitingInput: gateTriggered,
+			metadata: {
+				makerPath: true,
+				unitsCompleted,
+				progress: progress.success ? progress.value : undefined,
+			},
+			timestamp: new Date().toISOString(),
+		},
+	};
+}
+
+/**
+ * Run acceptance contract validation during VALIDATE phase.
+ * If no contract exists, returns no-op result (passes through).
+ */
+async function runMakerContractValidation(
+	dialogueId: string
+): Promise<{ gateTriggered: boolean; reason?: string }> {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:validate', dialogueId })
+		: undefined;
+
+	try {
+		const contractResult = getAcceptanceContractForDialogue(dialogueId);
+		if (!contractResult.success || !contractResult.value) {
+			return { gateTriggered: false }; // No contract — skip
+		}
+
+		const contract = contractResult.value;
+		if (contract.required_validations.length === 0) {
+			return { gateTriggered: false }; // No validations required
+		}
+
+		const workspaceRoot = getWorkspaceRoot() ?? '.';
+		const toolchainsResult = await detectToolchains(workspaceRoot);
+		const toolchains: ToolchainDetection[] = toolchainsResult.success ? toolchainsResult.value : [];
+
+		// Run a "whole-project" validation by creating a synthetic unit with no scope restriction
+		const syntheticUnit: TaskUnit = {
+			unit_id: 'contract-validation',
+			graph_id: '',
+			label: 'Acceptance Contract Validation',
+			goal: 'Validate acceptance contract conditions',
+			category: 'TEST',
+			inputs: [],
+			outputs: [],
+			preconditions: [],
+			postconditions: contract.success_conditions,
+			allowed_tools: [],
+			preferred_provider: null,
+			max_change_scope: null,
+			observables: contract.success_conditions,
+			falsifiers: [],
+			verification_method: 'automated',
+			status: 'IN_PROGRESS',
+			parent_unit_id: null,
+			sort_order: 0,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString(),
+		};
+
+		const validationResult = await runUnitValidation(syntheticUnit, toolchains, contract, workspaceRoot);
+
+		if (!validationResult.success || !validationResult.value.pass_fail) {
+			const failedChecks = validationResult.success
+				? validationResult.value.checks.filter((c) => !c.passed).map((c) => `${c.check_type}: ${c.stdout_excerpt}`).join('; ')
+				: validationResult.error.message;
+
+			logger?.warn('Acceptance contract validation failed', { failedChecks });
+
+			const gateResult = createReviewGate(
+				dialogueId,
+				`Acceptance contract validation failed:\n${failedChecks}\n\nReview and decide how to proceed.`
+			);
+			if (gateResult.success && gateResult.value) {
+				emitWorkflowGateTriggered(dialogueId, gateResult.value.gate_id, gateResult.value.reason);
+			}
+
+			return { gateTriggered: true, reason: failedChecks };
+		}
+
+		logger?.info('Acceptance contract validation passed');
+		return { gateTriggered: false };
+	} catch (err) {
+		logger?.warn('MAKER contract validation failed', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return { gateTriggered: false }; // Non-fatal
+	}
+}
+
+/**
+ * Record OutcomeSnapshot during COMMIT phase.
+ * Aggregates execution data from the task graph and repairs.
+ */
+function recordMakerOutcomeSnapshot(dialogueId: string): void {
+	const logger = isLoggerInitialized()
+		? getLogger().child({ component: 'maker:outcome', dialogueId })
+		: undefined;
+
+	try {
+		const graphResult = getTaskGraphForDialogue(dialogueId);
+		if (!graphResult.success || !graphResult.value) { return; }
+
+		const graph = graphResult.value;
+		const progress = getGraphProgress(graph.graph_id);
+
+		createOutcomeSnapshot(dialogueId, graph.graph_id, {
+			providers_used: [],
+			augmentations_used: [],
+			success: graph.graph_status === 'COMPLETED',
+			failure_modes: [],
+			useful_invariants: [],
+			units_completed: progress.success ? progress.value.completed : 0,
+			units_total: progress.success ? progress.value.total : 0,
+			total_wall_clock_ms: 0, // TODO: track wall clock time across units
+		});
+
+		logger?.info('MAKER outcome snapshot recorded', {
+			graphId: graph.graph_id,
+			success: graph.graph_status === 'COMPLETED',
+		});
+	} catch (err) {
+		logger?.warn('MAKER outcome snapshot failed', {
+			error: err instanceof Error ? err.message : String(err),
+		});
+	}
 }
 
 /**

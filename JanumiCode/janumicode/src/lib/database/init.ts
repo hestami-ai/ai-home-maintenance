@@ -291,6 +291,19 @@ export function clearAllData(): Result<void> {
 				'workflow_states',
 				'overrides',
 				'constraint_waivers',
+				// V11 MAKER tables (children before parents)
+				'repair_packets',                // FK → task_units
+				'validation_packets',            // FK → task_units
+				'evidence_packets',              // FK → task_units
+				'claim_units',                   // FK → task_units
+				'historical_invariant_packets',  // FK → task_units (nullable)
+				'outcome_snapshots',             // FK → task_graphs
+				'task_edges',                    // FK → task_graphs, task_units
+				'task_units',                    // FK → task_graphs, self-ref
+				'task_graphs',                   // FK → intent_records
+				'acceptance_contracts',          // FK → intent_records
+				'intent_records',
+				'toolchain_detections',
 				// Schema-managed tables (children before parents)
 				'embeddings',
 				'narrative_memories',

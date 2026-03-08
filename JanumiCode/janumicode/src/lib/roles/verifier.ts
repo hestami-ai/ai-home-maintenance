@@ -55,6 +55,12 @@ export interface EvidenceClassification {
 }
 
 /**
+ * Claim scope classification (MAKER integration)
+ * Indicates the granularity of a claim for decomposition quality assessment.
+ */
+export type ClaimScopeClassification = 'ATOMIC' | 'COMPOSITE' | 'VAGUE';
+
+/**
  * Verifier response
  */
 export interface VerifierResponse {
@@ -65,6 +71,10 @@ export interface VerifierResponse {
 	rationale: string;
 	constraints_ref?: string;
 	evidence_ref?: string;
+	/** Claim scope classification — how granular/specific the claim is */
+	claim_scope?: ClaimScopeClassification;
+	/** Whether the claim is too broad for verification and should be decomposed */
+	decompose_required?: boolean;
 	raw_response: string;
 }
 
@@ -152,7 +162,9 @@ Your response MUST be valid JSON with this exact structure:
   "verdict": "VERIFIED" | "CONDITIONAL" | "DISPROVED" | "UNKNOWN",
   "rationale": "Detailed explanation of verdict based on evidence",
   "constraints_ref": "Constraint manifest reference (if applicable)",
-  "evidence_ref": "Primary evidence reference (if available)"
+  "evidence_ref": "Primary evidence reference (if available)",
+  "claim_scope": "ATOMIC" | "COMPOSITE" | "VAGUE",
+  "decompose_required": false
 }
 \`\`\`
 
@@ -166,7 +178,16 @@ You will receive:
 - **Related Claims**: Other claims that may inform verification
 
 Process this context carefully and generate your response in the required JSON format.
-Be conservative - when in doubt, emit UNKNOWN rather than guessing.`;
+Be conservative - when in doubt, emit UNKNOWN rather than guessing.
+
+# Claim Scope Classification
+
+Classify each claim's scope to help the workflow determine decomposition quality:
+- **ATOMIC**: A single, testable assertion about one specific thing (e.g., "function X returns Y when given Z")
+- **COMPOSITE**: Multiple assertions bundled together (e.g., "the auth system handles login, signup, and password reset correctly")
+- **VAGUE**: Too imprecise to verify meaningfully (e.g., "the code is good" or "performance is acceptable")
+
+Set "decompose_required" to true if the claim is COMPOSITE or VAGUE and cannot be meaningfully verified as a single unit. This signals that the claim should be broken down into smaller, verifiable sub-claims.`;
 
 /**
  * Invoke Verifier agent
@@ -338,6 +359,12 @@ function parseVerifierResponse(rawResponse: string): Result<VerifierResponse> {
 				})
 			);
 
+		// Parse optional MAKER fields
+		const validScopes: ClaimScopeClassification[] = ['ATOMIC', 'COMPOSITE', 'VAGUE'];
+		const claimScope = validScopes.includes(parsed.claim_scope)
+			? parsed.claim_scope as ClaimScopeClassification
+			: undefined;
+
 		const response: VerifierResponse = {
 			normalized_claim: parsed.normalized_claim,
 			disconfirming_queries: disconfirmingQueries,
@@ -346,6 +373,8 @@ function parseVerifierResponse(rawResponse: string): Result<VerifierResponse> {
 			rationale: parsed.rationale,
 			constraints_ref: parsed.constraints_ref,
 			evidence_ref: parsed.evidence_ref,
+			claim_scope: claimScope,
+			decompose_required: parsed.decompose_required === true,
 			raw_response: rawResponse,
 		};
 

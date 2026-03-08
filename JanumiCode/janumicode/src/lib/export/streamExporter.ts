@@ -98,8 +98,8 @@ export function exportDialogueMarkdown(
 		lines.push('| ID | Statement | Status | Criticality |');
 		lines.push('|----|-----------|--------|-------------|');
 		for (const claim of state.claims) {
-			const stmt = claim.statement.substring(0, 60).replace(/\n/g, ' ');
-			lines.push(`| ${claim.claim_id.substring(0, 8)}... | ${escapeMd(stmt)}... | ${claim.status} | ${claim.criticality} |`);
+			const stmt = claim.statement.replaceAll('\n', ' ');
+			lines.push(`| ${claim.claim_id.substring(0, 8)}... | ${escapeMd(stmt)} | ${claim.status} | ${claim.criticality} |`);
 		}
 		lines.push('');
 	}
@@ -156,7 +156,7 @@ function exportStreamItem(item: StreamItem, options: ExportOptions): string[] {
 			break;
 
 		case 'review_gate':
-			lines.push(...exportReviewGate(item.gate, item.reviewItems, item.summary, item.historianFindings, item.resolvedAction));
+			lines.push(...exportReviewGate(item.gate, item.reviewItems, item.summary, item.historianFindings, item.verdicts, item.resolvedAction, item.resolvedRationale));
 			break;
 
 		case 'command_block':
@@ -207,7 +207,7 @@ function exportTurn(turn: DialogueTurn, claims: Claim[], verdict?: Verdict): str
 
 	// Verdict
 	if (verdict) {
-		lines.push(`**Verdict:** ${verdict.verdict} — ${escapeMd(verdict.rationale?.substring(0, 100) ?? 'No rationale')}`);
+		lines.push(`**Verdict:** ${verdict.verdict} — ${escapeMd(verdict.rationale ?? 'No rationale')}`);
 		lines.push('');
 	}
 
@@ -280,14 +280,17 @@ function exportVerificationGate(
 }
 
 /**
- * Export a review gate
+ * Export a review gate with full detail: all review items, historian findings,
+ * per-item verdicts, and human feedback/rationale.
  */
 function exportReviewGate(
 	gate: Gate,
 	reviewItems: ReviewItem[],
 	summary: { verified: number; disproved: number; unknown: number; conditional: number; open: number; needsDecisionCount: number; awarenessCount: number; allClearCount: number },
 	historianFindings: string[],
-	resolvedAction?: string
+	verdicts: Verdict[],
+	resolvedAction?: string,
+	resolvedRationale?: string
 ): string[] {
 	const lines: string[] = [];
 
@@ -313,28 +316,84 @@ function exportReviewGate(
 	lines.push(`- All Clear: ${summary.allClearCount}`);
 	lines.push('');
 
-	// Historian findings
-	if (historianFindings.length > 0) {
-		lines.push(`**Historian Findings:**`);
-		for (const f of historianFindings) {
-			lines.push(`- ${escapeMd(f.substring(0, 100))}...`);
-		}
+	// Human feedback (resolved rationale)
+	if (resolvedRationale) {
+		lines.push(`**Human Feedback:**`);
 		lines.push('');
-	}
-
-	// Review items (sample first 10)
-	const sampleItems = reviewItems.slice(0, 10);
-	if (sampleItems.length > 0) {
-		lines.push(`**Review Items (first 10 of ${reviewItems.length}):**`);
-		for (const item of sampleItems) {
-			if (item.kind === 'claim' && item.claim) {
-				lines.push(`- [${item.category}] Claim ${item.claim.claim_id.substring(0, 8)}... — ${item.claim.status}`);
-			} else if (item.kind === 'finding') {
-				lines.push(`- [${item.category}] Finding: ${escapeMd(item.findingText?.substring(0, 60) ?? 'N/A')}...`);
+		for (const ratLine of resolvedRationale.split('\n')) {
+			const trimmed = ratLine.trim();
+			if (trimmed) {
+				lines.push(`> ${escapeMd(trimmed)}`);
 			}
 		}
 		lines.push('');
 	}
+
+	// Historian findings (full text, no truncation)
+	if (historianFindings.length > 0) {
+		lines.push(`**Historian Findings (${historianFindings.length}):**`);
+		lines.push('');
+		for (let i = 0; i < historianFindings.length; i++) {
+			lines.push(`${i + 1}. ${escapeMd(historianFindings[i])}`);
+			lines.push('');
+		}
+	}
+
+	// Build verdict lookup for rationale display
+	const verdictByClaim = new Map<string, Verdict>();
+	for (const v of verdicts) {
+		verdictByClaim.set(v.claim_id, v);
+	}
+
+	// Review items — all items, grouped by category
+	const needsDecision = reviewItems.filter((i) => i.category === 'needs_decision');
+	const awareness = reviewItems.filter((i) => i.category === 'awareness');
+	const allClear = reviewItems.filter((i) => i.category === 'all_clear');
+
+	if (needsDecision.length > 0) {
+		lines.push(`**Needs Decision (${needsDecision.length}):**`);
+		lines.push('');
+		for (const item of needsDecision) {
+			lines.push(...exportReviewItem(item, verdictByClaim));
+		}
+	}
+
+	if (awareness.length > 0) {
+		lines.push(`**For Awareness (${awareness.length}):**`);
+		lines.push('');
+		for (const item of awareness) {
+			lines.push(...exportReviewItem(item, verdictByClaim));
+		}
+	}
+
+	if (allClear.length > 0) {
+		lines.push(`**All Clear (${allClear.length}):**`);
+		lines.push('');
+		for (const item of allClear) {
+			lines.push(...exportReviewItem(item, verdictByClaim));
+		}
+	}
+
+	return lines;
+}
+
+/**
+ * Export a single review item (claim or finding) with full detail.
+ */
+function exportReviewItem(item: ReviewItem, verdictByClaim: Map<string, Verdict>): string[] {
+	const lines: string[] = [];
+
+	if (item.kind === 'claim' && item.claim) {
+		const claim = item.claim;
+		const verdict = item.verdict ?? verdictByClaim.get(claim.claim_id);
+		lines.push(`- **[${claim.status}] [${claim.criticality}]** ${escapeMd(claim.statement)}`);
+		if (verdict?.rationale) {
+			lines.push(`  - *Verifier:* ${escapeMd(verdict.rationale)}`);
+		}
+	} else if (item.kind === 'finding' && item.findingText) {
+		lines.push(`- **[FINDING]** ${escapeMd(item.findingText)}`);
+	}
+	lines.push('');
 
 	return lines;
 }
@@ -512,7 +571,7 @@ function exportIntakeApprovalGate(
 		lines.push(`**Title:** ${escapeMd(plan.title)}`);
 	}
 	if (plan.summary) {
-		lines.push(`**Summary:** ${escapeMd(plan.summary.substring(0, 100))}...`);
+		lines.push(`**Summary:** ${escapeMd(plan.summary)}`);
 	}
 	if (plan.requirements?.length) {
 		lines.push(`**Requirements:** ${plan.requirements.length}`);
