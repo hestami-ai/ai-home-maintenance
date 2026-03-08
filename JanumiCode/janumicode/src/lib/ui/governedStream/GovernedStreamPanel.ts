@@ -1319,14 +1319,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 
-		const result = await askClarification(this._activeDialogueId, itemContext, history);
+		const result = await askClarification(itemContext, history);
 
 		if (result.success) {
 			// Persist the full conversation (including the new assistant response) to DB
 			const now = new Date().toISOString();
 			const fullHistory = [
 				...history.map((m) => ({ ...m, timestamp: now })),
-				{ role: 'assistant' as const, content: result.value, timestamp: now },
+				{ role: 'assistant' as const, content: result.value.content, timestamp: now },
 			];
 			saveClarificationThread(this._activeDialogueId, itemId, itemContext, fullHistory);
 		}
@@ -1334,7 +1334,9 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		this._view?.webview.postMessage({
 			type: 'clarificationResponse',
 			itemId,
-			response: result.success ? result.value : undefined,
+			response: result.success ? result.value.content : undefined,
+			elapsedMs: result.success ? result.value.elapsedMs : undefined,
+			model: result.success ? result.value.model : undefined,
 			error: result.success ? undefined : result.error.message,
 		});
 	}

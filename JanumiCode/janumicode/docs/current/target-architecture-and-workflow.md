@@ -2,6 +2,8 @@
 
 This document synthesizes the strategic direction for JanumiCode, incorporating principles from OpenAI Harness Engineering, Stripe Minions, and the MAKER approach. The overarching goal is to transition JanumiCode from a "governed multi-agent wrapper" to a "governed repo harness and agent integration control plane."
 
+For the concrete testing and validation implementation plan that supports this strategy, see [testing-harness-roadmap.md](/mnt/e/Projects/hestami-ai/JanumiCode/janumicode/docs/current/testing-harness-roadmap.md).
+
 ## Core Strategy
 
 JanumiCode should not attempt to own the full agent runtime. Instead, it serves as the orchestration, policy, and memory layer that combines various underlying runtimes (Claude Code, Codex, Gemini, specialists). It provides:

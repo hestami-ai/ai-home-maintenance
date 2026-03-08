@@ -1,0 +1,27 @@
+{
+  "service": "Concierge",
+  "layer": "Pillar",
+  "components": [
+    {
+      "name": "ConciergeAPI",
+      "type": "REST_Service",
+      "port": 3001,
+      "routes": ["/residents", "/requests", "/parcels"]
+    },
+    {
+      "name": "ConciergeDB",
+      "type": "Database",
+      "engine": "PostgreSQL",
+      "schemas": ["residents", "service_requests", "parcels"]
+    },
+    {
+      "name": "NotificationWorker",
+      "type": "Worker",
+      "triggers": ["event:request.updated", "event:parcel.received"]
+    }
+  ],
+  "dependencies": {
+    "internal": ["ConciergeDB"],
+    "external": ["IdentityService", "EventBus", "CAMService"]
+  }
+}

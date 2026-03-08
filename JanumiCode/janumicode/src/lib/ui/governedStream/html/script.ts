@@ -69,7 +69,7 @@ export function getClientScript(): string {
 						handleCommandOptions(msg.data);
 						break;
 					case 'clarificationResponse':
-						handleClarificationResponse(msg.itemId, msg.response, msg.error);
+						handleClarificationResponse(msg.itemId, msg.response, msg.error, msg.elapsedMs, msg.model);
 						break;
 					case 'clarificationThreadsLoaded':
 						restoreClarificationThreads(msg.threads);
@@ -575,7 +575,7 @@ export function getClientScript(): string {
 				});
 			}
 
-			function handleClarificationResponse(itemId, response, error) {
+			function handleClarificationResponse(itemId, response, error, elapsedMs, model) {
 				clarificationPending[itemId] = false;
 				var loading = document.getElementById('clarification-loading-' + itemId);
 				if (loading) { loading.parentNode.removeChild(loading); }
@@ -587,7 +587,7 @@ export function getClientScript(): string {
 						clarificationConversations[itemId] = [];
 					}
 					clarificationConversations[itemId].push({ role: 'assistant', content: response });
-					appendClarificationMessage(itemId, 'assistant', response);
+					appendClarificationMessage(itemId, 'assistant', response, elapsedMs, model);
 				}
 			}
 
@@ -627,7 +627,7 @@ export function getClientScript(): string {
 					.replace(new RegExp('\\x60([^\\x60]+)\\x60', 'g'), '<code>$1</code>');
 			}
 
-			function appendClarificationMessage(itemId, role, content) {
+			function appendClarificationMessage(itemId, role, content, elapsedMs, model) {
 				var container = document.getElementById('clarification-messages-' + itemId);
 				if (!container) return;
 				var div = document.createElement('div');
@@ -636,7 +636,13 @@ export function getClientScript(): string {
 					div.id = 'clarification-loading-' + itemId;
 					div.innerHTML = '<span class="clarification-loading-dots">Thinking...</span>';
 				} else if (role === 'assistant') {
-					div.innerHTML = simpleMd(content);
+					var meta = '';
+					if (elapsedMs) {
+						var secs = (elapsedMs / 1000).toFixed(1);
+						meta = '<div class="clarification-meta">' + secs + 's' +
+							(model ? ' \\u00B7 ' + escapeHtmlClient(model) : '') + '</div>';
+					}
+					div.innerHTML = simpleMd(content) + meta;
 				} else {
 					div.textContent = content;
 				}

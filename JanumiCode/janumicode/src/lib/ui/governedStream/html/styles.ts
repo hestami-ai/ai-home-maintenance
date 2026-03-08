@@ -945,16 +945,22 @@ export function getStyles(): string {
 		.clarification-msg:last-child { margin-bottom: 0; }
 		.clarification-msg-human {
 			background: color-mix(in srgb, var(--vscode-charts-blue) 12%, transparent);
-			margin-left: 20px;
+			margin-left: 30%;
 			text-align: right;
 		}
 		.clarification-msg-assistant {
 			background: var(--vscode-textCodeBlock-background);
-			margin-right: 20px;
+			margin-right: 30%;
 		}
 		.clarification-msg-error {
 			color: var(--vscode-errorForeground);
 			font-style: italic;
+		}
+		.clarification-meta {
+			margin-top: 4px;
+			font-size: 10px;
+			opacity: 0.5;
+			text-align: right;
 		}
 		.clarification-loading-dots {
 			opacity: 0.6;

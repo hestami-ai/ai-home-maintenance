@@ -1,0 +1,44 @@
+{
+  "system": "Hestami AI OS",
+  "version": "2.0.0",
+  "description": "Semantic topology of the Hestami AI Operating System",
+  "nodes": [
+    {
+      "id": "IdentityService",
+      "type": "CoreService",
+      "description": "Centralized Authentication and User Management"
+    },
+    {
+      "id": "EventBus",
+      "type": "Infrastructure",
+      "description": "Global message broker for inter-service communication"
+    },
+    {
+      "id": "ConciergeService",
+      "type": "Pillar",
+      "priority": 1,
+      "description": "Resident-facing services, front desk, and amenity management"
+    },
+    {
+      "id": "ServiceProviderService",
+      "type": "Pillar",
+      "priority": 2,
+      "description": "Vendor management, gig worker coordination, and marketplace"
+    },
+    {
+      "id": "CAMService",
+      "type": "Pillar",
+      "priority": 3,
+      "description": "Community Association Management, accounting, and governance"
+    }
+  ],
+  "edges": [
+    { "from": "ConciergeService", "to": "IdentityService", "relationship": "consumes", "interface": "Auth" },
+    { "from": "ServiceProviderService", "to": "IdentityService", "relationship": "consumes", "interface": "Auth" },
+    { "from": "CAMService", "to": "IdentityService", "relationship": "consumes", "interface": "Auth" },
+    { "from": "ConciergeService", "to": "EventBus", "relationship": "publishes", "topics": ["resident.created", "request.created"] },
+    { "from": "ConciergeService", "to": "CAMService", "relationship": "queries", "data": "PropertyValidation" },
+    { "from": "ConciergeService", "to": "ServiceProviderService", "relationship": "dispatches", "data": "WorkOrders" },
+    { "from": "CAMService", "to": "ServiceProviderService", "relationship": "audits", "data": "Invoices" }
+  ]
+}

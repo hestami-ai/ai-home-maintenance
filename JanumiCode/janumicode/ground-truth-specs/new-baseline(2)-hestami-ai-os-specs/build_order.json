@@ -1,0 +1,28 @@
+{
+  "strategy": "Pillar-based Sequential Implementation",
+  "phases": [
+    {
+      "id": "00_KERNEL",
+      "description": "Foundational services required by all pillars",
+      "components": ["IdentityService", "EventBus", "ApiGateway"]
+    },
+    {
+      "id": "01_CONCIERGE",
+      "description": "Pillar 1: Resident experience and front-desk operations",
+      "dependencies": ["00_KERNEL"],
+      "components": ["ResidentApp", "FrontDeskPortal", "ConciergeCore"]
+    },
+    {
+      "id": "02_SERVICE_PROVIDER",
+      "description": "Pillar 2: Vendor and gig-worker marketplace",
+      "dependencies": ["01_CONCIERGE"],
+      "components": ["VendorPortal", "GigWorkerApp", "MarketplaceCore"]
+    },
+    {
+      "id": "03_CAM",
+      "description": "Pillar 3: Community Association Management and Accounting",
+      "dependencies": ["02_SERVICE_PROVIDER"],
+      "components": ["AccountingEngine", "GovernanceModule", "CAMDashboard"]
+    }
+  ]
+}

@@ -45,7 +45,8 @@
       "Bash(node -e:*)",
       "Bash(node esbuild.js:*)",
       "Bash(code:*)",
-      "Bash(if not exist \"e:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\test-workspace\" mkdir \"e:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\test-workspace\")"
+      "Bash(if not exist \"e:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\test-workspace\" mkdir \"e:\\\\Projects\\\\hestami-ai\\\\JanumiCode\\\\janumicode\\\\test-workspace\")",
+      "Bash(wc -l:*)"
     ]
   }
 }

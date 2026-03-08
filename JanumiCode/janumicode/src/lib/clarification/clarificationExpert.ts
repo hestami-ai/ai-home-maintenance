@@ -1,8 +1,9 @@
 /**
  * Clarification Expert
  * Lightweight LLM call for inline "Ask More" threads.
- * Follows the Narrative Curator's direct-API pattern —
- * fast, non-blocking, and observable via emitWorkflowCommand.
+ * Uses the Narrative Curator's direct-API pattern —
+ * fast, non-blocking. Timing info is returned to the caller
+ * for inline display rather than emitting standalone command blocks.
  */
 
 import type { Result } from '../types';
@@ -11,8 +12,6 @@ import type { LLMProvider, ProviderConfig } from '../llm/provider';
 import { MessageRole } from '../llm/provider';
 import { createProvider } from '../llm/providerFactory';
 import { getSecretKeyManager } from '../config/secretKeyManager';
-import { emitWorkflowCommand } from '../integration/eventBus';
-import { randomUUID } from 'node:crypto';
 import * as vscode from 'vscode';
 
 // ==================== SYSTEM PROMPT ====================
@@ -29,21 +28,23 @@ Keep responses under 200 words unless the human explicitly asks for more detail.
 
 // ==================== MAIN FUNCTION ====================
 
+export interface ClarificationResult {
+	content: string;
+	elapsedMs: number;
+	model: string;
+}
+
 /**
  * Ask a clarification question about a specific workflow item.
  *
- * @param dialogueId  Current dialogue (for command-block visibility)
  * @param itemContext  The original question / claim / finding text
  * @param history     Conversation turns so far (user ↔ assistant)
- * @returns The assistant's response text
+ * @returns The assistant's response text with timing metadata
  */
 export async function askClarification(
-	dialogueId: string,
 	itemContext: string,
 	history: Array<{ role: 'user' | 'assistant'; content: string }>,
-): Promise<Result<string>> {
-	const commandId = randomUUID();
-
+): Promise<Result<ClarificationResult>> {
 	const provider = await createClarificationProvider();
 	if (!provider) {
 		return {
@@ -53,20 +54,6 @@ export async function askClarification(
 	}
 
 	const model = getClarificationModel();
-
-	// Emit start command for Governed Stream visibility
-	emitWorkflowCommand({
-		dialogueId,
-		commandId,
-		action: 'start',
-		commandType: 'llm_api_call',
-		label: 'Clarification',
-		summary: 'Answering follow-up question',
-		status: 'running',
-		timestamp: new Date().toISOString(),
-		collapsed: true,
-	});
-
 	const startMs = Date.now();
 
 	// Build messages: first message is the item context, then conversation history
@@ -90,32 +77,10 @@ export async function askClarification(
 	const elapsedMs = Date.now() - startMs;
 
 	if (!result.success) {
-		emitWorkflowCommand({
-			dialogueId,
-			commandId,
-			action: 'error',
-			commandType: 'llm_api_call',
-			label: 'Clarification',
-			summary: `Failed: ${result.error.message}`,
-			status: 'error',
-			timestamp: new Date().toISOString(),
-		});
 		return { success: false, error: result.error };
 	}
 
-	emitWorkflowCommand({
-		dialogueId,
-		commandId,
-		action: 'complete',
-		commandType: 'llm_api_call',
-		label: 'Clarification',
-		summary: `Answered in ${elapsedMs}ms`,
-		status: 'success',
-		timestamp: new Date().toISOString(),
-		collapsed: true,
-	});
-
-	return { success: true, value: result.value.content };
+	return { success: true, value: { content: result.value.content, elapsedMs, model } };
 }
 
 // ==================== PROVIDER CREATION ====================
