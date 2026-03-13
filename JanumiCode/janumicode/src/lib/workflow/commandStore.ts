@@ -93,6 +93,20 @@ export function appendCommandOutput(
 			 VALUES (?, ?, ?, ?, ?)`
 		).run(commandId, lineType, toolName ?? null, content, timestamp);
 
+		// Incremental FTS indexing (best-effort, fire-and-forget)
+		if (content?.trim() && (lineType === 'summary' || lineType === 'detail' || lineType === 'error')) {
+			try {
+				const row = db.prepare(
+					'SELECT dialogue_id FROM workflow_commands WHERE command_id = ?'
+				).get(commandId) as { dialogue_id: string } | undefined;
+				if (row) {
+					const { indexContent } = require('../database/ftsSync') as typeof import('../database/ftsSync');
+					const outputId = `${commandId}:${Date.now()}`;
+					indexContent('workflow_command_outputs', outputId, row.dialogue_id, content);
+				}
+			} catch { /* FTS indexing is best-effort */ }
+		}
+
 		return { success: true, value: undefined };
 	} catch (error) {
 		return {

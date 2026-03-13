@@ -57,6 +57,29 @@ export function cleanupMCPConfigFile(filePath: string): void {
  * @param apiKey     Specialist LLM API key
  * @param model      Specialist LLM model name
  */
+/**
+ * Build an MCP config for the permission prompt server.
+ *
+ * @param serverPath  Absolute path to the bundled permissionServer.js
+ * @param port        Localhost port where the permission bridge HTTP server is listening
+ */
+export function buildPermissionMCPConfig(
+	serverPath: string,
+	port: number,
+): MCPConfigFile {
+	return {
+		mcpServers: {
+			'janumicode-permission': {
+				command: 'node',
+				args: [serverPath],
+				env: {
+					JANUMICODE_PERMISSION_PORT: String(port),
+				},
+			},
+		},
+	};
+}
+
 export function buildMobileSpecialistMCPConfig(
 	serverPath: string,
 	baseUrl: string,

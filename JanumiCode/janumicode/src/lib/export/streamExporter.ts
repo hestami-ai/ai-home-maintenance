@@ -174,6 +174,14 @@ function exportStreamItem(item: StreamItem, options: ExportOptions): string[] {
 		case 'intake_approval_gate':
 			lines.push(...exportIntakeApprovalGate(item.plan, item.dialogueId, item.timestamp, item.resolved, item.resolvedAction));
 			break;
+
+		case 'qa_exchange':
+			lines.push(
+				`> **Q:** ${escapeMd(item.question)}`,
+				`> **A:** ${escapeMd(item.answer)}`,
+				'',
+			);
+			break;
 	}
 
 	return lines;
@@ -436,22 +444,95 @@ function exportCommandBlock(
 
 	// Output (if requested and available)
 	if (options.includeCommandOutput) {
-		const outputLines = outputs.filter(o => o.line_type !== 'stdin');
-		if (outputLines.length > 0) {
+		const textLines = outputs.filter(o =>
+			o.line_type !== 'stdin' && o.line_type !== 'tool_input' && o.line_type !== 'tool_output'
+		);
+		const toolInputs = outputs.filter(o => o.line_type === 'tool_input');
+		const toolOutputs = outputs.filter(o => o.line_type === 'tool_output');
+
+		// Text output (summary/detail/error) — same as before
+		if (textLines.length > 0) {
 			lines.push(`<details>`);
-			lines.push(`<summary>Output (${outputLines.length} entries)</summary>`);
+			lines.push(`<summary>Output (${textLines.length} entries)</summary>`);
 			lines.push('');
 			lines.push('```');
-			for (const o of outputLines) {
+			for (const o of textLines) {
 				lines.push(o.content);
 			}
 			lines.push('```');
 			lines.push(`</details>`);
 			lines.push('');
 		}
+
+		// Tool calls — formatted with tool name, input, result
+		if (toolInputs.length > 0) {
+			lines.push(`<details>`);
+			lines.push(`<summary>Tool Calls (${toolInputs.length})</summary>`);
+			lines.push('');
+			for (const ti of toolInputs) {
+				lines.push(formatToolCallForExport(ti, toolOutputs));
+			}
+			lines.push(`</details>`);
+			lines.push('');
+		}
 	}
 
 	return lines;
+}
+
+/**
+ * Format a tool_input record as readable markdown with its matching result.
+ */
+function formatToolCallForExport(
+	toolInput: WorkflowCommandOutput,
+	toolOutputs: WorkflowCommandOutput[],
+): string {
+	const parsed = safeParseJSON(toolInput.content);
+	if (!parsed) {
+		return `- **Tool call**: \`${toolInput.content.substring(0, 100)}\`\n`;
+	}
+
+	const toolName = String(parsed.toolName || parsed.tool || parsed.name || 'Unknown');
+	const input = (parsed.input as Record<string, unknown>) || {};
+	const inputSummary = String(
+		input.command
+		|| input.file_path || input.path
+		|| input.pattern
+		|| JSON.stringify(input).substring(0, 120)
+	);
+
+	// Find matching tool_output by toolUseId or timestamp proximity
+	const toolUseId = parsed.id || parsed.toolUseId;
+	let matchingOutput: WorkflowCommandOutput | undefined;
+	if (toolUseId) {
+		matchingOutput = toolOutputs.find(to => {
+			const toParsed = safeParseJSON(to.content);
+			return toParsed && (toParsed.tool_use_id === toolUseId || toParsed.toolUseId === toolUseId);
+		});
+	}
+
+	let result = '';
+	if (matchingOutput) {
+		const outParsed = safeParseJSON(matchingOutput.content);
+		const status = outParsed?.status || 'completed';
+		const output = outParsed?.output || outParsed?.content || '';
+		const outputPreview = typeof output === 'string'
+			? output.substring(0, 300) + (output.length > 300 ? '...' : '')
+			: '';
+		result = `  Result: ${status}${outputPreview ? '\n  ```\n  ' + outputPreview + '\n  ```' : ''}`;
+	}
+
+	return `- **${toolName}** — \`${inputSummary}\`\n${result}\n`;
+}
+
+/** Safely parse JSON, returning null on failure. */
+function safeParseJSON(text: string): Record<string, unknown> | null {
+	try {
+		const parsed = JSON.parse(text);
+		return typeof parsed === 'object' && parsed !== null ? parsed : null;
+	} catch {
+		return null;
+	}
 }
 
 /**

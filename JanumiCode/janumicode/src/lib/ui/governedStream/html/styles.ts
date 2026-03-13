@@ -51,7 +51,7 @@ export function getStyles(): string {
 		}
 
 		.header-title {
-			font-size: 13px;
+			font-size: 15px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.5px;
@@ -59,7 +59,7 @@ export function getStyles(): string {
 		}
 
 		.session-id {
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 			cursor: pointer;
 			padding: 2px 6px;
@@ -110,7 +110,7 @@ export function getStyles(): string {
 		}
 
 		.phase-label {
-			font-size: 9px;
+			font-size: 11px;
 			color: var(--vscode-descriptionForeground);
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -149,7 +149,7 @@ export function getStyles(): string {
 			display: flex;
 			align-items: center;
 			gap: 4px;
-			font-size: 11px;
+			font-size: 13px;
 			cursor: pointer;
 		}
 
@@ -202,7 +202,7 @@ export function getStyles(): string {
 		}
 
 		.milestone-label {
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.5px;
@@ -215,7 +215,7 @@ export function getStyles(): string {
 		}
 
 		.milestone-timestamp {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			font-family: var(--vscode-editor-font-family);
 		}
@@ -240,11 +240,11 @@ export function getStyles(): string {
 		}
 
 		.dialogue-marker-icon {
-			font-size: 14px;
+			font-size: 16px;
 		}
 
 		.dialogue-marker-label {
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 700;
 			text-transform: uppercase;
 			letter-spacing: 0.5px;
@@ -252,7 +252,7 @@ export function getStyles(): string {
 		}
 
 		.dialogue-marker-id {
-			font-size: 10px;
+			font-size: 12px;
 			font-family: var(--vscode-editor-font-family);
 			color: var(--vscode-descriptionForeground);
 			padding: 1px 6px;
@@ -262,7 +262,7 @@ export function getStyles(): string {
 		}
 
 		.dialogue-marker-time {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			font-family: var(--vscode-editor-font-family);
 			margin-left: auto;
@@ -270,7 +270,7 @@ export function getStyles(): string {
 
 		.dialogue-marker-goal {
 			padding: 6px 10px;
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.5;
 			color: var(--vscode-foreground);
 			background: color-mix(in srgb, var(--vscode-charts-blue) 6%, var(--vscode-editor-background));
@@ -293,7 +293,7 @@ export function getStyles(): string {
 		}
 
 		.dialogue-end-badge {
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			padding: 2px 10px;
 			border-radius: 10px;
@@ -311,7 +311,7 @@ export function getStyles(): string {
 		}
 
 		.dialogue-end-time {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			font-family: var(--vscode-editor-font-family);
 		}
@@ -336,7 +336,7 @@ export function getStyles(): string {
 		}
 
 		.card-chevron {
-			font-size: 8px;
+			font-size: 10px;
 			width: 10px;
 			text-align: center;
 			flex-shrink: 0;
@@ -387,7 +387,7 @@ export function getStyles(): string {
 		}
 
 		.role-icon {
-			font-size: 14px;
+			font-size: 16px;
 			width: 20px;
 			text-align: center;
 		}
@@ -396,7 +396,7 @@ export function getStyles(): string {
 			display: inline-block;
 			padding: 2px 8px;
 			border-radius: 3px;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -406,13 +406,13 @@ export function getStyles(): string {
 			display: inline-block;
 			padding: 1px 6px;
 			border-radius: 2px;
-			font-size: 9px;
+			font-size: 11px;
 			background: var(--vscode-badge-background);
 			color: var(--vscode-badge-foreground);
 		}
 
 		.card-timestamp {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			font-family: var(--vscode-editor-font-family);
 		}
@@ -526,7 +526,7 @@ export function getStyles(): string {
 			align-items: flex-start;
 			gap: 6px;
 			padding: 4px 0;
-			font-size: 12px;
+			font-size: 14px;
 		}
 
 		.claim-item + .claim-item {
@@ -562,7 +562,7 @@ export function getStyles(): string {
 			display: inline-block;
 			padding: 1px 6px;
 			border-radius: 2px;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 700;
 			letter-spacing: 0.3px;
 			white-space: nowrap;
@@ -581,14 +581,14 @@ export function getStyles(): string {
 		}
 
 		.assumption-statement {
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.4;
 		}
 
 		.assumption-rationale {
 			margin-top: 4px;
 			padding-left: 2px;
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 			line-height: 1.4;
 		}
@@ -600,7 +600,7 @@ export function getStyles(): string {
 			gap: 4px;
 			padding: 2px 8px;
 			border-radius: 10px;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			white-space: nowrap;
 		}
@@ -630,6 +630,38 @@ export function getStyles(): string {
 			color: var(--vscode-charts-orange, #ff9800);
 		}
 
+		/* Historian Adjudication Badges */
+		.adjudication-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			padding: 2px 8px;
+			border-radius: 10px;
+			font-size: 12px;
+			font-weight: 600;
+			white-space: nowrap;
+		}
+
+		.adjudication-badge.consistent {
+			background: color-mix(in srgb, var(--vscode-charts-green) 15%, transparent);
+			color: var(--vscode-charts-green);
+		}
+
+		.adjudication-badge.inconsistent {
+			background: color-mix(in srgb, var(--vscode-charts-red) 15%, transparent);
+			color: var(--vscode-charts-red);
+		}
+
+		.adjudication-badge.adj-conditional {
+			background: color-mix(in srgb, var(--vscode-charts-yellow) 15%, transparent);
+			color: var(--vscode-charts-yellow);
+		}
+
+		.adjudication-badge.adj-unknown {
+			background: color-mix(in srgb, var(--vscode-widget-border) 40%, transparent);
+			color: var(--vscode-descriptionForeground);
+		}
+
 		/* ===== VERIFIER EVIDENCE LOG ===== */
 		.evidence-log {
 			margin-top: 8px;
@@ -639,7 +671,7 @@ export function getStyles(): string {
 			background: var(--vscode-textCodeBlock-background);
 			border-radius: 3px;
 			font-family: var(--vscode-editor-font-family);
-			font-size: 11px;
+			font-size: 13px;
 			line-height: 1.5;
 		}
 
@@ -661,15 +693,15 @@ export function getStyles(): string {
 			align-items: center;
 			gap: 8px;
 			font-weight: 600;
-			font-size: 13px;
+			font-size: 15px;
 		}
 
 		.gate-icon {
-			font-size: 16px;
+			font-size: 18px;
 		}
 
 		.gate-context {
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.5;
 			margin-bottom: 12px;
 			color: var(--vscode-descriptionForeground);
@@ -683,7 +715,7 @@ export function getStyles(): string {
 		}
 
 		.gate-blocking-claims h4 {
-			font-size: 11px;
+			font-size: 13px;
 			text-transform: uppercase;
 			color: var(--vscode-descriptionForeground);
 			margin-bottom: 4px;
@@ -695,7 +727,7 @@ export function getStyles(): string {
 
 		.gate-rationale label {
 			display: block;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			margin-bottom: 4px;
 			color: var(--vscode-descriptionForeground);
@@ -720,10 +752,181 @@ export function getStyles(): string {
 		}
 
 		.gate-char-count {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			text-align: right;
 			margin-top: 2px;
+		}
+
+		/* ===== GATE EVALUATION (Enriched Failure Analysis) ===== */
+
+		.gate-evaluation {
+			margin: 8px 0;
+			padding: 10px;
+			border-radius: 4px;
+			background: color-mix(in srgb, var(--vscode-editor-foreground) 4%, transparent);
+			border-left: 3px solid var(--vscode-charts-orange, #d19a66);
+		}
+
+		.gate-eval-status {
+			margin-bottom: 6px;
+		}
+
+		.gate-eval-badge {
+			display: inline-block;
+			font-size: 14px;
+			font-weight: 600;
+			padding: 2px 8px;
+			border-radius: 3px;
+		}
+
+		.gate-eval-badge.completed-with-errors {
+			background: var(--vscode-charts-yellow, #e5c07b);
+			color: #000;
+		}
+
+		.gate-eval-badge.partially-completed {
+			background: var(--vscode-charts-orange, #d19a66);
+			color: #000;
+		}
+
+		.gate-eval-badge.blocked {
+			background: var(--vscode-charts-purple, #c678dd);
+			color: #fff;
+		}
+
+		.gate-eval-badge.failed {
+			background: var(--vscode-errorForeground, #e06c75);
+			color: #fff;
+		}
+
+		.gate-eval-summary {
+			font-size: 15px;
+			margin-bottom: 8px;
+			line-height: 1.4;
+		}
+
+		.gate-eval-section h4 {
+			font-size: 13px;
+			text-transform: uppercase;
+			opacity: 0.7;
+			margin: 8px 0 4px;
+			letter-spacing: 0.5px;
+		}
+
+		.gate-eval-section ul {
+			margin: 0;
+			padding-left: 16px;
+			font-size: 14px;
+		}
+
+		.gate-eval-section li {
+			margin-bottom: 3px;
+			line-height: 1.3;
+		}
+
+		.gate-eval-recovery {
+			margin-top: 8px;
+			padding: 6px 10px;
+			border-radius: 4px;
+			background: color-mix(in srgb, var(--vscode-charts-green) 15%, transparent);
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-green) 40%, transparent);
+			font-size: 14px;
+		}
+
+		.gate-eval-recovery code {
+			background: color-mix(in srgb, var(--vscode-editor-foreground) 10%, transparent);
+			padding: 1px 4px;
+			border-radius: 2px;
+		}
+
+		/* ===== PERMISSION CARDS ===== */
+
+		.permission-card {
+			border: 1px solid var(--vscode-charts-orange);
+			border-radius: 6px;
+			margin: 8px 0;
+			padding: 12px;
+			background: color-mix(in srgb, var(--vscode-charts-orange) 6%, var(--vscode-editor-background));
+		}
+
+		.permission-header {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			font-weight: 600;
+			font-size: 15px;
+			margin-bottom: 8px;
+		}
+
+		.permission-icon {
+			font-size: 16px;
+		}
+
+		.permission-body {
+			margin-bottom: 10px;
+		}
+
+		.permission-tool-name {
+			font-family: var(--vscode-editor-font-family);
+			font-size: 15px;
+			font-weight: 600;
+			color: var(--vscode-charts-orange);
+			margin-bottom: 4px;
+		}
+
+		.permission-input {
+			font-family: var(--vscode-editor-font-family);
+			font-size: 14px;
+			opacity: 0.8;
+			white-space: pre-wrap;
+			word-break: break-all;
+			max-height: 80px;
+			overflow: hidden;
+		}
+
+		.permission-actions {
+			display: flex;
+			gap: 8px;
+			flex-wrap: wrap;
+		}
+
+		.permission-btn {
+			padding: 5px 12px;
+			border: none;
+			border-radius: 3px;
+			cursor: pointer;
+			font-size: 14px;
+			font-weight: 600;
+			font-family: var(--vscode-font-family);
+			transition: opacity 0.15s;
+		}
+		.permission-btn:hover { opacity: 0.85; }
+		.permission-btn:disabled { opacity: 0.5; cursor: default; }
+
+		.permission-approve {
+			background: var(--vscode-charts-green);
+			color: #000;
+		}
+
+		.permission-approve-all {
+			background: var(--vscode-charts-blue);
+			color: #fff;
+		}
+
+		.permission-deny {
+			background: var(--vscode-errorForeground);
+			color: #fff;
+		}
+
+		.permission-card.permission-approved {
+			border-color: var(--vscode-charts-green);
+			opacity: 0.7;
+		}
+
+		.permission-card.permission-denied {
+			border-color: var(--vscode-errorForeground);
+			opacity: 0.7;
 		}
 
 		.gate-actions {
@@ -737,7 +940,7 @@ export function getStyles(): string {
 			border: none;
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			transition: opacity 0.15s;
@@ -793,7 +996,7 @@ export function getStyles(): string {
 
 		.gate-resolved-badge {
 			display: inline-block;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			padding: 2px 8px;
 			border-radius: 3px;
@@ -816,7 +1019,7 @@ export function getStyles(): string {
 			align-items: center;
 			gap: 8px;
 			font-weight: 600;
-			font-size: 13px;
+			font-size: 15px;
 			margin-bottom: 10px;
 		}
 
@@ -834,12 +1037,12 @@ export function getStyles(): string {
 			display: flex;
 			align-items: center;
 			gap: 4px;
-			font-size: 12px;
+			font-size: 14px;
 		}
 
 		.verification-summary-count {
 			font-weight: 700;
-			font-size: 14px;
+			font-size: 16px;
 		}
 
 		.verification-claims-group {
@@ -847,7 +1050,7 @@ export function getStyles(): string {
 		}
 
 		.verification-group-header {
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			text-transform: uppercase;
 			color: var(--vscode-descriptionForeground);
@@ -872,7 +1075,7 @@ export function getStyles(): string {
 		}
 
 		.verification-claim-criticality {
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			padding: 1px 6px;
 			border-radius: 2px;
@@ -890,7 +1093,7 @@ export function getStyles(): string {
 		}
 
 		.assumption-type-badge {
-			font-size: 9px;
+			font-size: 11px;
 			font-weight: 600;
 			padding: 1px 5px;
 			border-radius: 2px;
@@ -908,7 +1111,7 @@ export function getStyles(): string {
 			margin-top: 2px;
 		}
 		.ask-more-toggle {
-			font-size: 11px;
+			font-size: 13px;
 			padding: 2px 8px;
 			background: transparent;
 			color: var(--vscode-textLink-foreground);
@@ -938,7 +1141,7 @@ export function getStyles(): string {
 			padding: 6px 10px;
 			margin-bottom: 6px;
 			border-radius: 6px;
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.4;
 			word-wrap: break-word;
 		}
@@ -958,7 +1161,7 @@ export function getStyles(): string {
 		}
 		.clarification-meta {
 			margin-top: 4px;
-			font-size: 10px;
+			font-size: 12px;
 			opacity: 0.5;
 			text-align: right;
 		}
@@ -969,7 +1172,7 @@ export function getStyles(): string {
 		/* Send button shown in Ask More mode (replaces charcount) */
 		.clarification-send-btn {
 			padding: 4px 10px;
-			font-size: 11px;
+			font-size: 13px;
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground);
 			border: none;
@@ -986,12 +1189,12 @@ export function getStyles(): string {
 		}
 
 		.verification-claim-statement {
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.4;
 		}
 
 		.verification-claim-rationale {
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 			margin-top: 4px;
 			padding-left: 8px;
@@ -1007,7 +1210,7 @@ export function getStyles(): string {
 			width: 100%;
 			min-height: 40px;
 			padding: 6px 8px;
-			font-size: 11px;
+			font-size: 13px;
 			background: var(--vscode-input-background);
 			color: var(--vscode-input-foreground);
 			border: 1px solid var(--vscode-input-border);
@@ -1024,13 +1227,13 @@ export function getStyles(): string {
 
 		.verification-claim-response label {
 			display: block;
-			font-size: 10px;
+			font-size: 12px;
 			margin-bottom: 3px;
 			color: var(--vscode-descriptionForeground);
 		}
 
 		.verification-claim-charcount {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			margin-top: 2px;
 			text-align: right;
@@ -1041,7 +1244,7 @@ export function getStyles(): string {
 		}
 
 		.verification-nonblocking-toggle {
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 			cursor: pointer;
 			display: flex;
@@ -1068,7 +1271,7 @@ export function getStyles(): string {
 		}
 
 		.verification-nonblocking-chevron {
-			font-size: 10px;
+			font-size: 12px;
 			transition: transform 0.15s;
 		}
 
@@ -1086,7 +1289,7 @@ export function getStyles(): string {
 			border: none;
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			transition: opacity 0.15s;
@@ -1132,12 +1335,12 @@ export function getStyles(): string {
 			gap: 8px;
 			margin-bottom: 4px;
 			font-weight: 600;
-			font-size: 14px;
+			font-size: 16px;
 		}
 
 		.review-gate-subtitle {
 			color: var(--vscode-descriptionForeground);
-			font-size: 12px;
+			font-size: 14px;
 			margin-bottom: 12px;
 		}
 
@@ -1149,7 +1352,7 @@ export function getStyles(): string {
 			background: color-mix(in srgb, var(--vscode-editor-foreground) 5%, var(--vscode-editor-background));
 			border-radius: 4px;
 			margin-bottom: 12px;
-			font-size: 12px;
+			font-size: 14px;
 		}
 
 		.review-dashboard-item {
@@ -1176,12 +1379,12 @@ export function getStyles(): string {
 			align-items: center;
 			gap: 8px;
 			font-weight: 600;
-			font-size: 12px;
+			font-size: 14px;
 			user-select: none;
 		}
 
 		.review-group-header .card-chevron {
-			font-size: 10px;
+			font-size: 12px;
 			transition: transform 0.15s;
 		}
 
@@ -1222,23 +1425,99 @@ export function getStyles(): string {
 		}
 
 		.review-item-statement {
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.4;
 		}
 
 		.review-item-rationale {
 			font-style: italic;
 			color: var(--vscode-descriptionForeground);
-			font-size: 11px;
+			font-size: 13px;
 			margin: 4px 0 4px 24px;
 			padding-left: 8px;
 			border-left: 2px solid var(--vscode-editorWidget-border);
 		}
 
+		/* Historian Adjudication Details (below Verifier rationale) */
+		.review-item-adjudication {
+			margin: 6px 0 4px 24px;
+			padding: 6px 10px;
+			background: color-mix(in srgb, var(--vscode-textCodeBlock-background) 60%, transparent);
+			border-radius: 4px;
+			border-left: 2px solid var(--vscode-descriptionForeground);
+		}
+
+		.adjudication-rationale {
+			font-style: italic;
+			color: var(--vscode-descriptionForeground);
+			font-size: 13px;
+			line-height: 1.4;
+			margin-bottom: 4px;
+		}
+
+		.adjudication-citations {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 4px;
+			margin-top: 4px;
+		}
+
+		.citation-tag {
+			display: inline-block;
+			padding: 1px 6px;
+			border-radius: 8px;
+			font-family: var(--vscode-editor-font-family);
+			font-size: 11px;
+			background: var(--vscode-badge-background);
+			color: var(--vscode-badge-foreground);
+			white-space: nowrap;
+		}
+
+		.adjudication-conflicts,
+		.adjudication-conditions,
+		.adjudication-queries {
+			margin-top: 6px;
+			font-size: 13px;
+			line-height: 1.4;
+		}
+
+		.adjudication-conflicts {
+			color: var(--vscode-charts-red);
+		}
+
+		.adjudication-conditions {
+			color: var(--vscode-charts-yellow);
+		}
+
+		.adjudication-queries {
+			color: var(--vscode-descriptionForeground);
+		}
+
+		.adjudication-conflicts strong,
+		.adjudication-conditions strong,
+		.adjudication-queries strong {
+			font-size: 12px;
+			text-transform: uppercase;
+			letter-spacing: 0.3px;
+		}
+
+		.adjudication-conflicts ul,
+		.adjudication-conditions ul,
+		.adjudication-queries ul {
+			margin: 2px 0 0 0;
+			padding-left: 18px;
+		}
+
+		.adjudication-conflicts li,
+		.adjudication-conditions li,
+		.adjudication-queries li {
+			margin-bottom: 2px;
+		}
+
 		.review-finding-context {
 			font-style: italic;
 			color: var(--vscode-descriptionForeground);
-			font-size: 11px;
+			font-size: 13px;
 			margin: 4px 0 4px 24px;
 		}
 
@@ -1254,14 +1533,14 @@ export function getStyles(): string {
 			background: var(--vscode-input-background);
 			color: var(--vscode-input-foreground);
 			font-family: var(--vscode-font-family);
-			font-size: 12px;
+			font-size: 14px;
 			border-radius: 3px;
 			resize: vertical;
 			box-sizing: border-box;
 		}
 
 		.review-item-charcount {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			text-align: right;
 			margin-top: 2px;
@@ -1275,7 +1554,7 @@ export function getStyles(): string {
 
 		.review-overall-section label {
 			display: block;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			margin-bottom: 4px;
 		}
@@ -1288,7 +1567,7 @@ export function getStyles(): string {
 			background: var(--vscode-input-background);
 			color: var(--vscode-input-foreground);
 			font-family: var(--vscode-font-family);
-			font-size: 12px;
+			font-size: 14px;
 			border-radius: 3px;
 			resize: vertical;
 			box-sizing: border-box;
@@ -1308,7 +1587,7 @@ export function getStyles(): string {
 			border: none;
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			transition: opacity 0.15s;
@@ -1346,7 +1625,7 @@ export function getStyles(): string {
 			gap: 8px;
 			padding: 8px 12px;
 			border-radius: 4px;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 		}
 
@@ -1366,7 +1645,7 @@ export function getStyles(): string {
 
 		.review-resolved-timestamp {
 			font-weight: 400;
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 		}
 
@@ -1380,14 +1659,14 @@ export function getStyles(): string {
 
 		.review-resolved-rationale label {
 			display: block;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			margin-bottom: 4px;
 			color: var(--vscode-descriptionForeground);
 		}
 
 		.review-resolved-rationale-text {
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.5;
 			white-space: pre-wrap;
 		}
@@ -1417,7 +1696,7 @@ export function getStyles(): string {
 			align-items: center;
 			gap: 6px;
 			font-weight: 600;
-			font-size: 12px;
+			font-size: 14px;
 			margin-bottom: 6px;
 		}
 
@@ -1434,7 +1713,7 @@ export function getStyles(): string {
 			color: var(--vscode-input-foreground);
 			border-radius: 4px;
 			font-family: var(--vscode-font-family);
-			font-size: 12px;
+			font-size: 14px;
 			resize: vertical;
 			box-sizing: border-box;
 		}
@@ -1458,7 +1737,7 @@ export function getStyles(): string {
 			border-top: 1px solid var(--vscode-editorWidget-border);
 		}
 		.intake-questions-submit-count {
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 		}
 		.intake-questions-submit-btn {
@@ -1468,7 +1747,7 @@ export function getStyles(): string {
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground);
 			cursor: pointer;
-			font-size: 12px;
+			font-size: 14px;
 		}
 		.intake-questions-submit-btn:hover {
 			background: var(--vscode-button-hoverBackground);
@@ -1476,6 +1755,16 @@ export function getStyles(): string {
 		.intake-questions-submit-btn:disabled {
 			opacity: 0.5;
 			cursor: not-allowed;
+		}
+		.intake-question-textarea.submitted {
+			opacity: 0.7;
+			cursor: default;
+			border-color: transparent;
+			background: color-mix(in srgb, var(--vscode-input-background) 50%, transparent);
+			resize: none;
+		}
+		.intake-questions-submit-bar.submitted {
+			opacity: 0.7;
 		}
 
 		/* ===== ZONE 3: CONTEXTUAL INPUT AREA ===== */
@@ -1502,7 +1791,7 @@ export function getStyles(): string {
 			color: var(--vscode-button-background);
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 11px;
+			font-size: 13px;
 			font-family: var(--vscode-font-family);
 			transition: all 0.15s;
 		}
@@ -1536,7 +1825,7 @@ export function getStyles(): string {
 		}
 
 		.composer-tokens-label {
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -1553,7 +1842,7 @@ export function getStyles(): string {
 			border: 1px solid var(--vscode-charts-blue);
 			color: var(--vscode-charts-blue);
 			border-radius: 10px;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			font-family: var(--vscode-editor-font-family);
 			max-width: 180px;
@@ -1616,16 +1905,21 @@ export function getStyles(): string {
 		}
 
 		.input-submit-btn {
-			padding: 8px 16px;
+			width: 32px;
+			height: 32px;
+			padding: 0;
+			display: flex;
+			align-items: center;
+			justify-content: center;
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground);
 			border: none;
-			border-radius: 3px;
+			border-radius: 50%;
 			cursor: pointer;
-			font-size: 12px;
-			font-weight: 600;
-			font-family: var(--vscode-font-family);
-			white-space: nowrap;
+			font-size: 18px;
+			font-weight: 700;
+			transition: background 0.15s;
+			flex-shrink: 0;
 		}
 
 		.input-submit-btn:hover {
@@ -1633,8 +1927,38 @@ export function getStyles(): string {
 		}
 
 		.input-submit-btn:disabled {
-			opacity: 0.4;
+			opacity: 0.3;
 			cursor: not-allowed;
+		}
+
+		.input-submit-btn.thinking {
+			background: var(--vscode-inputValidation-warningBorder, #c57a1a);
+		}
+
+		.input-submit-btn.thinking:hover {
+			background: var(--vscode-errorForeground, #f44747);
+		}
+
+		.submit-icon {
+			line-height: 1;
+		}
+
+		.submit-spinner {
+			display: none;
+			width: 14px;
+			height: 14px;
+			border: 2px solid rgba(255,255,255,0.3);
+			border-top-color: var(--vscode-button-foreground);
+			border-radius: 50%;
+			animation: processingSpinnerRotate 0.8s linear infinite;
+		}
+
+		.input-submit-btn.thinking .submit-icon {
+			display: none;
+		}
+
+		.input-submit-btn.thinking .submit-spinner {
+			display: block;
 		}
 
 		/* --- Input Toolbar (inside composer footer) --- */
@@ -1652,7 +1976,7 @@ export function getStyles(): string {
 			border: 1px solid var(--vscode-widget-border);
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 11px;
+			font-size: 13px;
 			font-family: var(--vscode-font-family);
 			transition: all 0.15s;
 			flex-shrink: 0;
@@ -1665,7 +1989,7 @@ export function getStyles(): string {
 		}
 
 		.input-toolbar-hint {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			margin-left: auto;
 			opacity: 0.6;
@@ -1675,7 +1999,7 @@ export function getStyles(): string {
 		.input-toolbar-hint kbd {
 			display: inline-block;
 			padding: 0 4px;
-			font-size: 10px;
+			font-size: 12px;
 			font-family: var(--vscode-editor-font-family, monospace);
 			background: var(--vscode-keybindingLabel-background, rgba(128,128,128,0.17));
 			border: 1px solid var(--vscode-keybindingLabel-border, rgba(128,128,128,0.3));
@@ -1699,7 +2023,7 @@ export function getStyles(): string {
 			background: var(--vscode-badge-background);
 			color: var(--vscode-badge-foreground);
 			border-radius: 10px;
-			font-size: 11px;
+			font-size: 13px;
 			max-width: 260px;
 			white-space: nowrap;
 			transition: opacity 0.15s;
@@ -1710,14 +2034,14 @@ export function getStyles(): string {
 		}
 
 		.attachment-chip .chip-icon {
-			font-size: 12px;
+			font-size: 14px;
 			flex-shrink: 0;
 		}
 
 		.attachment-chip .chip-folder {
 			color: var(--vscode-badge-foreground);
 			opacity: 0.6;
-			font-size: 10px;
+			font-size: 12px;
 			overflow: hidden;
 			text-overflow: ellipsis;
 		}
@@ -1731,7 +2055,7 @@ export function getStyles(): string {
 		.attachment-chip .remove-attachment {
 			cursor: pointer;
 			opacity: 0.6;
-			font-size: 14px;
+			font-size: 16px;
 			line-height: 1;
 			margin-left: 2px;
 			flex-shrink: 0;
@@ -1764,7 +2088,7 @@ export function getStyles(): string {
 
 		.mention-group-header {
 			padding: 4px 10px 2px;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			color: var(--vscode-descriptionForeground);
 			text-transform: uppercase;
@@ -1780,7 +2104,7 @@ export function getStyles(): string {
 		.mention-item {
 			padding: 5px 10px;
 			cursor: pointer;
-			font-size: 12px;
+			font-size: 14px;
 			display: flex;
 			align-items: center;
 			gap: 6px;
@@ -1793,7 +2117,7 @@ export function getStyles(): string {
 
 		.mention-item-icon {
 			flex-shrink: 0;
-			font-size: 13px;
+			font-size: 15px;
 			width: 18px;
 			text-align: center;
 		}
@@ -1810,7 +2134,7 @@ export function getStyles(): string {
 		}
 
 		.mention-recent-badge {
-			font-size: 9px;
+			font-size: 11px;
 			padding: 0 4px;
 			border-radius: 3px;
 			background: var(--vscode-badge-background);
@@ -1838,13 +2162,13 @@ export function getStyles(): string {
 		}
 
 		.empty-state h3 {
-			font-size: 14px;
+			font-size: 16px;
 			margin-bottom: 6px;
 			color: var(--vscode-foreground);
 		}
 
 		.empty-state p {
-			font-size: 12px;
+			font-size: 14px;
 		}
 
 		/* ===== SCROLLBAR STYLING ===== */
@@ -1903,7 +2227,7 @@ export function getStyles(): string {
 		}
 
 		.settings-title {
-			font-size: 14px;
+			font-size: 16px;
 			font-weight: 600;
 			color: var(--vscode-foreground);
 			margin: 0;
@@ -1913,7 +2237,7 @@ export function getStyles(): string {
 			background: none;
 			border: none;
 			color: var(--vscode-foreground);
-			font-size: 18px;
+			font-size: 20px;
 			cursor: pointer;
 			padding: 2px 6px;
 			border-radius: 3px;
@@ -1925,7 +2249,7 @@ export function getStyles(): string {
 		}
 
 		.settings-description {
-			font-size: 12px;
+			font-size: 14px;
 			color: var(--vscode-descriptionForeground);
 			margin-bottom: 16px;
 			line-height: 1.5;
@@ -1941,7 +2265,7 @@ export function getStyles(): string {
 			text-align: center;
 			padding: 20px;
 			color: var(--vscode-descriptionForeground);
-			font-size: 12px;
+			font-size: 14px;
 		}
 
 		.settings-role-row {
@@ -1960,14 +2284,14 @@ export function getStyles(): string {
 		}
 
 		.settings-role-name {
-			font-size: 13px;
+			font-size: 15px;
 			font-weight: 600;
 			color: var(--vscode-foreground);
 			margin-bottom: 2px;
 		}
 
 		.settings-role-provider {
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 		}
 
@@ -1975,7 +2299,7 @@ export function getStyles(): string {
 			display: flex;
 			align-items: center;
 			gap: 4px;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			white-space: nowrap;
 			flex-shrink: 0;
@@ -2000,7 +2324,7 @@ export function getStyles(): string {
 			border: none;
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			transition: opacity 0.15s;
@@ -2036,7 +2360,7 @@ export function getStyles(): string {
 		}
 
 		.settings-hint {
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 			line-height: 1.5;
 		}
@@ -2052,7 +2376,7 @@ export function getStyles(): string {
 
 		.settings-section-title {
 			margin: 0 0 6px 0;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			color: var(--vscode-foreground);
 		}
@@ -2078,7 +2402,7 @@ export function getStyles(): string {
 			background: var(--vscode-welcomePage-tileBackground, var(--vscode-sideBar-background));
 			border: 1px solid var(--vscode-widget-border);
 			border-radius: 6px;
-			font-size: 12px;
+			font-size: 14px;
 			color: var(--vscode-descriptionForeground);
 			animation: processingFadeIn 0.2s ease-out;
 		}
@@ -2105,8 +2429,26 @@ export function getStyles(): string {
 
 		.processing-detail {
 			margin-top: 2px;
-			font-size: 11px;
+			font-size: 13px;
 			opacity: 0.8;
+		}
+
+		.cancel-btn {
+			flex-shrink: 0;
+			padding: 3px 10px;
+			font-size: 13px;
+			border: 1px solid var(--vscode-button-secondaryBorder, var(--vscode-widget-border));
+			border-radius: 3px;
+			background: transparent;
+			color: var(--vscode-descriptionForeground);
+			cursor: pointer;
+			opacity: 0.7;
+		}
+		.cancel-btn:hover {
+			opacity: 1;
+			background: color-mix(in srgb, var(--vscode-errorForeground) 15%, transparent);
+			color: var(--vscode-errorForeground);
+			border-color: var(--vscode-errorForeground);
 		}
 
 		.processing-dots::after {
@@ -2139,7 +2481,7 @@ export function getStyles(): string {
 			border-radius: 4px;
 			overflow: hidden;
 			font-family: var(--vscode-editor-font-family, monospace);
-			font-size: 11px;
+			font-size: 13px;
 			animation: processingFadeIn 0.2s ease-out;
 		}
 
@@ -2171,7 +2513,7 @@ export function getStyles(): string {
 		}
 
 		.command-block-chevron {
-			font-size: 10px;
+			font-size: 12px;
 			width: 14px;
 			text-align: center;
 			flex-shrink: 0;
@@ -2184,7 +2526,7 @@ export function getStyles(): string {
 		}
 
 		.command-block-icon {
-			font-size: 12px;
+			font-size: 14px;
 			flex-shrink: 0;
 			width: 16px;
 			text-align: center;
@@ -2197,11 +2539,11 @@ export function getStyles(): string {
 			text-overflow: ellipsis;
 			white-space: nowrap;
 			font-weight: 600;
-			font-size: 11px;
+			font-size: 13px;
 		}
 
 		.command-block-type {
-			font-size: 9px;
+			font-size: 11px;
 			padding: 1px 5px;
 			border-radius: 3px;
 			background: var(--vscode-badge-background);
@@ -2212,7 +2554,7 @@ export function getStyles(): string {
 		}
 
 		.command-block-status {
-			font-size: 10px;
+			font-size: 12px;
 			flex-shrink: 0;
 		}
 
@@ -2239,7 +2581,7 @@ export function getStyles(): string {
 		}
 
 		.command-block-time {
-			font-size: 9px;
+			font-size: 11px;
 			color: var(--vscode-descriptionForeground);
 			flex-shrink: 0;
 		}
@@ -2262,7 +2604,7 @@ export function getStyles(): string {
 			word-break: break-all;
 			line-height: 1.5;
 			color: var(--vscode-foreground);
-			font-size: 11px;
+			font-size: 13px;
 		}
 
 		.command-block-output .cmd-line {
@@ -2276,7 +2618,7 @@ export function getStyles(): string {
 
 		.command-block-output .cmd-line.detail {
 			color: var(--vscode-descriptionForeground);
-			font-size: 10px;
+			font-size: 12px;
 		}
 
 		.command-block-output .cmd-line.error {
@@ -2299,7 +2641,7 @@ export function getStyles(): string {
 			padding: 2px 10px;
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 10px;
+			font-size: 12px;
 			font-family: var(--vscode-font-family);
 		}
 
@@ -2337,7 +2679,7 @@ export function getStyles(): string {
 			border: none;
 			border-radius: 3px;
 			cursor: pointer;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			transition: background 0.15s;
@@ -2369,7 +2711,7 @@ export function getStyles(): string {
 			background: color-mix(in srgb, var(--vscode-textCodeBlock-background) 60%, var(--vscode-editor-background));
 			cursor: pointer;
 			user-select: none;
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 		}
 
@@ -2379,7 +2721,7 @@ export function getStyles(): string {
 		}
 
 		.cmd-stdin-chevron {
-			font-size: 8px;
+			font-size: 10px;
 			width: 10px;
 			text-align: center;
 			flex-shrink: 0;
@@ -2400,7 +2742,7 @@ export function getStyles(): string {
 		}
 
 		.cmd-stdin-size {
-			font-size: 9px;
+			font-size: 11px;
 			opacity: 0.7;
 			flex-shrink: 0;
 		}
@@ -2420,7 +2762,7 @@ export function getStyles(): string {
 			margin: 0;
 			padding: 8px 10px;
 			font-family: var(--vscode-editor-font-family, monospace);
-			font-size: 10px;
+			font-size: 12px;
 			line-height: 1.4;
 			white-space: pre-wrap;
 			word-break: break-all;
@@ -2450,7 +2792,7 @@ export function getStyles(): string {
 			border-radius: 4px;
 			border-left: 3px solid var(--vscode-widget-border);
 			font-family: var(--vscode-editor-font-family, monospace);
-			font-size: 11px;
+			font-size: 13px;
 		}
 
 		.tool-call-header {
@@ -2487,13 +2829,13 @@ export function getStyles(): string {
 
 		.tool-call-name {
 			font-weight: 700;
-			font-size: 12px;
+			font-size: 14px;
 			color: var(--vscode-foreground);
 		}
 
 		.tool-call-time {
 			margin-left: auto;
-			font-size: 9px;
+			font-size: 11px;
 			color: var(--vscode-descriptionForeground);
 		}
 
@@ -2507,7 +2849,7 @@ export function getStyles(): string {
 
 		.tool-card-label {
 			display: inline-block;
-			font-size: 9px;
+			font-size: 11px;
 			font-weight: 700;
 			text-transform: uppercase;
 			letter-spacing: 0.5px;
@@ -2537,13 +2879,13 @@ export function getStyles(): string {
 
 		.tool-card-output-small {
 			max-height: 80px;
-			font-size: 10px;
+			font-size: 12px;
 		}
 
 		.tool-card-inline {
 			padding: 2px 0;
 			color: var(--vscode-foreground);
-			font-size: 11px;
+			font-size: 13px;
 		}
 
 		.tool-card-inline code {
@@ -2557,7 +2899,7 @@ export function getStyles(): string {
 			background: color-mix(in srgb, #000 20%, var(--vscode-editor-background));
 			border-radius: 3px;
 			white-space: pre-wrap;
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			max-height: 120px;
 			overflow-y: auto;
@@ -2594,7 +2936,7 @@ export function getStyles(): string {
 			align-items: center;
 			gap: 6px;
 			margin-bottom: 6px;
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 		}
 
@@ -2615,7 +2957,7 @@ export function getStyles(): string {
 		.intake-message {
 			padding: 10px 12px;
 			border-radius: 6px;
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.6;
 			word-wrap: break-word;
 			white-space: normal;
@@ -2627,7 +2969,7 @@ export function getStyles(): string {
 
 		.intake-message-role {
 			display: block;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -2659,12 +3001,12 @@ export function getStyles(): string {
 			padding: 8px 10px;
 			background: var(--vscode-textCodeBlock-background);
 			border-radius: 4px;
-			font-size: 11px;
+			font-size: 13px;
 		}
 
 		.intake-suggestions-label,
 		.intake-findings-label {
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -2705,7 +3047,7 @@ export function getStyles(): string {
 
 		.intake-findings li {
 			font-family: var(--vscode-editor-font-family);
-			font-size: 11px;
+			font-size: 13px;
 		}
 
 		/* --- Intake Plan Preview Card --- */
@@ -2739,14 +3081,14 @@ export function getStyles(): string {
 		}
 
 		.intake-plan-icon {
-			font-size: 14px;
+			font-size: 16px;
 			flex-shrink: 0;
 		}
 
 		.intake-plan-title {
 			flex: 1;
 			min-width: 0;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			overflow: hidden;
 			text-overflow: ellipsis;
@@ -2754,7 +3096,7 @@ export function getStyles(): string {
 		}
 
 		.intake-plan-version {
-			font-size: 9px;
+			font-size: 11px;
 			padding: 1px 6px;
 			border-radius: 10px;
 			font-weight: 600;
@@ -2773,7 +3115,7 @@ export function getStyles(): string {
 		}
 
 		.intake-plan-chevron {
-			font-size: 10px;
+			font-size: 12px;
 			width: 14px;
 			text-align: center;
 			flex-shrink: 0;
@@ -2797,7 +3139,7 @@ export function getStyles(): string {
 		}
 
 		.intake-plan-summary {
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.6;
 			margin-bottom: 12px;
 			color: var(--vscode-foreground);
@@ -2812,7 +3154,7 @@ export function getStyles(): string {
 		}
 
 		.intake-plan-section-title {
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -2830,13 +3172,13 @@ export function getStyles(): string {
 
 		.intake-plan-section li {
 			padding: 2px 0;
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.5;
 		}
 
 		.intake-plan-section .plan-item-type {
 			display: inline-block;
-			font-size: 9px;
+			font-size: 11px;
 			padding: 0 4px;
 			border-radius: 2px;
 			margin-right: 4px;
@@ -2850,7 +3192,7 @@ export function getStyles(): string {
 			padding: 8px 10px;
 			background: var(--vscode-textCodeBlock-background);
 			border-radius: 4px;
-			font-size: 12px;
+			font-size: 14px;
 			line-height: 1.6;
 			white-space: pre-wrap;
 		}
@@ -2860,7 +3202,7 @@ export function getStyles(): string {
 			background: var(--vscode-textCodeBlock-background);
 			border-radius: 4px;
 			font-family: var(--vscode-editor-font-family);
-			font-size: 11px;
+			font-size: 13px;
 			line-height: 1.5;
 		}
 
@@ -2883,16 +3225,16 @@ export function getStyles(): string {
 			align-items: center;
 			gap: 8px;
 			margin-bottom: 10px;
-			font-size: 13px;
+			font-size: 15px;
 			font-weight: 600;
 		}
 
 		.intake-approval-header .gate-icon {
-			font-size: 18px;
+			font-size: 20px;
 		}
 
 		.intake-approval-description {
-			font-size: 12px;
+			font-size: 14px;
 			color: var(--vscode-descriptionForeground);
 			line-height: 1.5;
 			margin-bottom: 14px;
@@ -2906,7 +3248,7 @@ export function getStyles(): string {
 
 		.intake-approval-actions .gate-btn {
 			padding: 8px 18px;
-			font-size: 12px;
+			font-size: 14px;
 		}
 
 		.intake-approval-actions .gate-btn.approve {
@@ -2934,7 +3276,7 @@ export function getStyles(): string {
 
 		.intake-finalize-hint {
 			flex: 1;
-			font-size: 11px;
+			font-size: 13px;
 			color: var(--vscode-descriptionForeground);
 			line-height: 1.4;
 		}
@@ -2946,7 +3288,7 @@ export function getStyles(): string {
 			border: none;
 			border-radius: 4px;
 			cursor: pointer;
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			white-space: nowrap;
@@ -2974,7 +3316,7 @@ export function getStyles(): string {
 		/* --- Resume Button (in dialogue end marker) --- */
 		.resume-btn {
 			padding: 3px 12px;
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			font-family: var(--vscode-font-family);
 			background: var(--vscode-button-background);
@@ -2992,7 +3334,7 @@ export function getStyles(): string {
 
 		/* --- Dialogue Marker Title (clickable) --- */
 		.dialogue-marker-title {
-			font-size: 12px;
+			font-size: 14px;
 			font-weight: 700;
 			color: var(--vscode-charts-blue);
 			cursor: pointer;
@@ -3017,7 +3359,7 @@ export function getStyles(): string {
 			gap: 4px;
 			max-width: 200px;
 			padding: 3px 8px;
-			font-size: 11px;
+			font-size: 13px;
 			font-family: var(--vscode-font-family);
 			background: transparent;
 			color: var(--vscode-descriptionForeground);
@@ -3062,7 +3404,7 @@ export function getStyles(): string {
 			gap: 8px;
 			padding: 6px 10px;
 			cursor: pointer;
-			font-size: 11px;
+			font-size: 13px;
 			transition: background 0.1s;
 		}
 
@@ -3075,7 +3417,7 @@ export function getStyles(): string {
 		}
 
 		.switcher-status {
-			font-size: 10px;
+			font-size: 12px;
 			flex-shrink: 0;
 			width: 16px;
 			text-align: center;
@@ -3091,7 +3433,7 @@ export function getStyles(): string {
 		}
 
 		.switcher-phase {
-			font-size: 9px;
+			font-size: 11px;
 			padding: 1px 5px;
 			border-radius: 3px;
 			background: var(--vscode-badge-background);
@@ -3132,7 +3474,7 @@ export function getStyles(): string {
 			gap: 6px;
 			padding: 2px 10px;
 			border-radius: 10px;
-			font-size: 11px;
+			font-size: 13px;
 			font-weight: 600;
 			white-space: nowrap;
 		}
@@ -3143,7 +3485,7 @@ export function getStyles(): string {
 
 		.hfs-unit {
 			font-weight: 400;
-			font-size: 10px;
+			font-size: 12px;
 			opacity: 0.85;
 			max-width: 120px;
 			overflow: hidden;
@@ -3214,7 +3556,7 @@ export function getStyles(): string {
 		}
 
 		.task-graph-progress-label {
-			font-size: 10px;
+			font-size: 12px;
 			font-weight: 600;
 			text-transform: uppercase;
 			letter-spacing: 0.3px;
@@ -3222,7 +3564,7 @@ export function getStyles(): string {
 		}
 
 		.task-graph-progress-count {
-			font-size: 10px;
+			font-size: 12px;
 			color: var(--vscode-descriptionForeground);
 			font-family: var(--vscode-editor-font-family);
 		}
@@ -3265,7 +3607,7 @@ export function getStyles(): string {
 			gap: 6px;
 			padding: 8px 12px;
 			margin: 6px 0;
-			font-size: 12px;
+			font-size: 14px;
 			color: var(--vscode-descriptionForeground);
 			background: var(--vscode-editor-inactiveSelectionBackground, color-mix(in srgb, var(--vscode-foreground) 5%, transparent));
 			border-radius: 4px;
@@ -3274,7 +3616,147 @@ export function getStyles(): string {
 
 		.system-message-icon {
 			flex-shrink: 0;
+			font-size: 15px;
+		}
+
+		.system-message-body {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.system-message-body .md-p {
+			margin: 2px 0;
+		}
+
+		.system-message-body ul,
+		.system-message-body ol {
+			margin: 4px 0;
+			padding-left: 20px;
+		}
+
+		.system-message-body li {
+			margin: 2px 0;
+		}
+
+		.system-message-body code {
+			background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06));
+			padding: 1px 4px;
+			border-radius: 3px;
+			font-family: var(--vscode-editor-font-family);
 			font-size: 13px;
+		}
+
+		/* ===== Q&A Exchange Card ===== */
+		.qa-exchange-card {
+			margin: 6px 0;
+			border-radius: 6px;
+			border: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.08));
+			background: var(--vscode-welcomePage-tileBackground, var(--vscode-sideBar-background));
+			overflow: hidden;
+		}
+
+		.qa-exchange-question {
+			display: flex;
+			align-items: flex-start;
+			gap: 8px;
+			padding: 8px 12px;
+			background: color-mix(in srgb, var(--vscode-button-background) 10%, transparent);
+			border-bottom: 1px solid var(--vscode-widget-border, rgba(255,255,255,0.06));
+		}
+
+		.qa-exchange-question-text {
+			flex: 1;
+			font-size: 14px;
+			font-weight: 600;
+			color: var(--vscode-foreground);
+			min-width: 0;
+		}
+
+		.qa-exchange-answer {
+			display: flex;
+			align-items: flex-start;
+			gap: 8px;
+			padding: 8px 12px;
+		}
+
+		.qa-exchange-answer-body {
+			flex: 1;
+			font-size: 14px;
+			color: var(--vscode-descriptionForeground);
+			min-width: 0;
+		}
+
+		.qa-exchange-answer-body .md-p {
+			margin: 2px 0;
+		}
+
+		.qa-exchange-answer-body ul,
+		.qa-exchange-answer-body ol {
+			margin: 4px 0;
+			padding-left: 20px;
+		}
+
+		.qa-exchange-answer-body li {
+			margin: 2px 0;
+		}
+
+		.qa-exchange-answer-body code {
+			background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06));
+			padding: 1px 4px;
+			border-radius: 3px;
+			font-family: var(--vscode-editor-font-family);
+			font-size: 13px;
+		}
+
+		.qa-exchange-icon {
+			flex-shrink: 0;
+			font-size: 15px;
+			line-height: 1.4;
+		}
+
+		.qa-exchange-time {
+			flex-shrink: 0;
+			font-size: 12px;
+			color: var(--vscode-descriptionForeground);
+			opacity: 0.7;
+		}
+
+		/* ===== Q&A Thinking Card (Streaming Progress) ===== */
+		.qa-exchange-card.qa-thinking {
+			border-left: 3px solid var(--vscode-charts-blue);
+		}
+
+		.qa-thinking-spinner {
+			display: inline-block;
+			width: 12px;
+			height: 12px;
+			border: 1.5px solid var(--vscode-widget-border);
+			border-top-color: var(--vscode-charts-blue);
+			border-radius: 50%;
+			animation: processingSpinnerRotate 0.8s linear infinite;
+		}
+
+		.qa-thinking-body {
+			min-height: 20px;
+			padding: 2px 0;
+		}
+
+		.qa-thinking-step {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			padding: 2px 0;
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			animation: processingFadeIn 0.2s ease-out;
+		}
+
+		.qa-thinking-step-dot {
+			width: 5px;
+			height: 5px;
+			border-radius: 50%;
+			background: var(--vscode-charts-blue);
+			flex-shrink: 0;
 		}
 
 		/* ===== TEXT COMMAND: Option Chips ===== */
@@ -3287,7 +3769,7 @@ export function getStyles(): string {
 		}
 
 		.command-options-prompt {
-			font-size: 12px;
+			font-size: 14px;
 			color: var(--vscode-foreground);
 			margin-bottom: 8px;
 			font-weight: 600;
@@ -3301,7 +3783,7 @@ export function getStyles(): string {
 
 		.command-option-chip {
 			padding: 6px 14px;
-			font-size: 12px;
+			font-size: 14px;
 			border: 1px solid var(--vscode-button-border, var(--vscode-focusBorder));
 			background: var(--vscode-button-secondaryBackground);
 			color: var(--vscode-button-secondaryForeground);
@@ -3325,6 +3807,825 @@ export function getStyles(): string {
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground);
 			opacity: 0.85;
+		}
+
+		/* ===== SPEECH-TO-TEXT MIC BUTTON ===== */
+		.mic-btn {
+			position: relative;
+			width: 24px;
+			height: 24px;
+			padding: 0;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: transparent;
+			color: var(--vscode-descriptionForeground);
+			border: 1px solid var(--vscode-widget-border);
+			border-radius: 50%;
+			cursor: pointer;
+			font-size: 14px;
+			transition: all 0.2s;
+			flex-shrink: 0;
+		}
+
+		.mic-btn:hover:not(:disabled) {
+			background: var(--vscode-toolbar-hoverBackground, rgba(90,93,94,0.31));
+			color: var(--vscode-foreground);
+			border-color: var(--vscode-focusBorder);
+		}
+
+		.mic-btn .mic-icon {
+			line-height: 1;
+		}
+
+		.mic-btn .mic-recording-dot {
+			display: none;
+			position: absolute;
+			top: 2px;
+			right: 2px;
+			width: 6px;
+			height: 6px;
+			background: var(--vscode-errorForeground, #f44747);
+			border-radius: 50%;
+		}
+
+		/* Recording state */
+		.mic-btn.recording {
+			background: color-mix(in srgb, var(--vscode-errorForeground, #f44747) 15%, transparent);
+			border-color: var(--vscode-errorForeground, #f44747);
+			color: var(--vscode-errorForeground, #f44747);
+		}
+
+		.mic-btn.recording .mic-recording-dot {
+			display: block;
+			animation: micPulse 1s ease-in-out infinite;
+		}
+
+		@keyframes micPulse {
+			0%, 100% { opacity: 1; transform: scale(1); }
+			50% { opacity: 0.4; transform: scale(1.3); }
+		}
+
+		/* Transcribing state */
+		.mic-btn.transcribing {
+			opacity: 0.6;
+			cursor: wait;
+			border-color: var(--vscode-charts-yellow, #cca700);
+		}
+
+		.mic-btn.transcribing .mic-icon {
+			animation: processingSpinnerRotate 0.8s linear infinite;
+		}
+
+		/* Error flash */
+		.mic-btn.speech-error {
+			border-color: var(--vscode-errorForeground, #f44747);
+			color: var(--vscode-errorForeground, #f44747);
+		}
+
+		.mic-btn:disabled {
+			opacity: 0.3;
+			cursor: not-allowed;
+		}
+
+		/* Larger mic button in the main composer footer */
+		.composer-footer-left .mic-btn {
+			width: 28px;
+			height: 28px;
+			font-size: 16px;
+		}
+
+		/* ===== INTAKE MODE SELECTOR ===== */
+		.intake-mode-selector {
+			margin-bottom: 14px;
+			animation: processingFadeIn 0.2s ease-out;
+		}
+
+		.intake-mode-rationale {
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			margin-bottom: 10px;
+			line-height: 1.5;
+		}
+
+		.intake-mode-options {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+		}
+
+		.intake-mode-btn {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+			padding: 10px 12px;
+			border: 1px solid var(--vscode-widget-border);
+			border-radius: 6px;
+			background: var(--vscode-editor-background);
+			cursor: pointer;
+			text-align: left;
+			transition: all 0.15s;
+			font-family: var(--vscode-font-family);
+		}
+
+		.intake-mode-btn:hover:not(:disabled) {
+			border-color: var(--vscode-focusBorder);
+			background: var(--vscode-list-hoverBackground);
+		}
+
+		.intake-mode-btn.recommended {
+			border-color: var(--vscode-charts-blue);
+			background: color-mix(in srgb, var(--vscode-charts-blue) 8%, var(--vscode-editor-background));
+		}
+
+		.intake-mode-btn:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.intake-mode-btn.was-selected {
+			border-color: var(--vscode-charts-green);
+			background: color-mix(in srgb, var(--vscode-charts-green) 10%, var(--vscode-editor-background));
+			opacity: 1;
+		}
+
+		.intake-mode-btn-icon {
+			font-size: 18px;
+		}
+
+		.intake-mode-btn-label {
+			font-size: 14px;
+			font-weight: 600;
+			color: var(--vscode-foreground);
+		}
+
+		.intake-mode-btn-desc {
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			line-height: 1.4;
+		}
+
+		.intake-mode-recommended {
+			font-size: 12px;
+			font-weight: 600;
+			color: var(--vscode-charts-blue);
+		}
+
+		/* ===== DOMAIN COVERAGE SIDEBAR ===== */
+		.domain-coverage-sidebar {
+			margin: 12px 0;
+			padding: 10px 12px;
+			border: 1px solid var(--vscode-widget-border);
+			border-radius: 6px;
+			background: var(--vscode-welcomePage-tileBackground, var(--vscode-sideBar-background));
+			animation: processingFadeIn 0.2s ease-out;
+		}
+
+		.coverage-sidebar-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 6px;
+		}
+
+		.coverage-sidebar-title {
+			font-size: 13px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.3px;
+			color: var(--vscode-descriptionForeground);
+		}
+
+		.coverage-sidebar-pct {
+			font-size: 14px;
+			font-weight: 700;
+			color: var(--vscode-foreground);
+			font-family: var(--vscode-editor-font-family);
+		}
+
+		.coverage-sidebar-bar {
+			height: 4px;
+			background: var(--vscode-widget-border);
+			border-radius: 2px;
+			overflow: hidden;
+			margin-bottom: 6px;
+		}
+
+		.coverage-bar-fill {
+			height: 100%;
+			background: var(--vscode-charts-green);
+			border-radius: 2px;
+			transition: width 0.3s ease;
+		}
+
+		.coverage-sidebar-stats {
+			display: flex;
+			gap: 8px;
+			margin-bottom: 8px;
+			font-size: 12px;
+		}
+
+		.coverage-stat {
+			font-family: var(--vscode-editor-font-family);
+		}
+
+		.coverage-stat.adequate {
+			color: var(--vscode-charts-green);
+		}
+
+		.coverage-stat.partial {
+			color: var(--vscode-charts-yellow);
+		}
+
+		.coverage-stat.none {
+			color: var(--vscode-charts-red);
+		}
+
+		.coverage-domain-list {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+		}
+
+		.coverage-domain-row {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			padding: 2px 4px;
+			border-radius: 3px;
+			font-size: 13px;
+			position: relative;
+		}
+
+		.coverage-domain-row:hover {
+			background: var(--vscode-list-hoverBackground);
+		}
+
+		.coverage-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			flex-shrink: 0;
+		}
+
+		.coverage-dot.coverage-adequate {
+			background: var(--vscode-charts-green);
+		}
+
+		.coverage-dot.coverage-partial {
+			background: var(--vscode-charts-yellow);
+		}
+
+		.coverage-dot.coverage-none {
+			background: var(--vscode-charts-red);
+			opacity: 0.5;
+		}
+
+		.coverage-domain-label {
+			flex: 1;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			color: var(--vscode-foreground);
+		}
+
+		.coverage-level-tag {
+			font-size: 11px;
+			padding: 0 4px;
+			border-radius: 3px;
+			font-weight: 600;
+			font-family: var(--vscode-editor-font-family);
+			flex-shrink: 0;
+		}
+
+		.coverage-level-tag.coverage-adequate {
+			color: var(--vscode-charts-green);
+			background: color-mix(in srgb, var(--vscode-charts-green) 15%, transparent);
+		}
+
+		.coverage-level-tag.coverage-partial {
+			color: var(--vscode-charts-yellow);
+			background: color-mix(in srgb, var(--vscode-charts-yellow) 15%, transparent);
+		}
+
+		.coverage-level-tag.coverage-none {
+			color: var(--vscode-charts-red);
+			background: color-mix(in srgb, var(--vscode-charts-red) 10%, transparent);
+			opacity: 0.6;
+		}
+
+		.coverage-domain-row.has-evidence {
+			cursor: pointer;
+		}
+
+		.coverage-row-chevron {
+			font-size: 10px;
+			color: var(--vscode-descriptionForeground);
+			transition: transform 0.15s ease;
+			flex-shrink: 0;
+			width: 10px;
+			text-align: center;
+		}
+
+		.coverage-domain-row.expanded .coverage-row-chevron {
+			transform: rotate(90deg);
+		}
+
+		.coverage-evidence-details {
+			display: none;
+			padding: 4px 8px 6px 24px;
+			font-size: 12px;
+			color: var(--vscode-descriptionForeground);
+			border-left: 2px solid var(--vscode-widget-border);
+			margin-left: 7px;
+			margin-bottom: 4px;
+			max-height: 150px;
+			overflow-y: auto;
+		}
+
+		.coverage-evidence-details.expanded {
+			display: block;
+		}
+
+		.coverage-evidence-details ul {
+			margin: 0;
+			padding-left: 12px;
+			list-style: disc;
+		}
+
+		.coverage-evidence-details li {
+			padding: 2px 0;
+			line-height: 1.5;
+			word-break: break-word;
+		}
+
+		.coverage-evidence-details .no-evidence {
+			font-style: italic;
+			opacity: 0.6;
+			list-style: none;
+			margin-left: -12px;
+		}
+
+		/* ===== INTAKE CHECKPOINT CARD ===== */
+		.intake-checkpoint {
+			margin-bottom: 14px;
+			animation: processingFadeIn 0.2s ease-out;
+		}
+
+		.checkpoint-summary {
+			margin-bottom: 10px;
+		}
+
+		.checkpoint-bar {
+			height: 6px;
+			background: var(--vscode-widget-border);
+			border-radius: 3px;
+			overflow: hidden;
+			margin-bottom: 6px;
+		}
+
+		.checkpoint-stats {
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			font-family: var(--vscode-editor-font-family);
+		}
+
+		.checkpoint-suggestions {
+			margin-bottom: 10px;
+		}
+
+		.checkpoint-suggestions-label {
+			font-size: 12px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.3px;
+			color: var(--vscode-descriptionForeground);
+			margin-bottom: 6px;
+		}
+
+		.checkpoint-domain-btn {
+			display: inline-block;
+			margin: 2px 4px 2px 0;
+			padding: 4px 10px;
+			font-size: 13px;
+			border: 1px solid var(--vscode-button-border, var(--vscode-focusBorder));
+			background: var(--vscode-button-secondaryBackground);
+			color: var(--vscode-button-secondaryForeground);
+			border-radius: 12px;
+			cursor: pointer;
+			transition: background 0.15s;
+			font-family: var(--vscode-font-family);
+		}
+
+		.checkpoint-domain-btn:hover:not(:disabled) {
+			background: var(--vscode-button-secondaryHoverBackground);
+			border-color: var(--vscode-focusBorder);
+		}
+
+		.checkpoint-domain-btn:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		.checkpoint-domain-btn.was-selected {
+			background: var(--vscode-button-background);
+			color: var(--vscode-button-foreground);
+			opacity: 0.85;
+		}
+
+		.checkpoint-actions {
+			display: flex;
+			gap: 8px;
+			margin-top: 8px;
+		}
+
+		.checkpoint-gap-prompt {
+			margin-top: 10px;
+			margin-bottom: 4px;
+			font-weight: 600;
+			color: var(--vscode-foreground);
+			font-size: 14px;
+		}
+
+		/* ===== INTAKE GATHERING PHASE ===== */
+
+		.gathering-turn {
+			border-left-color: var(--vscode-charts-purple, #b180d7);
+		}
+
+		.gathering-turn .intake-turn-header {
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 5%, var(--vscode-editor-background));
+		}
+
+		.intake-domain-badge {
+			display: inline-block;
+			font-size: 12px;
+			font-weight: 600;
+			padding: 1px 8px;
+			border-radius: 10px;
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 15%, transparent);
+			color: var(--vscode-charts-purple, #b180d7);
+			white-space: nowrap;
+		}
+
+		.intake-domain-notes {
+			margin-top: 8px;
+			padding: 8px 12px;
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 4%, var(--vscode-textCodeBlock-background));
+			border-left: 2px solid var(--vscode-charts-purple, #b180d7);
+			border-radius: 3px;
+		}
+
+		.intake-domain-notes ul {
+			margin: 0;
+			padding-left: 16px;
+		}
+
+		.intake-domain-notes li {
+			font-size: 14px;
+			line-height: 1.5;
+			margin-bottom: 4px;
+		}
+
+		.intake-gathering-footer {
+			display: flex;
+			flex-wrap: wrap;
+			align-items: center;
+			gap: 12px;
+			margin-top: 12px;
+			padding: 10px 14px;
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 5%, var(--vscode-editor-background));
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 20%, var(--vscode-widget-border));
+			border-radius: 6px;
+		}
+
+		.intake-gathering-guidance {
+			width: 100%;
+			font-size: 14px;
+			color: var(--vscode-descriptionForeground);
+			font-style: italic;
+			line-height: 1.4;
+		}
+
+		.intake-gathering-progress {
+			flex: 1;
+		}
+
+		.intake-gathering-progress-label {
+			display: block;
+			font-size: 13px;
+			font-weight: 600;
+			color: var(--vscode-charts-purple, #b180d7);
+			margin-bottom: 4px;
+		}
+
+		.intake-gathering-progress-bar {
+			height: 4px;
+			background: var(--vscode-widget-border);
+			border-radius: 2px;
+			overflow: hidden;
+		}
+
+		.intake-gathering-progress-fill {
+			height: 100%;
+			background: var(--vscode-charts-purple, #b180d7);
+			border-radius: 2px;
+			transition: width 0.3s ease;
+		}
+
+		.intake-skip-gathering-btn {
+			padding: 6px 14px;
+			border: 1px solid var(--vscode-button-secondaryBackground);
+			background: var(--vscode-button-secondaryBackground);
+			color: var(--vscode-button-secondaryForeground);
+			border-radius: 3px;
+			cursor: pointer;
+			font-size: 14px;
+			font-weight: 600;
+			font-family: var(--vscode-font-family);
+			white-space: nowrap;
+			transition: opacity 0.15s;
+		}
+
+		.intake-skip-gathering-btn:hover {
+			opacity: 0.85;
+		}
+
+		.intake-skip-gathering-btn:disabled {
+			opacity: 0.4;
+			cursor: not-allowed;
+		}
+
+		/* ===== INTAKE DOMAIN TRANSITION CARD ===== */
+
+		.intake-domain-transition {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 4px;
+			margin: 12px 0;
+			padding: 10px 16px;
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 5%, var(--vscode-editor-background));
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 20%, var(--vscode-widget-border));
+			border-radius: 6px;
+		}
+
+		.domain-transition-completed {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 14px;
+		}
+
+		.domain-transition-check {
+			font-size: 16px;
+		}
+
+		.domain-transition-label {
+			font-weight: 600;
+			color: var(--vscode-charts-green);
+		}
+
+		.domain-transition-status {
+			font-size: 12px;
+			padding: 1px 6px;
+			border-radius: 8px;
+			background: color-mix(in srgb, var(--vscode-charts-green) 15%, transparent);
+			color: var(--vscode-charts-green);
+		}
+
+		.domain-transition-arrow {
+			color: var(--vscode-charts-purple, #b180d7);
+			font-size: 12px;
+		}
+
+		.domain-transition-next {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 2px;
+		}
+
+		.domain-transition-next-label {
+			font-size: 14px;
+			font-weight: 600;
+			color: var(--vscode-charts-purple, #b180d7);
+		}
+
+		.domain-transition-next-desc {
+			font-size: 12px;
+			color: var(--vscode-descriptionForeground);
+			text-align: center;
+		}
+
+		/* ===== INTAKE GATHERING COMPLETE BANNER ===== */
+
+		.intake-gathering-complete-banner {
+			display: flex;
+			gap: 12px;
+			margin: 12px 0;
+			padding: 12px 16px;
+			background: color-mix(in srgb, var(--vscode-charts-green) 5%, var(--vscode-editor-background));
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-green) 25%, var(--vscode-widget-border));
+			border-radius: 6px;
+		}
+
+		.gathering-complete-icon {
+			font-size: 24px;
+		}
+
+		.gathering-complete-content {
+			flex: 1;
+		}
+
+		.gathering-complete-title {
+			font-size: 15px;
+			font-weight: 600;
+			color: var(--vscode-charts-green);
+		}
+
+		.gathering-complete-stats {
+			font-size: 13px;
+			color: var(--vscode-descriptionForeground);
+			margin-top: 2px;
+		}
+
+		.gathering-complete-hint {
+			font-size: 13px;
+			font-style: italic;
+			color: var(--vscode-descriptionForeground);
+			margin-top: 4px;
+		}
+
+		/* ===== CURRENT DOMAIN HIGHLIGHT IN SIDEBAR ===== */
+
+		.coverage-domain-row.current-domain {
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 8%, transparent);
+			border-radius: 3px;
+		}
+
+		.coverage-current-indicator {
+			font-size: 10px;
+			color: var(--vscode-charts-purple, #b180d7);
+			margin-right: 2px;
+		}
+
+		/* ==================== ANALYSIS CARD (INVERTED FLOW) ==================== */
+
+		.intake-analysis-card {
+			margin: 12px 0;
+			padding: 14px 16px;
+			background: color-mix(in srgb, var(--vscode-charts-blue, #4fc1ff) 5%, var(--vscode-editor-background));
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-blue, #4fc1ff) 20%, var(--vscode-widget-border));
+			border-radius: 6px;
+		}
+
+		.intake-analysis-header {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-bottom: 10px;
+		}
+
+		.intake-analysis-icon { font-size: 18px; }
+
+		.intake-analysis-title {
+			font-size: 15px;
+			font-weight: 600;
+			color: var(--vscode-charts-blue, #4fc1ff);
+		}
+
+		.intake-analysis-body {
+			font-size: 14px;
+			line-height: 1.5;
+			color: var(--vscode-foreground);
+		}
+
+		.intake-analysis-findings {
+			margin-top: 10px;
+			border-top: 1px solid var(--vscode-widget-border);
+			padding-top: 8px;
+		}
+
+		.intake-analysis-findings-header {
+			font-size: 13px;
+			font-weight: 600;
+			color: var(--vscode-descriptionForeground);
+			cursor: pointer;
+		}
+
+		.intake-analysis-findings-list {
+			margin: 6px 0 0 0;
+			padding-left: 20px;
+			font-size: 12px;
+			font-family: var(--vscode-editor-font-family), monospace;
+			color: var(--vscode-descriptionForeground);
+		}
+
+		.intake-analysis-findings-list li {
+			margin-bottom: 3px;
+		}
+
+		/* ==================== PROPOSAL CARD (INVERTED FLOW) ==================== */
+
+		.intake-proposal-card {
+			margin: 12px 0;
+			padding: 16px;
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 5%, var(--vscode-editor-background));
+			border: 1px solid color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 20%, var(--vscode-widget-border));
+			border-radius: 6px;
+		}
+
+		.intake-proposal-header {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-bottom: 12px;
+		}
+
+		.intake-proposal-icon { font-size: 18px; }
+
+		.intake-proposal-title {
+			font-size: 16px;
+			font-weight: 600;
+			color: var(--vscode-charts-purple, #b180d7);
+		}
+
+		.intake-proposal-plan-title {
+			font-size: 15px;
+			font-weight: 600;
+			color: var(--vscode-foreground);
+			margin-bottom: 8px;
+		}
+
+		.intake-proposal-summary {
+			font-size: 14px;
+			line-height: 1.5;
+			color: var(--vscode-foreground);
+			margin-bottom: 12px;
+		}
+
+		.intake-proposal-approach {
+			margin-bottom: 12px;
+			padding: 10px 12px;
+			background: color-mix(in srgb, var(--vscode-charts-purple, #b180d7) 3%, var(--vscode-editor-background));
+			border-left: 3px solid var(--vscode-charts-purple, #b180d7);
+			border-radius: 0 4px 4px 0;
+		}
+
+		.intake-proposal-approach-label {
+			font-size: 12px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+			color: var(--vscode-charts-purple, #b180d7);
+			margin-bottom: 4px;
+		}
+
+		.intake-proposal-approach-body {
+			font-size: 14px;
+			line-height: 1.5;
+			color: var(--vscode-foreground);
+		}
+
+		.intake-proposal-coverage {
+			margin-bottom: 12px;
+			padding: 8px 12px;
+			background: color-mix(in srgb, var(--vscode-foreground) 3%, var(--vscode-editor-background));
+			border-radius: 4px;
+		}
+
+		.intake-proposal-coverage-bar {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.intake-proposal-coverage-label {
+			font-size: 13px;
+			font-weight: 600;
+			color: var(--vscode-foreground);
+		}
+
+		.intake-proposal-coverage-pct {
+			font-size: 14px;
+			font-weight: 600;
+			color: var(--vscode-charts-green);
+		}
+
+		.intake-proposal-coverage-stats {
+			font-size: 12px;
+			color: var(--vscode-descriptionForeground);
+			margin-top: 2px;
+		}
+
+		.intake-proposal-footer {
+			font-size: 13px;
+			font-style: italic;
+			color: var(--vscode-descriptionForeground);
+			padding-top: 8px;
+			border-top: 1px solid var(--vscode-widget-border);
 		}
 	`;
 }

@@ -4,3 +4,4 @@ dist/
 test-workspace/
 *.vsix
 .env
+.electron-native-cache/

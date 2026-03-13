@@ -269,3 +269,11 @@ export function getLogger(): Logger {
 export function isLoggerInitialized(): boolean {
 	return rootLogger !== null;
 }
+
+/**
+ * Reset the root logger to null.
+ * Used in tests to avoid cross-test contamination.
+ */
+export function resetLogger(): void {
+	rootLogger = null;
+}

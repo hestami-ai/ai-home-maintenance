@@ -642,7 +642,8 @@ export function createRepairEscalationGate(
 	dialogueId: string,
 	unitId: string,
 	failureType: string,
-	reason: string
+	reason: string,
+	unitLabel?: string
 ): Result<Gate> {
 	return createGate({
 		dialogueId,
@@ -652,6 +653,56 @@ export function createRepairEscalationGate(
 			condition: GateTriggerCondition.REPAIR_ESCALATION,
 			unit_id: unitId,
 			failure_type: failureType,
+			unit_label: unitLabel,
+		},
+	});
+}
+
+/**
+ * Create an evaluator-enriched repair escalation gate.
+ * Calls the failure evaluator LLM to analyze executor output, then stores
+ * the structured evaluation in gate metadata for rich UI rendering.
+ *
+ * Falls back to the basic gate if the evaluation call fails.
+ */
+export async function createEnrichedRepairEscalationGate(
+	dialogueId: string,
+	unitId: string,
+	failureType: string,
+	reason: string,
+	unitLabel: string,
+	executorOutput: string,
+	unitGoal: string,
+): Promise<Result<Gate>> {
+	// Attempt LLM evaluation of the failure
+	let evaluation: import('./failureEvaluator').FailureEvaluation | undefined;
+	try {
+		const { evaluateUnitFailure } = await import('./failureEvaluator');
+		const evalResult = await evaluateUnitFailure(
+			unitLabel, unitGoal, executorOutput, reason, failureType
+		);
+		if (evalResult.success) {
+			evaluation = evalResult.value;
+		}
+	} catch {
+		// Evaluation failed — proceed with basic gate
+	}
+
+	const enrichedReason = evaluation?.summary
+		? `${reason} — ${evaluation.summary}`
+		: reason;
+
+	return createGate({
+		dialogueId,
+		reason: enrichedReason,
+		blockingClaims: [],
+		metadata: {
+			condition: GateTriggerCondition.REPAIR_ESCALATION,
+			unit_id: unitId,
+			failure_type: failureType,
+			unit_label: unitLabel,
+			executor_output: executorOutput,
+			...(evaluation ? { evaluation } : {}),
 		},
 	});
 }

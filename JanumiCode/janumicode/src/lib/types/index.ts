@@ -380,14 +380,23 @@ export type VerdictStatus = VerdictType;
  */
 export {
 	IntakeSubState,
+	IntakeMode,
+	EngineeringDomain,
+	DomainCoverageLevel,
 	type IntakeExtractedItemType,
 	type IntakeExtractedItem,
 	type IntakePlanDocument,
 	type IntakeTurnResponse,
+	type IntakeGatheringTurnResponse,
 	type IntakeAccumulation,
 	type IntakeConversationState,
 	type IntakeConversationTurn,
+	type DomainCoverageEntry,
+	type DomainCoverageMap,
+	type IntakeModeRecommendation,
+	type IntakeCheckpoint,
 	createEmptyPlanDocument,
+	isGatheringResponse,
 } from './intake';
 
 // ==================== MAKER / AGENT INTEGRATION CONTROL PLANE TYPES ====================

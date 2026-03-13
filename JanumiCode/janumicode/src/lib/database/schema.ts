@@ -725,6 +725,96 @@ CREATE INDEX IF NOT EXISTS idx_clarification_dialogue ON clarification_threads(d
 CREATE UNIQUE INDEX IF NOT EXISTS idx_clarification_item ON clarification_threads(dialogue_id, item_id);
 `;
 
+export const SCHEMA_V14 = `
+-- FTS5 virtual table for full-text search over governed stream content
+CREATE VIRTUAL TABLE IF NOT EXISTS fts_stream_content USING fts5(
+    content,
+    source_table UNINDEXED,
+    source_id UNINDEXED,
+    dialogue_id UNINDEXED,
+    tokenize = 'porter unicode61'
+);
+`;
+
+/**
+ * Migration V15: Adaptive Deep INTAKE — domain coverage tracking
+ * Adds columns to intake_conversations for INTAKE mode, domain coverage,
+ * checkpoints, and classifier result. All DEFAULT NULL for backward compatibility.
+ */
+export const SCHEMA_V15 = `
+ALTER TABLE intake_conversations ADD COLUMN intake_mode TEXT DEFAULT NULL;
+ALTER TABLE intake_conversations ADD COLUMN domain_coverage TEXT DEFAULT NULL;
+ALTER TABLE intake_conversations ADD COLUMN current_domain TEXT DEFAULT NULL;
+ALTER TABLE intake_conversations ADD COLUMN checkpoints TEXT DEFAULT NULL;
+ALTER TABLE intake_conversations ADD COLUMN classifier_result TEXT DEFAULT NULL;
+`;
+
+/**
+ * Migration V16: INTAKE GATHERING sub-state
+ * - Recreate intake_conversations with GATHERING added to sub_state CHECK constraint
+ *   (SQLite cannot ALTER CHECK constraints, so table must be recreated)
+ * - Add is_gathering flag to intake_turns to distinguish gathering from discussion turns
+ */
+export const SCHEMA_V16 = `
+-- Recreate intake_conversations with GATHERING in CHECK constraint
+CREATE TABLE IF NOT EXISTS intake_conversations_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING', 'DISCUSSING', 'SYNTHESIZING', 'AWAITING_APPROVAL')) DEFAULT 'DISCUSSING',
+    turn_count INTEGER NOT NULL DEFAULT 0,
+    draft_plan TEXT NOT NULL DEFAULT '{}',
+    accumulations TEXT NOT NULL DEFAULT '[]',
+    finalized_plan TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    intake_mode TEXT DEFAULT NULL,
+    domain_coverage TEXT DEFAULT NULL,
+    current_domain TEXT DEFAULT NULL,
+    checkpoints TEXT DEFAULT NULL,
+    classifier_result TEXT DEFAULT NULL,
+    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
+);
+INSERT OR IGNORE INTO intake_conversations_new SELECT * FROM intake_conversations;
+DROP INDEX IF EXISTS idx_intake_conv_dialogue_id;
+DROP TABLE IF EXISTS intake_conversations;
+ALTER TABLE intake_conversations_new RENAME TO intake_conversations;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
+
+-- Add is_gathering flag to intake_turns
+ALTER TABLE intake_turns ADD COLUMN is_gathering INTEGER DEFAULT 0;
+`;
+
+export const SCHEMA_V17 = `
+-- Recreate intake_conversations with inverted flow sub-states (ANALYZING, PROPOSING, CLARIFYING)
+CREATE TABLE IF NOT EXISTS intake_conversations_new (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dialogue_id TEXT NOT NULL,
+    sub_state TEXT NOT NULL CHECK(sub_state IN ('GATHERING', 'DISCUSSING', 'SYNTHESIZING', 'AWAITING_APPROVAL', 'ANALYZING', 'PROPOSING', 'CLARIFYING')) DEFAULT 'DISCUSSING',
+    turn_count INTEGER NOT NULL DEFAULT 0,
+    draft_plan TEXT NOT NULL DEFAULT '{}',
+    accumulations TEXT NOT NULL DEFAULT '[]',
+    finalized_plan TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    intake_mode TEXT DEFAULT NULL,
+    domain_coverage TEXT DEFAULT NULL,
+    current_domain TEXT DEFAULT NULL,
+    checkpoints TEXT DEFAULT NULL,
+    classifier_result TEXT DEFAULT NULL,
+    clarification_round INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT fk_dialogue_id CHECK(length(dialogue_id) = 36)
+);
+INSERT OR IGNORE INTO intake_conversations_new
+    SELECT id, dialogue_id, sub_state, turn_count, draft_plan, accumulations,
+           finalized_plan, created_at, updated_at, intake_mode, domain_coverage,
+           current_domain, checkpoints, classifier_result, 0
+    FROM intake_conversations;
+DROP INDEX IF EXISTS idx_intake_conv_dialogue_id;
+DROP TABLE IF EXISTS intake_conversations;
+ALTER TABLE intake_conversations_new RENAME TO intake_conversations;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_intake_conv_dialogue_id ON intake_conversations(dialogue_id);
+`;
+
 export const MIGRATIONS: Migration[] = [
 	{
 		version: 1,
@@ -790,5 +880,25 @@ export const MIGRATIONS: Migration[] = [
 		version: 13,
 		description: 'Add clarification threads table for Ask More conversations',
 		sql: SCHEMA_V13,
+	},
+	{
+		version: 14,
+		description: 'Add FTS5 full-text search over governed stream content',
+		sql: SCHEMA_V14,
+	},
+	{
+		version: 15,
+		description: 'Adaptive Deep INTAKE — domain coverage tracking columns',
+		sql: SCHEMA_V15,
+	},
+	{
+		version: 16,
+		description: 'INTAKE GATHERING sub-state — updated sub_state CHECK, is_gathering flag on turns',
+		sql: SCHEMA_V16,
+	},
+	{
+		version: 17,
+		description: 'INTAKE inverted flow — ANALYZING/PROPOSING/CLARIFYING sub-states, clarification_round column',
+		sql: SCHEMA_V17,
 	},
 ];

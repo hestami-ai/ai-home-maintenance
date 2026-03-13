@@ -9,6 +9,7 @@ export {
 	initializeLogger,
 	getLogger,
 	isLoggerInitialized,
+	resetLogger,
 	type LogContext,
 	type LogEntry,
 } from './logger';

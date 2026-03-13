@@ -1,0 +1,70 @@
+name: JanumiCode CI
+
+on:
+  pull_request:
+    paths: ['JanumiCode/janumicode/**']
+  push:
+    branches: [main]
+    paths: ['JanumiCode/janumicode/**']
+
+defaults:
+  run:
+    working-directory: JanumiCode/janumicode
+
+jobs:
+  typecheck-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: JanumiCode/janumicode/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check-types
+      - run: pnpm run lint
+
+  unit-tests:
+    needs: typecheck-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: JanumiCode/janumicode/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Rebuild better-sqlite3 for Linux
+        run: npx node-gyp rebuild --directory=node_modules/.pnpm/better-sqlite3@12.6.2/node_modules/better-sqlite3 || true
+      - run: pnpm run test:unit
+      - run: pnpm run test:coverage
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: JanumiCode/janumicode/coverage/
+          retention-days: 14
+
+  structural-checks:
+    needs: typecheck-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: JanumiCode/janumicode/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec vitest run scripts/test/structural/

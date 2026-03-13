@@ -4,7 +4,7 @@
  * Creates optimized context packs for Historian-Interpreter role invocations
  */
 
-import type { Result, Role } from '../../types';
+import type { Result, Role, Claim, Verdict } from '../../types';
 import { getLogger, isLoggerInitialized } from '../../logging';
 import {
 	compileContextPack,
@@ -419,6 +419,191 @@ export function formatHistorianInterpreterContext(
 	// Token usage footer
 	sections.push(
 		`---\n\nToken Budget: ${context.token_budget}\nToken Usage: ${context.tokenUsage.total} / ${context.token_budget} (${Math.round((context.tokenUsage.total / context.token_budget) * 100)}%)`
+	);
+
+	return sections.join('\n\n');
+}
+
+// ==================== ADJUDICATION CONTEXT ====================
+
+/**
+ * Options for building adjudication context
+ */
+export interface AdjudicationContextOptions {
+	dialogueId: string;
+	claims: Claim[];
+	verdicts: Verdict[];
+	tokenBudget: number;
+	timeWindowDays?: number;
+}
+
+/**
+ * Build context for per-claim consistency adjudication.
+ * Pairs each claim with its Verifier verdict and enriches with historical context.
+ */
+export async function buildAdjudicationContext(
+	options: AdjudicationContextOptions
+): Promise<Result<CompiledContextPack>> {
+	try {
+		// Compile base context with historical data
+		const compileOptions: CompileContextOptions = {
+			role: 'HISTORIAN' as Role,
+			dialogueId: options.dialogueId,
+			goal: 'Per-claim consistency adjudication against historical record and specifications',
+			tokenBudget: options.tokenBudget,
+			includeHistorical: true,
+			maxHistoricalFindings: 20,
+		};
+
+		const contextResult = compileContextPack(compileOptions);
+		if (!contextResult.success) {
+			return contextResult;
+		}
+
+		let context = contextResult.value;
+
+		// Enhance with contradiction search for all claims
+		const claimIds = options.claims.map(c => c.claim_id);
+		context = await enhanceForContradictionCheck(context, {
+			dialogueId: options.dialogueId,
+			query: 'Adjudicate all claims for consistency',
+			queryType: HistorianQueryType.CONTRADICTION_CHECK,
+			relatedClaimIds: claimIds,
+			tokenBudget: options.tokenBudget,
+			timeWindowDays: options.timeWindowDays,
+		});
+
+		// Enhance with precedent search
+		context = await enhanceForPrecedentSearch(context, {
+			dialogueId: options.dialogueId,
+			query: 'Find precedents relevant to current claims',
+			queryType: HistorianQueryType.PRECEDENT_SEARCH,
+			tokenBudget: options.tokenBudget,
+			timeWindowDays: options.timeWindowDays,
+		});
+
+		// Enhance with general history for temporal context
+		context = await enhanceForGeneralHistory(context, {
+			dialogueId: options.dialogueId,
+			query: 'Retrieve recent dialogue history',
+			queryType: HistorianQueryType.GENERAL_HISTORY,
+			tokenBudget: options.tokenBudget,
+			timeWindowDays: options.timeWindowDays,
+		});
+
+		// Truncate if needed
+		if (context.tokenUsage.total > options.tokenBudget) {
+			const budgetResult = allocateBudget(
+				options.tokenBudget,
+				'HISTORIAN' as Role,
+				BudgetAllocationStrategy.ROLE_SPECIFIC
+			);
+			if (budgetResult.success) {
+				const truncateResult = truncateContextPack(
+					context,
+					budgetResult.value.allocation,
+					{
+						strategy: TruncationStrategy.OLDEST_FIRST,
+						preserveCritical: false,
+						preserveDecisions: true,
+						allowPartialContent: true,
+					}
+				);
+				if (truncateResult.success) {
+					context = truncateResult.value.truncatedPack;
+				}
+			}
+		}
+
+		// Organize chronologically
+		const enhanced = enhanceHistorianInterpreterContext(context);
+
+		return { success: true, value: enhanced };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error
+				? error
+				: new Error('Failed to build adjudication context'),
+		};
+	}
+}
+
+/**
+ * Format a single claim with its Verifier verdict for the adjudication context.
+ */
+function formatClaimForAdjudication(claim: Claim, verdict: Verdict | undefined): string {
+	let text = `\n## Claim: ${claim.claim_id}\n`;
+	text += `- **Statement**: ${claim.statement}\n`;
+	text += `- **Criticality**: ${claim.criticality}\n`;
+	if (claim.assumption_type) {
+		text += `- **Type**: ${claim.assumption_type}\n`;
+	}
+	text += `- **Status**: ${claim.status}\n`;
+	if (verdict) {
+		text += `- **Verifier Verdict**: ${verdict.verdict}\n`;
+		text += `- **Verifier Rationale**: ${verdict.rationale}\n`;
+	} else {
+		text += `- **Verifier Verdict**: (none)\n`;
+	}
+	return text;
+}
+
+/**
+ * Format adjudication context for LLM consumption.
+ * Produces a document with each claim paired with its Verifier verdict,
+ * plus historical context for the Historian to adjudicate against.
+ */
+export function formatAdjudicationContext(
+	context: CompiledContextPack,
+	claims: Claim[],
+	verdicts: Verdict[],
+): string {
+	const sections: string[] = [];
+
+	// Build verdict lookup
+	const verdictByClaim = new Map<string, Verdict>();
+	for (const v of verdicts) {
+		verdictByClaim.set(v.claim_id, v);
+	}
+
+	// Claims section — each claim paired with its Verifier verdict
+	const claimBlocks = claims.map(c => formatClaimForAdjudication(c, verdictByClaim.get(c.claim_id)));
+	sections.push(
+		'# Claims to Adjudicate\n\nFor each claim below, determine its consistency with the historical record and specifications.\n'
+		+ claimBlocks.join('')
+	);
+
+	// Historical context section
+	if (context.historical_findings.length > 0) {
+		const items = context.historical_findings.map((f, i) => `${i + 1}. ${f}`).join('\n');
+		sections.push('# Historical Context\n\nUse this context to evaluate consistency. Cite specific items as evidence.\n\n' + items);
+	}
+
+	// Human decisions section
+	if (context.human_decisions.length > 0) {
+		const items = context.human_decisions.map(d =>
+			`- **${d.action}** (${d.timestamp})\n  Rationale: ${d.rationale}`
+		).join('\n\n');
+		sections.push('# Human Decisions (Decision Trace)\n\n' + items);
+	}
+
+	// Constraint manifest
+	if (context.constraint_manifest) {
+		sections.push(
+			`# Constraint Manifest\n\nVersion: ${context.constraint_manifest.version}\nReference: ${context.constraint_manifest.constraints_ref}`
+		);
+	}
+
+	// Artifact references
+	if (context.artifact_refs.length > 0) {
+		const items = context.artifact_refs.map(ref => `- ${ref}`).join('\n');
+		sections.push('# Referenced Artifacts\n\n' + items);
+	}
+
+	// Token usage footer
+	sections.push(
+		`---\n\nToken Budget: ${context.token_budget}\nClaim Count: ${claims.length}`
 	);
 
 	return sections.join('\n\n');

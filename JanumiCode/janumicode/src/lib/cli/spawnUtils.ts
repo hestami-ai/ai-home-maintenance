@@ -9,10 +9,43 @@
  * - Logs the full command being attempted before spawning
  */
 
-import { spawn, type SpawnOptions } from 'node:child_process';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { getLogger, isLoggerInitialized } from '../logging';
 
 const IS_WINDOWS = process.platform === 'win32';
+
+// ==================== ACTIVE PROCESS REGISTRY ====================
+
+/** Tracks all active CLI child processes so they can be killed on cancel. */
+const activeProcesses = new Set<ChildProcess>();
+
+/**
+ * Kill all active CLI child processes.
+ * Called when the user cancels/aborts a running workflow.
+ * @returns Number of processes that were sent kill signals.
+ */
+export function killAllActiveProcesses(): number {
+	let killed = 0;
+	for (const proc of activeProcesses) {
+		try {
+			if (IS_WINDOWS && proc.pid) {
+				// On Windows with shell:true, proc.kill() may not reach the child tree.
+				// Use taskkill /T /F to kill the entire process tree.
+				spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { shell: true });
+			} else {
+				proc.kill('SIGTERM');
+			}
+			killed++;
+		} catch { /* process may already be dead */ }
+	}
+	activeProcesses.clear();
+	return killed;
+}
+
+/** Get count of currently active CLI processes. */
+export function getActiveProcessCount(): number {
+	return activeProcesses.size;
+}
 
 /**
  * Build spawn options with Windows compatibility.
@@ -102,6 +135,7 @@ export function spawnCLIWithStdin(
 	return new Promise((resolve, reject) => {
 		const opts = buildSpawnOptions(cwd, timeout);
 		const proc = spawn(command, args, opts);
+		activeProcesses.add(proc);
 
 		const stdoutChunks: Buffer[] = [];
 		const stderrChunks: Buffer[] = [];
@@ -110,6 +144,7 @@ export function spawnCLIWithStdin(
 		proc.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
 		proc.on('close', (code) => {
+			activeProcesses.delete(proc);
 			const stdout = Buffer.concat(stdoutChunks).toString('utf-8').trim();
 			const stderr = Buffer.concat(stderrChunks).toString('utf-8').trim();
 
@@ -125,7 +160,10 @@ export function spawnCLIWithStdin(
 			resolve({ stdout, stderr, exitCode: code ?? 1 });
 		});
 
-		proc.on('error', (err) => reject(enrichSpawnError(err, command, cwd)));
+		proc.on('error', (err) => {
+			activeProcesses.delete(proc);
+			reject(enrichSpawnError(err, command, cwd));
+		});
 
 		proc.stdin!.write(stdinContent);
 		proc.stdin!.end();
@@ -156,6 +194,7 @@ export function spawnCLIStreamingWithStdin(
 	return new Promise((resolve, reject) => {
 		const opts = buildSpawnOptions(cwd, timeout);
 		const proc = spawn(command, args, opts);
+		activeProcesses.add(proc);
 
 		const stderrChunks: Buffer[] = [];
 		let fullStdout = '';
@@ -179,6 +218,7 @@ export function spawnCLIStreamingWithStdin(
 		proc.stderr!.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
 		proc.on('close', (code) => {
+			activeProcesses.delete(proc);
 			if (lineBuffer.trim()) {
 				onLine(lineBuffer.trim());
 			}
@@ -189,7 +229,10 @@ export function spawnCLIStreamingWithStdin(
 			});
 		});
 
-		proc.on('error', (err) => reject(enrichSpawnError(err, command, cwd)));
+		proc.on('error', (err) => {
+			activeProcesses.delete(proc);
+			reject(enrichSpawnError(err, command, cwd));
+		});
 
 		proc.stdin!.write(stdinContent);
 		proc.stdin!.end();

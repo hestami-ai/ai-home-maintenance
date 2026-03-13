@@ -378,6 +378,33 @@ export function computeCriticalPath(
 }
 
 /**
+ * Reset stale in-progress units back to READY.
+ * Called at the start of the EXECUTE phase to recover from killed/cancelled executions
+ * where units were left in IN_PROGRESS/VALIDATING/REPAIRING status.
+ * Returns the number of units reset.
+ */
+export function resetStaleInProgressUnits(graphId: string): Result<number> {
+	const unitsResult = getTaskUnitsForGraph(graphId);
+	if (!unitsResult.success) { return { success: false, error: unitsResult.error }; }
+
+	const staleStatuses = new Set([
+		TaskUnitStatus.IN_PROGRESS,
+		TaskUnitStatus.VALIDATING,
+		TaskUnitStatus.REPAIRING,
+	]);
+
+	let resetCount = 0;
+	for (const unit of unitsResult.value) {
+		if (staleStatuses.has(unit.status)) {
+			updateTaskUnitStatus(unit.unit_id, TaskUnitStatus.READY);
+			resetCount++;
+		}
+	}
+
+	return { success: true, value: resetCount };
+}
+
+/**
  * Get units that are READY for execution (all DEPENDS_ON dependencies completed).
  * Queries the database for current state.
  */

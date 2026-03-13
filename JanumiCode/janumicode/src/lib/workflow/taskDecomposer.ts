@@ -64,7 +64,13 @@ inputs: string[]         // What this unit needs to start
 outputs: string[]        // What this unit produces
 preconditions: string[]  // What must be true before execution
 postconditions: string[] // What must be true after execution
-allowed_tools: string[]  // Tool categories this unit may use (e.g., "file_write", "bash", "file_read")
+allowed_tools: string[]  // Tool categories this unit needs. Rules:
+  // - "file_read" — reading files (always available, include for clarity)
+  // - "file_write" — creating or modifying files. REQUIRED if the unit produces any file output.
+  // - "bash" — running shell commands (tests, builds, installs, scripts)
+  // - "web_search" — external web lookups
+  // If a unit's outputs or postconditions mention creating/updating/writing files, it MUST include "file_write".
+  // If a unit's verification_method runs commands, it MUST include "bash".
 preferred_provider: string | null  // "claude-code" | "codex-cli" | "gemini-cli" | null (auto-select)
 max_change_scope: string // Directory or file pattern bounding changes (e.g., "src/lib/auth/")
 observables: string[]    // Concrete things to check after execution

@@ -27,8 +27,12 @@ import type {
 	IntakePlanDocument,
 	IntakeAccumulation,
 	IntakeTurnResponse,
+	IntakeGatheringTurnResponse,
+	DomainCoverageMap,
+	IntakeModeRecommendation,
+	IntakeCheckpoint,
 } from '../types';
-import { IntakeSubState, createEmptyPlanDocument } from '../types';
+import { IntakeSubState, IntakeMode, EngineeringDomain, createEmptyPlanDocument } from '../types';
 import { getDatabase } from '../database';
 
 // ==================== FILTER TYPES ====================
@@ -695,6 +699,14 @@ interface IntakeConversationRow {
 	finalized_plan: string | null;
 	created_at: string;
 	updated_at: string;
+	// V15 Adaptive Deep INTAKE columns (nullable)
+	intake_mode: string | null;
+	domain_coverage: string | null;
+	current_domain: string | null;
+	checkpoints: string | null;
+	classifier_result: string | null;
+	// V17 Inverted flow
+	clarification_round: number;
 }
 
 /**
@@ -708,6 +720,7 @@ interface IntakeTurnRow {
 	expert_response: string;
 	plan_snapshot: string;
 	token_count: number;
+	is_gathering: number;
 	created_at: string;
 }
 
@@ -729,6 +742,20 @@ function parseIntakeConversationRow(
 			: null,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
+		// V15 Adaptive Deep INTAKE fields
+		intakeMode: row.intake_mode as IntakeMode | null,
+		domainCoverage: row.domain_coverage
+			? (JSON.parse(row.domain_coverage) as DomainCoverageMap)
+			: null,
+		currentDomain: row.current_domain as EngineeringDomain | null,
+		checkpoints: row.checkpoints
+			? (JSON.parse(row.checkpoints) as IntakeCheckpoint[])
+			: [],
+		classifierResult: row.classifier_result
+			? (JSON.parse(row.classifier_result) as IntakeModeRecommendation)
+			: null,
+		// V17 Inverted flow
+		clarificationRound: row.clarification_round ?? 0,
 	};
 }
 
@@ -736,14 +763,21 @@ function parseIntakeConversationRow(
  * Parse a raw intake_turns row into typed IntakeConversationTurn
  */
 function parseIntakeTurnRow(row: IntakeTurnRow): IntakeConversationTurn {
+	const isGathering = row.is_gathering === 1;
+	const parsedPlan = JSON.parse(row.plan_snapshot) as IntakePlanDocument;
 	return {
 		id: row.id,
 		dialogueId: row.dialogue_id,
 		turnNumber: row.turn_number,
 		humanMessage: row.human_message,
-		expertResponse: JSON.parse(row.expert_response) as IntakeTurnResponse,
-		planSnapshot: JSON.parse(row.plan_snapshot) as IntakePlanDocument,
+		expertResponse: JSON.parse(row.expert_response) as
+			IntakeTurnResponse | IntakeGatheringTurnResponse,
+		// Gathering turns store an empty plan doc — return null instead
+		planSnapshot: isGathering || (parsedPlan.version === 0 && !parsedPlan.title)
+			? null
+			: parsedPlan,
 		tokenCount: row.token_count,
+		isGathering,
 		createdAt: row.created_at,
 	};
 }
@@ -891,6 +925,43 @@ export function getIntakeTurns(
 }
 
 /**
+ * Get INTAKE gathering turns for a dialogue (is_gathering = 1).
+ * Returns turns in chronological order.
+ */
+export function getGatheringTurns(
+	dialogueId: string
+): Result<IntakeConversationTurn[]> {
+	const db = getDatabase();
+	if (!db) {
+		return {
+			success: false,
+			error: new Error('Database not initialized'),
+		};
+	}
+
+	try {
+		const rows = db
+			.prepare(
+				'SELECT * FROM intake_turns WHERE dialogue_id = ? AND is_gathering = 1 ORDER BY turn_number ASC'
+			)
+			.all(dialogueId) as IntakeTurnRow[];
+
+		return {
+			success: true,
+			value: rows.map(parseIntakeTurnRow),
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error:
+				error instanceof Error
+					? error
+					: new Error('Failed to get gathering turns'),
+		};
+	}
+}
+
+/**
  * Get the most recent N INTAKE conversation turns (for sliding window context).
  * Returns turns in chronological order (oldest first).
  */
@@ -1003,6 +1074,45 @@ export function getLatestConstraintManifest(): Result<ConstraintManifest | null>
 				error instanceof Error
 					? error
 					: new Error('Failed to get latest constraint manifest'),
+		};
+	}
+}
+
+// ==================== Q&A EXCHANGE READERS ====================
+
+export interface QaExchange {
+	event_id: number;
+	dialogue_id: string;
+	timestamp: string;
+	phase: string | null;
+	question: string;
+	answer: string;
+}
+
+/**
+ * Get all Q&A exchanges for a dialogue, ordered chronologically.
+ * Reads from cli_activity_events where event_type = 'qa_exchange'.
+ */
+export function getQaExchanges(dialogueId: string): Result<QaExchange[]> {
+	const db = getDatabase();
+	if (!db) {
+		return { success: false, error: new Error('Database not initialized') };
+	}
+
+	try {
+		const rows = db.prepare(
+			`SELECT event_id, dialogue_id, timestamp, phase,
+					summary AS question, detail AS answer
+			 FROM cli_activity_events
+			 WHERE dialogue_id = ? AND event_type = 'qa_exchange'
+			 ORDER BY timestamp ASC`
+		).all(dialogueId) as QaExchange[];
+
+		return { success: true, value: rows };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error : new Error('Failed to get Q&A exchanges'),
 		};
 	}
 }

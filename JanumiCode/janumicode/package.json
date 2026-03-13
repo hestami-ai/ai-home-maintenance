@@ -367,6 +367,66 @@
           "type": "string",
           "default": "voyage-embed",
           "description": "Path to the voyage-embed CLI for local ONNX inference (default: 'voyage-embed' on PATH)"
+        },
+        "janumicode.interpreter.textToSql.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable text-to-SQL for answering questions (Tier 3). The LLM generates a SELECT query against the database schema to retrieve relevant data. When disabled, falls back to static context."
+        },
+        "janumicode.interpreter.ftsSearch.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable full-text search (FTS5) over governed stream history for answering questions about executor output, claims, and activity events"
+        },
+        "janumicode.interpreter.workspaceQuery.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CLI agent delegation for answering questions about workspace files and directories (requires a configured CLI provider like Claude Code)"
+        },
+        "janumicode.interpreter.workspaceQuery.provider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "claude-code",
+            "codex-cli",
+            "gemini-cli"
+          ],
+          "default": "auto",
+          "description": "CLI provider for workspace queries ('auto' uses the first available provider)"
+        },
+        "janumicode.speech.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable speech-to-text input via microphone. Requires SoX (rec command) to be installed."
+        },
+        "janumicode.speech.backend": {
+          "type": "string",
+          "enum": [
+            "whisper-api",
+            "whisper-local"
+          ],
+          "default": "whisper-api",
+          "description": "Speech-to-text backend: 'whisper-api' (OpenAI Whisper cloud) or 'whisper-local' (local whisper CLI)"
+        },
+        "janumicode.speech.model": {
+          "type": "string",
+          "default": "whisper-1",
+          "description": "Model for transcription. API: 'whisper-1'. Local: 'base.en', 'small.en', 'medium.en', etc."
+        },
+        "janumicode.speech.language": {
+          "type": "string",
+          "default": "",
+          "description": "ISO 639-1 language code for transcription (e.g. 'en', 'es', 'fr'). Leave empty for auto-detect."
+        },
+        "janumicode.speech.soxRecPath": {
+          "type": "string",
+          "default": "rec",
+          "description": "Path to the SoX 'rec' binary for audio recording. Usually 'rec' if SoX is on PATH."
+        },
+        "janumicode.speech.localWhisperPath": {
+          "type": "string",
+          "default": "whisper",
+          "description": "Path to the local whisper CLI binary. Only used when backend is 'whisper-local'."
         }
       }
     }
@@ -384,7 +444,12 @@
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vscode-test",
-    "rebuild:native": "electron-rebuild -f -w better-sqlite3 -v 39.3.0"
+    "test:unit": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:host": "tsc -p tsconfig.test.json && node esbuild.js && vscode-test",
+    "test:ci": "vitest run",
+    "rebuild:native": "node scripts/ensure-native-modules.js --force"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",
@@ -393,20 +458,25 @@
     "@types/node": "22.x",
     "@types/uuid": "^11.0.0",
     "@types/vscode": "^1.109.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "npm-run-all": "^4.1.5",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0"
+    "typescript-eslint": "^8.54.0",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.73.0",
+    "@esbuild/linux-x64": "^0.27.3",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
     "@sqliteai/sqlite-vector": "^0.9.92",
     "better-sqlite3": "^12.6.2",
     "nanoid": "^3.3.11",
     "openai": "^6.18.0",
+    "rollup": "^4.59.0",
     "uuid": "^13.0.0"
   }
 }

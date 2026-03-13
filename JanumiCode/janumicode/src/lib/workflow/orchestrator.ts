@@ -8,6 +8,7 @@ import type {
 	Result,
 	Phase,
 	Claim,
+	Verdict,
 	LLMProviderInterface,
 	RoleLLMConfig,
 } from '../types';
@@ -32,11 +33,25 @@ import {
 import { hasOpenGates, createReviewGate, createGate, GateTriggerCondition } from './gates';
 import {
 	executeIntakeConversationTurn,
+	executeIntakeGatheringTurn,
 	executeIntakePlanFinalization,
 	executeIntakePlanApproval,
+	executeIntakeAnalysis,
+	executeIntakeClarificationTurn,
 } from './intakePhase';
-import { IntakeSubState } from '../types';
+import { IntakeSubState, IntakeMode } from '../types';
+import type { DomainCoverageMap } from '../types';
 import { getOrCreateIntakeConversation } from '../events/reader';
+import { updateIntakeConversation } from '../events/writer';
+import { classifyIntakeInput } from './intakeClassifier';
+import {
+	initializeCoverageMap,
+	formatUncoveredDomainsForPrompt,
+	getCoverageGaps,
+	DOMAIN_INFO,
+	DOMAIN_SEQUENCE,
+} from './domainCoverageTracker';
+import { getEventBus } from '../integration/eventBus';
 import { executeVerification } from './verification';
 import {
 	invokeExecutor,
@@ -46,6 +61,7 @@ import {
 } from '../roles/executor';
 import {
 	invokeHistorianInterpreter,
+	invokeHistorianAdjudication,
 } from '../roles/historianInterpreter';
 import { HistorianQueryType } from '../context';
 import { getDatabase } from '../database';
@@ -80,7 +96,7 @@ import {
 	getRepairPacketsForUnit,
 } from '../database/makerStore';
 import { decomposeGoalIntoTaskGraph } from './taskDecomposer';
-import { checkDecompositionQuality, getNextReadyUnits, completeUnitAndPropagate, isGraphComplete, getGraphProgress } from './taskGraph';
+import { checkDecompositionQuality, getNextReadyUnits, completeUnitAndPropagate, isGraphComplete, getGraphProgress, resetStaleInProgressUnits } from './taskGraph';
 import { detectToolchains, runUnitValidation, classifyFailureType } from './validationPipeline';
 import { classifyRepairability, canAttemptRepair, attemptRepair } from './repairEngine';
 import { routeTaskToProvider } from './taskRouter';
@@ -88,7 +104,7 @@ import { getAllProviderProfiles } from '../cli/providerCapabilities';
 import { getProviderCapabilityOverrides } from '../config/manager';
 import { buildMakerPlannerContext } from '../context/builders/makerPlanner';
 import { invokeExecutorForUnit } from '../roles/executor';
-import { createRepairEscalationGate } from './gates';
+import { createEnrichedRepairEscalationGate } from './gates';
 import { getWorkspaceRoot } from '../context/workspaceReader';
 
 /**
@@ -224,12 +240,41 @@ export async function executeIntakePhase(
 		const conv = convResult.value;
 
 		switch (conv.subState) {
+			case IntakeSubState.ANALYZING:
+				return await executeIntakeAnalysis(dialogueId, humanInput);
+
+			case IntakeSubState.PROPOSING:
+				// User responded to the proposal — transition to CLARIFYING
+				updateIntakeConversation(dialogueId, {
+					subState: IntakeSubState.CLARIFYING,
+					clarificationRound: 1,
+				});
+				return await executeIntakeClarificationTurn(dialogueId, humanInput);
+
+			case IntakeSubState.CLARIFYING:
+				return await executeIntakeClarificationTurn(dialogueId, humanInput);
+
+			case IntakeSubState.GATHERING:
+				return await executeIntakeGatheringTurn(dialogueId, humanInput);
+
 			case IntakeSubState.DISCUSSING:
-				// Cache the goal on first turn for later use by PROPOSE
+				// First turn: cache goal, run classifier, initialize coverage
 				if (conv.turnCount === 0) {
 					updateWorkflowMetadata(dialogueId, {
 						lastIntakeGoal: humanInput,
 					});
+					await initializeAdaptiveIntake(dialogueId, humanInput, []);
+
+					// Re-read conv after initialization to get mode-aware state
+					const freshResult = getOrCreateIntakeConversation(dialogueId);
+					if (freshResult.success) {
+						const fresh = freshResult.value;
+						// STATE_DRIVEN and DOMAIN_GUIDED now use inverted flow (ANALYZING)
+						if (fresh.intakeMode === IntakeMode.STATE_DRIVEN ||
+							fresh.intakeMode === IntakeMode.DOMAIN_GUIDED) {
+							return await executeIntakeAnalysis(dialogueId, humanInput);
+						}
+					}
 				}
 				return await executeIntakeConversationTurn(
 					dialogueId,
@@ -1116,31 +1161,87 @@ export async function executeHistoricalCheckPhase(
 			});
 		}
 
-		const historianResult = await invokeHistorianInterpreter({
-			dialogueId,
-			query: 'Check for contradictions and relevant precedents',
-			queryType: HistorianQueryType.GENERAL_HISTORY,
-			tokenBudget,
-			provider: historianProviderResult.value,
-			commandId: histCheckCommandId,
-		});
+		// ── Read claims + verdicts from DB for per-claim adjudication ──
+		const db = getDatabase();
+		const claims: Claim[] = db
+			? (db.prepare('SELECT * FROM claims WHERE dialogue_id = ?').all(dialogueId) as Claim[])
+			: [];
+		const verdicts: Verdict[] = db
+			? (db.prepare(
+				'SELECT v.* FROM verdicts v JOIN claims c ON v.claim_id = c.claim_id WHERE c.dialogue_id = ?'
+			).all(dialogueId) as Verdict[])
+			: [];
 
-		if (!historianResult.success) {
-			emitWorkflowCommand({
+		// ── Try per-claim adjudication first, fallback to generic query ──
+		let findings: string[] = [];
+		let adjudicationData: any = null;
+
+		if (claims.length > 0) {
+			const adjResult = await invokeHistorianAdjudication({
 				dialogueId,
+				claims,
+				verdicts,
+				tokenBudget,
+				provider: historianProviderResult.value,
 				commandId: histCheckCommandId,
-				action: 'error',
-				commandType: 'role_invocation',
-				label: 'Historian — Checking Precedents',
-				summary: `Failed: ${historianResult.error.message}`,
-				status: 'error',
-				timestamp: new Date().toISOString(),
 			});
-			return historianResult as Result<PhaseExecutionResult>;
+
+			if (adjResult.success) {
+				adjudicationData = adjResult.value;
+				findings = adjResult.value.general_findings ?? [];
+
+				// Emit adjudication summary
+				const adjCount = adjResult.value.claim_adjudications.length;
+				const verdictCounts = adjResult.value.claim_adjudications.reduce((acc, a) => {
+					acc[a.verdict] = (acc[a.verdict] || 0) + 1;
+					return acc;
+				}, {} as Record<string, number>);
+				const verdictSummary = Object.entries(verdictCounts)
+					.map(([v, c]) => `${c} ${v}`)
+					.join(', ');
+
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: histCheckCommandId,
+					action: 'output',
+					commandType: 'role_invocation',
+					label: 'Historian',
+					summary: `── Adjudication (${adjCount} claims: ${verdictSummary}) ──`,
+					detail: adjResult.value.summary,
+					timestamp: new Date().toISOString(),
+				});
+			}
 		}
 
-		// Emit findings as output
-		const findings = historianResult.value.findings ?? [];
+		// Fallback to generic query if adjudication failed or no claims
+		if (!adjudicationData) {
+			const historianResult = await invokeHistorianInterpreter({
+				dialogueId,
+				query: 'Check for contradictions and relevant precedents',
+				queryType: HistorianQueryType.GENERAL_HISTORY,
+				tokenBudget,
+				provider: historianProviderResult.value,
+				commandId: histCheckCommandId,
+			});
+
+			if (!historianResult.success) {
+				emitWorkflowCommand({
+					dialogueId,
+					commandId: histCheckCommandId,
+					action: 'error',
+					commandType: 'role_invocation',
+					label: 'Historian — Checking Precedents',
+					summary: `Failed: ${historianResult.error.message}`,
+					status: 'error',
+					timestamp: new Date().toISOString(),
+				});
+				return historianResult as Result<PhaseExecutionResult>;
+			}
+
+			findings = historianResult.value.findings ?? [];
+		}
+
+		// Emit general findings as output
 		if (findings.length > 0) {
 			const findingsText = findings
 				.map((f: any, i: number) => `${i + 1}. ${typeof f === 'string' ? f : JSON.stringify(f)}`)
@@ -1162,8 +1263,10 @@ export async function executeHistoricalCheckPhase(
 			commandId: histCheckCommandId,
 			action: 'complete',
 			commandType: 'role_invocation',
-			label: 'Historian — Checking Precedents',
-			summary: `Found ${findings.length} finding(s)`,
+			label: 'Historian — Consistency Adjudication',
+			summary: adjudicationData
+				? `Adjudicated ${adjudicationData.claim_adjudications.length} claim(s), ${findings.length} finding(s)`
+				: `Found ${findings.length} finding(s)`,
 			status: 'success',
 			timestamp: new Date().toISOString(),
 		});
@@ -1182,9 +1285,12 @@ export async function executeHistoricalCheckPhase(
 					? getLogger().child({ component: 'evaluator', dialogueId })
 					: undefined;
 
-				// Mark current branch as analyzed and store its findings
+				// Mark current branch as analyzed and store its findings + adjudication
 				branches[currentIdx].status = 'analyzed';
-				branches[currentIdx].historical_findings = historianResult.value.findings;
+				branches[currentIdx].historical_findings = findings;
+				if (adjudicationData) {
+					branches[currentIdx].historian_adjudication = adjudicationData;
+				}
 
 				const nextIdx = currentIdx + 1;
 
@@ -1215,7 +1321,7 @@ export async function executeHistoricalCheckPhase(
 							success: true,
 							nextPhase: 'ASSUMPTION_SURFACING' as Phase,
 							metadata: {
-								findings: historianResult.value.findings,
+								findings,
 								branchCompleted: branches[currentIdx].label,
 								branchesRemaining: branches.length - nextIdx,
 							},
@@ -1235,13 +1341,17 @@ export async function executeHistoricalCheckPhase(
 			}
 		}
 
-		// Persist findings to workflow metadata so the review gate card can access them
-		updateWorkflowMetadata(dialogueId, {
-			historical_findings: historianResult.value.findings,
-		});
+		// Persist to workflow metadata so the review gate card can access them
+		const metadataUpdate: Record<string, any> = {
+			historical_findings: findings,
+		};
+		if (adjudicationData) {
+			metadataUpdate.historian_adjudication = adjudicationData;
+		}
+		updateWorkflowMetadata(dialogueId, metadataUpdate);
 
 		// ── MAKER: Create HistoricalInvariantPacket from findings ──
-		createMakerHistoricalPacket(dialogueId, historianResult.value.findings);
+		createMakerHistoricalPacket(dialogueId, findings);
 
 		return {
 			success: true,
@@ -1799,11 +1909,96 @@ function formatApprovedPlanForExecutor(
 		sections.push(`## Proposed Approach\n\n${plan.proposedApproach}`);
 	}
 
+	// Domain coverage gap enrichment (Adaptive Deep INTAKE)
+	const domainCoverage = plan.domainCoverage as DomainCoverageMap | undefined;
+	if (domainCoverage) {
+		const gaps = getCoverageGaps(domainCoverage);
+		if (gaps.length > 0) {
+			sections.push(
+				'## Domain Coverage Gaps (from INTAKE)\n\n' +
+				'The following engineering domains had limited coverage during INTAKE. ' +
+				'Generate explicit assumptions for these areas:\n\n' +
+				gaps.map(d => `- **${DOMAIN_INFO[d].label}**: ${DOMAIN_INFO[d].description}`).join('\n')
+			);
+		}
+	}
+
 	sections.push(
 		'\n---\n\nImplement this plan. Generate a concrete proposal with assumptions.'
 	);
 
 	return sections.join('\n\n');
+}
+
+// ==================== ADAPTIVE DEEP INTAKE HELPERS ====================
+
+/**
+ * Initialize the Adaptive Deep INTAKE on first turn:
+ * - Run the LLM-backed classifier (falls back to heuristics)
+ * - Auto-select mode and initialize coverage map
+ * - Emit classifier result and mode selection events
+ */
+async function initializeAdaptiveIntake(
+	dialogueId: string,
+	humanInput: string,
+	attachments: string[],
+): Promise<void> {
+	try {
+		const recommendation = await classifyIntakeInput(humanInput, attachments, dialogueId);
+
+		// Initialize coverage map and set mode
+		const coverageMap = initializeCoverageMap();
+
+		// STATE_DRIVEN and DOMAIN_GUIDED use inverted flow (ANALYZING → PROPOSING → CLARIFYING)
+		// HYBRID_CHECKPOINTS uses the original flow (DISCUSSING)
+		const needsAnalysis = recommendation.recommended === IntakeMode.STATE_DRIVEN
+			|| recommendation.recommended === IntakeMode.DOMAIN_GUIDED;
+		const currentDomain = null; // No sequential domain walk in inverted flow
+		const initialSubState = needsAnalysis
+			? IntakeSubState.ANALYZING
+			: IntakeSubState.DISCUSSING;
+
+		// Persist to DB
+		updateIntakeConversation(dialogueId, {
+			intakeMode: recommendation.recommended,
+			domainCoverage: coverageMap,
+			currentDomain,
+			checkpoints: [],
+			classifierResult: recommendation,
+			subState: initialSubState,
+			clarificationRound: 0,
+		});
+
+		// Emit events
+		getEventBus().emit('intake:classifier_result', {
+			dialogueId,
+			recommendation,
+		});
+		getEventBus().emit('intake:mode_selected', {
+			dialogueId,
+			mode: recommendation.recommended,
+			source: 'classifier',
+		});
+		getEventBus().emit('intake:domain_coverage_updated', {
+			dialogueId,
+			coverage: coverageMap,
+		});
+
+		if (isLoggerInitialized()) {
+			getLogger().child({ component: 'orchestrator:intake' }).info(
+				`Adaptive INTAKE initialized: mode=${recommendation.recommended}, confidence=${recommendation.confidence}`,
+				{ dialogueId, recommendation },
+			);
+		}
+	} catch (error) {
+		// Non-fatal: if classifier fails, conversation proceeds without adaptive mode
+		if (isLoggerInitialized()) {
+			getLogger().child({ component: 'orchestrator:intake' }).warn(
+				'Failed to initialize adaptive INTAKE — proceeding without domain tracking',
+				{ dialogueId, error: error instanceof Error ? error.message : String(error) },
+			);
+		}
+	}
 }
 
 // ==================== MAKER HELPER FUNCTIONS ====================
@@ -2114,6 +2309,14 @@ async function executeMakerExecutePhase(
 	// Update graph status
 	updateTaskGraphStatus(graphId, 'IN_PROGRESS');
 
+	// Reset any units stuck in IN_PROGRESS/VALIDATING/REPAIRING from a prior
+	// killed or cancelled execution. Without this, those units would be invisible
+	// to getNextReadyUnits() and cause a deadlock.
+	const staleReset = resetStaleInProgressUnits(graphId);
+	if (staleReset.success && staleReset.value > 0) {
+		logger?.warn(`Reset ${staleReset.value} stale in-progress unit(s) to READY`);
+	}
+
 	// Get ready units and process them
 	const readyResult = getNextReadyUnits(graphId);
 	if (!readyResult.success || readyResult.value.length === 0) {
@@ -2150,7 +2353,7 @@ async function executeMakerExecutePhase(
 			commandId: unitCommandId,
 			action: 'start',
 			commandType: 'cli_invocation',
-			label: `Unit: ${unit.label}`,
+			label: `Executor — Unit: ${unit.label}`,
 			summary: unit.goal.substring(0, 120),
 			status: 'running',
 			timestamp: new Date().toISOString(),
@@ -2206,14 +2409,18 @@ async function executeMakerExecutePhase(
 				commandId: unitCommandId,
 				action: 'error',
 				commandType: 'cli_invocation',
-				label: `Unit: ${unit.label}`,
+				label: `Executor — Unit: ${unit.label}`,
 				summary: `Execution failed: ${errorMsg}`,
 				status: 'error',
 				timestamp: new Date().toISOString(),
 			});
 			updateTaskUnitStatus(unit.unit_id, 'FAILED');
 			gateTriggered = true;
-			createRepairEscalationGate(dialogueId, unit.unit_id, 'runtime_error', `Unit execution failed: ${errorMsg}`);
+			await createEnrichedRepairEscalationGate(
+				dialogueId, unit.unit_id, 'runtime_error',
+				`Unit execution failed: ${errorMsg}`, unit.label,
+				execResult.value?.response ?? '', unit.goal,
+			);
 			break;
 		}
 
@@ -2232,7 +2439,7 @@ async function executeMakerExecutePhase(
 				commandId: unitCommandId,
 				action: 'complete',
 				commandType: 'cli_invocation',
-				label: `Unit: ${unit.label}`,
+				label: `Executor — Unit: ${unit.label}`,
 				summary: `Completed and validated`,
 				status: 'success',
 				timestamp: new Date().toISOString(),
@@ -2275,7 +2482,7 @@ async function executeMakerExecutePhase(
 							commandId: unitCommandId,
 							action: 'complete',
 							commandType: 'cli_invocation',
-							label: `Unit: ${unit.label}`,
+							label: `Executor — Unit: ${unit.label}`,
 							summary: `Repaired and validated`,
 							status: 'success',
 							timestamp: new Date().toISOString(),
@@ -2286,7 +2493,11 @@ async function executeMakerExecutePhase(
 				// Repair failed or re-validation failed — escalate
 				updateTaskUnitStatus(unit.unit_id, 'FAILED');
 				gateTriggered = true;
-				createRepairEscalationGate(dialogueId, unit.unit_id, failureType, `Auto-repair failed for unit "${unit.label}"`);
+				await createEnrichedRepairEscalationGate(
+					dialogueId, unit.unit_id, failureType,
+					`Auto-repair failed for unit "${unit.label}"`, unit.label,
+					execResult.value?.response ?? '', unit.goal,
+				);
 			} else {
 				// Cannot auto-repair — escalate immediately
 				updateTaskUnitStatus(unit.unit_id, 'FAILED');
@@ -2294,7 +2505,11 @@ async function executeMakerExecutePhase(
 				const reason = classification === RepairClassification.ESCALATE_REQUIRED
 					? `Failure type "${failureType}" requires human intervention`
 					: canRepair.reason ?? 'Repair budget exhausted';
-				createRepairEscalationGate(dialogueId, unit.unit_id, failureType, `${reason} (unit: "${unit.label}")`);
+				await createEnrichedRepairEscalationGate(
+					dialogueId, unit.unit_id, failureType,
+					`${reason} (unit: "${unit.label}")`, unit.label,
+					execResult.value?.response ?? '', unit.goal,
+				);
 			}
 
 			emitWorkflowCommand({
@@ -2302,7 +2517,7 @@ async function executeMakerExecutePhase(
 				commandId: unitCommandId,
 				action: 'error',
 				commandType: 'cli_invocation',
-				label: `Unit: ${unit.label}`,
+				label: `Executor — Unit: ${unit.label}`,
 				summary: `Validation failed: ${failureType}`,
 				status: 'error',
 				timestamp: new Date().toISOString(),

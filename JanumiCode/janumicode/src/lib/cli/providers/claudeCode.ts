@@ -163,8 +163,8 @@ export class ClaudeCodeRoleCLIProvider implements RoleCLIProvider {
 			const raw = await spawnCLIStreamingWithStdin(
 				claudePath, args, cwd, timeout, options.stdinContent,
 				(line) => {
-					const event = normalizeClaudeCodeStreamEvent(line);
-					if (event) {
+					const events = normalizeClaudeCodeStreamEvent(line);
+					for (const event of events) {
 						onEvent(event);
 					}
 				}
@@ -247,6 +247,16 @@ function buildArgs(outputFormat: string, options: RoleCLIInvocationOptions): str
 		args.push('--mcp-config', ...options.mcpConfigPaths);
 	}
 
+	// Tool permission allow-list — enables non-interactive file writes etc.
+	if (options.allowedTools && options.allowedTools.length > 0) {
+		args.push('--allowedTools', options.allowedTools.join(','));
+	}
+
+	// MCP permission prompt tool — intercepts tool permission requests in non-interactive mode
+	if (options.permissionPromptTool) {
+		args.push('--permission-prompt-tool', options.permissionPromptTool);
+	}
+
 	return args;
 }
 
@@ -285,117 +295,208 @@ function parseClaudeCodeOutput(
 }
 
 /**
- * Normalize a single JSONL line from Claude Code stream-json into CLIActivityEvent.
+ * Normalize a single JSONL line from Claude Code stream-json into CLIActivityEvents.
+ * Returns an array because a single assistant message may contain both text and
+ * tool_use content blocks, each of which needs its own event.
  */
-function normalizeClaudeCodeStreamEvent(line: string): CLIActivityEvent | null {
+function normalizeClaudeCodeStreamEvent(line: string): CLIActivityEvent[] {
 	try {
 		const event = JSON.parse(line);
 
-		// Claude Code stream-json events vary by type
-		if (event.type === 'tool_use' || event.tool) {
-			const toolName = event.tool || event.name || event.type;
-			const isFileRead = /read/i.test(toolName);
-			const isFileWrite = /write|edit|create/i.test(toolName);
-			const isBash = /bash|shell|command/i.test(toolName);
-			const isGlob = /glob/i.test(toolName);
+		// Assistant messages may contain both text and tool_use blocks.
+		// Handle them specially to emit multiple events.
+		if (event.type === 'assistant') {
+			return normalizeAssistantMulti(event);
+		}
 
-			let eventType: CLIActivityEvent['eventType'] = 'tool_call';
-			if (isFileRead) {
-				eventType = 'file_read';
-			} else if (isFileWrite) {
-				eventType = 'file_write';
-			} else if (isBash) {
-				eventType = 'command_exec';
+		const handler = STREAM_EVENT_HANDLERS[event.type as string];
+		if (handler) {
+			const result = handler(event);
+			return result ? [result] : [];
+		}
+
+		// tool_use events may not have type === 'tool_use' but do have .tool
+		if (event.tool) { return [normalizeToolUse(event)]; }
+
+		// Unknown event types — suppress rather than dump raw JSON
+		return [];
+	} catch {
+		// Not valid JSON — treat as plain text message
+		if (!line.trim()) { return []; }
+		return [{
+			timestamp: new Date().toISOString(),
+			eventType: 'message',
+			summary: line.substring(0, 150),
+			detail: line.length > 150 ? line : undefined,
+		}];
+	}
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StreamEventHandler = (event: any) => CLIActivityEvent | null;
+
+/** Dispatch table for stream-json event types. */
+const STREAM_EVENT_HANDLERS: Record<string, StreamEventHandler> = {
+	// Suppress system init — command header already shows CLI invocation.
+	system: () => null,
+
+	// User messages wrap tool_results. Individual tool_result events are
+	// captured separately, so suppress conversation-level wrappers.
+	// Exception: surface permission denials as actionable errors.
+	user: (event) => {
+		const blocks = event.message?.content;
+		if (!Array.isArray(blocks)) { return null; }
+		for (const block of blocks) {
+			if (block.is_error && typeof block.content === 'string' &&
+				block.content.includes('permissions')) {
+				return {
+					timestamp: new Date().toISOString(),
+					eventType: 'error' as const,
+					summary: block.content.substring(0, 120),
+					status: 'error' as const,
+				};
 			}
-
-			// Extract structured tool input
-			let input: string | undefined;
-			if (isBash) {
-				input = event.input?.command ?? '';
-			} else if (isFileRead) {
-				input = event.input?.file_path ?? event.input?.path ?? '';
-			} else if (isGlob) {
-				input = event.input?.pattern ?? '';
-			} else if (isFileWrite) {
-				input = event.input?.file_path ?? event.input?.path ?? '';
-			} else if (event.input) {
-				input = JSON.stringify(event.input);
-			}
-
-			return {
-				timestamp: new Date().toISOString(),
-				eventType,
-				summary: `${toolName}${event.input?.path ? `: ${event.input.path}` : ''}`,
-				detail: JSON.stringify(event),
-				toolName,
-				filePath: event.input?.path || event.input?.file_path,
-				input,
-				toolUseId: event.id,
-			};
 		}
+		return null;
+	},
 
-		if (event.type === 'tool_result') {
-			// Extract readable output text
-			let output: string | undefined;
-			if (typeof event.content === 'string') {
-				output = event.content;
-			} else if (Array.isArray(event.content)) {
-				output = event.content
-					.filter((b: { type?: string }) => b.type === 'text')
-					.map((b: { text?: string }) => b.text ?? '')
-					.join('\n');
-			} else if (event.output) {
-				output = String(event.output);
-			}
-
-			return {
-				timestamp: new Date().toISOString(),
-				eventType: 'tool_result',
-				summary: `Tool result: ${event.status || 'completed'}`,
-				detail: JSON.stringify(event),
-				status: event.error ? 'error' : 'success',
-				output,
-				toolUseId: event.tool_use_id,
-			};
-		}
-
-		if (event.type === 'assistant' || event.role === 'assistant') {
-			const content = event.content || event.text || '';
-			return {
-				timestamp: new Date().toISOString(),
-				eventType: 'message',
-				summary: typeof content === 'string' ? content.substring(0, 100) : 'Assistant message',
-				detail: typeof content === 'string' ? content : JSON.stringify(content),
-			};
-		}
-
-		if (event.type === 'error') {
-			return {
-				timestamp: new Date().toISOString(),
-				eventType: 'error',
-				summary: event.message || event.error || 'Unknown error',
-				detail: JSON.stringify(event),
-				status: 'error',
-			};
-		}
-
-		// Generic event — store at Level 3 only
+	// Final result — show completion text cleanly.
+	result: (event) => {
+		const text = typeof event.result === 'string' ? event.result : '';
+		if (!text) { return null; }
 		return {
 			timestamp: new Date().toISOString(),
 			eventType: 'message',
-			summary: event.type || 'Event',
-			detail: JSON.stringify(event),
+			summary: text.substring(0, 150),
+			detail: text.length > 150 ? text : undefined,
 		};
-	} catch {
-		// Not valid JSON — treat as plain text message
-		if (line.trim()) {
-			return {
+	},
+
+	tool_use: normalizeToolUse,
+	tool_result: normalizeToolResult,
+
+	error: (event) => ({
+		timestamp: new Date().toISOString(),
+		eventType: 'error',
+		summary: event.message || event.error || 'Unknown error',
+		detail: JSON.stringify(event),
+		status: 'error',
+	}),
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeToolUse(event: any): CLIActivityEvent {
+	const toolName: string = event.tool || event.name || event.type;
+	const eventType = classifyToolEventType(toolName);
+	const input = extractToolInput(toolName, event.input);
+
+	return {
+		timestamp: new Date().toISOString(),
+		eventType,
+		summary: event.input?.path ? toolName + ': ' + event.input.path : toolName,
+		detail: JSON.stringify(event),
+		toolName,
+		filePath: event.input?.path || event.input?.file_path,
+		input,
+		toolUseId: event.id,
+	};
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeToolResult(event: any): CLIActivityEvent {
+	let output: string | undefined;
+	if (typeof event.content === 'string') {
+		output = event.content;
+	} else if (Array.isArray(event.content)) {
+		output = extractTextBlocks(event.content);
+	} else if (event.output) {
+		output = String(event.output);
+	}
+
+	return {
+		timestamp: new Date().toISOString(),
+		eventType: 'tool_result',
+		summary: `Tool result: ${event.status || 'completed'}`,
+		detail: JSON.stringify(event),
+		status: event.error ? 'error' : 'success',
+		output,
+		toolUseId: event.tool_use_id,
+	};
+}
+
+/**
+ * Extract ALL events from an assistant message — both text and tool_use blocks.
+ * Claude Code's stream-json format can embed tool_use content blocks alongside
+ * text blocks in a single assistant message. We emit each as a separate event.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeAssistantMulti(event: any): CLIActivityEvent[] {
+	const msgContent = event.message?.content ?? event.content;
+	const events: CLIActivityEvent[] = [];
+
+	if (Array.isArray(msgContent)) {
+		// Extract text blocks as a single message event
+		const textContent = extractTextBlocks(msgContent);
+		if (textContent.trim()) {
+			events.push({
 				timestamp: new Date().toISOString(),
 				eventType: 'message',
-				summary: line.substring(0, 100),
-				detail: line,
-			};
+				summary: textContent.substring(0, 150),
+				detail: textContent.length > 150 ? textContent : undefined,
+			});
 		}
-		return null;
+
+		// Extract tool_use blocks as individual tool_call events
+		for (const block of msgContent) {
+			if (block.type === 'tool_use') {
+				events.push(normalizeToolUse({
+					...block,
+					tool: block.name,
+					type: 'tool_use',
+				}));
+			}
+		}
+	} else {
+		// Simple string or text content — just a message
+		const textContent = typeof msgContent === 'string'
+			? msgContent
+			: typeof event.text === 'string' ? event.text : '';
+		if (textContent.trim()) {
+			events.push({
+				timestamp: new Date().toISOString(),
+				eventType: 'message',
+				summary: textContent.substring(0, 150),
+				detail: textContent.length > 150 ? textContent : undefined,
+			});
+		}
 	}
+
+	return events;
+}
+
+/** Map a tool name to its CLIActivityEvent type. */
+function classifyToolEventType(toolName: string): CLIActivityEvent['eventType'] {
+	if (/read/i.test(toolName)) { return 'file_read'; }
+	if (/write|edit|create/i.test(toolName)) { return 'file_write'; }
+	if (/bash|shell|command/i.test(toolName)) { return 'command_exec'; }
+	return 'tool_call';
+}
+
+/** Extract the most meaningful input string from a tool_use event's input object. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractToolInput(toolName: string, input: any): string | undefined {
+	if (!input) { return undefined; }
+	if (/bash|shell|command/i.test(toolName)) { return input.command ?? ''; }
+	if (/read/i.test(toolName)) { return input.file_path ?? input.path ?? ''; }
+	if (/glob/i.test(toolName)) { return input.pattern ?? ''; }
+	if (/write|edit|create/i.test(toolName)) { return input.file_path ?? input.path ?? ''; }
+	return JSON.stringify(input);
+}
+
+/** Join text blocks from a content array, ignoring tool_use and other block types. */
+function extractTextBlocks(blocks: Array<{ type?: string; text?: string }>): string {
+	return blocks
+		.filter((b) => b.type === 'text')
+		.map((b) => b.text ?? '')
+		.join('\n');
 }

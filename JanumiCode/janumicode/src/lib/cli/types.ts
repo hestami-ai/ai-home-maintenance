@@ -57,6 +57,12 @@ export interface RoleCLIInvocationOptions {
 
 	/** Paths to MCP config JSON files to pass via --mcp-config (Claude Code only) */
 	mcpConfigPaths?: string[];
+
+	/** Claude Code tool names to allow without interactive approval (--allowedTools) */
+	allowedTools?: string[];
+
+	/** MCP tool name for permission prompt handling (--permission-prompt-tool) */
+	permissionPromptTool?: string;
 }
 
 /**

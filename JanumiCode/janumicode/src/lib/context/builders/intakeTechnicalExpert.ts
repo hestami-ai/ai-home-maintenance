@@ -19,6 +19,7 @@ import type {
 	IntakeConversationTurn,
 	IntakeAccumulation,
 } from '../../types/intake';
+import { isAnalysisResponse } from '../../types/intake';
 import {
 	getRecentIntakeTurns,
 	getIntakeTurns,
@@ -291,10 +292,14 @@ function formatConversationHistory(
 	if (recentTurns.length > 0) {
 		parts.push('## Recent Turns');
 		for (const turn of recentTurns) {
+			// Analysis turns use analysisSummary instead of conversationalResponse
+			const expertText = isAnalysisResponse(turn.expertResponse)
+				? turn.expertResponse.analysisSummary
+				: turn.expertResponse.conversationalResponse;
 			parts.push(
 				`### Turn ${turn.turnNumber}\n\n` +
 				`**Human:** ${turn.humanMessage}\n\n` +
-				`**Expert:** ${turn.expertResponse.conversationalResponse}`
+				`**Expert:** ${expertText}`
 			);
 		}
 	}
@@ -328,7 +333,11 @@ function estimateContextTokens(
 	// Recent turns
 	for (const turn of recentTurns) {
 		charCount += turn.humanMessage.length;
-		charCount += turn.expertResponse.conversationalResponse.length;
+		// Analysis turns use analysisSummary instead of conversationalResponse
+		const expertText = isAnalysisResponse(turn.expertResponse)
+			? turn.expertResponse.analysisSummary
+			: turn.expertResponse.conversationalResponse;
+		charCount += (expertText ?? '').length;
 	}
 
 	// Formatting overhead (~20%)

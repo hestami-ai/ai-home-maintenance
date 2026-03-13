@@ -70,7 +70,6 @@ export async function askClarification(
 		systemPrompt: CLARIFICATION_SYSTEM_PROMPT,
 		messages,
 		model,
-		maxTokens: 1500,
 		temperature: 0.3,
 	});
 

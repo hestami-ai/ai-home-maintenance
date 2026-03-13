@@ -18,11 +18,12 @@ import type { RoleCLIProvider } from '../cli/roleCLIProvider';
 import { buildStdinContent } from '../cli/types';
 import { randomUUID } from 'node:crypto';
 import { getLogger, isLoggerInitialized } from '../logging';
-import { emitWorkflowCommand, emitCLIActivity } from '../integration/eventBus';
+import { emitWorkflowCommand, emitCLIActivity, getEventBus } from '../integration/eventBus';
 import { updateWorkflowMetadata } from '../workflow/stateMachine';
 import { analyzeGoalForMobile } from '../mcp/goalDetector';
 import {
 	buildMobileSpecialistMCPConfig,
+	buildPermissionMCPConfig,
 	createMCPConfigFile,
 	cleanupMCPConfigFile,
 } from '../mcp/mcpConfigManager';
@@ -30,6 +31,9 @@ import {
 	isMobileSpecialistEnabled,
 	getMobileSpecialistConfig,
 } from '../config/manager';
+import { PermissionBridge, setActivePermissionBridge } from '../mcp/permissionBridge';
+import type { PermissionDecision } from '../mcp/permissionBridge';
+import * as path from 'node:path';
 
 /**
  * Executor invocation options
@@ -767,39 +771,114 @@ export async function invokeExecutorForUnit(
 
 		const startMs = Date.now();
 
-		// Invoke with streaming for real-time progress
-		const executionResult = await provider.invokeStreaming(
-			{
-				stdinContent,
-				outputFormat: 'stream-json',
-			},
-			(event) => {
-				emitCLIActivity(dialogueId, {
-					...event,
-					role: 'EXECUTOR' as Role,
-					phase: 'EXECUTE' as import('../types').Phase,
-				});
+		// Map unit's allowed_tools categories to Claude Code tool names
+		const allowedTools = mapUnitToolsToClaudeTools(unit.allowed_tools);
+
+		// ── Permission bridge lifecycle ──
+		// Start an HTTP bridge that intercepts Claude Code tool permission requests.
+		// The MCP permission server (child process) forwards requests here.
+		const permissionBridge = new PermissionBridge();
+		const mcpConfigPaths: string[] = [];
+		let permissionConfigPath: string | undefined;
+
+		try {
+			const permissionPort = await permissionBridge.start({
+				allowedTools,
+				maxChangeScope: unit.max_change_scope,
+				onHumanPrompt: async (request) => {
+					const permissionId = (request.input._permissionId as string) || randomUUID();
+					// Surface permission card in the Governed Stream webview
+					getEventBus().emit('permission:requested', {
+						dialogueId,
+						permissionId,
+						tool: request.tool,
+						input: request.input,
+					});
+					// Wait for user decision via event bus
+					return new Promise<PermissionDecision>((resolve) => {
+						const bus = getEventBus();
+						const unsub = bus.on('permission:decided', (payload) => {
+							if (payload.permissionId === permissionId) {
+								unsub();
+								if (payload.approveAll) {
+									permissionBridge.addSessionApproval(request.tool);
+								}
+								resolve({ approved: payload.approved, reason: payload.reason });
+							}
+						});
+					});
+				},
+			});
+
+			setActivePermissionBridge(permissionBridge);
+
+			// Build MCP config for the permission server
+			// __dirname at runtime is the dist/ directory (extension.js is bundled there),
+			// and permissionServer.js is at dist/mcp/permissionServer.js
+			const permissionServerPath = path.join(__dirname, 'mcp', 'permissionServer.js');
+
+			// Diagnostic: verify the MCP server script exists
+			const fs = await import('node:fs');
+			const serverExists = fs.existsSync(permissionServerPath);
+			console.log(`[PermissionBridge] __dirname = ${__dirname}`);
+			console.log(`[PermissionBridge] permissionServerPath = ${permissionServerPath}`);
+			console.log(`[PermissionBridge] server file exists = ${serverExists}`);
+			console.log(`[PermissionBridge] bridge port = ${permissionPort}`);
+
+			const permissionMCPConfig = buildPermissionMCPConfig(permissionServerPath, permissionPort);
+			permissionConfigPath = createMCPConfigFile(permissionMCPConfig);
+			mcpConfigPaths.push(permissionConfigPath);
+
+			// Diagnostic: log the MCP config file contents
+			console.log(`[PermissionBridge] MCP config path = ${permissionConfigPath}`);
+			console.log(`[PermissionBridge] MCP config = ${JSON.stringify(permissionMCPConfig, null, 2)}`);
+			const mcpLogPath = path.join(require('node:os').tmpdir(), 'janumicode-mcp', 'permission-server.log');
+			console.log(`[PermissionBridge] MCP server log file = ${mcpLogPath}`);
+
+			// Invoke with streaming for real-time progress
+			const executionResult = await provider.invokeStreaming(
+				{
+					stdinContent,
+					outputFormat: 'stream-json',
+					allowedTools,
+					mcpConfigPaths,
+					permissionPromptTool: 'mcp__janumicode-permission__decide_permission',
+				},
+				(event) => {
+					emitCLIActivity(dialogueId, {
+						...event,
+						role: 'EXECUTOR' as Role,
+						phase: 'EXECUTE' as import('../types').Phase,
+					});
+				}
+			);
+
+			const elapsedMs = Date.now() - startMs;
+
+			if (!executionResult.success) {
+				return {
+					success: false,
+					error: executionResult.error,
+				};
 			}
-		);
 
-		const elapsedMs = Date.now() - startMs;
-
-		if (!executionResult.success) {
 			return {
-				success: false,
-				error: executionResult.error,
+				success: true,
+				value: {
+					success: executionResult.value.exitCode === 0,
+					exitCode: executionResult.value.exitCode,
+					response: executionResult.value.response ?? '',
+					executionTimeMs: elapsedMs,
+				},
 			};
+		} finally {
+			// Clean up permission bridge and temp config
+			setActivePermissionBridge(null);
+			await permissionBridge.stop().catch(() => {});
+			if (permissionConfigPath) {
+				cleanupMCPConfigFile(permissionConfigPath);
+			}
 		}
-
-		return {
-			success: true,
-			value: {
-				success: executionResult.value.exitCode === 0,
-				exitCode: executionResult.value.exitCode,
-				response: executionResult.value.response ?? '',
-				executionTimeMs: elapsedMs,
-			},
-		};
 	} catch (error) {
 		return {
 			success: false,
@@ -825,7 +904,7 @@ function formatUnitPrompt(unit: TaskUnit, plannerContext: string): string {
 	}
 
 	if (unit.max_change_scope) {
-		sections.push(`## Change Scope\n\nYou may ONLY modify files within: \`${unit.max_change_scope}\``);
+		sections.push(`## Change Scope\n\nYour primary workspace is: \`${unit.max_change_scope}\`\nFocus changes within this directory.`);
 	}
 
 	if (unit.inputs.length > 0) {
@@ -861,4 +940,51 @@ function formatUnitPrompt(unit: TaskUnit, plannerContext: string): string {
 	}
 
 	return sections.join('\n\n');
+}
+
+/**
+ * Map task-unit allowed_tools categories to Claude Code CLI tool names.
+ * Task units use semantic categories like "file_write", "bash", "file_read".
+ * Claude Code CLI --allowedTools expects tool names like "Write", "Edit", "Bash", "Read".
+ *
+ * Always includes read-only tools (Read, Glob, Grep) since every unit needs to
+ * inspect the workspace. Write/Edit/Bash are gated on unit declarations.
+ */
+function mapUnitToolsToClaudeTools(unitTools?: string[]): string[] {
+	// Read-only tools are always safe
+	const tools = ['Read', 'Glob', 'Grep'];
+
+	if (!unitTools || unitTools.length === 0) {
+		return tools;
+	}
+
+	for (const t of unitTools) {
+		switch (t.toLowerCase()) {
+			case 'file_write':
+			case 'write':
+				tools.push('Write', 'Edit');
+				break;
+			case 'bash':
+			case 'shell':
+			case 'command':
+				tools.push('Bash');
+				break;
+			case 'web_search':
+				tools.push('WebSearch', 'WebFetch');
+				break;
+			case 'notebook':
+				tools.push('NotebookEdit');
+				break;
+			case 'file_read':
+			case 'read':
+				break;  // Read/Glob/Grep always included
+			default:
+				// Pass through unrecognized names directly — lets the CLI handle them
+				tools.push(t);
+				break;
+		}
+	}
+
+	// Deduplicate
+	return [...new Set(tools)];
 }

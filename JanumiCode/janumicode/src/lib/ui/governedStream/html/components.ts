@@ -20,7 +20,11 @@ import { getHumanFacingStateClass } from '../../../workflow/humanFacingState';
 
 import type { WorkflowCommandRecord, WorkflowCommandOutput } from '../../../workflow/commandStore';
 
-import type { IntakePlanDocument, IntakeConversationTurn } from '../../../types/intake';
+import type { IntakePlanDocument, IntakeConversationTurn, IntakeGatheringTurnResponse } from '../../../types/intake';
+import { isGatheringResponse } from '../../../types/intake';
+import type { IntakeModeRecommendation, DomainCoverageMap, IntakeCheckpoint } from '../../../types';
+import { IntakeMode, DomainCoverageLevel } from '../../../types';
+import { DOMAIN_INFO, DOMAIN_SEQUENCE } from '../../../workflow/domainCoverageTracker';
 
 
 
@@ -56,6 +60,36 @@ function renderAskMoreToggle(itemId: string, itemContext: string): string {
 	return `<button class="ask-more-toggle" data-action="toggle-askmore"
 		data-clarification-item="${escaped}"
 		data-clarification-context="${escapedCtx}">Ask More</button>`;
+}
+
+// ===== Speech-to-Text Mic Button =====
+
+let _speechEnabled = false;
+let _soxAvailable = false;
+
+/** Called by GovernedStreamPanel before rendering to control mic button visibility. */
+export function setSpeechEnabled(enabled: boolean): void {
+	_speechEnabled = enabled;
+}
+
+/** Called by GovernedStreamPanel before rendering to control mic button disabled state. */
+export function setSoxAvailable(available: boolean): void {
+	_soxAvailable = available;
+}
+
+/** Render a mic button for a specific input area. Returns empty string if speech is disabled. */
+function renderMicButton(targetInputId: string): string {
+	if (!_speechEnabled) { return ''; }
+	const disabled = !_soxAvailable ? ' disabled' : '';
+	const title = _soxAvailable
+		? 'Click to record voice input'
+		: 'Speech-to-text requires SoX. Install the SoX &quot;rec&quot; command to enable.';
+	return `<button class="mic-btn" data-action="toggle-speech"
+		data-speech-target="${escapeHtml(targetInputId)}"
+		title="${title}"${disabled}>
+		<span class="mic-icon">&#x1F3A4;</span>
+		<span class="mic-recording-dot"></span>
+	</button>`;
 }
 
 /**
@@ -243,23 +277,74 @@ function verdictClass(status: string): string {
 
 
 function verdictIcon(status: string): string {
-
 	switch (status) {
-
 		case ClaimStatus.VERIFIED: return '&#x2705;';
-
 		case ClaimStatus.DISPROVED: return '&#x274C;';
-
 		case ClaimStatus.UNKNOWN: return '&#x2753;';
-
 		case ClaimStatus.CONDITIONAL: return '&#x26A0;';
-
 		default: return '&#x26AA;';
-
 	}
-
 }
 
+function adjudicationClass(verdict: string): string {
+	switch (verdict) {
+		case 'CONSISTENT': return 'consistent';
+		case 'INCONSISTENT': return 'inconsistent';
+		case 'CONDITIONAL': return 'adj-conditional';
+		case 'UNKNOWN': return 'adj-unknown';
+		default: return 'adj-unknown';
+	}
+}
+
+function adjudicationIcon(verdict: string): string {
+	switch (verdict) {
+		case 'CONSISTENT': return '&#x1F3DB;';
+		case 'INCONSISTENT': return '&#x26D4;';
+		case 'CONDITIONAL': return '&#x26A0;';
+		case 'UNKNOWN': return '&#x2753;';
+		default: return '&#x2753;';
+	}
+}
+
+function renderAdjudicationDetails(adj: NonNullable<ReviewItem['adjudication']>): string {
+	let html = '<div class="review-item-adjudication">';
+	html += `<div class="adjudication-rationale">Historian: ${escapeHtml(adj.rationale)}</div>`;
+
+	if (adj.citations.length > 0) {
+		html += '<div class="adjudication-citations">';
+		for (const cite of adj.citations) {
+			html += `<span class="citation-tag">${escapeHtml(cite)}</span>`;
+		}
+		html += '</div>';
+	}
+
+	if (adj.conflicts && adj.conflicts.length > 0) {
+		html += '<div class="adjudication-conflicts"><strong>Conflicts:</strong><ul>';
+		for (const conflict of adj.conflicts) {
+			html += `<li>${escapeHtml(conflict)}</li>`;
+		}
+		html += '</ul></div>';
+	}
+
+	if (adj.conditions && adj.conditions.length > 0) {
+		html += '<div class="adjudication-conditions"><strong>Conditions:</strong><ul>';
+		for (const cond of adj.conditions) {
+			html += `<li>${escapeHtml(cond)}</li>`;
+		}
+		html += '</ul></div>';
+	}
+
+	if (adj.verification_queries && adj.verification_queries.length > 0) {
+		html += '<div class="adjudication-queries"><strong>Missing evidence:</strong><ul>';
+		for (const q of adj.verification_queries) {
+			html += `<li>${escapeHtml(q)}</li>`;
+		}
+		html += '</ul></div>';
+	}
+
+	html += '</div>';
+	return html;
+}
 
 
 // ==================== STICKY HEADER ====================
@@ -823,7 +908,7 @@ function renderVerdictBadge(verdict: Verdict): string {
 
 
 
-export function renderHumanGateCard(gate: Gate, blockingClaims: Claim[], resolvedAction?: string): string {
+export function renderHumanGateCard(gate: Gate, blockingClaims: Claim[], resolvedAction?: string, metadata?: Record<string, unknown>): string {
 	const isResolved = gate.status === GateStatus.RESOLVED;
 
 	const claimsListHtml = blockingClaims.length > 0
@@ -843,6 +928,9 @@ export function renderHumanGateCard(gate: Gate, blockingClaims: Claim[], resolve
 	const expandedClass = isResolved ? '' : 'expanded';
 	const resolvedClass = isResolved ? ' resolved' : '';
 
+	// Build evaluation context section if available
+	const evaluationHtml = renderGateEvaluation(metadata);
+
 	return `
 		<div class="gate-card collapsible-card ${expandedClass}${resolvedClass}" data-gate-id="${escapeHtml(gate.gate_id)}">
 			<div class="collapsible-card-header gate-header" data-action="toggle-card">
@@ -856,6 +944,7 @@ export function renderHumanGateCard(gate: Gate, blockingClaims: Claim[], resolve
 						? 'This gate has been resolved. The decision is recorded below for reference.'
 						: 'The workflow is blocked and requires your input before proceeding.'}
 				</div>
+				${evaluationHtml}
 				<div class="gate-blocking-claims">
 					<h4>Blocking Claims</h4>
 					<ul class="claims-list">${claimsListHtml}</ul>
@@ -868,7 +957,10 @@ export function renderHumanGateCard(gate: Gate, blockingClaims: Claim[], resolve
 						placeholder="Explain your decision..."
 						data-gate-rationale="${escapeHtml(gate.gate_id)}"
 					></textarea>
-					<div class="gate-char-count" id="charcount-${escapeHtml(gate.gate_id)}">0 / 10 min</div>
+					<div class="response-toolbar">
+						<div class="gate-char-count" id="charcount-${escapeHtml(gate.gate_id)}">0 / 10 min</div>
+						${renderMicButton('gate-rationale:' + gate.gate_id)}
+					</div>
 				</div>
 				<div class="gate-actions">
 					<button class="gate-btn approve" disabled data-gate-id="${escapeHtml(gate.gate_id)}" data-action="gate-decision" data-gate-action="APPROVE">Approve</button>
@@ -880,6 +972,70 @@ export function renderHumanGateCard(gate: Gate, blockingClaims: Claim[], resolve
 			</div>
 		</div>
 	`;
+}
+
+/**
+ * Render the evaluator analysis section for enriched repair escalation gates.
+ * Returns empty string if no evaluation data is present.
+ */
+function renderGateEvaluation(metadata?: Record<string, unknown>): string {
+	if (!metadata) { return ''; }
+	const evaluation = metadata.evaluation as {
+		completionStatus?: string;
+		summary?: string;
+		deliverables?: string[];
+		issues?: string[];
+		recommendations?: string[];
+		contentRecoverable?: boolean;
+		intendedFilePath?: string;
+	} | undefined;
+	if (!evaluation) { return ''; }
+
+	const statusIcons: Record<string, string> = {
+		'completed_with_errors': '&#x26A0;',
+		'partially_completed': '&#x1F527;',
+		'blocked': '&#x1F6AB;',
+		'failed': '&#x274C;',
+	};
+	const statusLabels: Record<string, string> = {
+		'completed_with_errors': 'Completed with errors',
+		'partially_completed': 'Partially completed',
+		'blocked': 'Blocked',
+		'failed': 'Failed',
+	};
+
+	const status = evaluation.completionStatus || 'failed';
+	const statusClass = status.replace(/_/g, '-');
+	const icon = statusIcons[status] || '&#x2753;';
+	const label = statusLabels[status] || status;
+	const summary = evaluation.summary ? escapeHtml(evaluation.summary) : '';
+
+	const deliverables = Array.isArray(evaluation.deliverables) ? evaluation.deliverables : [];
+	const issues = Array.isArray(evaluation.issues) ? evaluation.issues : [];
+	const recommendations = Array.isArray(evaluation.recommendations) ? evaluation.recommendations : [];
+
+	let html = `<div class="gate-evaluation">`;
+	html += `<div class="gate-eval-status"><span class="gate-eval-badge ${escapeHtml(statusClass)}">${icon} ${escapeHtml(label)}</span></div>`;
+	if (summary) {
+		html += `<div class="gate-eval-summary">${summary}</div>`;
+	}
+	if (deliverables.length > 0) {
+		html += `<div class="gate-eval-section"><h4>Deliverables</h4><ul>${deliverables.map((d) => `<li>${escapeHtml(String(d))}</li>`).join('')}</ul></div>`;
+	}
+	if (issues.length > 0) {
+		html += `<div class="gate-eval-section"><h4>Issues</h4><ul>${issues.map((i) => `<li>${escapeHtml(String(i))}</li>`).join('')}</ul></div>`;
+	}
+	if (recommendations.length > 0) {
+		html += `<div class="gate-eval-section"><h4>Recommendations</h4><ul>${recommendations.map((r) => `<li>${escapeHtml(String(r))}</li>`).join('')}</ul></div>`;
+	}
+	if (evaluation.contentRecoverable) {
+		const suggestedPath = evaluation.intendedFilePath
+			? escapeHtml(evaluation.intendedFilePath)
+			: '&lt;path&gt;';
+		html += `<div class="gate-eval-recovery">Content recoverable &mdash; type <code>save ${suggestedPath}</code> to write the file</div>`;
+	}
+	html += `</div>`;
+	return html;
 }
 
 
@@ -977,6 +1133,7 @@ export function renderVerificationGateCard(
 					></textarea>
 					<div class="response-toolbar">
 						<div class="verification-claim-charcount" id="vg-charcount-${escapeHtml(claim.claim_id)}">0 / 10 min</div>
+						${renderMicButton('claim-rationale:' + claim.claim_id)}
 						${renderAskMoreToggle(claim.claim_id, claim.statement)}
 					</div>
 				</div>
@@ -1111,28 +1268,58 @@ export function renderReviewGateCard(
 			${summary.historianFindings > 0 ? `
 				<div class="review-dashboard-item">
 					<span class="count">${summary.historianFindings}</span>
-					<span style="font-size: 11px;">&#x1F4DC; Findings</span>
+					<span style="font-size: 13px;">&#x1F4DC; Findings</span>
 				</div>
 			` : ''}
 		</div>
+		${summary.adjudicationAvailable ? `
+		<div class="review-dashboard-bar adjudication-dashboard" style="margin-top: 6px;">
+			<div class="review-dashboard-item">
+				<span class="count">${summary.consistent}</span>
+				<span class="adjudication-badge consistent" style="font-size: 13px;">&#x1F3DB; Consistent</span>
+			</div>
+			<div class="review-dashboard-item">
+				<span class="count">${summary.inconsistent}</span>
+				<span class="adjudication-badge inconsistent" style="font-size: 13px;">&#x26D4; Inconsistent</span>
+			</div>
+			<div class="review-dashboard-item">
+				<span class="count">${summary.adjConditional}</span>
+				<span class="adjudication-badge adj-conditional" style="font-size: 13px;">&#x26A0; Conditional</span>
+			</div>
+			<div class="review-dashboard-item">
+				<span class="count">${summary.adjUnknown}</span>
+				<span class="adjudication-badge adj-unknown" style="font-size: 13px;">&#x2753; Unknown</span>
+			</div>
+		</div>
+		` : ''}
 	`;
 
 	// Render a single review item row
 	function renderReviewItemRow(item: ReviewItem, showResponse: boolean): string {
 		if (item.kind === 'claim' && item.claim) {
-			return renderReviewClaimRow(item.claim, item.verdict, showResponse);
+			return renderReviewClaimRow(item.claim, item.verdict, item.adjudication, showResponse);
 		} else if (item.kind === 'finding' && item.findingText) {
 			return renderReviewFindingRow(item.findingText, item.findingIndex ?? 0, showResponse);
 		}
 		return '';
 	}
 
-	function renderReviewClaimRow(claim: Claim, verdict: Verdict | undefined, showResponse: boolean): string {
+	function renderReviewClaimRow(
+		claim: Claim,
+		verdict: Verdict | undefined,
+		adjudication: ReviewItem['adjudication'],
+		showResponse: boolean,
+	): string {
 		const critClass = claim.criticality === 'CRITICAL' ? 'critical' : 'non-critical';
 		const rationale = verdict?.rationale;
 
 		const typeBadge = claim.assumption_type
 			? `<span class="assumption-type-badge">${escapeHtml(claim.assumption_type)}</span>`
+			: '';
+
+		// Adjudication badge (if available)
+		const adjBadge = adjudication
+			? `<span class="adjudication-badge ${adjudicationClass(adjudication.verdict)}">${adjudicationIcon(adjudication.verdict)} ${escapeHtml(adjudication.verdict)}</span>`
 			: '';
 
 		let html = `
@@ -1141,12 +1328,18 @@ export function renderReviewGateCard(
 					<span class="verdict-badge ${verdictClass(claim.status)}">${verdictIcon(claim.status)} ${escapeHtml(claim.status)}</span>
 					<span class="verification-claim-criticality ${critClass}">${escapeHtml(claim.criticality)}</span>
 					${typeBadge}
+					${adjBadge}
 				</div>
 				<div class="review-item-statement">${escapeHtml(claim.statement)}</div>
 		`;
 
 		if (rationale) {
 			html += `<div class="review-item-rationale">Verifier: ${escapeHtml(rationale)}</div>`;
+		}
+
+		// Historian adjudication details
+		if (adjudication) {
+			html += renderAdjudicationDetails(adjudication);
 		}
 
 		if (showResponse && !isResolved) {
@@ -1160,6 +1353,7 @@ export function renderReviewGateCard(
 					></textarea>
 					<div class="response-toolbar">
 						<div class="review-item-charcount" id="review-charcount-${escapeHtml(claim.claim_id)}">0 / 10 min</div>
+						${renderMicButton('review-item:' + claim.claim_id)}
 						${renderAskMoreToggle(claim.claim_id, claim.statement)}
 					</div>
 				</div>
@@ -1193,6 +1387,7 @@ export function renderReviewGateCard(
 					></textarea>
 					<div class="response-toolbar">
 						<div class="review-item-charcount" id="review-charcount-${escapeHtml(findingKey)}">0 / 10 min</div>
+						${renderMicButton('review-item:' + findingKey)}
 						${renderAskMoreToggle(findingKey, text)}
 					</div>
 				</div>
@@ -1320,7 +1515,10 @@ export function renderReviewGateCard(
 					placeholder="Additional comments, concerns, or instructions for the workflow..."
 					data-review-overall-rationale="${gateId}"
 				></textarea>
-				<div class="review-item-charcount" id="review-overall-charcount-${gateId}">0 characters</div>
+				<div class="response-toolbar">
+					<div class="review-item-charcount" id="review-overall-charcount-${gateId}">0 characters</div>
+					${renderMicButton('review-overall:' + gateId)}
+				</div>
 			</div>
 		`;
 		actionsHtml = `
@@ -1380,6 +1578,54 @@ export function renderReviewGateCard(
 
 
 
+// ==================== PERMISSION CARD ====================
+
+
+export function renderPermissionCard(permissionId: string, tool: string, input: Record<string, unknown>): string {
+	const escapedId = escapeHtml(permissionId);
+	const escapedTool = escapeHtml(tool);
+
+	// Build a human-readable summary of the tool input
+	let inputSummary = '';
+	if (input.command) {
+		inputSummary = `Command: ${escapeHtml(String(input.command).substring(0, 200))}`;
+	} else if (input.file_path || input.path) {
+		inputSummary = `File: ${escapeHtml(String(input.file_path || input.path))}`;
+	} else if (input.pattern) {
+		inputSummary = `Pattern: ${escapeHtml(String(input.pattern))}`;
+	} else {
+		const keys = Object.keys(input).filter(k => k !== '_permissionId');
+		if (keys.length > 0) {
+			inputSummary = keys.map(k => `${escapeHtml(k)}: ${escapeHtml(String(input[k]).substring(0, 100))}`).join(', ');
+		}
+	}
+
+	return `
+		<div class="permission-card" data-permission-id="${escapedId}">
+			<div class="permission-header">
+				<span class="permission-icon">&#x1F512;</span>
+				<span>Tool Permission Requested</span>
+			</div>
+			<div class="permission-body">
+				<div class="permission-tool-name">${escapedTool}</div>
+				${inputSummary ? `<div class="permission-input">${inputSummary}</div>` : ''}
+			</div>
+			<div class="permission-actions">
+				<button class="permission-btn permission-approve"
+					data-action="permission-approve"
+					data-permission-id="${escapedId}">Approve</button>
+				<button class="permission-btn permission-approve-all"
+					data-action="permission-approve-all"
+					data-permission-id="${escapedId}">Approve All (${escapedTool})</button>
+				<button class="permission-btn permission-deny"
+					data-action="permission-deny"
+					data-permission-id="${escapedId}">Deny</button>
+			</div>
+		</div>
+	`;
+}
+
+
 export function renderWarningCard(message: string): string {
 
 	return `
@@ -1415,27 +1661,16 @@ export function renderWarningCard(message: string): string {
 
 
 const PHASE_PLACEHOLDERS: Record<Phase, string> = {
-
-	[Phase.INTAKE]: 'Discuss your requirements with the Technical Expert...',
-
-	[Phase.PROPOSE]: 'Waiting for proposal...',
-
-	[Phase.ASSUMPTION_SURFACING]: 'Assumptions are being surfaced...',
-
-	[Phase.VERIFY]: 'Verification in progress...',
-
-	[Phase.HISTORICAL_CHECK]: 'Checking historical precedents...',
-
-	[Phase.REVIEW]: 'Provide review feedback...',
-
-	[Phase.EXECUTE]: 'Execution in progress...',
-
-	[Phase.VALIDATE]: 'Validation in progress...',
-
-	[Phase.COMMIT]: 'Ready to commit changes...',
-
-	[Phase.REPLAN]: 'Provide rationale for replanning...',
-
+	[Phase.INTAKE]: 'Discuss your requirements...',
+	[Phase.PROPOSE]: 'Ask a question or wait for the proposal...',
+	[Phase.ASSUMPTION_SURFACING]: 'Ask about assumptions or wait...',
+	[Phase.VERIFY]: 'Ask about results, approve, retry, or override...',
+	[Phase.HISTORICAL_CHECK]: 'Ask about historical findings...',
+	[Phase.REVIEW]: 'Approve, request changes, or ask a question...',
+	[Phase.EXECUTE]: 'Ask about progress, save output, or cancel...',
+	[Phase.VALIDATE]: 'Ask about validation results...',
+	[Phase.COMMIT]: 'Ask about results or start a new task...',
+	[Phase.REPLAN]: 'Provide feedback for replanning...',
 };
 
 
@@ -1477,11 +1712,16 @@ export function renderInputArea(currentPhase: Phase, hasOpenGates: boolean, gate
 
 						</button>
 
-						<span class="input-toolbar-hint">Type <kbd>@</kbd> to mention files &middot; <kbd>/retry</kbd> to retry &middot; <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline</span>
+						${renderMicButton('user-input')}
+
+						<span class="input-toolbar-hint">Natural language understood &middot; <kbd>@</kbd> mention files &middot; <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline</span>
 
 					</div>
 
-					<button class="input-submit-btn" id="submit-btn">Send</button>
+					<button class="input-submit-btn" id="submit-btn" title="Send (Enter)">
+						<span class="submit-icon" id="submit-icon">&#x2191;</span>
+						<span class="submit-spinner" id="submit-spinner"></span>
+					</button>
 
 				</div>
 
@@ -2238,6 +2478,88 @@ export function renderCommandBlock(
 // ==================== INTAKE CONVERSATION COMPONENTS ====================
 
 
+/**
+ * Render a gathering-phase turn card (Expert as Interviewer — no plan output).
+ * Shows domain badge, interviewer role, domain notes, and follow-up questions.
+ */
+function renderGatheringTurnCard(
+	turn: IntakeConversationTurn,
+	response: IntakeGatheringTurnResponse,
+	timestamp: string,
+	commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>,
+	isLatest?: boolean,
+): string {
+	const domainInfo = DOMAIN_INFO[response.focusDomain];
+	const domainLabel = domainInfo ? domainInfo.label : response.focusDomain;
+
+	const domainNotesHtml = response.domainNotes.length > 0
+		? '<div class="intake-domain-notes"><ul>' +
+			response.domainNotes.map((n) => '<li>' + escapeHtml(n) + '</li>').join('') +
+			'</ul></div>'
+		: '';
+
+	const findingsHtml = response.codebaseFindings && response.codebaseFindings.length > 0
+		? '<div class="intake-findings">' +
+			'<span class="intake-findings-label">Codebase findings:</span>' +
+			'<ul>' + response.codebaseFindings.map((f) => '<li><code>' + escapeHtml(f) + '</code></li>').join('') + '</ul>' +
+			'</div>'
+		: '';
+
+	const followUpHtml = response.followUpQuestions && response.followUpQuestions.length > 0
+		? '<div class="intake-suggestions">' +
+			'<span class="intake-suggestions-label">Consider asking:</span>' +
+			'<ul>' + response.followUpQuestions.map((q, i) => {
+				const qId = 'GQ-T' + turn.turnNumber + '-' + (i + 1);
+				if (isLatest) {
+					return '<li class="question-item">' +
+						'<span class="question-item-text">' + escapeHtml(q) + '</span>' +
+						'<div class="intake-question-response" data-clarification-item="' + qId + '">' +
+						'<div class="clarification-messages" id="clarification-messages-' + qId + '" style="display:none;"></div>' +
+						'<textarea class="intake-question-textarea" data-intake-question-id="' + qId + '" data-intake-question-text="' + escapeHtml(q) + '" placeholder="Type your response..." rows="2"></textarea>' +
+						'<div class="response-toolbar">' +
+						'<span class="intake-question-charcount" data-charcount-for="' + qId + '">0 chars</span>' +
+						renderMicButton('intake-question:' + qId) +
+						renderAskMoreToggle(qId, q) +
+						'</div></div></li>';
+				}
+				return '<li class="question-item"><span class="question-item-text">' + escapeHtml(q) + '</span></li>';
+			}).join('') +
+			'</ul></div>'
+		: '';
+
+	const humanPreview = escapeHtml(turn.humanMessage.substring(0, 60)) + (turn.humanMessage.length > 60 ? '\u2026' : '');
+
+	return '<div class="intake-turn-card gathering-turn collapsible-card expanded" data-intake-turn="' + turn.turnNumber + '">' +
+		'<div class="collapsible-card-header intake-turn-header" data-action="toggle-card">' +
+		'<span class="card-chevron">&#x25B6;</span>' +
+		'<span class="intake-turn-number">Turn ' + turn.turnNumber + '</span>' +
+		'<span class="intake-domain-badge">' + escapeHtml(domainLabel) + '</span>' +
+		'<span class="intake-turn-preview">' + humanPreview + '</span>' +
+		'<span class="intake-turn-time">' + formatTimestamp(timestamp) + '</span>' +
+		'</div>' +
+		'<div class="collapsible-card-body">' +
+		'<div class="intake-message intake-human">' +
+		'<div class="card-header"><div class="card-header-left">' +
+		'<span class="role-icon codicon codicon-account"></span>' +
+		'<span class="role-badge role-human">Human</span>' +
+		'</div></div>' +
+		'<div class="card-content">' + escapeHtml(turn.humanMessage) + '</div>' +
+		'</div>' +
+		(commandBlocks && commandBlocks.length > 0
+			? '<div class="intake-command-blocks" style="margin-top: 6px;">' + commandBlocks.map((cb) => renderCommandBlock(cb.command, cb.outputs)).join('') + '</div>'
+			: '') +
+		'<div class="intake-message intake-expert" style="margin-top: 6px;">' +
+		'<div class="card-header"><div class="card-header-left">' +
+		'<span class="role-icon codicon codicon-beaker"></span>' +
+		'<span class="role-badge role-technical_expert">Interviewer</span>' +
+		'<span class="intake-domain-badge">' + escapeHtml(domainLabel) + '</span>' +
+		'</div></div>' +
+		'<div class="card-content">' + simpleMarkdownToHtml(response.conversationalResponse) + '</div>' +
+		domainNotesHtml +
+		followUpHtml +
+		findingsHtml +
+		'</div></div></div>';
+}
 
 export function renderIntakeTurnCard(
 	turn: IntakeConversationTurn,
@@ -2245,6 +2567,11 @@ export function renderIntakeTurnCard(
 	commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>,
 	isLatest?: boolean,
 ): string {
+
+	// Delegate to gathering-specific renderer for interviewer turns
+	if (isGatheringResponse(turn.expertResponse)) {
+		return renderGatheringTurnCard(turn, turn.expertResponse, timestamp, commandBlocks, isLatest);
+	}
 
 	const expertResponse = turn.expertResponse;
 
@@ -2255,7 +2582,7 @@ export function renderIntakeTurnCard(
 				<span class="intake-suggestions-label">Consider asking:</span>
 
 				<ul>${expertResponse.suggestedQuestions.map((q, i) => {
-					const qId = `SQ-${i + 1}`;
+					const qId = `SQ-T${turn.turnNumber}-${i + 1}`;
 					if (isLatest) {
 						return `<li class="question-item">
 							<span class="question-item-text">${escapeHtml(q)}</span>
@@ -2268,6 +2595,7 @@ export function renderIntakeTurnCard(
 									rows="2"></textarea>
 								<div class="response-toolbar">
 									<span class="intake-question-charcount" data-charcount-for="${qId}">0 chars</span>
+									${renderMicButton('intake-question:' + qId)}
 									${renderAskMoreToggle(qId, q)}
 								</div>
 							</div>
@@ -2425,36 +2753,16 @@ export function renderIntakePlanPreview(plan: IntakePlanDocument, isFinal: boole
 
 
 
-	const openQuestionsHtml = plan.openQuestions.length > 0
-
+	// When isLatest, open questions are suppressed here because they duplicate
+	// the "Consider Asking" section in the turn card above (which has interactive
+	// textareas for the user to respond). For historical plans, show them read-only.
+	const openQuestionsHtml = !isLatest && plan.openQuestions.length > 0
 		? `<div class="intake-plan-section">
-
 				<h5>Open Questions (${plan.openQuestions.length})</h5>
-
 				<ul>${plan.openQuestions.map((q) => {
-					if (isLatest) {
-						return `<li class="question-item">
-							<span class="question-item-text"><strong>[${escapeHtml(q.id)}]</strong> ${escapeHtml(q.text)}</span>
-							<div class="intake-question-response" data-clarification-item="${escapeHtml(q.id)}">
-								<div class="clarification-messages" id="clarification-messages-${escapeHtml(q.id)}" style="display:none;"></div>
-								<textarea class="intake-question-textarea"
-									data-intake-question-id="${escapeHtml(q.id)}"
-									data-intake-question-text="${escapeHtml(q.text)}"
-									placeholder="Type your answer..."
-									rows="2"></textarea>
-								<div class="response-toolbar">
-									<span class="intake-question-charcount" data-charcount-for="${escapeHtml(q.id)}">0 chars</span>
-									${renderAskMoreToggle(q.id, q.text)}
-								</div>
-							</div>
-						</li>`;
-					} else {
-						return `<li class="question-item"><span class="question-item-text"><strong>[${escapeHtml(q.id)}]</strong> ${escapeHtml(q.text)}</span></li>`;
-					}
+					return `<li class="question-item"><span class="question-item-text"><strong>[${escapeHtml(q.id)}]</strong> ${escapeHtml(q.text)}</span></li>`;
 				}).join('')}</ul>
-
 			</div>`
-
 		: '';
 
 
@@ -2598,6 +2906,484 @@ function renderIntakeFinalizeResolved(): string {
 	`;
 }
 
+function renderIntakeGatheringFooter(intakeState: NonNullable<GovernedStreamState['intakeState']>): string {
+	const currentDomain = intakeState.currentDomain;
+	const domainInfo = currentDomain ? DOMAIN_INFO[currentDomain as keyof typeof DOMAIN_INFO] : null;
+	const currentIdx = currentDomain ? DOMAIN_SEQUENCE.indexOf(currentDomain as any) : -1;
+	const mode = intakeState.intakeMode;
+	const coverage = intakeState.domainCoverage;
+
+	// Coverage-based progress for DOMAIN_GUIDED, domain-sequential for STATE_DRIVEN
+	let progressLabel: string;
+	let progressPercent: number;
+
+	if (mode === 'DOMAIN_GUIDED' && coverage) {
+		// For document-based: show coverage percentage (domains may advance non-sequentially)
+		const total = DOMAIN_SEQUENCE.length;
+		let covered = 0;
+		for (const key of Object.keys(coverage)) {
+			if (coverage[key as keyof typeof coverage] !== DomainCoverageLevel.NONE) {
+				covered++;
+			}
+		}
+		progressPercent = Math.round((covered / total) * 100);
+		progressLabel = 'Analyzing documents \u2014 ' + covered + ' of ' + total + ' domains touched';
+	} else if (currentIdx >= 0) {
+		// STATE_DRIVEN: sequential domain walkthrough
+		progressPercent = Math.round(((currentIdx + 1) / DOMAIN_SEQUENCE.length) * 100);
+		progressLabel = 'Domain ' + (currentIdx + 1) + ' of ' + DOMAIN_SEQUENCE.length + ': ' + (domainInfo ? domainInfo.label : currentDomain);
+	} else {
+		progressPercent = 0;
+		progressLabel = 'Gathering domain information';
+	}
+
+	// Guidance text: tell the user what to do next
+	const guidanceText = mode === 'DOMAIN_GUIDED'
+		? 'Answer any questions above, then submit to continue document analysis. Or type freely in the composer.'
+		: 'Answer any questions above, then submit to continue the walkthrough. Or type freely in the composer.';
+
+	return '<div class="intake-gathering-footer">' +
+		'<div class="intake-gathering-guidance">' + escapeHtml(guidanceText) + '</div>' +
+		'<div class="intake-gathering-progress">' +
+		'<span class="intake-gathering-progress-label">' + escapeHtml(progressLabel) + '</span>' +
+		'<div class="intake-gathering-progress-bar">' +
+		'<div class="intake-gathering-progress-fill" style="width: ' + progressPercent + '%;"></div>' +
+		'</div></div>' +
+		'<button class="intake-skip-gathering-btn" data-action="intake-skip-gathering">' +
+		'Skip to Plan Discussion &#x2192;' +
+		'</button></div>';
+}
+
+
+// ==================== INTAKE MODE SELECTOR ====================
+
+export function renderIntakeModeSelector(recommendation: IntakeModeRecommendation, resolved?: boolean, selectedMode?: string): string {
+	const modeLabels: Record<string, { label: string; icon: string; description: string }> = {
+		STATE_DRIVEN: {
+			label: 'Guided Walkthrough',
+			icon: '&#x1F4CB;',
+			description: 'Sequential walk through 12 engineering domains with targeted questions',
+		},
+		DOMAIN_GUIDED: {
+			label: 'Document-Based',
+			icon: '&#x1F4C4;',
+			description: 'Analyze provided documents, then explore uncovered domains',
+		},
+		HYBRID_CHECKPOINTS: {
+			label: 'Conversational',
+			icon: '&#x1F4AC;',
+			description: 'Free-form discussion with periodic domain coverage checkpoints',
+		},
+	};
+
+	const isResolved = resolved === true;
+	const expandedClass = isResolved ? '' : 'expanded';
+	const resolvedClass = isResolved ? ' resolved' : '';
+
+	const headerIcon = isResolved ? '&#x2705;' : '&#x1F9ED;';
+	const headerText = isResolved
+		? `INTAKE Mode: ${modeLabels[selectedMode || recommendation.recommended]?.label || selectedMode}`
+		: 'Select INTAKE Mode';
+
+	let buttonsHtml = '';
+	const modes = [IntakeMode.STATE_DRIVEN, IntakeMode.DOMAIN_GUIDED, IntakeMode.HYBRID_CHECKPOINTS];
+	for (const mode of modes) {
+		const info = modeLabels[mode];
+		const isRecommended = mode === recommendation.recommended;
+		const recommendedTag = isRecommended ? ' <span class="intake-mode-recommended">(Recommended)</span>' : '';
+
+		if (isResolved) {
+			const wasSelected = mode === selectedMode;
+			buttonsHtml += `
+				<button class="intake-mode-btn${wasSelected ? ' was-selected' : ''}" disabled>
+					<span class="intake-mode-btn-icon">${info.icon}</span>
+					<span class="intake-mode-btn-label">${info.label}${recommendedTag}</span>
+					<span class="intake-mode-btn-desc">${info.description}</span>
+				</button>`;
+		} else {
+			buttonsHtml += `
+				<button class="intake-mode-btn${isRecommended ? ' recommended' : ''}"
+					data-action="intake-select-mode" data-intake-mode="${mode}">
+					<span class="intake-mode-btn-icon">${info.icon}</span>
+					<span class="intake-mode-btn-label">${info.label}${recommendedTag}</span>
+					<span class="intake-mode-btn-desc">${info.description}</span>
+				</button>`;
+		}
+	}
+
+	return `
+		<div class="intake-mode-selector collapsible-card ${expandedClass}${resolvedClass}">
+			<div class="collapsible-card-header gate-header" data-action="toggle-card">
+				<span class="card-chevron">&#x25B6;</span>
+				<span class="gate-icon">${headerIcon}</span>
+				<span>${headerText}</span>
+			</div>
+			<div class="collapsible-card-body">
+				<div class="intake-mode-rationale">
+					${escapeHtml(recommendation.rationale)}
+				</div>
+				<div class="intake-mode-options">
+					${buttonsHtml}
+				</div>
+			</div>
+		</div>
+	`;
+}
+
+
+// ==================== DOMAIN COVERAGE SIDEBAR ====================
+
+export function renderDomainCoverageSidebar(coverage: DomainCoverageMap, currentDomain?: string | null): string {
+	let domainsHtml = '';
+	for (const domain of DOMAIN_SEQUENCE) {
+		const entry = coverage[domain];
+		const info = DOMAIN_INFO[domain];
+		let dotClass: string;
+		switch (entry.level) {
+			case DomainCoverageLevel.ADEQUATE: dotClass = 'coverage-adequate'; break;
+			case DomainCoverageLevel.PARTIAL: dotClass = 'coverage-partial'; break;
+			default: dotClass = 'coverage-none'; break;
+		}
+
+		const hasEvidence = entry.evidence.length > 0;
+		const isCurrentDomain = currentDomain && domain === currentDomain;
+		const evidenceSnippets = hasEvidence
+			? entry.evidence.map(e => '<li>' + escapeHtml(e) + '</li>').join('')
+			: '<li class="no-evidence">No evidence yet</li>';
+		const chevron = hasEvidence ? '<span class="coverage-row-chevron">&#x25B6;</span>' : '';
+		const pointer = isCurrentDomain ? '<span class="coverage-current-indicator">&#x25B6;</span>' : '';
+
+		domainsHtml +=
+			'<div class="coverage-domain-row' + (hasEvidence ? ' has-evidence' : '') + (isCurrentDomain ? ' current-domain' : '') + '" title="' + escapeHtml(info.description) + '" data-action="toggle-coverage-evidence">' +
+				chevron +
+				pointer +
+				'<span class="coverage-dot ' + dotClass + '"></span>' +
+				'<span class="coverage-domain-label">' + escapeHtml(info.label) + '</span>' +
+				'<span class="coverage-level-tag ' + dotClass + '">' + entry.level + '</span>' +
+			'</div>' +
+			'<div class="coverage-evidence-details"' + (hasEvidence ? '' : ' style="display:none"') + '>' +
+				'<ul>' + evidenceSnippets + '</ul>' +
+			'</div>';
+	}
+
+	// Compute summary
+	let adequate = 0, partial = 0, none = 0;
+	const total = DOMAIN_SEQUENCE.length;
+	for (const domain of DOMAIN_SEQUENCE) {
+		switch (coverage[domain].level) {
+			case DomainCoverageLevel.ADEQUATE: adequate++; break;
+			case DomainCoverageLevel.PARTIAL: partial++; break;
+			default: none++; break;
+		}
+	}
+	const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
+
+	return `
+		<div class="domain-coverage-sidebar">
+			<div class="coverage-sidebar-header">
+				<span class="coverage-sidebar-title">Domain Coverage</span>
+				<span class="coverage-sidebar-pct">${percentage}%</span>
+			</div>
+			<div class="coverage-sidebar-bar">
+				<div class="coverage-bar-fill" style="width: ${percentage}%"></div>
+			</div>
+			<div class="coverage-sidebar-stats">
+				<span class="coverage-stat adequate">${adequate} adequate</span>
+				<span class="coverage-stat partial">${partial} partial</span>
+				<span class="coverage-stat none">${none} uncovered</span>
+			</div>
+			<div class="coverage-domain-list">
+				${domainsHtml}
+			</div>
+		</div>
+	`;
+}
+
+
+// ==================== INTAKE CHECKPOINT CARD ====================
+
+export function renderIntakeCheckpoint(checkpoint: IntakeCheckpoint, resolved?: boolean): string {
+	const isResolved = resolved === true;
+	const expandedClass = isResolved ? '' : 'expanded';
+	const resolvedClass = isResolved ? ' resolved' : '';
+
+	const headerIcon = isResolved ? '&#x2705;' : '&#x1F4CA;';
+	const headerText = isResolved
+		? `Coverage Checkpoint (Turn ${checkpoint.turnNumber})`
+		: `Coverage Checkpoint — Turn ${checkpoint.turnNumber}`;
+
+	// Coverage summary from snapshot
+	let adequate = 0, partial = 0, none = 0;
+	const total = DOMAIN_SEQUENCE.length;
+	for (const domain of DOMAIN_SEQUENCE) {
+		const entry = checkpoint.coverageSnapshot[domain];
+		switch (entry.level) {
+			case DomainCoverageLevel.ADEQUATE: adequate++; break;
+			case DomainCoverageLevel.PARTIAL: partial++; break;
+			default: none++; break;
+		}
+	}
+	const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
+
+	// Suggested domain buttons
+	let suggestionsHtml = '';
+	if (checkpoint.suggestedDomains.length > 0 && !isResolved) {
+		const domainBtns = checkpoint.suggestedDomains.map(d => {
+			const info = DOMAIN_INFO[d];
+			return `<button class="checkpoint-domain-btn"
+				data-action="intake-ask-domain" data-domain-label="${escapeHtml(info.label)}">
+				Ask about ${escapeHtml(info.label)}
+			</button>`;
+		}).join('');
+		suggestionsHtml = `
+			<div class="checkpoint-suggestions">
+				<div class="checkpoint-suggestions-label">Suggested areas to explore:</div>
+				${domainBtns}
+			</div>`;
+	}
+
+	let actionsHtml = '';
+	if (!isResolved) {
+		if (checkpoint.offerModeSwitch) {
+			// DOMAIN_GUIDED gap analysis: offer mode-switch to fill coverage gaps
+			actionsHtml = `
+				<div class="checkpoint-gap-prompt">How would you like to address uncovered domains?</div>
+				<div class="checkpoint-actions">
+					<button class="gate-btn approve" data-action="intake-switch-to-walkthrough"
+						data-intake-mode="${IntakeMode.STATE_DRIVEN}">Walk Through Gaps</button>
+					<button class="gate-btn" data-action="intake-switch-to-conversational"
+						data-intake-mode="${IntakeMode.HYBRID_CHECKPOINTS}">Discuss Freely</button>
+					<button class="gate-btn reframe" data-action="intake-finalize-plan">Finalize As-Is</button>
+				</div>`;
+		} else {
+			actionsHtml = `
+				<div class="checkpoint-actions">
+					<button class="gate-btn approve" data-action="intake-checkpoint-continue">Continue Discussing</button>
+					<button class="gate-btn reframe" data-action="intake-finalize-plan">Finalize Plan</button>
+				</div>`;
+		}
+	}
+
+	return `
+		<div class="intake-checkpoint collapsible-card ${expandedClass}${resolvedClass}">
+			<div class="collapsible-card-header gate-header" data-action="toggle-card">
+				<span class="card-chevron">&#x25B6;</span>
+				<span class="gate-icon">${headerIcon}</span>
+				<span>${headerText}</span>
+			</div>
+			<div class="collapsible-card-body">
+				<div class="checkpoint-summary">
+					<div class="checkpoint-bar">
+						<div class="coverage-bar-fill" style="width: ${percentage}%"></div>
+					</div>
+					<div class="checkpoint-stats">
+						${percentage}% coverage: ${adequate} adequate, ${partial} partial, ${none} uncovered
+					</div>
+				</div>
+				${suggestionsHtml}
+				${actionsHtml}
+			</div>
+		</div>
+	`;
+}
+
+
+// ==================== INTAKE DOMAIN TRANSITION CARD ====================
+
+function renderDomainTransitionCard(
+	fromLabel: string,
+	toDomain: string | null,
+	toLabel: string | null,
+	toDescription: string | null,
+): string {
+	const completedHtml =
+		'<div class="domain-transition-completed">' +
+		'<span class="domain-transition-check">&#x2705;</span>' +
+		'<span class="domain-transition-label">' + escapeHtml(fromLabel) + '</span>' +
+		'<span class="domain-transition-status">Adequate</span>' +
+		'</div>';
+
+	let nextHtml: string;
+	if (toDomain && toLabel) {
+		nextHtml =
+			'<div class="domain-transition-next">' +
+			'<span class="domain-transition-next-label">Next: ' + escapeHtml(toLabel) + '</span>' +
+			(toDescription
+				? '<span class="domain-transition-next-desc">' + escapeHtml(toDescription) + '</span>'
+				: '') +
+			'</div>';
+	} else {
+		nextHtml =
+			'<div class="domain-transition-next">' +
+			'<span class="domain-transition-next-label">All domains explored</span>' +
+			'</div>';
+	}
+
+	return '<div class="intake-domain-transition">' +
+		completedHtml +
+		'<div class="domain-transition-arrow">&#x25BC;</div>' +
+		nextHtml +
+		'</div>';
+}
+
+
+// ==================== INTAKE GATHERING COMPLETE BANNER ====================
+
+function renderGatheringCompleteBanner(
+	coverageSummary: { adequate: number; partial: number; none: number; percentage: number },
+	intakeMode?: string | null,
+): string {
+	const isDocBased = intakeMode === 'DOMAIN_GUIDED';
+	const title = isDocBased ? 'Document Analysis Complete' : 'All Domains Gathered';
+	const hint = isDocBased
+		? 'Initial document analysis is complete. You can now discuss the plan, answer follow-up questions, or finalize.'
+		: 'The system will now synthesize your responses into a plan. You can also type additional context in the composer.';
+
+	return '<div class="intake-gathering-complete-banner">' +
+		'<div class="gathering-complete-icon">&#x1F4CB;</div>' +
+		'<div class="gathering-complete-content">' +
+		'<div class="gathering-complete-title">' + escapeHtml(title) + '</div>' +
+		'<div class="gathering-complete-stats">' +
+		coverageSummary.percentage + '% coverage &mdash; ' +
+		coverageSummary.adequate + ' adequate, ' +
+		coverageSummary.partial + ' partial, ' +
+		coverageSummary.none + ' uncovered' +
+		'</div>' +
+		'<div class="gathering-complete-hint">' + escapeHtml(hint) + '</div>' +
+		'</div></div>';
+}
+
+
+// ==================== ANALYSIS & PROPOSAL CARDS (INVERTED FLOW) ====================
+
+function renderIntakeAnalysisCard(
+	humanMessage: string,
+	analysisSummary: string,
+	codebaseFindings: string[],
+	commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }>,
+): string {
+	let html = '';
+
+	// Human message bubble (the user's original prompt)
+	if (humanMessage) {
+		html += '<div class="intake-message intake-human">' +
+			'<div class="card-header"><div class="card-header-left">' +
+			'<span class="role-icon codicon codicon-account"></span>' +
+			'<span class="role-badge role-human">Human</span>' +
+			'</div></div>' +
+			'<div class="card-content">' + escapeHtml(humanMessage) + '</div>' +
+			'</div>';
+	}
+
+	html += '<div class="intake-analysis-card">';
+
+	// Header
+	html += '<div class="intake-analysis-header">' +
+		'<span class="intake-analysis-icon">&#x1F50D;</span>' +
+		'<span class="intake-analysis-title">Technical Analysis</span>' +
+		'</div>';
+
+	// Command blocks (CLI activity during analysis)
+	if (commandBlocks && commandBlocks.length > 0) {
+		for (const block of commandBlocks) {
+			html += renderCommandBlock(block.command, block.outputs);
+		}
+	}
+
+	// Analysis summary
+	html += '<div class="intake-analysis-body">' +
+		simpleMarkdownToHtml(analysisSummary) +
+		'</div>';
+
+	// Codebase findings (collapsible)
+	if (codebaseFindings.length > 0) {
+		html += '<details class="intake-analysis-findings">' +
+			'<summary class="intake-analysis-findings-header">Codebase Findings (' + codebaseFindings.length + ')</summary>' +
+			'<ul class="intake-analysis-findings-list">';
+		for (const finding of codebaseFindings) {
+			html += '<li>' + escapeHtml(finding) + '</li>';
+		}
+		html += '</ul></details>';
+	}
+
+	html += '</div>';
+	return html;
+}
+
+function renderIntakeProposalCard(
+	title: string,
+	summary: string,
+	proposedApproach: string,
+	domainCoverage: { adequate: number; partial: number; none: number; percentage: number },
+): string {
+	let html = '<div class="intake-proposal-card">';
+
+	// Header
+	html += '<div class="intake-proposal-header">' +
+		'<span class="intake-proposal-icon">&#x1F4D0;</span>' +
+		'<span class="intake-proposal-title">Proposed Technical Approach</span>' +
+		'</div>';
+
+	// Plan title
+	if (title) {
+		html += '<div class="intake-proposal-plan-title">' + escapeHtml(title) + '</div>';
+	}
+
+	// Summary
+	if (summary) {
+		html += '<div class="intake-proposal-summary">' +
+			simpleMarkdownToHtml(summary) +
+			'</div>';
+	}
+
+	// Proposed approach
+	if (proposedApproach) {
+		html += '<div class="intake-proposal-approach">' +
+			'<div class="intake-proposal-approach-label">Approach</div>' +
+			'<div class="intake-proposal-approach-body">' +
+			simpleMarkdownToHtml(proposedApproach) +
+			'</div></div>';
+	}
+
+	// Domain coverage summary
+	html += '<div class="intake-proposal-coverage">' +
+		'<div class="intake-proposal-coverage-bar">' +
+		'<span class="intake-proposal-coverage-label">Domain Coverage</span>' +
+		'<span class="intake-proposal-coverage-pct">' + domainCoverage.percentage + '%</span>' +
+		'</div>' +
+		'<div class="intake-proposal-coverage-stats">' +
+		domainCoverage.adequate + ' adequate, ' +
+		domainCoverage.partial + ' partial, ' +
+		domainCoverage.none + ' uncovered' +
+		'</div></div>';
+
+	// Footer prompt
+	html += '<div class="intake-proposal-footer">' +
+		'Review the proposal above. Share feedback, priorities, or questions to refine the approach.' +
+		'</div>';
+
+	html += '</div>';
+	return html;
+}
+
+// ==================== Q&A EXCHANGE CARD ====================
+
+function renderQaExchangeCard(question: string, answer: string, timestamp: string): string {
+	return `
+		<div class="qa-exchange-card">
+			<div class="qa-exchange-question">
+				<span class="qa-exchange-icon">&#x2753;</span>
+				<div class="qa-exchange-question-text">${escapeHtml(question)}</div>
+				<span class="qa-exchange-time">${formatTimestamp(timestamp)}</span>
+			</div>
+			<div class="qa-exchange-answer">
+				<span class="qa-exchange-icon">&#x2139;&#xFE0E;</span>
+				<div class="qa-exchange-answer-body">${simpleMarkdownToHtml(answer)}</div>
+			</div>
+		</div>
+	`;
+}
+
 
 // ==================== STREAM RENDERER ====================
 
@@ -2635,7 +3421,7 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 			case 'gate':
 
-				return renderHumanGateCard(item.gate, item.blockingClaims, item.resolvedAction);
+				return renderHumanGateCard(item.gate, item.blockingClaims, item.resolvedAction, item.metadata);
 
 			case 'verification_gate':
 
@@ -2670,6 +3456,34 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 				return renderIntakeApprovalGate(item.plan, item.dialogueId, item.resolved, item.resolvedAction);
 
+			case 'qa_exchange':
+
+				return renderQaExchangeCard(item.question, item.answer, item.timestamp);
+
+			case 'intake_mode_selector':
+
+				return renderIntakeModeSelector(item.recommendation, item.resolved, item.selectedMode);
+
+			case 'intake_checkpoint':
+
+				return renderIntakeCheckpoint(item.checkpoint, item.resolved);
+
+			case 'intake_domain_transition':
+
+				return renderDomainTransitionCard(item.fromLabel, item.toDomain, item.toLabel, item.toDescription);
+
+			case 'intake_gathering_complete':
+
+				return renderGatheringCompleteBanner(item.coverageSummary, item.intakeMode);
+
+			case 'intake_analysis':
+
+				return renderIntakeAnalysisCard(item.humanMessage, item.analysisSummary, item.codebaseFindings, item.commandBlocks);
+
+			case 'intake_proposal':
+
+				return renderIntakeProposalCard(item.title, item.summary, item.proposedApproach, item.domainCoverage);
+
 			default:
 
 				return '';
@@ -2680,9 +3494,17 @@ export function renderStream(items: StreamItem[], intakeState?: GovernedStreamSt
 
 
 
+	// Add domain coverage sidebar after first turn completes (avoid showing 0% prematurely)
+	if (intakeState && intakeState.domainCoverage && intakeState.turnCount > 0) {
+		html += renderDomainCoverageSidebar(intakeState.domainCoverage, intakeState.currentDomain);
+	}
+
 	// Add finalize button or resolved marker based on INTAKE sub-state
 	if (intakeState && intakeState.turnCount > 0) {
-		if (intakeState.subState === 'DISCUSSING') {
+		if (intakeState.subState === 'GATHERING') {
+			html += renderIntakeQuestionsSubmitBar();
+			html += renderIntakeGatheringFooter(intakeState);
+		} else if (intakeState.subState === 'DISCUSSING') {
 			html += renderIntakeQuestionsSubmitBar();
 			html += renderIntakeFinalizeButton();
 		} else if (intakeState.subState === 'SYNTHESIZING' || intakeState.subState === 'AWAITING_APPROVAL') {

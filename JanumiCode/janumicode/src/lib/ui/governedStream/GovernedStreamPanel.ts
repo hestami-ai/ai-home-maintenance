@@ -11,7 +11,6 @@ import { processHumanGateDecision, type HumanGateDecisionInput } from '../../wor
 import { HumanAction, Role, ClaimEventType, Phase, ClaimStatus } from '../../types';
 import { getStyles } from './html/styles';
 import { renderStickyHeader, renderStream, renderInputArea, renderEmptyState, renderRichCard, renderSettingsPanel } from './html/components';
-import { getClientScript } from './html/script';
 import { getDialogueTurnById, getClaims } from '../../events/reader';
 import { getSecretKeyManager } from '../../config/secretKeyManager';
 import { getProviderForRole } from '../../config/manager';
@@ -26,17 +25,23 @@ import { clearAllData } from '../../database/init';
 import { generateDialogueTitle } from '../../llm/titleGenerator';
 import { getConfig } from '../../config';
 import { subscribeCommandPersistence, completeCommand, appendCommandOutput as appendCommandOutputToDB } from '../../workflow/commandStore';
-import { IntakeSubState } from '../../types/intake';
-import { updateIntakeConversation, writeClaimEvent } from '../../events/writer';
+import { IntakeSubState, IntakeMode } from '../../types/intake';
+import { updateIntakeConversation, writeClaimEvent, writeQaExchange } from '../../events/writer';
+import { getOrCreateIntakeConversation } from '../../events/reader';
+import { getCoverageGaps, getPartialDomains, DOMAIN_SEQUENCE } from '../../workflow/domainCoverageTracker';
 import { getWorkflowState, updateWorkflowMetadata, transitionWorkflow, TransitionTrigger } from '../../workflow/stateMachine';
 import { resolveGate, getGate, getGatesForDialogue } from '../../workflow/gates';
 import { GateStatus } from '../../types';
 import { getDatabase } from '../../database';
-import { parseTextCommand, assessRetryableActions, type ParsedCommand, type RetryableAction } from './textCommands';
+import { parseTextCommand, interpretInput, escalateQuery, assessRetryableActions, type ParsedCommand, type RetryableAction, type InterpreterAction, type QaProgressCallback } from './textCommands';
+import { killAllActiveProcesses } from '../../cli/spawnUtils';
+import { getActivePermissionBridge, setActivePermissionBridge } from '../../mcp/permissionBridge';
 import { runNarrativeCuration } from '../../curation/narrativeCurator';
 import { CurationMode } from '../../types/narrativeCurator';
 import { askClarification } from '../../clarification/clarificationExpert';
 import { saveClarificationThread, getClarificationThreads } from '../../clarification/clarificationStore';
+import { SpeechToTextService, resolveSpeechConfig } from '../../speech/speechToTextService';
+import { setSpeechEnabled, setSoxAvailable } from './html/components';
 
 /**
  * WebviewViewProvider for the Governed Stream sidebar view.
@@ -49,13 +54,15 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	private _activeDialogueId: string | null = null;
 	private _settingsPanelVisible = false;
 	private _isProcessing = false;
+	private _thinkingCancelled = false;
 	private _processingPhase = '';
 	private _processingDetail = '';
 	private _activeCLICommandId: string | null = null;
 	private _pendingToolCalls: Map<string, import('../../cli/types').CLIActivityEvent> = new Map();
 	/** Suppress the next dialogue:turn_added event (the initial turn is already included in the dialogue:started full re-render) */
 	private _suppressNextTurnAdded = false;
-
+	private _speechService: SpeechToTextService | null = null;
+	private _speechTargetInputId: string | null = null;
 	constructor(private readonly _extensionUri: vscode.Uri) {}
 
 	/**
@@ -99,6 +106,15 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		// Start persisting workflow commands to DB (idempotent — only subscribes once)
 		subscribeCommandPersistence();
+
+		// Send speech capability status (checks SoX availability) and listen for config changes
+		this._sendSpeechCapability();
+		vscode.workspace.onDidChangeConfiguration((e) => {
+			if (e.affectsConfiguration('janumicode.speech')) {
+				this._getSpeechService().resetAvailabilityCache();
+				this._sendSpeechCapability();
+			}
+		});
 	}
 
 	/**
@@ -472,6 +488,20 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			})
 		);
 
+		// Permission request events → surface permission card in webview
+		this._eventUnsubscribers.push(
+			bus.on('permission:requested', (payload) => {
+				this._view?.webview.postMessage({
+					type: 'permissionRequested',
+					data: {
+						permissionId: payload.permissionId,
+						tool: payload.tool,
+						input: payload.input,
+					},
+				});
+			})
+		);
+
 		// INTAKE conversation events → refresh to show updated conversation
 		this._eventUnsubscribers.push(
 			bus.on('intake:turn_completed', () => {
@@ -496,6 +526,43 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 		this._eventUnsubscribers.push(
 			bus.on('intake:plan_approved', () => {
+				this._update();
+			})
+		);
+
+		// Adaptive INTAKE events → refresh to show mode selector, coverage, checkpoints
+		this._eventUnsubscribers.push(
+			bus.on('intake:mode_selected', () => {
+				this._update();
+			})
+		);
+
+		this._eventUnsubscribers.push(
+			bus.on('intake:domain_coverage_updated', () => {
+				this._update();
+			})
+		);
+
+		this._eventUnsubscribers.push(
+			bus.on('intake:checkpoint_triggered', () => {
+				this._update();
+			})
+		);
+
+		this._eventUnsubscribers.push(
+			bus.on('intake:domain_transition', () => {
+				this._update();
+			})
+		);
+
+		this._eventUnsubscribers.push(
+			bus.on('intake:classifier_result', () => {
+				this._update();
+			})
+		);
+
+		this._eventUnsubscribers.push(
+			bus.on('intake:gathering_skipped', () => {
 				this._update();
 			})
 		);
@@ -561,7 +628,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				break;
 
 			case 'gateDecision':
-				this._handleGateDecision(
+				this._handleGateDecisionAndResume(
 					message.gateId as string,
 					message.action as string,
 					message.rationale as string
@@ -607,6 +674,14 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 			case 'intakeContinueDiscussing':
 				this._handleIntakeContinueDiscussing();
+				break;
+
+			case 'intakeSkipGathering':
+				this._handleIntakeSkipGathering();
+				break;
+
+			case 'intakeModeSelected':
+				this._handleIntakeModeSelected(message.mode as string);
 				break;
 
 			case 'resumeDialogue':
@@ -658,6 +733,33 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			case 'clarificationMessage':
 				this._handleClarificationMessage(message);
 				break;
+
+			case 'permissionDecision':
+				this._handlePermissionDecision(message);
+				break;
+
+			case 'cancelWorkflow':
+				this._handleCancel();
+				break;
+
+			case 'cancelThinking':
+				this._thinkingCancelled = true;
+				this._postInputThinking(false);
+				// If a thinking Q&A card is visible, finalize it
+				this._postQaThinkingComplete('*(Cancelled)*');
+				break;
+
+			case 'speechStart':
+				this._handleSpeechStart(message.targetInputId as string);
+				break;
+
+			case 'speechStop':
+				this._handleSpeechStop();
+				break;
+
+			case 'speechCancel':
+				this._handleSpeechCancel();
+				break;
 		}
 	}
 
@@ -665,16 +767,113 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	 * Handle user input submission — starts or advances the governed workflow
 	 */
 	private async _handleSubmitInput(text: string): Promise<void> {
-		if (!text.trim() || this._isProcessing) {
+		if (!text.trim()) { return; }
+
+		// Cancel/abort command — checked BEFORE the _isProcessing guard
+		// so users can always cancel even when execution is in progress.
+		const cancelCheck = parseTextCommand(text);
+		if (cancelCheck?.command === 'cancel') {
+			await this._handleCancel();
 			return;
 		}
 
-		// Smart text command parsing — intercept before normal routing
+		if (this._isProcessing) { return; }
+
+		// Smart text command parsing — two-tier intent detection
+		// Tier 1: instant alias map (retry, redo, approve, ok, etc.)
 		const parsed = parseTextCommand(text);
+
 		if (parsed && this._activeDialogueId) {
 			const handled = await this._handleTextCommand(parsed);
 			if (handled) { return; }
-			// Not handled (e.g., no open gate for "approve") — fall through to normal input
+			// Not handled (e.g., no open gate for "approve") — fall through
+		}
+
+		// Tier 2/3: LLM-mediated classification and escalation.
+		// Wrap in thinking indicator — the spinner shows while the LLM calls run.
+		this._thinkingCancelled = false;
+		this._postInputThinking(true);
+		try {
+			// Tier 2: LLM-mediated natural language interpretation
+			// Fires for any active dialogue — handles questions, commands with parameters, etc.
+			if (!parsed && this._activeDialogueId) {
+				const progressCb: QaProgressCallback = (step) => this._postQaThinkingProgress(step);
+				const action = await interpretInput(text, this._activeDialogueId, progressCb);
+				if (this._thinkingCancelled) { return; }
+				if (action) {
+					if (action.action === 'answer') {
+						// Show the Q&A card immediately with question header + spinner
+						this._postQaThinkingStart(text);
+
+						if (action.needsEscalation && this._activeDialogueId) {
+							// Tier 3: Escalate to deep context + FTS + workspace query
+							const escalated = await escalateQuery(text, this._activeDialogueId, progressCb);
+							if (this._thinkingCancelled) {
+								this._postQaThinkingComplete('*(Cancelled)*');
+								return;
+							}
+							if (escalated && escalated.action === 'answer') {
+								this._postQaThinkingComplete(escalated.response);
+								this._persistQaOnly(text, escalated.response);
+								return;
+							}
+						}
+						// Use Tier 2 answer (complete or partial fallback)
+						this._postQaThinkingComplete(action.response);
+						this._persistQaOnly(text, action.response);
+						return;
+					} else if (action.action === 'cancel') {
+						await this._handleCancel();
+						return;
+					} else if (action.action === 'save_output') {
+						const handled = await this._handleSaveOutputCommand(action.filePath);
+						if (handled) { return; }
+					} else if (action.action !== 'freetext') {
+						// retry, approve, reframe, override
+						const commandParsed: ParsedCommand = {
+							command: action.action,
+							args: action.rationale ?? text,
+							raw: text,
+						};
+						const handled = await this._handleTextCommand(commandParsed);
+						if (handled) { return; }
+					}
+					// freetext or unhandled action — fall through to normal submission
+				}
+			}
+
+			// Freetext guard: when gates are open, block new instructions from reaching
+			// the dialogue submission path (which creates dead HUMAN DECISION turns).
+			// If Tier 2 failed or returned freetext, try Tier 3 as a fallback —
+			// it will answer questions and return null for actual freetext.
+			if (this._activeDialogueId) {
+				const gatesResult = getGatesForDialogue(this._activeDialogueId, GateStatus.OPEN);
+				if (gatesResult.success && gatesResult.value.length > 0) {
+					// Tier 2 was unavailable or misclassified — let Tier 3 decide
+					const progressCb: QaProgressCallback = (step) => this._postQaThinkingProgress(step);
+					this._postQaThinkingStart(text);
+					const escalated = await escalateQuery(text, this._activeDialogueId, progressCb);
+					if (this._thinkingCancelled) {
+						this._postQaThinkingComplete('*(Cancelled)*');
+						return;
+					}
+					if (escalated && escalated.action === 'answer') {
+						this._postQaThinkingComplete(escalated.response);
+						this._persistQaOnly(text, escalated.response);
+						return;
+					}
+					// Tier 3 didn't produce an answer — remove thinking card, this is genuine freetext
+					this._postQaThinkingComplete('*(No answer found — this looks like an instruction, not a question)*');
+					this._postSystemMessage(
+						'There are open gates requiring a decision. ' +
+						'Use approve, retry, override, reframe, or cancel — ' +
+						'or ask a question about the current state.'
+					);
+					return;
+				}
+			}
+		} finally {
+			this._postInputThinking(false);
 		}
 
 		this._isProcessing = true;
@@ -787,6 +986,68 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Signal the webview to show/hide the thinking spinner on the submit button.
+	 * Used during Tier 2/3 LLM classification before the heavier setProcessing indicator.
+	 */
+	private _postInputThinking(active: boolean): void {
+		this._view?.webview.postMessage({
+			type: 'setInputThinking',
+			data: { active },
+		});
+	}
+
+	/**
+	 * Persist a Q&A exchange to the database and render the card in the webview.
+	 */
+	private _persistAndRenderQa(question: string, answer: string): void {
+		if (this._activeDialogueId) {
+			const wsResult = getWorkflowState(this._activeDialogueId);
+			const phase = wsResult.success ? wsResult.value.current_phase : undefined;
+			writeQaExchange({ dialogueId: this._activeDialogueId, question, answer, phase });
+		}
+		this._view?.webview.postMessage({
+			type: 'qaExchangeAdded',
+			data: { question, answer, timestamp: new Date().toISOString() },
+		});
+	}
+
+	/**
+	 * Persist a Q&A exchange to the database only (no webview message).
+	 * Used when the card is already rendered via the thinking lifecycle.
+	 */
+	private _persistQaOnly(question: string, answer: string): void {
+		if (this._activeDialogueId) {
+			const wsResult = getWorkflowState(this._activeDialogueId);
+			const phase = wsResult.success ? wsResult.value.current_phase : undefined;
+			writeQaExchange({ dialogueId: this._activeDialogueId, question, answer, phase });
+		}
+	}
+
+	/** Create a Q&A card with the question header and a spinner body. */
+	private _postQaThinkingStart(question: string): void {
+		this._view?.webview.postMessage({
+			type: 'qaThinkingStart',
+			data: { question, timestamp: new Date().toISOString() },
+		});
+	}
+
+	/** Append a progress step to the thinking Q&A card. */
+	private _postQaThinkingProgress(step: string): void {
+		this._view?.webview.postMessage({
+			type: 'qaThinkingProgress',
+			data: { step },
+		});
+	}
+
+	/** Replace the thinking body with the final formatted answer. */
+	private _postQaThinkingComplete(answer: string): void {
+		this._view?.webview.postMessage({
+			type: 'qaThinkingComplete',
+			data: { answer, timestamp: new Date().toISOString() },
+		});
+	}
+
+	/**
 	 * Show or hide the processing indicator in the webview
 	 */
 	private _postProcessing(active: boolean, phase?: string, detail?: string): void {
@@ -823,6 +1084,38 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			this._postProcessing(false);
 			this._postInputEnabled(true);
 		}
+	}
+
+	/**
+	 * Handle user cancel/abort command.
+	 * Kills all active CLI processes, stops the permission bridge,
+	 * resets the UI processing state, and shows a cancellation message.
+	 */
+	private async _handleCancel(): Promise<void> {
+		// Kill all active CLI child processes
+		const killed = killAllActiveProcesses();
+
+		// Stop permission bridge if active
+		const bridge = getActivePermissionBridge();
+		if (bridge) {
+			await bridge.stop().catch(() => {});
+			setActivePermissionBridge(null);
+		}
+
+		// Reset UI processing state
+		this._isProcessing = false;
+		this._postProcessing(false);
+		this._postInputEnabled(true);
+
+		// Show cancellation message in the stream
+		const detail = killed > 0 ? ` (${killed} process${killed > 1 ? 'es' : ''} terminated)` : '';
+		this._view?.webview.postMessage({
+			type: 'systemMessage',
+			data: { message: `Workflow cancelled by user${detail}. You can start a new task or resume.` },
+		});
+
+		// Refresh view to show current state
+		this._update();
 	}
 
 	private async _handleIntakeFinalize(): Promise<void> {
@@ -881,6 +1174,67 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		updateIntakeConversation(this._activeDialogueId, {
 			subState: IntakeSubState.DISCUSSING,
 		});
+		this._update();
+	}
+
+	/**
+	 * Handle skipping the GATHERING sub-state — transition directly to DISCUSSING.
+	 */
+	private _handleIntakeSkipGathering(): void {
+		if (!this._activeDialogueId) {
+			return;
+		}
+
+		updateIntakeConversation(this._activeDialogueId, {
+			subState: IntakeSubState.DISCUSSING,
+		});
+
+		getEventBus().emit('intake:gathering_skipped', {
+			dialogueId: this._activeDialogueId,
+		});
+
+		this._update();
+	}
+
+	private _handleIntakeModeSelected(mode: string): void {
+		if (!this._activeDialogueId) {
+			return;
+		}
+
+		// Validate mode string
+		const validModes = Object.values(IntakeMode) as string[];
+		if (!validModes.includes(mode)) {
+			return;
+		}
+
+		const updates: Record<string, unknown> = {
+			intakeMode: mode as IntakeMode,
+		};
+
+		// When switching to STATE_DRIVEN, set currentDomain to the first uncovered domain
+		if (mode === IntakeMode.STATE_DRIVEN) {
+			const convResult = getOrCreateIntakeConversation(this._activeDialogueId);
+			if (convResult.success && convResult.value.domainCoverage) {
+				const gaps = getCoverageGaps(convResult.value.domainCoverage);
+				const partials = getPartialDomains(convResult.value.domainCoverage);
+				const firstTarget = gaps.length > 0 ? gaps[0]
+					: partials.length > 0 ? partials[0]
+					: DOMAIN_SEQUENCE[0];
+				updates.currentDomain = firstTarget;
+			} else {
+				updates.currentDomain = DOMAIN_SEQUENCE[0];
+			}
+		}
+
+		updateIntakeConversation(this._activeDialogueId, updates);
+
+		const bus = getEventBus();
+		bus.emit('intake:mode_selected', {
+			dialogueId: this._activeDialogueId,
+			mode: mode as IntakeMode,
+			source: 'user_selection',
+		});
+
 		this._update();
 	}
 
@@ -1004,6 +1358,51 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 			}
 		} else {
 			vscode.window.showErrorMessage(`Gate decision failed: ${result.error.message}`);
+		}
+	}
+
+	/**
+	 * Handle a gate decision from the webview card buttons.
+	 * Wraps the generic gate decision with repair-escalation awareness:
+	 * if the gate is a repair escalation, reset the failed unit to READY and resume.
+	 */
+	private async _handleGateDecisionAndResume(
+		gateId: string,
+		action: string,
+		rationale: string
+	): Promise<void> {
+		// Read gate metadata BEFORE resolving (so we know what kind of gate this is)
+		let isRepairEscalation = false;
+		let repairUnitId: string | undefined;
+		try {
+			const db = getDatabase();
+			if (db) {
+				const row = db.prepare(
+					'SELECT metadata FROM gate_metadata WHERE gate_id = ?'
+				).get(gateId) as { metadata: string } | undefined;
+				if (row) {
+					const meta = JSON.parse(row.metadata) as Record<string, unknown>;
+					if (meta.condition === 'REPAIR_ESCALATION') {
+						isRepairEscalation = true;
+						repairUnitId = meta.unit_id as string | undefined;
+					}
+				}
+			}
+		} catch { /* metadata read failed — proceed without repair handling */ }
+
+		// Reset the failed unit to READY before resolving the gate
+		if (isRepairEscalation && repairUnitId) {
+			const { updateTaskUnitStatus } = await import('../../database/makerStore');
+			const { TaskUnitStatus } = await import('../../types/maker');
+			updateTaskUnitStatus(repairUnitId, TaskUnitStatus.READY);
+		}
+
+		// Resolve the gate via the generic handler
+		this._handleGateDecision(gateId, action, rationale);
+
+		// Resume workflow if this was a repair escalation
+		if (isRepairEscalation) {
+			await this._resumeAfterGate();
 		}
 	}
 
@@ -1342,6 +1741,26 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Handle a permission decision from the webview.
+	 * Emits the decision on the event bus so the permission bridge can resolve
+	 * the pending Promise and respond to the MCP server.
+	 */
+	private _handlePermissionDecision(message: { [key: string]: unknown }): void {
+		const permissionId = message.permissionId as string;
+		const approved = message.approved as boolean;
+		const approveAll = message.approveAll as boolean | undefined;
+
+		if (!permissionId) { return; }
+
+		getEventBus().emit('permission:decided', {
+			permissionId,
+			approved,
+			approveAll,
+			reason: approved ? 'Approved by human' : 'Denied by human',
+		});
+	}
+
+	/**
 	 * Resume the workflow cycle after a gate has been resolved
 	 */
 	private async _resumeAfterGate(): Promise<void> {
@@ -1379,6 +1798,8 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 				return this._handleReframeCommand(parsed.args);
 			case 'override':
 				return this._handleOverrideCommand(parsed.args);
+			case 'save-output':
+				return this._handleSaveOutputCommand(parsed.args);
 			default:
 				return false;
 		}
@@ -1511,6 +1932,66 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	/**
+	 * Handle the "save-output" command — extract executor output from gate metadata and write to file.
+	 */
+	private async _handleSaveOutputCommand(argsText: string): Promise<boolean> {
+		if (!this._activeDialogueId) { return false; }
+
+		const filePath = argsText.trim();
+		if (!filePath) {
+			this._postSystemMessage('Usage: save <path> — specify the file path to write executor output to.');
+			return true;
+		}
+
+		// Find the most recent open REPAIR_ESCALATION gate
+		const gatesResult = getGatesForDialogue(this._activeDialogueId, GateStatus.OPEN);
+		const openGates = gatesResult.success ? gatesResult.value : [];
+
+		let executorOutput: string | undefined;
+
+		// Try gate_metadata for executor_output
+		for (const gate of openGates) {
+			try {
+				const db = getDatabase();
+				if (!db) { continue; }
+				const row = db.prepare(
+					'SELECT metadata FROM gate_metadata WHERE gate_id = ?'
+				).get(gate.gate_id) as { metadata: string } | undefined;
+				if (row) {
+					const meta = JSON.parse(row.metadata) as Record<string, unknown>;
+					if (meta.executor_output && typeof meta.executor_output === 'string') {
+						executorOutput = meta.executor_output;
+						break;
+					}
+				}
+			} catch { /* continue to next gate */ }
+		}
+
+		if (!executorOutput) {
+			this._postSystemMessage('No executor output found in gate metadata. The gate may not have captured output.');
+			return true;
+		}
+
+		// Resolve path relative to workspace root
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		const baseUri = workspaceFolders?.[0]?.uri;
+		if (!baseUri) {
+			this._postSystemMessage('No workspace folder open.');
+			return true;
+		}
+
+		try {
+			const targetUri = vscode.Uri.joinPath(baseUri, filePath);
+			await vscode.workspace.fs.writeFile(targetUri, Buffer.from(executorOutput, 'utf-8'));
+			this._postSystemMessage(`Executor output saved to ${filePath} (${executorOutput.length} chars)`);
+		} catch (err) {
+			this._postSystemMessage(`Failed to write file: ${err instanceof Error ? err.message : String(err)}`);
+		}
+
+		return true;
+	}
+
+	/**
 	 * Execute a specific retry action by dispatching to existing handler methods.
 	 */
 	private async _executeRetryAction(action: RetryableAction): Promise<void> {
@@ -1523,6 +2004,12 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 
 			case 'retry_repair':
 				if (action.gateId) {
+					// Reset the failed unit to READY so it gets picked up for re-execution
+					if (action.unitId) {
+						const { updateTaskUnitStatus } = await import('../../database/makerStore');
+						const { TaskUnitStatus } = await import('../../types/maker');
+						updateTaskUnitStatus(action.unitId, TaskUnitStatus.READY);
+					}
 					this._handleGateDecision(
 						action.gateId,
 						'OVERRIDE',
@@ -1727,8 +2214,11 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		if (!this._view) {
 			return;
 		}
+		const speechSetting = vscode.workspace.getConfiguration('janumicode.speech').get('enabled', true);
+		setSpeechEnabled(speechSetting);
+		setSoxAvailable(this._speechService?.soxAvailable ?? false);
 		const state = aggregateStreamState(this._activeDialogueId ?? undefined);
-		this._view.webview.html = this._getHtmlForWebview(state);
+		this._view.webview.html = this._getHtmlForWebview(state, this._view.webview);
 
 		// Restore settings panel state if it was open before the re-render
 		if (this._settingsPanelVisible) {
@@ -1783,8 +2273,12 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	/**
 	 * Compose the full HTML document for the webview
 	 */
-	private _getHtmlForWebview(state: GovernedStreamState): string {
+	private _getHtmlForWebview(state: GovernedStreamState, webview: vscode.Webview): string {
 		const nonce = getNonce();
+
+		const scriptUri = webview.asWebviewUri(
+			vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview', 'governedStream.js')
+		);
 
 		const headerHtml = renderStickyHeader(state);
 
@@ -1805,7 +2299,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}' ${webview.cspSource};">
 	<title>Governed Stream</title>
 	<style nonce="${nonce}">
 		${getStyles()}
@@ -1822,9 +2316,7 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 		${settingsPanelHtml}
 		${inputHtml}
 	</div>
-	<script nonce="${nonce}">
-		${getClientScript()}
-	</script>
+	<script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
 	}
@@ -1832,7 +2324,115 @@ export class GovernedStreamViewProvider implements vscode.WebviewViewProvider {
 	/**
 	 * Clean up event bus subscriptions
 	 */
+	// ==================== SPEECH-TO-TEXT ====================
+
+	private _getSpeechService(): SpeechToTextService {
+		if (!this._speechService) {
+			this._speechService = new SpeechToTextService();
+		}
+		return this._speechService;
+	}
+
+	private async _sendSpeechCapability(): Promise<void> {
+		const cfg = vscode.workspace.getConfiguration('janumicode.speech');
+		const enabled = cfg.get<boolean>('enabled', true);
+
+		if (!enabled) {
+			this._view?.webview.postMessage({ type: 'speechCapability', data: { enabled: false, soxAvailable: false } });
+			return;
+		}
+
+		// Check if SoX is actually installed
+		const recPath = cfg.get<string>('soxRecPath', 'rec');
+		const svc = this._getSpeechService();
+		const soxAvailable = await svc.checkSoxAvailable(recPath);
+
+		if (!soxAvailable) {
+			const hint = process.platform === 'win32'
+				? 'Install: choco install sox.portable (or download from https://sox.sourceforge.net/)'
+				: process.platform === 'darwin'
+					? 'Install: brew install sox'
+					: 'Install: sudo apt install sox';
+			vscode.window.showWarningMessage(
+				`Speech-to-text requires SoX but 'rec' was not found. ${hint}`,
+			);
+		}
+
+		this._view?.webview.postMessage({ type: 'speechCapability', data: { enabled, soxAvailable } });
+	}
+
+	private async _handleSpeechStart(targetInputId: string): Promise<void> {
+		try {
+			const config = await resolveSpeechConfig();
+			const svc = this._getSpeechService();
+
+			if (svc.isRecording) {
+				// Already recording — stop first
+				await this._handleSpeechStop();
+				return;
+			}
+
+			this._speechTargetInputId = targetInputId;
+			await svc.startRecording(config);
+
+			this._view?.webview.postMessage({
+				type: 'speechRecordingStarted',
+				data: { targetInputId },
+			});
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			this._view?.webview.postMessage({
+				type: 'speechError',
+				data: { targetInputId, error: message },
+			});
+		}
+	}
+
+	private async _handleSpeechStop(): Promise<void> {
+		const svc = this._getSpeechService();
+		const targetInputId = this._speechTargetInputId || '';
+
+		try {
+			this._view?.webview.postMessage({
+				type: 'speechTranscribing',
+				data: { targetInputId },
+			});
+
+			const wavPath = await svc.stopRecording();
+			const config = await resolveSpeechConfig();
+			const text = await svc.transcribe(wavPath, config);
+
+			this._view?.webview.postMessage({
+				type: 'speechResult',
+				data: { targetInputId, text },
+			});
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			this._view?.webview.postMessage({
+				type: 'speechError',
+				data: { targetInputId, error: message },
+			});
+		} finally {
+			this._speechTargetInputId = null;
+		}
+	}
+
+	private _handleSpeechCancel(): void {
+		const svc = this._getSpeechService();
+		svc.cancel();
+		if (this._speechTargetInputId) {
+			this._view?.webview.postMessage({
+				type: 'speechError',
+				data: { targetInputId: this._speechTargetInputId, error: 'Recording cancelled' },
+			});
+			this._speechTargetInputId = null;
+		}
+	}
+
+	// ==================== CLEANUP ====================
+
 	private _cleanup(): void {
+		this._getSpeechService().cancel();
 		for (const unsub of this._eventUnsubscribers) {
 			unsub();
 		}

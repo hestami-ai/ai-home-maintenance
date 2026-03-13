@@ -10,7 +10,7 @@
 
 import type { DialogueTurn, Claim, Verdict, Gate } from '../../types';
 import { ClaimStatus, GateStatus, Phase } from '../../types';
-import { getDialogueTurns, getClaims, getVerdicts, getGates, getHumanDecisions, getIntakeConversation, getIntakeTurns } from '../../events/reader';
+import { getDialogueTurns, getClaims, getVerdicts, getGates, getHumanDecisions, getIntakeConversation, getIntakeTurns, getQaExchanges } from '../../events/reader';
 import { getWorkflowState, type WorkflowState } from '../../workflow/stateMachine';
 import { getAllDialogues, type DialogueRecord } from '../../dialogue/lifecycle';
 import {
@@ -19,12 +19,14 @@ import {
 	type WorkflowCommandRecord,
 	type WorkflowCommandOutput,
 } from '../../workflow/commandStore';
-import type { IntakePlanDocument, IntakeConversationTurn } from '../../types/intake';
-import { IntakeSubState } from '../../types/intake';
+import type { IntakePlanDocument, IntakeConversationTurn, DomainCoverageMap, IntakeModeRecommendation, IntakeCheckpoint, IntakeGatheringTurnResponse } from '../../types/intake';
+import { IntakeSubState, DomainCoverageLevel, isGatheringResponse, isAnalysisResponse } from '../../types/intake';
+import { DOMAIN_INFO, DOMAIN_SEQUENCE, type EngineeringDomain } from '../../workflow/domainCoverageTracker';
 import type { HumanFacingStatus } from '../../types/maker';
 import { resolveHumanFacingState } from '../../workflow/humanFacingState';
 import { getTaskGraphForDialogue, getTaskUnitsForGraph } from '../../database/makerStore';
 import { getGraphProgress } from '../../workflow/taskGraph';
+import { getDatabase } from '../../database';
 
 /**
  * Summary counts of claim statuses for the health bar
@@ -55,6 +57,7 @@ export interface ReviewItem {
 	kind: 'claim' | 'finding';
 	claim?: Claim;
 	verdict?: Verdict;
+	adjudication?: import('../../roles/historianInterpreter').ClaimAdjudication;
 	findingText?: string;
 	findingIndex?: number;
 	category: 'needs_decision' | 'awareness' | 'all_clear';
@@ -74,6 +77,11 @@ export interface ReviewSummary {
 	needsDecisionCount: number;
 	awarenessCount: number;
 	allClearCount: number;
+	adjudicationAvailable: boolean;
+	consistent: number;
+	inconsistent: number;
+	adjConditional: number;
+	adjUnknown: number;
 }
 
 /**
@@ -81,7 +89,7 @@ export interface ReviewSummary {
  */
 export type StreamItem =
 	| { type: 'turn'; turn: DialogueTurn; claims: Claim[]; verdict?: Verdict }
-	| { type: 'gate'; gate: Gate; blockingClaims: Claim[]; resolvedAction?: string }
+	| { type: 'gate'; gate: Gate; blockingClaims: Claim[]; resolvedAction?: string; metadata?: Record<string, unknown> }
 	| { type: 'verification_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[]; blockingClaims: Claim[]; resolvedAction?: string }
 	| { type: 'review_gate'; gate: Gate; allClaims: Claim[]; verdicts: Verdict[];
 		historianFindings: string[]; reviewItems: ReviewItem[]; summary: ReviewSummary; resolvedAction?: string; resolvedRationale?: string }
@@ -91,7 +99,14 @@ export type StreamItem =
 	| { type: 'command_block'; command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }
 	| { type: 'intake_turn'; turn: IntakeConversationTurn; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
 	| { type: 'intake_plan_preview'; plan: IntakePlanDocument; isFinal: boolean; timestamp: string }
-	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string };
+	| { type: 'intake_approval_gate'; plan: IntakePlanDocument; dialogueId: string; timestamp: string; resolved?: boolean; resolvedAction?: string }
+	| { type: 'intake_mode_selector'; recommendation: IntakeModeRecommendation; timestamp: string; resolved?: boolean; selectedMode?: string }
+	| { type: 'intake_checkpoint'; checkpoint: IntakeCheckpoint; timestamp: string; resolved?: boolean }
+	| { type: 'intake_domain_transition'; fromDomain: string; fromLabel: string; toDomain: string | null; toLabel: string | null; toDescription: string | null; timestamp: string }
+	| { type: 'intake_gathering_complete'; coverageSummary: { adequate: number; partial: number; none: number; percentage: number }; intakeMode: string | null; timestamp: string }
+	| { type: 'intake_analysis'; humanMessage: string; analysisSummary: string; codebaseFindings: string[]; domainAssessment: Array<{ domain: string; level: string; evidence: string }>; timestamp: string; commandBlocks?: Array<{ command: WorkflowCommandRecord; outputs: WorkflowCommandOutput[] }> }
+	| { type: 'intake_proposal'; title: string; summary: string; proposedApproach: string; domainCoverage: { adequate: number; partial: number; none: number; percentage: number }; timestamp: string }
+	| { type: 'qa_exchange'; question: string; answer: string; timestamp: string };
 
 /**
  * Summary of a dialogue for the switcher dropdown
@@ -126,6 +141,9 @@ export interface GovernedStreamState {
 		turnCount: number;
 		currentPlan: IntakePlanDocument | null;
 		finalizedPlan: IntakePlanDocument | null;
+		domainCoverage: DomainCoverageMap | null;
+		currentDomain: string | null;
+		intakeMode: string | null;
 	} | null;
 	/** MAKER human-facing state for the active dialogue */
 	humanFacingState: HumanFacingStatus | null;
@@ -340,7 +358,21 @@ function pushGateOrReviewGate(
 			return;
 		}
 	}
-	items.push({ type: 'gate', gate, blockingClaims, resolvedAction });
+	// Read gate metadata (evaluation context, etc.) for enriched rendering
+	let metadata: Record<string, unknown> | undefined;
+	try {
+		const db = getDatabase();
+		if (db) {
+			const row = db.prepare(
+				'SELECT metadata FROM gate_metadata WHERE gate_id = ?'
+			).get(gate.gate_id) as { metadata: string } | undefined;
+			if (row) {
+				metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+			}
+		}
+	} catch { /* metadata read failed — render without enrichment */ }
+
+	items.push({ type: 'gate', gate, blockingClaims, resolvedAction, metadata });
 }
 
 /**
@@ -358,18 +390,44 @@ function buildReviewGateData(
 		verdictByClaim.set(v.claim_id, v);
 	}
 
-	// Get historian findings from workflow metadata
+	// Get historian findings + adjudication from workflow metadata
 	let historianFindings: string[] = [];
+	let adjudicationMap = new Map<string, import('../../roles/historianInterpreter').ClaimAdjudication>();
+	let adjudicationAvailable = false;
 	const wsResult = getWorkflowState(dialogueId);
 	if (wsResult.success) {
 		try {
 			const metadata = JSON.parse(wsResult.value.metadata);
-			if (Array.isArray(metadata.historical_findings)) {
+
+			// Read adjudication data (new structured format)
+			if (metadata.historian_adjudication?.claim_adjudications) {
+				adjudicationAvailable = true;
+				for (const adj of metadata.historian_adjudication.claim_adjudications) {
+					adjudicationMap.set(adj.claim_id, adj);
+				}
+				// Use general_findings from adjudication response
+				if (Array.isArray(metadata.historian_adjudication.general_findings)) {
+					historianFindings = metadata.historian_adjudication.general_findings;
+				}
+			}
+
+			// Fallback: read flat historical_findings (backward compat)
+			if (historianFindings.length === 0 && Array.isArray(metadata.historical_findings)) {
 				historianFindings = metadata.historical_findings;
-			} else if (Array.isArray(metadata.proposalBranches)) {
+			}
+
+			// Fallback: accumulate from proposal branches
+			if (historianFindings.length === 0 && Array.isArray(metadata.proposalBranches)) {
 				for (const branch of metadata.proposalBranches) {
 					if (Array.isArray(branch.historical_findings)) {
 						historianFindings.push(...branch.historical_findings);
+					}
+					// Also accumulate branch adjudication data
+					if (!adjudicationAvailable && branch.historian_adjudication?.claim_adjudications) {
+						adjudicationAvailable = true;
+						for (const adj of branch.historian_adjudication.claim_adjudications) {
+							adjudicationMap.set(adj.claim_id, adj);
+						}
 					}
 				}
 			}
@@ -382,20 +440,31 @@ function buildReviewGateData(
 		verified: 0, disproved: 0, unknown: 0, conditional: 0, open: 0,
 		historianFindings: historianFindings.length,
 		needsDecisionCount: 0, awarenessCount: 0, allClearCount: 0,
+		adjudicationAvailable,
+		consistent: 0, inconsistent: 0, adjConditional: 0, adjUnknown: 0,
 	};
 
 	for (const claim of claims) {
 		const verdict = verdictByClaim.get(claim.claim_id);
+		const adjudication = adjudicationMap.get(claim.claim_id);
 		const status = claim.status;
 
-		// Count by status
+		// Count by Verifier status
 		if (status === ClaimStatus.VERIFIED) { summary.verified++; }
 		else if (status === ClaimStatus.DISPROVED) { summary.disproved++; }
 		else if (status === ClaimStatus.UNKNOWN) { summary.unknown++; }
 		else if (status === ClaimStatus.CONDITIONAL) { summary.conditional++; }
 		else { summary.open++; }
 
-		// Categorize
+		// Count by Historian adjudication
+		if (adjudication) {
+			if (adjudication.verdict === 'CONSISTENT') { summary.consistent++; }
+			else if (adjudication.verdict === 'INCONSISTENT') { summary.inconsistent++; }
+			else if (adjudication.verdict === 'CONDITIONAL') { summary.adjConditional++; }
+			else if (adjudication.verdict === 'UNKNOWN') { summary.adjUnknown++; }
+		}
+
+		// Categorize (Verifier-based, with Historian escalation)
 		let category: ReviewItem['category'];
 		let categoryReason: string;
 
@@ -403,12 +472,19 @@ function buildReviewGateData(
 			(status === ClaimStatus.DISPROVED || status === ClaimStatus.UNKNOWN)) {
 			category = 'needs_decision';
 			categoryReason = `CRITICAL claim with ${status} verdict`;
+		} else if (adjudication?.verdict === 'INCONSISTENT') {
+			// Historian escalation: INCONSISTENT claims always need a decision
+			category = 'needs_decision';
+			categoryReason = 'Historian: INCONSISTENT with historical record';
 		} else if (status === ClaimStatus.CONDITIONAL) {
 			category = 'awareness';
 			categoryReason = 'Conditional verdict — review conditions';
 		} else if (status === ClaimStatus.DISPROVED || status === ClaimStatus.UNKNOWN) {
 			category = 'awareness';
 			categoryReason = `NON_CRITICAL claim with ${status} verdict`;
+		} else if (adjudication?.verdict === 'CONDITIONAL') {
+			category = 'awareness';
+			categoryReason = 'Historian: CONDITIONAL — conditions must be verified';
 		} else if (status === ClaimStatus.VERIFIED) {
 			category = 'all_clear';
 			categoryReason = 'Verified successfully';
@@ -417,7 +493,7 @@ function buildReviewGateData(
 			categoryReason = `${claim.criticality} claim — ${status}`;
 		}
 
-		reviewItems.push({ kind: 'claim', claim, verdict, category, categoryReason });
+		reviewItems.push({ kind: 'claim', claim, verdict, adjudication, category, categoryReason });
 	}
 
 	// Categorize historian findings
@@ -479,11 +555,14 @@ function buildDialogueStreamItems(record: DialogueRecord): StreamItem[] {
 	// Build the inner stream items (turns, milestones, gates)
 	const turnItems = buildStreamItems(turns, claims, verdicts, gates, record.dialogue_id);
 
-	// Fetch persisted command blocks for this dialogue
+	// Fetch persisted command blocks and Q&A exchanges for this dialogue
 	const commandItems = buildCommandBlockItems(record.dialogue_id);
+	const qaItems = buildQaExchangeItems(record.dialogue_id);
 
-	// Merge turn-based items and command blocks by timestamp
-	const mergedItems = mergeStreamItemsByTimestamp(turnItems, commandItems);
+	// Merge turn-based items, command blocks, and Q&A exchanges by timestamp
+	const mergedItems = mergeStreamItemsByTimestamp(
+		mergeStreamItemsByTimestamp(turnItems, commandItems), qaItems
+	);
 
 	// Apply intake processing: if this dialogue has intake conversation data,
 	// filter out INTAKE-phase audit dialogue_turns and inject proper intake_turn
@@ -526,6 +605,43 @@ function buildCommandBlockItems(dialogueId: string): StreamItem[] {
 }
 
 /**
+ * Build qa_exchange StreamItems for a dialogue from the database
+ */
+function buildQaExchangeItems(dialogueId: string): StreamItem[] {
+	const result = getQaExchanges(dialogueId);
+	if (!result.success) { return []; }
+	return result.value.map((qa) => ({
+		type: 'qa_exchange' as const,
+		question: qa.question,
+		answer: qa.answer,
+		timestamp: qa.timestamp,
+	}));
+}
+
+/**
+ * Resolve a possibly-malformed domain string to its canonical EngineeringDomain enum value.
+ * LLM responses may return "PROBLEM_AND_MISSION" instead of "PROBLEM_MISSION", etc.
+ * Returns the matched enum value, or null if no match is found.
+ */
+function resolveDomainEnum(raw: string): EngineeringDomain | null {
+	// Exact match
+	if (DOMAIN_INFO[raw as EngineeringDomain]) {
+		return raw as EngineeringDomain;
+	}
+	// Normalize: strip common filler words, collapse separators
+	const normalized = raw.toUpperCase().replace(/\bAND\b/g, '').replace(/[_\s]+/g, '_').replace(/^_|_$/g, '');
+	for (const domain of DOMAIN_SEQUENCE) {
+		if (domain === normalized) { return domain; }
+	}
+	// Fallback: match by label
+	const lowerRaw = raw.toLowerCase().replace(/_/g, ' ');
+	for (const domain of DOMAIN_SEQUENCE) {
+		if (DOMAIN_INFO[domain].label.toLowerCase() === lowerRaw) { return domain; }
+	}
+	return null;
+}
+
+/**
  * Normalize a timestamp string to ISO 8601 format for consistent comparison.
  * Handles two formats:
  *   - SQLite datetime('now'): "2026-02-25 19:51:28" (UTC but no T/Z)
@@ -557,6 +673,13 @@ function getStreamItemTimestamp(item: StreamItem): string {
 		case 'intake_turn': raw = item.timestamp; break;
 		case 'intake_plan_preview': raw = item.timestamp; break;
 		case 'intake_approval_gate': raw = item.timestamp; break;
+		case 'intake_mode_selector': raw = item.timestamp; break;
+		case 'intake_checkpoint': raw = item.timestamp; break;
+		case 'intake_domain_transition': raw = item.timestamp; break;
+		case 'intake_gathering_complete': raw = item.timestamp; break;
+		case 'intake_analysis': raw = item.timestamp; break;
+		case 'intake_proposal': raw = item.timestamp; break;
+		case 'qa_exchange': raw = item.timestamp; break;
 		default: raw = ''; break;
 	}
 	return normalizeTimestamp(raw);
@@ -607,6 +730,13 @@ function getStreamItemSortPriority(item: StreamItem): number {
 		case 'verification_gate': return 6;
 		case 'review_gate': return 7;
 		case 'intake_approval_gate': return 8;
+		case 'intake_mode_selector': return 3;
+		case 'intake_analysis': return 1.5;    // After dialogue_start, before intake_turn
+		case 'intake_proposal': return 1.8;    // After analysis, before turns
+		case 'intake_domain_transition': return 5;
+		case 'intake_gathering_complete': return 6;
+		case 'intake_checkpoint': return 7;
+		case 'qa_exchange': return 4;
 		case 'dialogue_end': return 9;
 		default: return 10;
 	}
@@ -798,7 +928,10 @@ function aggregateLegacySingleDialogue(
 
 	const turnItems = buildStreamItems(turns, claims, verdicts, allGates);
 	const commandItems = buildCommandBlockItems(effectiveDialogueId);
-	const streamItems = mergeStreamItemsByTimestamp(turnItems, commandItems);
+	const qaItems = buildQaExchangeItems(effectiveDialogueId);
+	const streamItems = mergeStreamItemsByTimestamp(
+		mergeStreamItemsByTimestamp(turnItems, commandItems), qaItems
+	);
 	const claimHealth = computeClaimHealth(claims);
 
 	// Apply intake processing (filter audit turns, inject proper cards)
@@ -843,7 +976,9 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 
 	const conv = convResult.value;
 
-	// Remove INTAKE-phase audit dialogue_turns — the richer intake_turn cards replace them.
+	// Remove INTAKE-phase audit dialogue_turns — they are lightweight audit
+	// entries ({role, phase, content_ref}) with no message text. The richer
+	// intake_turn / intake_analysis cards replace them with full content.
 	for (let i = streamItems.length - 1; i >= 0; i--) {
 		const item = streamItems[i];
 		if (item.type === 'turn' && item.turn.phase === Phase.INTAKE) {
@@ -900,22 +1035,63 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 				outputs: cmd.outputs,
 			}));
 
-			streamItems.push({
-				type: 'intake_turn',
-				turn,
-				timestamp: effectiveTimestamp,
-				commandBlocks: embeddedBlocks.length > 0 ? embeddedBlocks : undefined,
-			});
-
-			const turnPlanVersion = turn.planSnapshot?.version ?? 0;
-			if (turnPlanVersion > 0 && turnPlanVersion !== lastPlanVersion) {
+			// Check if this is an analysis turn (inverted flow)
+			if (isAnalysisResponse(turn.expertResponse)) {
+				const analysis = turn.expertResponse;
 				streamItems.push({
-					type: 'intake_plan_preview',
-					plan: turn.planSnapshot,
-					isFinal: false,
-					timestamp: turn.createdAt,
+					type: 'intake_analysis',
+					humanMessage: turn.humanMessage,
+					analysisSummary: analysis.analysisSummary,
+					codebaseFindings: analysis.codebaseFindings ?? [],
+					domainAssessment: analysis.domainAssessment ?? [],
+					timestamp: effectiveTimestamp,
+					commandBlocks: embeddedBlocks.length > 0 ? embeddedBlocks : undefined,
 				});
-				lastPlanVersion = turnPlanVersion;
+				// Add proposal card derived from the analysis
+				const plan = analysis.initialPlan;
+				if (plan) {
+					const coverage = conv.domainCoverage;
+					let adequate = 0, partial = 0, none = 0;
+					if (coverage) {
+						for (const domain of DOMAIN_SEQUENCE) {
+							switch (coverage[domain]?.level) {
+								case DomainCoverageLevel.ADEQUATE: adequate++; break;
+								case DomainCoverageLevel.PARTIAL: partial++; break;
+								default: none++; break;
+							}
+						}
+					}
+					const total = DOMAIN_SEQUENCE.length;
+					const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
+					streamItems.push({
+						type: 'intake_proposal',
+						title: plan.title,
+						summary: plan.summary,
+						proposedApproach: plan.proposedApproach,
+						domainCoverage: { adequate, partial, none, percentage },
+						timestamp: turn.createdAt,
+					});
+					lastPlanVersion = plan.version;
+				}
+			} else {
+				streamItems.push({
+					type: 'intake_turn',
+					turn,
+					timestamp: effectiveTimestamp,
+					commandBlocks: embeddedBlocks.length > 0 ? embeddedBlocks : undefined,
+				});
+
+				const turnPlanVersion = turn.planSnapshot?.version ?? 0;
+				// Skip plan preview for gathering turns (version 0) or unchanged versions
+				if (turnPlanVersion > 0 && turnPlanVersion !== lastPlanVersion) {
+					streamItems.push({
+						type: 'intake_plan_preview',
+						plan: turn.planSnapshot,
+						isFinal: false,
+						timestamp: turn.createdAt,
+					});
+					lastPlanVersion = turnPlanVersion;
+				}
 			}
 
 			previousTurnNormalized = normalizedTurnTs;
@@ -949,6 +1125,86 @@ function applyIntakeStreamProcessing(dialogueId: string, streamItems: StreamItem
 			isFinal: true,
 			timestamp: conv.updatedAt,
 		});
+	}
+
+	// Inject mode selector card if classifier result exists
+	if (conv.classifierResult) {
+		const isResolved = !!conv.intakeMode;
+		// Use the earliest intake content timestamp for ordering
+		const selectorTimestamp = firstIntakeTurnTimestamp || conv.createdAt;
+		streamItems.push({
+			type: 'intake_mode_selector',
+			recommendation: conv.classifierResult,
+			timestamp: selectorTimestamp,
+			resolved: isResolved,
+			selectedMode: conv.intakeMode ?? undefined,
+		});
+	}
+
+	// Inject checkpoint cards from stored checkpoints
+	if (conv.checkpoints && conv.checkpoints.length > 0) {
+		for (const checkpoint of conv.checkpoints) {
+			streamItems.push({
+				type: 'intake_checkpoint',
+				checkpoint,
+				timestamp: conv.updatedAt,
+				resolved: true,
+			});
+		}
+	}
+
+	// Inject domain transition and gathering-complete cards from gathering turn data
+	if (turnsResult.success) {
+		const gatheringTurns = turnsResult.value.filter(
+			(t) => isGatheringResponse(t.expertResponse),
+		);
+
+		// Domain transitions: detect consecutive gathering turns with different focusDomain
+		for (let gi = 1; gi < gatheringTurns.length; gi++) {
+			const prev = gatheringTurns[gi - 1].expertResponse as IntakeGatheringTurnResponse;
+			const curr = gatheringTurns[gi].expertResponse as IntakeGatheringTurnResponse;
+			// Normalize domain strings to canonical enum values for comparison
+			const prevResolved = resolveDomainEnum(prev.focusDomain);
+			const currResolved = resolveDomainEnum(curr.focusDomain);
+			if (prevResolved !== currResolved) {
+				const fromInfo = prevResolved ? DOMAIN_INFO[prevResolved] : undefined;
+				const toInfo = currResolved ? DOMAIN_INFO[currResolved] : undefined;
+				streamItems.push({
+					type: 'intake_domain_transition',
+					fromDomain: prev.focusDomain,
+					fromLabel: fromInfo?.label ?? prev.focusDomain,
+					toDomain: curr.focusDomain,
+					toLabel: toInfo?.label ?? curr.focusDomain,
+					toDescription: toInfo?.description ?? null,
+					timestamp: gatheringTurns[gi].createdAt,
+				});
+			}
+		}
+
+		// Gathering complete: if there are gathering turns and subState advanced past GATHERING
+		if (gatheringTurns.length > 0 && conv.subState !== IntakeSubState.GATHERING) {
+			const coverage = conv.domainCoverage;
+			let adequate = 0;
+			let partial = 0;
+			let none = 0;
+			if (coverage) {
+				for (const domain of DOMAIN_SEQUENCE) {
+					switch (coverage[domain].level) {
+						case DomainCoverageLevel.ADEQUATE: adequate++; break;
+						case DomainCoverageLevel.PARTIAL: partial++; break;
+						default: none++; break;
+					}
+				}
+			}
+			const total = DOMAIN_SEQUENCE.length;
+			const percentage = Math.round(((adequate * 100) + (partial * 50)) / total);
+			streamItems.push({
+				type: 'intake_gathering_complete',
+				coverageSummary: { adequate, partial, none, percentage },
+				intakeMode: conv.intakeMode ?? null,
+				timestamp: gatheringTurns[gatheringTurns.length - 1].createdAt,
+			});
+		}
 	}
 
 	// Inject approval gate as a persistent stream artifact:
@@ -1017,6 +1273,9 @@ function buildIntakeState(
 		turnCount: conv.turnCount,
 		currentPlan: conv.draftPlan,
 		finalizedPlan: conv.finalizedPlan,
+		domainCoverage: conv.domainCoverage ?? null,
+		currentDomain: conv.currentDomain ?? null,
+		intakeMode: conv.intakeMode ?? null,
 	};
 }
 

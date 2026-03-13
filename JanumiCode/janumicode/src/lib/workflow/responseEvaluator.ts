@@ -191,7 +191,6 @@ export async function evaluateExecutorResponse(
 				},
 			],
 			model,
-			maxTokens: 2000,
 			temperature: 0.1,
 		});
 

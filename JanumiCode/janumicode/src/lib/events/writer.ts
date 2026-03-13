@@ -22,12 +22,19 @@ import type {
 	IntakePlanDocument,
 	IntakeAccumulation,
 	IntakeTurnResponse,
+	IntakeGatheringTurnResponse,
+	DomainCoverageMap,
+	IntakeModeRecommendation,
+	IntakeCheckpoint,
 } from '../types';
+import { createEmptyPlanDocument } from '../types/intake';
 import {
 	Role,
 	ClaimEventType,
 	VerdictType,
 	IntakeSubState,
+	IntakeMode,
+	EngineeringDomain,
 } from '../types';
 import { getDatabase } from '../database';
 
@@ -134,6 +141,14 @@ export function writeClaim(
 		const createdClaim = db
 			.prepare('SELECT * FROM claims WHERE claim_id = ?')
 			.get(claimId) as Claim;
+
+		// Incremental FTS indexing (best-effort)
+		if (claim.statement?.trim()) {
+			try {
+				const { indexContent } = require('../database/ftsSync') as typeof import('../database/ftsSync');
+				indexContent('claims', claimId, claim.dialogue_id, claim.statement);
+			} catch { /* FTS indexing is best-effort */ }
+		}
 
 		return { success: true, value: createdClaim };
 	} catch (error) {
@@ -263,6 +278,18 @@ export function writeVerdict(
 		const createdVerdict = db
 			.prepare('SELECT * FROM verdicts WHERE verdict_id = ?')
 			.get(verdictId) as Verdict;
+
+		// Incremental FTS indexing (best-effort)
+		if (verdict.rationale?.trim()) {
+			try {
+				// Look up dialogue_id from the claim
+				const claimRow = db.prepare('SELECT dialogue_id FROM claims WHERE claim_id = ?').get(verdict.claim_id) as { dialogue_id: string } | undefined;
+				if (claimRow) {
+					const { indexContent } = require('../database/ftsSync') as typeof import('../database/ftsSync');
+					indexContent('verdicts', verdictId, claimRow.dialogue_id, verdict.rationale);
+				}
+			} catch { /* FTS indexing is best-effort */ }
+		}
 
 		return { success: true, value: createdVerdict };
 	} catch (error) {
@@ -546,9 +573,10 @@ export function writeIntakeTurn(options: {
 	dialogueId: string;
 	turnNumber: number;
 	humanMessage: string;
-	expertResponse: IntakeTurnResponse;
-	planSnapshot: IntakePlanDocument;
+	expertResponse: IntakeTurnResponse | IntakeGatheringTurnResponse;
+	planSnapshot: IntakePlanDocument | null;
 	tokenCount: number;
+	isGathering?: boolean;
 }): Result<IntakeConversationTurn> {
 	const db = getDatabase();
 	if (!db) {
@@ -560,11 +588,14 @@ export function writeIntakeTurn(options: {
 
 	try {
 		const expertResponseJson = JSON.stringify(options.expertResponse);
-		const planSnapshotJson = JSON.stringify(options.planSnapshot);
+		// During gathering, planSnapshot is null — store empty plan doc (column is NOT NULL)
+		const planSnapshotJson = JSON.stringify(
+			options.planSnapshot ?? createEmptyPlanDocument()
+		);
 
 		const stmt = db.prepare(
-			`INSERT INTO intake_turns (dialogue_id, turn_number, human_message, expert_response, plan_snapshot, token_count, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`
+			`INSERT INTO intake_turns (dialogue_id, turn_number, human_message, expert_response, plan_snapshot, token_count, is_gathering, created_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`
 		);
 
 		const info = stmt.run(
@@ -573,7 +604,8 @@ export function writeIntakeTurn(options: {
 			options.humanMessage,
 			expertResponseJson,
 			planSnapshotJson,
-			options.tokenCount
+			options.tokenCount,
+			options.isGathering ? 1 : 0,
 		);
 
 		const created = db
@@ -586,8 +618,11 @@ export function writeIntakeTurn(options: {
 			expert_response: string;
 			plan_snapshot: string;
 			token_count: number;
+			is_gathering: number;
 			created_at: string;
 		};
+
+		const parsedPlan = JSON.parse(created.plan_snapshot) as IntakePlanDocument;
 
 		return {
 			success: true,
@@ -598,11 +633,12 @@ export function writeIntakeTurn(options: {
 				humanMessage: created.human_message,
 				expertResponse: JSON.parse(
 					created.expert_response
-				) as IntakeTurnResponse,
-				planSnapshot: JSON.parse(
-					created.plan_snapshot
-				) as IntakePlanDocument,
+				) as IntakeTurnResponse | IntakeGatheringTurnResponse,
+				planSnapshot: parsedPlan.version === 0 && !parsedPlan.title
+					? null
+					: parsedPlan,
 				tokenCount: created.token_count,
+				isGathering: created.is_gathering === 1,
 				createdAt: created.created_at,
 			},
 		};
@@ -629,6 +665,14 @@ export function updateIntakeConversation(
 		draftPlan?: IntakePlanDocument;
 		accumulations?: IntakeAccumulation[];
 		finalizedPlan?: IntakePlanDocument | null;
+		// V15 Adaptive Deep INTAKE fields
+		intakeMode?: IntakeMode;
+		domainCoverage?: DomainCoverageMap | null;
+		currentDomain?: EngineeringDomain | null;
+		checkpoints?: IntakeCheckpoint[];
+		classifierResult?: IntakeModeRecommendation | null;
+		// V17 Inverted flow
+		clarificationRound?: number;
 	}
 ): Result<IntakeConversationState> {
 	const db = getDatabase();
@@ -667,6 +711,40 @@ export function updateIntakeConversation(
 					: JSON.stringify(updates.finalizedPlan)
 			);
 		}
+		// V15 Adaptive Deep INTAKE fields
+		if (updates.intakeMode !== undefined) {
+			setClauses.push('intake_mode = ?');
+			params.push(updates.intakeMode);
+		}
+		if (updates.domainCoverage !== undefined) {
+			setClauses.push('domain_coverage = ?');
+			params.push(
+				updates.domainCoverage === null
+					? null
+					: JSON.stringify(updates.domainCoverage)
+			);
+		}
+		if (updates.currentDomain !== undefined) {
+			setClauses.push('current_domain = ?');
+			params.push(updates.currentDomain);
+		}
+		if (updates.checkpoints !== undefined) {
+			setClauses.push('checkpoints = ?');
+			params.push(JSON.stringify(updates.checkpoints));
+		}
+		if (updates.classifierResult !== undefined) {
+			setClauses.push('classifier_result = ?');
+			params.push(
+				updates.classifierResult === null
+					? null
+					: JSON.stringify(updates.classifierResult)
+			);
+		}
+		// V17 Inverted flow
+		if (updates.clarificationRound !== undefined) {
+			setClauses.push('clarification_round = ?');
+			params.push(updates.clarificationRound);
+		}
 
 		params.push(dialogueId);
 
@@ -689,6 +767,11 @@ export function updateIntakeConversation(
 			finalized_plan: string | null;
 			created_at: string;
 			updated_at: string;
+			intake_mode: string | null;
+			domain_coverage: string | null;
+			current_domain: string | null;
+			checkpoints: string | null;
+			classifier_result: string | null;
 		};
 
 		if (!row) {
@@ -716,6 +799,18 @@ export function updateIntakeConversation(
 					: null,
 				createdAt: row.created_at,
 				updatedAt: row.updated_at,
+				// V15 Adaptive Deep INTAKE fields
+				intakeMode: row.intake_mode as IntakeMode | null,
+				domainCoverage: row.domain_coverage
+					? (JSON.parse(row.domain_coverage) as DomainCoverageMap)
+					: null,
+				currentDomain: row.current_domain as EngineeringDomain | null,
+				checkpoints: row.checkpoints
+					? (JSON.parse(row.checkpoints) as IntakeCheckpoint[])
+					: [],
+				classifierResult: row.classifier_result
+					? (JSON.parse(row.classifier_result) as IntakeModeRecommendation)
+					: null,
 			},
 		};
 	} catch (error) {
@@ -725,6 +820,54 @@ export function updateIntakeConversation(
 				error instanceof Error
 					? error
 					: new Error('Failed to update intake conversation'),
+		};
+	}
+}
+
+// ==================== Q&A EXCHANGE WRITER ====================
+
+/**
+ * Persist a Q&A exchange to the cli_activity_events table.
+ * Uses event_type 'qa_exchange' with summary = question, detail = answer.
+ * No schema migration needed — event_type has no CHECK constraint.
+ */
+export function writeQaExchange(options: {
+	dialogueId: string;
+	question: string;
+	answer: string;
+	phase?: string;
+}): Result<{ event_id: number }> {
+	const db = getDatabase();
+	if (!db) {
+		return { success: false, error: new Error('Database not initialized') };
+	}
+
+	try {
+		const timestamp = new Date().toISOString();
+		const info = db.prepare(
+			`INSERT INTO cli_activity_events
+			 (dialogue_id, timestamp, role, phase, event_type, summary, detail)
+			 VALUES (?, ?, 'HUMAN', ?, 'qa_exchange', ?, ?)`
+		).run(
+			options.dialogueId,
+			timestamp,
+			options.phase ?? null,
+			options.question,
+			options.answer,
+		);
+
+		// Index for FTS search
+		try {
+			const { indexContent } = require('../database/ftsSync');
+			indexContent('cli_activity_events', String(info.lastInsertRowid), options.dialogueId,
+				`${options.question} ${options.answer}`);
+		} catch { /* FTS is best-effort */ }
+
+		return { success: true, value: { event_id: info.lastInsertRowid as number } };
+	} catch (error) {
+		return {
+			success: false,
+			error: error instanceof Error ? error : new Error('Failed to write Q&A exchange'),
 		};
 	}
 }

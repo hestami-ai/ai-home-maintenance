@@ -32,7 +32,15 @@ export type JanumiCodeEventType =
 	| 'workflow:phase_failed'
 	| 'error:occurred'
 	| 'ui:refresh_required'
-	| 'cli:activity';
+	| 'cli:activity'
+	| 'permission:requested'
+	| 'permission:decided'
+	| 'intake:mode_selected'
+	| 'intake:domain_coverage_updated'
+	| 'intake:checkpoint_triggered'
+	| 'intake:domain_transition'
+	| 'intake:classifier_result'
+	| 'intake:gathering_skipped';
 
 /**
  * Event data payloads
@@ -145,6 +153,43 @@ export interface EventPayloads {
 	'cli:activity': {
 		dialogueId: string;
 		event: import('../cli/types').CLIActivityEvent;
+	};
+	'permission:requested': {
+		dialogueId: string;
+		permissionId: string;
+		tool: string;
+		input: Record<string, unknown>;
+	};
+	'permission:decided': {
+		permissionId: string;
+		approved: boolean;
+		approveAll?: boolean;
+		reason: string;
+	};
+	'intake:mode_selected': {
+		dialogueId: string;
+		mode: import('../types/intake').IntakeMode;
+		source: 'classifier' | 'user';
+	};
+	'intake:domain_coverage_updated': {
+		dialogueId: string;
+		coverage: import('../types/intake').DomainCoverageMap;
+	};
+	'intake:checkpoint_triggered': {
+		dialogueId: string;
+		checkpoint: import('../types/intake').IntakeCheckpoint;
+	};
+	'intake:domain_transition': {
+		dialogueId: string;
+		fromDomain: import('../types/intake').EngineeringDomain | null;
+		toDomain: import('../types/intake').EngineeringDomain | null;
+	};
+	'intake:classifier_result': {
+		dialogueId: string;
+		recommendation: import('../types/intake').IntakeModeRecommendation;
+	};
+	'intake:gathering_skipped': {
+		dialogueId: string;
 	};
 }
 
@@ -557,6 +602,12 @@ export function subscribeToIntakeEvents(
 		'intake:finalize_requested',
 		'intake:plan_finalized',
 		'intake:plan_approved',
+		'intake:mode_selected',
+		'intake:domain_coverage_updated',
+		'intake:checkpoint_triggered',
+		'intake:domain_transition',
+		'intake:classifier_result',
+		'intake:gathering_skipped',
 	];
 
 	const unsubscribeFns = intakeEvents.map((eventType) =>
